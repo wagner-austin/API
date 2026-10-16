@@ -31,8 +31,7 @@ from __future__ import annotations
 import io
 import pathlib
 import subprocess
-import tarfile
-import tempfile
+import zipfile
 
 from platform_core.json_utils import JSONValue, load_json_str
 
@@ -52,24 +51,35 @@ def documents() -> list[tuple[str, dict[str, JSONValue]]]:
     even at depth 1. An older revision would not be, which is a separate trap
     this repo has already paid for once.
 
+    READ FROM THE ZIP IN MEMORY, NOT EXTRACTED. This used to extract a tar
+    with ``extractall(filter="data")``, and that keyword exists only from
+    Python 3.11.4: on serendipity's 3.11.1 every caller failed with
+    ``unexpected keyword argument 'filter'`` (fleet jobs 14027068 and
+    32feb32b, 16 cases each; MCPs board task 0562a8f4 carries the node).
+    Nothing here needs a file on disk, so nothing is extracted, which also
+    leaves no path in the archive for an extraction filter to guard.
+
     Returns:
-        Each document's filename and parsed body, in filename order.
+        Each document's filename and parsed body, in filename order. Only
+        documents directly under ``runs/`` count, as a non-recursive glob
+        of it did.
     """
     archive = subprocess.run(
-        ["git", "archive", "HEAD", "--", RUNS_IN_REPO],
+        ["git", "archive", "--format=zip", "HEAD", "--", RUNS_IN_REPO],
         cwd=REPO,
         capture_output=True,
         check=True,
     ).stdout
+    prefix = f"{RUNS_IN_REPO}/"
     found: list[tuple[str, dict[str, JSONValue]]] = []
-    with tempfile.TemporaryDirectory() as scratch:
-        root = pathlib.Path(scratch)
-        with tarfile.open(fileobj=io.BytesIO(archive)) as tar:
-            tar.extractall(root, filter="data")
-        for path in sorted((root / RUNS_IN_REPO).glob("*.json")):
-            document = load_json_str(path.read_text(encoding="utf-8"))
+    with zipfile.ZipFile(io.BytesIO(archive)) as tree:
+        for member in sorted(tree.namelist()):
+            name = member.removeprefix(prefix)
+            if not member.startswith(prefix) or "/" in name or not name.endswith(".json"):
+                continue
+            document = load_json_str(tree.read(member).decode("utf-8"))
             if isinstance(document, dict):
-                found.append((path.name, document))
+                found.append((name, document))
     return found
 
 
