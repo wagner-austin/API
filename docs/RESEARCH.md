@@ -109,6 +109,18 @@ Rendered from `tools/hpc3/runs/hpc3*.json`. Regenerate with `hpc3-research-index
   minimum-detectable-effect sweep's question, and `cartridge_qa_benchmark` is
   the standing proof that a surface can be registered and still be running an
   instrument too weak for what it reports.
+- **Image freshness:** the registered image, v23 (`55651342e15d`), was built
+  from `fab1d991`, read from `/opt/env/GIT_COMMIT` inside it on 2026-10-16,
+  and that commit carries none of the `cartridge_*` entry points above. A run
+  of one pins a newer image in its own document: `cartridge-qa` registers v56
+  (`890e444560d4`, built from `0e9f177f`, a commit carrying
+  `cartridge_benchmark`, `cartridge_composition_sweep` and
+  `cartridge_qa_benchmark`). Until 2026-10-16 that was convention; preflight
+  now asks the image whether it can start the command's `python -m` module
+  and refuses one it cannot with `ENTRYPOINT_NOT_INSTALLED` (board task
+  `2c8161a3`, [image freshness](../tools/hpc3/wiki/pages/image-freshness.md)),
+  measured against v23 itself: `cartridge_composition_sweep` refused,
+  `known_answer_probe` admitted.
 - **Produces:** one `RunRecord` JSON per run under `/pub/wagnera3/{bench,gemm,
   sdpa,ladder,trace,...}`
 - **Provenance:** `RunRecord` + `RunFingerprint` — image digest, GPU model,
