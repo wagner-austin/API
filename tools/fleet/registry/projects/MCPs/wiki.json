@@ -20,13 +20,11 @@
         ]
       },
       {
-        "phase": "workspace-build",
+        "phase": "wiki-search-build",
         "argv": [
-          "make",
-          "-s",
-          "-C",
-          "scripts/fleet-prepare",
-          "workspace-build"
+          "node",
+          "scripts/ci-build-consumed-workspaces.mjs",
+          "packages/wiki-search"
         ]
       }
     ],
