@@ -5,8 +5,8 @@ import logging
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final
 
+import pytest
 import torch
 from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.logging import JsonFormatter, get_logger
@@ -19,11 +19,6 @@ from handwriting_ai.config import (
 )
 from handwriting_ai.inference.engine import InferenceEngine, build_fresh_state_dict
 from handwriting_ai.preprocess import preprocess_signature
-
-#: How long the hot-reload test waits for its predictions before calling them
-#: hung: a guard against a deadlock, sized far past a loaded runner's slowest
-#: inference, never a speed budget.
-HANG_GUARD_SECONDS: Final = 120
 
 
 def _make_engine_with_root(root: Path, active: str) -> InferenceEngine:
@@ -189,6 +184,7 @@ def test_invalid_state_dict_variants_logged_and_raise() -> None:
             assert "state_dict_invalid" in buf.getvalue()
 
 
+@pytest.mark.timeout(120)
 def test_hot_reload_concurrent_access() -> None:
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
@@ -231,11 +227,12 @@ def test_hot_reload_concurrent_access() -> None:
         man2["model_id"] = active + "_new"
         (active_dir / "manifest.json").write_text(dump_json_str(man2), encoding="utf-8")
         eng.try_load_active()
-        # Every prediction completes and the reload wins. The wait is a hang
-        # guard, not a speed budget: a 2 s budget per prediction failed on a
-        # loaded CI runner at API b6b662e41 (MCPs board task 543968a7) while
-        # the engine was correct.
-        done, pending = concurrent.futures.wait(futs, timeout=HANG_GUARD_SECONDS)
+        # Every prediction completes and the reload wins. The wait has no
+        # budget of its own: a 2 s budget per prediction failed on a loaded
+        # CI runner at API b6b662e41 (MCPs board task 543968a7) while the
+        # engine was correct, and pytest-timeout's marker on this case is
+        # the guard against a hang.
+        done, pending = concurrent.futures.wait(futs)
         assert (len(done), len(pending)) == (len(xs), 0)
         assert [sorted(f.result()) for f in done] == [
             sorted(PredictOutput.__required_keys__)
