@@ -23,7 +23,7 @@ Three files, one directory:
 runs/
   hpc3.json          the workspace: where the cluster is, what each project needs
   arm-b.json         one run: what is different about this job
-  ledger.jsonl       written for you; every job ever submitted from this machine
+  ledger.jsonl       written for you; every job submitted from this machine, by any worktree
 ```
 
 ```bash
@@ -82,7 +82,7 @@ are written down.
 | `cluster` | which measured machine's limits every rule is checked against ([facts are code](wiki/pages/facts-are-code.md)) |
 | `host` | SSH destination — an alias from your `~/.ssh/config`, not a hostname |
 | `root` | absolute cluster directory; scripts and logs are **derived** from it |
-| `ledger` | local record of every submission; relative paths resolve against this file's directory |
+| `ledger` | local record of every submission; a relative path resolves against this file's directory **as it sits in the repository's main checkout**, so every `git worktree` reads and appends the one ledger ([one ledger per repository](wiki/pages/one-ledger-per-repository.md)) |
 | `quiet_seconds` | how long a running job may write nothing before triage calls it silent (default 1800) |
 | `projects` | resource defaults, caps and charge account per body of work |
 | `projects.<name>.budget` | that project's self-imposed caps, checked before submission and again while running ([budget model](wiki/pages/budget-model.md)) |
@@ -298,7 +298,7 @@ dependencies, CPU-only, and job arrays (a sweep IS one `--array` call now,
 | `hpc3-preflight --config C {--run R \| --sweep S}` | asks the scheduler whether it would start. Nothing is queued. |
 | `hpc3-submit --config C --run R` | preflight → submit → record in the ledger |
 | `hpc3-sweep --config C --run S` | the same, per member, recording each as it goes |
-| `hpc3-campaign --config C --run S` | the same sweep document, run repeatedly: submits only the members that are neither finished nor already running |
+| `hpc3-campaign --config C --run S` | the same sweep document, run repeatedly: submits only the members that are neither finished nor already running, and refuses with `LIVE_JOB_UNRECORDED` while a live job carries its name that the ledger has no row for |
 | `hpc3-watch --config C --job ID[,ID…]` | state, elapsed, real cost, GPU-hours, state tally; one `sacct` call so a sweep's rows share one moment |
 | `hpc3-watch … --until-done 1 [--poll-seconds N]` | re-reads accounting until EVERY requested job is terminal, emitting only state transitions, then the ordinary summary. Waits for ids accounting has not learned yet (a member absent from `sacct` is in flight, not done) and rules the ids wrong after five straight empty reads rather than spinning on a typo |
 | `hpc3-triage --config C` | the [five conditions that look like health](wiki/pages/triage-conditions.md); exit 1 if any |
