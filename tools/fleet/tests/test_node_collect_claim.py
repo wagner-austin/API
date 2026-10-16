@@ -21,8 +21,10 @@ from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import _config, node_agent, node_collect
 from fleet.contracts.dispatch import decode_job, encode_job_line
+from fleet.contracts.host_claim import HostClaim
 from fleet.contracts.ledger import LedgerEntry
-from fleet.core import _test_hooks, claim_window, leases, records, staging
+from fleet.contracts.node import LiveLoad
+from fleet.core import _test_hooks, claim_window, host_claims, leases, records, staging
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -233,6 +235,45 @@ class TestTheNextTick:
             "never reached the queue, and nothing was launched; refused so the submitter can "
             "resubmit it"
         )
+
+    def test_a_refused_claim_stops_charging_its_host_in_the_tick_that_refuses_it(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task 3f7d40fe. A tick killed mid-launch leaves the
+        claim file its launch would have removed, as the hub runner's restart
+        at 2026-10-16T07:10:08Z left six; until the refusal removed it, the
+        host was charged for it until its lease lapsed an hour later."""
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        host_claims.record(
+            loaded.host_claims,
+            alias="lavender",
+            claim=HostClaim(
+                job_id=DEFAULT_JOB_ID,
+                runner="fleet-node-lavender",
+                project="libs/demo",
+                workers=2,
+                ram_gb=2.0,
+                until_unix=DEMO_NOW + claim_window.CLAIM_LEASE_SECONDS,
+            ),
+        )
+        _test_hooks.run = FakeRun(list(PROBED))
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": [ORPHANED]}),
+                dump_json_str({"job": queue_job(status="refused")}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.arguments[1]["status"] == "refused"
+        claims = host_claims.claims_directory(loaded.host_claims, alias="lavender")
+        assert list(claims.iterdir()) == []
+        assert host_claims.host_load(
+            host_claims.live_claims(loaded.host_claims, alias="lavender")
+        ) == LiveLoad(runs=0, workers=0, ram_gb=0.0)
 
     def test_refuses_rather_than_guesses_between_two_runs_either_claim_could_have_launched(
         self, sourced_config: pathlib.Path

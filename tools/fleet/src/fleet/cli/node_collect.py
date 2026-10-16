@@ -37,7 +37,11 @@ runner holds and settles every run it launched in one of four ways:
   claim in a tick, so a claimed job it sees was left by an earlier tick: it
   ADOPTS the run that claim launched, found by :func:`launched_by_claim`,
   by reporting its start, or REFUSES the claim when nothing was launched.
-  A cancel of such a job reaches its run the same way.
+  A refusal also removes the claim's host claim (MCPs board task 3f7d40fe):
+  the launch that removes it ended with its killed tick, and measured
+  2026-10-16, six claims the hub runner's restart left at 07:10:08Z held
+  colossus and serendipity, the one elevated node, for the hour until their
+  leases lapsed. A cancel of such a job reaches its run the same way.
 
 A stop ends the build's whole process tree
 (:meth:`fleet.core.dialect.Dialect.stop_script`) and then closes the row
@@ -64,7 +68,7 @@ from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus,
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, collect, queue, retire_owed, stop
+from fleet.core import _test_hooks, collect, host_claims, queue, retire_owed, stop
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
 
 _log = get_logger(__name__)
@@ -314,6 +318,10 @@ def reconcile_claim(
             detail=detail,
             identity=identity,
         )
+        # The launch that would have removed its host claim never ended: its
+        # tick was killed (MCPs board task 3f7d40fe), so the claim is removed
+        # here, or it charges the host until its lease lapses an hour later.
+        host_claims.discharge(loaded.host_claims, alias=alias, job_id=job["job_id"])
         return Reconciled(line=f"{encode_job_line(job)}: refused, {detail}", adopted=None)
     queue.report_start(
         credentials,

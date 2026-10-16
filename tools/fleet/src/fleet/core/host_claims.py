@@ -17,9 +17,11 @@ a launched run is on the ledger. Every runner of the host charges every
 claim written there, whichever runner wrote it. One file per claim, so
 ending a launch is one removal that needs no turn: the launch ends on a
 thread of the pool while its runner may be holding the turn for its next
-claim. A claim stops counting at its ``until_unix``, the queue job's own
-claim lease, so a runner that died mid-launch frees its host when the
-queue frees its job, and the turn that finds such a claim removes it.
+claim. A runner killed mid-launch never removes its claim, so the next
+tick's collect pass, which refuses the job it finds claimed with nothing
+launched, removes it then (MCPs board task 3f7d40fe). A claim also stops
+counting at its ``until_unix``, the queue job's own claim lease, and the
+turn that finds one past it removes it.
 
 THE CLAIM IS TAKEN IN TURN. Reading the host's load and claiming against it
 are two steps, and two runners between them would both read the same free
