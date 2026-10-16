@@ -23,6 +23,7 @@ from collections.abc import Sequence
 
 from hpc3.clusters import require_cluster
 from hpc3.contracts.workspace import decode_workspace_connection
+from hpc3.core.checkout import shared_directory
 from platform_core import cli_args
 from platform_core.json_utils import load_json_str
 
@@ -50,9 +51,14 @@ def main(argv: Sequence[str]) -> int:
         ValueError: A missing ``--config`` flag.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
-    config_path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG))
+    # Resolved, as hpc3's _read_document does: the pump passes a relative
+    # path, and shared_directory walks the absolute one's parents.
+    config_path = pathlib.Path(cli_args.require_flag(parsed, CONFIG_FLAG)).resolve()
     value = load_json_str(config_path.read_text(encoding="utf-8"))
-    connection = decode_workspace_connection(value, config_dir=config_path.parent)
+    # The ledger every worktree of the checkout records into, resolved as
+    # hpc3's own commands resolve it (hpc3.cli._config), so the bridge reads
+    # the rows hpc3-submit wrote from any worktree (MCPs board task e0cad7c5).
+    connection = decode_workspace_connection(value, ledger_dir=shared_directory(config_path.parent))
     run_cycle(connection, require_cluster(connection["cluster"]))
     return 0
 

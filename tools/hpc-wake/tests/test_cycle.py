@@ -54,7 +54,7 @@ def _connection(tmp_path: pathlib.Path) -> WorkspaceConnection:
         "ledger": "ledger.jsonl",
         "quiet_seconds": 1800,
     }
-    return decode_workspace_connection(document, config_dir=tmp_path)
+    return decode_workspace_connection(document, ledger_dir=tmp_path)
 
 
 def _entry(job_id: str, *, submitter: str | None = "label-a-0906") -> LedgerEntry:
