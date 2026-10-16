@@ -102,6 +102,8 @@ class _History:
                 "services/trainer/src/model_trainer/cli/__init__.py": b"",
                 "services/trainer/src/model_trainer/cli/probe.py": b"STEPS = 1\n",
                 "libs/steady/__init__.py": b"",
+                "libs/core/__init__.py": b"",
+                "libs/core/model_trainer.py": b"CONFIG = 1\n",
                 "tools/single.py": b"X = 1\n",
                 "README.md": b"one\n",
             },
@@ -111,6 +113,7 @@ class _History:
             self.repo,
             {
                 "services/trainer/src/model_trainer/cli/probe.py": b"STEPS = 2\n",
+                "libs/core/model_trainer.py": b"CONFIG = 2\n",
                 "README.md": b"two\n",
             },
             "after the image",
@@ -152,7 +155,10 @@ def _compared(module: str, compared: list[str], changed: list[str]) -> ModuleDri
 
 class TestMeasuringAgainstRealHistory:
     def test_a_module_whose_source_moved_names_what_changed(self, tmp_path: pathlib.Path) -> None:
-        """Only its own package: the README edit in the same commit is not its code."""
+        """Only its own package: the README edit in the same commit is not its
+        code, and neither is libs/core/model_trainer.py, a submodule of
+        another package that shares the name -- the first real run counted
+        platform_core's config/model_trainer.py as the trainer's."""
         history = _History(tmp_path / "repo")
         reading = EntrypointReading(
             image_commit=history.image_commit, modules=[_in_image("model_trainer.cli.probe")]
@@ -261,18 +267,27 @@ class TestGitFailingOnceTheCommitIsKnown:
 
 
 class TestWhereAPackageLives:
-    def test_every_tracked_copy_and_a_single_file_are_found_once(self) -> None:
+    def test_every_copy_at_a_source_root_is_found_once(self) -> None:
         tracked = [
-            "a/pkg/__init__.py",
-            "a/pkg/sub/__init__.py",
-            "b/pkg/__init__.py",
-            "c/pkg.py",
+            "src/pkg/__init__.py",
+            "src/pkg/sub/__init__.py",
+            "other/src/pkg/__init__.py",
+            "tools/pkg.py",
             "pkg/__init__.py",
             "notpkg/__init__.py",
-            "__init__.py",
             "",
         ]
-        assert source_paths(tracked, "pkg") == ["a/pkg", "b/pkg", "c/pkg.py", "pkg"]
+        assert source_paths(tracked, "pkg") == ["other/src/pkg", "pkg", "src/pkg", "tools/pkg.py"]
+
+    def test_a_same_named_submodule_of_another_package_is_not_it(self) -> None:
+        """``host.pkg`` is imported as ``host.pkg``, never as ``pkg``."""
+        tracked = [
+            "lib/host/__init__.py",
+            "lib/host/pkg.py",
+            "lib/host/nested/__init__.py",
+            "lib/host/nested/pkg/__init__.py",
+        ]
+        assert source_paths(tracked, "pkg") == []
 
 
 _DRIFT = ImageDrift(
