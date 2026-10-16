@@ -108,7 +108,7 @@ Measured through the real cluster on 2026-10-16:[^measured]
 The first run of this comparison also counted
 `libs/platform_core/src/platform_core/config/model_trainer.py` as part of
 `model_trainer`, 195 files rather than 194, which is why the source must sit
-at a root.
+at a root.[^firstrun]
 
 Every submission records the result in its ledger row's `image_drift`, per
 array member for the modules that member starts, `hpc3-submit`, `hpc3-sweep`,
@@ -124,4 +124,5 @@ which `hpc3-trace` renders as "code unrecorded", never as unchanged.[^ledger]
 [^refusal]: `src/hpc3/core/entrypoint.py` § `parse_probe` and `check_entrypoints`; `tests/test_entrypoint.py` § `TestReadingTheAnswer` and `TestBothSubmissionPathsAskBeforeTheScheduler`; `README.md`, the paragraph after the `repo_commit` one.
 [^drift]: `src/hpc3/core/drift.py` § module docstring, `source_paths` and `measure_drift`; `src/hpc3/contracts/drift.py` § `ModuleDrift` and `ImageDrift`; `tests/test_drift.py` § `TestMeasuringAgainstRealHistory`, against a real two-commit repository, and `TestWhereAPackageLives`.
 [^measured]: The three `hpc3-preflight` runs, finished at 2026-10-16T17:55:18Z (v23), 17:56:05Z (v56) and 17:58:09Z (cleargbm), from ziggurat (see `provenance`).
+[^firstrun]: The `hpc3-preflight` run finished at 2026-10-16T17:53:58Z, before the rule (see `provenance`); `src/hpc3/core/drift.py` § `source_paths`, "ONLY AT A SOURCE ROOT"; `tests/test_drift.py` § `TestWhereAPackageLives` and the real repository's `libs/core/model_trainer.py`.
 [^ledger]: `src/hpc3/contracts/ledger.py` § `LedgerEntry`'s `image_drift` attribute and `_require_drift_or_null`; `src/hpc3/core/array_submit.py` § `submit_array`, which narrows the drift per member; `src/hpc3/cli/trace.py` § `main`; the hub ledger's backfill (see `provenance`).
