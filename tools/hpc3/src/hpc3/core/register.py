@@ -202,7 +202,7 @@ def write_registration(
         ValueError: If the re-read finds the project declared twice, or the
             index carries no generated block to replace.
     """
-    _ = decode_workspace(payload, config_dir=runs)
+    _ = decode_workspace(payload, config_dir=runs, ledger_dir=runs)
     _test_hooks.write_text(
         runs / workspace_filename(project), dump_json_str(payload, indent=2) + "\n"
     )

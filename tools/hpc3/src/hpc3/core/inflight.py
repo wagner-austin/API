@@ -109,4 +109,65 @@ def check_artifact_is_free(artifact: str | None, claimed: dict[str, str], *, nam
     )
 
 
-__all__ = ["check_artifact_is_free", "claimed_artifacts"]
+def check_no_unrecorded_live_job(
+    entries: Sequence[LedgerEntry],
+    account: Sequence[AccountJob],
+    *,
+    names: frozenset[str],
+    ledger_path: str,
+) -> None:
+    """Refuse to submit beside a live job this ledger cannot account for.
+
+    :func:`claimed_artifacts` reaches a live job's artifact only through the
+    job's ledger row, because ``squeue`` has never heard of an artifact. A
+    live job with no row is therefore invisible to it, and on 2026-10-05 that
+    is how a duplicate array was submitted (board task 747c391e): the twelve
+    live members had been recorded in another worktree's ledger, this one
+    read ``0 in flight``, and array 57783755 went up beside them. What
+    ``squeue`` does say is the job's NAME, and this package names every job
+    it submits: a single job by its qualified name, an array by its sweep's.
+
+    Refused for the whole submission, not per member. An unrecorded job's
+    artifact cannot be read from here at all; an array's task index says
+    which member it ran only under the member table of the document that
+    submitted it, which may not be this one. The only reading that cannot
+    race a live job is that any member may be the one it is writing. A
+    pending array aggregate counts by each task it stands for, so one
+    recorded task does not vouch for the rest.
+
+    Args:
+        entries: The whole ledger.
+        account: Every job the cluster currently holds for this account.
+        names: The Slurm job names the caller is about to submit under.
+        ledger_path: The ledger that was read, named in the message so the
+            reader knows which record is missing the rows.
+
+    Raises:
+        AppError: With ``LIVE_JOB_UNRECORDED`` when a live job carries one of
+            ``names`` and the ledger has no row for it. Every such job is
+            named with its state, because the remedy depends on where it
+            came from: run the command from the checkout or machine that
+            submitted it, copy its rows into this ledger, or cancel it.
+    """
+    recorded = {entry["job_id"] for entry in entries}
+    unrecorded = [
+        job
+        for job in account
+        if job["name"] in names
+        and any(task_id not in recorded for task_id in expand_job_id(job["job_id"]))
+    ]
+    if unrecorded == []:
+        return
+    listed = ", ".join(f"{job['job_id']} {job['name']} ({job['state']})" for job in unrecorded)
+    raise AppError(
+        Hpc3ErrorCode.LIVE_JOB_UNRECORDED,
+        f"The cluster holds {listed} under the name this submission would use, and "
+        f"the ledger at {ledger_path} has no row for it, so what it is writing cannot "
+        "be read from here and submitting could race it on its artifact. It was "
+        "submitted from another ledger: another machine, or a checkout recorded "
+        "before every worktree shared one. Run this from where it was submitted, "
+        "copy its rows into this ledger, or cancel it, then submit again.",
+    )
+
+
+__all__ = ["check_artifact_is_free", "check_no_unrecorded_live_job", "claimed_artifacts"]

@@ -26,7 +26,11 @@ from hpc3.contracts.cluster import ClusterFacts
 from hpc3.contracts.job import JobSpec
 from hpc3.contracts.ledger import LedgerEntry
 from hpc3.core import audit, ledger, preflight, remote
-from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts
+from hpc3.core.inflight import (
+    check_artifact_is_free,
+    check_no_unrecorded_live_job,
+    claimed_artifacts,
+)
 from hpc3.core.squeue import account_command, parse_account_output
 
 _SUBMIT_PREFIX = "Submitted batch job "
@@ -107,7 +111,10 @@ def submit(
         The submitted job's id.
 
     Raises:
-        AppError: With ``ENV_PATH_MISSING`` if the environment is absent,
+        AppError: With ``LIVE_JOB_UNRECORDED`` if a live job carries this
+            job's name and the ledger has no row for it,
+            ``ARTIFACT_ALREADY_IN_FLIGHT`` if a recorded live job is writing
+            its artifact, ``ENV_PATH_MISSING`` if the environment is absent,
             ``PREFLIGHT_REJECTED`` if the scheduler would refuse the job,
             ``PREFLIGHT_UNPARSABLE`` if its verdict cannot be read, or
             ``REMOTE_COMMAND_FAILED`` if a command failed or ``sbatch``
@@ -118,14 +125,13 @@ def submit(
     # malformed". Two jobs writing one artifact both SUCCEED, so this is the
     # rare check whose absence produces no failure to notice -- see
     # `hpc3.core.inflight`, and the uz_best.pt race it was written for.
-    check_artifact_is_free(
-        spec["artifact"],
-        claimed_artifacts(
-            ledger.read(ledger_path, cluster),
-            parse_account_output(remote.run_remote(host, account_command())),
-        ),
-        name=qualified_name(spec["project"], spec["name"]),
+    entries = ledger.read(ledger_path, cluster)
+    account = parse_account_output(remote.run_remote(host, account_command()))
+    label = qualified_name(spec["project"], spec["name"])
+    check_no_unrecorded_live_job(
+        entries, account, names=frozenset([label]), ledger_path=str(ledger_path)
     )
+    check_artifact_is_free(spec["artifact"], claimed_artifacts(entries, account), name=label)
 
     # Preflight is not a separate step a caller may skip. It uploads the
     # script and asks the scheduler whether it would be admitted; submission
@@ -141,7 +147,6 @@ def submit(
         charge_account=charge_account,
     )
 
-    label = qualified_name(spec["project"], spec["name"])
     output = remote.run_remote(host, f"cd {script_dir} && sbatch {label}.sbatch")
     job_id = parse_job_id(output)
 

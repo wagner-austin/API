@@ -37,7 +37,11 @@ from hpc3.contracts.preflight import PreflightResult
 from hpc3.contracts.sweep import SweepSpec, expand_sweep
 from hpc3.core import audit, code_claim, env_probe, ledger, remote
 from hpc3.core.array_sbatch import render_array_sbatch
-from hpc3.core.inflight import check_artifact_is_free, claimed_artifacts
+from hpc3.core.inflight import (
+    check_artifact_is_free,
+    check_no_unrecorded_live_job,
+    claimed_artifacts,
+)
 from hpc3.core.preflight import check_env_path, dependency_hint, parse_test_only
 from hpc3.core.squeue import account_command, parse_account_output
 from hpc3.core.submit import parse_job_id
@@ -209,21 +213,32 @@ def submit_array(
 
     Raises:
         AppError: With ``ARRAY_INDICES_EMPTY`` / ``ARRAY_ID_UNPARSABLE`` on
-            bad indices, ``ARTIFACT_ALREADY_IN_FLIGHT`` when a live job is
-            already writing a selected member's artifact, the preflight
+            bad indices, ``LIVE_JOB_UNRECORDED`` when a live job carries the
+            array's name or a selected member's and the ledger has no row
+            for it, ``ARTIFACT_ALREADY_IN_FLIGHT`` when a recorded live job
+            is already writing a selected member's artifact, the preflight
             codes from :func:`array_preflight`, or ``REMOTE_COMMAND_FAILED``
             when a command failed or ``sbatch`` announced no usable id.
     """
     expression = format_array_argument(indices, spec["throttle"])
     rows = selected_members(spec, indices)
 
-    # One account enumeration for every member, then the same per-artifact
-    # refusal the single-job path applies. Before any upload: a submission
-    # that would race a live job should cost nothing but this query.
-    claimed = claimed_artifacts(
-        ledger.read(ledger_path, cluster),
-        parse_account_output(remote.run_remote(host, account_command())),
+    # One account enumeration for every member, then the same two refusals
+    # the single-job path applies: a live job this ledger has no row for
+    # under the array's name or a selected member's, then each artifact a
+    # recorded live job is writing. Before any upload: a submission that
+    # would race a live job should cost nothing but this query.
+    entries = ledger.read(ledger_path, cluster)
+    account = parse_account_output(remote.run_remote(host, account_command()))
+    base = spec["base"]
+    label = qualified_name(base["project"], base["name"])
+    check_no_unrecorded_live_job(
+        entries,
+        account,
+        names=frozenset([label, *(name for _, name in rows)]),
+        ledger_path=str(ledger_path),
     )
+    claimed = claimed_artifacts(entries, account)
     members = expand_sweep(spec)
     for index, name in rows:
         check_artifact_is_free(members[index]["artifact"], claimed, name=name)
@@ -238,8 +253,6 @@ def submit_array(
         charge_account=charge_account,
     )
 
-    base = spec["base"]
-    label = qualified_name(base["project"], base["name"])
     output = remote.run_remote(
         host, f"cd {script_dir} && sbatch --array={expression} {label}.sbatch"
     )

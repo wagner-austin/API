@@ -76,8 +76,12 @@ class WorkspaceConnection(TypedDict):
         root: Absolute cluster directory under which every project's scripts
             and logs are derived.
         ledger: Local path to the append-only submission record, already
-            resolved against the config file's own directory -- so a workspace
-            can be checked in and used from anywhere without absolute paths.
+            resolved against the directory the caller named for it -- so a
+            workspace can be checked in and used from anywhere without
+            absolute paths. The commands name the document's own directory
+            as it sits in the repository's MAIN checkout
+            (:func:`hpc3.core.checkout.shared_directory`), so every
+            worktree records into, and reads, one ledger.
         quiet_seconds: Staleness threshold triage applies to running jobs.
     """
 
@@ -168,7 +172,7 @@ def _require_workspace_object(value: JSONValue) -> dict[str, JSONValue]:
 
 
 def decode_workspace_connection(
-    value: JSONValue, *, config_dir: pathlib.Path
+    value: JSONValue, *, ledger_dir: pathlib.Path
 ) -> WorkspaceConnection:
     """Decode where the cluster is, WITHOUT decoding the project registry.
 
@@ -180,8 +184,9 @@ def decode_workspace_connection(
 
     Args:
         value: Value produced by the JSON loader.
-        config_dir: Directory the document was read from. Relative ledger
-            paths resolve against it.
+        ledger_dir: Directory a relative ledger path resolves against. A
+            caller that only compares documents passes an empty path and
+            reads the ledger back as written.
 
     Returns:
         The validated connection.
@@ -214,19 +219,26 @@ def decode_workspace_connection(
         cluster=cluster["slug"],
         host=require_nonempty_str(obj, "host"),
         root=require_root(require_nonempty_str(obj, "root")),
-        ledger=str(config_dir / require_nonempty_str(obj, "ledger")),
+        ledger=str(ledger_dir / require_nonempty_str(obj, "ledger")),
         quiet_seconds=quiet_seconds,
     )
 
 
-def decode_workspace(value: JSONValue, *, config_dir: pathlib.Path) -> Workspace:
+def decode_workspace(
+    value: JSONValue, *, config_dir: pathlib.Path, ledger_dir: pathlib.Path
+) -> Workspace:
     """Decode and validate a workspace document, registry included.
 
     Args:
         value: Value produced by the JSON loader.
-        config_dir: Directory the document was read from. Relative ledger
-            paths resolve against it, so a workspace committed alongside its
-            runs works from any working directory and on any machine.
+        config_dir: Directory the document was read from. Each project's
+            relative ``repo`` resolves against it, so a run names the code in
+            the checkout it was started from.
+        ledger_dir: Directory a relative ledger path resolves against.
+            Separate from ``config_dir`` because the two answer different
+            questions: the code a run names is this checkout's, while the
+            record of what is on the cluster must be one file for every
+            checkout of the repository.
 
     Returns:
         Validated workspace.
@@ -241,7 +253,7 @@ def decode_workspace(value: JSONValue, *, config_dir: pathlib.Path) -> Workspace
             if a project names hardware that cluster does not have, or
             ``PROJECT_UNIMAGED`` if a project declares no image.
     """
-    connection = decode_workspace_connection(value, config_dir=config_dir)
+    connection = decode_workspace_connection(value, ledger_dir=ledger_dir)
     return Workspace(
         cluster=connection["cluster"],
         host=connection["host"],

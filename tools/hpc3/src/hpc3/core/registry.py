@@ -109,7 +109,7 @@ def declared_projects(runs: pathlib.Path) -> dict[str, ProjectConfig]:
     """
     projects: dict[str, ProjectConfig] = {}
     for name, document in workspace_documents(runs).items():
-        workspace = decode_workspace(document, config_dir=runs)
+        workspace = decode_workspace(document, config_dir=runs, ledger_dir=runs)
         for project, config in workspace["projects"].items():
             if project in projects:
                 raise ValueError(f"project {project!r} is declared twice, one place is {name}")
@@ -141,7 +141,7 @@ def shared_connection(runs: pathlib.Path) -> WorkspaceConnection:
             which machine a new project runs on.
     """
     connections = {
-        name: decode_workspace_connection(document, config_dir=pathlib.Path())
+        name: decode_workspace_connection(document, ledger_dir=pathlib.Path())
         for name, document in workspace_documents(runs).items()
     }
     distinct = {

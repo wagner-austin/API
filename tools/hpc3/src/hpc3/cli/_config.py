@@ -6,7 +6,10 @@ the same file through the same function.
 
 The document is located relative to the process, and the paths inside it
 relative to the document. That is what lets a workspace live next to the runs
-it describes and be used from any working directory.
+it describes and be used from any working directory. The one exception is the
+ledger, which resolves against the document's directory as it sits in the
+repository's main checkout, so every worktree reads and appends the same
+record (:mod:`hpc3.core.checkout`, board task 747c391e).
 """
 
 from __future__ import annotations
@@ -26,6 +29,7 @@ from hpc3.contracts.workspace import (
     decode_workspace_connection,
 )
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core.checkout import shared_directory
 
 CONFIG_FLAG = "--config"
 """The one flag every command shares."""
@@ -68,10 +72,11 @@ def load_workspace_connection(parsed: dict[str, str]) -> WorkspaceConnection:
             root that is not an absolute POSIX path.
         JSONTypeError: If the document's connection fields are invalid.
         AppError: With ``CLUSTER_UNKNOWN`` if the named cluster has not been
-            measured.
+            measured, or ``LEDGER_CHECKOUT_UNREADABLE`` if the worktree's
+            ``.git`` pointer cannot be followed to a main checkout.
     """
     value, config_dir = _read_document(parsed)
-    return decode_workspace_connection(value, config_dir=config_dir)
+    return decode_workspace_connection(value, ledger_dir=shared_directory(config_dir))
 
 
 def load_workspace(parsed: dict[str, str]) -> Workspace:
@@ -82,16 +87,20 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
 
     Returns:
         The validated workspace, with its ledger path resolved against the
-        document's own directory.
+        document's directory as it sits in the repository's main checkout,
+        so every worktree reads and appends one ledger, and each project's
+        ``repo`` against the document's own directory.
 
     Raises:
         ValueError: If ``--config`` was not given, or the document declares a
             root that is not an absolute POSIX path.
         JSONTypeError: If the document is not a valid workspace.
-        AppError: If a project declares a GPU this cluster does not carry.
+        AppError: If a project declares a GPU this cluster does not carry, or
+            with ``LEDGER_CHECKOUT_UNREADABLE`` if the worktree's ``.git``
+            pointer cannot be followed to a main checkout.
     """
     value, config_dir = _read_document(parsed)
-    return decode_workspace(value, config_dir=config_dir)
+    return decode_workspace(value, config_dir=config_dir, ledger_dir=shared_directory(config_dir))
 
 
 def _stack_file_text(path: pathlib.Path) -> str:
