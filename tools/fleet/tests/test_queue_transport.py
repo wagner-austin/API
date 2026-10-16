@@ -12,12 +12,20 @@ from __future__ import annotations
 
 import http.client
 import socket
+import threading
+import time
 import urllib.error
+from typing import Final
 
 import pytest
 from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.mcp_client import McpCredentials, McpHttpResponse, McpPostProtocol
+from platform_core.mcp_client import (
+    McpCredentials,
+    McpHttpResponse,
+    McpPostProtocol,
+    call_mcp_tool,
+)
 
 from fleet.core import _test_hooks, queue
 from fleet.core.queue_transport import answering, unanswered
@@ -28,6 +36,33 @@ URL = "http://127.0.0.1:8035/mcp"
 
 #: What the endpoint refused every serving runner with on 2026-10-05.
 REFUSED = "No connection could be made because the target machine actively refused it"
+
+#: The head mcp-fleet answered an unserved tool with, byte for byte as read
+#: on 2026-10-16T01:27Z, less its Date line.
+KEEPALIVE_HEAD: Final = (
+    b"HTTP/1.1 200 OK\r\nX-Powered-By: Express\r\ncache-control: no-cache, no-transform\r\n"
+    b"connection: keep-alive\r\ncontent-type: text/event-stream\r\nx-accel-buffering: no\r\n"
+    b"Transfer-Encoding: chunked\r\n\r\n"
+)
+
+#: The chunk it then sent every 15 s: an event-stream comment, never a result.
+KEEPALIVE_CHUNK: Final = b"d\r\n: keepalive\n\n\r\n"
+
+#: The peer's keepalive interval, far inside any per-read timeout.
+KEEPALIVE_INTERVAL_SECONDS: Final = 0.25
+
+#: Enough keepalives to outlast the deadline several times over.
+KEEPALIVE_SENDS: Final = 24
+
+#: The call's whole-exchange deadline in the keepalive case.
+DEADLINE_SECONDS: Final = 1
+
+#: Slack for thread scheduling between the deadline and the raise.
+SLACK_SECONDS: Final = 1.0
+
+#: What a peer's send meets once the client shut the connection: Windows
+#: reports an abort or a reset, Linux a broken pipe or a reset.
+HUNG_UP: Final = frozenset({"ConnectionAbortedError", "ConnectionResetError", "BrokenPipeError"})
 
 
 def _post(answer: McpHttpResponse | OSError) -> McpPostProtocol:
@@ -131,3 +166,56 @@ class TestTheProductionSeam:
             raised.value.message == f"{closed} did not answer: URLError: {raised.value.__cause__}"
         )
         assert str(raised.value.__cause__).startswith("<urlopen error [")
+
+    def test_a_queue_call_answered_by_keepalives_alone_ends_at_its_deadline(self) -> None:
+        """The real transport against a real loopback peer sending what
+        mcp-fleet sent the hub tick that held the hub lane 290 s on
+        2026-10-16 (MCPs board task e14815d3): a 200 event stream for a tool
+        it no longer served, then a keepalive comment and never a result.
+        A byte arrives well inside every per-read timeout, so only the
+        whole-exchange deadline can end the call."""
+        listener = socket.create_server(("127.0.0.1", 0))
+        port: int = listener.getsockname()[1]
+        url = f"http://127.0.0.1:{port}/mcp"
+        hung_up: list[OSError] = []
+
+        def keep_alive() -> None:
+            conn, _ = listener.accept()
+            with conn:
+                conn.recv(65536)
+                try:
+                    conn.sendall(KEEPALIVE_HEAD)
+                    for _ in range(KEEPALIVE_SENDS):
+                        conn.sendall(KEEPALIVE_CHUNK)
+                        time.sleep(KEEPALIVE_INTERVAL_SECONDS)
+                except OSError as gone:
+                    # The send the client's hang-up refused is the evidence.
+                    hung_up.append(gone)
+
+        peer = threading.Thread(target=keep_alive, daemon=True)
+        peer.start()
+        assert _test_hooks.http_post is _test_hooks._default_http_post
+        credentials = McpCredentials(
+            url=url,
+            api_key=QUEUE_CREDENTIALS["api_key"],
+            tenant_id=QUEUE_CREDENTIALS["tenant_id"],
+        )
+        started = time.monotonic()
+
+        with pytest.raises(AppError) as raised:
+            call_mcp_tool(
+                _test_hooks.http_post,
+                credentials,
+                "dispatch_refuse_undeclared",
+                {},
+                timeout_seconds=DEADLINE_SECONDS,
+            )
+
+        elapsed = time.monotonic() - started
+        peer.join(timeout=KEEPALIVE_SENDS * KEEPALIVE_INTERVAL_SECONDS + 2)
+        listener.close()
+        cut = f"{url} did not finish the exchange within its {DEADLINE_SECONDS} s deadline"
+        assert raised.value.code is FleetErrorCode.QUEUE_UNANSWERED
+        assert raised.value.message == f"{url} did not answer: TimeoutError: {cut}"
+        assert elapsed < DEADLINE_SECONDS + SLACK_SECONDS
+        assert [type(gone).__name__ in HUNG_UP for gone in hung_up] == [True]
