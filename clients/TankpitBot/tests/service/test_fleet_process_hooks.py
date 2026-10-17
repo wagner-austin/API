@@ -101,8 +101,8 @@ def test_an_exited_child_no_longer_has_its_original_identity(
     created_at = _identity_of(sleeper.pid)
     observer = psutil.Process(sleeper.pid)
     sleeper.kill()
-    sleeper.wait(timeout=30)
-    observer.wait(timeout=30)
+    sleeper.wait()
+    observer.wait()
 
     assert _real_process_identity(sleeper.pid) != created_at
 
