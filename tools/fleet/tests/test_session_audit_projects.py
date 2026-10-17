@@ -13,11 +13,33 @@ check the same build.
 
 from __future__ import annotations
 
+from typing import Final
+
 import pytest
 
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
+
+#: The prepare recipe every MCPs workspace install goes through.
+PREPARE: Final[tuple[str, ...]] = ("make", "-s", "-C", "scripts/fleet-prepare")
+
+#: The source both lanes check: the package, its workspace installed and
+#: built, and the fleet test database migrated.
+SOURCE: Final[ProjectSource] = ProjectSource(
+    remote="https://github.com/wagner-austin/MCPs.git",
+    path="packages/session-audit",
+    install=(
+        InstallStep(phase="install", argv=(*PREPARE, "install")),
+        InstallStep(phase="workspace-build", argv=(*PREPARE, "workspace-build")),
+        InstallStep(
+            phase="test-database",
+            argv=(*PREPARE, "test-database", "CONTAINER=corvis-fleet-testdb"),
+        ),
+    ),
+    companions=(),
+)
 
 
 @pytest.mark.parametrize(
@@ -28,12 +50,7 @@ from tests._registry import shipped_document
     ],
 )
 def test_each_platform_checks_the_session_audit_package(name: str, platform: NodeTag) -> None:
-    workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, name)
-    windows = require_project(workspace, "MCPs/packages/session-audit")
+    project = require_project(decode_fleet_workspace(shipped_document()), name)
     assert project["required_tags"] == (platform, NodeTag.TESTDB, NodeTag.CXX)
-    source = project["source"]
-    assert source is not None
-    assert source["path"] == "packages/session-audit"
-    assert source == windows["source"]
-    assert project["exclusive_resources"] == windows["exclusive_resources"]
+    assert project["source"] == SOURCE
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
