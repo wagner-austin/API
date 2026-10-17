@@ -35,6 +35,7 @@ systemctl() {
     case "$1" in
         list-units) cat "$TABLE/units" ;;
         show) cat "$TABLE/show/$5.$3" ;;
+        restart) echo "$2" >> "$TABLE/restarted" ;;
     esac
 }
 kill() {
@@ -101,13 +102,22 @@ BOUND = "21600"
 SHORT_BOUND = "60"
 
 
-def _lay_out(table: pathlib.Path, processes: tuple[Process, ...], *, main: int = 10) -> None:
+def _lay_out(
+    table: pathlib.Path,
+    processes: tuple[Process, ...],
+    *,
+    main: int = 10,
+    configured: str = "runners.slice",
+) -> None:
     """Write the process table and the unit's systemd answers.
 
     Args:
         table: The directory to lay it out in.
         processes: The unit's processes, in cgroup order.
         main: What systemd reports as the unit's MainPID.
+        configured: The unit's ``Slice=``; its cgroup is in the CI slice
+            either way, so the listener slice here is a move the provision
+            left pending.
     """
     for process in processes:
         directory = table / "proc" / str(process["pid"])
@@ -126,6 +136,7 @@ def _lay_out(table: pathlib.Path, processes: tuple[Process, ...], *, main: int =
     show.mkdir()
     (show / f"{UNIT}.ControlGroup").write_bytes(f"/runners.slice/{UNIT}\n".encode())
     (show / f"{UNIT}.MainPID").write_bytes(f"{main}\n".encode())
+    (show / f"{UNIT}.Slice").write_bytes(f"{configured}\n".encode())
     (table / "units").write_bytes(f"{UNIT} loaded active running GitHub Actions Runner\n".encode())
     (table / "unkillable").mkdir()
 

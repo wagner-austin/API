@@ -62,10 +62,22 @@ signal, then kills the Worker and every process of the unit descending from
 it, and never the listener above it. A Worker already gone is said and is no
 fault, since a job may end between the hub's reading and this, while a
 process that outlives SIGKILL is a refusal naming it.
+
+THE SAME TASK'S LISTENER MOVE FINISHES HERE. The provision writes each
+unit's ``Slice=`` drop-in for the listener slice
+(:mod:`fleet.core.runner_slice_render`) but restarts only a unit no job runs
+in, and lavender's runners go from one job straight into the next: at
+2026-10-17 18:11Z all six API and MCPs units were still pending 28 minutes
+after the first provision, each reading ``Slice=`` the listener slice while
+its cgroup stayed in the CI slice. So each pass restarts a unit in exactly
+that state the moment its Listener runs and it holds no Worker, in its
+cgroup or its job scopes; a unit with no Listener is mid self-update, as
+rule 2 says, and is left for a later pass.
 """
 
 from __future__ import annotations
 
+from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
 from fleet.core.script_values import scriptable
@@ -100,7 +112,8 @@ DROPPED_KILL_WAIT_SECONDS = 10
 #: question the reaper acts on. ``--dropped UNIT PID START`` ends the tree of
 #: the one Worker the hub names, as the module docstring says.
 REAPER_SCRIPT = (
-    """#!/usr/bin/env bash
+    (
+        """#!/usr/bin/env bash
 # fleet-runner-reaper -- rendered by fleet-runners (MCPs board task 53528106).
 # Kills what a finished GitHub Actions job left in its runner unit's cgroup
 # and in the job scopes its Workers were moved into, and, when the hub names
@@ -113,10 +126,10 @@ proc_root=/proc
 kill_wait=$KILL_WAIT
 
 """
-    + PROCESS_FUNCTIONS
-    + "\n"
-    + UNIT_PROCS_FUNCTION
-    + """
+        + PROCESS_FUNCTIONS
+        + "\n"
+        + UNIT_PROCS_FUNCTION
+        + """
 refuse() {
     echo "FLEET_RUNNER_REAPER_REFUSED: $1" >&2
     exit 1
@@ -253,6 +266,22 @@ dropped() {
         "process(es), whose job GitHub dropped; its listener runs on"
 }
 
+place() {
+    local unit=$1 cgroup pids
+    [ "$(systemctl show -p Slice --value "$unit")" = $LISTENER_SLICE ] || return 0
+    cgroup=$(systemctl show -p ControlGroup --value "$unit")
+    case "$cgroup" in
+        ''|/$LISTENER_SLICE/*) return 0 ;;
+    esac
+    pids=$(unit_procs "$cgroup" "$unit") || return 0
+    # No Listener is a self-update under way, which a restart would cut short.
+    runs Runner.Listener "$pids" || return 0
+    runs Runner.Worker "$pids" && return 0
+    systemctl restart "$unit"
+    echo "fleet-runner-reaper: $unit: restarted between jobs into $LISTENER_SLICE, as its" \\
+        "drop-in says"
+}
+
 if [ "${1:-}" = --dropped ]; then
     if [ $# -ne 4 ] || [ -z "$3" ] || [ -z "$4" ] || [ -n "${3//[0-9]/}${4//[0-9]/}" ]; then
         echo "fleet-runner-reaper: usage: fleet-runner-reaper --dropped UNIT PID START" >&2
@@ -290,9 +319,13 @@ for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut 
     if [ "$killed" -gt 0 ]; then
         echo "fleet-runner-reaper: $unit: killed $killed process(es) a finished job left behind"
     fi
+    place "$unit"
 done
 """
-).replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
+    )
+    .replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
+    .replace("$LISTENER_SLICE", LISTENER_SLICE_NAME)
+)
 
 #: The reaper's timer.
 REAPER_TIMER = f"""[Unit]

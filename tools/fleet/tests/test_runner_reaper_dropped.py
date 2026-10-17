@@ -25,6 +25,7 @@ from tests._host_bash import host_bash
 from tests.test_runner_reaper import (
     OWN,
     SCOPE,
+    STEP,
     UNIT,
     WORKER,
     Process,
@@ -34,8 +35,7 @@ from tests.test_runner_reaper import (
     _scope,
 )
 
-#: The Worker's step, and the step's own child.
-STEP = Process(pid=14, ppid=13, cmdline="python -m pytest", start_ticks=91000)
+#: The child of the Worker's step (:data:`tests.test_runner_reaper.STEP`).
 GRANDCHILD = Process(pid=15, ppid=14, cmdline="node vitest", start_ticks=92000)
 
 #: What the job daemonized, reparented to init: no descendant of the Worker,
