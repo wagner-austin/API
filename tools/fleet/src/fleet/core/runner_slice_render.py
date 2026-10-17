@@ -3,23 +3,33 @@
 MCPs board task 45a4f22b; the budget and the incident behind it are
 :mod:`fleet.contracts.runner_slice`. Three pieces, all idempotent:
 
-1. The slice unit, carrying the host's ``MemoryHigh``, ``MemoryMax``,
-   ``MemorySwapMax``, ``CPUWeight`` and root-disk read bounds (board task
-   cb264851), written and reloaded only when its text differs. systemd
-   re-applies a loaded slice's cgroup limits on reload, so a changed budget
-   reaches runners already inside it without restarting any of them.
-2. A per-runner drop-in naming the slice, beside the restart policy of
-   :mod:`fleet.core.runner_recovery`.
+1. The two slice units: the CI slice, carrying the host's ``MemoryHigh``,
+   ``MemoryMax``, ``MemorySwapMax``, ``CPUWeight`` and root-disk read bounds
+   (board task cb264851), and the listener slice, carrying none (board task
+   715b9ec5). Each is written and reloaded only when its text differs.
+   systemd re-applies a loaded slice's cgroup limits on reload, so a changed
+   budget reaches jobs already inside it without restarting any of them.
+2. A per-runner drop-in naming the listener slice, beside the restart
+   policy of :mod:`fleet.core.runner_recovery`. The unit runs there and its
+   jobs in scopes of the CI slice (:mod:`fleet.core.runner_job_scope_render`),
+   so the budget throttles the jobs and never the listener holding their
+   lease with GitHub.
 3. The move. ``Slice=`` takes effect only when a unit starts, so a runner
    still in its old cgroup is restarted, and only while it runs no job: a
-   job is a ``Runner.Worker`` process in the unit's cgroup, and a restart
+   job is a ``Runner.Worker`` process in the unit's cgroup, which is where
+   every Worker of a unit outside the listener slice runs, and a restart
    under one would kill the build. A busy runner is named and left where it
    is; the next provision moves it.
 """
 
 from __future__ import annotations
 
-from fleet.contracts.runner_slice import CI_SLICE_NAME, IO_BOUND_PATH, CiSlice
+from fleet.contracts.runner_slice import (
+    CI_SLICE_NAME,
+    IO_BOUND_PATH,
+    LISTENER_SLICE_NAME,
+    CiSlice,
+)
 from fleet.contracts.runners import RunnerInstall
 from fleet.core.script_values import scriptable
 
@@ -27,10 +37,26 @@ from fleet.core.script_values import scriptable
 SLICE_DROP_IN_NAME = "fleet-slice.conf"
 
 #: The drop-in's body.
-SLICE_DROP_IN = f"[Service]\nSlice={CI_SLICE_NAME}\n"
+SLICE_DROP_IN = f"[Service]\nSlice={LISTENER_SLICE_NAME}\n"
 
-#: Where the slice unit is written.
+#: Where the CI slice unit is written.
 SLICE_UNIT_PATH = f"/etc/systemd/system/{CI_SLICE_NAME}"
+
+#: Where the listener slice unit is written.
+LISTENER_SLICE_UNIT_PATH = f"/etc/systemd/system/{LISTENER_SLICE_NAME}"
+
+#: The listener slice unit: accounted, so ``systemctl show`` and the audit
+#: read what the listeners hold, and bounded by nothing.
+LISTENER_SLICE_UNIT = (
+    "[Unit]\n"
+    "Description=GitHub Actions runners' listeners, outside their jobs' budget, rendered by "
+    "fleet-runners (MCPs board task 715b9ec5)\n"
+    "\n"
+    "[Slice]\n"
+    "MemoryAccounting=yes\n"
+    "CPUAccounting=yes\n"
+    "IOAccounting=yes\n"
+)
 
 
 #: The controllers the slice accounts, so each bound below is enforced and
@@ -78,8 +104,33 @@ def render_slice_unit(budget: CiSlice) -> str:
     )
 
 
+def _render_unit_file_lines(path: str, body: str, said: str) -> list[str]:
+    """Bash lines that write one unit file only when its text differs.
+
+    Args:
+        path: Where the unit is written.
+        body: Its text.
+        said: What the lines print when they write it.
+
+    Returns:
+        The lines.
+    """
+    return [
+        f'if [ "$(cat {path} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
+        body.rstrip("\n"),
+        "SLICE_EOF",
+        ')" ]; then',
+        f"    cat > {path} <<'SLICE_EOF'",
+        body.rstrip("\n"),
+        "SLICE_EOF",
+        "    systemctl daemon-reload",
+        f"    echo '{said}'",
+        "fi",
+    ]
+
+
 def render_slice_unit_lines(budget: CiSlice) -> list[str]:
-    """Bash lines that write the slice unit when it differs, and start it.
+    """Bash lines that write both slice units when they differ, and start them.
 
     Args:
         budget: The host's CI budget.
@@ -87,24 +138,24 @@ def render_slice_unit_lines(budget: CiSlice) -> list[str]:
     Returns:
         The lines; they print what changed.
     """
-    body = render_slice_unit(budget)
     return [
-        f'if [ "$(cat {SLICE_UNIT_PATH} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
-        body.rstrip("\n"),
-        "SLICE_EOF",
-        ')" ]; then',
-        f"    cat > {SLICE_UNIT_PATH} <<'SLICE_EOF'",
-        body.rstrip("\n"),
-        "SLICE_EOF",
-        "    systemctl daemon-reload",
-        f"    echo 'ci budget set: {CI_SLICE_NAME} {' '.join(render_slice_bounds(budget))}'",
-        "fi",
+        *_render_unit_file_lines(
+            SLICE_UNIT_PATH,
+            render_slice_unit(budget),
+            f"ci budget set: {CI_SLICE_NAME} {' '.join(render_slice_bounds(budget))}",
+        ),
         f"systemctl start {CI_SLICE_NAME}",
+        *_render_unit_file_lines(
+            LISTENER_SLICE_UNIT_PATH,
+            LISTENER_SLICE_UNIT,
+            f"listener slice set: {LISTENER_SLICE_NAME}, bounded by nothing",
+        ),
+        f"systemctl start {LISTENER_SLICE_NAME}",
     ]
 
 
 def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that put one WSL runner in the CI slice.
+    """Bash lines that put one WSL runner unit in the listener slice.
 
     Run after the unit exists and after ``svc.sh start``, so the move sees
     the unit's live cgroup.
@@ -132,17 +183,18 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
         "fi",
         f"cgroup=$(systemctl show -p ControlGroup --value {unit})",
         'case "$cgroup" in',
-        f"    /{CI_SLICE_NAME}/*) ;;",
+        f"    /{LISTENER_SLICE_NAME}/*) ;;",
         "    *)",
         # /dev/null first: a unit with no processes lists none, and grep
         # given no file would read this script's stdin instead.
         "        if grep -qs Runner.Worker /dev/null "
         '$(sed "s#.*#/proc/&/cmdline#" "/sys/fs/cgroup$cgroup/cgroup.procs"); then',
-        f"            echo 'ci budget pending: {unit} is running a job; "
+        f"            echo 'listener placement pending: {unit} is running a job; "
         "the next provision moves it'",
         "        else",
         f"            systemctl restart {unit}",
-        f"            echo 'ci budget applied: {unit} moved into {CI_SLICE_NAME}'",
+        f"            echo 'listener placed: {unit} moved into {LISTENER_SLICE_NAME}, "
+        f"its jobs into {CI_SLICE_NAME}'",
         "        fi",
         "        ;;",
         "esac",
@@ -150,6 +202,8 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
 
 
 __all__ = [
+    "LISTENER_SLICE_UNIT",
+    "LISTENER_SLICE_UNIT_PATH",
     "SLICE_ACCOUNTING",
     "SLICE_DROP_IN",
     "SLICE_DROP_IN_NAME",

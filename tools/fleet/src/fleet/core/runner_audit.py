@@ -35,7 +35,13 @@ from fleet.core.runner_account import (
     service_account_check_id,
 )
 from fleet.core.runner_audit_cache import cache_rows, render_cache_check_lines
+from fleet.core.runner_audit_disk import disk_check_id, render_disk_check_lines
 from fleet.core.runner_base_render import EXECUTION_POLICY_KEY, LONG_PATHS_KEY
+from fleet.core.runner_job_scope_render import (
+    PLACEMENT_REASON,
+    placement_check_id,
+    render_placement_check_lines,
+)
 from fleet.core.runner_machine_env import (
     MACHINE_ENVIRONMENT_KEY,
     machine_variable_check_id,
@@ -200,6 +206,10 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                     check_id=service_account_check_id(install), reason=SERVICE_ACCOUNT_REASON
                 )
             )
+        else:
+            checks.append(
+                ExpectedCheck(check_id=placement_check_id(install), reason=PLACEMENT_REASON)
+            )
         checks.append(ExpectedCheck(check_id=orphan_check_id(install), reason=ORPHAN_REASON))
     for asset in spec["assets"]:
         checks.append(ExpectedCheck(check_id=f"asset:{asset['path']}", reason=asset["reason"]))
@@ -210,53 +220,6 @@ def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
                 ExpectedCheck(check_id=f"writable:{asset['path']}", reason=asset["reason"])
             )
     return checks
-
-
-def disk_check_id(spec: HostRunnerSpec) -> str:
-    """The disk row's id, which carries the ceiling and the idle baseline.
-
-    Both numbers are IN the id, so every audit line for the row, OK or
-    DRIFT, states what is allowed and what an idle rebuilt host measured
-    (board task 1aa6a021, A3).
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        E.g. ``disk:/:ceiling-150gb:baseline-46gb@2026-09-26``.
-    """
-    disk = spec["base"]["disk"]
-    return (
-        f"disk:/:ceiling-{disk['ceiling_gb']}gb:"
-        f"baseline-{disk['baseline_gb']}gb@{disk['baseline_measured']}"
-    )
-
-
-def _disk_check_lines(spec: HostRunnerSpec) -> list[str]:
-    """Script lines that hold the distro's root to the roster's ceiling.
-
-    Args:
-        spec: The host.
-
-    Returns:
-        The lines: ``df -BG`` of ``/`` inside the distro, parsed to whole GB,
-        and the Write-Check. An unreadable answer parses to -1 and drifts with df's
-        own words and exit, never passes.
-    """
-    disk = spec["base"]["disk"]
-    ceiling = disk["ceiling_gb"]
-    return [
-        "$Probe = Invoke-InDistro $Cmd $Wsl $Distro 'df -BG --output=used /'",
-        "$DiskLine = (@($Probe.Lines | Select-Object -Skip 1 -First 1) -join '')",
-        "$UsedGb = -1",
-        "if ($DiskLine -match '(\\d+)G') {",
-        "    $UsedGb = [int]$Matches[1]",
-        "}",
-        f"Write-Check '{disk_check_id(spec)}' ($UsedGb -ge 0 -and $UsedGb -le {ceiling}) "
-        f"('the distro root uses ' + $UsedGb + ' GB against a ceiling of {ceiling} GB; an "
-        f"idle rebuilt host used {disk['baseline_gb']} GB on {disk['baseline_measured']}; "
-        "df said: ' + $Probe.Text)",
-    ]
 
 
 def _emit_wsl_state_check(check_id: str, argv: str, expected: str) -> list[str]:
@@ -424,7 +387,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
             f"Write-Check 'memory-floor:{floor}gb' ($TotalMb -ge {floor_mb}) "
             "('the VM reports ' + $TotalMb + ' MB; free said: ' + $Probe.Text)",
         ]
-    lines += _disk_check_lines(spec)
+    lines += render_disk_check_lines(spec)
     lines += render_cache_check_lines(spec)
     policy = scriptable(spec["base"]["execution_policy"], label="execution_policy")
     lines += [
@@ -453,6 +416,7 @@ def render_audit_script(spec: HostRunnerSpec) -> str:
                 f"service:wsl:{service}", f"systemctl is-active '{service}'", "active"
             )
             lines += _emit_wsl_test_check(f"workdir:{repo}:wsl:{runner_name}", "-d", workdir)
+            lines += render_placement_check_lines(install)
         else:
             # Windows-side installs are checked NATIVELY: the driver already
             # runs in the host's PowerShell, so the service and the workdir
@@ -591,7 +555,6 @@ __all__ = [
     "AuditOutcome",
     "ExpectedCheck",
     "attempt_audit_host",
-    "disk_check_id",
     "expected_checks",
     "parse_audit_transcript",
     "render_audit_script",

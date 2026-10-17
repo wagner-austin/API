@@ -24,8 +24,10 @@ never starts one), systemd's configured environment for it holds the
 setting (so a timer that runs before the drop-in exists, or after it is
 removed, restarts nothing, rather than restarting an idle unit every
 minute), its running main process lacks the setting, and no process in its
-cgroup has been a ``Runner.Worker`` at any of the once-a-second samples
-across :data:`ADOPT_SETTLE_SECONDS`. Once every unit reads the cache, each
+cgroup, or in a job scope its Workers were moved into (MCPs board task
+715b9ec5, :mod:`fleet.core.runner_job_scope_render`), has been a
+``Runner.Worker`` at any of the once-a-second samples across
+:data:`ADOPT_SETTLE_SECONDS`. Once every unit reads the cache, each
 firing is two ``systemctl show`` calls and one read of ``/proc`` per unit.
 
 IDLE MEANS IDLE FOR A WHILE, NOT AT ONE INSTANT. Between two jobs a busy
@@ -47,6 +49,7 @@ from fleet.core.runner_action_cache import (
     CACHE_VARIABLE,
     WSL_CACHE_DIR,
 )
+from fleet.core.runner_proc_bash import UNIT_PROCS_FUNCTION
 from fleet.core.script_values import scriptable
 
 #: Where the adopt script is installed.
@@ -76,18 +79,21 @@ if [ $# -lt 2 ] || [[ ! $1 =~ ^[0-9]+$ ]]; then
 fi
 settle=$1
 shift
+cgroup_root=/sys/fs/cgroup
 """
-    + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n"
+    + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n\n"
+    + UNIT_PROCS_FUNCTION
     + r"""
-# Whether the cgroup at CGROUP held no Runner.Worker at every sample, one a
-# second for $settle seconds: prints idle, busy or unreadable.
+# Whether runner unit UNIT, its cgroup at CGROUP, held no Runner.Worker at
+# every sample, in its own cgroup or in a job scope its Workers were moved
+# into, one a second for $settle seconds: prints idle, busy or unreadable.
 settled() {
     local procs pid second
     for ((second = 0; second <= settle; second++)); do
         if [ "$second" -gt 0 ]; then
             sleep 1
         fi
-        if ! procs=$(cat "/sys/fs/cgroup$1/cgroup.procs" 2>/dev/null); then
+        if ! procs=$(unit_procs "$1" "$2"); then
             echo unreadable
             return 0
         fi
@@ -118,7 +124,7 @@ for unit in "$@"; do
         continue
     fi
     cgroup=$(systemctl show -p ControlGroup --value "$unit")
-    case $(settled "$cgroup") in
+    case $(settled "$cgroup" "$unit") in
         idle)
             systemctl restart "$unit"
             echo "fleet-action-cache-adopt: $unit restarted after $settle s idle," \

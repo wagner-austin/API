@@ -82,7 +82,7 @@ def _clean_transcript(name: str) -> str:
         The OK lines: the disk row, the cache rows for the account's cache
         and the one install's _work tree, the policy and long-paths rows
         every host reports, the fixture base's one machine variable, then
-        the one install's three.
+        the one install's four.
     """
     return (
         "CHECK disk:/:ceiling-150gb:baseline-46gb@2026-09-26 OK\n"
@@ -93,6 +93,7 @@ def _clean_transcript(name: str) -> str:
         "CHECK machine-env:POETRY_CACHE_DIR OK\n"
         f"CHECK service:wsl:actions.runner.wagner-austin-API.{name}-wsl.service OK\n"
         f"CHECK workdir:wagner-austin/API:wsl:{name}-wsl OK\n"
+        f"CHECK placement:wagner-austin/API:wsl:{name}-wsl OK\n"
         f"CHECK orphans:wagner-austin/API:wsl:{name}-wsl OK\n"
     )
 
@@ -366,6 +367,7 @@ class TestOnboardMode:
             _with_onboarded_work_row(_clean_transcript("lavender"))
             + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service OK\n"
             + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
+            + "CHECK placement:wagner-austin/x:wsl:lavender-wsl OK\n"
             + "CHECK orphans:wagner-austin/x:wsl:lavender-wsl OK\n"
         )
         _test_hooks.run = FakeRun(
@@ -408,6 +410,7 @@ class TestOnboardMode:
             + "CHECK service:wsl:actions.runner.wagner-austin-x.lavender-wsl.service "
             "DRIFT it said: inactive\n"
             + "CHECK workdir:wagner-austin/x:wsl:lavender-wsl OK\n"
+            + "CHECK placement:wagner-austin/x:wsl:lavender-wsl OK\n"
             + "CHECK orphans:wagner-austin/x:wsl:lavender-wsl OK\n"
         )
         _test_hooks.run = FakeRun(

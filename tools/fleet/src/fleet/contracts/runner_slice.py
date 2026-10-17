@@ -10,9 +10,10 @@ and sshd stopped answering, so every fleet tick for lavender-wsl read
 runners and sshd shared ``system.slice``, which carried no ceiling at all.
 
 This block is the ceiling, declared once per host. The provision renders it
-as one systemd slice holding every WSL runner on the host, so CI jobs
+as one systemd slice holding every WSL runner's jobs on the host, so CI jobs
 throttle, and at worst are killed, inside their own share, while sshd, the
-test database and the fleet's own checks keep the rest of the VM.
+test database, the fleet's own checks and the runners' listeners keep the
+rest of the VM.
 
 A memory ceiling alone did not hold them (MCPs board task cb264851). On
 2026-10-08 at 00:12Z a CI burst held the slice at its ``MemoryHigh``, the
@@ -34,10 +35,24 @@ from __future__ import annotations
 from platform_core.json_utils import JSONObject, JSONTypeError, require_int
 from typing_extensions import TypedDict
 
-#: The slice every WSL runner on a host is placed in. One name for every
-#: host: the budget differs per host, the unit it is enforced by does not.
-#: No dash: systemd reads ``a-b.slice`` as a child of ``a.slice``.
+#: The slice every WSL runner's jobs run in. One name for every host: the
+#: budget differs per host, the unit it is enforced by does not. No dash:
+#: systemd reads ``a-b.slice`` as a child of ``a.slice``.
 CI_SLICE_NAME = "runners.slice"
+
+#: The slice the runner units themselves run in, the listener that holds a
+#: job's lease with GitHub among them, beside :data:`CI_SLICE_NAME` and never
+#: under it (MCPs board task 715b9ec5). The kernel puts every task that
+#: charges memory beneath a cgroup over its ``memory.high`` to sleep, whatever
+#: that task's own ``memory.low``: measured on lavender-wsl on 2026-10-17, a
+#: process holding 4.5 MB under a 200 MB ``MemoryLow`` sat 227 s in
+#: ``mem_cgroup_handle_over_high`` beside a hog over its slice's high, while
+#: the same process in a slice of its own ran unhindered. So a listener inside
+#: the budget its jobs fill timed out its calls to GitHub (2026-10-02 and
+#: 2026-10-16), and the jobs are moved out of the units' cgroups into scopes
+#: of :data:`CI_SLICE_NAME` instead (:mod:`fleet.core.runner_job_scope_render`).
+#: This slice carries no bound. No dash, so it is no child of either.
+LISTENER_SLICE_NAME = "listeners.slice"
 
 #: systemd's CPUWeight range. 100 is every unit's default, so a weight below
 #: it yields the processor to sshd and the fleet under contention and takes
@@ -163,6 +178,7 @@ __all__ = [
     "CPU_WEIGHT_MAX",
     "CPU_WEIGHT_MIN",
     "IO_BOUND_PATH",
+    "LISTENER_SLICE_NAME",
     "CiSlice",
     "decode_ci_slice",
     "encode_ci_slice",

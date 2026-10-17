@@ -209,6 +209,25 @@ class Host:
         procs = self.root / "cgroup" / "system.slice" / name / "cgroup.procs"
         procs.write_text(f"{pid}\n", encoding="utf-8")
 
+    def scoped_job(self, name: str, pid: int) -> pathlib.Path:
+        """Run a job whose Worker the hook moved into its scope (MCPs board task 715b9ec5).
+
+        Args:
+            name: The unit.
+            pid: Its main process; the job's Worker is ``pid + 1``.
+
+        Returns:
+            The scope's directory, which the job's end removes.
+        """
+        worker = self.root / "proc" / str(pid + 1)
+        worker.mkdir()
+        (worker / "cmdline").write_bytes(b"/home/gharunner/bin/Runner.Worker\0spawnclient\0")
+        stem = name.removesuffix(".service")
+        scope = self.root / "cgroup" / "runners.slice" / f"fleet-job-{stem}-{pid + 1}.scope"
+        scope.mkdir(parents=True)
+        (scope / "cgroup.procs").write_text(f"{pid + 1}\n", encoding="utf-8")
+        return scope
+
     def job_arrives(self, name: str, pid: int) -> None:
         """Start a job in a unit at the first second of its settle window.
 

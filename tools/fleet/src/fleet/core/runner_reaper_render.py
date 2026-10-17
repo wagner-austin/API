@@ -44,11 +44,18 @@ Two pieces, both idempotent:
    forkservers and 12,678,709,248 bytes stayed with it. Such a Worker does
    not shield the unit's orphans, and it and every process under it are
    killed with them.
+
+SINCE MCPs BOARD TASK 715b9ec5 A JOB RUNS OUTSIDE ITS UNIT'S CGROUP, in a
+scope of the CI slice bound to the unit (:mod:`fleet.core.runner_job_scope_render`),
+so what it daemonizes is left in that scope. Every rule above reads a unit's
+processes as ``unit_procs`` lists them, its own cgroup's and its job
+scopes', and a stop of the unit still ends the job: the scope is bound to it.
 """
 
 from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
 from fleet.core.script_values import scriptable
 
 #: The runner drop-in's file name inside ``<unit>.d``.
@@ -73,22 +80,21 @@ REAPER_INTERVAL_SECONDS = 30
 #: processes it would kill are older than SECONDS, and kills nothing: the
 #: audit's check (:mod:`fleet.core.runner_orphan_check`) asks the same
 #: question the reaper acts on.
-REAPER_SCRIPT = """#!/usr/bin/env bash
+REAPER_SCRIPT = (
+    """#!/usr/bin/env bash
 # fleet-runner-reaper -- rendered by fleet-runners (MCPs board task 53528106).
-# Kills what a finished GitHub Actions job left in its runner unit's cgroup.
+# Kills what a finished GitHub Actions job left in its runner unit's cgroup
+# and in the job scopes its Workers were moved into.
 # Usage: fleet-runner-reaper SECONDS | fleet-runner-reaper --audit SECONDS UNIT
 set -euo pipefail
 cgroup_root=/sys/fs/cgroup
 proc_root=/proc
 
-parent_of() {
-    local stat
-    stat=$(cat "$proc_root/$1/stat" 2>/dev/null) || return 1
-    stat=${stat##*) }
-    set -- $stat
-    echo "$2"
-}
-
+"""
+    + PROCESS_FUNCTIONS
+    + "\n"
+    + UNIT_PROCS_FUNCTION
+    + """
 descends_from() {
     local pid=$1
     while [ "$pid" -gt 1 ]; do
@@ -104,21 +110,6 @@ runs() {
         grep -qs "$1" "$proc_root/$pid/cmdline" && return 0
     done
     return 1
-}
-
-start_of() {
-    local stat
-    stat=$(cat "$proc_root/$1/stat" 2>/dev/null) || return 1
-    stat=${stat##*) }
-    set -- $stat
-    echo "${20}"
-}
-
-age_of() {
-    local ticks uptime
-    ticks=$(start_of "$1") || return 1
-    uptime=$(cut -d. -f1 "$proc_root/uptime")
-    echo $(( uptime - ticks / $(getconf CLK_TCK) ))
 }
 
 tree_start_of() {
@@ -137,7 +128,7 @@ leftovers() {
     [ -n "$cgroup" ] && [ -r "$cgroup_root$cgroup/cgroup.procs" ] || return 0
     main=$(systemctl show -p MainPID --value "$unit")
     [ "$main" != 0 ] || return 0
-    pids=$(cat "$cgroup_root$cgroup/cgroup.procs")
+    pids=$(unit_procs "$cgroup" "$unit")
     runs Runner.Listener "$pids" || return 0
     for pid in $pids; do
         grep -qs Runner.Worker "$proc_root/$pid/cmdline" || continue
@@ -197,6 +188,7 @@ for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut 
     fi
 done
 """
+)
 
 #: The reaper's timer.
 REAPER_TIMER = f"""[Unit]

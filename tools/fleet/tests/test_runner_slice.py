@@ -16,6 +16,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runner_slice import (
     CI_SLICE_NAME,
+    LISTENER_SLICE_NAME,
     CiSlice,
     decode_ci_slice,
     encode_ci_slice,
@@ -207,9 +208,11 @@ class TestSliceUnit:
         budget["swap_max_gb"] = 0
         assert "\nMemorySwapMax=0G\n" in runner_slice_render.render_slice_unit(budget)
 
-    def test_the_unit_is_rewritten_only_when_it_differs_and_always_started(self) -> None:
+    def test_both_units_are_rewritten_only_when_they_differ_and_always_started(self) -> None:
         path = runner_slice_render.SLICE_UNIT_PATH
         body = runner_slice_render.render_slice_unit(a_ci_slice()).rstrip("\n")
+        listeners = runner_slice_render.LISTENER_SLICE_UNIT_PATH
+        unbounded = runner_slice_render.LISTENER_SLICE_UNIT.rstrip("\n")
         assert runner_slice_render.render_slice_unit_lines(a_ci_slice()) == [
             f'if [ "$(cat {path} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
             body,
@@ -223,7 +226,27 @@ class TestSliceUnit:
             "MemorySwapMax=2G CPUWeight=20 IOReadBandwidthMax=/ 200M IOReadIOPSMax=/ 5000'",
             "fi",
             "systemctl start runners.slice",
+            f'if [ "$(cat {listeners} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
+            unbounded,
+            "SLICE_EOF",
+            ')" ]; then',
+            f"    cat > {listeners} <<'SLICE_EOF'",
+            unbounded,
+            "SLICE_EOF",
+            "    systemctl daemon-reload",
+            "    echo 'listener slice set: listeners.slice, bounded by nothing'",
+            "fi",
+            "systemctl start listeners.slice",
         ]
+
+    def test_the_listener_slice_is_accounted_and_bounded_by_nothing(self) -> None:
+        """No Memory*, CPUWeight or IO*Max: a bound here would throttle the
+        listeners as the CI slice's did (MCPs board task 715b9ec5)."""
+        unit = runner_slice_render.LISTENER_SLICE_UNIT
+        directives = unit.split("[Slice]\n", 1)[1].splitlines()
+        assert directives == ["MemoryAccounting=yes", "CPUAccounting=yes", "IOAccounting=yes"]
+        assert LISTENER_SLICE_NAME == "listeners.slice"
+        assert "-" not in LISTENER_SLICE_NAME
 
     def test_the_slice_is_laid_before_any_runner_is_placed_in_it(self) -> None:
         script = runner_render.render_provision(_roster_host())["linux_script"]
@@ -247,35 +270,43 @@ class TestSliceUnit:
 class TestRunnerPlacement:
     """Each runner's drop-in and the move into the slice."""
 
-    def test_the_drop_in_names_the_slice_and_is_written_only_when_it_differs(self) -> None:
+    def test_the_drop_in_names_the_listener_slice_and_is_written_only_when_it_differs(
+        self,
+    ) -> None:
         lines = runner_slice_render.render_runner_slice_lines(_install())
         path = f"/etc/systemd/system/{UNIT}.d/fleet-slice.conf"
-        assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=runners.slice\n"
+        assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=listeners.slice\n"
         assert lines[0] == (
             f'if [ "$(cat {path} 2>/dev/null)" != '
-            "\"$(printf '[Service]\\nSlice=runners.slice\\n')\" ]; then"
+            "\"$(printf '[Service]\\nSlice=listeners.slice\\n')\" ]; then"
         )
-        assert lines[2] == f"    printf '[Service]\\nSlice=runners.slice\\n' > {path}"
+        assert lines[2] == f"    printf '[Service]\\nSlice=listeners.slice\\n' > {path}"
 
-    def test_a_runner_already_in_the_slice_is_left_running(self, tmp_path: pathlib.Path) -> None:
-        out, calls = _move(tmp_path, f"/{CI_SLICE_NAME}/{UNIT}")
+    def test_a_runner_already_in_the_listener_slice_is_left_running(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        out, calls = _move(tmp_path, f"/{LISTENER_SLICE_NAME}/{UNIT}")
         assert out == ""
         assert calls == [f"show -p ControlGroup --value {UNIT}"]
 
-    def test_an_idle_runner_outside_the_slice_is_restarted_into_it(
+    def test_an_idle_runner_in_the_ci_slice_is_restarted_into_the_listener_slice(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """No process is listed for the unit here, which is an idle runner's
-        shape between jobs; the /dev/null guard keeps grep off stdin."""
-        out, calls = _move(tmp_path, f"/system.slice/{UNIT}")
-        assert out == f"ci budget applied: {UNIT} moved into {CI_SLICE_NAME}\n"
+        """The shape every lavender runner had until board task 715b9ec5: the
+        unit itself in the CI slice. No process is listed for it, an idle
+        runner's shape between jobs; the /dev/null guard keeps grep off stdin."""
+        out, calls = _move(tmp_path, f"/{CI_SLICE_NAME}/{UNIT}")
+        assert out == (
+            f"listener placed: {UNIT} moved into {LISTENER_SLICE_NAME}, its jobs into "
+            f"{CI_SLICE_NAME}\n"
+        )
         assert calls == [f"show -p ControlGroup --value {UNIT}", f"restart {UNIT}"]
 
     def test_a_runner_running_a_job_is_named_and_never_restarted(self) -> None:
         lines = runner_slice_render.render_runner_slice_lines(_install())
         busy = next(index for index, line in enumerate(lines) if "Runner.Worker" in line)
         assert lines[busy + 1] == (
-            f"            echo 'ci budget pending: {UNIT} is running a job; "
+            f"            echo 'listener placement pending: {UNIT} is running a job; "
             "the next provision moves it'"
         )
         assert lines[busy + 2] == "        else"

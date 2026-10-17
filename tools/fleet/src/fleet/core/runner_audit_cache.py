@@ -1,6 +1,6 @@
 """Holding a runner host's caches to their ceilings.
 
-The disk row (:func:`fleet.core.runner_audit.disk_check_id`) holds the
+The disk row (:func:`fleet.core.runner_audit_disk.disk_check_id`) holds the
 distro's root to one number, which says a host has grown but not where. On
 lavender the root went from 10 GB to 97 GB in the day after its 2026-09-26
 rebuild (MCPs board task bfca20e6): 50 GB was the runner account's cache,

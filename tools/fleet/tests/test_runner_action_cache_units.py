@@ -197,6 +197,23 @@ class TestProvisionGivesAUnitTheCache:
         assert SETTING.encode() in host.environ(100)
         assert host.timer(UNIT).stdout == ""
 
+    def test_a_job_in_its_scope_keeps_its_unit_from_being_restarted(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs board task 715b9ec5: the Worker runs outside the unit's own
+        cgroup, which then holds no Worker, and a restart would still end the
+        job through the scope's binding to the unit."""
+        host = Host(tmp_path)
+        host.unit(UNIT, 100)
+        scope = host.scoped_job(UNIT, 100)
+        busy = host.timer(UNIT)
+        assert busy.returncode == 0, busy.stderr
+        assert busy.stdout == _left_busy(UNIT)
+        assert f"restart {UNIT}" not in host.calls()
+        (scope / "cgroup.procs").unlink()
+        scope.rmdir()
+        assert host.timer(UNIT).stdout == _restarted(UNIT)
+
     def test_a_job_taken_inside_the_settle_window_stops_the_restart(
         self, tmp_path: pathlib.Path
     ) -> None:

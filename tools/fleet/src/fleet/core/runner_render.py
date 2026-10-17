@@ -34,6 +34,7 @@ from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core.runner_action_cache import render_fill_lines
 from fleet.core.runner_cache_adopt import render_adopt_lines, render_cache_environment_lines
 from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
+from fleet.core.runner_job_scope_render import render_job_hook_lines, render_job_scope_lines
 from fleet.core.runner_reaper_render import render_kill_mode_lines, render_reaper_lines
 from fleet.core.runner_recovery import render_wsl_recovery_lines
 from fleet.core.runner_slice_render import render_runner_slice_lines, render_slice_unit_lines
@@ -259,6 +260,7 @@ def render_wsl_install_lines(install: RunnerInstall) -> list[str]:
         f"[ -f {directory}/.service ] || (cd {directory} && ./svc.sh install gharunner)",
         *render_wsl_recovery_lines(install),
         *render_kill_mode_lines(install),
+        *render_job_hook_lines(install),
         f"(cd {directory} && ./svc.sh start)",
         *render_cache_environment_lines(install),
         *render_runner_slice_lines(install),
@@ -307,6 +309,8 @@ def _render_linux_script(spec: HostRunnerSpec) -> str:
     lines += render_slice_unit_lines(spec["ci_slice"])
     lines += ["", "# --- what a finished job leaves behind (MCPs board task 53528106) ---"]
     lines += render_reaper_lines(spec)
+    lines += ["", "# --- each job outside its runner's listener (MCPs board task 715b9ec5) ---"]
+    lines += render_job_scope_lines()
     lines += ["", "# --- the actions jobs use, kept on the host (MCPs board task ce2b92e0) ---"]
     lines += render_fill_lines(spec)
     lines += render_adopt_lines(spec)

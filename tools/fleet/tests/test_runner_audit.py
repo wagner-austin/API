@@ -16,7 +16,7 @@ from fleet.contracts.runners import (
     HostRunnerSpec,
     RunnerInstall,
 )
-from fleet.core import _test_hooks, runner_audit
+from fleet.core import _test_hooks, runner_audit, runner_audit_disk
 from tests._runner_fixtures import a_base, a_ci_slice
 from tests.conftest import FakeRun, failed, ok
 
@@ -95,6 +95,7 @@ _POLICY_ID = "execution-policy:LocalMachine:RemoteSigned"
 _LONG_ID = runner_audit.LONG_PATHS_CHECK_ID
 _ENV_ID = "machine-env:POETRY_CACHE_DIR"
 _ORPHAN_ID = "orphans:wagner-austin/API:wsl:lavender-wsl"
+_PLACEMENT_ID = "placement:wagner-austin/API:wsl:lavender-wsl"
 
 
 def _clean_transcript(spec: HostRunnerSpec) -> str:
@@ -130,6 +131,7 @@ class TestExpectedChecks:
             "timer:ci-clean.timer",
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
             "workdir:wagner-austin/API:wsl:lavender-wsl",
+            _PLACEMENT_ID,
             _ORPHAN_ID,
             "asset:/opt/corvis/rw-game/game-lib.jar",
             "sha256:/opt/corvis/rw-game/game-lib.jar",
@@ -155,11 +157,12 @@ class TestExpectedChecks:
             _ENV_ID,
             "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
             "workdir:wagner-austin/API:wsl:lavender-wsl",
+            _PLACEMENT_ID,
             _ORPHAN_ID,
         ]
 
     def test_the_disk_row_carries_the_ceiling_and_the_idle_baseline(self) -> None:
-        assert runner_audit.disk_check_id(_host()) == _DISK_ID
+        assert runner_audit_disk.disk_check_id(_host()) == _DISK_ID
 
 
 class TestRenderAuditScript:
@@ -201,7 +204,7 @@ class TestParseAuditTranscript:
     def test_a_clean_transcript_scores_every_check_ok(self) -> None:
         spec = _host()
         findings = runner_audit.parse_audit_transcript(spec, _clean_transcript(spec))
-        assert [finding["ok"] for finding in findings] == [True] * 17
+        assert [finding["ok"] for finding in findings] == [True] * 18
         assert findings[0]["reason"].startswith("the scheduled task")
 
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
@@ -220,7 +223,7 @@ class TestParseAuditTranscript:
     def test_blank_lines_are_not_checks(self) -> None:
         spec = _host()
         transcript = "\n\n" + _clean_transcript(spec) + "\n"
-        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 17
+        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 18
 
     def test_a_non_check_line_is_unparsable(self) -> None:
         spec = _host()

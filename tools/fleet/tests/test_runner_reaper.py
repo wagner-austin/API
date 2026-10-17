@@ -329,6 +329,83 @@ class TestAReapPass:
         assert _killed(tmp_path) == ["20"]
 
 
+#: The scope the hook adopted the Worker into (MCPs board task 715b9ec5).
+SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-wsl-13.scope"
+
+#: A sibling unit's scope, whose name begins with this unit's: it is not
+#: this unit's, and nothing in it is read as this unit's.
+SIBLING_SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-wsl-2-30.scope"
+
+
+def _scope(table: pathlib.Path, name: str, processes: tuple[Process, ...]) -> None:
+    """Add a job scope of the CI slice holding ``processes``.
+
+    Args:
+        table: The table :func:`_lay_out` wrote.
+        name: The scope's name.
+        processes: Its processes, which :func:`_lay_out` did not write.
+    """
+    for process in processes:
+        directory = table / "proc" / str(process["pid"])
+        directory.mkdir()
+        after = ["S", str(process["ppid"]), *(["0"] * 17), str(process["start_ticks"])]
+        program = process["cmdline"].split()[0]
+        (directory / "stat").write_bytes(
+            f"{process['pid']} ({program}) {' '.join(after)}\n".encode()
+        )
+        (directory / "cmdline").write_bytes(process["cmdline"].replace(" ", "\0").encode())
+    scope = table / "cgroup" / "runners.slice" / name
+    scope.mkdir()
+    (scope / "cgroup.procs").write_bytes(
+        "".join(f"{process['pid']}\n" for process in processes).encode()
+    )
+
+
+class TestJobScopes:
+    """A job runs in a scope of the CI slice, outside its unit's cgroup (MCPs task 715b9ec5)."""
+
+    def test_what_a_finished_job_left_in_its_scope_is_killed(self, tmp_path: pathlib.Path) -> None:
+        _lay_out(tmp_path, OWN)
+        _scope(tmp_path, SCOPE, LEFT)
+
+        ran = _run(tmp_path, BOUND)
+
+        assert (ran.returncode, ran.stderr) == (0, "")
+        assert _killed(tmp_path) == ["20", "21"]
+
+    def test_a_worker_in_its_scope_keeps_its_unit_busy_and_its_own_job_alive(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The Worker and its step are in the scope. In the unit's own cgroup
+        the old forkserver tree predates the Worker and is a job before it,
+        and the daemon started after it is this job's: a reaper that read the
+        unit's cgroup alone would see no Worker and kill that daemon too."""
+        _lay_out(tmp_path, (*OWN, *LEFT, CURRENT))
+        _scope(tmp_path, SCOPE, (WORKER, STEP))
+
+        ran = _run(tmp_path, BOUND)
+
+        assert (ran.returncode, ran.stderr) == (0, "")
+        assert _killed(tmp_path) == ["20", "21"]
+
+    def test_a_sibling_unit_s_scope_is_never_read_as_this_unit_s(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The sibling's leftover would die if its scope were taken for this
+        unit's, which a name glob alone would have done."""
+        _lay_out(tmp_path, OWN)
+        _scope(
+            tmp_path,
+            SIBLING_SCOPE,
+            (Process(pid=30, ppid=1, cmdline="python -m forkserver", start_ticks=10000),),
+        )
+
+        ran = _run(tmp_path, BOUND)
+
+        assert (ran.returncode, ran.stdout, ran.stderr) == (0, "", "")
+        assert _killed(tmp_path) == []
+
+
 def _install() -> RunnerInstall:
     """The WSL install the render cases place.
 

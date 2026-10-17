@@ -186,6 +186,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-api-1/_work'"
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-API.lavender-wsl.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-API.lavender-wsl.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-API.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -194,6 +197,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-API.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-api-2/_work'"
 Write-Check 'workdir:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-API.lavender-wsl-2.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-API.lavender-wsl-2.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/API:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-API.lavender-wsl-2.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -202,6 +208,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-MCPs.lavender-wsl.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -210,6 +219,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-2.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-2/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-MCPs.lavender-wsl-2.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-2.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-2' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-2.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -218,6 +230,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-3.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-3/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-MCPs.lavender-wsl-3.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-3.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-3' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-3.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -226,6 +241,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-MCPs.lavender-wsl-4.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-4/_work'"
 Write-Check 'workdir:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-MCPs.lavender-wsl-4.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-MCPs.lavender-wsl-4.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl-4' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-MCPs.lavender-wsl-4.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -246,6 +264,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-corvis-stick.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-corvis-stick-1/_work'"
 Write-Check 'workdir:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-corvis-stick.lavender-wsl.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-corvis-stick.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/corvis-stick:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-corvis-stick.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
@@ -278,6 +299,9 @@ $State = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'service:wsl:actions.runner.wagner-austin-tree-bot.lavender-wsl.service' ($State -eq 'active') ('it said: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "test -d '/home/gharunner/actions-runner-treebot-1/_work'"
 Write-Check 'workdir:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0) ('test -d exited ' + $Probe.Exit)
+$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-job-scope --audit 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
+$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')
+Write-Check 'placement:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') ('actions.runner.wagner-austin-tree-bot.lavender-wsl.service in listeners.slice and its jobs in runners.slice; the helper read: ' + $Probe.Text)
 $Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper --audit 21600 'actions.runner.wagner-austin-tree-bot.lavender-wsl.service'"
 $Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')
 Write-Check 'orphans:wagner-austin/tree-bot:wsl:lavender-wsl' ($Probe.Exit -eq 0 -and $Leftover -eq '0') ('processes older than 360 minutes that a finished job left in actions.runner.wagner-austin-tree-bot.lavender-wsl.service, or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)
