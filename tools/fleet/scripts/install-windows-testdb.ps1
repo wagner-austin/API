@@ -58,6 +58,25 @@
     redirected by PowerShell is an error record, and docker writes its pull
     progress there.
 
+    DOCKER DESKTOP NEEDS A LAUNCHER, OR A REBOOT ENDS THE LANE (MCPs board
+    task 801ecab0). Docker Desktop starts at its account's logon, and a node
+    nobody logs on to after a reboot runs no daemon and so no container:
+    loki rebooted at 2026-10-14 20:33 local and claimed no testdb job for
+    about three days. MCPs' node standard (fleet-mcp
+    scripts/FleetStandardDocker.ps1) runs as SYSTEM at boot and every 15
+    minutes and starts a stopped Docker Desktop through the scheduled task
+    whose action is Docker Desktop.exe. SYSTEM cannot start it itself, since
+    it must run as the account that owns its settings and its WSL distro.
+    So this script makes sure such a task exists in the root folder: one
+    already there (sedona's \SlimeDockerAutoStart) is left as it is, and
+    otherwise \corvis-docker-desktop-start is registered as the account
+    running this script, S4U so it needs no logon, at the highest run level,
+    as the one opus-mcps-1008-debe registered on loki by hand on
+    2026-10-10. It has no trigger: the node standard is what runs it, at
+    boot and whenever the daemon is down. The tasks are read through Task
+    Scheduler's COM service, because the scheduled-task cmdlets fail while
+    another process deletes a task (MCPs board task d69786fa).
+
 .PARAMETER Root
     The directory the client's bin directory is unpacked into.
 
@@ -70,6 +89,23 @@
 .PARAMETER Docker
     Docker Desktop's docker.exe, by its full path, since the pull runs with
     no PATH to find it on.
+
+.PARAMETER DockerDesktop
+    Docker Desktop.exe, by its full path: the program a launcher task runs.
+
+.PARAMETER Launcher
+    The name the launcher task is registered under when the root folder has
+    none.
+
+.PARAMETER ReadLaunchers
+    Reads the names of the root folder's tasks whose action runs a program,
+    given its path. The default asks Task Scheduler's COM service; the test
+    hands in a stand-in.
+
+.PARAMETER RegisterLauncher
+    Registers a launcher task, given its name and the program it runs. The
+    default registers it with Task Scheduler as the account running this
+    script; the test hands in a stand-in.
 
 .PARAMETER Container
     The container's name, the one fleet.contracts.detection.TESTDB_CONTAINER
@@ -104,6 +140,10 @@ param(
     [string]$ClientUrl = 'https://get.enterprisedb.com/postgresql/postgresql-16.15-1-windows-x64-binaries.zip',
     [string]$ClientSha256 = '25e6fcdfb8caec38691bf461125e7564508760666f7b8e5dc6a5f0818f58f81e',
     [string]$Docker = "$env:ProgramFiles\Docker\Docker\resources\bin\docker.exe",
+    [string]$DockerDesktop = "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe",
+    [string]$Launcher = 'corvis-docker-desktop-start',
+    [scriptblock]$ReadLaunchers = { param([string]$Execute) Get-RootTaskRunning $Execute },
+    [scriptblock]$RegisterLauncher = { param([string]$Name, [string]$Execute) Register-DockerDesktopLauncher $Name $Execute },
     [string]$Container = 'corvis-fleet-testdb',
     [string]$Image = 'pgvector/pgvector:pg16-bookworm',
     [int]$Port = 15432,
@@ -137,6 +177,44 @@ function Get-TestdbPortListener {
     if ($bound.Count -eq 0) { return $null }
     $names = @(Get-Process | Where-Object { $_.Id -eq $bound[0].OwningProcess } | ForEach-Object { $_.ProcessName })
     return "$(@($names + 'an unnamed process')[0]) (pid $($bound[0].OwningProcess))"
+}
+
+function Get-RootTaskRunning {
+    <#
+    .SYNOPSIS
+        The names of the root folder's tasks with an action that runs a
+        program: what the default -ReadLaunchers answers.
+    .DESCRIPTION
+        Read through Task Scheduler's COM service, hidden tasks included. An
+        action's Path is read only on an exec action (type 0), the one kind
+        that has it.
+    .PARAMETER Execute
+        The program's full path.
+    #>
+    param([string]$Execute)
+    $scheduler = New-Object -ComObject Schedule.Service
+    $scheduler.Connect()
+    return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object {
+            @($_.Definition.Actions | Where-Object { $_.Type -eq 0 -and $_.Path -eq $Execute }).Count -gt 0
+        } | ForEach-Object { $_.Name })
+}
+
+function Register-DockerDesktopLauncher {
+    <#
+    .SYNOPSIS
+        Register the root folder task that starts Docker Desktop as the
+        account running this script, with no logon and no trigger: what the
+        default -RegisterLauncher does.
+    .PARAMETER Name
+        The task's name.
+    .PARAMETER Execute
+        Docker Desktop.exe's full path.
+    #>
+    param([string]$Name, [string]$Execute)
+    $action = New-ScheduledTaskAction -Execute $Execute
+    $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType S4U -RunLevel Highest
+    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
+    [void](Register-ScheduledTask -TaskPath '\' -TaskName $Name -Action $action -Principal $principal -Settings $settings)
 }
 
 function Invoke-Native {
@@ -193,6 +271,11 @@ $parts = @([string][Environment]::GetEnvironmentVariable('Path', $PathScope) -sp
 if ($parts -notcontains $bin) {
     [Environment]::SetEnvironmentVariable('Path', ((@($parts) + $bin) -join ';'), $PathScope)
     Write-Output "fleet-testdb: added $bin to the $PathScope PATH"
+}
+
+if (@(& $ReadLaunchers $DockerDesktop).Count -eq 0) {
+    & $RegisterLauncher $Launcher $DockerDesktop
+    Write-Output "fleet-testdb: registered \$Launcher, the task the node standard starts $DockerDesktop through"
 }
 
 $declared = "127.0.0.1:$Port"

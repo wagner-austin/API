@@ -118,7 +118,13 @@ BeforeAll {
 
     function Get-InstallParameterSet {
         param([string]$Root, [pscustomobject]$Docker, [pscustomobject]$Client)
-        $parameters = @{ Root = $Root; Docker = $Docker.Path; PathScope = 'Process'; ClientUrl = 'file:///absent.zip' }
+        # A node whose root folder already has a launcher, as sedona's has
+        # \SlimeDockerAutoStart, so a case registers nothing unless it says so.
+        $parameters = @{
+            Root = $Root; Docker = $Docker.Path; PathScope = 'Process'; ClientUrl = 'file:///absent.zip'
+            ReadLaunchers = { param([string]$Execute) 'SlimeDockerAutoStart' }
+            RegisterLauncher = { param([string]$Name, [string]$Execute) throw "TEST_UNEXPECTED_REGISTER: $Name" }
+        }
         if ($null -ne $Client) {
             $parameters.ClientUrl = $Client.Url
             $parameters.ClientSha256 = $Client.Sha256
@@ -224,6 +230,57 @@ Describe 'install-windows-testdb' {
         [System.IO.File]::ReadAllLines($docker.Calls) | Should -Be @(
             'ps -aq --filter "name=^corvis-fleet-testdb$"', 'port corvis-fleet-testdb 5432/tcp',
             'inspect corvis-fleet-testdb --format "{{len .Mounts}}"')
+    }
+    # MCPs board task 801ecab0: loki, rebooted with nobody logged on, ran no
+    # Docker Desktop for three days because nothing the node standard could
+    # run started it.
+    It 'registers the launcher when the root folder has none, before any docker call, and says so' {
+        $root = Initialize-Installed
+        $docker = Initialize-Docker -Exists
+        $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
+        $parameters = Get-InstallParameterSet $root $docker $null
+        $asked = New-Object System.Collections.Generic.List[string]
+        $registered = New-Object System.Collections.Generic.List[string]
+        $parameters.ReadLaunchers = { param([string]$Execute) $asked.Add($Execute) }.GetNewClosure()
+        $parameters.RegisterLauncher = {
+            param([string]$Name, [string]$Execute)
+            $registered.Add("$Name|$Execute|$(Test-Path -LiteralPath $docker.Calls)")
+        }.GetNewClosure()
+        $desktop = "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+        $said = @(Invoke-Install $parameters)
+        $said | Should -Be @(
+            "fleet-testdb: registered \corvis-docker-desktop-start, the task the node standard starts $desktop through",
+            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+        @($asked) | Should -Be @($desktop)
+        @($registered) | Should -Be @("corvis-docker-desktop-start|$desktop|False")
+    }
+    It 'registers a real S4U launcher with no trigger through Task Scheduler, and finds it on the rerun' {
+        . (Join-Path $PSScriptRoot 'task-fixtures.ps1')
+        $name = 'fleet-test-' + [guid]::NewGuid().ToString('N').Substring(0, 12)
+        $desktop = Join-Path $TestDrive 'Docker Desktop.exe'
+        try {
+            $root = Initialize-Installed
+            $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
+            $parameters = Get-InstallParameterSet $root (Initialize-Docker -Exists) $null
+            $parameters.Remove('ReadLaunchers')
+            $parameters.Remove('RegisterLauncher')
+            $parameters.DockerDesktop = $desktop
+            $parameters.Launcher = $name
+            @(Invoke-Install $parameters)[0] |
+                Should -BeExactly "fleet-testdb: registered \$name, the task the node standard starts $desktop through"
+            $task = (Get-TaskDefinition $name).Task
+            $task.Actions.Exec.Command | Should -BeExactly $desktop
+            $task.Principals.Principal.UserId | Should -BeExactly ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value)
+            $task.Principals.Principal.LogonType | Should -BeExactly 'S4U'
+            $task.Principals.Principal.RunLevel | Should -BeExactly 'HighestAvailable'
+            $task.Settings.ExecutionTimeLimit | Should -BeExactly 'PT0S'
+            $task.Settings.DisallowStartIfOnBatteries | Should -BeExactly 'false'
+            @($task.SelectNodes("*[local-name()='Triggers']/*")).Count | Should -Be 0
+            @(Invoke-Install $parameters) |
+                Should -Be @('fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+        } finally {
+            Invoke-TaskCleanup $name
+        }
     }
     It 'refuses a client zip whose digest is not the pinned one, and keeps none of it' {
         $client = Initialize-ClientZip @{ 'pgsql/bin/psql.cmd' = '@echo off' }
