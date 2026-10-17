@@ -26,6 +26,8 @@ rather than by size, mirroring the top-level ``_test_hooks`` tree:
   and re-attaching to the ones a previous manager spawned.
 * :mod:`~tankpit_bot.service._test_hooks.bots` — constructing the bot
   a session runs.
+* :mod:`~tankpit_bot.service._test_hooks.tv` — the one SOAP request
+  the fleet sends the operator's TV.
 
 Every name stays importable from ``tankpit_bot.service._test_hooks``
 exactly as before, and a test that swaps one here swaps what
@@ -70,16 +72,24 @@ from tankpit_bot.service._test_hooks.serving import (
     serve,
     serve_fleet,
 )
+from tankpit_bot.service._test_hooks.tv import (
+    PostSoapProtocol,
+    SoapReplyDict,
+    _real_post_soap,
+    post_soap,
+)
 
 __all__ = [
     "BotFactoryBuilderProtocol",
     "OpenAdoptedProcessProtocol",
+    "PostSoapProtocol",
     "ProbeExistingInstanceProtocol",
     "ProcessIdentityProtocol",
     "ServeProtocol",
     "SiteFactoryProtocol",
     "SiteRunnerProtocol",
     "SleepSecondsProtocol",
+    "SoapReplyDict",
     "SpawnBotProcessProtocol",
     "SpawnedProcessProtocol",
     "_AdoptedProcess",
@@ -87,6 +97,7 @@ __all__ = [
     "_real_build_bot_factory",
     "_real_build_site",
     "_real_open_adopted_process",
+    "_real_post_soap",
     "_real_process_identity",
     "_real_serve",
     "_real_serve_fleet",
@@ -95,6 +106,7 @@ __all__ = [
     "build_bot_factory",
     "build_site",
     "open_adopted_process",
+    "post_soap",
     "probe_existing_instance",
     "process_identity",
     "serve",
