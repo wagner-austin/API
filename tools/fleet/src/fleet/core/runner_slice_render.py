@@ -19,7 +19,9 @@ MCPs board task 45a4f22b; the budget and the incident behind it are
    job is a ``Runner.Worker`` process in the unit's cgroup, which is where
    every Worker of a unit outside the listener slice runs, and a restart
    under one would kill the build. A busy runner is named and left where it
-   is; the next provision moves it.
+   is, and the reaper's 30 s pass restarts it at its first moment between
+   jobs (:mod:`fleet.core.runner_reaper_render`), since lavender's runners go
+   from one job straight into the next and a provision seldom finds one idle.
 """
 
 from __future__ import annotations
@@ -190,7 +192,7 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
         "        if grep -qs Runner.Worker /dev/null "
         '$(sed "s#.*#/proc/&/cmdline#" "/sys/fs/cgroup$cgroup/cgroup.procs"); then',
         f"            echo 'listener placement pending: {unit} is running a job; "
-        "the next provision moves it'",
+        "the reaper restarts it into the listener slice between jobs'",
         "        else",
         f"            systemctl restart {unit}",
         f"            echo 'listener placed: {unit} moved into {LISTENER_SLICE_NAME}, "

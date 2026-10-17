@@ -307,7 +307,7 @@ class TestRunnerPlacement:
         busy = next(index for index, line in enumerate(lines) if "Runner.Worker" in line)
         assert lines[busy + 1] == (
             f"            echo 'listener placement pending: {UNIT} is running a job; "
-            "the next provision moves it'"
+            "the reaper restarts it into the listener slice between jobs'"
         )
         assert lines[busy + 2] == "        else"
 
