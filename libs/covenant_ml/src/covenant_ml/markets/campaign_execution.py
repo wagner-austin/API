@@ -12,6 +12,7 @@ from platform_core.json_utils import (
     JSONObject,
 )
 
+from . import _test_hooks
 from .campaign_inputs import acquisition_window, load_campaign_inputs
 from .campaign_planning import write_new_json
 from .campaign_process import CommandRunner
@@ -22,6 +23,7 @@ from .campaign_records import (
     decode_attempt,
     encode_attempt,
 )
+from .evidence_location import locate_evidence
 from .paper_records import PaperPlan
 from .paper_scoring import load_verified_predictions
 from .provenance import implementation_digest
@@ -92,6 +94,7 @@ def _command(
             str(root / "reports" / f"{name}-capture.json"),
             *tail,
         )
+    relocations = _test_hooks.evidence_relocations()
     models = {model["hour"]: model["path"] for model in campaign["models"]}
     return (
         *base,
@@ -99,9 +102,9 @@ def _command(
         "--plan",
         str(root / "plans" / (name + ".json")),
         "--protocol",
-        campaign["protocol_path"],
+        str(locate_evidence(campaign["protocol_path"], relocations)),
         "--models",
-        models[plan["forecast_hour"]],
+        str(locate_evidence(models[plan["forecast_hour"]], relocations)),
         "--forecast-url",
         forecast_url,
         *tail,

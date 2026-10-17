@@ -24,6 +24,9 @@ from platform_core.run_record import (
     run_record_sidecar,
 )
 
+from . import _test_hooks
+from .evidence_location import locate_evidence
+
 
 def read_verified_market_report(
     path: Path,
@@ -51,9 +54,10 @@ def read_verified_market_report(
     if record["payload_digest"] != digest:
         raise ValueError(f"[{error_code}] report differs from its RunRecord")
     sources = [path, sidecar]
+    relocations = _test_hooks.evidence_relocations()
     for value in require_list(report, "sources"):
         source = narrow_json_to_dict(value)
-        source_path = Path(require_str(source, "path"))
+        source_path = locate_evidence(require_str(source, "path"), relocations)
         if sha256(source_path.read_bytes()).hexdigest() != require_str(source, "sha256"):
             raise ValueError(f"[{error_code}] original source evidence changed")
         sources.append(source_path)

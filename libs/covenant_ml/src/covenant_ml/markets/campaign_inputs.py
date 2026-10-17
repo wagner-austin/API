@@ -8,7 +8,9 @@ from pathlib import Path
 
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
+from . import _test_hooks
 from .campaign_records import Campaign, decode_campaign
+from .evidence_location import locate_evidence
 from .paper_records import PaperPlan, encode_paper_plan
 from .validation import parse_timestamp
 
@@ -31,10 +33,11 @@ def load_campaign_inputs(root: Path, digest: str) -> Campaign:
     if sha256(payload).hexdigest() != digest:
         raise ValueError("[CAMPAIGN-007] campaign manifest differs from scheduler identity")
     campaign = decode_campaign(narrow_json_to_dict(load_json_str(payload.decode("utf-8"))))
+    relocations = _test_hooks.evidence_relocations()
     artifacts = [(campaign["protocol_path"], campaign["protocol_digest"])]
     artifacts.extend((model["path"], model["digest"]) for model in campaign["models"])
     for path, expected in artifacts:
-        if sha256(Path(path).read_bytes()).hexdigest() != expected:
+        if sha256(locate_evidence(path, relocations).read_bytes()).hexdigest() != expected:
             raise ValueError("[CAMPAIGN-007] frozen protocol or model artifact changed")
     for plan in campaign["plans"]:
         expected_text = dump_json_str(encode_paper_plan(plan), indent=2)

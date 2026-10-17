@@ -21,6 +21,7 @@ from platform_core.http_client import HttpxClient, SyncTransport, build_client
 from .campaign_process import CommandRunner, run_command
 from .demo_batch import DemoBatchService, build_demo_batch
 from .demo_trial import DemoTrialService, build_demo_trial
+from .evidence_location import EvidenceRelocation, read_host_relocations
 from .kalshi_auth import KalshiSigner
 from .kalshi_demo import DemoAccountClient
 
@@ -40,6 +41,7 @@ client_factory: Callable[[float, SyncTransport | None], HttpxClient] = build_cli
 host_probe: HostProbe = stdlib_host_probe(cpu_count)
 installed_version: VersionReader = _installed_version
 campaign_runner: CommandRunner = run_command
+evidence_relocations: Callable[[], tuple[EvidenceRelocation, ...]] = read_host_relocations
 demo_account_factory: Callable[
     [HttpxClient, KalshiSigner, Callable[[], str]], DemoAccountClient
 ] = DemoAccountClient
@@ -58,6 +60,7 @@ __all__ = [
     "demo_account_factory",
     "demo_batch_factory",
     "demo_trial_factory",
+    "evidence_relocations",
     "host_probe",
     "installed_version",
     "pause",

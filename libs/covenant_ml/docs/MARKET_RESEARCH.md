@@ -610,6 +610,21 @@ date from the campaign that answers for it. To remove the continuation's
 schedule, run `systemctl --user disable --now covenant-market-paper-20261019-20261212.timer`
 on diphtheria. Removing it preserves every evidence file.
 
+**Evidence that moved hosts.** Reports and manifests record each source by its
+absolute path at writing time, and every reader re-hashes the file there. So
+evidence written on Windows could not be verified on any Linux host.
+`markets/evidence_location.py` reads a host's declaration,
+`~/.config/covenant_ml/evidence-relocations.json`: schema version 1, with a list
+of `recorded_prefix` and `current_prefix` pairs. A recorded path under a declared
+prefix is read at the same relative place under its current prefix. The first
+declared prefix containing the path decides, and a path under none is read
+where it was recorded. Report verification (`reporting.py`), the campaign's
+frozen-input check (`campaign_inputs.py`), the tick's child commands and the
+campaign evaluator all locate through it. The SHA-256 each checks is still the
+one recorded, so a relocation can only point at a byte-identical copy. An absent
+declaration relocates nothing. A malformed one is refused with
+`EVIDENCE-RELOCATION-001`.
+
 The [offline campaign evaluator](CAMPAIGN_EVALUATION.md) now verifies the frozen
 inputs and original reports, replays archived settlements, and computes the
 declared event-date comparison. It retains every acquisition omission and

@@ -15,9 +15,11 @@ from platform_core.json_utils import (
     require_str,
 )
 
+from . import _test_hooks
 from .archive import ResponseArchive
 from .campaign_evidence import read_campaign_attempt, replay_campaign_outcomes
 from .campaign_inputs import load_campaign_inputs
+from .evidence_location import locate_evidence
 from .paper_records import decode_paper_plan
 from .paper_scoring import load_verified_predictions
 from .settlement_records import ARMS, SavedPrediction
@@ -98,8 +100,9 @@ def evaluate_campaign(
     """
     campaign = load_campaign_inputs(root, digest)
     observed = parse_timestamp(observed_at)
-    sources = {root / "campaign.json", Path(campaign["protocol_path"])}
-    sources.update(Path(model["path"]) for model in campaign["models"])
+    relocations = _test_hooks.evidence_relocations()
+    sources = {root / "campaign.json", locate_evidence(campaign["protocol_path"], relocations)}
+    sources.update(locate_evidence(model["path"], relocations) for model in campaign["models"])
     rows: list[JSONValue] = []
     counts: dict[str, int] = {}
     scoring: dict[int, list[tuple[str, int, JSONObject]]] = {0: [], 12: []}
