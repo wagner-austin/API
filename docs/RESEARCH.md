@@ -1564,6 +1564,11 @@ or retrospective replacement. The integrated suite now passes 3,145 tests with
 100% statement and branch coverage. The linked contract records the manifest,
 protocol, schedule, evidence locations and removal procedure; future observations
 are not represented as completed research or profits.
+On 2026-10-17 the study was re-planned on Linux because its Windows host is
+reimaged. A continuation on diphtheria answers for October 19 through December 12,
+with the same protocol, model reports and collector implementation, byte for
+byte. The original answers for October 14 through 18. The contract records both
+manifests and the relocation record.
 
 `libs/covenant_ml/scripts/execution_rehearsal.py` separately exercises the proposed
 $20 execution experiment's fixed risk limits using a durable SQLite journal.

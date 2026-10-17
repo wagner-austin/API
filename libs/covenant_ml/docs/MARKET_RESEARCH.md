@@ -578,6 +578,38 @@ tick registrations in MCPs board task b27bd34a). Removing the task
 preserves every evidence file. The scheduler continues checking evidence after
 the finite study window until removed; it does not extend the study implicitly.
 
+**Continuation on Linux (2026-10-17).** austinpc, the Windows host above, is
+reimaged to Linux (MCPs board task `e2ffed0d`). The manifest records absolute
+Windows paths that every tick re-hashes, so the study cannot run on Linux as
+frozen. The operator chose to re-plan it there under a new manifest. The
+continuation `frozen-autumn-probability-study-diphtheria` answers for event
+dates **October 19 through December 12** (330 plans). The original answers for
+**October 14 through 18**. Both are prepared from the same protocol and the same
+two fitted-model reports, byte for byte, and run the same collector
+implementation, SHA-256
+`332f0975d3ef78766c5f1f863ea9034fa37c79c7ebe6d46cd85c9cd5a080fcb7`. The Linux
+runtime is a byte-identical copy of `campaign-runtime/` with a fresh locked
+Poetry environment, and its `implementation_digest()` was measured equal before
+preparation. The continuation's manifest SHA-256 is
+`f57a191b3a7a1f289d01e5b9826a9f9d49e6222133a06382e2a92330a122cc85`, under
+`/home/corvis/PROJECTS/files/market-edge-20261012/campaign-20261019-20261212/`
+on diphtheria. Its first tick (2026-10-17 23:12 UTC) reported 660 future
+acquisitions. The systemd user timer `covenant-market-paper-20261019-20261212.timer`
+runs the tick every three minutes and one minute after boot.
+
+The original keeps running on austinpc until the reimage stops it. That lets it
+complete the settlement snapshots of its October 14 to 18 captures, the last on
+October 20 at 15:00-16:00 UTC. Whatever it captures for October 19 or later is
+outside its study scope. It is retained as a same-implementation, cross-host
+replication of the continuation, not as observations. The record of the move is
+`market-edge-20261012/campaign-relocation-20261017.json`, SHA-256
+`c402550295f470a42d8170a991288dede3630308af1efd821bea8710f34f5060`. It names both
+manifests, both hosts, each campaign's event dates, and the protocol, model and
+implementation identities. An evaluation of the full 60-date window reads each
+date from the campaign that answers for it. To remove the continuation's
+schedule, run `systemctl --user disable --now covenant-market-paper-20261019-20261212.timer`
+on diphtheria. Removing it preserves every evidence file.
+
 The [offline campaign evaluator](CAMPAIGN_EVALUATION.md) now verifies the frozen
 inputs and original reports, replays archived settlements, and computes the
 declared event-date comparison. It retains every acquisition omission and
