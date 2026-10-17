@@ -6766,3 +6766,34 @@ to scan one of the four corners around it without moving." It is preserved
 at `docs/sources/next-preview-2026-10-17.png`. The page counted three stream
 reconnects by 41 seconds while playback passed; that observation was sent
 to the stream-repair session rather than treated as a wording failure.
+
+## [2026-10-17] fix | Capture queues sized in frames, and the registry rewritten atomically
+
+MCPs board task 73d4789e. With four World bots and the four-up TV stream
+live at 08:19 UTC, sedona's Docker VM ran out of memory and swap, the
+kernel's OOM killer fired at 08:20, and Docker Desktop restarted at 08:24,
+taking every container on sedona down for about five minutes. Each
+`x11grab` input passed `-thread_queue_size 1024`, the depth the sound
+input needs, and a video packet is one raw 1280-by-768 frame of 3.9 MB,
+so an encoder that fell behind could hold 4 GB per display. Measured on
+one display with the encoder held behind, a 1024 queue grew from 733 to
+1013 MB in 20 s and a 30-frame queue stayed at 810 MB. Every display input,
+per-bot and four-up, now queues one second of frames
+(`stream.capture.video_queue_frames`); sound keeps 1024 packets.
+
+The same incident corrupted `data/tank_registry.json`: three bots ending
+together each truncated and rewrote it, leaving a 3651-byte document
+followed by the longer write's tail, and the next bot died on
+`InvalidJsonError`. The registry is now rewritten with the atomic
+`replace_text`, read through `read_once`, and a read that a replace
+window hides or that does not parse skips the sample instead of
+overwriting the other accounts. The corrupt file is kept on sedona as
+`data/tank_registry.corrupt-20261017T0811Z.json`.
+
+Release `3888f06b2` carries both. From 09:40:24 to 09:51:07 UTC four bots
+and the four-up stream ran on it, cast to the operator's TV, which read
+PLAYING: 65 samples of the VM gave a lowest MemAvailable of 1496620 kB,
+swap free never below 2090572 kB, a highest load of 26.6 on 20 cores and
+no new oom-kill line. Each per-bot encoder held about 440 MB and the
+four-up one 1.43 GB. At the operator's request every bot was drained and the fleet stopped at 09:51:32 UTC, and the
+TV was sent a UPnP Stop at 09:54 UTC.
