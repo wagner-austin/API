@@ -1,6 +1,6 @@
-"""The two passes a hub tick runs after its claim: publish and observe.
+"""The three passes a hub tick runs after its claim: publish, observe and reap.
 
-Both are the control duty's (MCPs board task c39ee056), so only
+Each is the control duty's (MCPs board task c39ee056), so only
 ``fleet-agent --lane hub`` runs them (:mod:`fleet.cli.agent`); a sessions
 tick claims and stops. The module docstring of :mod:`fleet.cli.agent` says
 why each comes in the order it does.
@@ -15,7 +15,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import _test_hooks, declared, observe, registry
+from fleet.core import _test_hooks, declared, observe, registry, runner_reap_dropped
 
 _log = get_logger(__name__)
 
@@ -80,4 +80,25 @@ def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
         _log.info("%s", observe.render_outcome(outcome))
 
 
-__all__ = ["observe_pass", "publish_pass"]
+def reap_pass(repo_root: pathlib.Path) -> None:
+    """End every WSL runner Worker whose job GitHub dropped (MCPs board task 715b9ec5).
+
+    Args:
+        repo_root: The API checkout whose object store holds
+            ``refs/fleet/rolled``, at whose commit the roster is read.
+
+    Raises:
+        AppError: As :func:`fleet.core.runner_reap_dropped.reap_pass` and
+            :func:`fleet.core.runner_reap_dropped.read_rolled_roster` say. A
+            roster that could not be read is logged with its code, every tick
+            it happens, and nothing is reaped.
+    """
+    roster = runner_reap_dropped.read_rolled_roster(repo_root)
+    if isinstance(roster, str):
+        _log.warning("reaped nothing: %s", roster)
+        return
+    for line in runner_reap_dropped.reap_pass(roster):
+        _log.info("%s", line)
+
+
+__all__ = ["observe_pass", "publish_pass", "reap_pass"]

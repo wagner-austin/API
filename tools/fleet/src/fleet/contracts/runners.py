@@ -27,10 +27,12 @@ from __future__ import annotations
 
 from typing import Literal
 
+from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
     JSONValue,
+    load_json_str,
     require_bool,
     require_dict,
     require_int,
@@ -544,6 +546,29 @@ def decode_runner_spec(value: JSONValue) -> RunnerSpec:
     return RunnerSpec(hosts=hosts)
 
 
+def parse_runner_spec(raw: str, *, source: str) -> RunnerSpec:
+    """Read a roster's text, the one reader of the checkout's file and the rolled one.
+
+    Args:
+        raw: The text of ``runners.json``.
+        source: Where it was read, for the refusal.
+
+    Returns:
+        The validated roster.
+
+    Raises:
+        AppError: ``RUNNER_SPEC_UNREADABLE`` when the text does not decode as
+            a roster.
+    """
+    try:
+        return decode_runner_spec(load_json_str(raw))
+    except JSONTypeError as fault:
+        raise AppError(
+            FleetErrorCode.RUNNER_SPEC_UNREADABLE,
+            f"the runner roster at {source} cannot be read: {fault}",
+        ) from fault
+
+
 __all__ = [
     "FileAsset",
     "HostRunnerSpec",
@@ -557,4 +582,5 @@ __all__ = [
     "encode_host_runner_spec",
     "encode_runner_install",
     "encode_runner_spec",
+    "parse_runner_spec",
 ]

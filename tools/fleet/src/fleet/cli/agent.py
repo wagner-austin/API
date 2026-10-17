@@ -36,8 +36,8 @@ kills (board task 4199d1fb) and nine nodes behaved as one slow node; lanes
 and per-node runners are the fix, and nothing here collects a suite any more
 because nothing here starts one.
 
-A HUB TICK IS THREE PASSES, IN THIS ORDER; a sessions tick is the first
-alone, since publishing and observing are the control duty's:
+A HUB TICK IS FOUR PASSES, IN THIS ORDER; a sessions tick is the first
+alone, since publishing, observing and reaping are the control duty's:
 
     1. CLAIM. Take at most one job of the lane and run it to its close.
     2. PUBLISH. Read every project the registry declares at the commit
@@ -58,6 +58,12 @@ alone, since publishing and observing are the control duty's:
        Runs only when ``--registry`` names the identity registry: the pass
        needs to know which machines exist, and that file lives in the MCPs
        checkout, which a runner may legitimately not have.
+    4. REAP. Read each WSL runner host's Workers against GitHub's runner
+       list, read again two minutes later where one was named, and end each
+       Worker both readings name as holding a job GitHub dropped, by pid,
+       through the host's reaper (MCPs board task 715b9ec5,
+       :mod:`fleet.core.runner_reap_dropped`). Last, because its second
+       reading waits, and nothing above should wait behind it.
 
 At most ONE job per tick, deliberately: a bake or a session verb holds its
 machine, and a second claimed before the first closed would run beside it.
@@ -505,6 +511,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         _log.info("session observation skipped: no %s given", REGISTRY_FLAG)
     else:
         hub_passes.observe_pass(pathlib.Path(raw_registry).resolve(), identity)
+    hub_passes.reap_pass(project_root)
     return 0
 
 

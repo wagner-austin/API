@@ -59,14 +59,14 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
+from platform_core.json_utils import dump_json_str
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
 from fleet.contracts.runners import (
     HostRunnerSpec,
     RunnerSpec,
-    decode_runner_spec,
     encode_runner_spec,
+    parse_runner_spec,
 )
 from fleet.core import (
     _test_hooks,
@@ -129,14 +129,7 @@ def load_runner_spec(path: str) -> RunnerSpec:
             reader instead -- an audit pointed at nothing has established
             nothing, and must not report it as anything.
     """
-    raw = _test_hooks.read_text(pathlib.Path(path))
-    try:
-        return decode_runner_spec(load_json_str(raw))
-    except JSONTypeError as fault:
-        raise AppError(
-            FleetErrorCode.RUNNER_SPEC_UNREADABLE,
-            f"the runner roster at {path} cannot be read: {fault}",
-        ) from fault
+    return parse_runner_spec(_test_hooks.read_text(pathlib.Path(path)), source=path)
 
 
 def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec]:

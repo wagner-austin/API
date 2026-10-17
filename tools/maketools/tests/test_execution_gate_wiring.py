@@ -69,13 +69,17 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     # Every fleet tick is poetry running fleet.cli.tick (MCPs board task
     # 94ac1c4f; the MCPs hub runner's fleet rows run that, held by its table
     # suite since MCPs board task b27bd34a), and the tick runs its agent only
-    # through the rolled launcher, for both the hub's agent and a node's.
+    # through the rolled launcher: fleet-agent from the hub lanes' plan and the
+    # sessions lanes' (MCPs board task c39ee056), fleet-node-agent from a
+    # node's. Each plan names its agent once, beside the launcher's flag.
     tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
         encoding="utf-8"
     )
     assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
-    for agent in ("fleet-agent", "fleet-node-agent"):
-        assert len(list(re.finditer(rf'rolled_cli\.AGENT_FLAG,\s+"{agent}",', tick))) == 1
+    plans = {"fleet-agent": 2, "fleet-node-agent": 1}
+    for agent, count in plans.items():
+        assert len(list(re.finditer(rf'rolled_cli\.AGENT_FLAG,\s+"{agent}",', tick))) == count
+    assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == sum(plans.values())
     # The registry is the roll's own; a tick naming one would run pinned code
     # against an unpinned configuration.
     assert "--config" not in tick

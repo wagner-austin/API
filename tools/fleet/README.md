@@ -177,7 +177,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 | Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
-| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<side>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106) |
+| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<side>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5) |
 | The distro itself | Imported from the pinned image |
 | Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1; the keepalive is registered through S4U at startup, so it holds the distro open after a reboot with nobody logged on |
 | Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned, and the audit's `account:windows:<service>:LocalSystem` row drifts on any other |
@@ -218,12 +218,16 @@ claims `build-bases` and the five session verbs (restart, revive,
 graceful and hard kill, and since MCPs mig 564 `compact-session`, which
 runs `session-audit compact` and leaves the session running), runs each on
 the hub and closes it in the same tick. The make targets are the NODE lane's, claimed
-by one `fleet-node-agent` per enabled node. A `fleet-agent` tick is
-therefore two passes, in this order:
+by one `fleet-node-agent` per enabled node. A `fleet-agent` hub tick is
+therefore four passes, in this order:
 
 1. **claim** — take at most one hub-lane job (`dispatch_claim` with
    `lane: "hub"` and no tags), run it here, report it started and closed.
-2. **observe** — read every enabled worker's Claude Code session records
+2. **publish** — hand the queue every project the registry declares at the
+   commit `refs/fleet/rolled` names (`dispatch_registry_publish`), which
+   refuses each queued job naming a project it does not declare (MCPs board
+   tasks `1915b042` and `0be88a36`).
+3. **observe** — read every enabled worker's Claude Code session records
    (`~/.claude/sessions/<pid>.json`) over ssh and hand them to the board's
    session ledger through `task_session_observe`, keyed by the machine they
    came from (MCPs board task `5a3865bf`). The script goes out in the
@@ -234,6 +238,16 @@ therefore two passes, in this order:
    was skipped. A node that is asleep is one logged line, not a failed tick.
    This pass writes to the **taskboard**, so it needs `TASKBOARD_MCP_API_KEY`
    (mcp-taskboard's `MCP_INTERNAL_KEY`) beside the queue's key.
+4. **reap** — read the roster (`runners.json` at the rolled commit) and, for
+   each host with WSL runners, ask `gh` for each repository's runners and the
+   host's job scope helper for each unit's `Runner.Worker`s by pid, start and
+   age. A Worker over five minutes old is holding a job GitHub dropped when
+   GitHub reads its runner offline, idle or unlisted, or when a newer Worker
+   in its unit superseded it. Where one is named, the pass reads again two
+   minutes later and ends each Worker both readings name, by pid, through
+   `fleet-runner-reaper --dropped UNIT PID START` as root on the host (MCPs
+   board task `715b9ec5`). This pass runs `gh` on the hub, as the runners'
+   token minting does.
 
 No loop. The interval belongs to whatever schedules it, where it is visible:
 

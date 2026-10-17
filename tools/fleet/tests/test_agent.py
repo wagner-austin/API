@@ -34,7 +34,7 @@ from fleet.cli import agent
 from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, queue
 from tests._agent_cli import agent_argv, sessions_argv
-from tests._hub_tick import UNROLLED, unrolled_call
+from tests._hub_tick import UNROLLED, UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests._registry import write_registry
 from tests.conftest import FakeRun, failed, ok, workspace_document
@@ -378,7 +378,7 @@ class TestObservingSessions:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
-        _test_hooks.run = FakeRun([UNROLLED, failed(255, "ssh: serendipity is asleep")])
+        _test_hooks.run = FakeRun([UNROLLED, failed(255, "ssh: serendipity is asleep"), UNROLLED])
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -419,6 +419,7 @@ class TestObservingSessions:
                         }
                     )
                 ),
+                UNROLLED,
             ]
         )
         endpoint = FakeQueue(
@@ -438,7 +439,7 @@ class TestObservingSessions:
     def test_without_a_registry_the_tick_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        run = FakeRun([UNROLLED])
+        run = FakeRun([*UNROLLED_TICK])
         _test_hooks.run = run
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
@@ -446,15 +447,20 @@ class TestObservingSessions:
         with caplog.at_level("INFO"):
             agent.main(agent_argv(config_path, repo))
 
-        # The one command is the publish pass's read of the rolled ref, which
-        # resolved nothing, so the queue was sent no registry.
-        assert run.calls == [unrolled_call(repo)]
+        # The two commands are the publish and reap passes' reads of the
+        # rolled ref, which resolved nothing, so the queue was sent no
+        # registry and no host was read.
+        assert run.calls == [*unrolled_calls(repo)]
         assert endpoint.tools == ["dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert "session observation skipped: no --registry given" in messages
         assert "hub lane empty" in messages
         assert any(
             message.startswith("published nothing: FLEET_ROLL_REF_UNRESOLVED: ")
+            for message in messages
+        )
+        assert any(
+            message.startswith("reaped nothing: FLEET_ROLL_REF_UNRESOLVED: ")
             for message in messages
         )
 

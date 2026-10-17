@@ -272,7 +272,8 @@ class TestAttemptAuditHost:
             check_id="dropped-jobs:lavender",
             ok=True,
             detail="examined 1 WSL runner(s) against GitHub; none holds a Runner.Worker over "
-            "300 s that GitHub reads idle, offline or unlisted",
+            "300 s that GitHub reads idle, offline or unlisted, or that a newer Worker "
+            "superseded",
             reason=runner_dropped_check.DROPPED_REASON,
         )
         assert outcome == AuditOutcome(

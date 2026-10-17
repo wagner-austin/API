@@ -32,8 +32,10 @@ which carries no bound, and each job is moved into a scope of
 A refusal fails the job by name, before its first step, rather than running
 it inside the listener's cgroup. The helper's ``--audit UNIT`` mode is the
 audit's placement row (:mod:`fleet.core.runner_audit`), and its ``--workers
-UNIT...`` mode the host's half of the dropped-job row
-(:mod:`fleet.core.runner_dropped_check`).
+UNIT...`` mode the host's half of the dropped-job reading
+(:mod:`fleet.core.runner_dropped_check`): each unit's Workers, in its cgroup or
+its job scopes, by pid, start in clock ticks since boot and age in seconds,
+which the hub's reap names a Worker by.
 """
 
 from __future__ import annotations
@@ -91,8 +93,8 @@ JOB_SCOPE_SCRIPT = (
 # budget throttles the job and never the listener holding its lease.
 # Usage: fleet-runner-job-scope                as root, from the job-started hook
 #        fleet-runner-job-scope --audit UNIT    prints placed or misplaced, then why
-#        fleet-runner-job-scope --workers UNIT... prints each unit and the age in
-#                                               seconds of its oldest Runner.Worker, or -
+#        fleet-runner-job-scope --workers UNIT... prints each Runner.Worker of each
+#                                               unit as UNIT PID START AGE, or UNIT -
 set -euo pipefail
 cgroup_root=/sys/fs/cgroup
 proc_root=/proc
@@ -178,20 +180,23 @@ audit() {
 }
 
 workers() {
-    local unit cgroup pid age oldest
+    local unit cgroup pid started age found
     for unit in "$@"; do
-        oldest=-
+        found=0
         cgroup=$(systemctl show -p ControlGroup --value "$unit")
         if [ -n "$cgroup" ]; then
             for pid in $(unit_procs "$cgroup" "$unit"); do
-                grep -qs Runner.Worker "$proc_root/$pid/cmdline" || continue
+                case "$(argv0_of "$pid")" in
+                    */bin/Runner.Worker) ;;
+                    *) continue ;;
+                esac
+                started=$(start_of "$pid") || continue
                 age=$(age_of "$pid") || continue
-                if [ "$oldest" = - ] || [ "$age" -gt "$oldest" ]; then
-                    oldest=$age
-                fi
+                echo "$unit $pid $started $age"
+                found=1
             done
         fi
-        echo "$unit $oldest"
+        [ "$found" = 1 ] || echo "$unit -"
     done
 }
 

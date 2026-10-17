@@ -369,12 +369,13 @@ OTHER_UNIT = "actions.runner.wagner-austin-API.lavender-wsl-2.service"
 
 
 class TestTheWorkersMode:
-    """The hub's read for the dropped-job row: each unit's oldest Worker age."""
+    """The hub's read for the dropped-job reading: each unit's Workers by pid."""
 
-    def test_the_oldest_worker_in_the_unit_or_its_scopes_is_named(
+    def test_each_worker_in_the_unit_or_its_scopes_is_named_with_its_start_and_age(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """A Worker 990 s old in its scope beside one 10 s old in the unit."""
+        """A Worker 990 s old in its scope beside one 10 s old in the unit,
+        and a step whose command line names a Worker but which is none."""
         scoped = Process(
             pid=20,
             ppid=12,
@@ -382,10 +383,17 @@ class TestTheWorkersMode:
             start_ticks=1000,
             cgroup=f"/{CI_SLICE_NAME}/fleet-job-{UNIT.removesuffix('.service')}-20.scope",
         )
-        _lay_out(tmp_path, (*SERVICE, WORKER, scoped))
+        step = Process(
+            pid=21,
+            ppid=20,
+            cmdline="grep -c Runner.Worker",
+            start_ticks=2000,
+            cgroup=scoped["cgroup"],
+        )
+        _lay_out(tmp_path, (*SERVICE, WORKER, scoped, step))
         ran = _run(tmp_path, "--workers", UNIT)
         assert ran.returncode == 0, ran.stderr
-        assert ran.stdout == f"{UNIT} 990\n"
+        assert ran.stdout == f"{UNIT} 13 99000 10\n{UNIT} 20 1000 990\n"
 
     def test_a_unit_with_no_worker_and_a_stopped_unit_each_read_none(
         self, tmp_path: pathlib.Path

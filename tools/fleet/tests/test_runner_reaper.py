@@ -3,10 +3,11 @@
 These execute the rendered script itself under bash, over a process table
 laid out as files: ``/proc/<pid>/stat`` and ``cmdline``, ``/proc/uptime``
 and the unit's ``cgroup.procs``. Only its two root paths are pointed at that
-table; ``systemctl``, ``kill`` and ``getconf`` are shell functions defined
-before the script runs, which answer from the table and record what was
-killed. The table mirrors lavender on 2026-10-02: a runner unit whose main
-process is ``runsvc.sh``, under it the node service and ``Runner.Listener``,
+table; ``systemctl``, ``kill``, ``getconf`` and ``sleep`` are shell functions
+defined before the script runs, which answer from the table and record what
+was killed and how long a run waited. The table mirrors lavender on
+2026-10-02: a runner unit whose main process is ``runsvc.sh``, under it the
+node service and ``Runner.Listener``,
 and beside them processes a cancelled job reparented to init, one started
 before the next job's Worker and one after it.
 """
@@ -45,6 +46,9 @@ kill() {
 }
 getconf() {
     echo 100
+}
+sleep() {
+    echo "$1" >> "$TABLE/slept"
 }
 """
 

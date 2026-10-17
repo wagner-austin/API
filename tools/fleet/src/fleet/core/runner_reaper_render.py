@@ -50,6 +50,18 @@ scope of the CI slice bound to the unit (:mod:`fleet.core.runner_job_scope_rende
 so what it daemonizes is left in that scope. Every rule above reads a unit's
 processes as ``unit_procs`` lists them, its own cgroup's and its job
 scopes', and a stop of the unit still ends the job: the scope is bound to it.
+
+THE SAME TASK'S A2: ``--dropped UNIT PID START`` ends one Worker GitHub has
+dropped, which rule 3 would spare until the job timeout. On 2026-10-16 six
+such Workers held lavender-wsl's CI slice for 1 h 45 min against a six-hour
+timeout. The host cannot tell such a Worker from a long job, so the hub names
+it (:mod:`fleet.core.runner_reap_dropped`), by pid and by its start in clock
+ticks since boot, and the reaper ends it only while that pid is still that
+process, a Runner.Worker of that unit. It writes each pid's argv before any
+signal, then kills the Worker and every process of the unit descending from
+it, and never the listener above it. A Worker already gone is said and is no
+fault, since a job may end between the hub's reading and this, while a
+process that outlives SIGKILL is a refusal naming it.
 """
 
 from __future__ import annotations
@@ -75,26 +87,63 @@ REAPER_TIMER_NAME = "fleet-runner-reaper.timer"
 #: cancelled job to an empty cgroup.
 REAPER_INTERVAL_SECONDS = 30
 
+#: Seconds the ``--dropped`` mode waits, a second at a time, for every pid it
+#: sent SIGKILL to be gone. The kernel ends a killed process at once unless it
+#: sleeps uninterruptibly, which a slice over its memory high causes: ten
+#: seconds outlasts such a sleep and still ends a hub pass promptly.
+DROPPED_KILL_WAIT_SECONDS = 10
+
 #: The reaper. ``SECONDS`` is the host's job timeout: past it a Worker is
 #: stale. ``--audit SECONDS UNIT`` prints, for one unit, how many of the
 #: processes it would kill are older than SECONDS, and kills nothing: the
 #: audit's check (:mod:`fleet.core.runner_orphan_check`) asks the same
-#: question the reaper acts on.
+#: question the reaper acts on. ``--dropped UNIT PID START`` ends the tree of
+#: the one Worker the hub names, as the module docstring says.
 REAPER_SCRIPT = (
     """#!/usr/bin/env bash
 # fleet-runner-reaper -- rendered by fleet-runners (MCPs board task 53528106).
 # Kills what a finished GitHub Actions job left in its runner unit's cgroup
-# and in the job scopes its Workers were moved into.
+# and in the job scopes its Workers were moved into, and, when the hub names
+# one, a Runner.Worker whose job GitHub dropped (MCPs board task 715b9ec5).
 # Usage: fleet-runner-reaper SECONDS | fleet-runner-reaper --audit SECONDS UNIT
+#        | fleet-runner-reaper --dropped UNIT PID START
 set -euo pipefail
 cgroup_root=/sys/fs/cgroup
 proc_root=/proc
+kill_wait=$KILL_WAIT
 
 """
     + PROCESS_FUNCTIONS
     + "\n"
     + UNIT_PROCS_FUNCTION
     + """
+refuse() {
+    echo "FLEET_RUNNER_REAPER_REFUSED: $1" >&2
+    exit 1
+}
+
+state_of() {
+    local stat
+    stat=$(cat "$proc_root/$1/stat" 2>/dev/null) || return 1
+    stat=${stat##*) }
+    set -- $stat
+    echo "$1"
+}
+
+alive() {
+    local state
+    state=$(state_of "$1") || return 1
+    [ "$state" != Z ]
+}
+
+held() {
+    local pid
+    for pid in $2; do
+        [ "$pid" = "$1" ] && return 0
+    done
+    return 1
+}
+
 descends_from() {
     local pid=$1
     while [ "$pid" -gt 1 ]; do
@@ -158,6 +207,61 @@ leftovers() {
     done
 }
 
+dropped() {
+    local unit=$1 worker=$2 started=$3 cgroup pids pid tree='' count=0 survivors waited=0
+    cgroup=$(systemctl show -p ControlGroup --value "$unit")
+    if [ -z "$cgroup" ]; then
+        echo "fleet-runner-reaper: $unit runs in no cgroup, so Runner.Worker $worker ended with it"
+        return 0
+    fi
+    pids=$(unit_procs "$cgroup" "$unit") || refuse "$unit's cgroup $cgroup cannot be read"
+    if ! held "$worker" "$pids" || [ "$(start_of "$worker" || true)" != "$started" ]; then
+        echo "fleet-runner-reaper: $unit: Runner.Worker $worker, started at $started, has ended"
+        return 0
+    fi
+    case "$(argv0_of "$worker" || true)" in
+        */bin/Runner.Worker) ;;
+        *) refuse "$unit's pid $worker, started at $started, is no Runner.Worker" ;;
+    esac
+    for pid in $pids; do
+        if descends_from "$pid" "$worker"; then
+            tree="$tree $pid"
+            count=$((count + 1))
+        fi
+    done
+    for pid in $tree; do
+        echo "fleet-runner-reaper: $unit: ending pid $pid:" \\
+            "$(tr '\\0' ' ' < "$proc_root/$pid/cmdline" 2>/dev/null || true)"
+    done
+    for pid in $tree; do
+        kill -KILL "$pid" 2>/dev/null || true
+    done
+    while :; do
+        survivors=''
+        for pid in $tree; do
+            if alive "$pid"; then
+                survivors="$survivors $pid"
+            fi
+        done
+        [ -n "$survivors" ] || break
+        [ "$waited" -lt "$kill_wait" ] ||
+            refuse "$unit: pid(s)$survivors of Runner.Worker $worker's tree outlived SIGKILL"
+        sleep 1
+        waited=$((waited + 1))
+    done
+    echo "fleet-runner-reaper: $unit: ended Runner.Worker $worker and its tree, $count" \\
+        "process(es), whose job GitHub dropped; its listener runs on"
+}
+
+if [ "${1:-}" = --dropped ]; then
+    if [ $# -ne 4 ] || [ -z "$3" ] || [ -z "$4" ] || [ -n "${3//[0-9]/}${4//[0-9]/}" ]; then
+        echo "fleet-runner-reaper: usage: fleet-runner-reaper --dropped UNIT PID START" >&2
+        exit 2
+    fi
+    dropped "$2" "$3" "$4"
+    exit 0
+fi
+
 if [ "${1:-}" = --audit ]; then
     count=0
     for pid in $(leftovers "$3" "$2"); do
@@ -188,7 +292,7 @@ for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut 
     fi
 done
 """
-)
+).replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
 
 #: The reaper's timer.
 REAPER_TIMER = f"""[Unit]
@@ -282,6 +386,7 @@ def render_reaper_lines(spec: HostRunnerSpec) -> list[str]:
 
 
 __all__ = [
+    "DROPPED_KILL_WAIT_SECONDS",
     "KILL_DROP_IN",
     "KILL_DROP_IN_NAME",
     "REAPER_INTERVAL_SECONDS",
