@@ -64,9 +64,14 @@ infra: commit-tasks executed services-executed
 # tools/fleet's fleet.cli.rolled, never from this checkout; this is the only
 # thing that moves the ref, and only after executed passed at HEAD. The ref
 # lives in the object store every worktree shares, so a roll from any of
-# them is what the next tick runs.
+# them is what the next tick runs. It is pushed to origin as well (MCPs
+# board task c39ee056), since a machine holding a hub-runner duty other than
+# the hub ticks its own lanes and has no other way to learn the roll: MCPs
+# maketools release-sync fetches it there and aligns that machine's checkout
+# to it. A roll may move the ref back, so the push forces it.
 fleet-roll: commit-tasks executed
 	git update-ref refs/fleet/rolled HEAD
+	git push origin +refs/fleet/rolled:refs/fleet/rolled
 
 # ---------------------------------------------------------------------------
 # Individual Services (each starts infra first)
