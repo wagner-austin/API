@@ -121,9 +121,20 @@ def test_an_adopted_process_reports_its_exit_code_after_it_dies(
     the handle is what keeps the exit observable.
     """
     adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
+    # A second psutil handle, resolved while the process is alive, as in
+    # the liveness test below: looking the pid up after the kill races
+    # its reaping.
+    observer = psutil.Process(sleeper.pid)
 
     sleeper.kill()
     expected = sleeper.wait()
+    # The parent's handle and psutil's are two observers of one exit, and
+    # under load psutil's zero-wait poll can still answer "not yet" for a
+    # moment after the parent's wait returned (board task b347c6aa: 10 of
+    # 300 kills on austinpc under 40 busy processes, each settled within a
+    # millisecond). So the test blocks on psutil's own observation of the
+    # exit, once, before asking what the adopted handle reads.
+    observer.wait(timeout=30)
 
     # The adopted handle agrees with the parent's own handle, and keeps
     # agreeing: neither answer is a one-shot reading.
