@@ -47,11 +47,12 @@ from tankpit_bot.stream.audio import (
 )
 from tankpit_bot.stream.capture import (
     AUDIO_BITRATE_KBPS,
+    AUDIO_QUEUE_PACKETS,
     FFMPEG_PROGRAM,
     HLS_LIST_SEGMENTS,
     HLS_PLAYLIST_FILENAME,
     HLS_SEGMENT_TEMPLATE,
-    INPUT_QUEUE_PACKETS,
+    video_queue_frames,
 )
 
 MOSAIC_POSITIONS = 4
@@ -242,7 +243,7 @@ def _input_args(tile: MosaicTileDict) -> list[str]:
     """
     return [
         "-thread_queue_size",
-        str(INPUT_QUEUE_PACKETS),
+        str(video_queue_frames(MOSAIC_FPS)),
         "-f",
         "x11grab",
         "-draw_mouse",
@@ -252,7 +253,7 @@ def _input_args(tile: MosaicTileDict) -> list[str]:
         "-i",
         f":{tile['display']}",
         "-thread_queue_size",
-        str(INPUT_QUEUE_PACKETS),
+        str(AUDIO_QUEUE_PACKETS),
         "-f",
         "pulse",
         "-server",

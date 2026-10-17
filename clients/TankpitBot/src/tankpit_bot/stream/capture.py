@@ -45,13 +45,38 @@ AUDIO_BITRATE_KBPS = 128
 128k stereo carries them without the smearing lower rates add, and is
 a small fraction of the video's bitrate."""
 
-INPUT_QUEUE_PACKETS = 1024
-"""ffmpeg's per-input packet queue (``-thread_queue_size``).
+AUDIO_QUEUE_PACKETS = 1024
+"""ffmpeg's packet queue (``-thread_queue_size``) for a sound input.
 
-Two live inputs are read on their own threads; the default queue of 8
+Each live input is read on its own thread; the default queue of 8
 fills while the encoder is busy on a keyframe, and a full queue drops
-packets from a live source, which is heard as clicks and seen as
-stutter."""
+packets from a live source, which is heard as clicks. A sound packet
+is a few kilobytes, so the deep queue costs nothing."""
+
+VIDEO_QUEUE_SECONDS = 1
+"""How much picture an ``x11grab`` input may queue, in seconds of frames.
+
+A video packet is one raw frame, 3.9 MB at 1280x768, so the queue is
+sized in frames and kept short: a one-second queue covers a keyframe's
+encode, while the 1024 packets the sound input takes let an encoder that
+falls behind hold 4 GB per display. That is what took sedona's Docker VM
+out of memory with four bots and the four-up stream live on 2026-10-17
+(board task 73d4789e): measured on one display with the encoder held
+behind, a 1024 queue grew from 733 to 1013 MB in 20 s and a 30-frame
+queue stayed at 810 MB."""
+
+
+def video_queue_frames(fps: int) -> int:
+    """Return the ``-thread_queue_size`` for a display captured at ``fps``.
+
+    Args:
+        fps: The capture rate.
+
+    Returns:
+        :data:`VIDEO_QUEUE_SECONDS` worth of frames.
+    """
+    return fps * VIDEO_QUEUE_SECONDS
+
 
 HLS_PLAYLIST_FILENAME = "index.m3u8"
 """The playlist ffmpeg maintains, and the file viewers ask for first."""
@@ -140,7 +165,7 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         "error",
         "-nostdin",
         "-thread_queue_size",
-        str(INPUT_QUEUE_PACKETS),
+        str(video_queue_frames(config["fps"])),
         "-f",
         "x11grab",
         # The X cursor parks wherever it last was — the bot plays over
@@ -156,7 +181,7 @@ def ffmpeg_command(config: StreamConfigDict) -> list[str]:
         "-i",
         f":{config['display']}",
         "-thread_queue_size",
-        str(INPUT_QUEUE_PACKETS),
+        str(AUDIO_QUEUE_PACKETS),
         "-f",
         "pulse",
         "-server",
@@ -295,14 +320,16 @@ class DisplayCapture:
 
 __all__ = [
     "AUDIO_BITRATE_KBPS",
+    "AUDIO_QUEUE_PACKETS",
     "FFMPEG_PROGRAM",
     "HLS_LIST_SEGMENTS",
     "HLS_PLAYLIST_FILENAME",
     "HLS_SEGMENT_TEMPLATE",
-    "INPUT_QUEUE_PACKETS",
+    "VIDEO_QUEUE_SECONDS",
     "XVFB_PROGRAM",
     "DisplayCapture",
     "ffmpeg_command",
+    "video_queue_frames",
     "x11_socket_path",
     "xvfb_command",
 ]

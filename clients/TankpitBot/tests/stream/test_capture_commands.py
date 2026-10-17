@@ -22,6 +22,7 @@ from tankpit_bot.stream.capture import (
     HLS_PLAYLIST_FILENAME,
     HLS_SEGMENT_TEMPLATE,
     ffmpeg_command,
+    video_queue_frames,
     x11_socket_path,
     xvfb_command,
 )
@@ -73,7 +74,7 @@ def test_ffmpeg_command_is_exactly_the_documented_argv(tmp_path: Path, _socket_r
         "error",
         "-nostdin",
         "-thread_queue_size",
-        "1024",
+        "30",
         "-f",
         "x11grab",
         "-draw_mouse",
@@ -163,3 +164,9 @@ def test_the_segment_template_matches_the_serving_grammar() -> None:
 def test_x11_socket_path_is_the_display_socket() -> None:
     """The readiness poll watches the socket X clients dial."""
     assert x11_socket_path(91) == Path("/tmp/.X11-unix/X91")
+
+
+def test_a_display_queues_one_second_of_frames_at_its_own_rate() -> None:
+    """The video queue follows the capture rate, never the sound queue's depth."""
+    assert video_queue_frames(30) == 30
+    assert video_queue_frames(15) == 15

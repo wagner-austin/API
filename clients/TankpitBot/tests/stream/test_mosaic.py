@@ -183,6 +183,25 @@ class TestCommand:
         assert _option(argv, "-server") == pulse_server_address(27104)
         assert _option(argv, "-draw_mouse") == "0"
 
+    def test_a_display_queues_one_second_of_frames_and_its_sound_1024_packets(self) -> None:
+        """Each input's queue precedes it: 30 raw frames for the display, 1024 for the sound.
+
+        A raw frame is megabytes, so the deep sound queue on a display let
+        a lagging encoder hold gigabytes (board task 73d4789e).
+        """
+        tiles = [
+            MosaicTileDict(position=0, display=27101),
+            MosaicTileDict(position=1, display=27102),
+        ]
+        argv = mosaic_ffmpeg_command(tiles, TEXT_DIR, HLS_DIR)
+
+        queues = [
+            argv[index + 1] for index, word in enumerate(argv) if word == "-thread_queue_size"
+        ]
+        formats = [argv[index + 1] for index, word in enumerate(argv) if word == "-f"][:4]
+        assert queues == ["30", "1024", "30", "1024"]
+        assert formats == ["x11grab", "pulse", "x11grab", "pulse"]
+
     def test_an_all_waiting_grid_records_nothing(self) -> None:
         """With no live tile there are no device inputs at all."""
         argv = mosaic_ffmpeg_command([], TEXT_DIR, HLS_DIR)
