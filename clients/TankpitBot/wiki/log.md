@@ -6735,3 +6735,10 @@ passed on Linux. The whole-file Linux run also exposed an untouched
 Windows-specific exit-code expectation: after Popen reaps the child, an
 independent psutil observer reports no exit code. It is not claimed as a
 passing Linux file. The Windows release check remains the supported gate.
+
+The next full check, `815aa51e`, passed all 7,579 other cases but caught
+a rule violation in this repair: the new child test bounded its wait after
+kill. Both exit observers now wait without a timeout, as the existing
+`killed_wait_rules` requires; pytest retains its test-level hang bound.
+The guard and applicable real-process cases passed 14 tests on Linux; all
+nine real-process cases passed on Windows.
