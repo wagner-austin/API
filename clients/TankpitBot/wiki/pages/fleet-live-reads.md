@@ -136,7 +136,7 @@ delays the action and status together. The public webpage no longer
 renders a separate caption from the API history.[^14]
 
 [^12]: `src/tankpit_bot/browser/caption_panel.py:update_caption_panel` and
-      `src/tankpit_bot/bot/base.py:Bot._bootstrap`; real Chromium layout,
+      `src/tankpit_bot/bot/base.py:Bot.run`; real Chromium layout,
       resize, text-escaping and log-boundary checks in
       `tests/browser/test_caption_panel.py`.
 [^13]: `src/tankpit_bot/bot/tick_body.py:_accept_dispatched_decision` and
