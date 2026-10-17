@@ -49,6 +49,14 @@ verified for this job, with no ``PYTHONPATH`` of its own and bytecode writes
 off, so nothing the verb does changes the release under its seal. Neither
 the MCPs checkout's working tree nor ``origin/main`` is ever what acts, and
 the closing detail names the release id and revision.
+
+EVERY VERB NAMES ITS SESSION'S HOST (MCPs board task 78a1eca7). A verb is
+pinned to the node its target session runs on (MCPs mig 796), and the
+sessions tick that claims it runs as that node: on the session's own
+machine, or, for a session host that runs no runner of its own (ziggurat),
+on the machine holding the sessions duty, which reaches in over ssh. So
+every invocation passes ``--host <node>``, the tick's own ``--node``, and
+session-audit acts on that host, locally when it is the machine it runs on.
 """
 
 from __future__ import annotations
@@ -139,7 +147,7 @@ def refusal_for(session_target: str | None) -> str | None:
 
 
 def session_audit_argv(
-    release_root: pathlib.Path, registry_dir: str, *arguments: str
+    release_root: pathlib.Path, registry_dir: str, host: str, *arguments: str
 ) -> tuple[str, ...]:
     """Compose one session-audit invocation against a release's register.
 
@@ -149,14 +157,16 @@ def session_audit_argv(
             sealed session-audit environment the invocation runs in.
         registry_dir: The release's register, so the window a kill
             re-checks is the sealed one.
+        host: The node the target session runs on, the claiming tick's
+            ``--node``, which session-audit acts on.
         arguments: The mode and its arguments.
 
     Returns:
         ``poetry -C <release>/packages/session-audit run session-audit
-        <arguments> --registry-dir <dir>``. Through poetry, the same way the
-        supervisor's runner invokes the package, so the invocation resolves
-        the release's own in-project venv, whose editable install is the
-        release's source, rather than this runner's.
+        <arguments> --host <node> --registry-dir <dir>``. Through poetry,
+        the same way the supervisor's runner invokes the package, so the
+        invocation resolves the release's own in-project venv, whose
+        editable install is the release's source, rather than this runner's.
     """
     return (
         "poetry",
@@ -165,19 +175,22 @@ def session_audit_argv(
         "run",
         "session-audit",
         *arguments,
+        "--host",
+        host,
         "--registry-dir",
         registry_dir,
     )
 
 
 def restart_argv(
-    release_root: pathlib.Path, registry_dir: str, session_target: str
+    release_root: pathlib.Path, registry_dir: str, host: str, session_target: str
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one restart job.
 
     Args:
         release_root: The verified release's checkout.
         registry_dir: The release's register.
+        host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
 
     Returns:
@@ -185,18 +198,23 @@ def restart_argv(
         through :func:`session_audit_argv`.
     """
     return session_audit_argv(
-        release_root, registry_dir, "rollover", "--apply", "--session", session_target
+        release_root, registry_dir, host, "rollover", "--apply", "--session", session_target
     )
 
 
 def revive_argv(
-    release_root: pathlib.Path, registry_dir: str, session_target: str, requested_by: str
+    release_root: pathlib.Path,
+    registry_dir: str,
+    host: str,
+    session_target: str,
+    requested_by: str,
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one revive job.
 
     Args:
         release_root: The verified release's checkout.
         registry_dir: The release's register.
+        host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the revive (already
             grammar-checked), named in the brief session-audit types.
@@ -208,6 +226,7 @@ def revive_argv(
     return session_audit_argv(
         release_root,
         registry_dir,
+        host,
         "revive",
         "--session",
         session_target,
@@ -219,6 +238,7 @@ def revive_argv(
 def kill_argv(
     release_root: pathlib.Path,
     registry_dir: str,
+    host: str,
     session_target: str,
     requested_by: str,
     *,
@@ -230,6 +250,7 @@ def kill_argv(
         release_root: The verified release's checkout.
         registry_dir: The release's register, which carries the idle window
             the graceful kill re-checks its premise against.
+        host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the kill (already
             grammar-checked), printed with session-audit's outcome.
@@ -241,17 +262,24 @@ def kill_argv(
         the label for the hard verb and never otherwise.
     """
     base = ("kill", "--session", session_target, "--requested-by", requested_by)
-    return session_audit_argv(release_root, registry_dir, *base, *(("--hard",) if hard else ()))
+    return session_audit_argv(
+        release_root, registry_dir, host, *base, *(("--hard",) if hard else ())
+    )
 
 
 def compact_argv(
-    release_root: pathlib.Path, registry_dir: str, session_target: str, requested_by: str
+    release_root: pathlib.Path,
+    registry_dir: str,
+    host: str,
+    session_target: str,
+    requested_by: str,
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one compact job.
 
     Args:
         release_root: The verified release's checkout.
         registry_dir: The release's register.
+        host: The node the session runs on.
         session_target: The session UUID (already grammar-checked).
         requested_by: The label that enqueued the compact (already
             grammar-checked), printed with session-audit's outcome.
@@ -263,6 +291,7 @@ def compact_argv(
     return session_audit_argv(
         release_root,
         registry_dir,
+        host,
         "compact",
         "--session",
         session_target,
@@ -300,6 +329,7 @@ def session_invocation(
     command: DispatchCommand,
     session_target: str,
     requested_by: str,
+    host: str,
 ) -> SessionInvocation:
     """Map one session verb to its one invocation.
 
@@ -309,6 +339,8 @@ def session_invocation(
         command: The queue row's command.
         session_target: The session UUID (already grammar-checked).
         requested_by: The queue row's ``submitted_by``.
+        host: The node the session runs on: the claiming tick's ``--node``,
+            which the queue pinned the verb to (MCPs mig 796).
 
     Returns:
         The :class:`SessionInvocation`.
@@ -326,7 +358,7 @@ def session_invocation(
         return SessionInvocation(
             verb="restart",
             mode="rollover",
-            argv=restart_argv(root, registry_dir, session_target),
+            argv=restart_argv(root, registry_dir, host, session_target),
             types_requester=False,
             release=release_id,
             revision=revision,
@@ -335,7 +367,7 @@ def session_invocation(
         return SessionInvocation(
             verb="revive",
             mode="revive",
-            argv=revive_argv(root, registry_dir, session_target, requested_by),
+            argv=revive_argv(root, registry_dir, host, session_target, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -347,6 +379,7 @@ def session_invocation(
             argv=kill_argv(
                 root,
                 registry_dir,
+                host,
                 session_target,
                 requested_by,
                 hard=command is DispatchCommand.KILL_SESSION_HARD,
@@ -359,7 +392,7 @@ def session_invocation(
         return SessionInvocation(
             verb="compact",
             mode="compact",
-            argv=compact_argv(root, registry_dir, session_target, requested_by),
+            argv=compact_argv(root, registry_dir, host, session_target, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -371,7 +404,7 @@ def session_invocation(
         return SessionInvocation(
             verb="exit",
             mode="kill",
-            argv=kill_argv(root, registry_dir, session_target, requested_by, hard=False),
+            argv=kill_argv(root, registry_dir, host, session_target, requested_by, hard=False),
             types_requester=True,
             release=release_id,
             revision=revision,

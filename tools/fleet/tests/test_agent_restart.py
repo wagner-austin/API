@@ -165,7 +165,7 @@ class TestRestartLane:
         # release's session-audit against its register (MCPs c7c2527d).
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.restart_argv(release["root"], release["registry_dir"], TARGET),
+            restart.restart_argv(release["root"], release["registry_dir"], agent.HUB_NODE, TARGET),
             *unrolled_calls(repo),
         ]
         # The child inherits neither this agent's poetry venv nor any
@@ -220,9 +220,12 @@ class TestRestartLane:
         assert endpoint.arguments[1]["node"] == "ziggurat"
         assert endpoint.arguments[1]["runId"] == f"restart-{DEFAULT_JOB_ID}"
         # The verb and nothing after it: a sessions tick has no publish pass.
+        # It acts on the host the tick runs as, which a tick on the sessions
+        # duty's machine names for a session host it reaches in to (MCPs
+        # board task 78a1eca7).
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.restart_argv(release["root"], release["registry_dir"], TARGET),
+            restart.restart_argv(release["root"], release["registry_dir"], "ziggurat", TARGET),
         ]
 
     def test_a_claimed_revive_runs_session_audits_revive_mode_with_the_submitter(
@@ -251,7 +254,9 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.revive_argv(release["root"], release["registry_dir"], TARGET, SUBMITTER),
+            restart.revive_argv(
+                release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER
+            ),
             *unrolled_calls(repo),
         ]
         assert runner.unset_env[1] == restart.SESSION_ENVIRONMENT_EXCLUDED
@@ -312,7 +317,12 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.kill_argv(
-                release["root"], release["registry_dir"], TARGET, SUBMITTER, hard=hard
+                release["root"],
+                release["registry_dir"],
+                agent.HUB_NODE,
+                TARGET,
+                SUBMITTER,
+                hard=hard,
             ),
             *unrolled_calls(repo),
         ]
@@ -341,7 +351,9 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.compact_argv(release["root"], release["registry_dir"], TARGET, SUBMITTER),
+            restart.compact_argv(
+                release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER
+            ),
             *unrolled_calls(repo),
         ]
         assert endpoint.arguments[1]["runId"] == f"compact-{DEFAULT_JOB_ID}"
@@ -366,7 +378,7 @@ class TestRestartLane:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls[1] == restart.kill_argv(
-            release["root"], release["registry_dir"], TARGET, SUBMITTER, hard=False
+            release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER, hard=False
         )
         assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (

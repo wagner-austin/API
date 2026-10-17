@@ -296,7 +296,9 @@ def session_job(
     release = session_release.active_session_release()
     if isinstance(release, str):
         return _refuse_hub_job(credentials, job, identity, detail=release)
-    invocation = restart.session_invocation(release, job["command"], target, job["submitted_by"])
+    invocation = restart.session_invocation(
+        release, job["command"], target, job["submitted_by"], node
+    )
     # A revive types the submitter's label into its brief and a kill passes
     # it as an argument (MCPs migs 525 and 526), so the label is judged
     # before it can become an argv element, the same way the target is.

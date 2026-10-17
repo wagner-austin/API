@@ -38,33 +38,40 @@ PREFIX: Final = ("poetry", "-C", str(ROOT / "packages" / "session-audit"), "run"
 #: The closing detail's opening for a rollover, naming the release.
 SEALED: Final = f"from sealed release {RELEASE['release']} (revision {RELEASE['revision']}) exited"
 
+#: The node the target session runs on, a session host the verb reaches in
+#: to (MCPs board task 78a1eca7).
+HOST: Final = "ziggurat"
+
+#: Every invocation closes the same way: the session's host, then the
+#: release's register, last on the line.
+SUFFIX: Final = ("--host", HOST, "--registry-dir", REGISTRY)
+
 
 class TestRestartArgv:
     def test_composes_the_exact_session_audit_invocation(self) -> None:
-        """The register the verb reads is the release's, last on the line."""
-        assert restart.restart_argv(ROOT, REGISTRY, TARGET) == (
+        """The register the verb reads is the release's, last on the line,
+        after the host the session runs on."""
+        assert restart.restart_argv(ROOT, REGISTRY, HOST, TARGET) == (
             *PREFIX,
             "rollover",
             "--apply",
             "--session",
             TARGET,
-            "--registry-dir",
-            REGISTRY,
+            *SUFFIX,
         )
 
     def test_composes_the_exact_revive_invocation(self) -> None:
         """The second session verb (MCPs mig 525, board task 1fe89973): one
         table maps it to session-audit's revive mode, carrying the submitter
         into the brief the revived session is typed."""
-        assert restart.revive_argv(ROOT, REGISTRY, TARGET, "fable-system-audit-0915") == (
+        assert restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, "fable-system-audit-0915") == (
             *PREFIX,
             "revive",
             "--session",
             TARGET,
             "--requested-by",
             "fable-system-audit-0915",
-            "--registry-dir",
-            REGISTRY,
+            *SUFFIX,
         )
         assert restart.SESSION_COMMANDS == (
             DispatchCommand.RESTART_SESSION,
@@ -78,32 +85,30 @@ class TestRestartArgv:
     def test_composes_the_exact_compact_invocation(self) -> None:
         """MCPs mig 564, board task 01f31e4a: the compact carries the
         submitter so session-audit prints who asked, and no kill flag."""
-        assert restart.compact_argv(ROOT, REGISTRY, TARGET, "opus-super-fleet-0926") == (
+        assert restart.compact_argv(ROOT, REGISTRY, HOST, TARGET, "opus-super-fleet-0926") == (
             *PREFIX,
             "compact",
             "--session",
             TARGET,
             "--requested-by",
             "opus-super-fleet-0926",
-            "--registry-dir",
-            REGISTRY,
+            *SUFFIX,
         )
 
     def test_composes_the_exact_kill_invocations_and_only_the_hard_verb_is_hard(self) -> None:
         """MCPs mig 526, board task 660964d9: two verbs, one mode, and the
         --hard flag is the queue's choice, never this runner's."""
         graceful = (*PREFIX, "kill", "--session", TARGET, "--requested-by", "opus-mcps-0917-e7b5")
+        label = "opus-mcps-0917-e7b5"
 
-        assert restart.kill_argv(ROOT, REGISTRY, TARGET, "opus-mcps-0917-e7b5", hard=False) == (
+        assert restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False) == (
             *graceful,
-            "--registry-dir",
-            REGISTRY,
+            *SUFFIX,
         )
-        assert restart.kill_argv(ROOT, REGISTRY, TARGET, "opus-mcps-0917-e7b5", hard=True) == (
+        assert restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=True) == (
             *graceful,
             "--hard",
-            "--registry-dir",
-            REGISTRY,
+            *SUFFIX,
         )
 
     def test_maps_every_session_verb_to_exactly_one_invocation_of_the_release(self) -> None:
@@ -111,47 +116,53 @@ class TestRestartArgv:
         sealed = {"release": RELEASE["release"], "revision": RELEASE["revision"]}
 
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label
+            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label, HOST
         ) == {
             "verb": "restart",
             "mode": "rollover",
-            "argv": restart.restart_argv(ROOT, REGISTRY, TARGET),
+            "argv": restart.restart_argv(ROOT, REGISTRY, HOST, TARGET),
             "types_requester": False,
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label, HOST
         ) == {
             "verb": "revive",
             "mode": "revive",
-            "argv": restart.revive_argv(ROOT, REGISTRY, TARGET, label),
+            "argv": restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
-        assert restart.session_invocation(RELEASE, DispatchCommand.KILL_SESSION, TARGET, label) == {
+        assert restart.session_invocation(
+            RELEASE, DispatchCommand.KILL_SESSION, TARGET, label, HOST
+        ) == {
             "verb": "kill",
             "mode": "kill",
-            "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
+            "argv": restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
             "types_requester": True,
             **sealed,
         }
-        hard = restart.session_invocation(RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label)
-        assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=True)
+        hard = restart.session_invocation(
+            RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label, HOST
+        )
+        assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=True)
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label
+            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label, HOST
         ) == {
             "verb": "compact",
             "mode": "compact",
-            "argv": restart.compact_argv(ROOT, REGISTRY, TARGET, label),
+            "argv": restart.compact_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
         # MCPs board task 5aa8ed06: an approved self-exit is the graceful
         # kill's one invocation, never the hard one, under its own run verb.
-        assert restart.session_invocation(RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label) == {
+        assert restart.session_invocation(
+            RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST
+        ) == {
             "verb": "exit",
             "mode": "kill",
-            "argv": restart.kill_argv(ROOT, REGISTRY, TARGET, label, hard=False),
+            "argv": restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
             "types_requester": True,
             **sealed,
         }
@@ -160,7 +171,7 @@ class TestRestartArgv:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
         with pytest.raises(ValueError, match=refusal):
             restart.session_invocation(
-                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5"
+                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5", HOST
             )
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
@@ -208,12 +219,12 @@ class TestRunAndDescribe:
 
         result = restart.run_session_job(
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
             )
         )
 
         assert result["returncode"] == 0
-        assert runner.calls == [restart.restart_argv(ROOT, REGISTRY, TARGET)]
+        assert runner.calls == [restart.restart_argv(ROOT, REGISTRY, HOST, TARGET)]
         assert runner.unset_env == [restart.SESSION_ENVIRONMENT_EXCLUDED]
         assert restart.SESSION_ENVIRONMENT_EXCLUDED == ("VIRTUAL_ENV", "PYTHONPATH")
         assert runner.set_env == [(("PYTHONDONTWRITEBYTECODE", "1"),)]
@@ -223,13 +234,13 @@ class TestRunAndDescribe:
         runner = FakeRun([ok("REVIVE - REVIVED session x: now pid 5")])
         _test_hooks.run = runner
         invocation = restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915"
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915", HOST
         )
 
         result = restart.run_session_job(invocation)
 
         assert runner.calls == [
-            restart.revive_argv(ROOT, REGISTRY, TARGET, "fable-system-audit-0915")
+            restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, "fable-system-audit-0915")
         ]
         assert restart.describe_result(result, invocation) == (
             f"session-audit revive {SEALED} 0: REVIVE - REVIVED session x: now pid 5"
@@ -246,7 +257,7 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
             ),
         )
 
@@ -265,7 +276,7 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912"
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
             ),
         )
 
