@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -25,7 +25,7 @@ _PAGE = """
 
 
 @pytest.fixture()
-def client() -> Iterator[tuple[PageProtocol, CDPSessionProtocol]]:
+def client() -> Generator[tuple[PageProtocol, CDPSessionProtocol], None, None]:
     """Yield a real page with the game's chat-panel DOM contract.
 
     Yields:
