@@ -11,9 +11,8 @@ task's criteria as a visitor meets them:
 - A1: the bot's tile starts with its sound off (the button reads "Sound off",
   the video is muted); one key press on the button turns it on, the video
   stays playing unmuted, and the browser goes on decoding the stream's audio.
-- A2: the caption under the tile, once the video plays, is word for word one
-  of the captions the bot's own row in ``/demo/fleet`` carries, so it comes
-  from the bot's state and not from anything the page works out.
+- The game status is recorded into the video; there is no second caption
+  under the tile. The real panel renderer is exercised in browser tests.
 - A4: all of it on the published page, with a real bot.
 
 The sound button is pressed with a real key press, not a scripted
@@ -26,7 +25,6 @@ It is EXECUTION-ONLY (``tests/_host.py``): the fleet project
 
 from __future__ import annotations
 
-import time
 from collections.abc import Generator
 from typing import Final, TypedDict
 
@@ -38,7 +36,6 @@ from platform_core.json_utils import (
     narrow_json_to_str,
     require_bool,
     require_int,
-    require_list,
     require_str,
 )
 
@@ -50,19 +47,13 @@ pytestmark = pytest.mark.host_live_demo
 #: The page a visitor opens.
 PAGE_URL: Final[str] = "https://austinwagner.org/tankpit/"
 
-#: What the tile says before the video has a dated frame (``STARTING`` in
-#: ``Dashboards/tankpit/index.html``).
-STARTING_DOING: Final[str] = "Getting ready"
-
 #: The sentences of the page's "What you are watching" panel the case
 #: requires, whitespace collapsed: what TankPit is, what the bot is, and the
 #: practice-room-only promise (A3).
 EXPLANATION: Final[tuple[str, ...]] = (
-    "What you are watching",
-    "TankPit is a multiplayer tank game played in the web browser at tankpit.com.",
-    "Each tank here is driven by a program, not a person.",
-    "The bots play only in TankPit's practice room, where nothing a tank wins or "
-    "loses counts toward anyone's rank.",
+    "TankPit is a multiplayer tank game.",
+    "This bot reads the game's messages and sends its own commands.",
+    "These demos stay in the practice room and do not affect ranked play.",
 )
 
 #: How long the page may take to list the bot's tile after loading: one of
@@ -82,8 +73,7 @@ class TileState(TypedDict):
         pressed: The button's ``aria-pressed``, ``false`` or ``true``.
         muted: Whether the video element is muted.
         paused: Whether the video element is paused.
-        doing: The caption's phrase, what the bot is doing.
-        why: The caption's sentence, why, with the fuel when the bot knows it.
+        external_caption: Whether the obsolete caption below the video exists.
         audio_bytes: Audio the browser has decoded from the stream so far.
     """
 
@@ -91,8 +81,7 @@ class TileState(TypedDict):
     pressed: str
     muted: bool
     paused: bool
-    doing: str
-    why: str
+    external_caption: bool
     audio_bytes: int
 
 
@@ -110,8 +99,7 @@ def _decode_tile(raw: JSONObject) -> TileState:
         pressed=require_str(raw, "pressed"),
         muted=require_bool(raw, "muted"),
         paused=require_bool(raw, "paused"),
-        doing=require_str(raw, "doing"),
-        why=require_str(raw, "why"),
+        external_caption=require_bool(raw, "external_caption"),
         audio_bytes=require_int(raw, "audio_bytes"),
     )
 
@@ -153,8 +141,7 @@ def _tile_expression(slot: str) -> str:
         ' pressed: sound.getAttribute("aria-pressed"),'
         " muted: video.muted,"
         " paused: video.paused,"
-        ' doing: tile.querySelector(".say .doing").textContent,'
-        ' why: tile.querySelector(".say .why").textContent,'
+        ' external_caption: tile.querySelector(".say") !== null,'
         " audio_bytes: video.webkitAudioDecodedByteCount,"
         " };"
         "})()"
@@ -172,52 +159,6 @@ def _read_tile(page: PageProtocol, slot: str) -> TileState:
         The tile's state.
     """
     return _decode_tile(narrow_json_to_dict(page.evaluate(_tile_expression(slot))))
-
-
-def _shown_as(caption: JSONObject) -> tuple[str, str]:
-    """Word a fleet caption the way the page shows it.
-
-    Args:
-        caption: One caption of a ``/demo/fleet`` row.
-
-    Returns:
-        The phrase, and the sentence with ``Fuel N.`` after it when the bot
-        knew its fuel (a negative fuel means it did not).
-    """
-    why = require_str(caption, "why")
-    fuel = require_int(caption, "fuel")
-    return require_str(caption, "doing"), why if fuel < 0 else f"{why} Fuel {fuel}."
-
-
-def _bot_caption_on_tile(page: PageProtocol, slot: str) -> TileState:
-    """Wait until the tile shows a caption the bot's own row carries.
-
-    Args:
-        page: The page, showing the bot's tile.
-        slot: The bot's slot.
-
-    Returns:
-        The tile, at the read that matched.
-
-    Raises:
-        AssertionError: When the deadline passes with no match, naming the
-            last tile read and the captions the bot's row carried then.
-    """
-    deadline = time.monotonic() + _demo.CAPTION_DEADLINE_SECONDS
-    tile = _read_tile(page, slot)
-    carried: list[tuple[str, str]] = []
-    while time.monotonic() < deadline:
-        row = _demo.bot_row(slot)
-        captions = [] if row is None else require_list(row, "captions")
-        carried = [_shown_as(narrow_json_to_dict(caption)) for caption in captions]
-        if tile["doing"] != STARTING_DOING and (tile["doing"], tile["why"]) in carried:
-            return tile
-        time.sleep(_demo.POLL_SECONDS)
-        tile = _read_tile(page, slot)
-    raise AssertionError(
-        f"{slot}'s tile never showed one of its own captions within "
-        f"{_demo.CAPTION_DEADLINE_SECONDS:.0f} s: last {tile}, row carried {carried}"
-    )
 
 
 @pytest.fixture()
@@ -256,7 +197,12 @@ def test_the_live_page_explains_captions_and_plays_sound_on_request(
     # of view, so a tile nobody scrolled to stops playing.
     visitor_page.evaluate(f"{_tile_query(slot)}.scrollIntoView()")
 
-    captioned = _bot_caption_on_tile(visitor_page, slot)
+    visitor_page.wait_for_function(
+        f'{_tile_query(slot)}.querySelector("video").currentTime > 0',
+        timeout=TILE_DEADLINE_MS,
+    )
+    captioned = _read_tile(visitor_page, slot)
+    assert not captioned["external_caption"], captioned
     assert not captioned["paused"], captioned
     assert captioned["muted"], captioned
 

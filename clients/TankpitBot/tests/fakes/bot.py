@@ -137,6 +137,8 @@ class FakeCDPSessionBot:
         if method == "Browser.getWindowForTarget":
             return {"windowId": 1}
         if method == "Runtime.evaluate" and params is not None:
+            if "CAPTION_PANEL_UPDATED" in str(params.get("expression", "")):
+                return {"result": {"value": "CAPTION_PANEL_UPDATED"}}
             return self._runtime_evaluate_result(str(params.get("expression", "")))
         return {"result": {"value": ""}}
 

@@ -31,6 +31,7 @@ from tankpit_bot.bot.game_log_witness import GameLogWitnessMixin
 from tankpit_bot.bot.state_access import StateAccessMixin
 from tankpit_bot.bot.states import make_initial_state_data
 from tankpit_bot.bot.tank_registry import record_tank_sample
+from tankpit_bot.browser.caption_panel import update_caption_panel
 from tankpit_bot.browser.cdp_service import CDPService
 from tankpit_bot.browser.cdp_utils import get_current_time_ms
 from tankpit_bot.browser.client_structure import ClientStructureSurveyor
@@ -56,6 +57,7 @@ from tankpit_bot.bus.status_bus import StatusBus, StatusBusProtocol
 from tankpit_bot.diagnostics.entity_alignment import EntityAlignmentEmitter
 from tankpit_bot.diagnostics.self_alignment import SelfAlignmentEmitter
 from tankpit_bot.runtime_logging import emit_state
+from tankpit_bot.service.demo_caption_words import CaptionWordsDict
 from tankpit_bot.sniffer.chrome_launch import (
     _chrome_stream_display_args,
     _chrome_stream_no_viewport,
@@ -403,6 +405,13 @@ class Bot(GameLogWitnessMixin, StateAccessMixin, DispatchMixin):
                 # centred box in dead margin.
                 if capture is not None:
                     enter_game_fullscreen(cdp)
+                    update_caption_panel(
+                        cdp,
+                        CaptionWordsDict(
+                            doing="Getting ready",
+                            why="It is surveying the field before choosing its first move.",
+                        ),
+                    )
                     capture.start_encoder()
 
                 # Persist the freshly-issued auth cookies + localStorage
