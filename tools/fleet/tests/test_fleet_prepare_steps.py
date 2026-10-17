@@ -58,8 +58,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # -colossus (MCPs board task bf7a9460); 61 since session-audit's real
     # PostgreSQL review-routing cases (MCPs board task 55189157); 60 since
     # MCPs/pc, which named a directory MCPs deleted, was dropped (MCPs board
-    # task 60458a21).
-    assert len(prepared) == 60
+    # task 60458a21); 61 since MCPs/packages/session-audit-linux, the
+    # package's Linux lane (MCPs board task 31e0a1eb).
+    assert len(prepared) == 61
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -81,8 +82,9 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
 
     # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2); 29 since
     # MCPs/brief-generator (MCPs board task b1089284); 30 since
-    # MCPs/packages/session-audit (MCPs board task 55189157).
-    assert len(databases) == 30
+    # MCPs/packages/session-audit (MCPs board task 55189157); 31 since its
+    # Linux lane, MCPs/packages/session-audit-linux (MCPs board task 31e0a1eb).
+    assert len(databases) == 31
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
