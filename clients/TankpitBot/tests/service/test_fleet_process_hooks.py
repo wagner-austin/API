@@ -89,16 +89,33 @@ def test_identity_reads_a_live_process_creation_time(
     assert first > 0.0
 
 
-def test_identity_of_a_pid_that_is_not_running_is_absent() -> None:
-    """A child that died before it could be recorded has no identity.
+def test_an_exited_child_no_longer_has_its_original_identity(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """Observe exit through psutil before looking up the reusable pid again.
 
-    That is the case the spawn path treats as "nothing to adopt
-    later", rather than as a failure to record.
+    Popen.wait and psutil observe exit separately on Windows. Even after
+    both agree, another process may acquire the pid: what must disappear
+    is this child's identity, not necessarily the number itself.
     """
-    process = subprocess.Popen([sys.executable, "-c", "raise SystemExit(0)"])
-    process.wait(timeout=30)
+    created_at = _identity_of(sleeper.pid)
+    observer = psutil.Process(sleeper.pid)
+    sleeper.kill()
+    sleeper.wait(timeout=30)
+    observer.wait(timeout=30)
 
-    assert _real_process_identity(process.pid) is None
+    assert _real_process_identity(sleeper.pid) != created_at
+
+
+def test_identity_of_an_unassigned_pid_is_absent() -> None:
+    """Exercise absence without racing an exited child's reusable pid.
+
+    Use a high sentinel and confirm its absence through the OS before
+    exercising the lookup.
+    """
+    unassigned_pid = 2**31 - 1
+    assert psutil.pid_exists(unassigned_pid) is False
+    assert _real_process_identity(unassigned_pid) is None
 
 
 def test_a_live_process_is_adopted_and_reports_itself_running(
