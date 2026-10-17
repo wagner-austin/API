@@ -19,6 +19,7 @@ press already had. Run N's results land in run N+1's startup sample.
 from __future__ import annotations
 
 from platform_core.json_utils import (
+    InvalidJsonError,
     JSONObject,
     JSONTypeError,
     dump_json_str,
@@ -29,6 +30,7 @@ from platform_core.logging import get_logger
 
 from tankpit_bot import _test_hooks
 from tankpit_bot.browser.accounts import resolve_account
+from tankpit_bot.fleetshare.replace_window import read_once
 from tankpit_bot.runtime_artifacts import TANK_REGISTRY_PATH
 from tankpit_bot.sniffer.world_service import WorldService
 from tankpit_bot.types.constants import TROOP_COLOR_NAMES
@@ -36,28 +38,41 @@ from tankpit_bot.types.constants import TROOP_COLOR_NAMES
 log = get_logger(__name__)
 
 
-def _load_registry() -> JSONObject:
-    """Return the registry on disk, or an empty one.
+def _load_registry() -> JSONObject | None:
+    """Return the registry on disk, or ``None`` when this read cannot be merged into.
+
+    The file is committed with the bot and seeded onto the fleet host
+    (``scripts/fleet_host.py``), and every bot rewrites it with an atomic
+    replace, so a read that does not see it is another bot's replace
+    window, not a first run. Merging into nothing there would write a
+    registry holding only this account over everyone else's readings;
+    so would merging into a document that does not parse, which is kept
+    on disk for a person to read instead.
 
     Returns:
-        The parsed registry; empty when absent or unreadable, so a
-        first run writes a fresh file instead of failing.
+        The parsed registry, or ``None`` when a replace window hid it or
+        it is not a JSON object.
     """
+    read = read_once(TANK_REGISTRY_PATH)
+    window = read["window"]
+    if window is not None:
+        log.warning(
+            "Tank registry: skipped (%s: another bot was rewriting %s)",
+            window.value,
+            TANK_REGISTRY_PATH,
+        )
+        return None
     try:
-        raw = _test_hooks.read_text(TANK_REGISTRY_PATH)
-    except OSError:
-        return {}
-    try:
-        return narrow_json_to_dict(load_json_str(raw))
-    except JSONTypeError as error:
+        return narrow_json_to_dict(load_json_str(read["text"]))
+    except (InvalidJsonError, JSONTypeError) as error:
         # A corrupt registry must not take a live session down: the
         # bot is mid-run and this is bookkeeping, not gameplay.
         log.warning(
-            "Tank registry at %s is not an object (%s); starting fresh",
+            "Tank registry: skipped (%s is not a JSON object: %s)",
             TANK_REGISTRY_PATH,
             error,
         )
-        return {}
+        return None
 
 
 def record_tank_sample(ws: WorldService, room: str) -> None:
@@ -94,6 +109,8 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
 
     inventory = ws.inventory_state
     registry = _load_registry()
+    if registry is None:
+        return
     accounts = narrow_json_to_dict(registry.get("accounts", {}))
     rooms = narrow_json_to_dict(accounts.get(name, {}))
     colours = narrow_json_to_dict(rooms.get(room, {}))
@@ -128,7 +145,10 @@ def record_tank_sample(ws: WorldService, room: str) -> None:
     rooms[room] = colours
     accounts[name] = rooms
     registry["accounts"] = accounts
-    _test_hooks.write_text(TANK_REGISTRY_PATH, dump_json_str(registry, indent=1))
+    # Atomic: bots ending together each rewrite this one file, and a
+    # truncating write_text from two of them left the longer write's
+    # tail behind the shorter one on 2026-10-17 (board task 73d4789e).
+    _test_hooks.replace_text(TANK_REGISTRY_PATH, dump_json_str(registry, indent=1))
     log.info(
         "Tank registry: %s %s %s -> %s, fuel %d (%d kills, %d deaths)",
         name,
