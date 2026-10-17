@@ -8,4 +8,6 @@ The cross-service platform that makes the monorepo run — Redis (queues + RQ), 
 
 [Guard-pass as a fine-tune metric](../pages/code-style-guard-pass-instrument-limits.md) -- what code-style-eval can and cannot measure: truncation gates the metric before any checker runs, the sandbox's import boundary, why installing the corpus's deps changes the instrument and must enter the fingerprint, and the exact-McNemar power the 392-item corpus does not have
 
+[WSL runner listeners and dropped jobs](../pages/fleet-runner-listener-isolation-and-dropped-jobs.md) -- why lavender's runner listeners sit in an unbounded `listeners.slice` with each job moved into a scope of the bounded `runners.slice`, why `MemoryLow` could not protect them, and how the hub's reap pass ends a Worker only when GitHub reads its runner not busy (the offline busy=true incident)
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
