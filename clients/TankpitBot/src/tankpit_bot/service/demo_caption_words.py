@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from platform_core.json_utils import JSONObject, require_str
 from typing_extensions import TypedDict
 
 from tankpit_bot.bot.ai.scoring_types import ReasonKind
@@ -140,8 +141,8 @@ REASON_WORDS: Final[dict[ReasonKind, CaptionWordsDict]] = {
         "It just drove over a mine it could not see, so it scans to find the rest.",
     ),
     ReasonKind.SEARCH_COLLECT_LOCAL: _words(
-        "Picking up nearby supplies",
-        "There are supplies close by, so it collects them before going anywhere else.",
+        "Teleporting toward fuel",
+        "It jumps to fuel on the map, refuelling while it searches a new area.",
     ),
     ReasonKind.CLAIM_DENIED: _words(
         "Choosing another target",
@@ -224,8 +225,62 @@ REASON_WORDS: Final[dict[ReasonKind, CaptionWordsDict]] = {
 """Every reason the bot gives, as a caption."""
 
 
+def caption_words(reason: ReasonKind, resource_kind: str) -> CaptionWordsDict:
+    """Describe a decision using its committed resource target.
+
+    Args:
+        reason: The decision's reason.
+        resource_kind: The held target's kind, or empty when none is held.
+
+    Returns:
+        Plain words that distinguish fuel from equipment when a target is known.
+    """
+    if resource_kind in ("fuel", "equipment"):
+        if reason == ReasonKind.HARVEST_FRAME_SHIFT:
+            return _words(
+                f"Lining up {resource_kind}",
+                f"It moves its view to bring the {resource_kind} it found into sight.",
+            )
+        if reason == ReasonKind.HARVEST_LEG_WALK:
+            return _words(
+                f"Heading to {resource_kind}",
+                f"It is going to collect the {resource_kind} it found nearby.",
+            )
+    return REASON_WORDS[reason]
+
+
+def encode_caption_words(words: CaptionWordsDict) -> JSONObject:
+    """Encode the text sent to the game's status panel.
+
+    Args:
+        words: The action and its explanation.
+
+    Returns:
+        A JSON object containing only text.
+    """
+    return {"doing": words["doing"], "why": words["why"]}
+
+
+def decode_caption_words(data: JSONObject) -> CaptionWordsDict:
+    """Validate status-panel text at a JSON boundary.
+
+    Args:
+        data: Serialized caption words.
+
+    Returns:
+        Validated caption text.
+
+    Raises:
+        JSONTypeError: Either field is missing or is not text.
+    """
+    return CaptionWordsDict(doing=require_str(data, "doing"), why=require_str(data, "why"))
+
+
 __all__ = [
     "DESTROYED_WORDS",
     "REASON_WORDS",
     "CaptionWordsDict",
+    "caption_words",
+    "decode_caption_words",
+    "encode_caption_words",
 ]

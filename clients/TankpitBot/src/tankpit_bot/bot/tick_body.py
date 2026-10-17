@@ -29,8 +29,10 @@ from tankpit_bot.bot.tick_combat_feedback import (
     _resolve_pending_ground_shot,
 )
 from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+from tankpit_bot.bot.tick_loop_types import TickDecisionDict
 from tankpit_bot.browser import _test_hooks as browser_hooks
 from tankpit_bot.browser import get_current_time_ms
+from tankpit_bot.browser.caption_panel import update_caption_panel
 from tankpit_bot.browser.overlay import OverlayStateDict, render_overlay_payload
 from tankpit_bot.browser.overlay_hud import update_bot_overlay
 from tankpit_bot.browser.page_client_snapshot import (
@@ -53,6 +55,7 @@ from tankpit_bot.runtime_logging import (
     emit_diagnostic,
     emit_sync,
 )
+from tankpit_bot.service.demo_caption_words import DESTROYED_WORDS, caption_words
 from tankpit_bot.sniffer.world_state_inventory import get_inventory_state
 from tankpit_bot.state import SelfStateDict
 from tankpit_bot.types.modes import AIMode
@@ -197,20 +200,7 @@ def _tick_once(bot: Bot) -> None:
     # This prevents speculative shot feedback state from leaking across
     # executor-side validation failures.
     if command_sent:
-        previous_mode = bot._ai_state["mode"]
-        bot._ai_state = decision["updated_ai_state"]
-        if bot._ai_state["mode"] != previous_mode:
-            emit_mode_transition(
-                bot.world.ledger,
-                from_mode=previous_mode,
-                to_mode=bot._ai_state["mode"],
-                reason_kind=decision["behavior"]["reason_kind"],
-                caused_by=(
-                    0
-                    if decision["command"]["cmd_type"] == "hold"
-                    else latest_decision_event_id(bot.world.ledger)
-                ),
-            )
+        _accept_dispatched_decision(bot, decision)
 
     # 9. Update the in-page HUD so a human watching the browser sees what
     # the bot decided this tick without tailing artifacts, keep the flag
@@ -251,6 +241,36 @@ def _tick_once(bot: Bot) -> None:
     )
     _publish_hud(bot, overlay)
     _exchange_fleet_knowledge(bot)
+
+
+def _accept_dispatched_decision(bot: Bot, decision: TickDecisionDict) -> None:
+    """Commit dispatched intent and publish its mode transition and caption.
+
+    Args:
+        bot: The bot whose command was sent.
+        decision: The accepted decision, never a suppressed proposal.
+    """
+    previous_mode = bot._ai_state["mode"]
+    bot._ai_state = decision["updated_ai_state"]
+    if bot._stream_config is not None:
+        update_caption_panel(
+            bot._require_cdp(),
+            caption_words(
+                decision["behavior"]["reason_kind"], bot._ai_state["resource_target_kind"]
+            ),
+        )
+    if bot._ai_state["mode"] != previous_mode:
+        emit_mode_transition(
+            bot.world.ledger,
+            from_mode=previous_mode,
+            to_mode=bot._ai_state["mode"],
+            reason_kind=decision["behavior"]["reason_kind"],
+            caused_by=(
+                0
+                if decision["command"]["cmd_type"] == "hold"
+                else latest_decision_event_id(bot.world.ledger)
+            ),
+        )
 
 
 def _publish_hud(bot: Bot, overlay: OverlayStateDict) -> None:
@@ -435,6 +455,8 @@ def _handle_own_deactivation(bot: Bot, self_state: SelfStateDict) -> None:
         self_state: The corpse's final self record, for the receipt.
     """
     service = bot.world
+    if bot._stream_config is not None:
+        update_caption_panel(bot._require_cdp(), DESTROYED_WORDS)
     service.self_deactivated = False
     emit_diagnostic(
         diagnostic_kind="self_respawn_wait",
