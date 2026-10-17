@@ -52,6 +52,16 @@ PACKAGE_ROOTS = ("clients", "services", "libs", "tools")
 #: A package is one this repository gates, which is what a `check` target means.
 CHECK_TARGET = re.compile(r"^check:", re.MULTILINE)
 
+#: A gated directory the fleet runs rather than CI: its name names
+#: ``execution`` as a hyphen-delimited word, the rule MCPs' audit reads a
+#: repository's execution suites by (session-audit ``review/execution_rows.py``).
+#: Each runs host cases against what a hosted runner lacks: a rootless Docker
+#: daemon, the ssh route to HPC3, a Windows node's browser, or a runner host's
+#: own units. Until 2026-10-17 the workflow excluded them by a hand-kept set,
+#: and the first suite added after it, tools/fleet-execution-runners at
+#: 3e4066d4a, ran here and failed (MCPs board task 715b9ec5).
+FLEET_SUITE = re.compile(r"(?:\A|-)execution(?:-|\Z)")
+
 #: Poetry path dependency, e.g. `platform-core = { path = "../../libs/platform_core" }`.
 PATH_DEPENDENCY = re.compile(r"""path\s*=\s*["']([^"']+)["']""")
 
@@ -86,13 +96,17 @@ def gated_packages(repo: pathlib.Path) -> list[str]:
         repo: Repository root.
 
     Returns:
-        Repo-relative package directories carrying a ``check`` target, sorted.
-        Membership is derived from the Makefile rather than from a list, so a
-        new package joins CI by having a gate rather than by being added here.
+        Repo-relative package directories carrying a ``check`` target, sorted,
+        less the fleet's execution suites (:data:`FLEET_SUITE`). Membership is
+        derived from the Makefile and the name rather than from a list, so a
+        new package joins CI by having a gate, and a new suite stays out of it
+        by its name, rather than either by being added here.
     """
     found: list[str] = []
     for root in PACKAGE_ROOTS:
         for makefile in sorted((repo / root).glob("*/Makefile")):
+            if FLEET_SUITE.search(makefile.parent.name):
+                continue
             if CHECK_TARGET.search(makefile.read_text(encoding="utf-8", errors="replace")):
                 found.append(makefile.parent.relative_to(repo).as_posix())
     return found
