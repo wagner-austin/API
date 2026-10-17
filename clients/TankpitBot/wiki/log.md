@@ -6742,3 +6742,27 @@ kill. Both exit observers now wait without a timeout, as the existing
 `killed_wait_rules` requires; pytest retains its test-level hang bound.
 The guard and applicable real-process cases passed 14 tests on Linux; all
 nine real-process cases passed on Windows.
+
+## [2026-10-17] update | Next labels for planned actions
+
+Board task 6275ecaa. The operator chose to keep action previews and call
+them "Next", then asked to clarify the wording too. Every decision title
+now starts with "Next:" and its explanation describes a plan. Fuel and
+equipment remain distinct; startup and observed destruction retain actual
+state wording. [[fleet-live-reads]] describes the dispatch-time preview.
+
+Release `3888f06b2` passed the Windows full check (7,580 tests, 100%
+coverage, every guard, 223 seconds within 300) and was activated on sedona
+by the coordinated stream-repair session. Its practice startup gate reached
+tick 2 at fuel 1100. The separately checked webpage `d99e5af` (200 tests,
+100% coverage) was published and explains that Next precedes visible action.
+
+The public demo-1 was started at about 09:43:30 UTC after reserving one
+of four running-bot positions with the TV session. Real Chromium at 390px
+verified playback, the Enter-key sound toggle, increasing decoded audio,
+no duplicate external caption and no horizontal overflow. The captured
+1280-by-768 video frame visibly says "Next: Scan with radar" and "It plans
+to scan one of the four corners around it without moving." It is preserved
+at `docs/sources/next-preview-2026-10-17.png`. The page counted three stream
+reconnects by 41 seconds while playback passed; that observation was sent
+to the stream-repair session rather than treated as a wording failure.
