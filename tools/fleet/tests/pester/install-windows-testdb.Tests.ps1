@@ -122,8 +122,8 @@ BeforeAll {
         # \SlimeDockerAutoStart, so a case registers nothing unless it says so.
         $parameters = @{
             Root = $Root; Docker = $Docker.Path; PathScope = 'Process'; ClientUrl = 'file:///absent.zip'
-            ReadLaunchers = { param([string]$Execute) 'SlimeDockerAutoStart' }
-            RegisterLauncher = { param([string]$Name, [string]$Execute) throw "TEST_UNEXPECTED_REGISTER: $Name" }
+            ReadLaunchers = { 'SlimeDockerAutoStart' }
+            RegisterLauncher = { param([string]$Name) throw "TEST_UNEXPECTED_REGISTER: $Name" }
         }
         if ($null -ne $Client) {
             $parameters.ClientUrl = $Client.Url
