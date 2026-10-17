@@ -10,11 +10,19 @@ source_paths:
   - "src/tankpit_bot/diagnostics/run_digest_fold.py"
   - "src/tankpit_bot/service/fleet_stream.py"
   - "src/tankpit_bot/service/fleet_telemetry.py"
+  - "src/tankpit_bot/browser/caption_panel.py"
+  - "src/tankpit_bot/bot/base.py"
+  - "src/tankpit_bot/bot/tick_body.py"
+  - "src/tankpit_bot/service/demo_caption_words.py"
 source_git_blobs:
   "src/tankpit_bot/diagnostics/event_tail.py": "4d97cda6957481cd5fd578002f9b20923c2ce2e0"
   "src/tankpit_bot/diagnostics/run_digest_fold.py": "e07513e31b7f8627cc5cc250d4e71c3970087cb3"
   "src/tankpit_bot/service/fleet_stream.py": "78a46fa480589aa3c912fe92447697bcd7241be3"
   "src/tankpit_bot/service/fleet_telemetry.py": "200890db7e371470d184a2d16839725ee4e6df2a"
+  "src/tankpit_bot/browser/caption_panel.py": "3f344fbc539f289d264d3f70c81cf3d4eb969762"
+  "src/tankpit_bot/bot/base.py": "459c1d9f76b2cd84ee9a2378f4fc05a4ae54ecee"
+  "src/tankpit_bot/bot/tick_body.py": "f89288ff6a4b37a57ad41520167638635f2a3d17"
+  "src/tankpit_bot/service/demo_caption_words.py": "141aafe95a65502b2c0197891b34f1e11f9e02bb"
 fact_checked: "2026-09-01"
 verified: 2026-10-08 (the three files re-read against API HEAD for MCPs board task 3d71a8e1; the stream now feeds a third fold, the demo captions, and the digest's radar-yield window closes only on the bot's own pickup)
 confidence: high
@@ -98,7 +106,7 @@ wrong — while claiming nothing was amiss.
 One cursor feeds every summary, so whichever of stats/activity is
 asked for second finds nothing new to fold.[^8] Since `3fb0838f1`
 (2026-10-05, repo API) the same stream feeds a third fold, the public
-demo page's timed captions (`InstanceStream.captions`,
+demo API's caption history (`InstanceStream.captions`,
 `service/demo_caption.py`), whose read is bounded by the same cache TTL
 but whose window is measured at each call rather than cached.[^11] The page also polls its
 bots **concurrently** now, so first paint costs the slowest bot rather
@@ -110,6 +118,33 @@ page poll -- `GET /bots` plus stats and hud for all five -- costs
 actually reads and folds) is no slower than one that hits the cache.
 The incremental read has taken the per-poll cost off the run's length
 entirely.[^10]
+
+## Status recorded with the game
+
+The streamed browser replaces `.message-list select`, the preset-chat
+selector, with a status panel before the encoder starts. It copies the
+selector's computed font, colors and border and follows its resizing.
+The invisible selector remains in place because the game keeps references
+to it and the game-log reader uses its text as a boundary.[^12]
+
+Accepted decisions update the panel after dispatch; rejected proposals
+do not. Deactivation paints "Destroyed". Resource-target context makes
+harvesting say "Heading to fuel" or "Heading to equipment". The
+`SEARCH_COLLECT_LOCAL` reason describes a teleport toward fuel, not a
+local pickup.[^13] These words become video pixels, so playback buffering
+delays the action and status together. The public webpage no longer
+renders a separate caption from the API history.[^14]
+
+[^12]: `src/tankpit_bot/browser/caption_panel.py:update_caption_panel` and
+      `src/tankpit_bot/bot/base.py:Bot._bootstrap`; real Chromium layout,
+      resize, text-escaping and log-boundary checks in
+      `tests/browser/test_caption_panel.py`.
+[^13]: `src/tankpit_bot/bot/tick_body.py:_accept_dispatched_decision` and
+      `_handle_own_deactivation`; `src/tankpit_bot/service/demo_caption_words.py:caption_words`
+      and `REASON_WORDS`; the search hop is
+      `src/tankpit_bot/bot/ai/resource_search.py:make_resource_search_hop`.
+[^14]: Dashboards repository `tankpit/index.html:tile` and
+      `tests/test_tankpit_page.py:test_status_is_in_the_video_without_a_second_caption_panel`.
 
 [^1]: `src/tankpit_bot/service/fleet_telemetry.py:117` — the pre-change `FleetTelemetry.stats` called `build_run_digest` (`src/tankpit_bot/diagnostics/run_digest.py:38`)
       (whole file) and `activity` called `load_event_records` (whole
