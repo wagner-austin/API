@@ -6718,3 +6718,20 @@ bytes. Its wait now observes unpaused playback and a decoded frame rather
 than treating nonzero playback time alone as ready. The Windows wire/audio
 case passed; its Edge page fixture could not launch under SSH because the
 Windows encryption API denied access, so that fixture is not claimed green.
+
+## [2026-10-17] fix | Exit observation and reusable process IDs
+
+Board task 29590be1. Combined release check 958145c1 failed its old
+process-identity test after a child exited: a fresh lookup still returned
+a creation time. That test had not saved the child's original identity,
+so the artifact cannot distinguish delayed exit observation from PID reuse.
+Test commit `23649564c` records the identity while the child lives, waits
+through both Popen and a pre-existing psutil observer, and checks that the
+old identity is gone. A separate OS-confirmed unassigned PID exercises
+lookup absence. Runtime process handling is unchanged.
+
+All nine real-process cases passed on austinpc; both revised identity cases
+passed on Linux. The whole-file Linux run also exposed an untouched
+Windows-specific exit-code expectation: after Popen reaps the child, an
+independent psutil observer reports no exit code. It is not claimed as a
+passing Linux file. The Windows release check remains the supported gate.
