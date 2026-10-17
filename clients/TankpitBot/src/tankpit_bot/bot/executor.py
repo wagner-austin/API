@@ -536,6 +536,7 @@ def execute(
         command_type=command["cmd_type"],
         behavior_reason=render_reason(behavior),
         behavior_reason_kind=behavior["reason_kind"].value,
+        resource_target_kind=updated_state["resource_target_kind"],
         owner_mode=updated_state["mode"],
         held_lock_id=updated_state["combat_target_id"],
     )
