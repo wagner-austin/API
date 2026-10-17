@@ -30,8 +30,8 @@ from tankpit_bot.bot.ai.scoring_types import ReasonKind
 from tankpit_bot.runtime_records import RuntimeEventRecordDict
 from tankpit_bot.service.demo_caption_words import (
     DESTROYED_WORDS,
-    REASON_WORDS,
     CaptionWordsDict,
+    caption_words,
 )
 from tankpit_bot.service.fuel_line import fuel_total, is_fuel_line
 
@@ -138,7 +138,13 @@ class CaptionAccumulator:
         for record in records:
             reason = record["fields"].get(REASON_FIELD)
             if isinstance(reason, str):
-                self._words = REASON_WORDS[as_member(reason, REASON_FIELD, ReasonKind)]
+                target_kind = record["fields"].get("resource_target_kind", "")
+                if not isinstance(target_kind, str):
+                    raise ValueError("CAPTION_RESOURCE_KIND_INVALID: expected text")
+                self._words = caption_words(
+                    as_member(reason, REASON_FIELD, ReasonKind),
+                    target_kind,
+                )
                 self._say(event_time_ms(record["timestamp"]))
             elif record["fields"].get("diagnostic_kind") == DEATH_DIAGNOSTIC:
                 self._words = DESTROYED_WORDS
