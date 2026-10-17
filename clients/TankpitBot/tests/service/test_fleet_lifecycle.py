@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable, Generator
 from pathlib import Path
 
@@ -27,10 +28,13 @@ from tankpit_bot.service.fleet import (
     drain_on_interrupt,
     exit_when_drained,
     main,
+    report_mosaic_end,
     resolve_fleet_host,
 )
 from tankpit_bot.service.fleet import log as fleet_log
 from tankpit_bot.service.fleet_manager import FleetManager
+from tankpit_bot.stream import _test_hooks as stream_hooks
+from tankpit_bot.stream.helper_process import PROCESS_END_TIMEOUT_SECONDS
 from tests.conftest import FakeEnv
 from tests.service._fleet_fixtures import (
     FakeRecordStore,
@@ -39,6 +43,7 @@ from tests.service._fleet_fixtures import (
     _with_configured_accounts,
 )
 from tests.service._service_main_harness import _CancellingSite, _RecordingSite
+from tests.stream._capture_fixtures import SubstitutingSpawner, sleeper_argv
 
 
 def _ignore_handler(on_interrupt: Callable[[], None]) -> None:
@@ -236,6 +241,7 @@ class TestAsyncMain:
         restore_service_hooks: None,
         records: FakeRecordStore,
         spawner: _FakeSpawner,
+        tmp_path: Path,
     ) -> None:
         """``_async_main`` builds the site on the configured port."""
         _ = (restore_service_hooks, records, spawner)
@@ -254,7 +260,7 @@ class TestAsyncMain:
         core_hooks.install_signal_handlers = capture_handler
 
         with pytest.raises(asyncio.CancelledError):
-            await _async_main()
+            await _async_main(mosaic_root=Path(os.path.relpath(tmp_path)))
 
         assert len(served) == 1
         app, host, port = served[0]
@@ -278,13 +284,21 @@ class TestAsyncMain:
             "/bots/{instance}/restart",
             "/bots/{instance}",
             "/shutdown",
-            # The public demo surface. Three routes and no more: it is
-            # the part of this service a stranger reaches, so a fourth
+            # The public demo surface. Four routes and no more: it is
+            # the part of this service a stranger reaches, so a fifth
             # appearing here should have to be argued for in a diff
-            # rather than arriving as a side effect.
+            # rather than arriving as a side effect. The fourth, the
+            # four-up stream, was argued for in board task 5067379e:
+            # the TV fetches it over the internet, and it carries the
+            # game's picture and captions only.
             "/demo/fleet",
             "/demo/spawn",
             "/demo/video/{slot}/{file}",
+            "/demo/mosaic/{file}",
+            # The operator's TV, which the edge does not forward.
+            "/tv",
+            "/tv/cast",
+            "/tv/stop",
         }
 
     async def test_the_drain_monitor_is_cancelled_when_serving_ends(
@@ -292,11 +306,19 @@ class TestAsyncMain:
         restore_service_hooks: None,
         records: FakeRecordStore,
         spawner: _FakeSpawner,
+        tmp_path: Path,
     ) -> None:
-        """A stopped manager leaves no monitor task behind."""
+        """A stopped manager leaves no monitor task and no encoder behind.
+
+        The four-up director ticks once while the manager serves, which
+        starts its encoder (a real stand-in child); stopping the manager
+        ends it.
+        """
         _ = (restore_service_hooks, records, spawner)
         top_hooks.get_env = FakeEnv({})
         site = _RecordingSite()
+        encoders = SubstitutingSpawner([sleeper_argv()])
+        stream_hooks.spawn_capture_process = encoders
 
         async def fake_build_site(app: web.Application, host: str, port: int) -> SiteRunnerProtocol:
             _ = (app, host, port)
@@ -305,8 +327,9 @@ class TestAsyncMain:
         service_hooks.build_site = fake_build_site
         core_hooks.install_signal_handlers = _ignore_handler
 
-        served = asyncio.create_task(_async_main())
-        await asyncio.sleep(0)
+        served = asyncio.create_task(_async_main(mosaic_root=Path(os.path.relpath(tmp_path))))
+        while not encoders.processes:
+            await asyncio.sleep(0)
         served.cancel()
         with pytest.raises(asyncio.CancelledError):
             await served
@@ -314,6 +337,47 @@ class TestAsyncMain:
 
         assert site.start_calls == 1
         assert site.cleanup_calls == 1
+        assert encoders.processes[0].wait_timeouts == [PROCESS_END_TIMEOUT_SECONDS]
+
+
+class TestReportMosaicEnd:
+    """The four-up task's end, said as it happens."""
+
+    async def test_a_failed_director_is_logged_at_once(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The exception is logged when the task ends, not at shutdown."""
+
+        async def fail() -> None:
+            raise OSError("ffmpeg is not installed")
+
+        task = asyncio.create_task(fail())
+        with pytest.raises(OSError, match="not installed"):
+            await task
+        with caplog.at_level(logging.ERROR, logger=fleet_log.name):
+            report_mosaic_end(task)
+
+        assert "the four-up stream stopped: OSError('ffmpeg is not installed')" in caplog.text
+
+    async def test_a_cancelled_or_finished_director_says_nothing(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Shutdown cancels it; a clean end has nothing to report."""
+
+        async def finish() -> None:
+            return None
+
+        finished = asyncio.create_task(finish())
+        await finished
+        cancelled = asyncio.create_task(asyncio.sleep(60))
+        cancelled.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await cancelled
+        with caplog.at_level(logging.ERROR, logger=fleet_log.name):
+            report_mosaic_end(finished)
+            report_mosaic_end(cancelled)
+
+        assert caplog.text == ""
 
 
 class TestRealServeFleet:
