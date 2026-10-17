@@ -15,12 +15,14 @@ from tankpit_bot.service.demo_caption_words import CaptionWordsDict
 
 _PAGE = """
 <style>
-.message-list {position:absolute;left:400px;top:240px;width:180px;height:88px}
+.game-right {position:absolute;left:400px;top:240px;width:180px}
+.history {height:180px}
+.message-list {width:180px;height:88px}
 .message-list select {width:100%;height:100%;font:10px Arial;background:#ffffe0;color:#000}
 </style>
-<div class="history">You hit orange-5</div>
+<div class="game-right"><div class="history">You hit orange-5</div>
 <div class="message-list"><select size="10"><option>Attack the red</option>
-<option>Be right back</option></select></div>
+<option>Be right back</option></select></div></div>
 """
 
 
