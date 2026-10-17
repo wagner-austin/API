@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'POETRY_KEYRING_ENABLED', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -86,6 +86,8 @@ Describe 'The build' {
         Read-Result $export.Target | Should -BeExactly '0'
         $env:npm_config_cache | Should -BeExactly "$($export.Cache)/npm"
         $env:POETRY_CACHE_DIR | Should -BeExactly "$($export.Cache)/pypoetry"
+        # No logon session on a runner's task for the Credential Manager (MCPs board task 65bb90c3).
+        $env:POETRY_KEYRING_ENABLED | Should -BeExactly 'false'
         $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/ms-playwright"
         $env:PYTEST_XDIST_AUTO_NUM_WORKERS | Should -BeExactly '3'
         $env:CORVIS_TEST_MAX_WORKERS | Should -BeExactly '3'

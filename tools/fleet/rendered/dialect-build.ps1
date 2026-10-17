@@ -106,6 +106,7 @@ $log = "$Target/result.txt.log"
 $result = "$Target/result.txt"
 $env:npm_config_cache = "$CacheRoot/npm"
 $env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"
+$env:POETRY_KEYRING_ENABLED = 'false'
 $env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"
 $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"
 $env:CORVIS_TEST_MAX_WORKERS = "$Workers"

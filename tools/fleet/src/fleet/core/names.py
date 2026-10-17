@@ -130,6 +130,27 @@ CACHE_VARIABLE = "CORVIS_FLEET_CACHE"
 #: Project directory used by preparation to select its dependency closure.
 WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
 
+#: The variable, and its value, that turn poetry's keyring off in every build,
+#: Linux and Windows, the runner's own and the isolated one alike. Every
+#: project the fleet builds installs from PyPI with no private index, so
+#: nothing needs a stored credential, and on a node's runner the keyring is
+#: either never answered or not there:
+#:
+#: - Linux (MCPs board task c837fd8d): poetry asks the SecretService over
+#:   D-Bus before it installs anything, and a headless node never answers.
+#:   Measured on diphtheria on 2026-09-30, ``poetry install --with dev`` sat
+#:   at ``Using keyring backend 'SecretService Keyring'`` for over ten minutes
+#:   at 0.1 percent CPU, so two doc-extract-api checks timed out before any
+#:   test ran; with this set the install finished in 144 s.
+#: - Windows (MCPs board task 65bb90c3): the runner's task has no logon
+#:   session, so the Credential Manager read in poetry's install preflight
+#:   fails with ``(1312, 'CredRead', 'A specified logon session does not
+#:   exist.')`` and the install exits 1 whenever poetry has a package to
+#:   download. Measured on serendipity from 2026-10-17T00:04Z, when
+#:   ast-serialize 0.13.1 reached PyPI: MCPs' execution-elevated suite failed
+#:   at every head after 3c1f26273, so no head was proven.
+POETRY_KEYRING_OFF = ("POETRY_KEYRING_ENABLED", "false")
+
 
 def cache_root(stage_root: str) -> str:
     """Where a node keeps the dependency caches its export runs share.

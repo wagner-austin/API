@@ -26,7 +26,7 @@ Every script here prepends it, so the same ``poetry`` the operator ran by
 hand is the one the build finds.
 
 WHY POETRY'S KEYRING IS OFF. Every build exports ``POETRY_KEYRING_ENABLED``
-false (:data:`fleet.core.linux_isolated_build.POETRY_KEYRING_OFF` says why):
+false (:data:`fleet.core.names.POETRY_KEYRING_OFF` says why):
 left on, poetry waits on a D-Bus SecretService that a headless node never
 answers, and the build times out inside ``poetry install`` (MCPs board task
 c837fd8d).
@@ -44,10 +44,10 @@ from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
-from fleet.core.linux_isolated_build import POETRY_KEYRING_OFF, isolated_build_lines
+from fleet.core.linux_isolated_build import isolated_build_lines
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
-from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import sh_phase_lines
 
 #: How a script file is run by path.

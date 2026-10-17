@@ -180,6 +180,16 @@ class TestBuildScript:
         assert '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"' in body
         assert '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"' in body
 
+    def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
+        """MCPs board task 65bb90c3: the runner's task has no logon session,
+        so poetry's Credential Manager read failed its install whenever it
+        had a package to download."""
+        lines = _build().splitlines()
+
+        assert lines.index("$env:POETRY_KEYRING_ENABLED = 'false'") < lines.index(
+            "Set-Location -LiteralPath $Target"
+        )
+
     def test_the_install_steps_are_one_string_each_in_order_beside_their_phases(self) -> None:
         body = _build(
             install=(

@@ -48,7 +48,7 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
-from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import sh_phase_lines
 
 #: The user whose rootless daemon a docker project's build runs against.
@@ -57,19 +57,6 @@ EXEC_USER = "execdocker"
 #: The PATH the isolated build starts from: the system's tools only, since
 #: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
 EXEC_PATH = "/usr/local/bin:/usr/bin:/bin"
-
-#: The variable, and its value, that turn poetry's keyring off in every Linux
-#: build, the runner's own and the isolated one alike (MCPs board task
-#: c837fd8d). With the keyring on, poetry asks the SecretService over D-Bus
-#: for credentials before it installs anything, and on a headless node that
-#: call can block with nothing ever answering: measured on diphtheria on
-#: 2026-09-30, ``poetry install --with dev`` printed ``Using keyring backend
-#: 'SecretService Keyring'`` and sat for over ten minutes at 0.1 percent CPU,
-#: which is how two doc-extract-api checks timed out inside poetry install
-#: before any test ran, while the same install with this set finished in
-#: 144 s. Every project the fleet builds installs from PyPI with no private
-#: index, so nothing needs a stored credential.
-POETRY_KEYRING_OFF = ("POETRY_KEYRING_ENABLED", "false")
 
 
 def isolated_build_lines(

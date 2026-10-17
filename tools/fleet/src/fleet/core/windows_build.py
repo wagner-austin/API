@@ -26,7 +26,7 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
-from fleet.core.names import CACHE_VARIABLE, WORKSPACE_VARIABLE
+from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
 from fleet.core.phase_markers import PHASE_MARKER
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
@@ -83,6 +83,11 @@ def build_script(
     token whether it was meant to have that one; with the lane in its
     environment, MCPs' execution suite asserts that the token it holds is the
     token the fleet launched it with, in both directions.
+
+    POETRY'S KEYRING IS OFF, as on Linux (:data:`fleet.core.names.POETRY_KEYRING_OFF`,
+    MCPs board task 65bb90c3): the runner's task has no logon session for
+    the Credential Manager, so poetry's install preflight failed there
+    whenever it had a package to download.
 
     THE BUILD SAYS WHO ASKED FOR IT, as ``BOARD_AGENT_LABEL``: the job's
     submitter, held to the board's grammar (:mod:`fleet.core.agent_label`),
@@ -156,6 +161,7 @@ def build_script(
         f'$result = "$Target/{names.RESULT_NAME}"',
         '$env:npm_config_cache = "$CacheRoot/npm"',
         '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"',
+        f"$env:{POETRY_KEYRING_OFF[0]} = '{POETRY_KEYRING_OFF[1]}'",
         '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
         '$env:CORVIS_TEST_MAX_WORKERS = "$Workers"',
