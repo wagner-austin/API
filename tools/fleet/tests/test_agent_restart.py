@@ -18,6 +18,7 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart, session_release
+from tests._agent_cli import agent_argv, sessions_argv
 from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests._session_release_fixtures import (
@@ -28,7 +29,7 @@ from tests._session_release_fixtures import (
     verify_call,
     verify_reply,
 )
-from tests.conftest import FakeRun, agent_argv, failed
+from tests.conftest import FakeRun, failed
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
 SUBMITTER = "fable-dm-versionsplit-0912"
@@ -194,6 +195,35 @@ class TestRestartLane:
         # what the submitter reads, and it names the new pid.
         assert "RESTARTED  mcps-99" in detail
         assert "now pid 41324" in detail
+
+    def test_a_sessions_tick_runs_the_verb_and_reports_it_started_on_its_machine(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs board task c39ee056: a session verb names no node in the
+        queue, so the runner holding the sessions duty says where it ran."""
+        release = plant_release(tmp_path)
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, "RESTARTED  mcps-99\n")])
+        _test_hooks.run = runner
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"claimed": restart_row(requestedNode=None)}),
+                dump_json_str({"job": restart_row(status="running", node="ziggurat")}),
+                dump_json_str({"job": restart_row(status="passed", node="ziggurat")}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(sessions_argv(config_path, repo, "ziggurat")) == 0
+
+        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
+        assert endpoint.arguments[0]["lane"] == "sessions"
+        assert endpoint.arguments[1]["node"] == "ziggurat"
+        assert endpoint.arguments[1]["runId"] == f"restart-{DEFAULT_JOB_ID}"
+        # The verb and nothing after it: a sessions tick has no publish pass.
+        assert runner.calls == [
+            verify_call(tmp_path),
+            restart.restart_argv(release["root"], release["registry_dir"], TARGET),
+        ]
 
     def test_a_claimed_revive_runs_session_audits_revive_mode_with_the_submitter(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path

@@ -84,16 +84,19 @@ class DispatchCommand(StrEnum):
 
 
 class DispatchLane(StrEnum):
-    """The two lanes a runner claims from (MCPs mig 532, board task fd5cabfa A5).
+    """The lanes a runner claims from (MCPs migs 532 and 795, board tasks
+    fd5cabfa A5 and c39ee056).
 
-    ``hub`` is the rebuild and the five session verbs, run on the hub by
-    ``fleet-agent``; ``node`` is the make targets a fleet node runs on a
+    ``hub`` is the rebuild, run on the hub by ``fleet-agent``; ``sessions``
+    is the session verbs, run by ``fleet-agent`` on the machine holding the
+    sessions duty; ``node`` is the make targets a fleet node runs on a
     checked-out commit, claimed by ``fleet-node-agent``. The queue
     partitions its claims by lane, which is what stops a revive queueing
     behind a check.
     """
 
     HUB = "hub"
+    SESSIONS = "sessions"
     NODE = "node"
 
 

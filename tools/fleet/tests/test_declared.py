@@ -20,10 +20,11 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, dump_
 from fleet.cli import agent
 from fleet.contracts.tags import NodeTag
 from fleet.core import _test_hooks, declared, queue, rolled
+from tests._agent_cli import agent_argv
 from tests._git_fixtures import committed_repository
 from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import FakeQueue, queue_env
-from tests.conftest import FakeRun, agent_argv, failed, ok, pin_clock
+from tests.conftest import FakeRun, failed, ok, pin_clock
 
 #: 2026-10-14T23:00:00Z, the instant the tests pin the clock at.
 NOW = 1_792_018_800

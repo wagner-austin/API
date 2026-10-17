@@ -78,6 +78,8 @@ class TestTheLanes:
                 "a850f688-f98d-415c-a244-e993226ca2fc",
                 "--repo-root",
                 str(root),
+                "--lane",
+                "hub",
                 "--mcps-root",
                 str(mcps),
                 "--registry",
@@ -105,10 +107,55 @@ class TestTheLanes:
                 "a850f688-f98d-415c-a244-e993226ca2fc",
                 "--repo-root",
                 str(root),
+                "--lane",
+                "hub",
                 "--announce",
             ),
             stem="fleet-agent",
             header="hub-announce",
+        )
+
+    # MCPs board task c39ee056: the session verbs are the sessions duty's,
+    # claimed by a runner on the machine holding it, under a label and a
+    # session derived from that machine's alias, with no hub-only flag.
+    @pytest.mark.parametrize(
+        ("lane", "tail", "header"),
+        [
+            (tick.Lane.SESSIONS, (), "sessions ziggurat"),
+            (tick.Lane.SESSIONS_ANNOUNCE, ("--announce",), "sessions-announce ziggurat"),
+        ],
+    )
+    def test_the_sessions_lanes_run_the_fleet_agent_as_the_machines_sessions_runner(
+        self, lane: tick.Lane, tail: tuple[str, ...], header: str
+    ) -> None:
+        root = pathlib.Path("/home/corvis/PROJECTS/API")
+        assert tick.plan_tick(root, lane, "ziggurat") == tick.TickPlan(
+            arguments=(
+                "--repo-root",
+                str(root),
+                "--agent",
+                "fleet-agent",
+                "--",
+                "--agent",
+                "fleet-sessions-ziggurat",
+                "--session",
+                "87816ad3-d019-5005-81e9-3036f89a50ab",
+                "--repo-root",
+                str(root),
+                "--lane",
+                "sessions",
+                "--node",
+                "ziggurat",
+                *tail,
+            ),
+            stem="fleet-sessions-ziggurat",
+            header=header,
+        )
+
+    def test_each_machine_has_its_own_sessions_runner_identity(self) -> None:
+        assert tick.sessions_identity("austinpc") == (
+            "fleet-sessions-austinpc",
+            "bf75d02e-27a3-5752-8d96-07819e29af54",
         )
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:
@@ -169,22 +216,35 @@ class TestTheLanes:
     @pytest.mark.parametrize(
         ("lane", "word"),
         [
+            (tick.Lane.SESSIONS, "sessions"),
+            (tick.Lane.SESSIONS_ANNOUNCE, "sessions-announce"),
             (tick.Lane.NODE, "node"),
             (tick.Lane.ANNOUNCE, "announce"),
             (tick.Lane.ELEVATED, "elevated"),
             (tick.Lane.ELEVATED_ANNOUNCE, "elevated-announce"),
         ],
     )
-    def test_a_node_lane_naming_no_node_is_refused(self, lane: tick.Lane, word: str) -> None:
+    def test_a_machine_lane_naming_no_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
             tick.plan_tick(pathlib.Path("C:/api"), lane, None)
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane needs --node"
 
     def test_each_lane_word_narrows_to_its_member_and_nothing_else_does(self) -> None:
-        names = ("hub", "hub-announce", "node", "announce", "elevated", "elevated-announce")
+        names = (
+            "hub",
+            "hub-announce",
+            "sessions",
+            "sessions-announce",
+            "node",
+            "announce",
+            "elevated",
+            "elevated-announce",
+        )
         assert [tick.require_lane(name) for name in names] == [
             tick.Lane.HUB,
             tick.Lane.HUB_ANNOUNCE,
+            tick.Lane.SESSIONS,
+            tick.Lane.SESSIONS_ANNOUNCE,
             tick.Lane.NODE,
             tick.Lane.ANNOUNCE,
             tick.Lane.ELEVATED,
@@ -194,8 +254,9 @@ class TestTheLanes:
         with pytest.raises(ValueError) as refused:
             tick.require_lane("agent")
         assert str(refused.value) == (
-            "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'node', 'announce', "
-            "'elevated', 'elevated-announce'], not 'agent'"
+            "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
+            "'sessions-announce', 'node', 'announce', 'elevated', 'elevated-announce'], "
+            "not 'agent'"
         )
 
     def test_the_ticks_deadline_is_half_a_minute_past_the_agents(self) -> None:

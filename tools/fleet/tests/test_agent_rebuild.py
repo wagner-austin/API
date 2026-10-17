@@ -16,9 +16,10 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, rebuild
+from tests._agent_cli import agent_argv
 from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
-from tests.conftest import FakeRun, agent_argv
+from tests.conftest import FakeRun
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)

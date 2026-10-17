@@ -137,11 +137,10 @@ def claim_next(
 
     Args:
         credentials: Endpoint and headers.
-        lane: Which jobs this runner drains (MCPs mig 532, board task
-            fd5cabfa A5): ``hub`` for the rebuild and the session verbs the
-            hub runs itself, ``node`` for the make targets a fleet node runs
-            on a checked-out commit. Two lanes so a revive never queues
-            behind a check.
+        lane: Which jobs this runner drains (MCPs migs 532 and 795): ``hub``
+            for the rebuild, ``sessions`` for the session verbs the sessions
+            host runs, ``node`` for the make targets a fleet node runs on a
+            checked-out commit. Lanes so a revive never queues behind a check.
         tags: The capabilities the claiming node carries; the queue hands
             back only a job whose required tags are all among them.
         node: Restrict to jobs for this node plus jobs that named none, or

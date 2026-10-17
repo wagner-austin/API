@@ -1,9 +1,12 @@
-"""CLI: one tick of the hub runner that serves the corvis dispatch queue's
-hub lane.
+"""CLI: one tick of the runner that serves the corvis dispatch queue's hub
+lane or its sessions lane.
 
 Usage:
     fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
-        --agent fleet-runner-austinpc --session <uuid> [--announce]
+        --agent fleet-runner-austinpc --session <uuid> --lane hub [--announce]
+    fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
+        --agent fleet-sessions-austinpc --session <uuid> --lane sessions \\
+        --node austinpc [--announce]
 
 THIS IS THE OTHER HALF OF QUEUE INVERSION. ``fleet-mcp``'s ``dispatch_*``
 tools hold a queue that any session can enqueue onto -- from a phone, from
@@ -17,21 +20,26 @@ ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- a shell
 loop, Task Scheduler, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
-THE HUB LANE ONLY (MCPs board task fd5cabfa, A5). This runner claims from
-the queue's ``hub`` lane: the ``build-bases`` rebuild and the five session
-verbs (restart, revive, the two kills and the compact), every one of them
-run on the hub itself and closed in the tick that claimed it. The make
-targets, which run on a fleet node against a checked-out commit, are the
-``node`` lane, drained by one :mod:`fleet.cli.node_agent` per enabled node.
-Until 2026-09-21 this one runner took every kind of job oldest-first, so a
-revive queued behind 129 stale kills (board task 4199d1fb) and nine nodes
-behaved as one slow node; two lanes and per-node
-runners are the fix, and nothing here collects a suite any more because
-nothing here starts one.
+THE HUB AND SESSIONS LANES ONLY (MCPs board tasks fd5cabfa, A5, and
+c39ee056). With ``--lane hub`` this runner claims the ``build-bases``
+rebuild, the control duty's verb; with ``--lane sessions`` it claims the
+session verbs (restart, revive, the two kills, the compact and the exit),
+the sessions duty's, on the machine whose sessions they are. Every one runs
+where it was claimed and closes in the tick that claimed it. The MCPs hub
+runner places each lane's row by the duty the node registry gives its
+machine, so the queue names no node for a session verb: holding the duty is
+the placement. The make targets, which run on a fleet node against a
+checked-out commit, are the ``node`` lane, drained by one
+:mod:`fleet.cli.node_agent` per enabled node. Until 2026-09-21 one runner
+took every kind of job oldest-first, so a revive queued behind 129 stale
+kills (board task 4199d1fb) and nine nodes behaved as one slow node; lanes
+and per-node runners are the fix, and nothing here collects a suite any more
+because nothing here starts one.
 
-A TICK IS THREE PASSES, IN THIS ORDER:
+A HUB TICK IS THREE PASSES, IN THIS ORDER; a sessions tick is the first
+alone, since publishing and observing are the control duty's:
 
-    1. CLAIM. Take at most one hub-lane job and run it to its close.
+    1. CLAIM. Take at most one job of the lane and run it to its close.
     2. PUBLISH. Read every project the registry declares at the commit
        ``refs/fleet/rolled`` names now, with the tags each requires, and
        hand them to the queue (MCPs board tasks 1915b042 and 0be88a36,
@@ -51,8 +59,8 @@ A TICK IS THREE PASSES, IN THIS ORDER:
        needs to know which machines exist, and that file lives in the MCPs
        checkout, which a runner may legitimately not have.
 
-At most ONE job per tick, deliberately: a bake or a session verb holds the
-hub, and a second claimed before the first closed would run beside it.
+At most ONE job per tick, deliberately: a bake or a session verb holds its
+machine, and a second claimed before the first closed would run beside it.
 
 WHY THIS COMMAND EXITS 0 FOR A REFUSED JOB, and it is the same argument
 ``fleet-collect`` makes for a failing suite: the status of this command is
@@ -77,7 +85,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config
+from fleet.cli import _config, hub_passes
 from fleet.contracts.dispatch import (
     ClosingStatus,
     DispatchCommand,
@@ -87,11 +95,8 @@ from fleet.contracts.dispatch import (
 )
 from fleet.core import (
     _test_hooks,
-    declared,
-    observe,
     queue,
     rebuild,
-    registry,
     restart,
     session_release,
 )
@@ -104,6 +109,7 @@ ROOT_FLAG = "--repo-root"
 NODE_FLAG = "--node"
 MCPS_ROOT_FLAG = "--mcps-root"
 REGISTRY_FLAG = "--registry"
+LANE_FLAG = "--lane"
 
 _FLAGS = (
     _config.CONFIG_FLAG,
@@ -114,7 +120,16 @@ _FLAGS = (
     NODE_FLAG,
     MCPS_ROOT_FLAG,
     REGISTRY_FLAG,
+    LANE_FLAG,
 )
+
+#: The flags only a hub tick's publish and observe passes read, which a
+#: sessions tick refuses rather than ignores.
+_HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG, REGISTRY_FLAG)
+
+#: The node a hub-lane job is reported on: ``build-bases`` is pinned there
+#: (MCPs ``FLEET_DISPATCH_HUB_NODE``, migs 497 and 795).
+HUB_NODE = "austinpc"
 
 #: How long a claim survives without a report.
 #:
@@ -205,12 +220,12 @@ def rebuild_job(
     queue.report_start(
         credentials,
         job_id=job["job_id"],
-        node="austinpc",
+        node=HUB_NODE,
         run_id=run_id,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    _log.info("started %s on austinpc as %s (local bake)", job["job_id"], run_id)
+    _log.info("started %s on %s as %s (local bake)", job["job_id"], HUB_NODE, run_id)
     result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
     detail = rebuild.describe_result(result)
     queue.report_close(
@@ -229,9 +244,11 @@ def session_job(
     credentials: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
+    *,
+    node: str,
 ) -> DispatchJob:
     """Execute a claimed session job (restart, revive, kill, compact or exit)
-    on the hub, start to close.
+    on this machine, start to close.
 
     The same shape as :func:`rebuild_job` and for the same reasons: the
     work is local, well under a minute, and closing it in one tick leaves
@@ -253,6 +270,7 @@ def session_job(
         credentials: The queue's endpoint and headers.
         job: The claimed session job.
         identity: This runner's identity arguments.
+        node: This machine's alias, which the job is reported started on.
 
     Returns:
         The job, whatever became of it.
@@ -285,12 +303,12 @@ def session_job(
     queue.report_start(
         credentials,
         job_id=job["job_id"],
-        node="austinpc",
+        node=node,
         run_id=run_id,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    _log.info("started %s on austinpc as %s (local %s)", job["job_id"], run_id, verb)
+    _log.info("started %s on %s as %s (local %s)", job["job_id"], node, run_id, verb)
     result = restart.run_session_job(invocation)
     detail = restart.describe_result(result, invocation)
     queue.report_close(
@@ -309,17 +327,24 @@ def claim_pass(
     credentials: McpCredentials,
     identity: JSONObject,
     *,
+    lane: DispatchLane,
     node: str | None,
+    host: str,
     mcps_root: pathlib.Path | None,
 ) -> DispatchJob | None:
-    """Take one hub-lane job and run it to its close.
+    """Take one job of this runner's lane and run it to its close.
+
+    A job is run by its command, whichever lane gave it: until the MCPs
+    queue split the session verbs into their own lane (mig 795), the hub
+    lane gave both kinds.
 
     Args:
         credentials: The queue's endpoint and headers.
         identity: This runner's identity arguments.
-        node: Restrict claims to this node, or None to take any hub job;
-            the hub verbs are pinned to ``austinpc``, so this is the hub's
-            own alias or None.
+        lane: The hub lane or the sessions lane.
+        node: Restrict claims to this node, plus jobs that name none, or
+            None to take any job of the lane.
+        host: The node a session job is reported started on: this machine.
         mcps_root: The MCPs checkout a base rebuild runs in, or None when
             the runner was started without ``--mcps-root``. Session verbs
             never use it: they run a sealed release
@@ -327,7 +352,7 @@ def claim_pass(
 
     Returns:
         The job that was claimed, whatever became of it, or None when the
-        hub lane was empty -- the outcome of most ticks.
+        lane was empty -- the outcome of most ticks.
 
     Raises:
         AppError: Only from the queue calls themselves. A LOCAL refusal (no
@@ -339,7 +364,7 @@ def claim_pass(
     """
     job = queue.claim_next(
         credentials,
-        lane=DispatchLane.HUB,
+        lane=lane,
         tags=(),
         node=node,
         projects=None,
@@ -353,79 +378,52 @@ def claim_pass(
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
-    return session_job(credentials, job, identity)
+    return session_job(credentials, job, identity, node=host)
 
 
-def publish_pass(
-    credentials: McpCredentials, identity: JSONObject, *, repo_root: pathlib.Path
-) -> None:
-    """Publish the rolled registry to the queue, which refuses undeclared work.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        identity: This runner's identity arguments; the publication is its.
-        repo_root: The API checkout whose object store holds
-            ``refs/fleet/rolled``.
-
-    Raises:
-        AppError: From the queue call. A read that could not list or read
-            the registry sends nothing and is logged with its code, every
-            tick it happens, since publishing a registry not read would
-            refuse declared work.
-        InvalidJsonError: From the read, when a project file is not JSON.
-        JSONTypeError: From the read, when a project file does not decode.
-    """
-    read = declared.read_declared(repo_root)
-    if isinstance(read, str):
-        _log.warning("published nothing: %s", read)
-        return
-    publication = declared.publish_registry(credentials, read, identity=identity)
-    _log.info(
-        "published %d project(s) from the registry at %s (%d dropped since the last "
-        "publication) and refused %d queued job(s) naming a project it does not declare",
-        publication["published"],
-        read["commit"],
-        publication["removed"],
-        publication["refused"],
-    )
+#: What each lane's check-in says the runner claims.
+_LANE_CLAIMS = {
+    DispatchLane.HUB: "the queue's hub lane (build-bases)",
+    DispatchLane.SESSIONS: "the queue's sessions lane (the session verbs)",
+}
 
 
-def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
-    """Record every enabled worker's Claude Code sessions in the board's ledger.
-
-    The board's credentials are read HERE, not at the top of the tick: they
-    are the taskboard's (``TASKBOARD_MCP_API_KEY``), a different secret from
-    the queue's, and a runner started without ``--registry`` has no use for
-    them and must not be refused for lacking them.
+def require_runner_lane(value: str) -> DispatchLane:
+    """Name the lane this runner claims from.
 
     Args:
-        registry_path: The identity registry, ``fleet-mcp/fleet-nodes.json``.
-        identity: This runner's identity arguments.
+        value: The ``--lane`` value.
+
+    Returns:
+        The hub lane or the sessions lane.
 
     Raises:
-        AppError: ``NODE_REGISTRY_UNREADABLE`` for a registry this cannot
-            read, the board-watch credential codes when the taskboard's
-            variables are unset, and the contract faults
-            :func:`fleet.core.observe.observe_node` names. A node that does
-            not answer is logged, not raised.
-        OSError: When the registry file cannot be read.
+        ValueError: ``FLEET_AGENT_USAGE`` for any other value, the node lane
+            included, which is :mod:`fleet.cli.node_agent`'s.
     """
-    nodes = registry.decode_registry_nodes(_test_hooks.read_text(registry_path))
-    board = board_config.load_credentials()
-    for outcome in observe.observe_pass(board, nodes, identity):
-        _log.info("%s", observe.render_outcome(outcome))
+    for lane in _LANE_CLAIMS:
+        if lane.value == value:
+            return lane
+    words = [lane.value for lane in _LANE_CLAIMS]
+    raise ValueError(f"FLEET_AGENT_USAGE: {LANE_FLAG} is one of {words}, not {value!r}")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Run one tick: claim and run at most one hub-lane job, publish the registry, observe.
+    """Run one tick: claim and run at most one job of the lane, then, on the
+    hub lane, publish the registry and observe.
 
     With ``--announce`` the tick instead posts the check-in that registers
     this runner's session on the board's ledger and claims nothing. The
     queue's close writer posts a task-naming job's outcome under the
     closer's label and the board admits a post only from a ledgered
-    session, so a hub runner that never announced could not close a
+    session, so a runner that never announced could not close a
     session-exit job, which names the finished task (MCPs board task
     2fecad69).
+
+    A sessions tick names its machine with ``--node``: the claim takes jobs
+    for it and jobs naming none, and its session jobs are reported started
+    there. It refuses ``--mcps-root`` and ``--registry``, which only the hub
+    tick's passes read.
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -436,7 +434,8 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or a
-            required one is absent.
+            required one is absent; ``FLEET_AGENT_USAGE`` for a lane this
+            runner does not claim, or a sessions tick given a hub-only flag.
         AppError: When the queue or the board cannot be reached or answered
             a shape this runner cannot read, or when the workspace does not
             decode.
@@ -446,11 +445,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = cli_args.parse_single_flags(
         [token for token in tokens if token != queue.ANNOUNCE_FLAG], _FLAGS
     )
-    # The workspace is still read, and refused when malformed, although the
-    # hub lane dispatches nothing to a node: a runner whose registry does
-    # not decode has no business claiming anything, and the node runners
-    # beside it read the same file.
+    # The workspace is still read, and refused when malformed, although
+    # neither lane dispatches to a node: a runner whose registry does not
+    # decode has no business claiming anything, and the node runners beside
+    # it read the same file.
     _config.load_workspace(parsed)
+    lane = require_runner_lane(cli_args.require_flag(parsed, LANE_FLAG))
+    if lane is DispatchLane.SESSIONS:
+        given = [flag for flag in _HUB_ONLY_FLAGS if flag in parsed]
+        if given:
+            raise ValueError(
+                f"FLEET_AGENT_USAGE: the sessions lane takes no {' or '.join(given)}; "
+                "only a hub tick publishes and observes"
+            )
+        host = cli_args.require_flag(parsed, NODE_FLAG)
+    else:
+        host = HUB_NODE
     agent = cli_args.require_flag(parsed, AGENT_FLAG)
     session_id = cli_args.require_flag(parsed, SESSION_FLAG)
     project_root = pathlib.Path(cli_args.require_flag(parsed, ROOT_FLAG)).resolve()
@@ -462,9 +472,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 board_config.load_credentials(),
                 machine=f"{sys.platform}:{_test_hooks.hostname()}",
                 body=(
-                    f"{agent}: claims the queue's hub lane (build-bases and the session "
-                    "verbs) and closes each job it claims, which posts the outcome to the "
-                    "job's task thread under this label"
+                    f"{agent}: claims {_LANE_CLAIMS[lane]} and closes each job it claims, "
+                    "which posts the outcome to the job's task thread under this label"
                 ),
                 identity=identity,
             ),
@@ -475,9 +484,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
 
-    if claim_pass(credentials, identity, node=parsed.get(NODE_FLAG), mcps_root=mcps_root) is None:
-        _log.info("hub lane empty")
-    publish_pass(credentials, identity, repo_root=project_root)
+    claimed = claim_pass(
+        credentials,
+        identity,
+        lane=lane,
+        node=parsed.get(NODE_FLAG),
+        host=host,
+        mcps_root=mcps_root,
+    )
+    if claimed is None:
+        _log.info("%s lane empty", lane.value)
+    if lane is DispatchLane.SESSIONS:
+        return 0
+    hub_passes.publish_pass(credentials, identity, repo_root=project_root)
 
     raw_registry = parsed.get(REGISTRY_FLAG)
     if raw_registry is None:
@@ -485,7 +504,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # distinguishable from a runner that was never asked to write any.
         _log.info("session observation skipped: no %s given", REGISTRY_FLAG)
     else:
-        observe_pass(pathlib.Path(raw_registry).resolve(), identity)
+        hub_passes.observe_pass(pathlib.Path(raw_registry).resolve(), identity)
     return 0
 
 
@@ -515,6 +534,8 @@ if __name__ == "__main__":
 __all__ = [
     "AGENT_FLAG",
     "CLAIM_LEASE_SECONDS",
+    "HUB_NODE",
+    "LANE_FLAG",
     "MCPS_ROOT_FLAG",
     "NODE_FLAG",
     "REGISTRY_FLAG",
@@ -523,7 +544,7 @@ __all__ = [
     "claim_pass",
     "entrypoint",
     "main",
-    "observe_pass",
     "rebuild_job",
+    "require_runner_lane",
     "session_job",
 ]

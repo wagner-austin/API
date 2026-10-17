@@ -31,11 +31,13 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, queue
+from tests._agent_cli import agent_argv, sessions_argv
 from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests._registry import write_registry
-from tests.conftest import FakeRun, agent_argv, failed, ok, workspace_document
+from tests.conftest import FakeRun, failed, ok, workspace_document
 
 #: The board's variables for the observe pass, with the url overridden so
 #: no test reads the MCPs checkout's endpoint declaration.
@@ -80,6 +82,94 @@ class TestAnEmptyHubLane:
         assert endpoint.arguments[0]["tags"] == []
         assert endpoint.arguments[0]["leaseSeconds"] == agent.CLAIM_LEASE_SECONDS
         assert "node" not in endpoint.arguments[0]
+
+
+class TestTheSessionsLane:
+    """The sessions duty's runner (MCPs board task c39ee056): it claims the
+    session verbs for its own machine and runs neither hub pass."""
+
+    def test_a_sessions_tick_claims_its_lane_for_its_node_and_nothing_else(
+        self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        run = FakeRun([])
+        _test_hooks.run = run
+        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            assert agent.main(sessions_argv(config_path, repo, "ziggurat")) == 0
+
+        assert endpoint.tools == ["dispatch_claim"]
+        assert endpoint.arguments[0]["lane"] == "sessions"
+        assert endpoint.arguments[0]["node"] == "ziggurat"
+        assert endpoint.arguments[0]["tags"] == []
+        # No publish pass read the rolled ref, and no observe pass ran.
+        assert run.calls == []
+        messages = [record.getMessage() for record in caplog.records]
+        assert "sessions lane empty" in messages
+        assert not any("observation" in message for message in messages)
+
+    def test_a_sessions_tick_names_its_machine(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+        argv = sessions_argv(config_path, repo, "ziggurat")[:-2]
+
+        with pytest.raises(ValueError, match="--node"):
+            agent.main(argv)
+
+        assert endpoint.tools == []
+
+    @pytest.mark.parametrize(
+        ("extra", "named"),
+        [
+            ([agent.REGISTRY_FLAG, "fleet-nodes.json"], "--registry"),
+            ([agent.MCPS_ROOT_FLAG, "MCPs"], "--mcps-root"),
+            (
+                [agent.MCPS_ROOT_FLAG, "MCPs", agent.REGISTRY_FLAG, "fleet-nodes.json"],
+                "--mcps-root or --registry",
+            ),
+        ],
+    )
+    def test_a_sessions_tick_refuses_the_hub_passes_flags(
+        self, config_path: pathlib.Path, repo: pathlib.Path, extra: list[str], named: str
+    ) -> None:
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+
+        with pytest.raises(ValueError) as refused:
+            agent.main([*sessions_argv(config_path, repo, "ziggurat"), *extra])
+
+        assert str(refused.value) == (
+            f"FLEET_AGENT_USAGE: the sessions lane takes no {named}; only a hub tick "
+            "publishes and observes"
+        )
+        assert endpoint.tools == []
+
+    @pytest.mark.parametrize("word", ["node", "hub-announce", ""])
+    def test_a_lane_this_runner_does_not_claim_is_refused(self, word: str) -> None:
+        with pytest.raises(ValueError) as refused:
+            agent.require_runner_lane(word)
+
+        assert str(refused.value) == (
+            f"FLEET_AGENT_USAGE: --lane is one of ['hub', 'sessions'], not {word!r}"
+        )
+
+    def test_each_lane_word_names_its_lane(self) -> None:
+        assert agent.require_runner_lane("hub") is DispatchLane.HUB
+        assert agent.require_runner_lane("sessions") is DispatchLane.SESSIONS
+
+    def test_a_tick_without_a_lane_is_refused_before_any_call(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+
+        with pytest.raises(ValueError, match="--lane"):
+            agent.main(agent_argv(config_path, repo)[:-2])
+
+        assert endpoint.tools == []
 
 
 class TestCredentialsAndEntryPoint:
@@ -189,9 +279,31 @@ class TestAnnounce:
         assert checkin["agent"] == "fleet-runner-austinpc"
         assert checkin["sessionId"] == "33333333-cccc-4ccc-8ccc-333333333333"
         assert checkin["body"] == (
-            "fleet-runner-austinpc: claims the queue's hub lane (build-bases and the session "
-            "verbs) and closes each job it claims, which posts the outcome to the job's task "
-            "thread under this label"
+            "fleet-runner-austinpc: claims the queue's hub lane (build-bases) and closes each "
+            "job it claims, which posts the outcome to the job's task thread under this label"
+        )
+
+    def test_announce_registers_the_sessions_runner_under_its_own_label(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        board_watch_hooks.env = FakeEnv(BOARD_ENV)
+        _test_hooks.env = FakeEnv({})
+        _test_hooks.hostname = lambda: "ziggurat"
+        endpoint = FakeQueue(["checked in"])
+        _test_hooks.http_post = endpoint
+
+        argv = [*sessions_argv(config_path, repo, "ziggurat"), queue.ANNOUNCE_FLAG]
+        assert agent.main(argv) == 0
+
+        assert endpoint.tools == ["task_post"]
+        checkin = endpoint.arguments[0]
+        assert checkin["machine"] == f"{sys.platform}:ziggurat"
+        assert checkin["agent"] == "fleet-sessions-ziggurat"
+        assert checkin["sessionId"] == "44444444-dddd-4ddd-8ddd-444444444444"
+        assert checkin["body"] == (
+            "fleet-sessions-ziggurat: claims the queue's sessions lane (the session verbs) and "
+            "closes each job it claims, which posts the outcome to the job's task thread under "
+            "this label"
         )
 
     def test_announce_without_the_boards_key_is_refused_before_any_call(
