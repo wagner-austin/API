@@ -24,6 +24,7 @@ from tankpit_bot.service._test_hooks.tv import (
 )
 from tankpit_bot.service.tv import (
     AV_TRANSPORT,
+    TV_TIMEOUT_SECONDS,
     TvError,
     TvStateDict,
     TvTargetDict,
@@ -104,10 +105,18 @@ class TestRealSeam:
                 )
 
     def test_a_tv_that_is_off_refuses_the_connection(self) -> None:
-        """Nothing listening is an OSError from the seam itself."""
+        """Nothing listening is an OSError from the seam itself.
+
+        Given the production timeout, not a shorter one: Windows retries a
+        refused loopback connection for about two seconds before it
+        reports the refusal, so a two-second timeout read as a timeout on
+        loki (fleet job 1cf364c0).
+        """
         url = f"http://127.0.0.1:{_closed_port()}/upnp/control/AVTransport1"
         with pytest.raises(ConnectionRefusedError):
-            service_hooks._real_post_soap(url, f'"{AV_TRANSPORT}#Play"', b"<x/>", 2.0)
+            service_hooks._real_post_soap(
+                url, f'"{AV_TRANSPORT}#Play"', b"<x/>", TV_TIMEOUT_SECONDS
+            )
 
     @pytest.mark.parametrize("url", ["https://127.0.0.1/x", "http:///x", "tv.local/x"])
     def test_a_url_that_is_not_plain_http_to_a_host_is_refused(self, url: str) -> None:

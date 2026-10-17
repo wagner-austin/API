@@ -73,7 +73,7 @@ async def test_the_playlist_and_a_segment_are_served(
 ) -> None:
     """Real files off the director's directory, with their media types."""
     director.hls_dir.mkdir(parents=True)
-    (director.hls_dir / "index.m3u8").write_text("#EXTM3U\n", encoding="utf-8")
+    (director.hls_dir / "index.m3u8").write_bytes(b"#EXTM3U\n")
     (director.hls_dir / "seg00007.ts").write_bytes(b"\x47" * 188)
 
     playlist = await client.get("/demo/mosaic/index.m3u8")
