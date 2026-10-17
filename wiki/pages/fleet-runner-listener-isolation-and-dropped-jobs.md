@@ -9,12 +9,14 @@ source_paths:
   - tools/fleet/src/fleet/core/runner_dropped_check.py
   - tools/fleet/src/fleet/core/runner_reap_dropped.py
   - tools/fleet/src/fleet/core/runner_reaper_render.py
+  - tools/fleet/tests/test_runner_placement_host.py
 source_git_blobs:
   "tools/fleet/src/fleet/contracts/runner_slice.py": b6b2115238d91a8485cb24fc2ed5edac0bbf9fea
   "tools/fleet/src/fleet/core/runner_job_scope_render.py": aadaf3447a0ae0923c980fd772bcbc86806013f8
   "tools/fleet/src/fleet/core/runner_dropped_check.py": e946b9ae156b05042934830476b9d9f0f24335d1
   "tools/fleet/src/fleet/core/runner_reap_dropped.py": 32f8ee0d947fbc9283c91230e531d3aa2f4e6ada
-  "tools/fleet/src/fleet/core/runner_reaper_render.py": 15922304e5b5e77d9641d22c373cc638ac16a22e
+  "tools/fleet/src/fleet/core/runner_reaper_render.py": 931c3e1d4db9f1a804bd82f9e5c898b588dae0e5
+  "tools/fleet/tests/test_runner_placement_host.py": f79e194e1a0ac7b2e2e5948eabfd8f0e46015f52
 fact_checked: "2026-10-17"
 confidence: high
 hubs: [infrastructure]
@@ -33,9 +35,11 @@ The kernel throttles every task that charges memory beneath a cgroup over its `m
 - **`listeners.slice`**, unbounded, holds every runner unit; no dash in either name, so neither is a child of the other.[^listener-slice]
 - **Each job is moved out of its unit** before its first step: a drop-in sets `ACTIONS_RUNNER_HOOK_JOB_STARTED`, the hook runs a root helper through a one-command sudoers rule, and the helper has systemd adopt the `Runner.Worker` into `runners.slice/fleet-job-<unit>-<pid>.scope`, bound to the unit so a stop of the unit still ends its job. A refusal fails the job by name rather than run it in the listener's cgroup.[^scope]
 - **`StartTransientUnit` answers when the start job is queued, not when the Worker has moved.** An immediate read failed every job on each placed runner from 17:43Z on 2026-10-17, so the helper now polls the cgroup every tenth of a second for up to `MOVE_WAIT_SECONDS = 5`.[^move]
-- **A running unit cannot be moved in place.** After the drop-in, `systemctl show` reads `Slice=listeners.slice` while the `ControlGroup` stays under `runners.slice`, and lavender's runners go from one job straight into the next. The host reaper's 30 s pass restarts such a unit only when its Listener runs and no Worker is in its cgroup or scopes; no Listener means a self-update, which a restart would cut short.[^place]
+- **A running unit cannot be moved in place.** After the drop-in, `systemctl show` reads `Slice=listeners.slice` while the `ControlGroup` stays under `runners.slice`, and lavender's runners go from one job straight into the next. The host reaper's 30 s pass restarts such a unit only when its Listener runs and no Worker is in its cgroup or scopes; no Listener means a self-update, which a restart would cut short.[^place] A single read per pass missed the seconds between jobs: MCPs lavender-wsl-3 held a Worker at every pass for 82 minutes. So after reaping, the pass re-reads each busy unit owed a move five times a second for up to `PLACE_WAIT_SECONDS = 20`.[^watch]
 
-Measured on lavender-wsl at 18:21:52Z on 2026-10-17, with `runners.slice` at 17,243,774,976 bytes over its 17,179,869,184-byte high: the slice's `memory.pressure` read `full avg10=95.27`, and `listeners.slice` and each placed listener read `0.00`.[^a3]
+## Proof the machine writes
+
+A note transcribing these readings was rejected as proof by two reviews of the task's closure. The proof is now a fleet project, `tools/fleet-execution-runners`, pinned to lavender-wsl, whose two cases run on the host as the fleet user.[^host-cases] One requires every unit `runners.json` declares for lavender to be active in `/listeners.slice`, that slice at `memory.high` max, `runners.slice` at the roster's bound, and every live Worker in its own job scope. The other fills a slice of the fleet user's systemd manager past its high with swap denied, beside an unbounded sibling. It requires the probe inside to stall at least a second and the sibling at most a hundredth of that. Run before lavender-wsl-3 moved, the first case failed on that unit, which is the fault it exists to catch. Its run at 3e4066d4a (fleet job c43c18f2) read 8 of 8 units in `/listeners.slice` and 4 Workers each in its scope, and the probe inside a slice over its high stalled 7,630,156 µs against the sibling's 0.[^a3]
 
 ## Ending a job GitHub dropped
 
@@ -51,8 +55,10 @@ Every hub tick runs a reap pass that reads the roster **at the rolled ref**, rea
 [^listener-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:54-55` -- "This slice carries no bound. No dash, so it is no child of either."
 [^scope]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:17-33` -- numbered steps 1 to 3: "A refusal fails the job by name, before its first step, rather than running"
 [^move]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:76-83` -- `MOVE_WAIT_SECONDS` comment: "move to land. ``StartTransientUnit`` answers once the scope's start job is"
-[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:269-283` -- `place()`: "# No Listener is a self-update under way, which a restart would cut short."
-[^a3]: [synthesis] -- read on lavender-wsl from `/sys/fs/cgroup/runners.slice` and `/sys/fs/cgroup/listeners.slice` (`memory.current`, `memory.high`, `memory.pressure`) by board task 715b9ec5's A3 probe; no file in the repo carries the reading.
+[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:285-300` -- `place()`: "# No Listener is a self-update under way, which a restart would cut short."
+[^watch]: `tools/fleet/src/fleet/core/runner_reaper_render.py:77-83` and `:120` -- module docstring: "A pass that only looked once missed the gap between two jobs, which lasts"
+[^host-cases]: `tools/fleet/tests/test_runner_placement_host.py:182-211` and `:294-341` -- the two `host_runner_units` cases: "assert outside_stall * SIBLING_RATIO <= inside_stall"
+[^a3]: [synthesis] -- the two `host reading:` lines of fleet job c43c18f2 (tools/fleet-execution-runners at 3e4066d4a, node lavender-wsl, 2 passed), in its log `/home/corvis/fleet/stage/logs/tools-fleet-execution-runners-lavender-wsl-1792267202.log` on lavender-wsl; the repo carries the cases that print them, not the figures.
 [^dropped]: `tools/fleet/src/fleet/core/runner_reap_dropped.py:3-8` -- module docstring: "the host alone cannot tell a long job from one GitHub let go of; on"
 [^rule]: `tools/fleet/src/fleet/core/runner_dropped_check.py:15-20` and `:45` -- "A runner GitHub reads busy holds its job however its listener reads."
 [^reap]: `tools/fleet/src/fleet/core/runner_reap_dropped.py:12-22` and `:61` -- "writes each pid's argv before it kills the Worker's tree and leaves the"
