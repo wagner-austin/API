@@ -50,11 +50,12 @@ from fleet.core import (
     runner_audit,
     runner_base_render,
     runner_distro,
-    runner_onboard,
     runner_render,
     runner_windows_provision,
 )
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
+from fleet.core.runner_audit_types import AuditFinding
+from fleet.core.runner_github import mint_registration_token
 from fleet.core.runner_install import token_variable
 from fleet.core.script_values import scriptable
 
@@ -148,7 +149,7 @@ class RebuildReport(TypedDict):
 
     steps: list[str]
     manual_steps: list[str]
-    findings: list[runner_audit.AuditFinding]
+    findings: list[AuditFinding]
 
 
 def _script_path(spec: HostRunnerSpec, name: str) -> str:
@@ -343,7 +344,7 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> list[str]:
             layer's codes.
     """
     repos = _distinct_repos(spec["installs"])
-    tokens = {repo: runner_onboard.mint_registration_token(repo) for repo in repos}
+    tokens = {repo: mint_registration_token(repo) for repo in repos}
     steps.append(f"tokens: minted for {len(tokens)} repositories")
     rendered = runner_render.render_provision(spec)
     windows_repos = _distinct_repos([i for i in spec["installs"] if i["side"] == "windows"])

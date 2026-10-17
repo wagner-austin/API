@@ -51,7 +51,7 @@ BeforeAll {
         param(
             [string]$Name, [switch]$Sick,
             [string]$Used = '40G', [string]$Cached = '4G', [string]$StartName = 'LocalSystem', [string]$Held = '', [string]$GitAnswer = 'true',
-            [string]$Reaped = '0', [object[]]$Processes = @()
+            [string]$Reaped = '0', [string]$Placement = 'placed', [object[]]$Processes = @()
         )
         $registry = 'HKCU:\Software\fleet-test-' + [guid]::NewGuid().ToString('N')
         foreach ($key in 'Policy', 'FileSystem', 'Environment') {
@@ -84,8 +84,11 @@ BeforeAll {
             # which made this suite 116 to 131 s of the harness's 300 s
             # budget (MCPs board task 8e8e8769). No probe's words carry a
             # double quote, so the quoted comparison holds every argument.
+            # The job scope helper's placement probe is told apart before
+            # the reaper's, since both ask their helper's --audit mode.
             $wsl = Initialize-Batch 'wsl' @(
                 'set "said=%*"',
+                'if not "%said:fleet-runner-job-scope=%"=="%said%" goto placement',
                 'if not "%said:--audit=%"=="%said%" goto reaped',
                 'if not "%said:free -m=%"=="%said%" goto free',
                 'if not "%said:df -BG=%"=="%said%" goto df',
@@ -95,6 +98,7 @@ BeforeAll {
                 'if not "%said:is-active=%"=="%said%" goto active',
                 'if not "%said:sha256sum=%"=="%said%" goto sum',
                 'exit /b 0',
+                ':placement', "echo $Placement", 'exit /b 0',
                 ':reaped', "echo $Reaped", 'exit /b 0',
                 ':free', 'echo               total        used', 'echo Mem:          64000        2000', 'exit /b 0',
                 ':df', 'echo  Used', "echo  $Used", 'exit /b 0',
@@ -175,6 +179,8 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
             Should -Be @($script:ids | Where-Object { $_ -like 'cache:*' }).Count
         @($said | Where-Object { $_ -like 'CHECK orphans:*:wsl:* DRIFT *the reaper counted: There is no distribution with the supplied name. (exit 1)' }).Count |
             Should -Be @($script:ids | Where-Object { $_ -like 'orphans:*:wsl:*' }).Count
+        @($said | Where-Object { $_ -like 'CHECK placement:*:wsl:* DRIFT *the helper read: There is no distribution with the supplied name. (exit 1)' }).Count |
+            Should -Be @($script:ids | Where-Object { $_ -like 'placement:*:wsl:*' }).Count
         @($said | Where-Object { $_ -like 'CHECK orphans:*:windows:* DRIFT 1 process(es) under *: stale.exe pid 9*' }).Count |
             Should -Be @($script:ids | Where-Object { $_ -like 'orphans:*:windows:*' }).Count
     }
@@ -228,6 +234,8 @@ Describe 'The runner audit for <_>' -ForEach @(Get-ChildItem -LiteralPath (Join-
         @{ Case = 'git without core.longpaths'; Variant = @{ GitAnswer = 'false' }; Row = 'long-paths:*'; Detail = 'LongPathsEnabled=1 git core.longpaths=false (exit 0)' }
         @{ Case = 'a reaper counting leftovers'; Variant = @{ Reaped = '2' }; Row = 'orphans:*:wsl:*'
             Detail = 'processes older than 360 minutes that a finished job left in *, or under a Worker past that job timeout; the reaper counted: 2 (exit 0)' }
+        @{ Case = 'a listener whose job never left its cgroup'; Variant = @{ Placement = 'misplaced' }; Row = 'placement:*:wsl:*'
+            Detail = 'actions.runner.*.service in listeners.slice and its jobs in runners.slice; the helper read: misplaced (exit 0)' }
     ) {
         $variant = Initialize-Host $script:name @Variant
         $said = [string[]]@(Invoke-Rendered $script:name $variant.Parameters)

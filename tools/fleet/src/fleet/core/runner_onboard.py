@@ -45,19 +45,15 @@ from typing_extensions import TypedDict
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import (
-    _test_hooks,
     remote,
     runner_audit,
     runner_distro,
     runner_render,
     runner_windows_provision,
 )
+from fleet.core.runner_audit_types import AuditFinding
+from fleet.core.runner_github import mint_registration_token
 from fleet.core.runner_install import token_variable
-
-#: The token mint's deadline, in seconds: one HTTPS round trip to GitHub.
-#: A minute outlasts any answer ``gh`` gives and ends a hung login prompt
-#: or a proxy that never connects with a named refusal.
-GH_API_TIMEOUT_SECONDS = 60
 
 
 class OnboardPlan(TypedDict):
@@ -164,55 +160,6 @@ def plan_onboard(
     return OnboardPlan(repo=repo, installs=installs)
 
 
-def mint_registration_token(repo: str) -> str:
-    """A fresh runner registration token for one repository.
-
-    Args:
-        repo: The repository, ``owner/name``.
-
-    Returns:
-        The token.
-
-    Raises:
-        AppError: ``RUNNER_TOKEN_UNAVAILABLE`` when ``gh`` exits non-zero
-            or returns nothing -- an auth or permission condition on THIS
-            machine, named as such rather than surfacing later as a remote
-            config.sh failure that looks like a fleet fault.
-    """
-    result = _test_hooks.run(
-        [
-            "gh",
-            "api",
-            "-X",
-            "POST",
-            f"repos/{repo}/actions/runners/registration-token",
-            "-q",
-            ".token",
-        ],
-        timeout_seconds=GH_API_TIMEOUT_SECONDS,
-    )
-    token = result["stdout"].strip()
-    if result["returncode"] != 0 or not token:
-        detail = result["stderr"].strip() or "<no stderr>"
-        raise AppError(
-            FleetErrorCode.RUNNER_TOKEN_UNAVAILABLE,
-            f"gh could not mint a registration token for {repo}: {detail}. This is "
-            "local auth or repo permissions, not the fleet.",
-        )
-    if not token.isalnum():
-        # The token is embedded in rendered scripts inside single quotes;
-        # a token that is not plain alphanumeric (every real one is) would
-        # either be shell-mangled or be something other than a token, and
-        # both deserve a refusal that names the field rather than a remote
-        # config.sh error that names nothing.
-        raise AppError(
-            FleetErrorCode.RUNNER_TOKEN_UNAVAILABLE,
-            f"gh returned a non-alphanumeric registration token for {repo} "
-            f"({len(token)} chars); refusing to embed it in a provision script.",
-        )
-    return token
-
-
 def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> None:
     """Provision one WSL-side install on the host.
 
@@ -278,7 +225,7 @@ def onboard(
     *,
     sides: tuple[str, ...],
     python_versions: tuple[str, ...] = (),
-) -> tuple[OnboardPlan, list[runner_audit.AuditFinding]]:
+) -> tuple[OnboardPlan, list[AuditFinding]]:
     """Onboard one repository onto one host, end to end.
 
     Args:
@@ -326,7 +273,6 @@ def onboard(
 
 __all__ = [
     "OnboardPlan",
-    "mint_registration_token",
     "onboard",
     "plan_onboard",
 ]

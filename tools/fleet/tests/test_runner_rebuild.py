@@ -108,7 +108,7 @@ class TestAQuietRebuild:
 
     def test_every_stage_runs_in_order_and_the_audit_is_the_verdict(self) -> None:
         spec = _host()
-        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), repos=2))
+        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2))
         _test_hooks.run = runner
         report = runner_rebuild.rebuild(spec)
         assert report["steps"] == [
@@ -122,11 +122,12 @@ class TestAQuietRebuild:
         ]
         assert report["manual_steps"] == runner_render.render_provision(spec)["manual_steps"]
         assert all(finding["ok"] for finding in report["findings"])
-        assert len(runner.calls) == 19
+        # The audit's two, then its dropped-job row's gh list and Worker read.
+        assert len(runner.calls) == 21
 
     def test_the_stages_ship_the_rendered_scripts_with_fresh_tokens(self) -> None:
         spec = _host()
-        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), repos=2))
+        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2))
         _test_hooks.run = runner
         runner_rebuild.rebuild(spec)
         rendered = runner_render.render_provision(spec)
@@ -154,7 +155,7 @@ class TestAQuietRebuild:
 
     def test_the_long_stages_carry_the_stage_deadline(self) -> None:
         spec = _host()
-        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), repos=2))
+        runner = FakeRun(quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2))
         _test_hooks.run = runner
         runner_rebuild.rebuild(spec)
         stage = runner_rebuild.STAGE_TIMEOUT_SECONDS
@@ -171,7 +172,7 @@ class TestAQuietRebuild:
 
     def test_an_imported_distro_is_named_in_its_step(self) -> None:
         spec = _host()
-        answers = quiet_rebuild_answers(_clean_transcript(spec), repos=2)
+        answers = quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2)
         answers[3] = ok("imported Ubuntu 24.04-20240423\n")
         _test_hooks.run = FakeRun(answers)
         report = runner_rebuild.rebuild(spec)
@@ -183,7 +184,7 @@ class TestWslConf:
 
     def test_a_changed_wsl_conf_terminates_the_distro(self) -> None:
         spec = _host()
-        answers = quiet_rebuild_answers(_clean_transcript(spec), repos=2)
+        answers = quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2)
         answers[6] = ok(runner_base_render.WSLCONF_CHANGED_MARKER + "\n")
         answers[7:7] = [ok(""), ok("")]
         runner = FakeRun(answers)
@@ -202,7 +203,7 @@ class TestTheReboot:
         sleeper = FakeSleep(clock)
         _test_hooks.now = clock
         _test_hooks.sleep = sleeper
-        quiet = quiet_rebuild_answers(_clean_transcript(spec), repos=2)
+        quiet = quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2)
         answers = [
             ok(""),
             ok(runner_base_render.REBOOT_MARKER + "\n"),  # windows base asks
@@ -295,8 +296,9 @@ class TestTheVerdict:
 
     def test_an_unreachable_audit_raises(self) -> None:
         spec = _host()
-        answers = quiet_rebuild_answers(_clean_transcript(spec), repos=2)
-        answers[-2:] = [failed(255, "No route to host")]
+        answers = quiet_rebuild_answers(_clean_transcript(spec), spec, repos=2)
+        # The audit's send and run, and the dropped-job reads after them.
+        answers[-4:] = [failed(255, "No route to host")]
         _test_hooks.run = FakeRun(answers)
         with pytest.raises(AppError) as fault:
             runner_rebuild.rebuild(spec)

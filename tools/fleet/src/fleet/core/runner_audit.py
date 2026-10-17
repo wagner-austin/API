@@ -23,7 +23,6 @@ depends on to be comparable at all.
 from __future__ import annotations
 
 from platform_core.errors import AppError, FleetErrorCode
-from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
@@ -36,7 +35,9 @@ from fleet.core.runner_account import (
 )
 from fleet.core.runner_audit_cache import cache_rows, render_cache_check_lines
 from fleet.core.runner_audit_disk import disk_check_id, render_disk_check_lines
+from fleet.core.runner_audit_types import AuditFinding, AuditOutcome, ExpectedCheck
 from fleet.core.runner_base_render import EXECUTION_POLICY_KEY, LONG_PATHS_KEY
+from fleet.core.runner_dropped_check import attempt_dropped_check
 from fleet.core.runner_job_scope_render import (
     PLACEMENT_REASON,
     placement_check_id,
@@ -61,53 +62,6 @@ AUDIT_SCRIPT_NAME = "fleet-runner-audit.ps1"
 
 #: The row holding a host to long paths, both Win32's and git's.
 LONG_PATHS_CHECK_ID = "long-paths:win32-and-git"
-
-
-class ExpectedCheck(TypedDict):
-    """One check the audit script promises to report.
-
-    Attributes:
-        check_id: Stable identifier, derived from the roster entry so two
-            audits of one host agree line for line.
-        reason: Why the item matters -- printed beside a drift line so the
-            reader learns what breaks without opening the roster.
-    """
-
-    check_id: str
-    reason: str
-
-
-class AuditFinding(TypedDict):
-    """One check's verdict.
-
-    Attributes:
-        check_id: The check that reported.
-        ok: Whether the host satisfies it.
-        detail: What the host actually said, for the drift line.
-        reason: The roster's reason for the check.
-    """
-
-    check_id: str
-    ok: bool
-    detail: str
-    reason: str
-
-
-class AuditOutcome(TypedDict):
-    """What auditing a host produced, or why it produced nothing.
-
-    Same shape as :class:`fleet.core.probe.ProbeOutcome` and for the same
-    caller: an audit over several hosts must report an unreachable one as a
-    line beside the hosts that answered, not as a crash that hides them.
-
-    Attributes:
-        findings: Every check's verdict, or ``None`` when the host could not
-            be audited at all.
-        reason: Why there are no findings. Empty when there are.
-    """
-
-    findings: list[AuditFinding] | None
-    reason: str
 
 
 def expected_checks(spec: HostRunnerSpec) -> list[ExpectedCheck]:
@@ -545,15 +499,16 @@ def attempt_audit_host(spec: HostRunnerSpec) -> AuditOutcome:
     failure = outcome["failure"]
     if failure is not None:
         return AuditOutcome(findings=None, reason=failure["message"])
-    return AuditOutcome(findings=parse_audit_transcript(spec, outcome["output"]), reason="")
+    findings = parse_audit_transcript(spec, outcome["output"])
+    dropped = attempt_dropped_check(spec)
+    if dropped["findings"] is None:
+        return dropped
+    return AuditOutcome(findings=[*findings, *dropped["findings"]], reason="")
 
 
 __all__ = [
     "AUDIT_SCRIPT_NAME",
     "LONG_PATHS_CHECK_ID",
-    "AuditFinding",
-    "AuditOutcome",
-    "ExpectedCheck",
     "attempt_audit_host",
     "expected_checks",
     "parse_audit_transcript",

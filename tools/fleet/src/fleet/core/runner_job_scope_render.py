@@ -31,7 +31,9 @@ which carries no bound, and each job is moved into a scope of
 
 A refusal fails the job by name, before its first step, rather than running
 it inside the listener's cgroup. The helper's ``--audit UNIT`` mode is the
-audit's placement row (:mod:`fleet.core.runner_audit`).
+audit's placement row (:mod:`fleet.core.runner_audit`), and its ``--workers
+UNIT...`` mode the host's half of the dropped-job row
+(:mod:`fleet.core.runner_dropped_check`).
 """
 
 from __future__ import annotations
@@ -87,8 +89,10 @@ JOB_SCOPE_SCRIPT = (
 # Moves the calling job's Runner.Worker out of its runner unit's cgroup in
 # $LISTENER_SLICE into a scope of $JOB_SLICE bound to the unit, so the CI
 # budget throttles the job and never the listener holding its lease.
-# Usage: fleet-runner-job-scope              as root, from the job-started hook
-#        fleet-runner-job-scope --audit UNIT  prints placed or misplaced, then why
+# Usage: fleet-runner-job-scope                as root, from the job-started hook
+#        fleet-runner-job-scope --audit UNIT    prints placed or misplaced, then why
+#        fleet-runner-job-scope --workers UNIT... prints each unit and the age in
+#                                               seconds of its oldest Runner.Worker, or -
 set -euo pipefail
 cgroup_root=/sys/fs/cgroup
 proc_root=/proc
@@ -173,13 +177,34 @@ audit() {
         "is in $JOB_SLICE or under $grace s old"
 }
 
+workers() {
+    local unit cgroup pid age oldest
+    for unit in "$@"; do
+        oldest=-
+        cgroup=$(systemctl show -p ControlGroup --value "$unit")
+        if [ -n "$cgroup" ]; then
+            for pid in $(unit_procs "$cgroup" "$unit"); do
+                grep -qs Runner.Worker "$proc_root/$pid/cmdline" || continue
+                age=$(age_of "$pid") || continue
+                if [ "$oldest" = - ] || [ "$age" -gt "$oldest" ]; then
+                    oldest=$age
+                fi
+            done
+        fi
+        echo "$unit $oldest"
+    done
+}
+
 if [ $# -eq 0 ]; then
     adopt
 elif [ $# -eq 2 ] && [ "$1" = --audit ]; then
     audit "$2"
+elif [ $# -ge 2 ] && [ "$1" = --workers ]; then
+    shift
+    workers "$@"
 else
     echo "fleet-runner-job-scope: usage: fleet-runner-job-scope |" \
-        "fleet-runner-job-scope --audit UNIT" >&2
+        "fleet-runner-job-scope --audit UNIT | fleet-runner-job-scope --workers UNIT..." >&2
     exit 2
 fi
 """

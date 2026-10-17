@@ -76,6 +76,7 @@ from fleet.core import (
     runner_rebuild,
     runner_render,
 )
+from fleet.core.runner_audit_types import AuditFinding
 
 _log = get_logger(__name__)
 
@@ -360,7 +361,7 @@ def _rebuild(host: HostRunnerSpec) -> int:
     return 0
 
 
-def _log_findings(host: HostRunnerSpec, findings: Sequence[runner_audit.AuditFinding]) -> int:
+def _log_findings(host: HostRunnerSpec, findings: Sequence[AuditFinding]) -> int:
     """Print one host's audit verdicts.
 
     Args:

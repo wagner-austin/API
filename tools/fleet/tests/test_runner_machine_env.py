@@ -12,6 +12,7 @@ import pytest
 from fleet.contracts.runner_base import MachineVariable
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_audit, runner_machine_env
+from fleet.core.runner_audit_types import ExpectedCheck
 from tests._runner_fixtures import a_base, a_ci_slice
 
 
@@ -66,8 +67,8 @@ class TestRendered:
         other = MachineVariable(name="PIP_CACHE_DIR", value="C:\\fleet\\pip", reason="also")
         checks = runner_audit.expected_checks(_host([_POETRY, other]))
         assert checks[4:] == [
-            runner_audit.ExpectedCheck(check_id="machine-env:POETRY_CACHE_DIR", reason="why"),
-            runner_audit.ExpectedCheck(check_id="machine-env:PIP_CACHE_DIR", reason="also"),
+            ExpectedCheck(check_id="machine-env:POETRY_CACHE_DIR", reason="why"),
+            ExpectedCheck(check_id="machine-env:PIP_CACHE_DIR", reason="also"),
         ]
 
     def test_the_base_takes_the_key_and_the_variables_as_parameters(self) -> None:

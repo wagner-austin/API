@@ -19,7 +19,7 @@ from fleet.core import (
     runner_render,
     runner_windows_provision,
 )
-from tests._runner_fixtures import a_base, a_ci_slice
+from tests._runner_fixtures import a_base, a_ci_slice, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -119,45 +119,6 @@ class TestPlan:
             )
 
 
-class TestMintToken:
-    """The gh seam."""
-
-    def test_a_minted_token_is_returned(self) -> None:
-        runner = FakeRun([ok("ABCDEF123\n")])
-        _test_hooks.run = runner
-        assert runner_onboard.mint_registration_token("wagner-austin/x") == "ABCDEF123"
-        argv = tuple(runner.calls[0])
-        assert argv == (
-            "gh",
-            "api",
-            "-X",
-            "POST",
-            "repos/wagner-austin/x/actions/runners/registration-token",
-            "-q",
-            ".token",
-        )
-
-    def test_a_gh_failure_is_a_local_auth_condition(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "HTTP 403: no admin rights")])
-        with pytest.raises(AppError) as fault:
-            runner_onboard.mint_registration_token("wagner-austin/x")
-        assert fault.value.code is FleetErrorCode.RUNNER_TOKEN_UNAVAILABLE
-        assert "403" in fault.value.message
-
-    def test_an_empty_token_is_refused(self) -> None:
-        _test_hooks.run = FakeRun([ok("\n")])
-        with pytest.raises(AppError) as fault:
-            runner_onboard.mint_registration_token("wagner-austin/x")
-        assert fault.value.code is FleetErrorCode.RUNNER_TOKEN_UNAVAILABLE
-
-    def test_a_token_that_could_break_quoting_is_refused(self) -> None:
-        _test_hooks.run = FakeRun([ok("AB'; rm -rf /; '\n")])
-        with pytest.raises(AppError) as fault:
-            runner_onboard.mint_registration_token("wagner-austin/x")
-        assert fault.value.code is FleetErrorCode.RUNNER_TOKEN_UNAVAILABLE
-        assert "non-alphanumeric" in fault.value.message
-
-
 class TestOnboard:
     """The whole act, scripts captured byte for byte."""
 
@@ -183,6 +144,7 @@ class TestOnboard:
                 ok("done"),  # run windows payload
                 ok(""),  # audit: send driver
                 ok(transcript),  # audit: run driver
+                *no_dropped_jobs(grown),  # audit: the dropped-job row's reads
             ]
         )
         _test_hooks.run = runner
@@ -221,7 +183,16 @@ class TestOnboard:
                 _host(), "wagner-austin/x", sides=("windows",), python_versions=()
             )["installs"]
         )
-        runner = FakeRun([ok("TOK1\n"), ok(""), ok("done"), ok(""), ok(_clean_transcript(grown))])
+        runner = FakeRun(
+            [
+                ok("TOK1\n"),
+                ok(""),
+                ok("done"),
+                ok(""),
+                ok(_clean_transcript(grown)),
+                *no_dropped_jobs(grown),
+            ]
+        )
         _test_hooks.run = runner
         plan, _ = runner_onboard.onboard(spec, "wagner-austin/x", sides=("windows",))
         expected = runner_windows_provision.render_windows_onboard_script(

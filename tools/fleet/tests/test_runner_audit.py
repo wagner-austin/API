@@ -16,8 +16,9 @@ from fleet.contracts.runners import (
     HostRunnerSpec,
     RunnerInstall,
 )
-from fleet.core import _test_hooks, runner_audit, runner_audit_disk
-from tests._runner_fixtures import a_base, a_ci_slice
+from fleet.core import _test_hooks, runner_audit, runner_audit_disk, runner_dropped_check
+from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
+from tests._runner_fixtures import a_base, a_ci_slice, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -262,16 +263,30 @@ class TestAttemptAuditHost:
 
     def test_a_reachable_clean_host_yields_findings(self) -> None:
         spec = _host()
-        runner = FakeRun([ok(""), ok(_clean_transcript(spec))])
+        runner = FakeRun([ok(""), ok(_clean_transcript(spec)), *no_dropped_jobs(spec)])
         _test_hooks.run = runner
         outcome = runner_audit.attempt_audit_host(spec)
-        assert outcome["reason"] == ""
-        assert outcome["findings"] == [
-            runner_audit.AuditFinding(
-                check_id=check["check_id"], ok=True, detail="", reason=check["reason"]
-            )
-            for check in runner_audit.expected_checks(spec)
-        ]
+        # The hub's own row closes the host's: GitHub's runner list beside the
+        # host's Worker ages (MCPs board task 715b9ec5).
+        dropped = AuditFinding(
+            check_id="dropped-jobs:lavender",
+            ok=True,
+            detail="examined 1 WSL runner(s) against GitHub; none holds a Runner.Worker over "
+            "300 s that GitHub reads idle, offline or unlisted",
+            reason=runner_dropped_check.DROPPED_REASON,
+        )
+        assert outcome == AuditOutcome(
+            findings=[
+                *(
+                    AuditFinding(
+                        check_id=check["check_id"], ok=True, detail="", reason=check["reason"]
+                    )
+                    for check in runner_audit.expected_checks(spec)
+                ),
+                dropped,
+            ],
+            reason="",
+        )
         sent_argv = runner.calls[0]
         assert sent_argv[0] == "ssh"
         assert "C:/fleet/stage/" + runner_audit.AUDIT_SCRIPT_NAME in " ".join(sent_argv)
@@ -282,6 +297,18 @@ class TestAttemptAuditHost:
         outcome = runner_audit.attempt_audit_host(_host())
         assert outcome["findings"] is None
         assert "No route to host" in outcome["reason"]
+
+    def test_a_host_lost_before_its_worker_read_is_unreachable_not_half_scored(self) -> None:
+        """The script answered, then ssh could not reach the host for the
+        dropped-job row's read: reporting the script's rows alone would read
+        as a host whose every row was examined."""
+        spec = _host()
+        _test_hooks.run = FakeRun(
+            [ok(""), ok(_clean_transcript(spec)), ok(""), failed(255, "Connection reset")]
+        )
+        outcome = runner_audit.attempt_audit_host(spec)
+        assert outcome["findings"] is None
+        assert "Connection reset" in outcome["reason"]
 
     def test_a_script_that_ran_and_lied_raises_rather_than_scores(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok("nonsense\n")])

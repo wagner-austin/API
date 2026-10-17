@@ -17,6 +17,7 @@ from __future__ import annotations
 import pathlib
 import subprocess
 
+import pytest
 from typing_extensions import TypedDict
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
@@ -299,13 +300,16 @@ class TestAdoption:
             f"not {CI_SLICE_NAME}/{SCOPE}\n"
         )
 
-    def test_any_argument_but_the_audit_s_is_refused(self, tmp_path: pathlib.Path) -> None:
+    @pytest.mark.parametrize("arguments", [("--adopt", "13"), ("--workers",), ("--audit",)])
+    def test_any_argument_but_the_audit_s_or_the_hub_s_is_refused(
+        self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
+    ) -> None:
         _lay_out(tmp_path, (*SERVICE, WORKER, *HOOK))
-        ran = _run(tmp_path, "--adopt", "13")
+        ran = _run(tmp_path, *arguments)
         assert ran.returncode == 2
         assert ran.stderr == (
             "fleet-runner-job-scope: usage: fleet-runner-job-scope | "
-            "fleet-runner-job-scope --audit UNIT\n"
+            "fleet-runner-job-scope --audit UNIT | fleet-runner-job-scope --workers UNIT...\n"
         )
         assert _busctl_calls(tmp_path) == []
 
@@ -358,6 +362,46 @@ class TestTheAuditMode:
         assert ran.stdout == (
             f"misplaced\n{UNIT} runs in no cgroup, not {LISTENER_SLICE_NAME}/{UNIT}\n"
         )
+
+
+#: Another unit of the host, asked about beside :data:`UNIT`.
+OTHER_UNIT = "actions.runner.wagner-austin-API.lavender-wsl-2.service"
+
+
+class TestTheWorkersMode:
+    """The hub's read for the dropped-job row: each unit's oldest Worker age."""
+
+    def test_the_oldest_worker_in_the_unit_or_its_scopes_is_named(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A Worker 990 s old in its scope beside one 10 s old in the unit."""
+        scoped = Process(
+            pid=20,
+            ppid=12,
+            cmdline="./bin/Runner.Worker spawnclient",
+            start_ticks=1000,
+            cgroup=f"/{CI_SLICE_NAME}/fleet-job-{UNIT.removesuffix('.service')}-20.scope",
+        )
+        _lay_out(tmp_path, (*SERVICE, WORKER, scoped))
+        ran = _run(tmp_path, "--workers", UNIT)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout == f"{UNIT} 990\n"
+
+    def test_a_unit_with_no_worker_and_a_stopped_unit_each_read_none(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        _lay_out(tmp_path, SERVICE)
+        (tmp_path / "show" / f"{OTHER_UNIT}.ControlGroup").write_bytes(b"\n")
+        ran = _run(tmp_path, "--workers", UNIT, OTHER_UNIT)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout == f"{UNIT} -\n{OTHER_UNIT} -\n"
+
+    def test_a_worker_whose_start_cannot_be_read_is_not_aged(self, tmp_path: pathlib.Path) -> None:
+        _lay_out(tmp_path, (*SERVICE, WORKER))
+        (tmp_path / "proc" / "13" / "stat").unlink()
+        ran = _run(tmp_path, "--workers", UNIT)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout == f"{UNIT} -\n"
 
 
 def _install() -> RunnerInstall:

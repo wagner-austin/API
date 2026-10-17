@@ -12,6 +12,7 @@ from platform_core.json_utils import JSONValue
 
 from fleet.contracts.runner_base import DiskCeiling, HostBase, MachineVariable, PinnedDownload
 from fleet.contracts.runner_slice import CiSlice
+from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import _test_hooks
 from tests.conftest import ok
 
@@ -96,8 +97,29 @@ def base_json() -> dict[str, JSONValue]:
     }
 
 
+def no_dropped_jobs(spec: HostRunnerSpec) -> list[_test_hooks.CommandResult]:
+    """The dropped-job row's reads on a host where nothing is dropped (MCPs task 715b9ec5).
+
+    Args:
+        spec: The audited host.
+
+    Returns:
+        One ``gh`` runner list per repository of its WSL installs, listing
+        none, then the job scope helper's ``--workers`` answer naming each
+        WSL unit with no Worker. Empty for a host with no WSL install, which
+        the row does not read.
+    """
+    wsl = [install for install in spec["installs"] if install["side"] == "wsl"]
+    if not wsl:
+        return []
+    return [
+        *(ok("") for _ in sorted({install["repo"] for install in wsl})),
+        ok("".join(f"{install['service']} -\n" for install in wsl)),
+    ]
+
+
 def quiet_rebuild_answers(
-    transcript: str, *, repos: int, linux_base: str = "linux base ready\n"
+    transcript: str, spec: HostRunnerSpec, *, repos: int, linux_base: str = "linux base ready\n"
 ) -> list[_test_hooks.CommandResult]:
     """Every command a rebuild of an already-built host runs, in order.
 
@@ -107,6 +129,8 @@ def quiet_rebuild_answers(
 
     Args:
         transcript: What the closing audit prints.
+        spec: The rebuilt host, whose WSL installs the audit's dropped-job
+            row reads.
         repos: How many repositories the roster names, one token each.
         linux_base: What the Linux base stage prints.
 
@@ -114,7 +138,8 @@ def quiet_rebuild_answers(
         The replies: windows base (send, run), import (send, run), wsl.conf
         (send, send, run), linux base (send, send, run), one ``gh`` mint per
         repository, provision.ps1 (send, run), provision.sh (send, send,
-        run), and the audit (send, run).
+        run), the audit (send, run) and its dropped-job reads
+        (:func:`no_dropped_jobs`).
     """
     return [
         ok(""),
@@ -135,6 +160,7 @@ def quiet_rebuild_answers(
         ok(""),
         ok(""),
         ok(transcript),
+        *no_dropped_jobs(spec),
     ]
 
 
@@ -171,4 +197,11 @@ def ci_slice_json() -> dict[str, JSONValue]:
     }
 
 
-__all__ = ["a_base", "a_ci_slice", "base_json", "ci_slice_json", "quiet_rebuild_answers"]
+__all__ = [
+    "a_base",
+    "a_ci_slice",
+    "base_json",
+    "ci_slice_json",
+    "no_dropped_jobs",
+    "quiet_rebuild_answers",
+]

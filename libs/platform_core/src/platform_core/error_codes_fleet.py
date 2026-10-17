@@ -223,6 +223,11 @@ class FleetErrorCode(ErrorCodeBase):
     # re-running it would register duplicate runners.
     RUNNER_TOKEN_UNAVAILABLE = "RUNNER_TOKEN_UNAVAILABLE"
     RUNNER_ALREADY_ONBOARDED = "RUNNER_ALREADY_ONBOARDED"
+    # The audit's dropped-job row (MCPs board task 715b9ec5) could not read
+    # GitHub's runner list: like an unmintable token, a gh/auth/permissions
+    # question on the LOCAL machine, raised rather than read as runners
+    # GitHub does not list, which would name every busy runner dropped.
+    RUNNER_GITHUB_UNREADABLE = "RUNNER_GITHUB_UNREADABLE"
 
 
 __all__ = ["FleetErrorCode"]

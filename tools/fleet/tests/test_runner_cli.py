@@ -16,8 +16,14 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
 
 from fleet.cli import runners
+from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import _test_hooks, runner_load
-from tests._runner_fixtures import base_json, ci_slice_json, quiet_rebuild_answers
+from tests._runner_fixtures import (
+    base_json,
+    ci_slice_json,
+    no_dropped_jobs,
+    quiet_rebuild_answers,
+)
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -70,6 +76,20 @@ def _write_roster(tmp_path: pathlib.Path, hosts: list[dict[str, JSONValue]]) -> 
     path = tmp_path / "runners.json"
     path.write_text(dump_json_str({"hosts": hosts}), encoding="utf-8")
     return str(path)
+
+
+def _host(spec_path: str, name: str) -> HostRunnerSpec:
+    """One host of the roster file a case wrote, decoded.
+
+    Args:
+        spec_path: The roster's path.
+        name: The host.
+
+    Returns:
+        Its entry.
+    """
+    hosts = runners.load_runner_spec(spec_path)["hosts"]
+    return next(host for host in hosts if host["name"] == name)
 
 
 def _clean_transcript(name: str) -> str:
@@ -160,18 +180,23 @@ class TestAudit:
             [
                 ok(""),
                 ok(_clean_transcript("lavender")),
+                *no_dropped_jobs(_host(spec_path, "lavender")),
                 ok(""),
                 ok(_clean_transcript("loki")),
+                *no_dropped_jobs(_host(spec_path, "loki")),
             ]
         )
         assert runners.main(["--spec", spec_path]) == 0
 
     def test_host_filters_to_one_machine(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender"), _raw_host("loki")])
-        runner = FakeRun([ok(""), ok(_clean_transcript("loki"))])
+        runner = FakeRun(
+            [ok(""), ok(_clean_transcript("loki")), *no_dropped_jobs(_host(spec_path, "loki"))]
+        )
         _test_hooks.run = runner
         assert runners.main(["--spec", spec_path, "--host", "loki"]) == 0
-        assert len(runner.calls) == 2
+        # The audit's send and run, then the dropped-job row's two reads.
+        assert len(runner.calls) == 4
         assert "loki" in runner.calls[0]
         assert not any("lavender" in call for call in runner.calls)
 
@@ -180,13 +205,20 @@ class TestAudit:
         transcript = _clean_transcript("lavender").replace(
             "lavender-wsl.service OK", "lavender-wsl.service DRIFT it said: inactive"
         )
-        _test_hooks.run = FakeRun([ok(""), ok(transcript)])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok(transcript), *no_dropped_jobs(_host(spec_path, "lavender"))]
+        )
         assert runners.main(["--spec", spec_path]) == 1
 
     def test_an_unreachable_host_is_a_line_beside_the_others(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender"), _raw_host("loki")])
         _test_hooks.run = FakeRun(
-            [failed(255, "No route to host"), ok(""), ok(_clean_transcript("loki"))]
+            [
+                failed(255, "No route to host"),
+                ok(""),
+                ok(_clean_transcript("loki")),
+                *no_dropped_jobs(_host(spec_path, "loki")),
+            ]
         )
         assert runners.main(["--spec", spec_path]) == 1
 
@@ -357,6 +389,17 @@ class TestOnboardMode:
         with pytest.raises(ValueError, match="--python only means something"):
             runners.main(["--spec", spec_path, "--python", "3.11.9"])
 
+    #: The post-onboard audit's dropped-job reads: GitHub lists no runner of
+    #: either repository, and neither unit holds a Worker.
+    ONBOARDED_NO_DROPPED = (
+        ok(""),
+        ok(""),
+        ok(
+            "actions.runner.wagner-austin-API.lavender-wsl.service -\n"
+            "actions.runner.wagner-austin-x.lavender-wsl.service -\n"
+        ),
+    )
+
     def test_onboard_rewrites_the_roster_and_exits_on_the_audit(
         self, tmp_path: pathlib.Path
     ) -> None:
@@ -378,6 +421,7 @@ class TestOnboardMode:
                 ok("done"),  # run wsl driver
                 ok(""),  # audit send
                 ok(transcript),  # audit run
+                *self.ONBOARDED_NO_DROPPED,
             ]
         )
         code = runners.main(
@@ -414,7 +458,15 @@ class TestOnboardMode:
             + "CHECK orphans:wagner-austin/x:wsl:lavender-wsl OK\n"
         )
         _test_hooks.run = FakeRun(
-            [ok("TOK123\n"), ok(""), ok(""), ok("done"), ok(""), ok(transcript)]
+            [
+                ok("TOK123\n"),
+                ok(""),
+                ok(""),
+                ok("done"),
+                ok(""),
+                ok(transcript),
+                *self.ONBOARDED_NO_DROPPED,
+            ]
         )
         code = runners.main(
             [
@@ -451,17 +503,23 @@ class TestRebuildMode:
 
     def test_a_clean_rebuild_exits_zero(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
-        runner = FakeRun(quiet_rebuild_answers(_clean_transcript("lavender"), repos=1))
+        runner = FakeRun(
+            quiet_rebuild_answers(
+                _clean_transcript("lavender"), _host(spec_path, "lavender"), repos=1
+            )
+        )
         _test_hooks.run = runner
         assert runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"]) == 0
-        assert len(runner.calls) == 18
+        assert len(runner.calls) == 20
 
     def test_a_rebuild_whose_audit_drifts_exits_one(self, tmp_path: pathlib.Path) -> None:
         spec_path = _write_roster(tmp_path, [_raw_host("lavender")])
         transcript = _clean_transcript("lavender").replace(
             "RemoteSigned OK", "RemoteSigned DRIFT Get-ExecutionPolicy said: Restricted"
         )
-        _test_hooks.run = FakeRun(quiet_rebuild_answers(transcript, repos=1))
+        _test_hooks.run = FakeRun(
+            quiet_rebuild_answers(transcript, _host(spec_path, "lavender"), repos=1)
+        )
         assert runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"]) == 1
 
     def test_a_manual_asset_is_printed_after_the_stages(
@@ -482,7 +540,9 @@ class TestRebuildMode:
         transcript = _clean_transcript("lavender") + (
             "CHECK asset:/opt/corvis/rw-game/game-lib.jar DRIFT test -e exited 1\n"
         )
-        _test_hooks.run = FakeRun(quiet_rebuild_answers(transcript, repos=1))
+        _test_hooks.run = FakeRun(
+            quiet_rebuild_answers(transcript, _host(spec_path, "lavender"), repos=1)
+        )
         with caplog.at_level("INFO"):
             code = runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"])
         assert code == 1
