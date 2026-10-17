@@ -21,8 +21,8 @@ from tests.service.test_demo_caption import _decision
 @pytest.mark.parametrize(
     "reason, verb",
     [
-        (ReasonKind.HARVEST_FRAME_SHIFT, "Lining up"),
-        (ReasonKind.HARVEST_LEG_WALK, "Heading to"),
+        (ReasonKind.HARVEST_FRAME_SHIFT, "Next: Look toward"),
+        (ReasonKind.HARVEST_LEG_WALK, "Next: Collect"),
     ],
 )
 def test_the_committed_target_names_the_resource(
@@ -47,7 +47,7 @@ def test_no_target_does_not_invent_a_resource() -> None:
         caption_words(ReasonKind.HARVEST_LEG_WALK, "") == REASON_WORDS[ReasonKind.HARVEST_LEG_WALK]
     )
     assert caption_words(ReasonKind.FORAGE_RADAR, "fuel") == REASON_WORDS[ReasonKind.FORAGE_RADAR]
-    assert caption_words(ReasonKind.SEARCH_COLLECT_LOCAL, "")["doing"] == "Teleporting toward fuel"
+    assert caption_words(ReasonKind.SEARCH_COLLECT_LOCAL, "")["doing"] == "Next: Jump toward fuel"
 
 
 def test_malformed_resource_context_is_refused() -> None:
