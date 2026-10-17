@@ -22,7 +22,7 @@ source_git_blobs:
   "src/tankpit_bot/browser/caption_panel.py": "8dfdb00ca476eae23e906295d110a246f7685704"
   "src/tankpit_bot/bot/base.py": "459c1d9f76b2cd84ee9a2378f4fc05a4ae54ecee"
   "src/tankpit_bot/bot/tick_body.py": "f89288ff6a4b37a57ad41520167638635f2a3d17"
-  "src/tankpit_bot/service/demo_caption_words.py": "141aafe95a65502b2c0197891b34f1e11f9e02bb"
+  "src/tankpit_bot/service/demo_caption_words.py": "59699c45094505801edb3bfd4eabd606ec5bfde2"
 fact_checked: "2026-09-01"
 verified: 2026-10-08 (live-read fold audit for task 3d71a8e1); status-panel section observed in public video on 2026-10-17 at release 94a93c241 for task c896a291
 confidence: high
@@ -130,8 +130,11 @@ The invisible selector remains in place because the game keeps references
 to it and the game-log reader uses its text as a boundary.[^12]
 
 Accepted decisions update the panel after dispatch; rejected proposals
-do not. Deactivation paints "Destroyed". Resource-target context makes
-harvesting say "Heading to fuel" or "Heading to equipment". The
+do not. Dispatch precedes the visible game action: this panel previews the
+plan, not a confirmed animation. At the operator's request on 2026-10-17,
+decision headings say "Next:" and explanations say what it plans to do.
+Deactivation still paints the actual state "Destroyed". Resource-target
+context makes harvesting say "Next: Collect fuel" or "Next: Collect equipment". The
 `SEARCH_COLLECT_LOCAL` reason describes a teleport toward fuel, not a
 local pickup.[^13] These words become video pixels, so playback buffering
 delays the action and status together. The public webpage no longer
