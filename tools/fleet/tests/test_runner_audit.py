@@ -272,7 +272,7 @@ class TestAttemptAuditHost:
             check_id="dropped-jobs:lavender",
             ok=True,
             detail="examined 1 WSL runner(s) against GitHub; none holds a Runner.Worker over "
-            "300 s that GitHub reads idle, offline or unlisted, or that a newer Worker "
+            "300 s that GitHub reads not busy or unlisted, or that a newer Worker "
             "superseded",
             reason=runner_dropped_check.DROPPED_REASON,
         )

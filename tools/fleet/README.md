@@ -242,8 +242,9 @@ therefore four passes, in this order:
    each host with WSL runners, ask `gh` for each repository's runners and the
    host's job scope helper for each unit's `Runner.Worker`s by pid, start and
    age. A Worker over five minutes old is holding a job GitHub dropped when
-   GitHub reads its runner offline, idle or unlisted, or when a newer Worker
-   in its unit superseded it. Where one is named, the pass reads again two
+   GitHub reads its runner not busy, online or offline, or does not list it,
+   or when a newer Worker in its unit superseded it. A runner GitHub reads
+   busy keeps its job even while its listener is offline. Where one is named, the pass reads again two
    minutes later and ends each Worker both readings name, by pid, through
    `fleet-runner-reaper --dropped UNIT PID START` as root on the host (MCPs
    board task `715b9ec5`). This pass runs `gh` on the hub, as the runners'

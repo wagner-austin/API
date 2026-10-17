@@ -14,9 +14,10 @@ host for every Runner.Worker of each WSL unit, in its cgroup or its job
 scopes, by pid, start and age, through the job scope helper's ``--workers``
 mode (:mod:`fleet.core.runner_job_scope_render`). A Worker older than
 :data:`DROPPED_GRACE_SECONDS` holds a dropped job when it is its unit's
-newest and GitHub reads its runner offline, or online with busy=false, or
+newest and GitHub reads its runner with busy=false, online or offline, or
 not at all; or when its unit holds a newer Worker, since a runner runs one
 job at a time and its listener took the next job once the older one was lost.
+A runner GitHub reads busy holds its job however its listener reads.
 
 :func:`read_dropped` is that reading, which two callers share: the audit row
 (:func:`attempt_dropped_check`), one per host, which says how many runners it
@@ -192,17 +193,25 @@ def _started(worker: HostWorker) -> int:
 def _github_said(reading: GitHubRunner | None) -> str | None:
     """How GitHub reads a runner, when that reading means it holds no job.
 
+    A runner GitHub reads busy, online or offline, holds a job GitHub still
+    keeps: offline is the listener out of touch, which a job outlives once it
+    reconnects. On 2026-10-17 at 18:26Z the first rolled reap pass, which
+    counted ``offline busy=true`` as dropped, ended two Workers GitHub still
+    held (API lavender-wsl-2's Model-Trainer check and MCPs lavender-wsl's
+    ballotpedia-mcp), each failing on GitHub within two seconds of the reap.
+
     Args:
         reading: GitHub's reading, None when it does not list the runner.
 
     Returns:
-        The reading in words, or None when GitHub reads it online and busy.
+        ``unlisted``, or ``<status> busy=false``; None when GitHub reads the
+        runner busy.
     """
     if reading is None:
         return "unlisted"
-    if reading["status"] == "online" and reading["busy"]:
+    if reading["busy"]:
         return None
-    return f"{reading['status']} busy={'true' if reading['busy'] else 'false'}"
+    return f"{reading['status']} busy=false"
 
 
 def _dropped_of(
@@ -317,7 +326,7 @@ def attempt_dropped_check(spec: HostRunnerSpec) -> AuditOutcome:
     else:
         detail = (
             f"examined {reading['examined']} WSL runner(s) against GitHub; none holds a "
-            f"Runner.Worker over {DROPPED_GRACE_SECONDS} s that GitHub reads idle, offline or "
+            f"Runner.Worker over {DROPPED_GRACE_SECONDS} s that GitHub reads not busy or "
             "unlisted, or that a newer Worker superseded"
         )
     finding = AuditFinding(

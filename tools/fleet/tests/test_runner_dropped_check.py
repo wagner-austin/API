@@ -149,7 +149,7 @@ def _one(*, passed: bool, detail: str) -> AuditOutcome:
 #: The clean detail over the four WSL installs.
 CLEAN = (
     "examined 4 WSL runner(s) against GitHub; none holds a Runner.Worker over 300 s that "
-    "GitHub reads idle, offline or unlisted, or that a newer Worker superseded"
+    "GitHub reads not busy or unlisted, or that a newer Worker superseded"
 )
 
 
@@ -290,7 +290,7 @@ class TestTheAuditRow:
     def test_each_dropped_worker_drifts_the_row_by_name(self) -> None:
         _test_hooks.run = FakeRun(
             [
-                ok("lavender-wsl offline true\n"),
+                ok("lavender-wsl online false\n"),
                 ok(X_BUSY),
                 ok(_answer((_worker(81, 700),), (), (), ())),
             ]
@@ -300,8 +300,22 @@ class TestTheAuditRow:
             passed=False,
             detail="examined 4 WSL runner(s) against GitHub; 1 Runner.Worker(s) hold a job "
             "GitHub dropped: wagner-austin/API lavender-wsl Runner.Worker 81 "
-            "(offline busy=true, 700 s)",
+            "(online busy=false, 700 s)",
         )
+
+    def test_a_runner_github_reads_offline_and_busy_still_holds_its_job(self) -> None:
+        """GitHub keeps the job of a runner whose listener is out of touch:
+        the first rolled reap pass, which ended such Workers, failed two jobs
+        GitHub still held on 2026-10-17."""
+        _test_hooks.run = FakeRun(
+            [
+                ok("lavender-wsl offline true\nlavender-wsl-2 offline true\n"),
+                ok(X_BUSY),
+                ok(_answer((_worker(91, 9000),), (_worker(92, 9000),), (), ())),
+            ]
+        )
+        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL))
+        assert outcome == _one(passed=True, detail=CLEAN)
 
     def test_a_host_ssh_cannot_reach_is_a_value_with_its_reason(self) -> None:
         _test_hooks.run = FakeRun([ok(API_BUSY), ok(X_BUSY), failed(255, "No route to host")])
