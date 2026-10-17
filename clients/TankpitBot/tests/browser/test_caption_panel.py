@@ -156,7 +156,7 @@ def test_dispatched_intent_and_death_reach_the_recorded_panel(
     _accept_dispatched_decision(bot, decision)
     assert page.evaluate(
         "document.getElementById('tankpit-bot-status').children[0].textContent"
-    ) == ("Heading to equipment")
+    ) == ("Next: Collect equipment")
     _handle_own_deactivation(
         bot,
         make_self_state(
