@@ -198,7 +198,8 @@ def test_the_live_page_explains_captions_and_plays_sound_on_request(
     visitor_page.evaluate(f"{_tile_query(slot)}.scrollIntoView()")
 
     visitor_page.wait_for_function(
-        f'{_tile_query(slot)}.querySelector("video").currentTime > 0',
+        f'(() => {{ const video = {_tile_query(slot)}.querySelector("video");'
+        " return video.currentTime > 0 && !video.paused && video.readyState >= 2; })()",
         timeout=TILE_DEADLINE_MS,
     )
     captioned = _read_tile(visitor_page, slot)
