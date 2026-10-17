@@ -11,6 +11,9 @@ inside; keeping them apart makes it a question about which file.
 Three routes, and the surface is deliberately not extensible by
 accident: ``GET /demo/fleet`` says what is playing, ``POST /demo/spawn``
 starts one bounded Practice bot, ``GET /demo/video/{slot}`` watches one.
+The fourth public route, ``GET /demo/mosaic/{file}``, is the four-up TV
+stream, in :mod:`tankpit_bot.service.mosaic_routes` because it reads
+the stream's director rather than the registry; it serves files only.
 There is no public stop, no public remove, no public shutdown — a demo
 bot ends on its own clock (:data:`~tankpit_bot.service.demo.DEMO_SESSION_SECONDS`),
 so nothing anonymous needs the power to end one.

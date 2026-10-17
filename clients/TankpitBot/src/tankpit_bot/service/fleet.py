@@ -6,7 +6,10 @@ kill a live tank, and the AI drives it with plain HTTP.
 
 This module is the composition root and holds nothing else -- the
 registry is :mod:`tankpit_bot.service.fleet_manager`, the routes are
-:mod:`tankpit_bot.service.fleet_routes`, and the serve loop is
+:mod:`tankpit_bot.service.fleet_routes`, the four-up TV stream is
+:mod:`tankpit_bot.service.mosaic_director` with its public route in
+:mod:`tankpit_bot.service.mosaic_routes` and the operator's TV routes
+in :mod:`tankpit_bot.service.tv_routes`, and the serve loop is
 :mod:`tankpit_bot.service.serving`.
 
 **Lifecycle (2026-09-01).** The manager used to block in
@@ -33,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
+from pathlib import Path
 
 from platform_core.logging import LogLevel, get_logger
 from platform_core.rich_logging import setup_rich_logging
@@ -42,7 +46,10 @@ from tankpit_bot.service import _test_hooks as service_hooks
 from tankpit_bot.service.fleet_config import resolve_fleet_port
 from tankpit_bot.service.fleet_manager import FleetManager
 from tankpit_bot.service.fleet_routes import make_fleet_app
+from tankpit_bot.service.mosaic_director import MOSAIC_DIR, MosaicDirector, direct_mosaic
+from tankpit_bot.service.mosaic_routes import add_mosaic_route
 from tankpit_bot.service.serving import cancel_and_await, run_until_stopped
+from tankpit_bot.service.tv_routes import add_tv_routes
 
 log = get_logger(__name__)
 
@@ -115,6 +122,24 @@ async def exit_when_drained(
         return
 
 
+def report_mosaic_end(task: asyncio.Task[None]) -> None:
+    """Say, the moment it happens, that the four-up stream stopped.
+
+    The director's task ends only at shutdown (cancelled) or because a
+    tick raised. The second leaves the bots playing and the TV's stream
+    frozen, and the exception would otherwise wait in the task until
+    shutdown re-raises it, so it is logged here as it lands.
+
+    Args:
+        task: The finished director task.
+    """
+    if task.cancelled():
+        return
+    error = task.exception()
+    if error is not None:
+        log.error("Fleet: the four-up stream stopped: %r", error)
+
+
 def drain_on_interrupt(manager: FleetManager) -> Callable[[], None]:
     """Build the interrupt handler that drains instead of exiting.
 
@@ -147,8 +172,11 @@ def drain_on_interrupt(manager: FleetManager) -> Callable[[], None]:
     return handle
 
 
-async def _async_main() -> None:
+async def _async_main(*, mosaic_root: Path = MOSAIC_DIR) -> None:
     """Adopt, serve, and drain: the manager's whole life.
+
+    Args:
+        mosaic_root: Where the four-up stream and its text files live.
 
     Returns:
         None. Returns once the site has been torn down.
@@ -158,14 +186,20 @@ async def _async_main() -> None:
     manager.adopt()
     stop_event = asyncio.Event()
     host = resolve_fleet_host()
-    site = await service_hooks.build_site(make_fleet_app(manager), host, port)
+    director = MosaicDirector(manager, mosaic_root)
+    app = make_fleet_app(manager)
+    add_mosaic_route(app, director)
+    add_tv_routes(app, director)
+    site = await service_hooks.build_site(app, host, port)
     drain_monitor = asyncio.create_task(exit_when_drained(manager, stop_event))
+    mosaic = asyncio.create_task(direct_mosaic(director, stop_event))
+    mosaic.add_done_callback(report_mosaic_end)
     core_hooks.install_signal_handlers(drain_on_interrupt(manager))
     log.info("tankpit-fleet listening on %s:%d", host, port)
     try:
         await run_until_stopped(site, stop_event, name="Fleet manager")
     finally:
-        await cancel_and_await(drain_monitor)
+        await cancel_and_await(drain_monitor, mosaic)
 
 
 def main() -> None:
@@ -199,5 +233,6 @@ __all__ = [
     "exit_when_drained",
     "log",
     "main",
+    "report_mosaic_end",
     "resolve_fleet_host",
 ]
