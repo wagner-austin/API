@@ -82,6 +82,15 @@ class ToolReport(TypedDict):
 #: is only what an install puts there, and a later 3.11 patch still passes.
 PINNED_PYTHON: Final = "3.11.9"
 
+#: The Poetry every install puts on a machine, and every host that commits or
+#: bakes a working tree (the hub, the session host, diphtheria) runs: the one
+#: every committed lock was written by. Measured 2026-10-17 (MCPs board task
+#: ce698bfb): 2.4.2 re-locks tools/fleet byte for byte, 2.5.1 rewrites its
+#: header and spells pydantic's exclusions as ``!=``, and a path-scoped commit
+#: then carries that rewrite. Readers outside this package take it from
+#: ``rendered/toolchain-pins.json`` (:mod:`fleet.core.toolchain_document`).
+PINNED_POETRY: Final = "2.4.2"
+
 #: Why a python install stops on a machine where this version is already registered.
 #:
 #: MEASURED ON LAVENDER, 2026-09-23. GitHub Actions' setup-python had put
@@ -162,8 +171,8 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         name="poetry",
         reason="every Makefile's lint and test targets run poetry lock and poetry sync",
         install={
-            "pip": "python -m pip install --user poetry",
-            "pipx": "pipx install poetry",
+            "pip": f"python -m pip install --user poetry=={PINNED_POETRY}",
+            "pipx": f"pipx install poetry=={PINNED_POETRY}",
         },
         uninstall={
             "pip": "python -m pip uninstall -y poetry",
@@ -544,6 +553,7 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 
 __all__ = [
     "PACKAGE_MANAGERS",
+    "PINNED_POETRY",
     "PINNED_PYTHON",
     "PYTHON_REGISTERED_GUARD",
     "PYTHON_REGISTERED_MESSAGE",

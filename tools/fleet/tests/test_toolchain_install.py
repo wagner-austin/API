@@ -72,7 +72,7 @@ class TestManagerSelection:
         assert install_command("git", ("pip", "winget", "choco")).startswith("winget")
         assert install_command("git", ("pip", "choco")).startswith("choco")
         assert install_command("git", ("pipx", "apt-get")) == "sudo apt-get install -y git"
-        assert install_command("poetry", ("pipx", "apt-get")) == "pipx install poetry"
+        assert install_command("poetry", ("pipx", "apt-get")) == "pipx install poetry==2.4.2"
         assert install_command("poetry", ("pip", "winget")).startswith("python -m pip")
 
     def test_a_tool_this_package_never_installs_has_no_command(self) -> None:
@@ -185,7 +185,7 @@ class TestInstall:
         )
 
         assert "Write-Output 'installing poetry'" in body
-        assert "python -m pip install --user poetry" in body
+        assert "python -m pip install --user poetry==2.4.2" in body
         assert "choco install make -y" in body
 
     def test_a_linux_node_gets_sh_echoes_and_its_own_managers(self) -> None:
@@ -194,7 +194,7 @@ class TestInstall:
         )
 
         assert body == (
-            "printf '%s\\n' 'installing poetry'\npipx install poetry\n"
+            "printf '%s\\n' 'installing poetry'\npipx install poetry==2.4.2\n"
             "printf '%s\\n' 'installing make'\nsudo apt-get install -y make\n"
         )
 

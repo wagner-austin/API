@@ -311,7 +311,7 @@ class TestDescribeGap:
         """The reader's next question is always how to fix it."""
         described = describe_gap("lavender", toolchain.parse_probe(LAVENDER))
 
-        assert "poetry (python -m pip install --user poetry)" in described
+        assert "poetry (python -m pip install --user poetry==2.4.2)" in described
         # lavender has winget and no choco, so the command it is told to run
         # is the winget one. loki, missing the same tool, would be told choco.
         assert "make (winget install --id GnuWin32.Make" in described

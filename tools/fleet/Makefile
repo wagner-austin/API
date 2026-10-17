@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check _check-unbudgeted execution render-powershell render-hooks-check
+.PHONY: lint test check _check-unbudgeted execution render-powershell render-documents
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -54,10 +54,13 @@ execution:
 render-powershell:
 	poetry run python -m fleet.cli.render_powershell --spec runners.json --out rendered
 
-# The committed JSON copy of the hooks check pins
-# (fleet.core.hooks_check_document, MCPs board task 88ca2402), read by MCPs'
-# session-host provision.sh and the fleet audit, which cannot import the
-# contract. Run this after a pin in fleet.contracts.tagged_tools moves;
-# tests/test_hooks_check_document.py fails until the copy matches.
-render-hooks-check:
-	poetry run python -m fleet.cli.render_hooks_check --out rendered
+# The committed JSON copies of the pins readers outside this package need:
+# the hooks check pins (fleet.core.hooks_check_document, MCPs board task
+# 88ca2402), read by MCPs' session-host provision.sh and the fleet audit, and
+# the toolchain's Poetry (fleet.core.toolchain_document, MCPs board task
+# ce698bfb), read by MCPs' host provisioning. Run this after a pin in
+# fleet.contracts.tagged_tools or fleet.contracts.toolchain moves;
+# tests/test_hooks_check_document.py and tests/test_toolchain_document.py
+# fail until the copies match.
+render-documents:
+	poetry run python -m fleet.cli.render_documents --out rendered
