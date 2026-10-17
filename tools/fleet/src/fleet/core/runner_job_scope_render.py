@@ -73,6 +73,15 @@ SUDOERS_RULE = f'gharunner ALL=(root) NOPASSWD: {JOB_SCOPE_PATH} ""\n'
 #: setup room and still names a job the hook never moved within one audit.
 ADOPTION_GRACE_SECONDS = 300
 
+#: Seconds the helper reads the Worker's cgroup, every tenth of one, for the
+#: move to land. ``StartTransientUnit`` answers once the scope's start job is
+#: queued, and the Worker moves when the job runs: on lavender-wsl on
+#: 2026-10-17 from 17:43Z an immediate read found every Worker still in its
+#: unit and failed every job of each placed runner. Five seconds outlasts a
+#: systemd job queue busy with the reaper's restarts and still fails a job
+#: the adoption never reaches before its first step.
+MOVE_WAIT_SECONDS = 5
+
 #: The hook.
 JOB_HOOK_SCRIPT = f"""#!/usr/bin/env bash
 # fleet-runner-job-started.sh -- rendered by fleet-runners (MCPs board task 715b9ec5).
@@ -102,7 +111,7 @@ caller=$PPID
 grace=$GRACE
 
 refuse() {
-    echo "FLEET_RUNNER_JOB_SCOPE_REFUSED: $1" >&2
+    echo "FLEET_RUNNER_JOB_SCOPE_REFUSED: $*" >&2
     exit 1
 }
 
@@ -142,9 +151,16 @@ adopt() {
         CollectMode s inactive-or-failed \
         Description s "GitHub Actions job of $unit, outside its listener" 0 ||
         refuse "systemd would not adopt Runner.Worker $worker of $unit into $JOB_SLICE/$scope"
-    moved=$(cgroup_of "$worker") || refuse "Runner.Worker $worker ended as it was moved"
+    # StartTransientUnit returns once systemd has queued the scope's start job;
+    # the Worker moves when that job runs, so the move is read until it lands.
+    for step in $(seq 1 $MOVE_TRIES); do
+        moved=$(cgroup_of "$worker") || refuse "Runner.Worker $worker ended as it was moved"
+        [ "$moved" = "/$JOB_SLICE/$scope" ] && break
+        sleep 0.1
+    done
     [ "$moved" = "/$JOB_SLICE/$scope" ] ||
-        refuse "systemd took Runner.Worker $worker, yet it is in $moved, not $JOB_SLICE/$scope"
+        refuse "systemd took Runner.Worker $worker, yet after $MOVE_SECONDS s it is in $moved," \
+            "not $JOB_SLICE/$scope"
     echo "fleet-runner-job-scope: Runner.Worker $worker of $unit runs in $JOB_SLICE/$scope," \
         "outside its listener's cgroup"
 }
@@ -218,6 +234,8 @@ fi
     .replace("$JOB_SLICE", CI_SLICE_NAME)
     .replace("$JOB_PREFIX", JOB_SCOPE_PREFIX)
     .replace("$GRACE", str(ADOPTION_GRACE_SECONDS))
+    .replace("$MOVE_TRIES", str(MOVE_WAIT_SECONDS * 10))
+    .replace("$MOVE_SECONDS", str(MOVE_WAIT_SECONDS))
 )
 
 
@@ -336,6 +354,7 @@ __all__ = [
     "JOB_HOOK_SCRIPT",
     "JOB_SCOPE_PATH",
     "JOB_SCOPE_SCRIPT",
+    "MOVE_WAIT_SECONDS",
     "PLACEMENT_REASON",
     "SUDOERS_PATH",
     "SUDOERS_RULE",

@@ -43,8 +43,17 @@ busctl() {
         echo "Failed to start transient scope unit: Access denied" >&2
         return 1
     fi
-    if [ ! -e "$TABLE/busctl-moves-nothing" ]; then
+    if [ -e "$TABLE/busctl-moves-late" ]; then
+        printf '0::/runners.slice/%s\\n' "$8" > "$TABLE/moves-to"
+        echo "${14}" > "$TABLE/moves-pid"
+    elif [ ! -e "$TABLE/busctl-moves-nothing" ]; then
         printf '0::/runners.slice/%s\\n' "$8" > "$TABLE/proc/${14}/cgroup"
+    fi
+}
+sleep() {
+    echo "$1" >> "$TABLE/slept"
+    if [ -e "$TABLE/moves-to" ]; then
+        cp "$TABLE/moves-to" "$TABLE/proc/$(cat "$TABLE/moves-pid")/cgroup"
     fi
 }
 getconf() {
@@ -286,19 +295,34 @@ class TestAdoption:
             f"into {CI_SLICE_NAME}/{SCOPE}\n"
         )
 
+    def test_a_move_that_lands_after_the_call_answers_is_waited_for(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """systemd answers once the scope's start job is queued and moves the
+        Worker when it runs: an immediate read failed every job on lavender-wsl
+        on 2026-10-17."""
+        _lay_out(tmp_path, (*SERVICE, WORKER, *HOOK))
+        (tmp_path / "busctl-moves-late").write_bytes(b"")
+        ran = _run(tmp_path)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout.startswith("fleet-runner-job-scope: Runner.Worker 13 of ")
+        assert (tmp_path / "slept").read_text(encoding="utf-8").split() == ["0.1"]
+
     def test_an_adoption_that_left_the_worker_where_it_was_is_refused(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """The cgroup is read back, so a call that answered and moved nothing
-        is not taken for a move."""
+        """The cgroup is read back for the whole wait, so a call that answered
+        and moved nothing is not taken for a move."""
         _lay_out(tmp_path, (*SERVICE, WORKER, *HOOK))
         (tmp_path / "busctl-moves-nothing").write_bytes(b"")
         ran = _run(tmp_path)
         assert ran.returncode == 1
+        wait = runner_job_scope_render.MOVE_WAIT_SECONDS
         assert ran.stderr == (
-            f"FLEET_RUNNER_JOB_SCOPE_REFUSED: systemd took Runner.Worker 13, yet it is in {OWN}, "
-            f"not {CI_SLICE_NAME}/{SCOPE}\n"
+            f"FLEET_RUNNER_JOB_SCOPE_REFUSED: systemd took Runner.Worker 13, yet after {wait} s "
+            f"it is in {OWN}, not {CI_SLICE_NAME}/{SCOPE}\n"
         )
+        assert (tmp_path / "slept").read_text(encoding="utf-8").split() == ["0.1"] * wait * 10
 
     @pytest.mark.parametrize("arguments", [("--adopt", "13"), ("--workers",), ("--audit",)])
     def test_any_argument_but_the_audit_s_or_the_hub_s_is_refused(
