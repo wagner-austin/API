@@ -553,7 +553,11 @@ ruff, mypy, pytest, xdist and pytest_cov in one `-c` (MCPs board task
 ec895824). `hooks` routes MCPs `packages/claude-hooks`, whose check runs on
 the system interpreter as Claude Code runs the hooks and whose live suites
 reach the board through that route file; measured 2026-10-02, sedona carried
-the file and pendragon and serendipity did not. A node with pip but without
+the file and pendragon and serendipity did not. The package is two projects,
+`MCPs/packages/claude-hooks` (windows) and `MCPs/packages/claude-hooks-linux`
+(linux), because its suites keep a real arm per platform (MCPs board task
+c1832d51); diphtheria is the linux node carrying the tag, its pins installed
+by MCPs `scripts/host/lib/hooks-tools.sh`. A node with pip but without
 the tools is offered `python -m pip install --user` at the versions the hub
 ran that check with; the route file only `install-hooks-node.py` writes.
 `go` is found the same way, asked `go version` because go has no `--version`
