@@ -104,8 +104,12 @@ class TestVocabulary:
     """Every reason has words, and the words read as captions."""
 
     def test_every_reason_the_bot_can_give_has_words(self) -> None:
-        """The table is the enum, member for member."""
+        """Every decision previews a plan; an observed death is a state."""
         assert set(REASON_WORDS) == set(ReasonKind)
+        for reason, words in REASON_WORDS.items():
+            assert words["doing"].startswith("Next: "), reason
+            assert "plans to" in words["why"] or "plans a" in words["why"], reason
+        assert DESTROYED_WORDS["doing"] == "Destroyed"
 
     def test_every_caption_is_a_short_phrase_and_a_sentence(self) -> None:
         """No code words: a phrase, then one sentence ending in a stop."""
