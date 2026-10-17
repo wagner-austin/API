@@ -79,6 +79,43 @@ propagates as a nonzero task result. Partial response archives do not become
 a complete portfolio result. Task registration does not guarantee future
 provider availability or prove that the future collection has already run.
 
+## Moved to Linux on 2026-10-17
+
+austinpc, the Windows host above, is reimaged to Linux (MCPs board task
+`e2ffed0d`), so the capture now runs on diphtheria. The frozen snapshot records
+each of its 85 sources by an absolute Windows path, and verification re-hashes
+them there. So it runs from a new runtime that reads moved evidence through a
+relocation declaration (`markets/evidence_location.py`; see
+[MARKET_RESEARCH.md](MARKET_RESEARCH.md)).
+
+- **Evidence:** `stock-panel-20261014/` was copied byte for byte to
+  `/home/corvis/PROJECTS/files/stock-panel-20261014/`. The snapshot's one source
+  outside it, `EQUITY_PILOT_PROTOCOL.md` in the research worktree (SHA-256
+  `1c3204c2b4120d9e573a180ee0b8b8946e84292067f80252db2c3a27c2f99530`), was copied
+  to `/home/corvis/PROJECTS/files/relocated-evidence/API-gpt6-markets-1012/libs/covenant_ml/docs/`.
+  `~/.config/covenant_ml/evidence-relocations.json` on diphtheria declares both
+  moves.
+- **Runtime:** `equity-runtime-linux-20261017/`, the six local packages exported
+  from API commit `57fcc042fb45117db9659cebcfb7206982b82e25` with their tests
+  left out, and a fresh `poetry sync --only main` on Python 3.11. Its implementation
+  digest is `3d41f687a56bd3cf840649143bd14beaa117e06f618baa73aba07f8754a6f80f`. It
+  differs from `0086bf80…` above because the verifier now locates moved evidence.
+  The calendar passed is still the original runtime's copied
+  `equity_pilot_calendar_20261014.json`.
+- **Diagnostic:** the production command, run 2026-10-17 23:28 UTC with
+  diagnostic destinations (`linux-diagnostic-20261017.json`), exited 0. It
+  verified all 89 sources through the declaration and left the future window
+  pending, with no returns, no scores and zero orders.
+- **Schedule:** the systemd user timer `covenant-equity-outcome-20261113.timer` on
+  diphtheria fires once at **2026-11-13 00:05 UTC**. With `Persistent=true` it
+  starts at the next boot if diphtheria was down then. It has no boot trigger
+  that could write a premature result. The action writes the same destinations
+  as above under the Linux root: `final-capture-20261113/` and
+  `final-outcomes-20261113.json`. The Windows task `API-EquityPaper-Outcome-20261113`
+  was unregistered the same day, so the capture cannot run twice. Remove the
+  Linux schedule with
+  `systemctl --user disable --now covenant-equity-outcome-20261113.timer`.
+
 ## Checks and interpretation
 
 Full `make check` passed **3,758 tests**, strict typing and all guards, with
