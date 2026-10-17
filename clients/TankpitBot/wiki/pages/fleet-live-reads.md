@@ -24,7 +24,7 @@ source_git_blobs:
   "src/tankpit_bot/bot/tick_body.py": "f89288ff6a4b37a57ad41520167638635f2a3d17"
   "src/tankpit_bot/service/demo_caption_words.py": "141aafe95a65502b2c0197891b34f1e11f9e02bb"
 fact_checked: "2026-09-01"
-verified: 2026-10-08 (the three files re-read against API HEAD for MCPs board task 3d71a8e1; the stream now feeds a third fold, the demo captions, and the digest's radar-yield window closes only on the bot's own pickup)
+verified: 2026-10-08 (live-read fold audit for task 3d71a8e1); status-panel section observed in public video on 2026-10-17 at release 94a93c241 for task c896a291
 confidence: high
 hubs: [architecture]
 ---
@@ -137,6 +137,11 @@ local pickup.[^13] These words become video pixels, so playback buffering
 delays the action and status together. The public webpage no longer
 renders a separate caption from the API history.[^14]
 
+Observed in the public video on 2026-10-17 at release `94a93c241`:
+the status sits below the location display, the combat log remains clear,
+and "Laying mines" is captured beside the adjacent enemy. The recorded
+frame is retained with the sources.[^15]
+
 [^12]: `src/tankpit_bot/browser/caption_panel.py:update_caption_panel` and
       `src/tankpit_bot/bot/base.py:Bot.run`; real Chromium layout,
       resize, text-escaping and log-boundary checks in
@@ -147,6 +152,9 @@ renders a separate caption from the API history.[^14]
       `src/tankpit_bot/bot/ai/resource_search.py:make_resource_search_hop`.
 [^14]: Dashboards repository `tankpit/index.html:tile` and
       `tests/test_tankpit_page.py:test_status_is_in_the_video_without_a_second_caption_panel`.
+[^15]: `docs/sources/status-panel-2026-10-17.png`, captured from the live
+      public demo-1 video after the 08:05 UTC activation; source video is
+      1280 by 768 and the screenshot is scaled by the webpage.
 
 [^1]: `src/tankpit_bot/service/fleet_telemetry.py:117` — the pre-change `FleetTelemetry.stats` called `build_run_digest` (`src/tankpit_bot/diagnostics/run_digest.py:38`)
       (whole file) and `activity` called `load_event_records` (whole

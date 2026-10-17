@@ -6692,3 +6692,29 @@ Pages updated: sim-network-server (a new "On sedona, started by hand"
 section replacing "Behind the platform's Traefik", the accounts section,
 footnotes 9 and 10, re-pinned blobs), sim-web-client (reaching the page
 through the forward; the Traefik prefix kept as the 2026-10-06 history).
+
+## [2026-10-17] update | Bot status recorded in the preset-chat panel
+
+Board task c896a291. The operator asked for fuel/equipment specificity and
+status inside the game's preset-chat selection area, matching its styling
+and captured directly into video. Updated [[fleet-live-reads]] with the
+source renderer, accepted-decision/deactivation publishers, target-aware
+wording and the separate API-history role.
+
+Live inspection of the first release found a positioning defect: the real
+chat parent uses normal flow, so the absolute overlay anchored over the
+combat log. The corrected renderer establishes the chat parent's containing
+block; the real Chromium regression fixture now reproduces that layout.
+Release `94a93c241` was activated on sedona at 08:05 UTC with a passing
+practice gate (tick 2, fuel 1016). Its Windows check passed 7,571 tests,
+100% coverage and every guard. The public 1280-by-768 video showed updates
+in the former chat rectangle, with the log unobscured; a frame is preserved
+at `docs/sources/status-panel-2026-10-17.png`.
+
+The published webpage was checked at 1440px and 390px without horizontal
+overflow or duplicate external captions. The real Chromium live-page test
+verified playback, the Enter-key sound toggle and increasing decoded audio
+bytes. Its wait now observes unpaused playback and a decoded frame rather
+than treating nonzero playback time alone as ready. The Windows wire/audio
+case passed; its Edge page fixture could not launch under SSH because the
+Windows encryption API denied access, so that fixture is not claimed green.
