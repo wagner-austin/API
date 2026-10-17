@@ -33,7 +33,13 @@ _UPDATE = """
         doing.style.cssText = 'font-weight:bold;margin-bottom:3px;';
         const why = document.createElement('div');
         panel.append(doing, why);
-        select.parentElement.append(panel);
+        const parent = select.parentElement;
+        // The live client lays this box out in normal flow. Establish its
+        // own containing block so inset:0 cannot cover the combat log.
+        if (getComputedStyle(parent).position === 'static') {
+            parent.style.position = 'relative';
+        }
+        parent.append(panel);
         const matchStyle = () => {
             const style = getComputedStyle(select);
             panel.style.font = style.font;

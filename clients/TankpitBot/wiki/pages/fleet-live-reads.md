@@ -19,7 +19,7 @@ source_git_blobs:
   "src/tankpit_bot/diagnostics/run_digest_fold.py": "e07513e31b7f8627cc5cc250d4e71c3970087cb3"
   "src/tankpit_bot/service/fleet_stream.py": "78a46fa480589aa3c912fe92447697bcd7241be3"
   "src/tankpit_bot/service/fleet_telemetry.py": "200890db7e371470d184a2d16839725ee4e6df2a"
-  "src/tankpit_bot/browser/caption_panel.py": "3f344fbc539f289d264d3f70c81cf3d4eb969762"
+  "src/tankpit_bot/browser/caption_panel.py": "8dfdb00ca476eae23e906295d110a246f7685704"
   "src/tankpit_bot/bot/base.py": "459c1d9f76b2cd84ee9a2378f4fc05a4ae54ecee"
   "src/tankpit_bot/bot/tick_body.py": "f89288ff6a4b37a57ad41520167638635f2a3d17"
   "src/tankpit_bot/service/demo_caption_words.py": "141aafe95a65502b2c0197891b34f1e11f9e02bb"
@@ -124,6 +124,8 @@ entirely.[^10]
 The streamed browser replaces `.message-list select`, the preset-chat
 selector, with a status panel before the encoder starts. It copies the
 selector's computed font, colors and border and follows its resizing.
+The chat parent establishes a positioning context when the game leaves
+it in normal flow, preventing the panel from covering the combat log.
 The invisible selector remains in place because the game keeps references
 to it and the game-log reader uses its text as a boundary.[^12]
 
