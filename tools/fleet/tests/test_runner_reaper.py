@@ -49,7 +49,13 @@ getconf() {
     echo 100
 }
 sleep() {
+    local pid
     echo "$1" >> "$TABLE/slept"
+    [ -e "$TABLE/job-ends-after" ] || return 0
+    [ "$(wc -l < "$TABLE/slept")" -ge "$(cat "$TABLE/job-ends-after")" ] || return 0
+    for pid in $(cat "$TABLE/job-pids"); do
+        rm -rf "$TABLE/proc/$pid"
+    done
 }
 """
 

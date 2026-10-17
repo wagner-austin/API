@@ -21,12 +21,20 @@ clone the hub sent beside the export (MCPs board task 93d7d7f4).
 
 from __future__ import annotations
 
+import pathlib
+from typing import Final
+
 import pytest
 
+from fleet.cli.runners import load_runner_spec
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
-from fleet.contracts.workspace import decode_fleet_workspace, require_project
+from fleet.contracts.workspace import decode_fleet_workspace, require_node, require_project
+from tests._host import RUNNER_HOST_OPTION
 from tests._registry import shipped_document
+
+#: This package, whose recipe and roster the runner host's suite reads.
+PACKAGE: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parent.parent
 
 
 @pytest.mark.parametrize(
@@ -48,6 +56,31 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
         install=(),
         companions=(),
     )
+
+
+def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
+    """tools/fleet-execution-runners reads lavender's live runner units.
+
+    It is pinned to the node whose WSL host is the one its recipe names to
+    the cases, which ``runners.json`` declares, and it requires no ``docker``
+    tag: that would isolate it as execdocker, while its full-slice case runs
+    under the fleet user's own systemd manager (MCPs board task 715b9ec5).
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "tools/fleet-execution-runners")
+    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX,), "lavender-wsl")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="tools/fleet-execution-runners",
+        install=(),
+        companions=(),
+    )
+    recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
+    given = f"{RUNNER_HOST_OPTION}="
+    named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]
+    host = require_node(workspace, "lavender-wsl")["wsl_host"]
+    declared = [each["name"] for each in load_runner_spec(str(PACKAGE / "runners.json"))["hosts"]]
+    assert (named, host in declared) == ([host], True)
 
 
 def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:

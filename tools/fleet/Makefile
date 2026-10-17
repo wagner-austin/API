@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check _check-unbudgeted execution render-powershell render-documents
+.PHONY: lint test check _check-unbudgeted execution execution-runners render-powershell render-documents
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -44,6 +44,15 @@ _check-unbudgeted: lint | test
 execution:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov
+
+# The runner host's cases (MCPs board task 715b9ec5): where lavender's WSL
+# runner units and their jobs run, read on lavender-wsl, and a full slice
+# measured beside an unbounded sibling there. The fleet runs it as
+# tools/fleet-execution-runners, pinned to that node; --runner-host names the
+# runners.json host the cases read, and no other run has their capability.
+execution-runners:
+	poetry sync --with dev
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --runner-host=lavender --no-cov
 
 # The committed copies of every PowerShell script this package renders
 # (fleet.core.rendered_powershell, MCPs board task d69786fa). They are

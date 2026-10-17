@@ -73,6 +73,14 @@ its cgroup stayed in the CI slice. So each pass restarts a unit in exactly
 that state the moment its Listener runs and it holds no Worker, in its
 cgroup or its job scopes; a unit with no Listener is mid self-update, as
 rule 2 says, and is left for a later pass.
+
+A pass that only looked once missed the gap between two jobs, which lasts
+seconds: from the reaper's install at 18:16:55Z that day to 19:39Z it moved
+five units, and MCPs lavender-wsl-3 held a Runner.Worker at every one of its
+passes. So once every unit's leftovers are reaped, the pass reads each unit
+still owed a move and running a job again five times a second, for up to
+:data:`PLACE_WAIT_SECONDS`, and restarts it on the first read its job has
+ended. Reaping comes first, so the watch delays no unit's leftovers.
 """
 
 from __future__ import annotations
@@ -104,6 +112,12 @@ REAPER_INTERVAL_SECONDS = 30
 #: sleeps uninterruptibly, which a slice over its memory high causes: ten
 #: seconds outlasts such a sleep and still ends a hub pass promptly.
 DROPPED_KILL_WAIT_SECONDS = 10
+
+#: Seconds a pass watches, five times a second, a unit whose listener move is
+#: owed while a job runs in it, to restart it the moment the job ends. Under
+#: :data:`REAPER_INTERVAL_SECONDS`, so a pass that waits the whole bound still
+#: ends before the timer's next one is due.
+PLACE_WAIT_SECONDS = 20
 
 #: The reaper. ``SECONDS`` is the host's job timeout: past it a Worker is
 #: stale. ``--audit SECONDS UNIT`` prints, for one unit, how many of the
@@ -266,6 +280,8 @@ dropped() {
         "process(es), whose job GitHub dropped; its listener runs on"
 }
 
+# Fails only while a job runs in a unit whose move is owed, which a later
+# read may find ended.
 place() {
     local unit=$1 cgroup pids
     [ "$(systemctl show -p Slice --value "$unit")" = $LISTENER_SLICE ] || return 0
@@ -276,7 +292,7 @@ place() {
     pids=$(unit_procs "$cgroup" "$unit") || return 0
     # No Listener is a self-update under way, which a restart would cut short.
     runs Runner.Listener "$pids" || return 0
-    runs Runner.Worker "$pids" && return 0
+    runs Runner.Worker "$pids" && return 1
     systemctl restart "$unit"
     echo "fleet-runner-reaper: $unit: restarted between jobs into $LISTENER_SLICE, as its" \\
         "drop-in says"
@@ -306,7 +322,8 @@ if [ $# -ne 1 ]; then
     exit 2
 fi
 bound=$1
-for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut -d' ' -f1); do
+units=$(systemctl list-units 'actions.runner.*' --no-legend --plain | cut -d' ' -f1)
+for unit in $units; do
     killed=0
     for pid in $(leftovers "$unit" "$bound"); do
         if kill -KILL "$pid" 2>/dev/null; then
@@ -319,11 +336,23 @@ for unit in $(systemctl list-units 'actions.runner.*' --no-legend --plain | cut 
     if [ "$killed" -gt 0 ]; then
         echo "fleet-runner-reaper: $unit: killed $killed process(es) a finished job left behind"
     fi
-    place "$unit"
+done
+pending=$units
+tries=0
+while :; do
+    busy=''
+    for unit in $pending; do
+        place "$unit" || busy="$busy $unit"
+    done
+    pending=$busy
+    [ -n "$pending" ] && [ "$tries" -lt $PLACE_TRIES ] || break
+    sleep 0.2
+    tries=$((tries + 1))
 done
 """
     )
     .replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
+    .replace("$PLACE_TRIES", str(PLACE_WAIT_SECONDS * 5))
     .replace("$LISTENER_SLICE", LISTENER_SLICE_NAME)
 )
 
@@ -422,6 +451,7 @@ __all__ = [
     "DROPPED_KILL_WAIT_SECONDS",
     "KILL_DROP_IN",
     "KILL_DROP_IN_NAME",
+    "PLACE_WAIT_SECONDS",
     "REAPER_INTERVAL_SECONDS",
     "REAPER_PATH",
     "REAPER_SCRIPT",

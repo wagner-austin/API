@@ -177,7 +177,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 | Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Rendered from `runner_render` and installed by provision.sh |
-| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<side>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5) |
+| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<side>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5). Once every unit's leftovers are reaped, a pass restarts each unit whose `Slice=` drop-in names `listeners.slice` while its cgroup is still in `runners.slice`, the moment its Listener runs with no Worker: a unit running a job is read again five times a second for up to `PLACE_WAIT_SECONDS`, 20 s, because a single read missed the seconds between two jobs on every pass for 82 minutes |
 | The distro itself | Imported from the pinned image |
 | Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1; the keepalive is registered through S4U at startup, so it holds the distro open after a reboot with nobody logged on |
 | Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned, and the audit's `account:windows:<service>:LocalSystem` row drifts on any other |
@@ -1163,6 +1163,19 @@ because `capacity.assess` matches the pin against the weighing node's host.
 Every other node refuses the project with `NODE_NOT_PINNED`, first, before
 its tags or capacity are weighed, so a runner is never offered it
 (`fitting_projects`) and nobody who submits the check has to name the node.
+
+`tools/fleet-execution-runners` is this package's own (MCPs board task
+715b9ec5, A3), pinned to `lavender-wsl`. Its `make check` is this package's
+`execution-runners`, which passes `--runner-host=lavender` to the suite and so
+runs only the `host_runner_units` cases (`tests/_host.py`): they read, on the
+host and as the fleet user, that every WSL runner unit `runners.json` declares
+for lavender is active in `listeners.slice`, that slice unbounded and
+`runners.slice` at the roster's `memory_high_gb`, and every live
+`Runner.Worker` in its own job scope; and they fill a slice of the fleet
+user's systemd manager past its high, swap denied, beside an unbounded
+sibling, and require the probe inside it to stall and the sibling's not to.
+Each prints what it read as a `host reading:` line. It is no roll or deploy
+gate: a runner a job holds mid-move fails it, which is what it is for.
 
 ## The staged tree is made a git repository, and that is not decoration
 

@@ -30,6 +30,13 @@ requires the ``docker`` tag, which makes the fleet build it through the
 isolated script, on a node that has execdocker and never on a CI runner. The
 ordinary run skips it on every platform, naming the project that runs it,
 and the Linux execution run requires it like any host case.
+
+A FOURTH, ``host_runner_units``, binds a case to a host that runs the fleet's
+WSL runner units, and reads where those units and their jobs run on it (MCPs
+board task 715b9ec5, A3). No platform has that capability: the Linux
+execution run deselects such a case, the ordinary run skips it, and only a
+run given ``--runner-host=<the runners.json host>`` has it, which is what
+``tools/fleet-execution-runners`` passes from the one node it is pinned to.
 """
 
 from __future__ import annotations
@@ -50,38 +57,116 @@ MARKERS: Final[dict[str, str]] = {"windows": "host_windows", "linux": "host_linu
 #: run only by the execution run.
 EXECUTION_ONLY_MARKER: Final[str] = "host_linux_docker"
 
-#: The fleet project that runs each platform's host cases.
+#: The capability of a host that runs the fleet's WSL runner units, whose cases
+#: read where those units and their jobs run (MCPs board task 715b9ec5).
+RUNNER_HOST: Final[str] = "runner-host"
+
+#: The marker for a case that reads a runner host's live units, run only by
+#: that host's execution run.
+RUNNER_HOST_MARKER: Final[str] = "host_runner_units"
+
+#: The option naming the runner host this run executes on, as ``runners.json``
+#: names it. Given, the run's capability is :data:`RUNNER_HOST`; it is what the
+#: fleet project of :data:`RUNNER_HOST` passes, from the one node it is pinned to.
+RUNNER_HOST_OPTION: Final[str] = "--runner-host"
+
+#: The fleet project that runs each capability's host cases.
 PROJECTS: Final[dict[str, str]] = {
     "windows": "tools/fleet-execution",
     "linux": "tools/fleet-execution-linux",
+    RUNNER_HOST: "tools/fleet-execution-runners",
 }
 
-#: This package's host cases, as platform_core's host-execution run reads them.
-PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan(
-    markers={marker: platform for platform, marker in MARKERS.items()},
-    execution_only={EXECUTION_ONLY_MARKER: "linux"},
-    needs={EXECUTION_ONLY_MARKER: "needs a node's execdocker user and its rootless daemon"},
-    projects=PROJECTS,
-    here=HOST_PLATFORM,
-)
+#: The user property a host case records what it read on the host under,
+#: which the run's summary prints so a passed row carries the reading.
+READING_PROPERTY: Final[str] = "host_reading"
+
+
+class HostReadings:
+    """Prints each passed case's host readings, on the process that reports the run.
+
+    Attributes:
+        lines: Every reading recorded so far, in report order.
+    """
+
+    def __init__(self) -> None:
+        """Start from no reading."""
+        self.lines: list[str] = []
+
+    def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
+        """Keep the readings a passed case recorded.
+
+        Args:
+            report: One phase's report.
+        """
+        if report.passed and report.when == "call":
+            self.lines.extend(
+                f"host reading: {value}"
+                for name, value in report.user_properties
+                if name == READING_PROPERTY
+            )
+
+    def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:
+        """Write the readings.
+
+        Args:
+            terminalreporter: The session's terminal reporter.
+        """
+        for line in self.lines:
+            terminalreporter.write_line(line)
+
+
+#: Where each run keeps its plan, built once its options are read.
+PLAN_KEY: Final[pytest.StashKey[host_execution.HostExecutionPlan]] = pytest.StashKey()
+
+
+def plan_for(here: str) -> host_execution.HostExecutionPlan:
+    """This package's host cases, as platform_core's host-execution run reads them.
+
+    Args:
+        here: The capability this run has.
+
+    Returns:
+        The plan.
+    """
+    return host_execution.HostExecutionPlan(
+        markers={marker: platform for platform, marker in MARKERS.items()},
+        execution_only={EXECUTION_ONLY_MARKER: "linux", RUNNER_HOST_MARKER: RUNNER_HOST},
+        needs={
+            EXECUTION_ONLY_MARKER: "needs a node's execdocker user and its rootless daemon",
+            RUNNER_HOST_MARKER: "needs a host that runs the fleet's WSL runner units",
+        },
+        projects=PROJECTS,
+        here=here,
+    )
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    """Declare the execution option.
+    """Declare the execution option and the runner host's.
 
     Args:
         parser: pytest's option parser.
     """
     host_execution.add_option(parser)
+    parser.addoption(
+        RUNNER_HOST_OPTION,
+        default=None,
+        help="the runners.json host this run executes on, making it that host's execution run",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
-    """Declare the markers, and count an execution run on the reporting process.
+    """Build the run's plan, declare its markers, and count an execution run.
 
     Args:
         config: The run's configuration.
     """
-    host_execution.configure(config, PLAN)
+    host: str | None = config.getoption(RUNNER_HOST_OPTION)
+    plan = plan_for(HOST_PLATFORM if host is None else RUNNER_HOST)
+    config.stash[PLAN_KEY] = plan
+    host_execution.configure(config, plan)
+    if not hasattr(config, "workerinput"):
+        config.pluginmanager.register(HostReadings(), "host-readings")
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -91,4 +176,4 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
         config: The run's configuration.
         items: The collected cases, narrowed in place for an execution run.
     """
-    host_execution.select(config, items, PLAN)
+    host_execution.select(config, items, config.stash[PLAN_KEY])

@@ -16,7 +16,15 @@ from typing import Final
 
 import pytest
 
-from tests._host import EXECUTION_ONLY_MARKER, HOST_PLATFORM, MARKERS, PROJECTS
+from tests._host import (
+    EXECUTION_ONLY_MARKER,
+    HOST_PLATFORM,
+    MARKERS,
+    PROJECTS,
+    READING_PROPERTY,
+    RUNNER_HOST,
+    RUNNER_HOST_MARKER,
+)
 
 #: The platform this machine is not.
 OTHER_PLATFORM: Final[str] = "linux" if HOST_PLATFORM == "windows" else "windows"
@@ -134,6 +142,65 @@ def test_the_execution_run_keeps_a_docker_case_only_on_linux(pytester: pytest.Py
 
     kept = {"linux": {"passed": 1}, "windows": {"deselected": 1}}[HOST_PLATFORM]
     result.assert_outcomes(**kept)
+
+
+#: A module with one case that reads a runner host's units, recording a
+#: reading, beside one bound to this platform.
+RUNNER_CASES: Final[str] = (
+    "import pytest\n"
+    f"@pytest.mark.{RUNNER_HOST_MARKER}\n"
+    f"def test_units(record_property):\n    record_property('{READING_PROPERTY}', 'read it')\n"
+    f"@pytest.mark.{MARKERS[HOST_PLATFORM]}\n"
+    "def test_here():\n    pass\n"
+)
+
+
+def test_the_runner_host_s_run_keeps_only_its_cases_and_prints_their_readings(
+    pytester: pytest.Pytester,
+) -> None:
+    result = _session(pytester, RUNNER_CASES, "--host-execution", "--runner-host=lavender")
+
+    assert result.ret == pytest.ExitCode.OK
+    result.assert_outcomes(passed=1, deselected=1)
+    assert f"host execution on {RUNNER_HOST}: 1 case(s) ran, 0 skipped" in result.outlines
+    assert "host reading: read it" in result.outlines
+
+
+def test_a_platform_s_execution_run_leaves_a_runner_host_case_out(
+    pytester: pytest.Pytester,
+) -> None:
+    result = _session(pytester, RUNNER_CASES, "--host-execution")
+
+    assert result.ret == pytest.ExitCode.OK
+    result.assert_outcomes(passed=1, deselected=1)
+    assert not any(line.startswith("host reading:") for line in result.outlines)
+
+
+def test_the_ordinary_run_skips_a_runner_host_case_naming_its_project(
+    pytester: pytest.Pytester,
+) -> None:
+    result = _session(pytester, RUNNER_CASES, "-rs")
+
+    assert result.ret == pytest.ExitCode.OK
+    result.assert_outcomes(passed=1, skipped=1)
+    project = PROJECTS[RUNNER_HOST]
+    reason = f"needs a host that runs the fleet's WSL runner units; {project} runs it there"
+    assert [line for line in result.outlines if line.startswith("SKIPPED")] == [
+        f"SKIPPED [1] test_cases.py:2: {reason}"
+    ]
+
+
+def test_a_failed_case_s_reading_is_not_printed(pytester: pytest.Pytester) -> None:
+    body = (
+        f"import pytest\n@pytest.mark.{RUNNER_HOST_MARKER}\n"
+        f"def test_units(record_property):\n"
+        f"    record_property('{READING_PROPERTY}', 'read it')\n    raise AssertionError\n"
+    )
+    result = _session(pytester, body, "--host-execution", "--runner-host=lavender")
+
+    assert result.ret == pytest.ExitCode.TESTS_FAILED
+    result.assert_outcomes(failed=1)
+    assert not any(line.startswith("host reading:") for line in result.outlines)
 
 
 def test_the_tally_counts_on_the_controller_under_xdist(pytester: pytest.Pytester) -> None:

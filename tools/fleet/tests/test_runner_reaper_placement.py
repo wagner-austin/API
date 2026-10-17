@@ -4,9 +4,10 @@ MCPs board task 715b9ec5. The provision writes each runner unit's ``Slice=``
 drop-in for the listener slice and restarts only a unit no job runs in. A
 unit it found busy reads ``Slice=`` the listener slice while its cgroup stays
 in the CI slice, and the reaper's 30 s pass restarts it once its Listener
-runs and it holds no Worker. These run the rendered pass over the laid-out
-table of :mod:`tests.test_runner_reaper`, whose ``systemctl`` stand-in
-records each restart.
+runs and it holds no Worker, watching a busy one for its job's end. These run
+the rendered pass over the laid-out table of :mod:`tests.test_runner_reaper`,
+whose ``systemctl`` stand-in records each restart and whose ``sleep`` stand-in
+records each wait and can end the job at one.
 """
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import pathlib
 
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
+from fleet.core.runner_reaper_render import PLACE_WAIT_SECONDS
 from tests.test_runner_reaper import (
     BOUND,
     OWN,
@@ -21,6 +23,7 @@ from tests.test_runner_reaper import (
     STEP,
     UNIT,
     WORKER,
+    Process,
     _killed,
     _lay_out,
     _run,
@@ -41,6 +44,35 @@ def _restarted(table: pathlib.Path) -> list[str]:
     return record.read_text(encoding="utf-8").split() if record.exists() else []
 
 
+def _slept(table: pathlib.Path) -> list[str]:
+    """Each wait the pass took, in order.
+
+    Args:
+        table: The laid-out table.
+
+    Returns:
+        The seconds of each, empty when it took none.
+    """
+    record = table / "slept"
+    return record.read_text(encoding="utf-8").split() if record.exists() else []
+
+
+def _job_ends_after(table: pathlib.Path, waits: int, processes: tuple[Process, ...]) -> None:
+    """Have the ``sleep`` stand-in end the job's processes at its ``waits``-th call.
+
+    Args:
+        table: The laid-out table.
+        waits: The call that ends them.
+        processes: The job's processes.
+    """
+    (table / "job-ends-after").write_bytes(f"{waits}\n".encode())
+    (table / "job-pids").write_bytes(" ".join(str(each["pid"]) for each in processes).encode())
+
+
+#: Every wait of a watch that never sees the job end: five a second for the bound.
+WHOLE_WATCH = ["0.2"] * (PLACE_WAIT_SECONDS * 5)
+
+
 #: The line the pass writes for a unit it moved.
 MOVED = (
     f"fleet-runner-reaper: {UNIT}: restarted between jobs into {LISTENER_SLICE_NAME}, as its "
@@ -55,21 +87,33 @@ class TestAPendingMove:
         _lay_out(tmp_path, OWN, configured=LISTENER_SLICE_NAME)
         ran = _run(tmp_path, BOUND)
         assert (ran.returncode, ran.stdout, ran.stderr) == (0, MOVED, "")
-        assert _restarted(tmp_path) == [UNIT]
+        assert (_restarted(tmp_path), _slept(tmp_path)) == ([UNIT], [])
         assert _killed(tmp_path) == []
 
-    def test_a_unit_running_a_job_waits_for_a_pass_between_jobs(
+    def test_a_unit_running_a_job_is_restarted_the_moment_the_job_ends(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs lavender-wsl-3 went job to job past every 30 s pass for 82 min."""
+        _lay_out(tmp_path, (*OWN, WORKER, STEP), configured=LISTENER_SLICE_NAME)
+        _job_ends_after(tmp_path, 3, (WORKER, STEP))
+        ran = _run(tmp_path, BOUND)
+        assert (ran.returncode, ran.stdout, ran.stderr) == (0, MOVED, "")
+        assert (_restarted(tmp_path), _slept(tmp_path)) == ([UNIT], ["0.2", "0.2", "0.2"])
+
+    def test_a_job_that_outlasts_the_watch_is_left_for_the_next_pass(
         self, tmp_path: pathlib.Path
     ) -> None:
         _lay_out(tmp_path, (*OWN, WORKER, STEP), configured=LISTENER_SLICE_NAME)
         ran = _run(tmp_path, BOUND)
         assert (ran.returncode, ran.stdout, _restarted(tmp_path)) == (0, "", [])
+        assert _slept(tmp_path) == WHOLE_WATCH
 
     def test_a_job_in_its_scope_counts_as_running(self, tmp_path: pathlib.Path) -> None:
         _lay_out(tmp_path, OWN, configured=LISTENER_SLICE_NAME)
         _scope(tmp_path, SCOPE, (WORKER, STEP))
         ran = _run(tmp_path, BOUND)
         assert (ran.returncode, ran.stdout, _restarted(tmp_path)) == (0, "", [])
+        assert _slept(tmp_path) == WHOLE_WATCH
 
     def test_a_unit_mid_self_update_is_left_for_a_later_pass(self, tmp_path: pathlib.Path) -> None:
         """runsvc.sh and the node service, the Listener gone: an update."""
