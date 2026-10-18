@@ -7,8 +7,8 @@ $ErrorActionPreference = 'Stop'
 # stand-ins for the install steps and make that record where they ran and
 # write to both streams, so what reaches the transcript, the order the steps
 # run in and the status written last are all measured. The render runs in
-# this process and sets its location and seven environment variables, which
-# every case restores. Every step and the recipe are timed as phases (MCPs
+# this process and sets its location and the environment variables
+# $script:variables names, which every case restores. Every step and the recipe are timed as phases (MCPs
 # board task 74b13c20): the transcript's fleet-phase lines are compared with
 # their stamps and durations read as shapes, and one case reads the stamps
 # themselves.
@@ -16,7 +16,14 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'POETRY_VIRTUALENVS_IN_PROJECT', 'POETRY_KEYRING_ENABLED', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'POETRY_VIRTUALENVS_IN_PROJECT', 'POETRY_KEYRING_ENABLED', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH', 'TEMP', 'TMP')
+
+    # The run's own temp beside its export, as fleet.core.names.temp_directory
+    # spells it, and the transcript line naming it (MCPs board task c5fbb546).
+    function Get-RunTemp {
+        param([string]$Target)
+        return [System.IO.Path]::GetFullPath("$Target.stage/temp")
+    }
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -79,7 +86,9 @@ Describe 'The build' {
         [System.IO.File]::ReadAllText((Join-Path $export.Target 'build.pid')).Trim() | Should -BeExactly "$PID"
         [System.IO.File]::ReadAllLines($install.Record) | Should -Be @("$($export.Target) ci", "$($export.Target) second")
         [System.IO.File]::ReadAllLines($make.Record) | Should -Be @("$($export.Recipe) check")
+        $runTemp = Get-RunTemp $export.Target
         Read-TranscriptShape $export.Target | Should -Be @(
+            "fleet-temp $runTemp",
             "`$ `"$($install.Path)`" ci", 'fleet-phase install started <utc>', 'installer says out', 'installer says err', 'fleet-phase install ended <utc> after <n> s, exit 0',
             "`$ `"$($install.Path)`" second", 'fleet-phase workspace-build started <utc>', 'installer says out', 'installer says err', 'fleet-phase workspace-build ended <utc> after <n> s, exit 0',
             'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 0')
@@ -103,6 +112,12 @@ Describe 'The build' {
         $env:CORVIS_FLEET_ELEVATED | Should -BeExactly '0'
         # The example job's submitter (MCPs board task 6c4516af A4).
         $env:BOARD_AGENT_LABEL | Should -BeExactly 'opus-example-0929'
+        # Git Bash's /tmp and every tool's temp are the run's, beside its
+        # export, never the account's shared Temp (MCPs board task c5fbb546).
+        $env:TEMP | Should -BeExactly $runTemp
+        $env:TMP | Should -BeExactly $runTemp
+        Test-Path -LiteralPath $runTemp -PathType Container | Should -BeTrue
+        $runTemp.StartsWith((Join-Path $export.Target '')) | Should -BeFalse
     }
     It 'reads a young generation as it is and follows one two weeks old with a new one, keeping the old' {
         $make = Initialize-Tool 'make' 0
@@ -139,7 +154,8 @@ Describe 'The build' {
         $after = [DateTime]::UtcNow.AddSeconds(1)
         $lines = [System.IO.File]::ReadAllLines((Join-Path $export.Target 'result.txt.log'))
         $styles = [Globalization.DateTimeStyles]'AdjustToUniversal, AssumeUniversal'
-        $lines[0] -match '^fleet-phase check started (\S+)$' | Should -BeTrue
+        $lines[0] | Should -BeExactly "fleet-temp $(Get-RunTemp $export.Target)"
+        $lines[1] -match '^fleet-phase check started (\S+)$' | Should -BeTrue
         $started = [DateTime]::ParseExact($Matches[1], "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture, $styles)
         $lines[-1] -match '^fleet-phase check ended (\S+) after (\d+) s, exit 0$' | Should -BeTrue
         $ended = [DateTime]::ParseExact($Matches[1], "yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture, $styles)
@@ -168,6 +184,7 @@ Describe 'The build' {
         Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
         Read-Result $export.Target | Should -BeExactly '2'
         Read-TranscriptShape $export.Target | Should -Be @(
+            "fleet-temp $(Get-RunTemp $export.Target)",
             'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 2')
     }
     It 'runs its rendered install step, npm ci, as whichever npm PATH names, in the phase it declares' {
@@ -177,7 +194,7 @@ Describe 'The build' {
         $env:PATH = "$($npm.Directory);$env:PATH"
         Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Make = $make.Path }
         [System.IO.File]::ReadAllLines($npm.Record) | Should -Be @("$($export.Target) ci")
-        (Read-TranscriptShape $export.Target)[1] | Should -BeExactly 'fleet-phase install started <utc>'
+        (Read-TranscriptShape $export.Target)[2] | Should -BeExactly 'fleet-phase install started <utc>'
         Read-Result $export.Target | Should -BeExactly '0'
     }
     It 'runs a bash install step as the bash in GitBin, ahead of any bash already on PATH (MCPs daae17f2)' {

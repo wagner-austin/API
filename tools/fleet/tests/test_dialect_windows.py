@@ -192,6 +192,23 @@ class TestBuildScript:
             '$env:PLAYWRIGHT_BROWSERS_PATH = "$toolCache/ms-playwright"',
         ]
 
+    def test_its_temp_is_the_run_s_own_beside_the_export_named_before_any_phase(self) -> None:
+        """Git Bash's ``/tmp`` is the process's ``TEMP``; inherited, it was the
+        account's one Temp, and fleet job adf3995a lost it for part of a run
+        (MCPs board task c5fbb546)."""
+        lines = _build().splitlines()
+
+        made = lines.index('$runTemp = "$Target.stage/temp"')
+        assert lines[made : made + 5] == [
+            '$runTemp = "$Target.stage/temp"',
+            "[void][System.IO.Directory]::CreateDirectory($runTemp)",
+            "$env:TEMP = [System.IO.Path]::GetFullPath($runTemp)",
+            "$env:TMP = $env:TEMP",
+            '[System.IO.File]::AppendAllText($log, "fleet-temp $env:TEMP`r`n")',
+        ]
+        assert lines.index(f'$log = "$Target/{names.RESULT_NAME}.log"') < made
+        assert made < lines.index("Set-Location -LiteralPath $Target")
+
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
         """MCPs board task 65bb90c3: the runner's task has no logon session,
         so poetry's Credential Manager read failed its install whenever it

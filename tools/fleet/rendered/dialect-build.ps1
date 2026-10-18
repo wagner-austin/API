@@ -104,6 +104,11 @@ namespace FleetNode {
 [void][FleetNode.KillOnCloseJob]::Enter()
 $log = "$Target/result.txt.log"
 $result = "$Target/result.txt"
+$runTemp = "$Target.stage/temp"
+[void][System.IO.Directory]::CreateDirectory($runTemp)
+$env:TEMP = [System.IO.Path]::GetFullPath($runTemp)
+$env:TMP = $env:TEMP
+[System.IO.File]::AppendAllText($log, "fleet-temp $env:TEMP`r`n")
 $tools = "$CacheRoot/tools"
 $currentFile = "$tools/current"
 [void][System.IO.Directory]::CreateDirectory($tools)

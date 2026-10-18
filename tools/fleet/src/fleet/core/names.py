@@ -88,6 +88,10 @@ COMPANION_REPOSITORY_STEM = "companion-repo"
 #: (FLEET-CHECK 8c1abde3, MCPs board task a8ee9b21).
 STAGE_SUFFIX = ".stage"
 
+#: The directory under a dispatch's staging directory that a Windows build's
+#: ``TEMP`` and ``TMP`` name (:func:`temp_directory`).
+TEMP_DIRECTORY = "temp"
+
 #: The install script, under a node's stage root.
 INSTALL_STEM = "fleet-install"
 
@@ -295,6 +299,26 @@ def reset_directory_stem(directory: str) -> str:
     return f"reset-{directory}"
 
 
+def temp_directory(target: str) -> str:
+    """Where a Windows build points ``TEMP`` and ``TMP``, beside its export.
+
+    THE RUN'S OWN, NOT THE ACCOUNT'S (MCPs board task c5fbb546). Git for
+    Windows mounts ``/tmp`` on the process's ``TEMP``, and a build inherited
+    the account's one Temp, shared with every other build and session on the
+    node: fleet job adf3995a on pendragon (2026-10-18) failed 21 cases because
+    Git Bash could not find ``/tmp`` for part of the run while that directory
+    stood. Under the staging directory, not the export, because the export is
+    read as a commit and suites walk it; the retire removes both.
+
+    Args:
+        target: The dispatch's absolute remote directory, the export root.
+
+    Returns:
+        ``<target>.stage/<TEMP_DIRECTORY>``.
+    """
+    return f"{staging_directory(target)}/{TEMP_DIRECTORY}"
+
+
 def recipe_directory(target: str, path: str) -> str:
     """Where a project's recipe runs inside its export.
 
@@ -470,6 +494,7 @@ __all__ = [
     "POETRY_IN_PROJECT",
     "RESULT_NAME",
     "STAGE_SUFFIX",
+    "TEMP_DIRECTORY",
     "TOOL_CACHES_DIRECTORY",
     "UNINSTALL_STEM",
     "cache_root",
@@ -488,5 +513,6 @@ __all__ = [
     "staging_directory",
     "stop_stem",
     "task_name",
+    "temp_directory",
     "toolchain_probe_stem",
 ]

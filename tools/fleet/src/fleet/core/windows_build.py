@@ -38,6 +38,10 @@ from fleet.core.script_values import scriptable
 from fleet.core.tool_caches import powershell_build_lines
 from fleet.core.windows_job import enter_job_lines
 
+#: The transcript's first line, naming the directory the build's ``TEMP`` and
+#: ``TMP`` point at.
+TEMP_MARKER = "fleet-temp"
+
 
 def _array(values: tuple[str, ...], *, label: str) -> str:
     """A PowerShell array literal of values held to the scriptable grammar.
@@ -114,6 +118,15 @@ def build_script(
     ``[DateTime]::UtcNow``. ``$InstallPhases`` runs parallel to ``$Install``,
     one phase per step.
 
+    THE BUILD'S TEMP IS ITS OWN (MCPs board task c5fbb546): ``TEMP`` and
+    ``TMP`` name :func:`fleet.core.names.temp_directory`, created before any
+    phase and named on the transcript's :data:`TEMP_MARKER` line, so Git
+    Bash's ``/tmp``, Python's ``tempfile`` and every tool's temp files are
+    the run's and go with its retire. Inherited, they were the account's one
+    Temp, shared with every build and session on the node, and fleet job
+    adf3995a on pendragon failed 21 cases while Git Bash could not find
+    ``/tmp`` there for part of the run.
+
     NOTHING THE BUILD STARTS OUTLIVES IT (MCPs board task e40bca34). Right
     after recording itself, before it starts any process, it puts its own
     process in a kill-on-close job object (:mod:`fleet.core.windows_job`),
@@ -165,6 +178,11 @@ def build_script(
         *enter_job_lines(),
         f'$log = "{names.log_path("$Target")}"',
         f'$result = "$Target/{names.RESULT_NAME}"',
+        f'$runTemp = "{names.temp_directory("$Target")}"',
+        "[void][System.IO.Directory]::CreateDirectory($runTemp)",
+        "$env:TEMP = [System.IO.Path]::GetFullPath($runTemp)",
+        "$env:TMP = $env:TEMP",
+        f'[System.IO.File]::AppendAllText($log, "{TEMP_MARKER} $env:TEMP`r`n")',
         *powershell_build_lines(),
         '$env:npm_config_cache = "$toolCache/npm"',
         '$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"',
@@ -224,4 +242,4 @@ def build_script(
     return "\n".join(lines) + "\n"
 
 
-__all__ = ["build_script"]
+__all__ = ["TEMP_MARKER", "build_script"]
