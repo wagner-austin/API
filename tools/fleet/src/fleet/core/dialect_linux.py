@@ -44,11 +44,17 @@ from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
-from fleet.core.linux_isolated_build import isolated_build_lines
+from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
-from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
+from fleet.core.names import (
+    CACHE_VARIABLE,
+    POETRY_IN_PROJECT,
+    POETRY_KEYRING_OFF,
+    WORKSPACE_VARIABLE,
+)
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: How a script file is run by path.
 SH_INVOCATION = ("/bin/sh",)
@@ -282,7 +288,7 @@ class LinuxDialect:
         return self.checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
 
     def retire_script(
-        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str, isolated: bool
     ) -> str:
         """Keep a settled run's transcript, then remove its directories and scripts.
 
@@ -295,6 +301,10 @@ class LinuxDialect:
             task: The run's transient unit. Nothing removes it here: the
                 launch starts it with ``--collect``, so the user manager
                 unloads it when the build exits, failed or not.
+            isolated: Whether the node runs docker projects' builds as
+                execdocker; the run's copy in that user's home then goes
+                too, as root, which such a build removes itself only when it
+                runs to its end (:mod:`fleet.core.linux_isolated_build`).
 
         Returns:
             The script's text. ``mv`` is guarded because a run cancelled
@@ -303,12 +313,15 @@ class LinuxDialect:
             removes the read-only objects of the repository staged there.
         """
         log = shlex.quote(names.log_path(target))
-        lines = (
+        lines = [
             f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
             f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
             f"rm -rf {shlex.quote(target)} {shlex.quote(names.staging_directory(target))}",
             "rm -f " + " ".join(shlex.quote(script) for script in scripts),
-        )
+        ]
+        if isolated:
+            run = posixpath.basename(target.rstrip("/"))
+            lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{exec_root(run)}"']
         return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
     def digest_script(self, target: str) -> str:
@@ -390,8 +403,14 @@ class LinuxDialect:
         result = f"{target}/{names.RESULT_NAME}"
         written = f"printf '%s\\n' \"$status\" > '{result}'"
         lines = [
-            f"{PROLOGUE}npm_config_cache='{cache_root}/npm'",
-            f"POETRY_CACHE_DIR='{cache_root}/pypoetry'",
+            *sh_build_lines(
+                tools=shlex.quote(tool_caches_directory(cache_root)),
+                marker=shlex.quote(f"{target}/{names.GENERATION_MARKER_NAME}"),
+                run_as="",
+            ),
+            'npm_config_cache="$tool_cache/npm"',
+            'POETRY_CACHE_DIR="$tool_cache/pypoetry"',
+            f"{POETRY_IN_PROJECT[0]}='{POETRY_IN_PROJECT[1]}'",
             f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}'",
             f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
@@ -399,7 +418,8 @@ class LinuxDialect:
             f"{AGENT_LABEL_VARIABLE}='{label}'",
             f"{CACHE_VARIABLE}='{cache_root}'",
             f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",
-            f"export npm_config_cache POETRY_CACHE_DIR {POETRY_KEYRING_OFF[0]} "
+            f"export npm_config_cache POETRY_CACHE_DIR {POETRY_IN_PROJECT[0]} "
+            f"{POETRY_KEYRING_OFF[0]} "
             "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
             f"{AGENT_LABEL_VARIABLE} "
             f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE}",
@@ -413,7 +433,7 @@ class LinuxDialect:
         lines.append(f"cd '{names.recipe_directory(target, path)}'")
         lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=f"make {MAKE_TARGET}", log=log))
         lines.append(written)
-        return "\n".join(lines) + "\n"
+        return PROLOGUE + "\n".join(lines) + "\n"
 
     def log_tail_script(self, target: str, lines: int) -> str:
         """Print the last lines of the build's transcript, or nothing.

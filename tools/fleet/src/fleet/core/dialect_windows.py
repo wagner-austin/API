@@ -378,7 +378,7 @@ class WindowsDialect:
         )
 
     def retire_script(
-        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str, isolated: bool
     ) -> str:
         """Keep a settled run's transcript, then remove its directories, scripts and task.
 
@@ -387,11 +387,21 @@ class WindowsDialect:
             retained: Where its transcript is kept.
             scripts: The scripts it left under the stage root.
             task: The run's scheduled task, in the root folder.
+            isolated: Refused when True, as :meth:`build_script` refuses an
+                isolated build: no Windows node runs one.
 
         Returns:
             :func:`fleet.core.windows_retire.retire_script`'s text, which
             says why its directories go through ``rd`` on the verbatim path.
+
+        Raises:
+            ValueError: When ``isolated`` is True.
         """
+        if isolated:
+            raise ValueError(
+                f"{target} is on a Windows node, which runs no build as execdocker, so there "
+                "is no isolated copy to retire"
+            )
         return windows_retire.retire_script(
             target=target, retained=retained, scripts=scripts, task=task
         )

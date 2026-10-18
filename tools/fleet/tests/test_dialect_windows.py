@@ -35,7 +35,7 @@ from fleet.contracts.toolchain import (
     PYTHON_REGISTERED_GUARD,
     PYTHON_REGISTERED_MESSAGE,
 )
-from fleet.core import names
+from fleet.core import names, tool_caches
 from fleet.core.dialect_windows import (
     OBSERVE_SESSIONS_SCRIPT,
     POWERSHELL_INVOCATION,
@@ -171,14 +171,26 @@ class TestBuildScript:
             "Set-Location -LiteralPath $Target"
         )
 
-    def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
+    def test_it_points_npm_and_poetry_at_the_current_generation_and_playwright_at_the_cache(
+        self,
+    ) -> None:
         """A clean export carries no dependencies; the node's cache is where
-        they are restored from, and every run on the node shares it."""
-        body = _build()
+        they are restored from, npm's and poetry's in the generation the
+        build reads first (MCPs board task 346abc45), with the virtualenv in
+        the project."""
+        lines = _build().splitlines()
 
-        assert '$env:npm_config_cache = "$CacheRoot/npm"' in body
-        assert '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"' in body
-        assert '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"' in body
+        generation = list(tool_caches.powershell_build_lines())
+        start = lines.index(generation[0])
+        assert lines[start : start + len(generation)] == generation
+        npm = start + len(generation)
+        assert lines[npm : npm + 5] == [
+            '$env:npm_config_cache = "$toolCache/npm"',
+            '$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"',
+            "$env:POETRY_VIRTUALENVS_IN_PROJECT = 'true'",
+            "$env:POETRY_KEYRING_ENABLED = 'false'",
+            '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
+        ]
 
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
         """MCPs board task 65bb90c3: the runner's task has no logon session,

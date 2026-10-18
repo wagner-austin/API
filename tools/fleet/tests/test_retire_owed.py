@@ -151,7 +151,7 @@ class TestTheOwedRetires:
         assert retire_owed.owed_on(path, alias="lavender") == (DEMO_RUN_ID, OTHER_RUN_ID)
         assert len(records.read_retires(path)) == 2
 
-    def test_an_answering_node_retires_each_once_and_sweeps_once(
+    def test_an_answering_node_retires_each_once_and_removes_generations_once(
         self, tmp_path: pathlib.Path
     ) -> None:
         path = _path(tmp_path)
@@ -167,7 +167,7 @@ class TestTheOwedRetires:
             any(f"retire-{run_id}.ps1" in " ".join(call) for call in answered.calls)
             for run_id in (DEMO_RUN_ID, OTHER_RUN_ID)
         ] == [True, True]
-        assert sum("fleet-venv-sweep" in " ".join(call) for call in answered.calls) == 2
+        assert sum("fleet-cache-generations" in " ".join(call) for call in answered.calls) == 2
         assert _states(path)[2:] == [
             (DEMO_RUN_ID, "lavender", RetireState.RETIRED),
             (OTHER_RUN_ID, "lavender", RetireState.RETIRED),

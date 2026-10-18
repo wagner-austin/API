@@ -114,11 +114,11 @@ class TestARetireTheNodeDidNotAnswer:
         assert node_agent.main(node_argv(sourced_config)) == 0
 
         # The run closed on both sides, the claim pass still ran after it,
-        # and no sweep was sent to a node that had just missed the retire.
+        # and no removal was sent to a node that had just missed the retire.
         assert settling.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
         assert settling.arguments[1]["status"] == "passed"
         assert _sent_retire(missed) == 1
-        assert not any("fleet-venv-sweep" in " ".join(call) for call in missed.calls)
+        assert not any("fleet-cache-generations" in " ".join(call) for call in missed.calls)
         assert _retires(sourced_config) == [(DEMO_RUN_ID, "lavender", "owed")]
 
         answered = FakeRun([*retire_replies(), *PROBED])
@@ -130,7 +130,7 @@ class TestARetireTheNodeDidNotAnswer:
 
         assert later.tools == ["dispatch_list", "dispatch_claim"]
         assert _sent_retire(answered) == 2
-        assert any("fleet-venv-sweep" in " ".join(call) for call in answered.calls)
+        assert any("fleet-cache-generations" in " ".join(call) for call in answered.calls)
         assert _retires(sourced_config) == [
             (DEMO_RUN_ID, "lavender", "owed"),
             (DEMO_RUN_ID, "lavender", "retired"),

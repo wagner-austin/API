@@ -13,17 +13,19 @@ cannot escalate.
 
 from __future__ import annotations
 
+import pathlib
 import subprocess
+import sys
 
 import pytest
 
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
-from fleet.core import dispatch, names
+from fleet.core import dispatch, names, tool_caches
 from fleet.core.dialect_linux import PROLOGUE, LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
-from fleet.core.linux_isolated_build import EXEC_PATH, EXEC_USER
+from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_PATH, EXEC_USER
 from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT
 
@@ -86,11 +88,26 @@ class TestIsolatedText:
         lines = _isolated().splitlines()
 
         assert _isolated().startswith(PROLOGUE)
-        assert f'exec_uid="$(id -u {EXEC_USER})"' in lines
-        assert 'exec_root="$exec_home/fleet/stage/slime-execution-1790600000"' in lines
         copy = lines.index(f"sudo -n cp -a '{TARGET}/.' \"$exec_root/\"")
+        uid = lines.index(f'exec_uid="$(id -u {EXEC_USER})"')
+        assert lines[uid + 1 : uid + 4] == [
+            EXEC_HOME_LINE,
+            'exec_root="$exec_home/fleet/stage/slime-execution-1790600000"',
+            'exec_cache="$exec_home/fleet/cache"',
+        ]
         owner = lines.index(f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_cache"')
         assert lines.index('sudo -n rm -rf "$exec_root"') < copy < owner
+        # The generation is chosen, and its marker written into the copy,
+        # as root before the copy and the cache are given to execdocker
+        # (MCPs board task 346abc45).
+        generation = list(
+            tool_caches.sh_build_lines(
+                tools='"$exec_cache/tools"',
+                marker=f'"$exec_root/{names.GENERATION_MARKER_NAME}"',
+                run_as="sudo -n ",
+            )
+        )
+        assert lines[copy + 1 : owner] == generation
 
     def test_every_step_runs_as_execdocker_from_an_empty_environment_on_its_rootless_socket(
         self,
@@ -103,7 +120,9 @@ class TestIsolatedText:
         # The submitter crosses the cleared environment, for the deploy
         # suite's fleet hold (MCPs board task 6c4516af A4).
         assert "BOARD_AGENT_LABEL='opus-demo-0929' " in body
-        assert 'npm_config_cache="$exec_cache/npm" ' in body
+        assert 'npm_config_cache="$tool_cache/npm" ' in body
+        assert 'POETRY_CACHE_DIR="$tool_cache/pypoetry" ' in body
+        assert "POETRY_VIRTUALENVS_IN_PROJECT='true' " in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='3' " in body
         assert "CORVIS_TEST_MAX_WORKERS='3' " in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT} " in body
@@ -235,3 +254,25 @@ def test_this_suite_itself_runs_as_execdocker_and_cannot_reach_the_stack() -> No
     assert "name=rootless" in options.stdout.splitlines(), options.stderr
     assert stack.returncode != 0, stack.stdout
     assert escalate.returncode != 0, escalate.stdout
+
+
+@pytest.mark.host_linux_docker
+def test_this_suite_reads_its_generation_s_caches_and_runs_in_its_own_virtualenv() -> None:
+    """The cache generation and the in-project virtualenv, measured from
+    inside the isolated build that runs this suite (MCPs board task
+    346abc45): poetry and npm read the generation the copy's marker names,
+    and the interpreter running these tests is the project's own ``.venv``,
+    inside the copy the retire removes."""
+    environment = _run(["env"]).stdout.splitlines()
+    inherited = dict(line.split("=", 1) for line in environment if "=" in line)
+    stage = pathlib.Path(inherited["HOME"]) / "fleet" / "stage"
+    here = pathlib.Path.cwd()
+    copy = next(directory for directory in (here, *here.parents) if directory.parent == stage)
+    generation = (copy / names.GENERATION_MARKER_NAME).read_text(encoding="utf-8").strip()
+    tools = pathlib.Path(inherited["HOME"]) / "fleet" / "cache" / names.TOOL_CACHES_DIRECTORY
+
+    assert generation.isdigit(), generation
+    assert inherited["POETRY_CACHE_DIR"] == (tools / generation / "pypoetry").as_posix()
+    assert inherited["npm_config_cache"] == (tools / generation / "npm").as_posix()
+    assert inherited["POETRY_VIRTUALENVS_IN_PROJECT"] == "true"
+    assert pathlib.Path(sys.prefix) == here / ".venv"

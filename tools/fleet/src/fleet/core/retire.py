@@ -21,15 +21,19 @@ queue close and the row's, so a node that does not answer it is recorded
 as owing the retire and a later collect pass sends it
 (:mod:`fleet.core.retire_owed`, MCPs board task 8776b828).
 
-THE RUN'S VIRTUALENV GOES TOO, BUT AFTER THE CLOSE, NOT HERE (MCPs board
-tasks 7b07c5d2 and 8993c306). Poetry named it after the tree just removed,
-so each caller sends the node :mod:`fleet.core.venv_sweep`, which removes
-every virtualenv in the node's fleet cache whose recorded source paths are
-all gone, once the row is closed. The sweep was part of this retire until
-2026-10-05, so it stood between a finished check and its queue close: one
-more script round trip, which on loki and sedona made a settle take 11 to
-24 s. A sweep that fails after the close leaves nothing a later sweep does
-not remove, since it removes every orphan it finds, not the run's alone.
+THE RUN'S VIRTUALENV GOES WITH IT. Every build keeps poetry's virtualenv in
+its project (:data:`fleet.core.names.POETRY_IN_PROJECT`, MCPs board task
+346abc45), so it is inside the export this removes, and on Linux the copy a
+docker project's build made in execdocker's home goes too.
+
+THE CACHE GENERATIONS ARE JUDGED AFTER THE CLOSE, NOT HERE (MCPs board tasks
+8993c306 and 346abc45). Removing the run removes its generation marker, so
+each caller then sends the node :mod:`fleet.core.cache_generations`, once the
+row is closed. Housekeeping was part of this retire until 2026-10-05, and it
+stood between a finished check and its queue close: one more script round
+trip, which on loki and sedona made a settle take 11 to 24 s. A removal that
+fails after the close leaves nothing a later one does not remove, since it
+judges every generation, not the run's alone.
 """
 
 from __future__ import annotations
@@ -43,7 +47,7 @@ from fleet.core import dialect, names, remote
 _log = get_logger(__name__)
 
 
-def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
+def script_for(platform: NodePlatform, *, stage_root: str, run_id: str, isolated: bool) -> str:
     """The retire script one dispatch's node is sent.
 
     The one place its arguments are derived from the run, so the script a
@@ -54,6 +58,8 @@ def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
         platform: The node's declared platform.
         stage_root: The node's declared stage root.
         run_id: The dispatch.
+        isolated: Whether the node declares execdocker's rootless daemon
+            (:func:`runs_isolated`).
 
     Returns:
         The script's text.
@@ -66,7 +72,21 @@ def script_for(platform: NodePlatform, *, stage_root: str, run_id: str) -> str:
             spoken.script_path(stage_root, stem) for stem in names.root_script_stems(run_id)
         ),
         task=names.task_name(run_id),
+        isolated=isolated,
     )
+
+
+def runs_isolated(node: NodeConfig) -> bool:
+    """Whether a node runs docker projects' builds as execdocker.
+
+    Args:
+        node: The node.
+
+    Returns:
+        True when it declares that user's rootless daemon (``docker``),
+        the capability a docker project's dispatch requires.
+    """
+    return node["docker"] is not None
 
 
 def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOutcome:
@@ -91,7 +111,9 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
     outcome = remote.attempt_script(
         node["host"],
         dialect.for_platform(node["platform"]).script_path(stage_root, names.retire_stem(run_id)),
-        script_for(node["platform"], stage_root=stage_root, run_id=run_id),
+        script_for(
+            node["platform"], stage_root=stage_root, run_id=run_id, isolated=runs_isolated(node)
+        ),
         platform=node["platform"],
     )
     # A Windows retire prints one line per leftover process it ended for
@@ -127,4 +149,4 @@ def retire_on_node(node: NodeConfig, *, run_id: str) -> str:
     return names.retained_log_path(node["stage_root"], run_id)
 
 
-__all__ = ["attempt_retire_on_node", "retire_on_node", "script_for"]
+__all__ = ["attempt_retire_on_node", "retire_on_node", "runs_isolated", "script_for"]

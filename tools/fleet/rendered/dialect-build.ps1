@@ -104,8 +104,21 @@ namespace FleetNode {
 [void][FleetNode.KillOnCloseJob]::Enter()
 $log = "$Target/result.txt.log"
 $result = "$Target/result.txt"
-$env:npm_config_cache = "$CacheRoot/npm"
-$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"
+$tools = "$CacheRoot/tools"
+$currentFile = "$tools/current"
+[void][System.IO.Directory]::CreateDirectory($tools)
+$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+if (-not (Test-Path -LiteralPath $currentFile) -or ($now - [long](Get-Content -LiteralPath $currentFile -Raw).Trim()) -ge 1209600) {
+    [void][System.IO.Directory]::CreateDirectory("$tools/$now")
+    [System.IO.File]::WriteAllText("$tools/$now/.pending", "$now")
+    Move-Item -LiteralPath "$tools/$now/.pending" -Destination $currentFile -Force
+}
+$generation = (Get-Content -LiteralPath $currentFile -Raw).Trim()
+[System.IO.File]::WriteAllText("$Target/cache-generation", $generation)
+$toolCache = "$tools/$generation"
+$env:npm_config_cache = "$toolCache/npm"
+$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"
+$env:POETRY_VIRTUALENVS_IN_PROJECT = 'true'
 $env:POETRY_KEYRING_ENABLED = 'false'
 $env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"
 $env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"

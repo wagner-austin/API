@@ -173,7 +173,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 |---|---|
 | Registration tokens | Minted fresh by every run; they expire within the hour |
 | Each runner's `.runner`, `.credentials`, service | Written by config.sh; `--replace` takes back the old registration of the same name |
-| `_work` trees, poetry venvs, pip cache | Caches; the next job recreates them. ci-clean removes a venv whose recorded sources are all gone, by the rule `venv_sweep` runs on the fleet nodes, and the poetry and pip cache files nothing has read for 14 days, while jobs run (MCPs board task ecb13d3d) |
+| `_work` trees, poetry venvs, pip cache | Caches; the next job recreates them. ci-clean removes a venv whose recorded sources are all gone, and the poetry and pip cache files nothing has read for 14 days, while jobs run (MCPs board task ecb13d3d) |
 | Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
 | Docker build cache | What the jobs' `docker build` steps leave; ci-clean prunes daily what no build used for a week, then the reclaimable cache above 60 GB (MCPs board task 46c7b11b) |
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
@@ -407,17 +407,28 @@ runner holds it, and another runner's run when that runner does
 (serendipity's two runners share one node); a run still going has its
 lease renewed only once it was last set 70 s or more ago (`leaseExpiresAt`,
 decoded to whole seconds, so 60 s let a pair land 59.2 s apart), so the
-boundary's pass renews and a pass seconds later writes nothing; a sweep of
-virtualenvs the node does not answer is left to the next sweep; and a run
+boundary's pass renews and a pass seconds later writes nothing; a removal of
+cache generations the node does not answer is left to the next one; and a run
 whose node missed the boundary's read is owed a renewal, which the watch
 makes at its first read that reaches the node.
 
-**A settle closes the queue job before it sweeps.** The node's orphaned
-virtualenvs (`fleet.core.venv_sweep`) are removed after the row and the
-queue job are closed, not inside the retire, since the sweep's script round
-trip stood between a finished check and its close (11 to 24 s per settle on
-loki and sedona); a sweep that fails after the close leaves nothing a later
-sweep does not remove.
+**A settle closes the queue job before it removes cache generations.** The
+node's cache generations no run reads (`fleet.core.cache_generations`) are
+removed after the row and the queue job are closed, not inside the retire,
+since housekeeping's script round trip stood between a finished check and
+its close (11 to 24 s per settle on loki and sedona); a removal that fails
+after the close leaves nothing a later one does not remove.
+
+**Every cache on a node has an owner that bounds it** (MCPs board task
+346abc45), measured 2026-10-18 before the change:
+
+| State | Owner and bound |
+|---|---|
+| Poetry virtualenvs | In the project (`POETRY_VIRTUALENVS_IN_PROJECT`), inside the run's directory, so the retire removes them with the run. Before: execdocker's cache held 168 (19 GB) on lavender-wsl, 77 (8.5 GB) on diphtheria and 33 (3.7 GB) on colossus, never swept |
+| npm's and poetry's download caches | `<cache root>/tools/<generation>`, the generation named in `tools/current`; a build starts a new one when the current is 14 days old (`fleet.core.tool_caches`) and writes the one it reads into its run directory. After each retire, every generation that is not current, that no run directory names and that stopped being current over an hour ago is removed whole, so no tool finds half of one of its entries. Before: poetry's held 10 to 23 GB per node, and per-file removal was measured to break both tools |
+| Playwright's browsers | Playwright itself: every `playwright install` removes each browser no live link under `.links` names, and a link into a removed run is dead |
+| A docker project's copy in execdocker's home | Removed by the build when it runs to its end, and by the retire on a node that declares `docker`. Before: lavender-wsl held eight stopped builds' copies, 11 GB |
+| MCPs' prepared installs and venvs (`npm-installations`, `python-venvs`, `fleet-prepare`) | MCPs maketools' prepare store: the three newest entries per pool are kept, and an older one is removed once it has gone an hour unused |
 
 **A node claims only what its tags admit.** The claim sends the node's
 derived tags (`fleet.contracts.tags.node_tags`: its platform, plus `gpu` for
@@ -675,9 +686,11 @@ one) and the runner exports THAT commit:
    into `<stage_root>/<directory>` — which is `../<directory>` from the
    export root, the layout a workstation already has — and made a one-commit
    git repository there;
-5. the build script points npm, poetry and Playwright at the node's caches
-   (`<stage_root>/cache/{npm,pypoetry,ms-playwright}`), runs the install
-   steps at the export root, and `make check` in `path`.
+5. the build script points npm and poetry at the current generation of the
+   node's caches (`<stage_root>/cache/tools/<generation>/{npm,pypoetry}`)
+   and Playwright at `<stage_root>/cache/ms-playwright`, keeps poetry's
+   virtualenv in the project, runs the install steps at the export root,
+   and `make check` in `path`.
 
 **Why a companion exists and why a node cannot fetch one itself** (MCPs board
 task 0515040d). A repository whose check reads a second repository has

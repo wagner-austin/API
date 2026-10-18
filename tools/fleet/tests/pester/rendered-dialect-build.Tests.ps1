@@ -16,7 +16,7 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'POETRY_KEYRING_ENABLED', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
+    $script:variables = @('npm_config_cache', 'POETRY_CACHE_DIR', 'POETRY_VIRTUALENVS_IN_PROJECT', 'POETRY_KEYRING_ENABLED', 'PLAYWRIGHT_BROWSERS_PATH', 'PYTEST_XDIST_AUTO_NUM_WORKERS', 'CORVIS_TEST_MAX_WORKERS', 'CORVIS_FLEET_ELEVATED', 'BOARD_AGENT_LABEL', 'CORVIS_FLEET_CACHE', 'CORVIS_FLEET_WORKSPACE', 'PATH')
 
     # A .cmd that records the directory it ran in and its arguments, writes
     # one line to each stream, and exits with the case's code. It lands in a
@@ -84,8 +84,13 @@ Describe 'The build' {
             "`$ `"$($install.Path)`" second", 'fleet-phase workspace-build started <utc>', 'installer says out', 'installer says err', 'fleet-phase workspace-build ended <utc> after <n> s, exit 0',
             'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 0')
         Read-Result $export.Target | Should -BeExactly '0'
-        $env:npm_config_cache | Should -BeExactly "$($export.Cache)/npm"
-        $env:POETRY_CACHE_DIR | Should -BeExactly "$($export.Cache)/pypoetry"
+        # npm and poetry read the generation the run's marker names (MCPs
+        # board task 346abc45), and the virtualenv is the project's.
+        $generation = [System.IO.File]::ReadAllText((Join-Path $export.Target 'cache-generation'))
+        $generation | Should -BeExactly ([System.IO.File]::ReadAllText((Join-Path $export.Cache 'tools/current')))
+        $env:npm_config_cache | Should -BeExactly "$($export.Cache)/tools/$generation/npm"
+        $env:POETRY_CACHE_DIR | Should -BeExactly "$($export.Cache)/tools/$generation/pypoetry"
+        $env:POETRY_VIRTUALENVS_IN_PROJECT | Should -BeExactly 'true'
         # No logon session on a runner's task for the Credential Manager (MCPs board task 65bb90c3).
         $env:POETRY_KEYRING_ENABLED | Should -BeExactly 'false'
         $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/ms-playwright"
@@ -98,6 +103,33 @@ Describe 'The build' {
         $env:CORVIS_FLEET_ELEVATED | Should -BeExactly '0'
         # The example job's submitter (MCPs board task 6c4516af A4).
         $env:BOARD_AGENT_LABEL | Should -BeExactly 'opus-example-0929'
+    }
+    It 'reads a young generation as it is and follows one two weeks old with a new one, keeping the old' {
+        $make = Initialize-Tool 'make' 0
+        $cacheRoot = Join-Path $TestDrive ('cache-' + [guid]::NewGuid().ToString('N'))
+        $tools = Join-Path $cacheRoot 'tools'
+        $current = Join-Path $tools 'current'
+        $now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+        $young = [string]($now - 13 * 86400)
+        $old = [string]($now - 14 * 86400)
+        foreach ($name in $young, $old) {
+            [void][System.IO.Directory]::CreateDirectory((Join-Path $tools $name))
+        }
+
+        [System.IO.File]::WriteAllText($current, $young)
+        $first = Initialize-Export
+        Invoke-Rendered 'dialect-build' @{ Target = $first.Target; Recipe = $first.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
+        [System.IO.File]::ReadAllText((Join-Path $first.Target 'cache-generation')) | Should -BeExactly $young
+
+        [System.IO.File]::WriteAllText($current, $old)
+        $second = Initialize-Export
+        Invoke-Rendered 'dialect-build' @{ Target = $second.Target; Recipe = $second.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
+        $started = [System.IO.File]::ReadAllText($current)
+        [long]$started | Should -BeGreaterOrEqual $now
+        [System.IO.File]::ReadAllText((Join-Path $second.Target 'cache-generation')) | Should -BeExactly $started
+        $env:npm_config_cache | Should -BeExactly "$cacheRoot/tools/$started/npm"
+        Test-Path -LiteralPath (Join-Path $tools $old) | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $tools "$started/.pending") | Should -BeFalse
     }
     It 'stamps each phase in UTC, ends after it starts, and counts whole seconds between' {
         $export = Initialize-Export

@@ -32,7 +32,14 @@ result file stay in the dispatch directory, appended to by the runner's own
 shell around each ``sudo``. The copy is removed after the recipe, as root,
 because a rootless container writes files under subordinate ids its user
 cannot delete; a failure to remove it ends the script before the result is
-written, which the collector reads as a crashed build rather than a pass.
+written, which the collector reads as a crashed build rather than a pass. A
+build stopped before that line leaves its copy, so the retire removes it too
+(:meth:`fleet.core.dialect_linux.LinuxDialect.retire_script`): measured
+2026-10-18, lavender-wsl held eight such copies, 11 GB, from 2026-10-01 on.
+
+execdocker's npm and poetry caches are one generation at a time, as the
+node's are (:mod:`fleet.core.tool_caches`); the generation's marker is in the
+copy, so the generation stays while the copy does.
 
 What this does not stop: containers the suite leaves running belong to
 execdocker's daemon, not to the build's unit, so stopping the unit does not
@@ -48,15 +55,42 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
-from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
+from fleet.core.names import (
+    CACHE_VARIABLE,
+    POETRY_IN_PROJECT,
+    POETRY_KEYRING_OFF,
+    WORKSPACE_VARIABLE,
+)
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: The user whose rootless daemon a docker project's build runs against.
 EXEC_USER = "execdocker"
 
+#: The sh line that sets ``$exec_home`` to that user's home.
+EXEC_HOME_LINE = f'exec_home="$(getent passwd {EXEC_USER} | cut -d : -f 6)"'
+
+#: Where that user's copies of the staged trees live, over ``$exec_home``.
+EXEC_STAGE = "$exec_home/fleet/stage"
+
+#: That user's cache root, over ``$exec_home``.
+EXEC_CACHE = "$exec_home/fleet/cache"
+
 #: The PATH the isolated build starts from: the system's tools only, since
 #: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
 EXEC_PATH = "/usr/local/bin:/usr/bin:/bin"
+
+
+def exec_root(run: str) -> str:
+    """Where one run's tree is copied for execdocker, over ``$exec_home``.
+
+    Args:
+        run: The run's id, its directory's name under the stage root.
+
+    Returns:
+        ``$exec_home/fleet/stage/<run>``.
+    """
+    return f"{EXEC_STAGE}/{run}"
 
 
 def isolated_build_lines(
@@ -94,20 +128,26 @@ def isolated_build_lines(
     run = target.rstrip("/").rsplit("/", 1)[-1]
     lines = [
         f'exec_uid="$(id -u {EXEC_USER})"',
-        f'exec_home="$(getent passwd {EXEC_USER} | cut -d : -f 6)"',
-        f'exec_root="$exec_home/fleet/stage/{run}"',
-        'exec_cache="$exec_home/fleet/cache"',
+        EXEC_HOME_LINE,
+        f'exec_root="{exec_root(run)}"',
+        f'exec_cache="{EXEC_CACHE}"',
         'sudo -n rm -rf "$exec_root"',
         'sudo -n mkdir -p "$exec_root" "$exec_cache"',
         f"sudo -n cp -a '{target}/.' \"$exec_root/\"",
+        *sh_build_lines(
+            tools=f'"{tool_caches_directory("$exec_cache")}"',
+            marker=f'"$exec_root/{names.GENERATION_MARKER_NAME}"',
+            run_as="sudo -n ",
+        ),
         f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_cache"',
         "as_exec() {",
         f"  sudo -n -u {EXEC_USER} env -i "
         f'HOME="$exec_home" USER={EXEC_USER} LOGNAME={EXEC_USER} PATH={EXEC_PATH} '
         'XDG_RUNTIME_DIR="/run/user/$exec_uid" '
         'DOCKER_HOST="unix:///run/user/$exec_uid/docker.sock" '
-        'npm_config_cache="$exec_cache/npm" '
-        'POETRY_CACHE_DIR="$exec_cache/pypoetry" '
+        'npm_config_cache="$tool_cache/npm" '
+        'POETRY_CACHE_DIR="$tool_cache/pypoetry" '
+        f"{POETRY_IN_PROJECT[0]}='{POETRY_IN_PROJECT[1]}' "
         f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}' "
         'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
@@ -143,4 +183,12 @@ def isolated_build_lines(
     return lines
 
 
-__all__ = ["EXEC_PATH", "EXEC_USER", "isolated_build_lines"]
+__all__ = [
+    "EXEC_CACHE",
+    "EXEC_HOME_LINE",
+    "EXEC_PATH",
+    "EXEC_STAGE",
+    "EXEC_USER",
+    "exec_root",
+    "isolated_build_lines",
+]

@@ -29,6 +29,7 @@ from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import RunnerSpec
 from fleet.contracts.source import InstallStep
 from fleet.core import (
+    cache_generations,
     dialect,
     names,
     retire,
@@ -39,7 +40,6 @@ from fleet.core import (
     runner_rebuild,
     runner_windows_provision,
     stage_repository,
-    venv_sweep,
     verdict,
 )
 from fleet.core.dialect_windows import WindowsDialect
@@ -128,12 +128,17 @@ def _dialect_scripts() -> list[RenderedScript]:
         RenderedScript(
             name="dialect-retire",
             text=retire.script_for(
-                NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT, run_id=EXAMPLE_RUN_ID
+                NodePlatform.WINDOWS,
+                stage_root=EXAMPLE_STAGE_ROOT,
+                run_id=EXAMPLE_RUN_ID,
+                isolated=False,
             ),
         ),
         RenderedScript(
-            name="dialect-venv-sweep",
-            text=venv_sweep.script_for(NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT),
+            name="dialect-cache-generations",
+            text=cache_generations.script_for(
+                NodePlatform.WINDOWS, stage_root=EXAMPLE_STAGE_ROOT, isolated=False
+            ),
         ),
         RenderedScript(
             name="dialect-extract",

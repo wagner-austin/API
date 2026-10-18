@@ -26,10 +26,16 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
-from fleet.core.names import CACHE_VARIABLE, POETRY_KEYRING_OFF, WORKSPACE_VARIABLE
+from fleet.core.names import (
+    CACHE_VARIABLE,
+    POETRY_IN_PROJECT,
+    POETRY_KEYRING_OFF,
+    WORKSPACE_VARIABLE,
+)
 from fleet.core.phase_markers import PHASE_MARKER
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.script_values import scriptable
+from fleet.core.tool_caches import powershell_build_lines
 from fleet.core.windows_job import enter_job_lines
 
 
@@ -159,8 +165,10 @@ def build_script(
         *enter_job_lines(),
         f'$log = "{names.log_path("$Target")}"',
         f'$result = "$Target/{names.RESULT_NAME}"',
-        '$env:npm_config_cache = "$CacheRoot/npm"',
-        '$env:POETRY_CACHE_DIR = "$CacheRoot/pypoetry"',
+        *powershell_build_lines(),
+        '$env:npm_config_cache = "$toolCache/npm"',
+        '$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"',
+        f"$env:{POETRY_IN_PROJECT[0]} = '{POETRY_IN_PROJECT[1]}'",
         f"$env:{POETRY_KEYRING_OFF[0]} = '{POETRY_KEYRING_OFF[1]}'",
         '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',

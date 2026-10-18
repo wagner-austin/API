@@ -197,7 +197,7 @@ class Dialect(Protocol):
         ...
 
     def retire_script(
-        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str
+        self, *, target: str, retained: str, scripts: tuple[str, ...], task: str, isolated: bool
     ) -> str:
         """The script that keeps a settled run's transcript and removes the rest.
 
@@ -207,6 +207,9 @@ class Dialect(Protocol):
         kept every one filled diphtheria's disk.
 
         Args:
+            isolated: Whether the node runs docker projects' builds as
+                execdocker (it declares that user's rootless daemon,
+                ``docker``), whose copy of the run the retire removes too.
             target: The dispatch's absolute remote directory, removed whole.
             retained: Where its transcript is moved to first, under the stage
                 root's logs directory, which is created if absent.
@@ -263,8 +266,10 @@ class Dialect(Protocol):
                 before the recipe, each an argv in the source grammar timed
                 as the phase it names (:mod:`fleet.core.phase_markers`); the
                 recipe is timed as the phase ``check``.
-            cache_root: The node's cache directory, which the package
-                managers are pointed at.
+            cache_root: The node's cache directory, whose current
+                generation npm and poetry are pointed at
+                (:mod:`fleet.core.tool_caches`) and which playwright's
+                browsers live under.
             isolated_docker: True for a project that declares the ``docker``
                 tag, whose install steps and recipe then run as the node's
                 execdocker user against its rootless daemon, never as the

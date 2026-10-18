@@ -345,9 +345,9 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
 
     Named for the same reason :func:`dispatch_replies` is: every settle and
     every stop ends with these calls, the retire script and then, once the
-    row is closed, the virtualenv sweep (:mod:`fleet.core.retire`,
-    :mod:`fleet.core.venv_sweep`), each sent and run, and a bare run of
-    ``ok("")`` at the end of a list does not say which step it answers.
+    row is closed, the cache generations' removal (:mod:`fleet.core.retire`,
+    :mod:`fleet.core.cache_generations`), each sent and run, and a bare run
+    of ``ok("")`` at the end of a list does not say which step it answers.
 
     Returns:
         One result per call.
@@ -355,8 +355,8 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
     return [
         ok(""),  # retire: send the script
         ok(""),  # retire: run it
-        ok(""),  # venv sweep: send the script (MCPs board task 7b07c5d2)
-        ok("venv-sweep: removed 0 of 0 (0 MB)\n"),  # venv sweep: run it
+        ok(""),  # generations: send the script (MCPs board task 346abc45)
+        ok("cache-generations: C:/fleet/stage/cache/tools: none yet\n"),  # generations: run it
     ]
 
 

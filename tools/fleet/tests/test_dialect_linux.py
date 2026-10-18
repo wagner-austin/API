@@ -19,7 +19,7 @@ import subprocess
 import pytest
 
 from fleet.contracts.source import InstallStep
-from fleet.core import names
+from fleet.core import names, tool_caches
 from fleet.core.dialect_linux import (
     PROLOGUE,
     SH_INVOCATION,
@@ -112,8 +112,9 @@ class TestBuildScript:
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT}\n" in body
         assert "CORVIS_FLEET_WORKSPACE=.\n" in _build(path="")
         assert (
-            "export npm_config_cache POETRY_CACHE_DIR POETRY_KEYRING_ENABLED "
-            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
+            "export npm_config_cache POETRY_CACHE_DIR POETRY_VIRTUALENVS_IN_PROJECT "
+            "POETRY_KEYRING_ENABLED PLAYWRIGHT_BROWSERS_PATH "
+            "PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
             "BOARD_AGENT_LABEL "
             "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE\n"
         ) in body
@@ -144,11 +145,23 @@ class TestBuildScript:
 
         assert body.count(f"cd '{TARGET}'\n") == 2
 
-    def test_it_points_the_three_package_managers_at_the_node_cache(self) -> None:
+    def test_it_points_npm_and_poetry_at_the_current_generation_and_playwright_at_the_cache(
+        self,
+    ) -> None:
+        """MCPs board task 346abc45: the generation lines run first, and
+        the virtualenv is the project's."""
         body = _build()
 
-        assert "npm_config_cache='/s/cache/npm'\n" in body
-        assert "POETRY_CACHE_DIR='/s/cache/pypoetry'\n" in body
+        generation = "".join(
+            f"{line}\n"
+            for line in tool_caches.sh_build_lines(
+                tools="/s/cache/tools", marker=f"{TARGET}/{names.GENERATION_MARKER_NAME}", run_as=""
+            )
+        )
+        assert body.startswith(PROLOGUE + generation)
+        assert 'npm_config_cache="$tool_cache/npm"\n' in body
+        assert 'POETRY_CACHE_DIR="$tool_cache/pypoetry"\n' in body
+        assert "POETRY_VIRTUALENVS_IN_PROJECT='true'\n" in body
         assert "PLAYWRIGHT_BROWSERS_PATH='/s/cache/ms-playwright'\n" in body
 
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:

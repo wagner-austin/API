@@ -70,7 +70,8 @@ class TestACloseTheQueueDidNotAnswer:
         assert refused_exit == 0
         assert refusing.tools == ["dispatch_list", "dispatch_report"]
         assert refusing.arguments[1]["action"] == "close"
-        # Neither the retire nor the sweep ran, and the row is as launched.
+        # Neither the retire nor the generations' removal ran, and the row is
+        # as launched.
         assert len(refused_node.calls) == len(READ_AND_TAIL)
         assert _ledger(sourced_config) == launched
         assert any(

@@ -48,7 +48,7 @@ from fleet.cli import _config
 from fleet.contracts.ledger import LedgerEntry, is_live
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import collect, dispatch, records, retire, venv_sweep
+from fleet.core import cache_generations, collect, dispatch, records, retire
 
 _log = get_logger(__name__)
 
@@ -125,7 +125,7 @@ def collect_one(loaded: _config.LoadedWorkspace, row: LedgerEntry) -> str:
     )
     # After the row closes: housekeeping no reader of the row waits on
     # (fleet.core.retire).
-    venv_sweep.sweep_on_node(node)
+    cache_generations.remove_unused_on_node(node)
     return f"{row['run_id']}: {collect.outcome_for(exit_code)} -- {detail}"
 
 

@@ -19,6 +19,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, dialect, names, retire
 from fleet.core.dialect_linux import PROLOGUE
+from fleet.core.linux_isolated_build import EXEC_HOME_LINE
 from tests._host_bash import host_bash
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
@@ -87,8 +88,8 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
     kept = retire.retire_on_node(node, run_id=DEMO_RUN_ID)
 
     assert kept == f"{root}/logs/{DEMO_RUN_ID}.log"
-    # The script sent and run, and no sweep: each caller sweeps once its row
-    # is closed (MCPs board task 8993c306).
+    # The script sent and run, and no generations' removal: each caller
+    # sends that once its row is closed (MCPs board task 8993c306).
     assert len(runner.calls) == 2
     script_path = spoken.script_path(root, f"retire-{DEMO_RUN_ID}")
     assert runner.stdin[0] == spoken.retire_script(
@@ -101,9 +102,42 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
             script_path,
         ),
         task=f"fleet-{DEMO_RUN_ID}",
+        isolated=False,
     ).encode("utf-8")
     assert script_path in " ".join(runner.calls[0])
     assert runner.calls[1][-1].endswith(script_path)
+
+
+def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() -> None:
+    """A docker project's build removes its copy only when it runs to its
+    end: measured 2026-10-18, lavender-wsl held eight stopped builds'
+    copies, 11 GB (MCPs board task 346abc45)."""
+    node = _node(NodePlatform.LINUX)
+    node["docker"] = "29.8.1"
+    runner = FakeRun(retire_replies()[:2])
+    _test_hooks.run = runner
+
+    retire.retire_on_node(node, run_id=DEMO_RUN_ID)
+
+    assert retire.runs_isolated(node)
+    assert not retire.runs_isolated(_node(NodePlatform.LINUX))
+    sent = retire.script_for(
+        NodePlatform.LINUX,
+        stage_root=STAGE_ROOTS[NodePlatform.LINUX],
+        run_id=DEMO_RUN_ID,
+        isolated=True,
+    )
+    assert runner.stdin[0] == sent.encode("utf-8")
+    assert sent.endswith(
+        f'{EXEC_HOME_LINE}\nsudo -n rm -rf "$exec_home/fleet/stage/{DEMO_RUN_ID}"\n'
+    )
+
+
+def test_a_windows_node_has_no_isolated_copy_to_retire() -> None:
+    with pytest.raises(ValueError, match="runs no build as execdocker"):
+        retire.script_for(
+            NodePlatform.WINDOWS, stage_root="C:/fleet/stage", run_id=DEMO_RUN_ID, isolated=True
+        )
 
 
 @pytest.mark.parametrize(
@@ -202,6 +236,7 @@ class TestTheShScriptRunsForReal:
                     for stem in names.root_script_stems(DEMO_RUN_ID)
                 ),
                 task=names.task_name(DEMO_RUN_ID),
+                isolated=False,
             ),
             encoding="utf-8",
         )

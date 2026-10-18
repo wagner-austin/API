@@ -227,10 +227,10 @@ class TestTheWiring:
         assert [row["outcome"] for row in rows] == ["running", "passed"]
         assert rows[-1]["exit_code"] == 0
         # The run's directory is retired, by a script sent to the stage root
-        # and run there, then the orphaned virtualenvs are swept by a second
-        # (MCPs board task 7b07c5d2), both before the row closes.
+        # and run there, then the unread cache generations are removed by a
+        # second (MCPs board task 346abc45) once the row is closed.
         retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
-        sweep_path = "C:/fleet/stage/fleet-venv-sweep.ps1"
+        sweep_path = "C:/fleet/stage/fleet-cache-generations.ps1"
         touched = [
             (retire_path in " ".join(call), sweep_path in " ".join(call)) for call in node.calls
         ]

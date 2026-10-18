@@ -331,7 +331,10 @@ class TestCancel:
         )
         assert runner.stdin[0] == stop_body.encode("utf-8")
         retire_body = retire.script_for(
-            node["platform"], stage_root=node["stage_root"], run_id=DEMO_RUN_ID
+            node["platform"],
+            stage_root=node["stage_root"],
+            run_id=DEMO_RUN_ID,
+            isolated=retire.runs_isolated(node),
         )
         assert runner.stdin[2] == retire_body.encode("utf-8")
         rows = records.read_ledger(loaded.ledger)

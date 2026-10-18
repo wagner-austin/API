@@ -55,6 +55,7 @@ from fleet.contracts.dispatch import ClosingStatus, DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import NodeConfig
 from fleet.core import (
+    cache_generations,
     collect,
     dialect,
     dispatch,
@@ -62,7 +63,6 @@ from fleet.core import (
     queue,
     remote,
     retire_owed,
-    venv_sweep,
     verdict,
 )
 
@@ -82,8 +82,8 @@ def settle(
     stopped: str | None,
 ) -> Collected:
     """Read a run's tail and judge it, post a task-less run's verdict, close its
-    queue job, then finish its row, retire its directory and sweep the node's
-    orphaned virtualenvs.
+    queue job, then finish its row, retire its directory and remove the
+    node's cache generations no run reads.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -176,9 +176,9 @@ def settle(
     # After the queue close, so the session waiting on this row is not kept
     # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
     # A node that did not answer owes the retire to a later collect pass,
-    # which sweeps after it (MCPs board task 8776b828).
+    # which removes the unread generations after it (MCPs board task 8776b828).
     if retire_owed.retire_or_owe(loaded.retires, node, alias=row["node"], run_id=row["run_id"]):
-        venv_sweep.sweep_on_node(node)
+        cache_generations.remove_unused_on_node(node)
     return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {line}")
 
 

@@ -36,7 +36,7 @@ from platform_core.logging import get_logger
 
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.retire_record import RetireRecord, RetireState
-from fleet.core import _test_hooks, names, records, retire, venv_sweep
+from fleet.core import _test_hooks, cache_generations, names, records, retire
 
 _log = get_logger(__name__)
 
@@ -154,7 +154,7 @@ def owed_on(path: pathlib.Path, *, alias: str) -> tuple[str, ...]:
 
 
 def retire_owed(path: pathlib.Path, node: NodeConfig, *, alias: str) -> None:
-    """Send every retire this node owes, then sweep its orphaned virtualenvs.
+    """Send every retire this node owes, then remove its unread cache generations.
 
     Args:
         path: The retire record file.
@@ -164,7 +164,7 @@ def retire_owed(path: pathlib.Path, node: NodeConfig, *, alias: str) -> None:
     Raises:
         AppError: ``DISPATCH_FAILED`` with the node's own error when it
             answered and a retire failed there, that run recorded ``failed``
-            and never sent again; or a sweep the node answered and failed.
+            and never sent again; or a removal the node answered and failed.
             Not caught.
     """
     retired = 0
@@ -175,7 +175,7 @@ def retire_owed(path: pathlib.Path, node: NodeConfig, *, alias: str) -> None:
             break
         retired += 1
     if retired:
-        venv_sweep.sweep_on_node(node)
+        cache_generations.remove_unused_on_node(node)
 
 
 __all__ = ["RETIRES_FILE", "owed_on", "retire_or_owe", "retire_owed"]

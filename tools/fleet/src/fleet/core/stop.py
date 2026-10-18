@@ -23,7 +23,7 @@ import pathlib
 
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.core import dialect, dispatch, names, remote, retire, venv_sweep
+from fleet.core import cache_generations, dialect, dispatch, names, remote, retire
 
 
 def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
@@ -65,7 +65,7 @@ def stop_and_finish(
     detail: str,
 ) -> LedgerEntry:
     """Stop a dispatch on its node, retire its directory, close its row, then
-    sweep the node's orphaned virtualenvs.
+    remove the node's cache generations no run reads.
 
     Closing the row emits it and frees its lease.
 
@@ -103,7 +103,7 @@ def stop_and_finish(
     )
     # After the row closes: housekeeping no reader of the row waits on
     # (fleet.core.retire).
-    venv_sweep.sweep_on_node(node)
+    cache_generations.remove_unused_on_node(node)
     return closing
 
 

@@ -17,7 +17,7 @@ from typing import Final
 
 import pytest
 
-from fleet.core import ci_clean, venv_sweep
+from fleet.core import ci_clean
 from tests._host_bash import host_bash
 
 #: One day in seconds.
@@ -35,12 +35,9 @@ def test_no_pass_waits_for_the_runners_to_be_idle() -> None:
     assert "skipping this pass" not in ci_clean.CI_CLEAN_SCRIPT
 
 
-def test_the_orphan_rule_is_the_node_sweeps_own_lines() -> None:
-    # One rule for both caches (MCPs board task 346abc45): the lines are
-    # rendered from venv_sweep, so changing them there changes both.
-    rule = "\n".join(venv_sweep.orphan_sweep_lines('"$POETRY/virtualenvs"'))
+def test_the_orphan_rule_runs_over_the_runner_account_s_virtualenvs() -> None:
+    rule = "\n".join(ci_clean.orphan_sweep_lines('"$POETRY/virtualenvs"'))
     assert rule in ci_clean.CI_CLEAN_SCRIPT
-    assert "\n".join(venv_sweep.orphan_sweep_lines("'/n'")[1:]) in venv_sweep.linux_script("/n")
     assert "unknown provenance: keep" in ci_clean.CI_CLEAN_SCRIPT
 
 

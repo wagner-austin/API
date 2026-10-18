@@ -110,6 +110,19 @@ LOG_TAIL_STEM = "log-tail"
 #: name alone.
 CACHE_DIRECTORY = "cache"
 
+#: The directory under a cache root that holds the package managers' own
+#: caches, npm's and poetry's, one generation at a time
+#: (:mod:`fleet.core.cache_generations`, MCPs board task 346abc45).
+TOOL_CACHES_DIRECTORY = "tools"
+
+#: The file under :data:`TOOL_CACHES_DIRECTORY` naming the generation a
+#: build starting now uses.
+CURRENT_GENERATION_NAME = "current"
+
+#: The file a build writes under its own run directory naming the generation
+#: it reads, so a generation a live run uses is never removed.
+GENERATION_MARKER_NAME = "cache-generation"
+
 #: The directory under a node's stage root that keeps every retired run's
 #: transcript, as ``<run_id>.log`` (MCPs board task bfca20e6). A run's own
 #: directory is removed once its runner has settled or stopped it, and the
@@ -150,6 +163,17 @@ WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
 #:   ast-serialize 0.13.1 reached PyPI: MCPs' execution-elevated suite failed
 #:   at every head after 3c1f26273, so no head was proven.
 POETRY_KEYRING_OFF = ("POETRY_KEYRING_ENABLED", "false")
+
+#: The variable, and its value, that put every build's poetry virtualenv in
+#: its project, inside the run's own directory, so the retire that removes
+#: the run removes it (MCPs board task 346abc45). In poetry's cache it was
+#: named after a run directory no later run reuses, and outlived it:
+#: measured 2026-10-18, execdocker's cache held 168 virtualenvs and 19 GB on
+#: lavender-wsl, 77 and 8.5 GB on diphtheria and 33 and 3.7 GB on colossus,
+#: none of them ever swept, and the nodes' own caches held 15 that the sweep
+#: kept because they recorded no source. diphtheria's poetry already set
+#: ``virtualenvs.in-project``, and its cache held none.
+POETRY_IN_PROJECT = ("POETRY_VIRTUALENVS_IN_PROJECT", "true")
 
 
 def cache_root(stage_root: str) -> str:
@@ -433,16 +457,20 @@ __all__ = [
     "CACHE_DIRECTORY",
     "COLLECT_STEM",
     "COMPANION_REPOSITORY_STEM",
+    "CURRENT_GENERATION_NAME",
     "DIGEST_STEM",
     "EXTRACT_STEM",
+    "GENERATION_MARKER_NAME",
     "INIT_REPOSITORY_STEM",
     "INSTALL_STEM",
     "LAUNCH_STEM",
     "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
     "PID_NAME",
+    "POETRY_IN_PROJECT",
     "RESULT_NAME",
     "STAGE_SUFFIX",
+    "TOOL_CACHES_DIRECTORY",
     "UNINSTALL_STEM",
     "cache_root",
     "capacity_probe_stem",

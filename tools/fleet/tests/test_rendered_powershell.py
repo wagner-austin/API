@@ -78,7 +78,7 @@ class TestTheCommittedCopies:
             "dialect-launch-elevated",
             "dialect-stop",
             "dialect-retire",
-            "dialect-venv-sweep",
+            "dialect-cache-generations",
             "dialect-extract",
             "dialect-init-repository",
             "dialect-companion-repository",

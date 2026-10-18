@@ -29,10 +29,8 @@ every run and never the line that reports a reclaim. So each pass now carries
 its own reason a running job is safe from it:
 
 - a virtualenv goes only when every source path its ``.pth`` files record is
-  gone, and a running job's checkout is not; the rule is
-  :func:`fleet.core.venv_sweep.orphan_sweep_lines`, the lines the fleet nodes'
-  sweep runs beside their running builds, and one recording no path is kept,
-  since poetry may still be creating it.
+  gone, and a running job's checkout is not (:func:`orphan_sweep_lines`); one
+  recording no path is kept, since poetry may still be creating it.
 - poetry's artifacts and repository cache and pip's cache lose only the files
   nothing has read for :data:`CACHE_UNREAD_DAYS` days, then the directories
   that left empty and unchanged as long. A job reading a file moves its atime,
@@ -55,10 +53,62 @@ from __future__ import annotations
 
 from typing import Final
 
-from fleet.core.venv_sweep import orphan_sweep_lines
-
 #: How long a cache file may go unread before the daily pass removes it.
 CACHE_UNREAD_DAYS: Final = 14
+
+
+def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
+    """The orphan rule over a virtualenvs directory, as POSIX sh lines.
+
+    Each ``.pth`` line is read through ``while read``, so a path holding a
+    space is still one path, and an absolute one is a recorded source. A
+    ``.pth`` file the pass cannot read stops it, naming the file, under the
+    script's ``set -e``: read as recording nothing, it would keep its
+    virtualenv with no word said (MCPs board task 346abc45, A2).
+
+    Args:
+        venvs: A shell word naming the virtualenvs directory, quoted by the
+            caller.
+
+    Returns:
+        The lines. They leave ``removed``, ``total`` and ``kb`` set and print
+        ``venv-sweep: removed <n> of <total> (<mb> MB)``.
+    """
+    return (
+        f"venvs={venvs}",
+        "total=0",
+        "removed=0",
+        "kb=0",
+        'if [ -d "$venvs" ]; then',
+        '    for venv in "$venvs"/*/; do',
+        '        [ -d "$venv" ] || continue',
+        "        total=$((total + 1))",
+        "        recorded=0",
+        "        alive=0",
+        '        for pth in "$venv"lib/python*/site-packages/*.pth; do',
+        '            [ -e "$pth" ] || continue',
+        '            if [ ! -r "$pth" ]; then',
+        '                echo "venv-sweep: cannot read $pth" >&2',
+        "                exit 1",
+        "            fi",
+        '            while IFS= read -r source || [ -n "$source" ]; do',
+        '                case "$source" in /*) ;; *) continue ;; esac',
+        "                recorded=1",
+        '                if [ -e "$source" ]; then alive=1; break; fi',
+        '            done < "$pth"',
+        '            [ "$alive" -eq 0 ] || break',
+        "        done",
+        '        [ "$recorded" -eq 1 ] || continue',
+        '        [ "$alive" -eq 0 ] || continue',
+        '        size=$(du -sk "$venv" | cut -f1)',
+        '        rm -rf "$venv"',
+        "        removed=$((removed + 1))",
+        "        kb=$((kb + size))",
+        "    done",
+        "fi",
+        'echo "venv-sweep: removed $removed of $total ($((kb / 1024)) MB)"',
+    )
+
 
 #: The orphan rule over the runner account's poetry virtualenvs.
 ORPHAN_SWEEP: Final = "\n".join(orphan_sweep_lines('"$POETRY/virtualenvs"'))
@@ -84,8 +134,8 @@ prune_unread() {{
     echo "ci-clean: $1: ${{freed_kb}}KB unread for $UNREAD_DAYS days"
 }}
 
-# The orphan rule, the node sweep's own lines; a virtualenv recording no
-# source path (unknown provenance: keep) stays.
+# The orphan rule; a virtualenv recording no source path stays
+# (unknown provenance: keep).
 {ORPHAN_SWEEP}
 reclaimed_kb=$((reclaimed_kb + kb))
 
@@ -147,4 +197,5 @@ __all__ = [
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
     "ORPHAN_SWEEP",
+    "orphan_sweep_lines",
 ]

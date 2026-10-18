@@ -13,7 +13,7 @@ twice, by the watch and by the collect pass. Neither is a reason to hold a
 second run back, so each run id has a lock of its own, and the record files
 the settles share guard themselves (:data:`fleet.core.leases.REWRITING`, one
 line per append to the ledger and the feed, and
-:data:`fleet.core.venv_sweep.SWEEPING`).
+:data:`fleet.core.cache_generations.REMOVING`).
 """
 
 from __future__ import annotations
