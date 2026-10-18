@@ -263,6 +263,7 @@ class TestTheCollectPass:
                 {},
                 agent=LAVENDER,
                 alias="lavender",
+                elevated=False,
                 holder=holder,
                 launching=frozenset({DEFAULT_JOB_ID}),
             )

@@ -195,6 +195,7 @@ class TestTheCollectPass:
             {},
             agent=LAVENDER,
             alias="lavender",
+            elevated=False,
             holder=holder,
             launching=frozenset(),
         )
@@ -229,6 +230,7 @@ class TestTheCollectPass:
             {},
             agent=LAVENDER,
             alias="lavender",
+            elevated=False,
             holder=holder,
             launching=frozenset(),
         )

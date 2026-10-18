@@ -411,6 +411,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             identity,
             agent=agent,
             alias=alias,
+            elevated=elevated,
             holder=watch,
             launching=launcher.launching()["jobs"],
         )

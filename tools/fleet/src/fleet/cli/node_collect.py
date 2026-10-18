@@ -471,12 +471,21 @@ def collect_pass(
     *,
     agent: str,
     alias: str,
+    elevated: bool,
     holder: RunHolder,
     launching: frozenset[str],
 ) -> None:
     """Send every retire this node owes (:mod:`fleet.core.retire_owed`),
     settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
+
+    THE NODE'S ORDINARY RUNNER ALONE SENDS ITS OWED RETIRES (MCPs board task
+    3d9eec0d). The record names a run's node, not its runner, so on a node
+    with an elevated runner both read the same owed runs; measured on
+    serendipity 2026-10-18T18:23Z, the two sent one run's retire at once and
+    each failed, one writing the script the other held open, the other
+    walking a tree the first was removing. The elevated runner reaches the
+    node over the same host, so nothing it owes is out of the other's reach.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -485,6 +494,8 @@ def collect_pass(
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
+        elevated: Whether this is the node's elevated runner, which sends
+            no owed retire.
         holder: The serve's watch (:mod:`fleet.cli.node_watch`), given the
             run ids of the running jobs this runner holds as soon as the
             queue has said, before any is settled, so it reads them while
@@ -502,13 +513,14 @@ def collect_pass(
     # First, so a retire a settle of this pass owes waits for the next pass
     # rather than meeting the node that just missed it again at once
     # (MCPs board task 8776b828).
-    retire_owed.retire_owed(
-        loaded.retires,
-        require_node(loaded.workspace, alias),
-        alias=alias,
-        leases_path=loaded.leases,
-        ledger_path=loaded.ledger,
-    )
+    if not elevated:
+        retire_owed.retire_owed(
+            loaded.retires,
+            require_node(loaded.workspace, alias),
+            alias=alias,
+            leases_path=loaded.leases,
+            ledger_path=loaded.ledger,
+        )
     held = queue.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     holder.hold(running)

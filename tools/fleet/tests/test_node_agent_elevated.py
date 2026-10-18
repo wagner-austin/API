@@ -18,8 +18,8 @@ import uuid
 import pytest
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
-from fleet.cli import node_agent
-from fleet.core import _test_hooks, queue
+from fleet.cli import _config, node_agent
+from fleet.core import _test_hooks, queue, retire_owed
 from tests._node_agent_fixtures import (
     NPM_CI,
     _credentials_in_env,
@@ -29,7 +29,7 @@ from tests._node_agent_fixtures import (
 from tests._queue_fakes import FakeQueue
 from tests._registry import write_registry
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok
+from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, PROBE_OK, FakeRun, ok, retire_replies
 
 __all__ = ["_credentials_in_env"]
 
@@ -188,6 +188,33 @@ class TestTheTwoRunnersProbeOnTheirOwnPaths:
             "C:/fleet/stage/fleet-capacity-lavender-elevated.ps1",
             "C:/fleet/stage/fleet-toolchain-lavender-elevated.ps1",
         )
+
+
+class TestTheNodesOwedRetires:
+    def test_are_sent_by_the_ordinary_runner_alone(
+        self, elevated_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """serendipity, 2026-10-18T18:23Z (MCPs board task 3d9eec0d): both
+        runners sent one owed run's retire at once and each failed, one
+        writing the script the other held open, the other walking a tree the
+        first was removing."""
+        retires = _config.load_workspace({_config.CONFIG_FLAG: str(elevated_config)}).retires
+        retire_owed.owe(retires, alias="lavender", run_id=DEMO_RUN_ID)
+
+        # Four replies, the probe's: a retire sent here would find none left.
+        _tick(elevated_config, ADMINISTRATOR_TOKEN, elevated=True, caplog=caplog)
+
+        assert retire_owed.owed_on(retires, alias="lavender") == (DEMO_RUN_ID,)
+
+        _test_hooks.run = FakeRun(
+            [*retire_replies(), ok(""), ok(PROBE_OK), ok(""), ok(FILTERED_TOKEN)]
+        )
+        _test_hooks.http_post = FakeQueue(
+            [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})]
+        )
+        assert node_agent.main(node_argv(elevated_config)) == 0
+
+        assert retire_owed.owed_on(retires, alias="lavender") == ()
 
 
 class TestRefusalsAndAnnounce:
