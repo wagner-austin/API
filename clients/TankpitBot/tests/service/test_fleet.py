@@ -11,7 +11,6 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
-import psutil
 import pytest
 
 from tankpit_bot import _test_hooks as top_hooks
@@ -493,35 +492,42 @@ def _unlink_accepting_handle_lag(path: Path) -> None:
 
 
 def test_real_spawn_bot_process_launches_a_live_python_child() -> None:
-    """The production spawner starts a real child; killed before it acts.
+    """The production spawner starts a real child, which dies before it acts.
 
-    The child is terminated immediately — interpreter startup takes far
-    longer than the kill lands, so it never reaches the bot entry point
-    (which would open a browser).
+    The child is handed a service port the bot refuses (80, under
+    1024), so its entry point raises before it opens a browser and the
+    interpreter exits 1, on every platform.
 
     Its console goes to the instance's own file, never to the
     manager's terminal: inheriting the console put every bot's tick
     lines in the ``make fleet`` window (2026-08-28). The file is
     opened even for a child that dies instantly, because the stream
-    the interpreter prints a fatal traceback to IS this one.
+    the interpreter prints a fatal traceback to IS this one, and the
+    case reads the refusal there.
+
+    The handle is the only thing that observes the end, by asking
+    whether the child runs, as the manager does. On Linux a child's
+    exit is collected once, by whichever observer waits first, and
+    ``Popen`` reads a code someone else collected as 0: a second
+    observer (a psutil ``wait``) made this case read 0 against -9 on
+    ziggurat (2026-10-18).
     """
     console = bot_run_dir("covspawn") / "console.log"
-    process = _real_spawn_bot_process({"TANKPIT_BOT_INSTANCE": "covspawn"})
-    # Killed through the pid, because the registry's surface is
-    # deliberately read-only: it can ask whether a bot is running,
-    # never end one. Stopping is the sentinel's job.
-    handle = psutil.Process(process.pid)
+    process = _real_spawn_bot_process(
+        {"TANKPIT_BOT_INSTANCE": "covspawn", "TANKPIT_BOT_SERVICE_PORT": "80"}
+    )
     try:
         assert process.pid > 0
-        assert console.exists()
+        while process.is_running():
+            time.sleep(0.01)
+        refusal = console.read_text(encoding="utf-8")
     finally:
-        handle.kill()
-        handle.wait()
         _unlink_accepting_handle_lag(console)
         console.parent.rmdir()
 
-    assert process.is_running() is False
-    assert process.exit_code() == handle.wait()
+    exit_code = process.exit_code()
+    assert exit_code == 1
+    assert "ValueError: TANKPIT_BOT_SERVICE_PORT 80 outside [1024, 65535]" in refusal
 
 
 def test_a_second_bot_on_a_live_account_is_refused(spawner: _FakeSpawner) -> None:

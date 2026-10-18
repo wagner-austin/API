@@ -129,13 +129,16 @@ def test_a_live_process_is_adopted_and_reports_itself_running(
     assert adopted.exit_code() is None
 
 
+@pytest.mark.host_windows
 def test_an_adopted_process_reports_its_exit_code_after_it_dies(
     sleeper: subprocess.Popen[bytes],
 ) -> None:
     """The handle outlives the process, which is why the code survives.
 
     A pid looked up fresh at this point would already be gone; holding
-    the handle is what keeps the exit observable.
+    the handle is what keeps the exit observable. Windows keeps a dead
+    process's code for every handle on it; Linux gives it to the parent
+    alone, which the case below holds.
     """
     adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
     # A second psutil handle, resolved while the process is alive, as in
@@ -159,6 +162,29 @@ def test_an_adopted_process_reports_its_exit_code_after_it_dies(
     assert adopted.exit_code() == expected
     assert adopted.is_running() is False
     assert adopted.exit_code() == expected
+
+
+@pytest.mark.host_linux
+def test_an_adopted_process_has_no_code_once_its_parent_collected_it(
+    sleeper: subprocess.Popen[bytes],
+) -> None:
+    """On Linux the exit code goes to the parent alone, so the adopted handle has none.
+
+    A manager that adopts a bot after a restart is not its parent, so
+    this is the answer it gets in production: ended, with no code to
+    give. That is the split :class:`SpawnedProcessProtocol` exists for,
+    and on ziggurat (2026-10-18) the Windows case above read None
+    where the parent's own wait read -9.
+    """
+    adopted = _adopt(sleeper.pid, _identity_of(sleeper.pid))
+
+    sleeper.kill()
+    sleeper.wait()
+
+    assert adopted.is_running() is False
+    assert adopted.exit_code() is None
+    assert adopted.is_running() is False
+    assert adopted.exit_code() is None
 
 
 def test_liveness_never_depends_on_recovering_an_exit_code(
