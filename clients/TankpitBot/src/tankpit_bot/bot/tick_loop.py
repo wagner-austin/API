@@ -22,7 +22,8 @@ from tankpit_bot.bot.ai.types import (
 from tankpit_bot.bot.base import Bot
 from tankpit_bot.bot.control import apply_pending_control
 from tankpit_bot.bot.session_exit import SessionExitError
-from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+from tankpit_bot.bot.states import ActionKind as InFlightKind
+from tankpit_bot.bot.states import ActionOutcome
 from tankpit_bot.browser import get_current_time_ms
 from tankpit_bot.bus.session_status import (
     SessionStatusDict,
@@ -86,10 +87,10 @@ def run_tick_loop(
 ) -> None:
     """Run the main tick loop.
 
-    A positive ``session_seconds`` bounds the session by requested
-    wait time (``seconds * 1000`` ms of between-tick sleeping; the
-    early-wake sleep charges only what it actually waited, so busy
-    stretches never shorten a bounded run); the loop then returns so
+    A positive ``session_seconds`` bounds the session by elapsed
+    iteration time, charging at least the requested between-tick wait.
+    Early replies shorten the wait without freezing the session clock;
+    the loop then returns so
     ``Bot.run`` saves the capture session and shuts the browser down
     cleanly. Zero or negative runs until stopped. Bounded runs
     previously worked by killing the browser, which ended every session
@@ -130,12 +131,12 @@ def run_tick_loop(
         budget_ms - _WIND_DOWN_SECONDS * 1000 if session_seconds > 2 * _WIND_DOWN_SECONDS else 0
     )
     ticks_done = 0
-    # The budget counts REQUESTED wait time, not iterations: the
-    # early-wake sleep below can end a wait after a fraction of
-    # TICK_RATE_MS, and charging a full window per iteration would
-    # shorten bounded sessions in proportion to how busy they were.
+    # Charge elapsed work and sleep, with requested sleep as the floor
+    # for deterministic test clocks. Immediate replies must still spend
+    # real elapsed time without charging a full window per iteration.
     waited_ms = 0
     while True:
+        iteration_started_ms = get_current_time_ms()
         _publish_tick_context(bot, ticks_done + 1)
         _apply_pending_mode_override(bot)
         # A control verb lives beside STOP and lands at the same boundary.
@@ -185,7 +186,8 @@ def run_tick_loop(
             _emit_session_scorecard(bot, ticks_done, exit_reason="stop_file")
             return
         try:
-            waited_ms += _wait_between_ticks(bot, page)
+            requested_wait_ms = _wait_between_ticks(bot, page)
+            waited_ms += max(requested_wait_ms, get_current_time_ms() - iteration_started_ms)
         except TargetClosedError:
             log.info("Browser closed between ticks, ending run gracefully")
             _emit_session_scorecard(bot, ticks_done, exit_reason="browser_closed")
@@ -240,19 +242,24 @@ def _wait_between_ticks(bot: Bot, page: PageProtocol) -> int:
         page: Playwright page providing the wait primitive.
 
     Returns:
-        Milliseconds of wait actually requested -- the session budget
-        charges real waiting, so early wakes never shorten a bounded
-        run.
+        Milliseconds of wait requested, used as the floor for elapsed
+        iteration accounting in the session budget.
     """
-    if not has_in_flight_action(bot):
+    # Input may arrive during dispatch/HUD publication, before this wait.
+    # Never run the action resolver here: only the next drain has the
+    # complete response batch needed to resolve an action correctly.
+    action = bot._state_data["in_flight_action"]
+    pending = action["kind"] is not InFlightKind.NONE and action["outcome"] is ActionOutcome.PENDING
+    if not pending and bot._ai_state["last_shot_target_id"] == -1:
         page.wait_for_timeout(TICK_RATE_MS)
         return TICK_RATE_MS
+    if bot._cdp_message_buffer:
+        return 0
     waited = 0
-    baseline = len(bot._cdp_message_buffer)
     while waited < TICK_RATE_MS:
         page.wait_for_timeout(_WAKE_SLICE_MS)
         waited += _WAKE_SLICE_MS
-        if len(bot._cdp_message_buffer) > baseline:
+        if bot._cdp_message_buffer:
             break
     return waited
 
