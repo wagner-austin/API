@@ -16,9 +16,12 @@ from scripts import run_cycle
 
 from tests.run_cycle_tree import (
     GOOD_ENV,
+    PYTHON,
+    WORKSPACE,
     Completed,
     FrozenClock,
     RecordingRunner,
+    cycle_argv,
     publisher,
     staged_root,
 )
@@ -29,7 +32,7 @@ class TestTheRecorderRow:
         assert run_cycle.RECORDER == {
             "name": "publisher-ticks",
             "args": ("poetry", "run", "--", "python", "-m", "fleet.cli.publisher_ticks"),
-            "cwd": "..\\fleet",
+            "cwd": "../fleet",
         }
 
     def test_it_runs_last_with_each_publisher_s_exit_and_directory(
@@ -38,16 +41,16 @@ class TestTheRecorderRow:
         runner.results[1] = Completed("", "actions api refused\n", 7)
         root = staged_root(tmp_path, GOOD_ENV)
 
-        run_cycle.main(["--package-root", str(root)])
+        run_cycle.main(cycle_argv(root))
 
         args, cwd, env = runner.calls[-1]
-        assert cwd == (root / "..\\fleet").resolve()
+        assert cwd == (root / "../fleet").resolve()
         assert list(args) == [
             *run_cycle.RECORDER["args"],
             *(
                 f"{row['name']}={7 if row['name'] == 'ci-wake' else 0}="
                 f"{(root / row['cwd']).resolve()}"
-                for row in run_cycle.PUBLISHERS
+                for row in run_cycle.publishers(WORKSPACE, PYTHON)
             ),
         ]
         # The pump's credentials reach it as they reach every publisher.
@@ -59,7 +62,7 @@ class TestTheRecorderRow:
         runner.results[-1] = Completed("", "QUEUE_UNANSWERED\n", 1)
         root = staged_root(tmp_path, GOOD_ENV)
 
-        assert run_cycle.main(["--package-root", str(root)]) == 1
+        assert run_cycle.main(cycle_argv(root)) == 1
 
         failing = publisher(root, "publisher-ticks")
         assert (failing["exit_code"], failing["consecutive_failures"]) == (1, 1)

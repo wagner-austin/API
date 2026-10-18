@@ -61,10 +61,8 @@ def make_runner() -> Generator[RecordingRunner, None, None]:
             Completed("ci-out\n", "ci-err\n", 0),
             Completed("lock-out\n", "lock-err\n", 0),
             Completed("health-out\n", "health-err\n", 0),
-            Completed("tunnel-out\n", "tunnel-err\n", 0),
-            Completed("diphtheria-out\n", "diphtheria-err\n", 0),
+            Completed("ziggurat-out\n", "ziggurat-err\n", 0),
             Completed("actions-out\n", "actions-err\n", 0),
-            Completed("rcs-out\n", "rcs-err\n", 0),
             Completed("login-out\n", "login-err\n", 0),
             Completed("search-out\n", "search-err\n", 0),
             Completed("ticks-out\n", "ticks-err\n", 0),
@@ -149,6 +147,24 @@ def staged_root(tmp_path: pathlib.Path, env_body: str) -> pathlib.Path:
     runs.mkdir()
     (runs / "env.ps1").write_text(env_body, encoding="utf-8")
     return tmp_path
+
+
+#: The MCPs checkout and the interpreter the hub runner's row names, as
+#: diphtheria fills them.
+WORKSPACE = pathlib.Path("/home/corvis/PROJECTS/MCPs")
+PYTHON = "/usr/bin/python3"
+
+
+def cycle_argv(root: pathlib.Path) -> list[str]:
+    """The arguments the hub runner's ``hpc-wake`` row passes for this tree.
+
+    Args:
+        root: The staged package root.
+
+    Returns:
+        The three flags with their values.
+    """
+    return ["--package-root", str(root), "--workspace", str(WORKSPACE), "--python", PYTHON]
 
 
 GOOD_ENV = "\n".join(

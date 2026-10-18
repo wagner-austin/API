@@ -67,7 +67,11 @@ on, which the Interactive registration of 2026-09-09 did not: 37
 consecutive missed runs after a Windows-Update reboot silenced every wake on
 the machine for two hours.
 
-The binary is this package's own `.venv\Scripts\python.exe`, never the
+The row runs it wherever the control duty is held (diphtheria since
+2026-10-18, MCPs board task c39ee056), passing `--package-root` this
+package, `--workspace` that machine's MCPs checkout and `--python` its
+system interpreter; the table is built from those, so no path in it is one
+machine's. The binary is this package's own `.venv` interpreter, never the
 python on PATH; the row names it. `run_cycle.py` imports `platform_core`,
 and the venv holds it as the editable path dependency `pyproject.toml`
 declares, so the pump always runs the tree's `platform_core`. The system
@@ -87,7 +91,7 @@ timestamp IS an outage even when the line under it looks healthy.
 ## The pump: publisher inventory (board 9406cfd9)
 
 The job above is THE machine's event pump: each 3-minute tick
-runs every row of `scripts/run_cycle.py`'s `PUBLISHERS` table, in order,
+runs every row of `scripts/run_cycle.py`'s `publishers` table, in order,
 each publisher isolated (one failing does not stop the next; the tick's
 status is the first nonzero exit and the log's `-- <name>` markers say
 which half went red). Publishers join the table, never become sibling
@@ -97,12 +101,10 @@ scheduled tasks — the random-task count goes down, not up.
 |---|---|---|---|
 | hpc-wake | hpc3 slurm ledger | `f6b04193` | ledger `submitter` |
 | ci-wake | GitHub Actions + push enrolment | `c5593c56` | enrolment `agent` |
-| lock-wake | fleet-lock journal | `5d86be8d` | journal `agent` |
+| lock-wake | the hub's fleet-lock journal, where every deploy locks | `5d86be8d` | journal `agent` |
 | fleet-health-wake | MCPs fleet audit's health journal | `88b20894` | none: a fleet change has no actor to tag |
-| hub-tunnel-wake | the hub tunnel's health journal | `88b20894` | none |
-| lock-wake-diphtheria | diphtheria's fleet-lock journal, over ssh (MCPs `03590bf9`: every deploy locks there) | `5d86be8d` | journal `agent` |
-| lock-wake-diphtheria-actions | diphtheria's action journal, over ssh: an MCPs command run there that changes state and takes no lock, posted only when it failed or was refused (MCPs `b00ab472`) | `5d86be8d` | journal `agent` |
-| rcs-pair-watch | rcs-bridge's `bridge.log`: a lost pairing runs MCPs' `make rcs-pair` at most once an hour (MCPs `21366226`) | an operator ask in room coordination, stated only when that run fails; every run's whole output in `rcs-pair-watch-<YYYYMMDDTHHMMSSZ>.log` beside `bridge.log`, which outlasts this cycle log's 1 MB truncation | none: an ask, not a post |
+| lock-wake-ziggurat | the session host's fleet-lock journal, over ssh (MCPs `03590bf9`, `c39ee056`: the sessions there lock in its checkout) | `5d86be8d` | journal `agent` |
+| lock-wake-ziggurat-actions | the session host's action journal, over ssh: an MCPs command run there that changes state and takes no lock, posted only when it failed or was refused (MCPs `b00ab472`) | `5d86be8d` | journal `agent` |
 | login-probe | MCPs' login real-use check: every three hours a real Chromium signs in to corvis with the probe's passkey, connects and refreshes a client, calls one tool and signs out, against production (MCPs `2ce5fc24`) | a critical operator ask (texted) and a note in room corvis, only when the set of failing checks changes; every run in the hub checkout's `fleet-mcp/state/login-probe.json` | none: an ask and an unaddressed note |
 | search-probe | MCPs' public search probe: every 9 to 12 minutes the declared checks of https://search.austinwagner.org are fetched through Cloudflare and judged (MCPs `d84d37e3`) | one repair ask and a note in room civic, only when the set of failing checks changes; every run in the hub checkout's `fleet-mcp/state/search-probe.json`, which `fleet_search_probe` serves | none: an ask and an unaddressed note |
 
@@ -129,9 +131,17 @@ DELIBERATE EXCLUSIONS, so the next reader knows they are decisions:
   harness's background-task notification, which already works.
 - **Deploy/rebuild completions have no separate publisher.** The locked
   compose targets already write the fleet-lock journal at their
-  boundaries (the hub's, and diphtheria's for every deploy, read by the
-  two lock-wake rows), so lock-wake's posts carry cascade start/end; a dedicated
-  publisher would announce the same transitions twice.
+  boundaries (the hub's, where every deploy locks, and the session host's,
+  read by the lock-wake rows), so lock-wake's posts carry cascade
+  start/end; a dedicated publisher would announce the same transitions
+  twice.
+- **The devices' own files are not read here** (MCPs `c39ee056`). The
+  table ran on austinpc until 2026-10-18 and read two files of the machine
+  holding the devices duty: rcs-bridge's `bridge.log` (rcs-pair-watch,
+  MCPs `21366226`, now a devices row of MCPs' hub runner) and the reverse
+  tunnel's health journal (hub-tunnel-wake), which retires with
+  austinpc's devices (MCPs `2d72a4da`). The control duty's machine cannot
+  read either; a row reading an absent file would read as quiet forever.
 
 ## Stated limitations
 
