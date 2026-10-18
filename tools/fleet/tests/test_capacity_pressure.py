@@ -1,4 +1,4 @@
-"""A node whose CPUs are already saturated takes no check (MCPs board task 2ce5dc13).
+"""A node whose CPUs or disk are saturated takes no check (MCPs 2ce5dc13, 814c4555).
 
 Split from ``test_capacity.py``, which sits at its line ceiling, and built
 with its builders. The shape is diphtheria's on 2026-10-16: 8 cores, one
@@ -120,3 +120,87 @@ class TestCpuPressure:
         )
 
         assert str(line).startswith("NODE_OWNER_RESERVED: diphtheria's CPUs are saturated")
+
+
+class TestIoPressure:
+    """A node whose disk is saturated takes no check (MCPs board task 814c4555).
+
+    diphtheria at 17:21:58Z on 2026-10-18: CPU pressure 29.9, under its bound,
+    and I/O pressure 71.5 while a database dump and a VM install shared its
+    disk; MCPs/transcriber-api claimed there ran five times its usual time.
+    """
+
+    def test_a_saturated_disk_takes_no_check_whatever_its_cpus_read(self) -> None:
+        verdict = assess(
+            _diphtheria(),
+            _state(host="diphtheria", cpu_pressure_pct=29.9, io_pressure_pct=71.5),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+
+        assert verdict == {
+            "workers": 0,
+            "code": FleetErrorCode.NODE_OWNER_RESERVED,
+            "reason": (
+                "diphtheria's disk is saturated: a task stalled on I/O through 71.5% of the last "
+                "minute, at or over the 60% a check is placed under. Its CPUs do not show it, and "
+                "a check placed here would run past its budget; it takes the next job when the "
+                "pressure falls."
+            ),
+        }
+
+    def test_the_bound_itself_refuses_and_just_under_it_is_weighed_on_the_pools(self) -> None:
+        """Checks claimed at 40 to 60 percent ran at their usual time, none over budget."""
+        at = assess(
+            _diphtheria(),
+            _state(host="diphtheria", cpu_pressure_pct=5.0, io_pressure_pct=60.0),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+        under = assess(
+            _diphtheria(),
+            _state(host="diphtheria", cpu_pressure_pct=5.0, io_pressure_pct=59.99),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+
+        assert at["code"] is FleetErrorCode.NODE_OWNER_RESERVED
+        assert under == {"workers": 3, "code": None, "reason": ""}
+
+    def test_saturated_cpus_are_named_before_a_saturated_disk(self) -> None:
+        verdict = assess(
+            _diphtheria(),
+            _state(host="diphtheria", cpu_pressure_pct=42.6, io_pressure_pct=88.9),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+
+        assert verdict["reason"].startswith("diphtheria's CPUs are saturated")
+
+    def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
+        node = _node(host="colossus", cores=12, reserved_cores=2, platform=NodePlatform.LINUX)
+        live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
+
+        verdict = assess(
+            node,
+            _state(host="colossus", live=live, cpu_pressure_pct=1.0, io_pressure_pct=65.0),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+
+        assert verdict["reason"] == (
+            "colossus's disk is saturated: a task stalled on I/O through 65.0% of the last "
+            "minute, at or over the 60% a check is placed under, and its 1 live fleet run(s) "
+            "hold 4 worker(s) and 4.4 GB. Its CPUs do not show it, and a check placed here "
+            "would run past its budget; it takes the next job when the pressure falls."
+        )
+
+    def test_the_runner_claims_nothing_on_a_saturated_disk(self) -> None:
+        line = room_for_any(
+            _diphtheria(),
+            _state(host="diphtheria", cpu_pressure_pct=12.7, io_pressure_pct=73.6),
+            (_project(),),
+            LINUX_TAGS,
+        )
+
+        assert str(line).startswith("NODE_OWNER_RESERVED: diphtheria's disk is saturated")

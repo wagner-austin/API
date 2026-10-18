@@ -100,6 +100,7 @@ def _state(
     ci_slice: SliceMemory | None = None,
     reserved_cores: int = 0,
     cpu_pressure_pct: float | None = None,
+    io_pressure_pct: float | None = None,
 ) -> NodeState:
     """Build a probed state.
 
@@ -111,6 +112,7 @@ def _state(
         ci_slice: Its runners.slice reading, or None for a node with none.
         reserved_cores: The cores its reservations hold.
         cpu_pressure_pct: Its CPU pressure, or None for a Windows node.
+        io_pressure_pct: Its I/O pressure, or None for a Windows node.
 
     Returns:
         The state.
@@ -124,6 +126,7 @@ def _state(
         reserved_cores=reserved_cores,
         action_cache=None,
         cpu_pressure_pct=cpu_pressure_pct,
+        io_pressure_pct=io_pressure_pct,
     )
 
 

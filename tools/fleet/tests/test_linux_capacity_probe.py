@@ -20,6 +20,7 @@ from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCAT
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
     CGROUPS_LINE,
+    IO_PRESSURE_LINE,
     MEMINFO_LINE,
     PRESSURE_LINE,
     PRESSURE_PART,
@@ -39,6 +40,13 @@ PRESSURE = (
     "full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
 )
 
+#: diphtheria's /proc/pressure/io at 17:43Z on 2026-10-18, a database dump
+#: and a VM install sharing its disk (MCPs board task 814c4555).
+IO_PRESSURE = (
+    "some avg10=73.86 avg60=68.81 avg300=52.24 total=289679902560\n"
+    "full avg10=54.57 avg60=39.17 avg300=25.84 total=170774218710\n"
+)
+
 
 def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
@@ -49,6 +57,8 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + RESERVATIONS_PART)
     assert PRESSURE_PART.startswith(PRESSURE_LINE)
     assert PRESSURE_LINE == "pressure=/proc/pressure/cpu\n"
+    assert IO_PRESSURE_LINE in PRESSURE_PART
+    assert IO_PRESSURE_LINE == "io_pressure=/proc/pressure/io\n"
     assert RESERVATIONS_PART.startswith(RESERVATIONS_LINE)
     assert RESERVATIONS_LINE == 'reservations="$HOME/.fleet/reservations"\n'
 
@@ -70,7 +80,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores", probe.PRESSURE_FIELD}
+    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores", *probe.PRESSURE_FIELDS}
     assert set(fields) == reported | counted | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
@@ -83,6 +93,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     # None on a CI runner, a VM smoke's cores on diphtheria (84a2b690).
     assert fields["reserved_cores"].isdigit()
     assert re.fullmatch(r"\d+\.\d{2}", fields["cpu_pressure_pct"])
+    assert re.fullmatch(r"\d+\.\d{2}", fields["io_pressure_pct"])
 
 
 def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: int = 0) -> None:
@@ -112,16 +123,19 @@ def _probe(
     cgroups: pathlib.Path,
     held: pathlib.Path | None,
     pressure: str | None,
+    io_pressure: str | None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the probe with its roots pointed at fakes.
 
     Args:
-        tmp_path: Where the fake meminfo, the fake pressure file and the
+        tmp_path: Where the fake meminfo, the fake pressure files and the
             script go.
         cgroups: The fake ``system.slice``.
         held: The fake reservations directory, or None for one that does
             not exist, as on every node nothing has reserved.
         pressure: What the fake ``/proc/pressure/cpu`` holds, or None for
+            a kernel without one.
+        io_pressure: What the fake ``/proc/pressure/io`` holds, or None for
             a kernel without one.
 
     Returns:
@@ -137,11 +151,15 @@ def _probe(
     cpu = tmp_path / "pressure-cpu"
     if pressure is not None:
         cpu.write_text(pressure, encoding="utf-8")
+    io = tmp_path / "pressure-io"
+    if io_pressure is not None:
+        io.write_text(io_pressure, encoding="utf-8")
     script = tmp_path / "probe.sh"
     script.write_text(
         CAPACITY_PROBE_SCRIPT.replace(MEMINFO_LINE, f"meminfo='{meminfo.as_posix()}'\n", 1)
         .replace(CGROUPS_LINE, f"cgroups='{cgroups.as_posix()}'\n", 1)
         .replace(PRESSURE_LINE, f"pressure='{cpu.as_posix()}'\n", 1)
+        .replace(IO_PRESSURE_LINE, f"io_pressure='{io.as_posix()}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{reservations.as_posix()}'\n", 1),
         encoding="utf-8",
     )
@@ -159,6 +177,7 @@ def _run(
     cgroups: pathlib.Path,
     held: pathlib.Path | None = None,
     pressure: str = PRESSURE,
+    io_pressure: str = IO_PRESSURE,
 ) -> dict[str, str]:
     """Run the probe with its roots pointed at fakes, and read what it printed.
 
@@ -167,11 +186,12 @@ def _run(
         cgroups: The fake ``system.slice``.
         held: The fake reservations directory, or None for none.
         pressure: What the fake ``/proc/pressure/cpu`` holds.
+        io_pressure: What the fake ``/proc/pressure/io`` holds.
 
     Returns:
         The probe's key=value fields.
     """
-    completed = _probe(tmp_path, cgroups, held, pressure)
+    completed = _probe(tmp_path, cgroups, held, pressure, io_pressure)
     assert completed.returncode == 0, completed.stderr
     return fields_of(completed.stdout)
 
@@ -214,6 +234,50 @@ class TestTheProbeUnderSh:
         keys = list(fields)
         assert keys.index("cpu_pressure_pct") == keys.index("logical_cores") + 1
 
+    def test_io_pressure_is_the_some_line_s_one_minute_average_after_the_cpu_one(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """diphtheria, 2026-10-18 (MCPs board task 814c4555): avg60 of some, not full."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        fields = _run(tmp_path, cgroups)
+
+        assert fields["io_pressure_pct"] == "68.81"
+        keys = list(fields)
+        assert keys.index("io_pressure_pct") == keys.index("cpu_pressure_pct") + 1
+
+    def test_an_io_pressure_file_with_no_some_line_prints_the_field_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Which the parser refuses as not a number, as it does the CPU reading."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        fields = _run(
+            tmp_path, cgroups, io_pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
+        )
+
+        assert (fields["cpu_pressure_pct"], fields["io_pressure_pct"]) == ("9.33", "")
+
+    def test_a_kernel_without_the_io_pressure_file_ends_the_probe(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """``awk`` cannot open it, and ``set -e`` stops the script on that line."""
+        cgroups = tmp_path / "system.slice"
+        cgroups.mkdir()
+
+        completed = _probe(tmp_path, cgroups, None, PRESSURE, None)
+
+        assert completed.returncode != 0
+        assert list(fields_of(completed.stdout)) == [
+            "free_ram_gb",
+            "promised_ram_gb",
+            "free_disk_gb",
+            "logical_cores",
+            "cpu_pressure_pct",
+        ]
+
     def test_a_pressure_file_with_no_some_line_prints_the_field_empty(
         self, tmp_path: pathlib.Path
     ) -> None:
@@ -235,7 +299,7 @@ class TestTheProbeUnderSh:
         cgroups = tmp_path / "system.slice"
         cgroups.mkdir()
 
-        completed = _probe(tmp_path, cgroups, None, None)
+        completed = _probe(tmp_path, cgroups, None, None, IO_PRESSURE)
 
         assert completed.returncode != 0
         assert list(fields_of(completed.stdout)) == [
@@ -324,7 +388,7 @@ class TestTheReservationsUnderSh:
         # Read after the body's other fields; the dialect's CI-slice lines,
         # printed only on a node with a runners.slice, follow it.
         keys = list(fields)
-        assert keys.index("reserved_cores") == keys.index("cpu_pressure_pct") + 1
+        assert keys.index("reserved_cores") == keys.index("io_pressure_pct") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         cgroups = tmp_path / "system.slice"

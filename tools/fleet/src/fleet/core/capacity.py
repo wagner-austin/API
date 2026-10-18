@@ -74,6 +74,20 @@ SLICE_AT_HIGH = 0.98
 #: ran 274 s and 287 s, inside its budget, so the bound never holds it.
 CPU_PRESSURE_BOUND_PCT = 30.0
 
+#: The I/O pressure, in percent of the last minute, at which a node takes no
+#: check (MCPs board task 814c4555). diphtheria's load sampler, 12,425
+#: one-minute readings from 2026-10-10 to 2026-10-18 17:45Z: p50 10.1, p75
+#: 18.6, p90 28.9, p95 37.8, max 91.3. Of its 468 checks in that span with a
+#: budget reading, each run's time against its project's median, by the I/O
+#: pressure it was claimed at: under 30, 380 runs at a median of 1.00 with
+#: 11 over budget; 30 to 40, 18 at 0.99 with none over; 40 to 60, 27 at 1.06
+#: with none over, so a disk this busy does not slow a check. None was
+#: claimed at 60 or over until MCPs/transcriber-api at 71.5 percent, while a
+#: 36 GB database dump and a VM install shared the disk, which ran about five
+#: times its usual 91 to 266 s and was ended past its lease (fleet job
+#: 347ae73b). 97 of the readings reach 60, 50 of them that afternoon.
+IO_PRESSURE_BOUND_PCT = 60.0
+
 
 def _project_budget(node: NodeConfig, project: ProjectConfig) -> NodeBudget:
     """A node's budget with the project's cost per worker in place of the node's.
@@ -163,6 +177,12 @@ def assess(
     past its budget with every test passing. A node whose probe reads
     pressure at :data:`CPU_PRESSURE_BOUND_PCT` or over waits, after the
     ``checks_at_once`` refusal, whose cause is the more specific one.
+
+    WHERE ITS DISK IS SATURATED, NO CHECK IS PLACED EITHER (MCPs board task
+    814c4555). The CPU reading does not see a task stalled on the disk: a
+    check claimed on diphtheria at 29.9 percent CPU and 71.5 percent I/O
+    pressure ran five times its usual time. A node reading I/O pressure at
+    :data:`IO_PRESSURE_BOUND_PCT` or over waits, after the CPU refusal.
 
     Args:
         node: The node's declaration.
@@ -255,6 +275,20 @@ def assess(
                 f"a check is placed under{_live_clause(state)}. Free cores counted from its "
                 "declaration do not show work the fleet does not run, and a check placed here "
                 "would run past its budget; it takes the next job when the pressure falls."
+            ),
+        )
+    io_pressure = state["io_pressure_pct"]
+    if io_pressure is not None and io_pressure >= IO_PRESSURE_BOUND_PCT:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_OWNER_RESERVED,
+            reason=(
+                f"{node['host']}'s disk is saturated: a task stalled on I/O through "
+                f"{io_pressure:.1f}% of the last minute, at or over the "
+                f"{IO_PRESSURE_BOUND_PCT:.0f}% a check is placed under{_live_clause(state)}. "
+                "Its CPUs do not show it, and a "
+                "check placed here would run past its budget; it takes the next job when the "
+                "pressure falls."
             ),
         )
     budget = _project_budget(node, project)

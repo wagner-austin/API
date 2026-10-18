@@ -55,6 +55,14 @@ SLICE_FIELDS = ("ci_slice_current_gb", "ci_slice_high_gb")
 #: present but not a number refuses the node like any other field.
 PRESSURE_FIELD = "cpu_pressure_pct"
 
+#: The I/O pressure every linux probe prints beside it (MCPs board task
+#: 814c4555). The two are one account, both or neither: one without the
+#: other is a probe that did not run as written, and refuses the node.
+IO_PRESSURE_FIELD = "io_pressure_pct"
+
+#: Both pressure readings, in the order the probe prints them.
+PRESSURE_FIELDS = (PRESSURE_FIELD, IO_PRESSURE_FIELD)
+
 
 class ProbeOutcome(TypedDict):
     """What a node reported, or why nothing could be read from it.
@@ -103,11 +111,9 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         )
     readings: dict[str, float] = {}
     sliced = any(key in fields for key in SLICE_FIELDS)
-    pressured = PRESSURE_FIELD in fields
+    pressured = any(key in fields for key in PRESSURE_FIELDS)
     for key in (
-        REQUIRED_FIELDS
-        + (SLICE_FIELDS if sliced else ())
-        + ((PRESSURE_FIELD,) if pressured else ())
+        REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()) + (PRESSURE_FIELDS if pressured else ())
     ):
         value = _read_number(fields, key)
         if value is None:
@@ -142,6 +148,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             reserved_cores=int(reserved_cores),
             action_cache=action_cache,
             cpu_pressure_pct=readings[PRESSURE_FIELD] if pressured else None,
+            io_pressure_pct=readings[IO_PRESSURE_FIELD] if pressured else None,
         ),
         reason="",
     )

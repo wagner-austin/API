@@ -91,6 +91,7 @@ def _idle(node: NodeConfig) -> NodeState:
         reserved_cores=0,
         action_cache=None,
         cpu_pressure_pct=None,
+        io_pressure_pct=None,
     )
 
 

@@ -59,6 +59,14 @@ message, the second prints the field empty, which :mod:`fleet.core.probe`
 refuses as not a number. Measured 2026-10-16 every linux node carries it:
 diphtheria ``some avg60=9.33``, colossus ``0.01``, lavender-wsl ``2.99``.
 
+ITS I/O PRESSURE IS READ THE SAME WAY (MCPs board task 814c4555).
+``io_pressure_pct`` is the ``some avg60`` of ``/proc/pressure/io``, the share
+of the last minute in which at least one task stalled on the disk, which the
+CPU reading does not see: on 2026-10-18 diphtheria read 14 percent CPU and 69
+percent I/O while a database dump and a VM install shared its disk, and a
+check placed there ran five times its usual time. It is printed after the
+CPU reading and fails the same ways.
+
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
 ``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
@@ -80,12 +88,35 @@ CGROUPS_LINE = "cgroups=/sys/fs/cgroup/system.slice\n"
 #: Where the probe reads CPU pressure from; the test replaces it.
 PRESSURE_LINE = "pressure=/proc/pressure/cpu\n"
 
-#: The ``some avg60`` reading, printed after the cores it is weighed beside.
+#: Where the probe reads I/O pressure from; the test replaces it.
+IO_PRESSURE_LINE = "io_pressure=/proc/pressure/io\n"
+
+
+def _some_avg60(path_variable: str, field: str) -> str:
+    """The lines that print one pressure file's ``some avg60`` as ``field``.
+
+    Args:
+        path_variable: The shell variable holding the file's path.
+        field: The field the reading is printed as.
+
+    Returns:
+        An ``awk`` reading of the ``some`` line's ``avg60=`` and its
+        ``printf``, empty when the file has no such line.
+    """
+    return (
+        f'{field}=$(awk \'$1 == "some" {{ for (i = 2; i <= NF; i++)'
+        + f' if (sub(/^avg60=/, "", $i)) print $i }}\' "${path_variable}")\n'
+        + f"printf '{field}=%s\\n' \"${field}\"\n"
+    )
+
+
+#: The CPU then the I/O ``some avg60`` readings, printed after the cores
+#: they are weighed beside.
 PRESSURE_PART = (
     PRESSURE_LINE
-    + 'cpu_pressure=$(awk \'$1 == "some" { for (i = 2; i <= NF; i++)'
-    + ' if (sub(/^avg60=/, "", $i)) print $i }\' "$pressure")\n'
-    + "printf 'cpu_pressure_pct=%s\\n' \"$cpu_pressure\"\n"
+    + _some_avg60("pressure", "cpu_pressure_pct")
+    + IO_PRESSURE_LINE
+    + _some_avg60("io_pressure", "io_pressure_pct")
 )
 
 #: Where the probe reads the node's reservations from; the test replaces it.
@@ -138,6 +169,7 @@ CAPACITY_PROBE_BODY = (
 __all__ = [
     "CAPACITY_PROBE_BODY",
     "CGROUPS_LINE",
+    "IO_PRESSURE_LINE",
     "MEMINFO_LINE",
     "PRESSURE_LINE",
     "PRESSURE_PART",

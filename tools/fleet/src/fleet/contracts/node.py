@@ -263,6 +263,9 @@ class NodeState(TypedDict):
             (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
             2ce5dc13), or None on a Windows node, whose kernel keeps no
             such account. Every linux probe prints it or fails.
+        io_pressure_pct: The share of the last minute some task stalled on
+            I/O, ``/proc/pressure/io``'s ``some avg60`` (MCPs board task
+            814c4555); None exactly where :attr:`cpu_pressure_pct` is.
     """
 
     host: str
@@ -273,6 +276,7 @@ class NodeState(TypedDict):
     reserved_cores: int
     action_cache: ActionCacheCounts | None
     cpu_pressure_pct: float | None
+    io_pressure_pct: float | None
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:
