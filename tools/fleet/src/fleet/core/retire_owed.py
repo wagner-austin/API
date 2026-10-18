@@ -33,6 +33,11 @@ settled run whose node missed the retire (lavender-wsl's ssh timed out its
 banner exchange at 02:53Z-02:55Z, 03:00Z and 04:05Z on 2026-10-07, MCPs
 board task 8776b828).
 
+ONE RUN'S RETIRE IS SENT IN ITS OWN TURN, held across the hub's runners
+(:func:`_turn`), and not sent at all when another turn already recorded it
+done: a settle frees its lease before it retires, so a collect pass can find
+the same run owed and no longer live while the settle is still retiring it.
+
 A retire the node ANSWERED and failed is a fault: it is recorded ``failed``
 and raised by name with the node's own error, and never sent again, because
 a pass that resent it would end every serve after it the same way.
@@ -40,6 +45,8 @@ a pass that resent it would end every serve after it the same way.
 
 from __future__ import annotations
 
+import contextlib
+import os
 import pathlib
 from typing import Final
 
@@ -49,13 +56,81 @@ from platform_core.logging import get_logger
 from fleet.contracts.ledger import is_live
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.retire_record import RetireRecord, RetireState
-from fleet.core import _test_hooks, cache_generations, leases, names, records, retire
+from fleet.core import (
+    _test_hooks,
+    cache_generations,
+    file_turn,
+    leases,
+    names,
+    records,
+    remote,
+    retire,
+)
 
 _log = get_logger(__name__)
 
 #: The retire record's file name, beside the ledger
 #: (:attr:`fleet.cli._config.LoadedWorkspace.retires`).
 RETIRES_FILE: Final = "retires.jsonl"
+
+#: Where each run's retire turn is held, beside the record.
+RETIRE_TURNS_DIRECTORY: Final = "retire-turns"
+
+#: The turn one run's retire is sent and recorded in. Inside it a runner
+#: sends the retire script and runs it, two ssh calls of at most
+#: :data:`fleet.core.remote.SSH_TIMEOUT_SECONDS` each, so a lock older than
+#: three of them was left by a process that died holding it.
+RETIRE_TURN: Final = file_turn.TurnBounds(
+    what="retire turn",
+    waited_for="another runner retiring the same run",
+    stale_seconds=3 * remote.SSH_TIMEOUT_SECONDS,
+    poll_seconds=1,
+)
+
+
+def _latest_state(path: pathlib.Path, run_id: str) -> RetireState | None:
+    """The state of one run's last line in the record.
+
+    Args:
+        path: The retire record file.
+        run_id: The run.
+
+    Returns:
+        The state, or None when the record holds no line for it.
+
+    Raises:
+        JSONTypeError: When a line of the record does not decode.
+    """
+    state: RetireState | None = None
+    for record in records.read_retires(path):
+        if record["run_id"] == run_id:
+            state = record["state"]
+    return state
+
+
+def _turn(path: pathlib.Path, run_id: str) -> contextlib.AbstractContextManager[None]:
+    """One run's retire turn, held across this hub's runners and their threads.
+
+    A settle closes its row and frees its lease before it retires, so a
+    collect pass reading the record in that span finds the run owed and no
+    longer live: measured 2026-10-18T18:38Z (MCPs board task 3d9eec0d),
+    serendipity's settle and a collect pass sent one run's retire at once
+    and each failed, one walking a tree the other was removing, and so did
+    pendragon's watch and its own collect pass. Every retire is sent in its
+    run's turn and first reads whether one is already recorded done.
+
+    Args:
+        path: The retire record file.
+        run_id: The run.
+
+    Returns:
+        The turn, held for the span of a ``with`` block.
+    """
+    return file_turn.held(
+        path.parent / RETIRE_TURNS_DIRECTORY / f"{run_id}.lock",
+        holder=f"fleet process {os.getpid()}",
+        bounds=RETIRE_TURN,
+    )
 
 
 def _record(
@@ -123,7 +198,9 @@ def retire_or_raise(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id:
 
     For a stop and the hub's ``fleet-collect``, which retire before the row
     closes, so a failure propagates with the row still live and the next
-    tick settles the run again; the run stays owed until then.
+    tick settles the run again; the run stays owed until then. Sent in the
+    run's turn (:func:`_turn`), and not at all when another turn already
+    recorded it ``retired``.
 
     Args:
         path: The retire record file.
@@ -139,10 +216,13 @@ def retire_or_raise(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id:
             transport, the latter carrying the node's own error when a file
             could not be moved or removed.
     """
-    failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
-    if failure is not None:
-        raise AppError(failure["code"], failure["message"])
-    return _retired(path, node, alias=alias, run_id=run_id)
+    with _turn(path, run_id):
+        if _latest_state(path, run_id) is RetireState.RETIRED:
+            return names.retained_log_path(node["stage_root"], run_id)
+        failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
+        if failure is not None:
+            raise AppError(failure["code"], failure["message"])
+        return _retired(path, node, alias=alias, run_id=run_id)
 
 
 def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: str) -> bool:
@@ -151,6 +231,8 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
     For a node runner's settle, which retires after the queue close and the
     row's, and for :func:`retire_owed`. The run has been owed since its
     lease (:func:`owe`), so a retire the node did not answer writes nothing.
+    Sent in the run's turn (:func:`_turn`), and not at all when another
+    turn already recorded it ``retired`` or ``failed``.
 
     Args:
         path: The retire record file.
@@ -159,7 +241,8 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
         run_id: The run.
 
     Returns:
-        True when it was retired; False when the node did not answer and
+        True when the run owes nothing more: retired here, or ended by
+        another turn; False when the node did not answer and
         :func:`retire_owed` retires it at a later pass.
 
     Raises:
@@ -167,21 +250,28 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
             answered and the retire failed there, recorded ``failed`` first.
             Not caught.
     """
-    failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
-    if failure is None:
-        _retired(path, node, alias=alias, run_id=run_id)
-        _log.info("retire %s on %s: done", run_id, alias)
-        return True
-    if failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
-        _log.info(
-            "retire %s on %s: the node did not answer; owed to the next collect pass: %s",
-            run_id,
-            alias,
-            failure["message"],
+    with _turn(path, run_id):
+        ended = _latest_state(path, run_id)
+        if ended is RetireState.RETIRED or ended is RetireState.FAILED:
+            _log.info("retire %s on %s: already %s in another turn", run_id, alias, ended)
+            return True
+        failure = retire.attempt_retire_on_node(node, run_id=run_id)["failure"]
+        if failure is None:
+            _retired(path, node, alias=alias, run_id=run_id)
+            _log.info("retire %s on %s: done", run_id, alias)
+            return True
+        if failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
+            _log.info(
+                "retire %s on %s: the node did not answer; owed to the next collect pass: %s",
+                run_id,
+                alias,
+                failure["message"],
+            )
+            return False
+        _record(
+            path, alias=alias, run_id=run_id, state=RetireState.FAILED, detail=failure["message"]
         )
-        return False
-    _record(path, alias=alias, run_id=run_id, state=RetireState.FAILED, detail=failure["message"])
-    raise AppError(failure["code"], failure["message"])
+        raise AppError(failure["code"], failure["message"])
 
 
 def owed_on(path: pathlib.Path, *, alias: str) -> tuple[str, ...]:

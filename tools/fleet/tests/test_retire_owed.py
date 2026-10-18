@@ -16,6 +16,7 @@ run a lease or a running ledger row still holds.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Sequence
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
@@ -185,6 +186,110 @@ class TestASettleRetire:
         _test_hooks.run = nothing
         _pass(path, tmp_path)
         assert nothing.calls == []
+
+
+class _InTurn(FakeRun):
+    """A node that records whether each call came while the run's turn was held."""
+
+    def __init__(self, replies: list[_test_hooks.CommandResult], *, lock: pathlib.Path) -> None:
+        """Answer as :class:`FakeRun`, looking at ``lock`` on every call.
+
+        Args:
+            replies: One result per expected call.
+            lock: The run's turn lock.
+        """
+        super().__init__(replies)
+        self._lock = lock
+        self.held: list[bool] = []
+
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout_seconds: int,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
+    ) -> _test_hooks.CommandResult:
+        """Note whether the turn is held, then answer the call.
+
+        Args:
+            argv: The command.
+            timeout_seconds: The deadline the caller chose.
+            stdin_bytes: Its standard input, or None.
+            unset_env: The variables the caller withheld from the child.
+            set_env: The variables the caller set in the child.
+
+        Returns:
+            The next scripted result.
+        """
+        self.held.append(self._lock.exists())
+        return super().__call__(
+            argv,
+            timeout_seconds=timeout_seconds,
+            stdin_bytes=stdin_bytes,
+            unset_env=unset_env,
+            set_env=set_env,
+        )
+
+
+class TestOneRunsTurn:
+    """serendipity and pendragon, 2026-10-18T18:38Z: a settle and a collect
+    pass sent one run's retire at once and each failed."""
+
+    def test_every_retire_is_sent_while_the_run_s_turn_is_held_and_it_is_given_back(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = _path(tmp_path)
+        retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
+        lock = path.parent / retire_owed.RETIRE_TURNS_DIRECTORY / f"{DEMO_RUN_ID}.lock"
+        settle = _InTurn(retire_replies()[:2], lock=lock)
+        _test_hooks.run = settle
+
+        assert retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+
+        assert settle.held == [True, True]
+        assert not lock.exists()
+        retire_owed.owe(path, alias="lavender", run_id=OTHER_RUN_ID)
+        other = path.parent / retire_owed.RETIRE_TURNS_DIRECTORY / f"{OTHER_RUN_ID}.lock"
+        stop = _InTurn(retire_replies()[:2], lock=other)
+        _test_hooks.run = stop
+
+        retire_owed.retire_or_raise(path, node(), alias="lavender", run_id=OTHER_RUN_ID)
+
+        assert stop.held == [True, True]
+
+    @pytest.mark.parametrize("ended", [RetireState.RETIRED, RetireState.FAILED])
+    def test_a_run_another_turn_ended_is_not_sent_again(
+        self, tmp_path: pathlib.Path, ended: RetireState
+    ) -> None:
+        path = _path(tmp_path)
+        retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
+        records.append_retire(
+            path,
+            RetireRecord(run_id=DEMO_RUN_ID, node="lavender", state=ended, at_unix=1, detail="x"),
+        )
+        nothing = FakeRun([])
+        _test_hooks.run = nothing
+
+        assert retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+
+        assert nothing.calls == []
+        assert len(records.read_retires(path)) == 2
+
+    def test_a_stop_after_another_turn_retired_the_run_names_its_transcript(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = _path(tmp_path)
+        retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
+        _test_hooks.run = FakeRun(retire_replies()[:2])
+        retire_owed.retire_or_owe(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+        nothing = FakeRun([])
+        _test_hooks.run = nothing
+
+        kept = retire_owed.retire_or_raise(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+
+        assert (kept, nothing.calls) == (KEPT, [])
 
 
 class TestARetireBeforeTheRowCloses:
