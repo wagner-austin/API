@@ -29,7 +29,7 @@ from typing import Final
 import pytest
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core import names
+from fleet.core import _test_hooks, names
 from tests._host import READING_PROPERTY
 
 #: The caches that lived at the cache root before they moved into the
@@ -58,7 +58,9 @@ def _read_generations() -> str:
         The reading: each generation, its age, the runs naming it and its
         caches' sizes.
     """
-    cache_root = pathlib.Path(os.environ[names.CACHE_VARIABLE])
+    named = _test_hooks.env(names.CACHE_VARIABLE)
+    assert named is not None, f"{names.CACHE_VARIABLE} is unset: this run is no fleet build"
+    cache_root = pathlib.Path(named)
     for retired in RETIRED_CACHES:
         left = cache_root / retired
         assert not left.exists(), f"{left} is outside every generation"
