@@ -11,6 +11,8 @@ provenance:
   - "/home/corvis/tankpit-evidence-20261017/manifest.json: 20 files, 104395465 bytes; every size and SHA-256 reverified."
   - "Runtime API release 3888f06b22f5eea63d8e8cb5fe9934143ee7f392; tv-1 run bot-20261017-093852, tank 740 / Yuppler."
 source_paths:
+  - "src/tankpit_bot/sniffer/world_state_tanks.py"
+  - "src/tankpit_bot/sniffer/world_state_containers.py"
   - "src/tankpit_bot/analysis/scan.py"
   - "src/tankpit_bot/container/decoders/events.py"
   - "src/tankpit_bot/browser/cdp_utils.py"
@@ -39,6 +41,8 @@ source_paths:
   - "src/tankpit_bot/fleetshare/report.py"
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
+  "src/tankpit_bot/sniffer/world_state_tanks.py": "52d730f73c82657055e931d2bf29d1e0648edbdf"
+  "src/tankpit_bot/sniffer/world_state_containers.py": "49678f03463720638851baf687e667b183f784fc"
   "src/tankpit_bot/analysis/scan.py": "808b553d59c0a4e80e0907c8fef7c28bf8843cbc"
   "src/tankpit_bot/container/decoders/events.py": "c2a81cd5ffe3b478915f5a5f2b85550bcf210577"
   "src/tankpit_bot/browser/cdp_utils.py": "810b4d1eb9fbba0f598b3bf6c0ac2da4b55463a3"
@@ -115,6 +119,8 @@ The wire also rules out a local arithmetic-only explanation for the 580 case: de
 
 The same bounded screen was applied to all 11 cases: other bots' radar sends within −4 to +1 seconds of landing, with the target inside their stored 16×16 viewport. Ten have no candidate. The remaining case, tv-3 landing 1289, overlaps demo-1 radar send 553; its response 556 arrives about two seconds before landing and contains no entry for (40,148), so it supplies no explicit zero for that target. This screen uses viewport containment as a permissive upper bound, not proof that a built-in radar reached every tile in the viewport. It is not an exhaustive exclusion of delayed commands or unrecorded players.[^15]
 
+**Enemy collection has direct supporting evidence.** Both tv-1/1612 and tv-2/1439 place human enemy 814 on the exact target (148,249) at 09:49:03.726. The following status messages, tv-1/1613 and tv-2/1440 at 09:49:03.727, raise its damage tier from 2 to 3 while rank stays 6. That tier is a fuel-quartile indicator, so this is evidence of an increased fuel band, not additional damage. The enemy moves to (153,252) by tv-1/1627 at 09:49:07.722; our landing follows at 09:49:15.765, about 12 seconds after the enemy occupied the fuel tile. Enemy refueling there, followed by correction of our stale container value when we attempt collection, is now the leading explanation for this case. The observer messages carry no exact enemy fuel total or actor id on the container update, so they do not prove that enemy 814 took all 580. This also does not establish the cause of the other ten cases.[^16]
+
 Successful controls also eliminate two simple proposed explanations for code 8:[^13]
 
 | Control | Observed fuel accounting | Implication |
@@ -128,6 +134,14 @@ These controls do not prove what fuel or resolved destination the server used fo
 For reproduction, use the existing decode pipeline described below, retaining each original message index and sorting by `timestamp_ms`. Resolve the player's id from a self status carrying fuel; track its absolute fuel and position, open a window at each outbound teleport, and identify the matching landing confirmation. In each window compare the last own fuel at confirmation with the first subsequent own fuel, and join nearby container updates to the landing viewport using `(left+col−1, top+row−1)`. Close the window at the next recognized gameplay command; then inspect the following 6.5 seconds separately for deferred gains and other pickups. This separates the census criterion from the later-credit check.[^11]
 
 Within-session send/receive deltas use CDP timestamps mapped through one anchored clock offset. Separate browser sessions anchor independently, so millisecond ordering across tv-1 and tv-2 is not a global server chronology. The repeated signature narrows the investigation to server-reported container/fuel behavior, but does not distinguish stale server map state, competing consumption, and other server collection rules. No new live run or guessed protocol correction was used to produce these findings.[^14]
+
+## What the enemy-consumption evidence means for the bot
+
+The existing accounting rule remains correct: `pickup_container` changes container beliefs, never our fuel. Absolute fuel messages remain authoritative. A zero remaining-volume receipt removes the target and records a tombstone so older fleet sightings cannot reintroduce it. The corrected retreat policy also prices transit and incoming-fire exposure without adding anticipated pickup fuel. Enemy consumption therefore does not invalidate the retreat, clearance or response-wake fixes, and it supplies no reason to change teleport cost arithmetic.[^17]
+
+Earlier resource-risk detection is a remaining opportunity, not an implemented behavior: `update_world_state_from_tank_damage` currently updates the enemy observation and emits `tank_damage_changed`; it does not revise container confidence. A future rule could correlate a fresh enemy position on a known fuel tile with an improving fuel tier and mark that target as suspect before spending fuel to reach it. Such a signal must not invent an exact remaining volume or unconditionally delete a container: the enemy may have taken only part, and a tier change alone does not identify its source. A fresh trustworthy resource observation or an explicit clear should resolve that suspicion. The capture supports evaluating this rule; it does not establish a general depletion law.[^17]
+
+Diagnostics also need to distinguish a world update from an own pickup: `update_world_state_from_container_pickup` currently logs “Picked up container” on any zero-volume receipt, despite not identifying a collector. That wording can mislead an investigation even though the fuel accounting is correct. The present follow-up changes documentation only; no enemy-refuel inference or logging change is claimed implemented.[^17]
 
 ## Confirmed control-flow gaps in release 3888f06b2
 
@@ -199,4 +213,6 @@ Executable regressions are `tests/bot/ai/test_retreat_regressions.py` and `tests
 [^12]: Private tv-1 messages 1662, 1669, 1671–1673; all five captures' gameplay commands and own fuel readings from 09:49:12 through 09:49:18. `src/tankpit_bot/container/decoders/events.py` decodes cache coordinates and remaining volume without a consumer id. Archived `tpclient.js`, `$g.prototype.h` and the `V.C=$g` registration, apply the remaining cache value to a tile.
 [^13]: Manifest-pinned demo-1, tv-1 and tv-2 captures at the outbound timestamps in the controls table, subsequent own position, absolute fuel and landing messages. `src/tankpit_bot/physics/costs.py`, `teleport_cost`, computes integer Euclidean cost; the controls compare its result with the observed charge before pickup.
 [^14]: `src/tankpit_bot/browser/cdp_service.py`, `_record_frame`, calls `CDPClock.to_unix_ms`; `src/tankpit_bot/browser/cdp_utils.py`, `CDPClock`, anchors the first CDP timestamp to local wall time and reuses that offset within the session.
+[^17]: `src/tankpit_bot/state/container_mutations.py`, `pickup_container`; `src/tankpit_bot/sniffer/world_state_containers.py`, `update_world_state_from_container_pickup` and `update_world_state_from_fuel_total`; `src/tankpit_bot/sniffer/world_state_tanks.py`, `update_world_state_from_tank_damage`; `src/tankpit_bot/bot/ai/escape_policy.py`, `escape_hop_permitted`. These are inspected current implementations; the confidence rule described here is a proposal, not code behavior.
+[^16]: Private tv-1 capture messages 1612/1613/1627/1664 and tv-2 messages 1439/1440; all referenced observations are decoded gameplay records. The enemy's short status has `fuel=None`, `rank=6`, and `damage_state=3` immediately after its position record has `damage_state=2`. `src/tankpit_bot/bot/ai/combat_break.py`, `assess_engagement_break`, documents and uses the fuel-quartile interpretation; [[deactivation-format]] § SOLVED (2026-07-23): there is no healing — the damage tier IS the fuel quartile records the historical 19,658-pair fit. The consumption attribution is an inference from position and improving fuel tier, not an actor-bearing pickup receipt.
 [^15]: Manifest-pinned captures: tv-1 commands 1587/1676 and radar messages 1592/1681; tv-2 command 1387, all outbound messages through 1482, and radar messages 1422/1480; demo-1 command 553 and response 556; tv-3 landing 1289 and zero updates 1291/1292. All five streams were checked over 09:48:40–09:49:20 for the fatal target and over the stated per-case windows. Archived `tpclient.js`, radar handler `ch` and cache handler `$g.prototype.h`, apply tile values without awarding fuel. The existing wiki contracts are [[radar-mechanics]] § The radar response is a delta sync (reveals + corrections, unchanged omitted) and [[fleet-coordination]] § The exchange, whose shared-scan paragraph records the August 25 team-reveal ruling; capture locators here provide the new primary evidence.
