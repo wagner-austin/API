@@ -206,3 +206,29 @@ def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
         install=(),
         companions=(),
     )
+
+
+def test_tankpitbot_runs_its_ordinary_check_on_each_platform() -> None:
+    """clients/TankpitBot checks on a Windows node and clients/TankpitBot-linux on a Linux one.
+
+    The package binds the cases where the two operating systems differ to
+    ``host_windows`` and ``host_linux`` (board task 8c6874a3), and the
+    ordinary run runs the half bound to its own platform, so the two
+    projects stage the same directory with the same install and differ
+    only in where they land.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    install = ("make", "-s", "-C", "clients/TankpitBot", "install")
+    source = ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="clients/TankpitBot",
+        install=(InstallStep(phase="install", argv=install),),
+        companions=(),
+    )
+    windows = require_project(workspace, "clients/TankpitBot")
+    linux = require_project(workspace, "clients/TankpitBot-linux")
+
+    assert windows["required_tags"] == (NodeTag.WINDOWS,)
+    assert linux["required_tags"] == (NodeTag.LINUX,)
+    assert windows["source"] == source
+    assert linux["source"] == source
