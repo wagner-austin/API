@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from platform_core.oauth import open_in_browser
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
@@ -46,6 +47,19 @@ class TestHooksContainer:
         assert callable(hooks.read_file)
         assert callable(hooks.write_file)
         assert callable(hooks.file_exists)
+
+    def test_the_production_opener_is_platform_core_s(self) -> None:
+        """A local opener that discarded webbrowser.open's answer asked a
+        host with no browser for a code from a page it never showed."""
+
+        def local_opener(_url: str) -> bool:
+            return True
+
+        hooks.open_browser = local_opener
+
+        reset_hooks()
+
+        assert hooks.open_browser is open_in_browser
 
 
 class TestMakeFakeHttpGet:

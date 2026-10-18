@@ -248,6 +248,50 @@ class TestAuthorize:
         assert "accounts.google.com" in opened_urls[0]
         assert len(saved_tokens) == 1
 
+    def test_prints_the_url_and_says_so_when_no_browser_opened_it(self) -> None:
+        """A host with no browser is shown the page it is asked to authorize on."""
+        hooks.current_time = make_fake_current_time(1735200000)
+        hooks.http_post = make_fake_http_send(
+            dump_json_str(
+                {
+                    "access_token": "new_access",
+                    "refresh_token": "new_refresh",
+                    "expires_in": 3600,
+                    "token_type": "Bearer",
+                }
+            )
+        )
+        refused: list[str] = []
+        printed: list[str] = []
+
+        def no_browser(url: str) -> bool:
+            refused.append(url)
+            return False
+
+        hooks.open_browser = no_browser
+        _, console_input = make_fake_console(["test_auth_code"])
+        hooks.console_output = printed.append
+        hooks.console_input = console_input
+
+        def discard_tokens(_tokens: OAuthTokens) -> None:
+            return None
+
+        hooks.save_tokens = discard_tokens
+
+        authorize(
+            OAuthCredentials(
+                client_id="test_client_id",
+                client_secret="test_secret",
+                redirect_uri="http://localhost:8080",
+            )
+        )
+
+        assert printed[:2] == [
+            f"Open this URL to authorize:\n{refused[0]}",
+            "No browser opened it; open the URL above yourself.",
+        ]
+        assert "accounts.google.com" in refused[0]
+
     def test_authorize_empty_code(self) -> None:
         # Fake browser opener
         hooks.open_browser = lambda url: True
