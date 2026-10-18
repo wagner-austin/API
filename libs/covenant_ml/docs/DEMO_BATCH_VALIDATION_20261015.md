@@ -123,9 +123,26 @@ scheduler-verification.json ties the task result, snapshot, order count and
 attempt count together. This verifies the scheduled action; future timed ticks
 and settlement observations remain prospective.
 
+## Final status (2026-10-18)
+
+The plan stopped admitting reservations at 2026-10-16T05:31:48Z. All four batch
+orders had settled by 2026-10-16T03:58:53Z. NJ2 paid $1; DET2, FLA2 and WPG2 paid
+nothing. The status observed at 2026-10-18T11:42:58Z reads expired, zero
+exposure and no issues, with 16 of the 20 permitted attempts started and 4
+reserved, confirmed, filled and settled. The batch's net realized mock result is
+-$1.1799: $1 revenue against $2.11 cost and $0.0699 fees. Including the
+baseline order, the account's net realized result is -$0.4946, gross realized
+loss is $1.6424 and $3.3576 of the $5 loss allowance remains. Because the
+expired plan could only reconcile, API-KalshiDemo-Batch-20261015 was disabled
+at 2026-10-18T11:55:53Z, ahead of the Linux reimage of its host austinpc (MCPs
+board task e2ffed0d), instead of running to October 22. The status is saved as
+kalshi-demo-batch-20261015-final-status-20261018.json, SHA256
+0dc063874285e61ac36cb78db9fd5607075dea105c114959cb1eb03ea98d44e7.
+
 ## Interpretation
 
 Four new demo fills validate a multi-order exchange path and observed recovery
 from inconsistent account views. They do not establish an edge, an independent
 sample of returns, production fill rates or a reason to add real funds. Several
-contracts share sports events. Remaining batch outcomes are still unobserved.
+contracts share sports events. The four settled outcomes are one batch, not a
+sample from which to estimate returns.

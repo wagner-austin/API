@@ -106,15 +106,20 @@ relocation declaration (`markets/evidence_location.py`; see
   diagnostic destinations (`linux-diagnostic-20261017.json`), exited 0. It
   verified all 89 sources through the declaration and left the future window
   pending, with no returns, no scores and zero orders.
-- **Schedule:** the systemd user timer `covenant-equity-outcome-20261113.timer` on
-  diphtheria fires once at **2026-11-13 00:05 UTC**. With `Persistent=true` it
-  starts at the next boot if diphtheria was down then. It has no boot trigger
-  that could write a premature result. The action writes the same destinations
-  as above under the Linux root: `final-capture-20261113/` and
-  `final-outcomes-20261113.json`. The Windows task `API-EquityPaper-Outcome-20261113`
-  was unregistered the same day, so the capture cannot run twice. Remove the
-  Linux schedule with
-  `systemctl --user disable --now covenant-equity-outcome-20261113.timer`.
+- **Schedule:** the hub runner on diphtheria runs the capture once at
+  **2026-11-13 00:05 UTC**, as row `equity-outcome-capture-20261113` of MCPs
+  `scripts/fleet/hub-jobs.json` (added in MCPs `d34dc2084`): duty control, Linux
+  only, `onceAt` that instant, with a 1,800-second deadline and no boot entry that
+  could write a premature result. The row's paths are under
+  `{data}/Corvis/markets`, a symlink to `/home/corvis/PROJECTS/files`. The action
+  writes the same destinations as above under the Linux root:
+  `final-capture-20261113/` and `final-outcomes-20261113.json`. The row went live
+  when MCPs `94319e53b` gave diphtheria the control duty on 2026-10-18 (MCPs board
+  task `c39ee056`). The systemd user timer `covenant-equity-outcome-20261113.timer`
+  that held the schedule from 2026-10-17 was found disabled and inactive on
+  2026-10-18. The Windows task `API-EquityPaper-Outcome-20261113` was unregistered
+  on 2026-10-17. So the runner row is the capture's only schedule, and it cannot
+  run twice. Remove the schedule by deleting the row.
 
 ## Checks and interpretation
 

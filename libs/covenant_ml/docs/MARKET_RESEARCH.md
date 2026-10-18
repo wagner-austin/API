@@ -594,21 +594,37 @@ preparation. The continuation's manifest SHA-256 is
 `f57a191b3a7a1f289d01e5b9826a9f9d49e6222133a06382e2a92330a122cc85`, under
 `/home/corvis/PROJECTS/files/market-edge-20261012/campaign-20261019-20261212/`
 on diphtheria. Its first tick (2026-10-17 23:12 UTC) reported 660 future
-acquisitions. The systemd user timer `covenant-market-paper-20261019-20261212.timer`
-runs the tick every three minutes and one minute after boot.
+acquisitions. Since 2026-10-18 the hub runner on diphtheria runs the tick as row
+`market-paper-campaign-20261019` of MCPs `scripts/fleet/hub-jobs.json` (added in
+MCPs `d34dc2084`): duty control, Linux only, every 180 seconds, with a
+3,000-second deadline. Its paths are under `{data}/Corvis/markets`, a symlink to
+`/home/corvis/PROJECTS/files`. The runner took the control duty when MCPs
+`94319e53b` reached diphtheria (MCPs board task `c39ee056`). The systemd user timer
+`covenant-market-paper-20261019-20261212.timer` that ran the tick before was
+disabled at 15:37:32 UTC, after its last tick at 15:36:01. The runner's first tick
+started at 15:50:18 UTC and carried the same manifest digest. Like every tick
+before it, it reported 660 future acquisitions and none missed: the first window
+opens October 18 at 20:00 UTC.
 
-The original keeps running on austinpc until the reimage stops it. That lets it
+The original keeps running on austinpc until the reimage stops it, so that it can
 complete the settlement snapshots of its October 14 to 18 captures, the last on
-October 20 at 15:00-16:00 UTC. Whatever it captures for October 19 or later is
-outside its study scope. It is retained as a same-implementation, cross-host
-replication of the continuation, not as observations. The record of the move is
+October 20 at 15:00-16:00 UTC. Its task was disabled on 2026-10-18 at 12:03 UTC,
+after tick `39c50b23`, which reported 42 complete acquisitions: all 30 captures
+and the 12 October 14 and 15 settlements. It was re-enabled at 15:55 UTC, inside
+the October 16 settlement window. That tick finished at 15:56:03 with 48 complete,
+none missed and none failed. The October 17 and 18 settlement windows (October
+19 and 20, 15:00-16:00 UTC) are captured only if austinpc still runs the task
+then. A window that passes is not captured later. Whatever the original captures
+for October 19 or later is outside its study scope. It is retained as a
+same-implementation, cross-host replication of the continuation, not as
+observations. The record of the move is
 `market-edge-20261012/campaign-relocation-20261017.json`, SHA-256
 `c402550295f470a42d8170a991288dede3630308af1efd821bea8710f34f5060`. It names both
 manifests, both hosts, each campaign's event dates, and the protocol, model and
 implementation identities. An evaluation of the full 60-date window reads each
 date from the campaign that answers for it. To remove the continuation's
-schedule, run `systemctl --user disable --now covenant-market-paper-20261019-20261212.timer`
-on diphtheria. Removing it preserves every evidence file.
+schedule, delete its row from `scripts/fleet/hub-jobs.json` in MCPs. Removing it
+preserves every evidence file.
 
 **Evidence that moved hosts.** Reports and manifests record each source by its
 absolute path at writing time, and every reader re-hashes the file there. So
