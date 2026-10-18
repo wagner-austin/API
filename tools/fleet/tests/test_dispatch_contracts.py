@@ -209,9 +209,28 @@ class TestMalformedAnswers:
 
         assert (
             "command 'deploy' is not one of check, lint, test, build-bases, restart-session, "
-            "revive-session, kill-session, kill-session-hard, compact-session, exit-session"
-            in raised.value.message
+            "revive-session, kill-session, kill-session-hard, compact-session, exit-session, "
+            "netboot-arm" in raised.value.message
         )
+
+    def test_an_arm_decodes_naming_the_machine_and_logs_as_an_arm_not_a_make(self) -> None:
+        """The queue admits netboot-arm only after every runner can read it
+        (MCPs board task bea0264b); its line names the machine it arms."""
+        job = claimed_job(
+            answer(
+                {
+                    "claimed": queue_job(
+                        command="netboot-arm", project="MCPs", requestedNode="sedona", sha=None
+                    )
+                }
+            )
+        )
+
+        assert job["command"] is DispatchCommand.NETBOOT_ARM
+        assert job["requested_node"] == "sedona"
+        line = encode_job_line(job)
+        assert "arm netboot install @sedona" in line
+        assert "make" not in line
 
     def test_the_refusal_names_the_repository_the_fix_belongs_in(self) -> None:
         """A malformed answer means the TOOL moved. A reader who has to work

@@ -81,6 +81,11 @@ class DispatchCommand(StrEnum):
     # performs it exactly as a graceful kill; the verb is what tells the
     # ledger the session ended itself rather than being ended.
     EXIT_SESSION = "exit-session"
+    # MCPs board task bea0264b: arm one machine of the roster to network-boot
+    # the installer, run by the machine holding the netboot duty. Decoded
+    # here before the queue admits one, since a command this reader does not
+    # know makes every listing raise QUEUE_ANSWER_MALFORMED.
+    NETBOOT_ARM = "netboot-arm"
 
 
 class DispatchLane(StrEnum):
@@ -90,14 +95,16 @@ class DispatchLane(StrEnum):
     ``hub`` is the rebuild, run on the hub by ``fleet-agent``; ``sessions``
     is the session verbs, run by ``fleet-agent`` on the machine holding the
     sessions duty; ``node`` is the make targets a fleet node runs on a
-    checked-out commit, claimed by ``fleet-node-agent``. The queue
-    partitions its claims by lane, which is what stops a revive queueing
-    behind a check.
+    checked-out commit, claimed by ``fleet-node-agent``; ``netboot`` is the
+    arms, run on the machine holding the netboot duty (MCPs board task
+    bea0264b). The queue partitions its claims by lane, which is what stops
+    a revive queueing behind a check.
     """
 
     HUB = "hub"
     SESSIONS = "sessions"
     NODE = "node"
+    NETBOOT = "netboot"
 
 
 class ClosingStatus(StrEnum):
@@ -464,11 +471,13 @@ def encode_job_line(job: DispatchJob) -> str:
     # A check names the commit it checks, abbreviated as git abbreviates,
     # because the line is read beside git log; a hub verb has none.
     at = f" at {job['sha'][:12]}" if job["sha"] is not None else ""
-    verb = (
-        f"restart session {target}"
-        if target is not None
-        else f"make {job['command']} {job['project']}{at}"
-    )
+    if target is not None:
+        verb = f"restart session {target}"
+    elif job["command"] is DispatchCommand.NETBOOT_ARM:
+        # An arm is not a make either; the machine it arms is @where.
+        verb = "arm netboot install"
+    else:
+        verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
 
 
