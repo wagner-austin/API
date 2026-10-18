@@ -335,6 +335,40 @@ class TestAuthorizeOutlook:
         assert tokens["access_token"] == "new_access"
         assert len(saved_tokens) == 1
 
+    def test_prints_the_url_and_says_so_when_no_browser_opened_it(self) -> None:
+        """A host with no browser is shown the page it is asked to authorize on."""
+        config = _make_config()
+        refused: list[str] = []
+        printed: list[str] = []
+
+        def _no_browser(url: str) -> bool:
+            refused.append(url)
+            return False
+
+        _, input_hook = make_fake_console(["auth_code_123"])
+        hooks.http_post = make_fake_http_send(
+            dump_json_str(
+                {"access_token": "new_access", "refresh_token": "new_refresh", "expires_in": 3600}
+            )
+        )
+        hooks.current_time = make_fake_current_time(1000)
+        hooks.open_browser = _no_browser
+        hooks.console_output = printed.append
+        hooks.console_input = input_hook
+
+        def _save(_tokens: OAuthTokens) -> None:
+            return None
+
+        hooks.save_outlook_tokens = _save
+
+        authorize_outlook(config)
+
+        assert printed[:2] == [
+            f"Open this URL to authorize:\n{refused[0]}",
+            "No browser opened it; open the URL above yourself.",
+        ]
+        assert "login.microsoftonline.com" in refused[0]
+
     def test_raises_if_no_code_provided(self) -> None:
         """Test that empty code raises AppError."""
         config = _make_config()

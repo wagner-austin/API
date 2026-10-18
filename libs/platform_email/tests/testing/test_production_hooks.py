@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
 import pytest
+from platform_core.oauth import open_in_browser
 
 from platform_email._prod_hooks import (
     _prod_cli_get_env,
@@ -32,6 +33,7 @@ from platform_email._prod_hooks import (
     _prod_write_file,
 )
 from platform_email.testing import (
+    hooks,
     reset_hooks,
 )
 
@@ -41,6 +43,23 @@ def _reset_hooks_after_test() -> Generator[None, None, None]:
     """Reset hooks after each test."""
     yield
     reset_hooks()
+
+
+class TestProdOpenBrowser:
+    """The sign-in flows' opener is platform_core's, which reports whether a browser opened."""
+
+    def test_the_production_opener_is_platform_core_s(self) -> None:
+        """A local opener that discarded webbrowser.open's answer asked a
+        host with no browser for a code from a page it never showed."""
+
+        def _local_opener(_url: str) -> bool:
+            return True
+
+        hooks.open_browser = _local_opener
+
+        reset_hooks()
+
+        assert hooks.open_browser is open_in_browser
 
 
 class TestProdCurrentTime:
