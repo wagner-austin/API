@@ -397,9 +397,9 @@ class TestBotBaseMain:
         if not factory_called:
             raise AssertionError("Expected sync_playwright factory to be called")
         written_files = fake_fs.get_written_files()
-        if "runs\\bot\\latest.log" not in written_files:
+        if str(Path("runs/bot/latest.log")) not in written_files:
             raise AssertionError("Expected bot runtime latest log artifact")
-        if "runs\\bot\\latest.events.jsonl" not in written_files:
+        if str(Path("runs/bot/latest.events.jsonl")) not in written_files:
             raise AssertionError("Expected bot runtime latest events artifact")
 
     def test_main_sets_sync_playwright_when_none(
@@ -452,7 +452,7 @@ class TestBotBaseMain:
         if not get_called:
             raise AssertionError("Expected get_sync_playwright to be called")
         written_files = fake_fs.get_written_files()
-        if "runs\\bot\\latest.log" not in written_files:
+        if str(Path("runs/bot/latest.log")) not in written_files:
             raise AssertionError("Expected bot runtime latest log artifact")
 
     def test_main_arms_the_session_exit_deadline_after_a_completed_run(

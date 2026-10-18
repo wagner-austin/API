@@ -154,11 +154,19 @@ class TestExtractStampFromArchivePath:
         result = _extract_stamp_from_archive_path("runs/bot/bot-20260620-150138.events.jsonl")
         assert result == "20260620-150138"
 
-    def test_returns_stamp_for_windows_separator_path(self) -> None:
-        """Windows separators in the input do not affect stamp extraction."""
-        from tankpit_bot.bot.tick_loop import _extract_stamp_from_archive_path
+    def test_returns_stamp_for_the_path_the_artifacts_builder_writes(self) -> None:
+        """The builder's own path, in this platform's separators, yields its stamp.
 
-        result = _extract_stamp_from_archive_path(r"runs\bot\bot-20260620-150138.events.jsonl")
+        The input is always ``build_bot_run_artifacts``'s, made on the
+        machine reading it, so the case reads that path, an instance's
+        directory included, and not a literal of one platform's spelling.
+        """
+        from tankpit_bot.bot.tick_loop import _extract_stamp_from_archive_path
+        from tankpit_bot.runtime_artifacts import build_bot_run_artifacts
+
+        artifacts = build_bot_run_artifacts("20260620-150138", "alpha")
+
+        result = _extract_stamp_from_archive_path(artifacts["archive_events_path"])
         assert result == "20260620-150138"
 
     def test_raises_when_prefix_missing(self) -> None:
@@ -225,7 +233,7 @@ class TestInterruptedExitReason:
         # ([[bot-behavior-contract]] §1.3: summary carries the exit
         # reason) — pinned byte-for-byte at the tick-1 empty-session
         # shape so a format drift is caught here, not in a live run.
-        summary = fake_fs.get_written_files()["runs\\bot\\latest.summary.txt"]
+        summary = fake_fs.get_written_files()[str(Path("runs/bot/latest.summary.txt"))]
         assert summary == (
             "TANKPIT SESSION SUMMARY\n"
             "========================================\n"

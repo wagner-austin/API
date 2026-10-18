@@ -75,7 +75,7 @@ class TestCrashedExitReason:
         row = decode_row(data_lines[0])
         assert row["exit_reason"] == "crashed"
         assert row["ticks"] == 0
-        summary = fake_fs.get_written_files()["runs\\bot\\latest.summary.txt"]
+        summary = fake_fs.get_written_files()[str(Path("runs/bot/latest.summary.txt"))]
         assert summary == (
             "TANKPIT SESSION SUMMARY\n"
             "========================================\n"
