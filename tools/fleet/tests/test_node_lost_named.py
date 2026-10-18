@@ -4,7 +4,7 @@ On 2026-10-07 lavender-wsl's collect pass listed job 641605e5 as claimed at
 03:47:50Z, its launch reported the start at 03:47:53Z, and the pass then
 took the started run for a lost one, found two of the same session's jobs
 that could have launched it, raised DISPATCH_CLAIM_AMBIGUOUS and ended the
-serve. Each case here asks :func:`fleet.cli.node_lost.launching_job` about
+serve. Each case here asks :func:`fleet.cli.node_lost.launching_jobs` about
 the demo run lavender launched at ``DEMO_NOW``, against the fake queue.
 """
 
@@ -52,20 +52,20 @@ def _launched_row(config_path: pathlib.Path) -> LedgerEntry:
     return records.read_ledger(loaded.ledger)[-1]
 
 
-def _ask(row: LedgerEntry, answers: list[str]) -> tuple[DispatchJob | None, FakeQueue]:
-    """Ask which job launched the row, against scripted queue answers.
+def _ask(row: LedgerEntry, answers: list[str]) -> tuple[tuple[DispatchJob, ...], FakeQueue]:
+    """Ask which jobs could have launched the row, against scripted queue answers.
 
     Args:
         row: The run's live row.
         answers: The submitter's pages and the trails read, in order.
 
     Returns:
-        The job found, and the queue for its calls.
+        The jobs found, and the queue for its calls.
     """
     _test_hooks.run = FakeRun([])
     endpoint = FakeQueue(answers)
     _test_hooks.http_post = endpoint
-    found = node_lost.launching_job(queue.load_credentials(), row, agent=LAVENDER)
+    found = node_lost.launching_jobs(queue.load_credentials(), row, agent=LAVENDER)
     return found, endpoint
 
 
@@ -85,7 +85,7 @@ class TestAJobThatNamesTheRun:
         )
 
         launcher = decode_job(started, answer="")
-        assert found == launcher
+        assert found == (launcher,)
         assert endpoint.tools == ["dispatch_list", "dispatch_get"]
         assert node_lost.still_held(launcher, agent=LAVENDER) is True
 
@@ -107,7 +107,7 @@ class TestAJobAnotherRunnerHoldsThatNamesTheRun:
 
         found, endpoint = _ask(row, [listing_page([sibling, TWIN], None)])
 
-        assert found is None
+        assert found == ()
         assert endpoint.tools == ["dispatch_list"]
 
 
@@ -127,7 +127,7 @@ class TestAJobThisRunnerHoldsForAnotherRun:
             [listing_page([other, TWIN], None), trail_answer(TWIN, [(LAVENDER, DEMO_NOW)])],
         )
 
-        assert found == decode_job(TWIN, answer="")
+        assert found == (decode_job(TWIN, answer=""),)
         assert endpoint.tools == ["dispatch_list", "dispatch_get"]
 
 
@@ -150,6 +150,29 @@ class TestTwoCandidatesOneStillUnstarted:
         )
 
         held = decode_job(unstarted, answer="")
-        assert found == held
+        assert found == (held,)
         assert endpoint.tools == ["dispatch_list", "dispatch_get", "dispatch_get"]
         assert node_lost.still_held(held, agent=LAVENDER) is True
+
+
+class TestTwoCandidatesThatBothLeft:
+    def test_answers_both_since_the_run_is_lost_whichever_launched_it(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task c39ee056: refusing here ended every pass of
+        serendipity's elevated runner for two hours on 2026-10-18."""
+        row = _launched_row(sourced_config)
+        refused = queue_job(status="refused", claimedBy=LAVENDER)
+
+        found, endpoint = _ask(
+            row,
+            [
+                listing_page([TWIN, refused], None),
+                trail_answer(TWIN, [(LAVENDER, DEMO_NOW)]),
+                trail_answer(refused, [(LAVENDER, DEMO_NOW)]),
+            ],
+        )
+
+        assert found == (decode_job(TWIN, answer=""), decode_job(refused, answer=""))
+        assert not any(node_lost.still_held(job, agent=LAVENDER) for job in found)
+        assert endpoint.tools == ["dispatch_list", "dispatch_get", "dispatch_get"]

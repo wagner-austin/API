@@ -16,8 +16,6 @@ from __future__ import annotations
 
 import pathlib
 
-import pytest
-from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
@@ -233,28 +231,33 @@ class TestLeftAlone:
         assert _last_row(sourced_config)["outcome"] == "running"
         assert not _lease_released(sourced_config)
 
-    def test_two_jobs_that_could_have_launched_it_are_refused_not_guessed_between(
+    def test_two_jobs_that_could_have_launched_it_and_both_left_stop_it_naming_both(
         self, sourced_config: pathlib.Path
     ) -> None:
+        """MCPs board task c39ee056: the refusal this replaced ended every
+        pass of serendipity's elevated runner for two hours on 2026-10-18,
+        though whichever job launched the run had left it."""
         launch(sourced_config)
-        twin = {**TAKEN_OVER, "id": "88888888-8888-4888-8888-888888888888"}
-        _test_hooks.run = FakeRun(list(PROBED))
-        _test_hooks.http_post = FakeQueue(
+        twin = queue_job(
+            id="88888888-8888-4888-8888-888888888888", status="refused", claimedBy=LAVENDER
+        )
+
+        _tick(
+            sourced_config,
             [
-                dump_json_str({"jobs": []}),
-                listing_page([], None),
                 listing_page([TAKEN_OVER, twin], None),
                 TAKEN_OVER_TRAIL,
                 trail_answer(twin, [(LAVENDER, DEMO_NOW)]),
-            ]
+            ],
+            stops=True,
         )
 
-        with pytest.raises(AppError) as raised:
-            node_agent.main(node_argv(sourced_config))
-
-        assert raised.value.code is FleetErrorCode.DISPATCH_CLAIM_AMBIGUOUS
-        assert raised.value.message == (
-            f"{DEMO_RUN_ID} has no job held by {LAVENDER}, and 2 jobs could have launched it: "
-            f"{DEFAULT_JOB_ID}, 88888888-8888-4888-8888-888888888888"
+        last = _last_row(sourced_config)
+        assert last["outcome"] == "lost"
+        assert last["detail"] == (
+            f"queue jobs {DEFAULT_JOB_ID}, 88888888-8888-4888-8888-888888888888 could each "
+            f"have launched it and every one left {LAVENDER} while this run was live: they are "
+            f"passed and held by {DIPHTHERIA}, refused and held by {LAVENDER}; stopped by "
+            f"{LAVENDER}; was dispatched by opus-dispatch-0905"
         )
-        assert _last_row(sourced_config)["outcome"] == "running"
+        assert _lease_released(sourced_config)
