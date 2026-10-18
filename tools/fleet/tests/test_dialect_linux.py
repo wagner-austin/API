@@ -21,6 +21,7 @@ import pytest
 from fleet.contracts.source import InstallStep
 from fleet.core import names, tool_caches
 from fleet.core.dialect_linux import (
+    CHECK_CPU_WEIGHT,
     PROLOGUE,
     SH_INVOCATION,
     LinuxDialect,
@@ -260,6 +261,15 @@ class TestLaunchScript:
         assert f"/bin/sh '{DIALECT.script_path(TARGET, names.BUILD_STEM)}'" in body
         assert body.rstrip().endswith("printf 'launched\\n'")
         assert "make check" not in body
+
+    def test_the_check_unit_outweighs_every_default_weighted_unit_beside_it(self) -> None:
+        """systemd gives every unit CPUWeight 100; the hub runner's duty jobs
+        took a check's CPU at that weight (MCPs board task 78484fa0)."""
+        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
+        start = next(line for line in body.splitlines() if line.startswith("systemd-run"))
+
+        assert f"--property=CPUWeight={CHECK_CPU_WEIGHT} " in start
+        assert CHECK_CPU_WEIGHT > 100
 
     def test_an_elevated_launch_or_build_is_refused_rather_than_rendered(self) -> None:
         """No linux node declares an elevated runner (MCPs board task

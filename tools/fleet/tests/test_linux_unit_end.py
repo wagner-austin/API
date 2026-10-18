@@ -21,7 +21,13 @@ import pytest
 from platform_core.config import config_test_hooks
 
 from fleet.core import names
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, UNIT_END_DELIMITER, LinuxDialect
+from fleet.core.dialect_linux import (
+    CHECK_CPU_WEIGHT,
+    PROLOGUE,
+    SH_INVOCATION,
+    UNIT_END_DELIMITER,
+    LinuxDialect,
+)
 from fleet.core.linux_unit_end import (
     UNEXPLAINED_EXIT_CODE,
     UNIT_ENDED_MARKER,
@@ -270,6 +276,7 @@ class TestTheLaunchUnderSh:
             "--collect",
             "--quiet",
             f"--property=WorkingDirectory={target.as_posix()}",
+            f"--property=CPUWeight={CHECK_CPU_WEIGHT}",
             f"--property=ExecStopPost=/bin/sh {target.as_posix()}/unit-end.sh",
             "/bin/sh",
             f"{target.as_posix()}/{names.BUILD_STEM}.sh",

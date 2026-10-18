@@ -63,6 +63,14 @@ SH_INVOCATION = ("/bin/sh",)
 #: launch script; the unit-end script never holds a line equal to it.
 UNIT_END_DELIMITER = "FLEET_UNIT_END_SCRIPT"
 
+#: A check unit's ``CPUWeight=``, ten times the default 100 of the hub
+#: runner's duty jobs beside it (MCPs board task 78484fa0): fleet job 40704279
+#: lost 11 s of budget on diphtheria when prove-head cut seven releases beside
+#: it. Measured there on 2026-10-18, an 8-process job beside five 4-loop
+#: units ran 36.8 and 41.1 s at 100, 12.9 and 11.1 s at 1000, 6.8 s alone.
+#: It divides only the user manager's share; system.slice keeps its own.
+CHECK_CPU_WEIGHT = 1000
+
 #: How a script's body is written on the far side.
 #:
 #: The same shape as the PowerShell command: one argument for the remote
@@ -503,6 +511,7 @@ class LinuxDialect:
             f"{UNIT_END_DELIMITER}\n"
             f"systemd-run --user --unit='{unit}' --collect --quiet "
             f"--property=WorkingDirectory='{target}' "
+            f"--property=CPUWeight={CHECK_CPU_WEIGHT} "
             f"--property=ExecStopPost='/bin/sh {ended}' /bin/sh '{build}'\n"
             f"printf 'launched\\n'\n"
         )
