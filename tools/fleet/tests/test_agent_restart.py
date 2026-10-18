@@ -18,7 +18,7 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart, session_release
-from tests._agent_cli import agent_argv, sessions_argv
+from tests._agent_cli import HUB_HOST, agent_argv, hub_host, sessions_argv
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests._session_release_fixtures import (
@@ -37,8 +37,12 @@ SUBMITTER = "fable-dm-versionsplit-0912"
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """Give every test the two variables the agent refuses to run without."""
+    """Give every test the two variables the agent refuses to run without.
+
+    And the machine it runs on, which a hub lane job is reported started on.
+    """
     _test_hooks.env = queue_env()
+    _test_hooks.hostname = hub_host
 
 
 def opening(mode: str, returncode: int) -> str:
@@ -165,7 +169,7 @@ class TestRestartLane:
         # release's session-audit against its register (MCPs c7c2527d).
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.restart_argv(release["root"], release["registry_dir"], agent.HUB_NODE, TARGET),
+            restart.restart_argv(release["root"], release["registry_dir"], HUB_HOST, TARGET),
             *unrolled_calls(repo),
         ]
         # The child inherits neither this agent's poetry venv nor any
@@ -255,7 +259,7 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.revive_argv(
-                release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER
+                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
             ),
             *unrolled_calls(repo),
         ]
@@ -319,7 +323,7 @@ class TestRestartLane:
             restart.kill_argv(
                 release["root"],
                 release["registry_dir"],
-                agent.HUB_NODE,
+                HUB_HOST,
                 TARGET,
                 SUBMITTER,
                 hard=hard,
@@ -352,7 +356,7 @@ class TestRestartLane:
         assert runner.calls == [
             verify_call(tmp_path),
             restart.compact_argv(
-                release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER
+                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
             ),
             *unrolled_calls(repo),
         ]
@@ -378,7 +382,7 @@ class TestRestartLane:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls[1] == restart.kill_argv(
-            release["root"], release["registry_dir"], agent.HUB_NODE, TARGET, SUBMITTER, hard=False
+            release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER, hard=False
         )
         assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (

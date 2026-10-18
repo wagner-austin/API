@@ -3,7 +3,7 @@ lane or its sessions lane.
 
 Usage:
     fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
-        --agent fleet-runner-austinpc --session <uuid> --lane hub [--announce]
+        --agent fleet-hub-diphtheria --session <uuid> --lane hub [--announce]
     fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
         --agent fleet-sessions-austinpc --session <uuid> --lane sessions \\
         --node austinpc [--announce]
@@ -133,10 +133,6 @@ _FLAGS = (
 #: sessions tick refuses rather than ignores.
 _HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG, REGISTRY_FLAG)
 
-#: The node a hub-lane job is reported on: ``build-bases`` is pinned there
-#: (MCPs ``FLEET_DISPATCH_HUB_NODE``, migs 497 and 795).
-HUB_NODE = "austinpc"
-
 #: How long a claim survives without a report.
 #:
 #: An hour: a hub verb closes in the tick that claimed it, so the lease only
@@ -184,6 +180,7 @@ def rebuild_job(
     identity: JSONObject,
     *,
     mcps_root: pathlib.Path | None,
+    node: str,
 ) -> DispatchJob:
     """Execute a claimed ``build-bases`` job on the hub, start to close.
 
@@ -199,6 +196,9 @@ def rebuild_job(
         identity: This runner's identity arguments.
         mcps_root: The MCPs checkout, or None when the runner was started
             without ``--mcps-root``.
+        node: This machine's alias, which the job is reported started on:
+            the job names none, since holding the control duty is the
+            placement (MCPs board task c39ee056).
 
     Returns:
         The job, whatever became of it.
@@ -226,12 +226,12 @@ def rebuild_job(
     queue.report_start(
         credentials,
         job_id=job["job_id"],
-        node=HUB_NODE,
+        node=node,
         run_id=run_id,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    _log.info("started %s on %s as %s (local bake)", job["job_id"], HUB_NODE, run_id)
+    _log.info("started %s on %s as %s (local bake)", job["job_id"], node, run_id)
     result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
     detail = rebuild.describe_result(result)
     queue.report_close(
@@ -352,7 +352,7 @@ def claim_pass(
         lane: The hub lane or the sessions lane.
         node: Restrict claims to this node, plus jobs that name none, or
             None to take any job of the lane.
-        host: The node a session job is reported started on: this machine.
+        host: The node a job is reported started on: this machine.
         mcps_root: The MCPs checkout a base rebuild runs in, or None when
             the runner was started without ``--mcps-root``. Session verbs
             never use it: they run a sealed release
@@ -385,7 +385,7 @@ def claim_pass(
     if job["command"] is DispatchCommand.BUILD_BASES:
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
-        return rebuild_job(credentials, job, identity, mcps_root=mcps_root)
+        return rebuild_job(credentials, job, identity, mcps_root=mcps_root, node=host)
     return session_job(credentials, job, identity, node=host)
 
 
@@ -468,7 +468,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         host = cli_args.require_flag(parsed, NODE_FLAG)
     else:
-        host = HUB_NODE
+        # The hub lane runs on whichever machine holds the control duty, so
+        # it reports on that machine by its own name (MCPs board task c39ee056).
+        host = _test_hooks.hostname()
     agent = cli_args.require_flag(parsed, AGENT_FLAG)
     session_id = cli_args.require_flag(parsed, SESSION_FLAG)
     project_root = pathlib.Path(cli_args.require_flag(parsed, ROOT_FLAG)).resolve()
@@ -543,7 +545,6 @@ if __name__ == "__main__":
 __all__ = [
     "AGENT_FLAG",
     "CLAIM_LEASE_SECONDS",
-    "HUB_NODE",
     "LANE_FLAG",
     "MCPS_ROOT_FLAG",
     "NODE_FLAG",

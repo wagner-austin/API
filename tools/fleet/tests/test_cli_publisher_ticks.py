@@ -17,7 +17,6 @@ from platform_core.json_utils import dump_json_str
 
 from fleet.cli import publisher_ticks
 from fleet.cli.publisher_ticks import RanPublisher, parse_ran
-from fleet.cli.tick import HUB_AGENT, HUB_SESSION
 from fleet.core import _test_hooks
 from tests._git_fixtures import committed_repository, git
 from tests._queue_fakes import FakeQueue, queue_env
@@ -109,7 +108,11 @@ class TestMain:
 
         assert code == 0
         assert endpoint.tools == ["dispatch_publisher_tick", "dispatch_publisher_tick"]
-        identity = {"agent": HUB_AGENT, "sessionId": HUB_SESSION, "cwd": str(pathlib.Path.cwd())}
+        identity = {
+            "agent": "fleet-hub-austinpc",
+            "sessionId": "6f531d60-5c82-5b23-b2a3-c523f13c9490",
+            "cwd": str(pathlib.Path.cwd()),
+        }
         assert endpoint.arguments == [
             {
                 "host": "austinpc",

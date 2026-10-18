@@ -2,7 +2,7 @@
 
 Usage:
     python -m fleet.cli.rolled --repo-root C:/Users/Test/PROJECTS/API \\
-        --agent fleet-agent -- --agent fleet-runner-austinpc --session <uuid> ...
+        --agent fleet-agent -- --agent fleet-hub-diphtheria --session <uuid> ...
     python -m fleet.cli.rolled --repo-root C:/Users/Test/PROJECTS/API \\
         --agent fleet-node-agent -- --node sedona
 

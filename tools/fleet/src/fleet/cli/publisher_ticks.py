@@ -22,9 +22,9 @@ IT RUNS AS ONE OF THE PUMP'S OWN ROWS, in the fleet package's environment,
 with the credentials the pump hands every bridge (``FLEET_MCP_API_KEY`` and
 ``CORVIS_TENANT_ID`` from its ``runs/env.ps1``), so a record that could not be
 made is a red row in the pump's health record like any bridge's, never a
-tick that crashed. It acts under the hub runner's dispatch identity
-(:data:`fleet.cli.tick.HUB_AGENT`): it is the fleet package acting for the
-hub, and the queue already knows that writer.
+tick that crashed. It acts under the dispatch identity of the hub runner on
+the machine it runs on (:func:`fleet.cli.tick.hub_identity`): it is the
+fleet package acting for the hub, and the queue already knows that writer.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from typing import Final, TypedDict
 
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
-from fleet.cli.tick import HUB_AGENT, HUB_SESSION
+from fleet.cli.tick import hub_identity
 from fleet.contracts.publisher_tick import PublisherTick
 from fleet.core import _test_hooks, queue, tick_report
 from fleet.core.checkout import read_checkout
@@ -117,8 +117,9 @@ def main(argv: Sequence[str]) -> int:
         raise ValueError(f"{USAGE_CODE}: name at least one <publisher>=<exit code>=<directory>")
     ran = [parse_ran(token) for token in argv]
     credentials = queue.load_credentials()
-    identity = queue.identity_arguments(HUB_AGENT, HUB_SESSION, str(pathlib.Path.cwd()))
     host = _test_hooks.hostname()
+    label, session = hub_identity(host)
+    identity = queue.identity_arguments(label, session, str(pathlib.Path.cwd()))
     for bridge in ran:
         checkout = read_checkout(bridge["directory"])
         counted = tick_report.record_publisher_tick(

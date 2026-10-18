@@ -13,6 +13,20 @@ import pathlib
 
 from fleet.cli import agent as agent_cli
 
+#: The machine a hub tick runs on, as the hostname hook reports it: a hub
+#: lane job is reported started there, wherever the control duty is held
+#: (MCPs board task c39ee056).
+HUB_HOST = "austinpc"
+
+
+def hub_host() -> str:
+    """Report :data:`HUB_HOST`, bound as the hostname hook.
+
+    Returns:
+        ``austinpc``.
+    """
+    return HUB_HOST
+
 
 def agent_argv(config_path: pathlib.Path, repo: pathlib.Path) -> list[str]:
     """Build the agent CLI's argument list for one hub tick.
@@ -28,7 +42,7 @@ def agent_argv(config_path: pathlib.Path, repo: pathlib.Path) -> list[str]:
         "--config",
         str(config_path),
         agent_cli.AGENT_FLAG,
-        "fleet-runner-austinpc",
+        f"fleet-hub-{HUB_HOST}",
         agent_cli.SESSION_FLAG,
         "33333333-cccc-4ccc-8ccc-333333333333",
         agent_cli.ROOT_FLAG,
@@ -65,4 +79,4 @@ def sessions_argv(config_path: pathlib.Path, repo: pathlib.Path, node: str) -> l
     ]
 
 
-__all__ = ["agent_argv", "sessions_argv"]
+__all__ = ["HUB_HOST", "agent_argv", "hub_host", "sessions_argv"]

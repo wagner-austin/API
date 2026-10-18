@@ -61,10 +61,22 @@ def _log_lines(logs: pathlib.Path, stem: str) -> list[str]:
     return (logs / f"{stem}-2026-09-29.log").read_text(encoding="utf-8").splitlines()
 
 
+def _diphtheria() -> str:
+    """The control duty's holder, as the hostname hook reports it.
+
+    Returns:
+        ``diphtheria``.
+    """
+    return "diphtheria"
+
+
 class TestTheLanes:
-    def test_the_hub_lane_runs_the_fleet_agent_as_the_hub_runner(self) -> None:
-        root = pathlib.Path("C:/Users/Test/PROJECTS/API")
-        mcps = pathlib.Path("C:/Users/Test/PROJECTS/MCPs")
+    # MCPs board task c39ee056: the hub lane runs on whichever machine holds
+    # the control duty, as that machine's own runner.
+    def test_the_hub_lane_runs_the_fleet_agent_as_this_machine_s_hub_runner(self) -> None:
+        _test_hooks.hostname = _diphtheria
+        root = pathlib.Path("/home/corvis/PROJECTS/API")
+        mcps = pathlib.Path("/home/corvis/PROJECTS/MCPs")
         assert tick.plan_tick(root, tick.Lane.HUB, None) == tick.TickPlan(
             arguments=(
                 "--repo-root",
@@ -73,9 +85,9 @@ class TestTheLanes:
                 "fleet-agent",
                 "--",
                 "--agent",
-                "fleet-runner-austinpc",
+                "fleet-hub-diphtheria",
                 "--session",
-                "a850f688-f98d-415c-a244-e993226ca2fc",
+                "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
                 "--repo-root",
                 str(root),
                 "--lane",
@@ -93,7 +105,8 @@ class TestTheLanes:
     # outcome under the closing runner's label, so the hub runner checks in
     # once, into the hub's own log, and claims nothing.
     def test_the_hub_announce_lane_checks_the_hub_runner_in_and_claims_nothing(self) -> None:
-        root = pathlib.Path("C:/Users/Test/PROJECTS/API")
+        _test_hooks.hostname = _diphtheria
+        root = pathlib.Path("/home/corvis/PROJECTS/API")
         assert tick.plan_tick(root, tick.Lane.HUB_ANNOUNCE, None) == tick.TickPlan(
             arguments=(
                 "--repo-root",
@@ -102,9 +115,9 @@ class TestTheLanes:
                 "fleet-agent",
                 "--",
                 "--agent",
-                "fleet-runner-austinpc",
+                "fleet-hub-diphtheria",
                 "--session",
-                "a850f688-f98d-415c-a244-e993226ca2fc",
+                "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
                 "--repo-root",
                 str(root),
                 "--lane",
@@ -156,6 +169,18 @@ class TestTheLanes:
         assert tick.sessions_identity("austinpc") == (
             "fleet-sessions-austinpc",
             "bf75d02e-27a3-5752-8d96-07819e29af54",
+        )
+
+    # Neither is austinpc's retired pair, fleet-runner-austinpc and session
+    # a850f688, which stays bound to the runner that used it.
+    def test_each_machine_has_its_own_hub_runner_identity(self) -> None:
+        assert tick.hub_identity("diphtheria") == (
+            "fleet-hub-diphtheria",
+            "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
+        )
+        assert tick.hub_identity("austinpc") == (
+            "fleet-hub-austinpc",
+            "6f531d60-5c82-5b23-b2a3-c523f13c9490",
         )
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:

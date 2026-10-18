@@ -20,7 +20,10 @@ hub lane and each ``fleet-node-<alias>`` one node's lane, every 3 minutes,
 one run at a time. ``announce`` is the node lane's one-time check-in, each
 node job's boot command, and ``hub-announce`` the hub's, which the board
 needs since the queue's close posts a task-naming job's outcome under the
-closing runner's label (MCPs board task 2fecad69). The ``fleet-sessions``
+closing runner's label (MCPs board task 2fecad69). The hub lane runs on the
+machine holding the control duty, as ``fleet-hub-<that machine's name>``
+(MCPs board task c39ee056), so moving the duty gives the new holder its own
+identity rather than lending it austinpc's. The ``fleet-sessions``
 job, placed on the machine holding the sessions duty, runs the ``sessions``
 lane for that machine as ``fleet-sessions-<alias>``, with
 ``sessions-announce`` its check-in (MCPs board task c39ee056). A node declaring
@@ -121,12 +124,31 @@ _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
     {Lane.HUB_ANNOUNCE, Lane.SESSIONS_ANNOUNCE, Lane.ANNOUNCE, Lane.ELEVATED_ANNOUNCE}
 )
 
-#: The hub runner's board identity: its label and the session it posts as.
-HUB_AGENT: Final = "fleet-runner-austinpc"
-HUB_SESSION: Final = "a850f688-f98d-415c-a244-e993226ca2fc"
-
-#: The namespace a sessions runner's session id is derived in.
+#: The namespace a hub or sessions runner's session id is derived in.
 SESSIONS_NAMESPACE: Final = uuid.NAMESPACE_URL
+
+
+def hub_identity(alias: str) -> tuple[str, str]:
+    """The label and session id a machine's hub runner acts as.
+
+    Derived from the alias as a sessions runner's are: one stable session
+    per machine, so the control duty moving to another machine gives that
+    machine its own label for good, ``fleet-hub-<alias>``. Until MCPs board
+    task c39ee056 the one hub was austinpc, whose fixed pair,
+    ``fleet-runner-austinpc`` and session a850f688, is bound for good and so
+    is not reused.
+
+    Args:
+        alias: The machine's registry name.
+
+    Returns:
+        ``fleet-hub-<alias>`` and the version-5 UUID of
+        ``fleet-agent/hub/<alias>`` in :data:`SESSIONS_NAMESPACE`.
+    """
+    return (
+        f"fleet-hub-{alias}",
+        str(uuid.uuid5(SESSIONS_NAMESPACE, f"fleet-agent/hub/{alias}")),
+    )
 
 
 def sessions_identity(alias: str) -> tuple[str, str]:
@@ -216,6 +238,7 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
     if lane in _HUB_LANES:
         if node is not None:
             raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane takes no {NODE_FLAG}")
+        label, session = hub_identity(_test_hooks.hostname())
         hub = (
             rolled_cli.REPO_ROOT_FLAG,
             repo,
@@ -223,9 +246,9 @@ def plan_tick(api_root: pathlib.Path, lane: Lane, node: str | None) -> TickPlan:
             "fleet-agent",
             rolled_cli.SEPARATOR,
             "--agent",
-            HUB_AGENT,
+            label,
             "--session",
-            HUB_SESSION,
+            session,
             "--repo-root",
             repo,
             "--lane",
@@ -361,8 +384,6 @@ def entrypoint() -> None:
 __all__ = [
     "API_ROOT_FLAG",
     "ENV_FILE",
-    "HUB_AGENT",
-    "HUB_SESSION",
     "LANE_FLAG",
     "LOG_DIRECTORY_FLAG",
     "NODE_FLAG",
@@ -372,6 +393,7 @@ __all__ = [
     "Lane",
     "TickPlan",
     "entrypoint",
+    "hub_identity",
     "main",
     "plan_tick",
     "remove_stale_logs",

@@ -276,10 +276,10 @@ class TestAnnounce:
         assert checkin["harness"] == "fleet-agent"
         assert checkin["machine"] == f"{sys.platform}:austinpc"
         assert checkin["room"] == "fleet"
-        assert checkin["agent"] == "fleet-runner-austinpc"
+        assert checkin["agent"] == "fleet-hub-austinpc"
         assert checkin["sessionId"] == "33333333-cccc-4ccc-8ccc-333333333333"
         assert checkin["body"] == (
-            "fleet-runner-austinpc: claims the queue's hub lane (build-bases) and closes each "
+            "fleet-hub-austinpc: claims the queue's hub lane (build-bases) and closes each "
             "job it claims, which posts the outcome to the job's task thread under this label"
         )
 
@@ -434,7 +434,7 @@ class TestObservingSessions:
 
         assert endpoint.tools == ["dispatch_claim", "task_session_observe"]
         assert endpoint.arguments[1]["machine"] == "win32:serendipity"
-        assert endpoint.arguments[1]["agent"] == "fleet-runner-austinpc"
+        assert endpoint.arguments[1]["agent"] == "fleet-hub-austinpc"
 
     def test_without_a_registry_the_tick_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture

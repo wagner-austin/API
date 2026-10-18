@@ -16,7 +16,7 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, rebuild
-from tests._agent_cli import agent_argv
+from tests._agent_cli import agent_argv, hub_host
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
 from tests.conftest import FakeRun
@@ -24,8 +24,12 @@ from tests.conftest import FakeRun
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """Give every test the two variables the agent refuses to run without."""
+    """Give every test the two variables the agent refuses to run without.
+
+    And the machine it runs on, which a base rebuild is reported started on.
+    """
     _test_hooks.env = queue_env()
+    _test_hooks.hostname = hub_host
 
 
 def rebuild_argv(config_path: pathlib.Path, repo: pathlib.Path, mcps: pathlib.Path) -> list[str]:

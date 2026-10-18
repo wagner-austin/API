@@ -257,7 +257,7 @@ export FLEET_MCP_API_KEY=...      # mcp-fleet's MCP_INTERNAL_KEY
 export TASKBOARD_MCP_API_KEY=...  # mcp-taskboard's MCP_INTERNAL_KEY (observe pass)
 export CORVIS_TENANT_ID=...       # the tenant whose queue this serves
 while true; do
-  fleet-agent --config registry --agent fleet-runner-austinpc \
+  fleet-agent --config registry --agent fleet-hub-diphtheria \
               --session <uuid> --repo-root ~/PROJECTS/API \
               --registry ~/PROJECTS/MCPs/fleet-mcp/fleet-nodes.json
   sleep 30
@@ -280,8 +280,16 @@ job 4d8b28a9 failed to send its payload to serendipity. The feed gets the run's
 terminal `refused` line with the same reason. A `LEASE_HELD` refusal gives
 nothing back, because that lease belongs to another run.
 
+**The hub runner is the machine holding the control duty, by name.** Its
+label is `fleet-hub-<alias>` and its session the version-5 UUID of
+`fleet-agent/hub/<alias>` (`fleet.cli.tick.hub_identity`), and a base rebuild
+or other hub job is reported started on that alias, so moving the duty gives
+the new holder its own label (MCPs board task c39ee056). austinpc's former
+pair, `fleet-runner-austinpc` and session a850f688, stays bound to the runner
+that used it and is never reused.
+
 **The ledger row names the submitter, not the runner.** A row stamped with
-`fleet-runner-austinpc` would record only that the runner ran something; the
+the hub runner's label would record only that the runner ran something; the
 queue job carries the enqueueing session's label and UUID, and those are what
 `run_lease.take` is given.
 
