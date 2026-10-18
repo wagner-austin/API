@@ -42,7 +42,8 @@
           "-C",
           "scripts/fleet-prepare",
           "netboot-lane",
-          "ENV_FILE=/home/corvis/PROJECTS/MCPs/.env"
+          "ENV_FILE=/home/corvis/PROJECTS/MCPs/.env",
+          "VM_HOST=lavender-wsl"
         ]
       }
     ],

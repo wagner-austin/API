@@ -235,17 +235,19 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     )
 
 
-def test_the_netboot_lane_installs_its_vm_on_diphtheria_alone() -> None:
+def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender_wsl() -> None:
     """MCPs/execution-netboot-diphtheria installs a clean VM by network boot.
 
     Its last install step copies the host's Tailscale API key out of the
-    workspace ``.env`` named on its argv and writes the marker that makes the
-    execution workspace collect tests/netboot alone (MCPs board task
-    d387271d). The case mints a tailnet key, boots a VM on the host's KVM and
-    reaches it over the tailnet, which diphtheria's grant allows and a
-    ``tag:corvis-node`` machine's does not, so the project names that host.
-    Its server listens on the definition's fixed port, so two runs at once
-    would refuse each other: the port is its exclusive resource.
+    workspace ``.env`` named on its argv, names the VM host, and writes the
+    marker that makes the execution workspace collect tests/netboot alone
+    (MCPs board task d387271d). The case mints a tailnet key and reaches the
+    VM over the tailnet, which diphtheria's grant allows and a
+    ``tag:corvis-node`` machine's does not, so the project names that host;
+    the VM itself boots on lavender-wsl's KVM, since diphtheria's stack leaves
+    no room for its 7.5 GB. Its server listens on the definition's fixed port,
+    so two runs at once would refuse each other: the port is its exclusive
+    resource.
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "MCPs/execution-netboot-diphtheria")
@@ -261,7 +263,12 @@ def test_the_netboot_lane_installs_its_vm_on_diphtheria_alone() -> None:
             InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
             InstallStep(
                 phase="netboot-lane",
-                argv=(*prepare, "netboot-lane", "ENV_FILE=/home/corvis/PROJECTS/MCPs/.env"),
+                argv=(
+                    *prepare,
+                    "netboot-lane",
+                    "ENV_FILE=/home/corvis/PROJECTS/MCPs/.env",
+                    "VM_HOST=lavender-wsl",
+                ),
             ),
         ),
         companions=(),

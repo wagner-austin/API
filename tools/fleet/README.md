@@ -1201,23 +1201,25 @@ Each prints what it read as a `host reading:` line. It is no roll or deploy
 gate: a runner a job holds mid-move fails it, which is what it is for.
 
 `MCPs/execution-netboot-diphtheria` (MCPs board task d387271d) is pinned to
-`diphtheria` because its case installs a clean Secure Boot VM on that host's
-KVM through MCPs' `fleet-netboot`, which mints the VM its own tailnet key,
-and then reaches the VM over ssh at its tailnet address, which diphtheria's
-tailnet grant allows and a `tag:corvis-node` machine's does not. Its last
-install step, `netboot-lane ENV_FILE=/home/corvis/PROJECTS/MCPs/.env`,
-copies only `TAILSCALE_API_KEY` from that host's workspace `.env` into the
-export, after the steps whose untracked files the node stores, so the key is
-never stored with the tree. Its server listens on the definition's fixed
-port, so `netboot-http-8780` is its exclusive resource and two runs never
-start at once. Its `worker_ram_gb` is 1.0, not the VM's 7.5 GB, because the
-case maps the VM's memory from a shared file on the fleet cache's disk:
-the guest's pages are file cache the kernel writes back and reclaims, where
-anonymous memory would take room the stack's capped containers are still
-promised. Declared at 8.5 GB the job never fit, since diphtheria measured
-3.6 GB left after those promises on 2026-10-18 15:45Z, and job 86c7afcc sat
-queued for three hours; 1.0 GB is qemu, which held 29 MB anonymous at the
-firmware, and the case's node processes, which its check-in line prints.
+`diphtheria` because its case arms and serves a clean Secure Boot VM's
+install through MCPs' `fleet-netboot`, which mints the VM its own tailnet
+key, and then reaches the VM over ssh at its tailnet address, which
+diphtheria's tailnet grant allows and a `tag:corvis-node` machine's does not.
+Its last install step, `netboot-lane ENV_FILE=/home/corvis/PROJECTS/MCPs/.env
+VM_HOST=lavender-wsl`, copies only `TAILSCALE_API_KEY` from that host's
+workspace `.env` into the export, after the steps whose untracked files the
+node stores, so the key is never stored with the tree, and names the host
+whose KVM boots the VM. The VM is not diphtheria's: its 7.5 GB never fit
+beside the stack, which on 2026-10-18 left 3.6 GB after its capped
+containers' promises (job 86c7afcc sat queued three hours declared at
+8.5 GB), and mapped from a file instead it was what the kernel reclaimed
+with the swap full, its qemu reading 156 GB and writing 75 GB to the SSD
+before job a6c3dec8 missed its check-in. So the case runs qemu on
+lavender-wsl over ssh, reserving its four cores there in
+`.fleet/reservations` and forwarding the server's port back, and its
+`worker_ram_gb` of 1.0 is what it holds on diphtheria. Its server listens on
+the definition's fixed port, so `netboot-http-8780` is its exclusive
+resource and two runs never start at once.
 
 ## The staged tree is made a git repository, and that is not decoration
 
