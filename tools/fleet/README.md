@@ -430,6 +430,14 @@ pass on their node as a settled run whose node missed the retire is. Before:
 12 run directories on six nodes, measured 2026-10-18, from runs the feed ends
 at `refused` or at `leased` or `staged`, none of them in the record.
 
+A retire the node answered and failed is recorded `failed` and no pass sends
+it again, since its fault would fail it again. Once the fix is rolled, the
+session that made it runs `python -m fleet.cli.owe_again --config registry
+--run <run> --because "<what fixed it>"` on the hub, and the node's next
+collect pass retires the run. The hub's stage-root case
+(`tools/fleet-execution-hub`) names every such run, since its directory is
+held by no live run and no owed retire.
+
 **Every cache on a node has an owner that bounds it** (MCPs board task
 346abc45), measured 2026-10-18 before the change:
 

@@ -7,9 +7,10 @@ retire removes them (:mod:`fleet.core.retire`). So the debt starts at the
 lease: :func:`owe` records the run ``owed`` in the retire record beside the
 ledger (:mod:`fleet.contracts.retire_record`) the moment the lease is held
 (:func:`fleet.core.run_lease.take`), and every retire that is done records
-it ``retired`` (:func:`retire_or_owe`, :func:`retire_or_raise`). It is the
-record's one writer of ``owed``: a retire the node did not answer leaves the
-run owed and writes nothing, so a node down for hours adds no line a pass.
+it ``retired`` (:func:`retire_or_owe`, :func:`retire_or_raise`). It writes
+``owed`` once for each lease, and :func:`owe_again` once more for a failed
+retire whose fault is fixed: a retire the node did not answer leaves the run
+owed and writes nothing, so a node down for hours adds no line a pass.
 
 WHY AT THE LEASE AND NOT AT THE SETTLE. Until 2026-10-18 a run was recorded
 only when its settle's retire was not answered, so a run that never settled
@@ -39,8 +40,10 @@ done: a settle frees its lease before it retires, so a collect pass can find
 the same run owed and no longer live while the settle is still retiring it.
 
 A retire the node ANSWERED and failed is a fault: it is recorded ``failed``
-and raised by name with the node's own error, and never sent again, because
-a pass that resent it would end every serve after it the same way.
+and raised by name with the node's own error, and no pass sends it again,
+because a pass that resent it would end every serve after it the same way;
+once the fault is fixed, :func:`owe_again` (``python -m fleet.cli.owe_again``)
+records it owed for the next pass.
 """
 
 from __future__ import annotations
@@ -88,6 +91,26 @@ RETIRE_TURN: Final = file_turn.TurnBounds(
 )
 
 
+def _latest(path: pathlib.Path, run_id: str) -> RetireRecord | None:
+    """One run's last line in the record.
+
+    Args:
+        path: The retire record file.
+        run_id: The run.
+
+    Returns:
+        The line, or None when the record holds none for it.
+
+    Raises:
+        JSONTypeError: When a line of the record does not decode.
+    """
+    latest: RetireRecord | None = None
+    for record in records.read_retires(path):
+        if record["run_id"] == run_id:
+            latest = record
+    return latest
+
+
 def _latest_state(path: pathlib.Path, run_id: str) -> RetireState | None:
     """The state of one run's last line in the record.
 
@@ -101,11 +124,8 @@ def _latest_state(path: pathlib.Path, run_id: str) -> RetireState | None:
     Raises:
         JSONTypeError: When a line of the record does not decode.
     """
-    state: RetireState | None = None
-    for record in records.read_retires(path):
-        if record["run_id"] == run_id:
-            state = record["state"]
-    return state
+    latest = _latest(path, run_id)
+    return None if latest is None else latest["state"]
 
 
 def _turn(path: pathlib.Path, run_id: str) -> contextlib.AbstractContextManager[None]:
@@ -274,6 +294,49 @@ def retire_or_owe(path: pathlib.Path, node: NodeConfig, *, alias: str, run_id: s
         raise AppError(failure["code"], failure["message"])
 
 
+def owe_again(path: pathlib.Path, *, run_id: str, because: str) -> str:
+    """Record a run whose retire failed as owed again, once that fault is fixed.
+
+    No pass resends a failed retire (:func:`retire_or_owe`), since the fault
+    that failed it fails it again, so its directory stays on the node until
+    the session that fixed the fault says so here; the node's next collect
+    pass then retires it as it would any owed run. Measured 2026-10-18T20:29:43Z
+    (MCPs board task 3d9eec0d): sedona's retire of
+    MCPs-fleet-mcp-sedona-1792355094 failed on a transcript holder that exited
+    under it, and after the render was fixed nothing could retire its 75802
+    files but a hand removal.
+
+    Args:
+        path: The retire record file.
+        run_id: The run.
+        because: What fixed the fault, recorded on the line.
+
+    Returns:
+        The run's node's workspace name, as its failed line recorded it.
+
+    Raises:
+        AppError: ``RUN_UNKNOWN`` when the run's last line is not ``failed``:
+            an owed run is already sent, a retired one left nothing, and one
+            the record does not hold was never leased by this hub's runners.
+    """
+    with _turn(path, run_id):
+        latest = _latest(path, run_id)
+        if latest is None or latest["state"] is not RetireState.FAILED:
+            state = "not recorded" if latest is None else latest["state"].value
+            raise AppError(
+                FleetErrorCode.RUN_UNKNOWN,
+                f"{run_id}'s retire is {state}, not failed, so it is not owed again",
+            )
+        _record(
+            path,
+            alias=latest["node"],
+            run_id=run_id,
+            state=RetireState.OWED,
+            detail=f"its failed retire is owed again: {because}",
+        )
+        return latest["node"]
+
+
 def owed_on(path: pathlib.Path, *, alias: str) -> tuple[str, ...]:
     """The runs on one node whose retire is owed.
 
@@ -361,6 +424,7 @@ __all__ = [
     "RETIRE_TURNS_DIRECTORY",
     "live_runs",
     "owe",
+    "owe_again",
     "owed_on",
     "retire_or_owe",
     "retire_or_raise",

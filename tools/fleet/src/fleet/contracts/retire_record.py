@@ -10,7 +10,8 @@ MCPs board tasks 8776b828 and 3d9eec0d).
 
 A run's CURRENT state is its last line. ``owed`` is the only state a pass
 acts on; ``retired`` and ``failed`` end it, so no directory is retired twice
-and a retire the node refused is not sent again.
+and a retire the node refused is not sent again until the session that fixed
+its fault records it owed again (:func:`fleet.core.retire_owed.owe_again`).
 """
 
 from __future__ import annotations
@@ -25,10 +26,10 @@ from typing_extensions import TypedDict
 class RetireState(StrEnum):
     """Where one run's retire stands; each value is a line's word.
 
-    ``owed`` is written when the run's lease is taken, ``retired`` when a
-    retire was answered and done, and ``failed`` when the node
-    answered and the retire failed there, which is raised by name and never
-    retried, as a settle's failed retire never was.
+    ``owed`` is written when the run's lease is taken, and again when a
+    failed retire's fault is fixed; ``retired`` when a retire was answered
+    and done; and ``failed`` when the node answered and the retire failed
+    there, which is raised by name and not retried until it is owed again.
     """
 
     OWED = "owed"
@@ -44,7 +45,8 @@ class RetireRecord(TypedDict):
         node: The node's workspace name, so a runner retries only its own.
         state: What happened.
         at_unix: When, whole seconds since the epoch.
-        detail: Why: that the lease is held for ``owed``, the transport's
+        detail: Why: that the lease is held, or what fixed a failed
+            retire's fault, for ``owed``; the transport's
             message for ``failed``, where the transcript is kept for
             ``retired``.
     """
