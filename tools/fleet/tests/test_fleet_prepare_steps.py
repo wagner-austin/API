@@ -59,8 +59,10 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # PostgreSQL review-routing cases (MCPs board task 55189157); 60 since
     # MCPs/pc, which named a directory MCPs deleted, was dropped (MCPs board
     # task 60458a21); 61 since MCPs/packages/session-audit-linux, the
-    # package's Linux lane (MCPs board task 31e0a1eb).
-    assert len(prepared) == 61
+    # package's Linux lane (MCPs board task 31e0a1eb); 62 since
+    # MCPs/execution-netboot-diphtheria, the execution suite's netboot lane
+    # (MCPs board task d387271d).
+    assert len(prepared) == 62
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -127,6 +129,25 @@ def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None
     assert sorted(marking) == ["MCPs/execution-served-colossus", "MCPs/execution-served-diphtheria"]
     for steps in marking.values():
         assert [step["phase"] for step in steps] == ["install", "workspace-build", "served-lane"]
+
+
+def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:
+    """MCPs fleet-prepare's netboot-lane phase copies the host's Tailscale API
+    key into the export and writes the marker that makes the execution
+    workspace collect tests/netboot alone (MCPs board task d387271d). That
+    case mints a tailnet key and installs a VM, so no project a deploy waits
+    on may carry the step, and it runs after install and workspace-build,
+    which store the tree's untracked files for the node's next row, so the
+    key is never stored with them."""
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:5] == ("netboot-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-netboot-diphtheria"]
+    for steps in marking.values():
+        assert [step["phase"] for step in steps] == ["install", "workspace-build", "netboot-lane"]
 
 
 def test_each_prepare_step_names_the_directory_an_older_commit_lacks() -> None:

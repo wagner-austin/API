@@ -1186,6 +1186,18 @@ sibling, and require the probe inside it to stall and the sibling's not to.
 Each prints what it read as a `host reading:` line. It is no roll or deploy
 gate: a runner a job holds mid-move fails it, which is what it is for.
 
+`MCPs/execution-netboot-diphtheria` (MCPs board task d387271d) is pinned to
+`diphtheria` because its case installs a clean Secure Boot VM on that host's
+KVM through MCPs' `fleet-netboot`, which mints the VM its own tailnet key,
+and then reaches the VM over ssh at its tailnet address, which diphtheria's
+tailnet grant allows and a `tag:corvis-node` machine's does not. Its last
+install step, `netboot-lane ENV_FILE=/home/corvis/PROJECTS/MCPs/.env`,
+copies only `TAILSCALE_API_KEY` from that host's workspace `.env` into the
+export, after the steps whose untracked files the node stores, so the key is
+never stored with the tree. Its server listens on the definition's fixed
+port, so `netboot-http-8780` is its exclusive resource and two runs never
+start at once.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A
