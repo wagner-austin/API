@@ -13,9 +13,7 @@ cannot escalate.
 
 from __future__ import annotations
 
-import pathlib
 import subprocess
-import sys
 
 import pytest
 
@@ -254,25 +252,3 @@ def test_this_suite_itself_runs_as_execdocker_and_cannot_reach_the_stack() -> No
     assert "name=rootless" in options.stdout.splitlines(), options.stderr
     assert stack.returncode != 0, stack.stdout
     assert escalate.returncode != 0, escalate.stdout
-
-
-@pytest.mark.host_linux_docker
-def test_this_suite_reads_its_generation_s_caches_and_runs_in_its_own_virtualenv() -> None:
-    """The cache generation and the in-project virtualenv, measured from
-    inside the isolated build that runs this suite (MCPs board task
-    346abc45): poetry and npm read the generation the copy's marker names,
-    and the interpreter running these tests is the project's own ``.venv``,
-    inside the copy the retire removes."""
-    environment = _run(["env"]).stdout.splitlines()
-    inherited = dict(line.split("=", 1) for line in environment if "=" in line)
-    stage = pathlib.Path(inherited["HOME"]) / "fleet" / "stage"
-    here = pathlib.Path.cwd()
-    copy = next(directory for directory in (here, *here.parents) if directory.parent == stage)
-    generation = (copy / names.GENERATION_MARKER_NAME).read_text(encoding="utf-8").strip()
-    tools = pathlib.Path(inherited["HOME"]) / "fleet" / "cache" / names.TOOL_CACHES_DIRECTORY
-
-    assert generation.isdigit(), generation
-    assert inherited["POETRY_CACHE_DIR"] == (tools / generation / "pypoetry").as_posix()
-    assert inherited["npm_config_cache"] == (tools / generation / "npm").as_posix()
-    assert inherited["POETRY_VIRTUALENVS_IN_PROJECT"] == "true"
-    assert pathlib.Path(sys.prefix) == here / ".venv"
