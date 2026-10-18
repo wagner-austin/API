@@ -257,17 +257,6 @@ def _prod_load_credentials(path: str | None = None) -> OAuthCredentials:
     )
 
 
-def _prod_open_browser(
-    url: str,
-    _opener: Callable[[str], bool] | None = None,
-) -> None:
-    """Production browser opener."""
-    import webbrowser
-
-    opener = _opener if _opener is not None else webbrowser.open
-    opener(url)
-
-
 def _prod_current_time() -> int:
     """Production current time in seconds since epoch."""
     import time

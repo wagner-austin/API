@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Protocol, runtime_checkable
 
 from platform_core.json_utils import JSONObject
+from platform_core.oauth import open_in_browser
 from platform_core.oauth_types import (
     OAuthCredentials,
     OAuthTokens,
@@ -42,7 +43,6 @@ from platform_calendar._prod_hooks import (
     _prod_http_post,
     _prod_load_credentials,
     _prod_load_tokens,
-    _prod_open_browser,
     _prod_read_file,
     _prod_save_tokens,
     _prod_write_file,
@@ -227,7 +227,7 @@ class HooksContainer:
     load_tokens: Callable[[], OAuthTokens | None]
     save_tokens: Callable[[OAuthTokens], None]
     load_credentials: Callable[[], OAuthCredentials]
-    open_browser: Callable[[str], None]
+    open_browser: Callable[[str], bool]
     current_time: Callable[[], int]
     read_file: Callable[[str], str]
     write_file: Callable[[str, str], None]
@@ -271,7 +271,7 @@ def _init_production_hooks() -> None:
     hooks.load_tokens = _prod_load_tokens
     hooks.save_tokens = _prod_save_tokens
     hooks.load_credentials = _prod_load_credentials
-    hooks.open_browser = _prod_open_browser
+    hooks.open_browser = open_in_browser
     hooks.current_time = _prod_current_time
     hooks.read_file = _prod_read_file
     hooks.write_file = _prod_write_file

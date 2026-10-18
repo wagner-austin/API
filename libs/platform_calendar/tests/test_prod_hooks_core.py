@@ -456,22 +456,6 @@ class TestProdHttpHooks:
         assert received_body[0] == b'{"summary": "Updated Event"}'
 
 
-class TestProdOpenBrowser:
-    def test_calls_opener_with_url(self) -> None:
-        """Test _prod_open_browser with a fake opener."""
-        from platform_calendar._prod_hooks import _prod_open_browser
-
-        opened_urls: list[str] = []
-
-        def fake_opener(url: str) -> bool:
-            opened_urls.append(url)
-            return True
-
-        _prod_open_browser("https://example.com/auth", _opener=fake_opener)
-
-        assert opened_urls == ["https://example.com/auth"]
-
-
 class TestProdConsoleInput:
     def test_returns_input_from_func(self) -> None:
         """Test _prod_console_input with a fake input function."""

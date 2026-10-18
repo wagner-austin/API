@@ -24,6 +24,7 @@ from platform_core.oauth import (
     generate_code_challenge,
     generate_code_verifier,
     generate_state,
+    open_authorization_page,
 )
 from platform_core.oauth import (
     is_token_expired as _core_is_token_expired,
@@ -291,9 +292,11 @@ def authorize(credentials: OAuthCredentials) -> OAuthTokens:
     code_challenge = generate_code_challenge(code_verifier)
     state = generate_state()
 
-    # Build and open auth URL
+    # Build the auth URL and show it to the user
     auth_url = build_auth_url(credentials, code_challenge=code_challenge, state=state)
-    hooks.open_browser(auth_url)
+    open_authorization_page(
+        auth_url, open_browser=hooks.open_browser, console_output=hooks.console_output
+    )
 
     # For desktop flow with urn:ietf:wg:oauth:2.0:oob, user copies code manually
     # In a real implementation, we'd either:

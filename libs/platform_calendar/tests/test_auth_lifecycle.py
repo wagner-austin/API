@@ -215,8 +215,9 @@ class TestAuthorize:
         # Fake browser opener (does nothing)
         opened_urls: list[str] = []
 
-        def fake_open_browser(url: str) -> None:
+        def fake_open_browser(url: str) -> bool:
             opened_urls.append(url)
+            return True
 
         hooks.open_browser = fake_open_browser
 
@@ -249,7 +250,7 @@ class TestAuthorize:
 
     def test_authorize_empty_code(self) -> None:
         # Fake browser opener
-        hooks.open_browser = lambda url: None
+        hooks.open_browser = lambda url: True
 
         # Fake console I/O - user enters empty code
         console_output, console_input = make_fake_console([""])
@@ -339,7 +340,7 @@ class TestLoadOrAuthorize:
             "token_type": "Bearer",
         }
         hooks.http_post = make_fake_http_send(dump_json_str(token_response))
-        hooks.open_browser = lambda url: None
+        hooks.open_browser = lambda url: True
 
         console_output, console_input = make_fake_console(["auth_code"])
         hooks.console_output = console_output
@@ -393,7 +394,7 @@ class TestLoadOrAuthorize:
             return dump_json_str(token_response_success)
 
         hooks.http_post = mock_http_post
-        hooks.open_browser = lambda url: None
+        hooks.open_browser = lambda url: True
 
         console_output, console_input = make_fake_console(["auth_code"])
         hooks.console_output = console_output
