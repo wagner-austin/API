@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
@@ -19,6 +21,9 @@ from tests.fakes import (
     fake_sync_playwright_with_mixed_scripts,
     fake_sync_playwright_with_scripts,
 )
+
+LATEST_CAPTURE = str(Path("runs/sniff/latest.capture_session.json"))
+"""The sniffer's latest capture mirror, spelled with this platform's separator."""
 
 # =============================================================================
 # run_sniffer Tests
@@ -75,9 +80,9 @@ def test_main_with_defaults(
     captured = capsys.readouterr()
     output = captured.out
     assert "Captured 4 WebSocket messages in" in output
-    assert "Saved to: runs\\sniff\\latest.capture_session.json" in output
+    assert f"Saved to: {LATEST_CAPTURE}" in output
     assert "Sniffer latest capture:" in output
-    assert "runs\\sniff\\latest.capture_session.json" in output
+    assert LATEST_CAPTURE in output
 
 
 def test_main_with_custom_env(
@@ -98,7 +103,7 @@ def test_main_with_custom_env(
     output = captured.out
     assert "Saved to: custom_output.json" in output
     assert "Latest capture mirror:" in output
-    assert "runs\\sniff\\latest.capture_session.json" in output
+    assert LATEST_CAPTURE in output
 
 
 def test_main_headless_variations(
