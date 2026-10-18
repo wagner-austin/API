@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import sys
 import threading
+import webbrowser
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -118,21 +119,31 @@ class TestProdConsoleOperations:
 class TestProdOpenBrowser:
     """Tests for _prod_open_browser."""
 
-    def test_open_browser_is_callable(self) -> None:
-        """Test that open_browser is a callable function."""
-        # We can't easily test that it opens a browser without mocking,
-        # but we can verify the function exists and is callable
-        assert callable(_prod_open_browser)
+    def test_open_browser_hands_the_url_to_the_preferred_browser(self, tmp_path: Path) -> None:
+        """webbrowser opens the URL with the browser registered first.
 
-    def test_open_browser_executes_without_error(self) -> None:
-        """Test that open_browser can be called.
-
-        Note: In CI environments without a browser, webbrowser.open() may
-        fail silently or return False. We just verify it can be called.
+        Here that is a real program that records the URL it was given, so
+        the host's own browser is never started: a real webbrowser.open on
+        colossus started a snap firefox in a scope of its own, which outlived
+        its fleet run of this suite by a week (measured 2026-10-18, MCPs
+        board task 346abc45). webbrowser keeps the registration for the rest
+        of this process; nothing else in the suite opens a browser.
         """
-        # Using a data URL that won't actually open anything meaningful
-        # webbrowser.open() may fail silently in headless environments
+        received = tmp_path / "received"
+        recorder = tmp_path / "recorder.py"
+        recorder.write_text(
+            "import pathlib, sys\n"
+            "pathlib.Path(sys.argv[1]).write_text(sys.argv[2], encoding='utf-8')\n",
+            encoding="utf-8",
+        )
+        command = [sys.executable, str(recorder), str(received), "%s"]
+        webbrowser.register(
+            "platform-email-recorder", None, webbrowser.GenericBrowser(command), preferred=True
+        )
+
         _prod_open_browser("data:text/html,<html></html>")
+
+        assert received.read_text(encoding="utf-8") == "data:text/html,<html></html>"
 
 
 class TestProdPathHooks:
