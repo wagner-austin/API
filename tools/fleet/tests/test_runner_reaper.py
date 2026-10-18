@@ -147,17 +147,20 @@ def _lay_out(
     (table / "unkillable").mkdir()
 
 
-def _run(table: pathlib.Path, *arguments: str) -> subprocess.CompletedProcess[str]:
+def _run(
+    table: pathlib.Path, *arguments: str, script: str = runner_reaper_render.REAPER_SCRIPT
+) -> subprocess.CompletedProcess[str]:
     """Run the rendered reaper over the table.
 
     Args:
         table: The laid-out table.
         *arguments: The reaper's own arguments.
+        script: The rendered reaper, or a case's copy of it with one rendered
+            constant rewritten.
 
     Returns:
         The finished run.
     """
-    script = runner_reaper_render.REAPER_SCRIPT
     for real, fake in (("cgroup_root=/sys/fs/cgroup", "cgroup"), ("proc_root=/proc", "proc")):
         assert f"\n{real}\n" in script
         script = script.replace(f"\n{real}\n", f'\n{real.split("=")[0]}="$TABLE/{fake}"\n')

@@ -15,7 +15,7 @@ from __future__ import annotations
 import pathlib
 
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
-from fleet.core.runner_reaper_render import PLACE_WAIT_SECONDS
+from fleet.core.runner_reaper_render import PLACE_WAIT_SECONDS, REAPER_SCRIPT
 from tests.test_runner_reaper import (
     BOUND,
     OWN,
@@ -69,8 +69,21 @@ def _job_ends_after(table: pathlib.Path, waits: int, processes: tuple[Process, .
     (table / "job-pids").write_bytes(" ".join(str(each["pid"]) for each in processes).encode())
 
 
-#: Every wait of a watch that never sees the job end: five a second for the bound.
-WHOLE_WATCH = ["0.2"] * (PLACE_WAIT_SECONDS * 5)
+#: The rendered bound of the watch: five reads a second for PLACE_WAIT_SECONDS.
+WATCH_BOUND = f'[ "$tries" -lt {PLACE_WAIT_SECONDS * 5} ]'
+
+#: The reads a watch the job outlasts takes here. Each read runs the stand-ins
+#: through host bash, so the rendered hundred made each such case 23 to 26 s,
+#: the two slowest of the suite, and pushed tools/fleet's check past its
+#: 300 s budget on pendragon (fleet job a3af5548, 309 s, MCPs board task
+#: 3d9eec0d). The bound itself is pinned on the rendered text instead.
+SHORT_TRIES = 3
+
+#: The rendered reaper with its watch bounded at SHORT_TRIES reads.
+SHORT_WATCH = REAPER_SCRIPT.replace(WATCH_BOUND, f'[ "$tries" -lt {SHORT_TRIES} ]')
+
+#: Every wait of a shortened watch that never sees the job end.
+WHOLE_WATCH = ["0.2"] * SHORT_TRIES
 
 
 #: The line the pass writes for a unit it moved.
@@ -104,14 +117,18 @@ class TestAPendingMove:
         self, tmp_path: pathlib.Path
     ) -> None:
         _lay_out(tmp_path, (*OWN, WORKER, STEP), configured=LISTENER_SLICE_NAME)
-        ran = _run(tmp_path, BOUND)
+        ran = _run(tmp_path, BOUND, script=SHORT_WATCH)
         assert (ran.returncode, ran.stdout, _restarted(tmp_path)) == (0, "", [])
         assert _slept(tmp_path) == WHOLE_WATCH
+
+    def test_the_rendered_watch_reads_five_times_a_second_for_its_bound(self) -> None:
+        assert REAPER_SCRIPT.count(WATCH_BOUND) == 1
+        assert SHORT_WATCH.count(WATCH_BOUND) == 0
 
     def test_a_job_in_its_scope_counts_as_running(self, tmp_path: pathlib.Path) -> None:
         _lay_out(tmp_path, OWN, configured=LISTENER_SLICE_NAME)
         _scope(tmp_path, SCOPE, (WORKER, STEP))
-        ran = _run(tmp_path, BOUND)
+        ran = _run(tmp_path, BOUND, script=SHORT_WATCH)
         assert (ran.returncode, ran.stdout, _restarted(tmp_path)) == (0, "", [])
         assert _slept(tmp_path) == WHOLE_WATCH
 
