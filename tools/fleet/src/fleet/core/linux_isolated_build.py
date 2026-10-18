@@ -37,7 +37,7 @@ build stopped before that line leaves its copy, so the retire removes it too
 (:meth:`fleet.core.dialect_linux.LinuxDialect.retire_script`): measured
 2026-10-18, lavender-wsl held eight such copies, 11 GB, from 2026-10-01 on.
 
-execdocker's npm and poetry caches are one generation at a time, as the
+execdocker's npm, poetry and playwright caches are one generation at a time, as the
 node's are (:mod:`fleet.core.tool_caches`); the generation's marker is in the
 copy, so the generation stays while the copy does.
 
@@ -149,7 +149,7 @@ def isolated_build_lines(
         'POETRY_CACHE_DIR="$tool_cache/pypoetry" '
         f"{POETRY_IN_PROJECT[0]}='{POETRY_IN_PROJECT[1]}' "
         f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}' "
-        'PLAYWRIGHT_BROWSERS_PATH="$exec_cache/ms-playwright" '
+        'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright" '
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}' "
         f"CORVIS_TEST_MAX_WORKERS='{workers}' "
         f"{AGENT_LABEL_VARIABLE}='{agent}' "

@@ -189,7 +189,7 @@ class TestBuildScript:
             '$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"',
             "$env:POETRY_VIRTUALENVS_IN_PROJECT = 'true'",
             "$env:POETRY_KEYRING_ENABLED = 'false'",
-            '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
+            '$env:PLAYWRIGHT_BROWSERS_PATH = "$toolCache/ms-playwright"',
         ]
 
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:

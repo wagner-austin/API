@@ -267,9 +267,8 @@ class Dialect(Protocol):
                 as the phase it names (:mod:`fleet.core.phase_markers`); the
                 recipe is timed as the phase ``check``.
             cache_root: The node's cache directory, whose current
-                generation npm and poetry are pointed at
-                (:mod:`fleet.core.tool_caches`) and which playwright's
-                browsers live under.
+                generation npm, poetry and playwright are pointed at
+                (:mod:`fleet.core.tool_caches`).
             isolated_docker: True for a project that declares the ``docker``
                 tag, whose install steps and recipe then run as the node's
                 execdocker user against its rootless daemon, never as the

@@ -426,8 +426,7 @@ after the close leaves nothing a later one does not remove.
 | State | Owner and bound |
 |---|---|
 | Poetry virtualenvs | In the project (`POETRY_VIRTUALENVS_IN_PROJECT`), inside the run's directory, so the retire removes them with the run. Before: execdocker's cache held 168 (19 GB) on lavender-wsl, 77 (8.5 GB) on diphtheria and 33 (3.7 GB) on colossus, never swept |
-| npm's and poetry's download caches | `<cache root>/tools/<generation>`, the generation named in `tools/current`; a build starts a new one when the current is 14 days old (`fleet.core.tool_caches`) and writes the one it reads into its run directory. After each retire, every generation that is not current, that no run directory names and that stopped being current over an hour ago is removed whole, so no tool finds half of one of its entries. Before: poetry's held 10 to 23 GB per node, and per-file removal was measured to break both tools |
-| Playwright's browsers | Playwright itself: every `playwright install` removes each browser no live link under `.links` names, and a link into a removed run is dead |
+| npm's and poetry's download caches and Playwright's browsers | `<cache root>/tools/<generation>`, the generation named in `tools/current`; a build starts a new one when the current is 14 days old (`fleet.core.tool_caches`) and writes the one it reads into its run directory. After each retire, every generation that is not current, that no run directory names and that stopped being current over an hour ago is removed whole, so no tool finds half of one of its entries. Inside a generation, every `playwright install` also removes each browser no live link under `.links` names. Before: poetry's held 10 to 23 GB per node, per-file removal was measured to break both tools, and `<cache root>/ms-playwright`, outside every generation, was bounded only by those installs |
 | A docker project's copy in execdocker's home | Removed by the build when it runs to its end, and by the retire on a node that declares `docker`. Before: lavender-wsl held eight stopped builds' copies, 11 GB |
 | MCPs' prepared installs and venvs (`npm-installations`, `python-venvs`, `fleet-prepare`) | MCPs maketools' prepare store: the three newest entries per pool are kept, and an older one is removed once it has gone an hour unused |
 
@@ -687,9 +686,9 @@ one) and the runner exports THAT commit:
    into `<stage_root>/<directory>` — which is `../<directory>` from the
    export root, the layout a workstation already has — and made a one-commit
    git repository there;
-5. the build script points npm and poetry at the current generation of the
-   node's caches (`<stage_root>/cache/tools/<generation>/{npm,pypoetry}`)
-   and Playwright at `<stage_root>/cache/ms-playwright`, keeps poetry's
+5. the build script points npm, poetry and Playwright at the current
+   generation of the node's caches
+   (`<stage_root>/cache/tools/<generation>/{npm,pypoetry,ms-playwright}`), keeps poetry's
    virtualenv in the project, runs the install steps at the export root,
    and `make check` in `path`.
 

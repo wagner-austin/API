@@ -162,7 +162,7 @@ class TestBuildScript:
         assert 'npm_config_cache="$tool_cache/npm"\n' in body
         assert 'POETRY_CACHE_DIR="$tool_cache/pypoetry"\n' in body
         assert "POETRY_VIRTUALENVS_IN_PROJECT='true'\n" in body
-        assert "PLAYWRIGHT_BROWSERS_PATH='/s/cache/ms-playwright'\n" in body
+        assert 'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright"\n' in body
 
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
         """MCPs board task c837fd8d: left on, poetry blocks on the D-Bus

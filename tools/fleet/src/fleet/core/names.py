@@ -111,7 +111,7 @@ LOG_TAIL_STEM = "log-tail"
 CACHE_DIRECTORY = "cache"
 
 #: The directory under a cache root that holds the package managers' own
-#: caches, npm's and poetry's, one generation at a time
+#: caches, npm's, poetry's and playwright's browsers, one generation at a time
 #: (:mod:`fleet.core.cache_generations`, MCPs board task 346abc45).
 TOOL_CACHES_DIRECTORY = "tools"
 

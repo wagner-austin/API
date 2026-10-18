@@ -22,10 +22,15 @@ The cost is one cold install per project per node every
 :data:`GENERATION_DAYS` days, in the install phase before a check's clock
 starts.
 
-Playwright's browsers stay outside the generations: Playwright removes, at
-each ``playwright install``, every browser no live link names. Poetry's
-virtualenvs are in the project (:data:`~fleet.core.names.POETRY_IN_PROJECT`),
-so the retire removes them with the run.
+Playwright's browsers are a generation's too (audit e736ed5f, A3). Outside
+the generations only ``playwright install`` bounded them, by removing each
+browser no live link names, and only when an install ran: measured
+2026-10-18, every node held 0.67 to 1.39 GB of them under ``<cache
+root>/ms-playwright``, serendipity two chromium revisions, 1200 and 1228. In
+a generation they go whole with it, and Playwright's own removal still runs
+inside one. Poetry's virtualenvs are in the project
+(:data:`~fleet.core.names.POETRY_IN_PROJECT`), so the retire removes them
+with the run.
 """
 
 from __future__ import annotations

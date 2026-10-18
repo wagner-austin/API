@@ -412,7 +412,7 @@ class LinuxDialect:
             'POETRY_CACHE_DIR="$tool_cache/pypoetry"',
             f"{POETRY_IN_PROJECT[0]}='{POETRY_IN_PROJECT[1]}'",
             f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}'",
-            f"PLAYWRIGHT_BROWSERS_PATH='{cache_root}/ms-playwright'",
+            'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright"',
             f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
             f"CORVIS_TEST_MAX_WORKERS='{workers}'",
             f"{AGENT_LABEL_VARIABLE}='{label}'",

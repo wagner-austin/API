@@ -170,7 +170,7 @@ def build_script(
         '$env:POETRY_CACHE_DIR = "$toolCache/pypoetry"',
         f"$env:{POETRY_IN_PROJECT[0]} = '{POETRY_IN_PROJECT[1]}'",
         f"$env:{POETRY_KEYRING_OFF[0]} = '{POETRY_KEYRING_OFF[1]}'",
-        '$env:PLAYWRIGHT_BROWSERS_PATH = "$CacheRoot/ms-playwright"',
+        '$env:PLAYWRIGHT_BROWSERS_PATH = "$toolCache/ms-playwright"',
         '$env:PYTEST_XDIST_AUTO_NUM_WORKERS = "$Workers"',
         '$env:CORVIS_TEST_MAX_WORKERS = "$Workers"',
         f"$env:CORVIS_FLEET_ELEVATED = '{1 if elevated else 0}'",

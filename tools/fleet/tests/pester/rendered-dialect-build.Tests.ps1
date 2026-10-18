@@ -84,8 +84,8 @@ Describe 'The build' {
             "`$ `"$($install.Path)`" second", 'fleet-phase workspace-build started <utc>', 'installer says out', 'installer says err', 'fleet-phase workspace-build ended <utc> after <n> s, exit 0',
             'fleet-phase check started <utc>', 'make says out', 'make says err', 'fleet-phase check ended <utc> after <n> s, exit 0')
         Read-Result $export.Target | Should -BeExactly '0'
-        # npm and poetry read the generation the run's marker names (MCPs
-        # board task 346abc45), and the virtualenv is the project's.
+        # npm, poetry and playwright read the generation the run's marker
+        # names (MCPs board task 346abc45), and the virtualenv is the project's.
         $generation = [System.IO.File]::ReadAllText((Join-Path $export.Target 'cache-generation'))
         $generation | Should -BeExactly ([System.IO.File]::ReadAllText((Join-Path $export.Cache 'tools/current')))
         $env:npm_config_cache | Should -BeExactly "$($export.Cache)/tools/$generation/npm"
@@ -93,7 +93,7 @@ Describe 'The build' {
         $env:POETRY_VIRTUALENVS_IN_PROJECT | Should -BeExactly 'true'
         # No logon session on a runner's task for the Credential Manager (MCPs board task 65bb90c3).
         $env:POETRY_KEYRING_ENABLED | Should -BeExactly 'false'
-        $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/ms-playwright"
+        $env:PLAYWRIGHT_BROWSERS_PATH | Should -BeExactly "$($export.Cache)/tools/$generation/ms-playwright"
         $env:PYTEST_XDIST_AUTO_NUM_WORKERS | Should -BeExactly '3'
         $env:CORVIS_TEST_MAX_WORKERS | Should -BeExactly '3'
         # The node's cache, for an install step that keeps state (MCPs board task 74b13c20).

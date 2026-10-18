@@ -120,6 +120,7 @@ class TestIsolatedText:
         assert "BOARD_AGENT_LABEL='opus-demo-0929' " in body
         assert 'npm_config_cache="$tool_cache/npm" ' in body
         assert 'POETRY_CACHE_DIR="$tool_cache/pypoetry" ' in body
+        assert 'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright" ' in body
         assert "POETRY_VIRTUALENVS_IN_PROJECT='true' " in body
         assert "PYTEST_XDIST_AUTO_NUM_WORKERS='3' " in body
         assert "CORVIS_TEST_MAX_WORKERS='3' " in body
