@@ -31,13 +31,15 @@ re-derives what changed, so the one definition of a transition lives beside
 the standard it reads. A kind this package does not declare is a decode
 refusal, never a line posted without being understood.
 
-**A second journal in the same shape** is MCPs
-`logs/hub-tunnel/health-events.jsonl`, appended by the hub tunnel's runner
-(`make hub-tunnel-run`, `packages/maketools`, `maketools.hub_tunnel_state`)
-with one `transitions` line each time the ssh -R tunnel into diphtheria goes
-down or comes back (MCPs board task `86c8e2c6`). The pump runs this bridge on
-it as its own row, `hub-tunnel-wake`, so each journal keeps one writer and
-its own cursor, and both post to the same standing task.
+**A second journal in the same shape** was MCPs
+`logs/hub-tunnel/health-events.jsonl`, appended by austinpc's hub tunnel
+runner with one `transitions` line each time the ssh -R tunnel into
+diphtheria went down or came back (MCPs board task `86c8e2c6`), which the
+pump ran this bridge on as its own row, `hub-tunnel-wake`. The row left the
+pump with the control duty (MCPs board task `c39ee056`), and the tunnel and
+its journal were deleted when austinpc's device services moved to diphtheria
+(MCPs board task `49b6588b`, MCPs `b911ee901`), so the fleet audit's journal
+is the one this bridge reads.
 
 The position is a byte offset beside the journal
 (`health-events.jsonl.fleet-health-wake-offset.json`), kept by
