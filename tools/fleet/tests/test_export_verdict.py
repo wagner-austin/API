@@ -3,8 +3,9 @@ finished check becomes (A3).
 
 The export half runs git through the one command hook: what is asserted is
 the exact argv of every git call, its deadline, and which of git's refusals
-becomes which fleet code. The mirror directory and the archive file are
-real, in a temporary directory, because the file hooks are left on their
+becomes which fleet code; the fetches are ``tests/test_mirror_fetch.py``'s.
+The mirror directory and the archive file are real, in a temporary
+directory, because the file hooks are left on their
 real implementations by the autouse reset. The verdict half is pure: real
 transcript tails from vitest and pytest-cov in, the one thread line out.
 """
@@ -18,7 +19,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.source import ProjectCompanion, ProjectSource
-from fleet.core import _test_hooks, export, verdict
+from fleet.core import _test_hooks, export, mirror_fetch, verdict
 from tests.conftest import FakeRun, failed, ok
 
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
@@ -65,7 +66,7 @@ class TestEnsureMirror:
         export.ensure_mirror(mirror)
 
         assert runner.calls == [("git", "init", "--bare", "--quiet", str(mirror))]
-        assert runner.timeouts == [export.INIT_TIMEOUT_SECONDS]
+        assert runner.timeouts == [mirror_fetch.INIT_TIMEOUT_SECONDS]
         assert mirror.parent.is_dir()
 
     def test_an_existing_mirror_is_left_alone(self, tmp_path: pathlib.Path) -> None:
@@ -95,61 +96,6 @@ class TestEnsureMirror:
 
         with pytest.raises(AppError, match=r"\(git wrote nothing to stderr\)"):
             export.ensure_mirror(tmp_path / "slime.git")
-
-
-class TestFetchCommit:
-    def test_a_commit_already_held_costs_no_fetch(self, tmp_path: pathlib.Path) -> None:
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        export.fetch_commit(tmp_path, REMOTE, SHA)
-
-        assert runner.calls == [("git", "-C", str(tmp_path), "cat-file", "-e", f"{SHA}^{{commit}}")]
-
-    def test_a_missing_commit_is_fetched_by_sha_without_tags(self, tmp_path: pathlib.Path) -> None:
-        runner = FakeRun([failed(128, "missing"), ok("")])
-        _test_hooks.run = runner
-
-        export.fetch_commit(tmp_path, REMOTE, SHA)
-
-        assert runner.calls[1] == (
-            "git",
-            "-C",
-            str(tmp_path),
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            REMOTE,
-            SHA,
-        )
-        assert runner.timeouts == [export.INIT_TIMEOUT_SECONDS, export.FETCH_TIMEOUT_SECONDS]
-
-    @pytest.mark.parametrize("marker", export.NOT_ON_REMOTE_MARKERS)
-    def test_every_spelling_of_an_unserved_object_is_sha_not_on_remote(
-        self, tmp_path: pathlib.Path, marker: str
-    ) -> None:
-        _test_hooks.run = FakeRun([failed(128, "missing"), failed(128, f"fatal: {marker}: {SHA}")])
-
-        with pytest.raises(AppError) as raised:
-            export.fetch_commit(tmp_path, REMOTE, SHA)
-
-        assert raised.value.code is FleetErrorCode.SHA_NOT_ON_REMOTE
-        assert raised.value.message.startswith(f"{REMOTE} does not serve {SHA}")
-        assert f"git said: fatal: {marker}: {SHA}" in raised.value.message
-
-    def test_any_other_fetch_failure_is_an_export_failure(self, tmp_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun(
-            [failed(128, "missing"), failed(128, "fatal: unable to access: Could not resolve host")]
-        )
-
-        with pytest.raises(AppError) as raised:
-            export.fetch_commit(tmp_path, REMOTE, SHA)
-
-        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert raised.value.message == (
-            f"git fetch {REMOTE} {SHA} into {tmp_path}: fatal: unable to access: Could not "
-            "resolve host"
-        )
 
 
 class TestArchiveCommit:
@@ -339,77 +285,6 @@ class TestCompanionMirrorKey:
         assert export.mirror_path(tmp_path, ours) != export.mirror_path(tmp_path, theirs)
 
 
-class TestFetchRef:
-    def test_the_tip_is_fetched_into_a_ref_and_resolved_to_a_commit(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """Into a ref rather than off FETCH_HEAD, so the commit is referenced
-        between the fetch and the archive; and never skipped the way a sha is,
-        because a ref's tip is a moving answer."""
-        runner = FakeRun([ok(""), ok(f"{SHA}\n")])
-        _test_hooks.run = runner
-
-        assert export.fetch_ref(tmp_path, REMOTE, "main") == SHA
-        assert runner.calls == [
-            (
-                "git",
-                "-C",
-                str(tmp_path),
-                "fetch",
-                "--quiet",
-                "--no-tags",
-                "--force",
-                REMOTE,
-                f"+main:{export.COMPANION_REF}",
-            ),
-            ("git", "-C", str(tmp_path), "rev-parse", f"{export.COMPANION_REF}^{{commit}}"),
-        ]
-        assert runner.timeouts == [export.FETCH_TIMEOUT_SECONDS, export.INIT_TIMEOUT_SECONDS]
-
-    @pytest.mark.parametrize("marker", export.NOT_ON_REMOTE_MARKERS)
-    def test_a_ref_the_remote_lacks_is_its_own_code_and_not_the_shas(
-        self, tmp_path: pathlib.Path, marker: str
-    ) -> None:
-        """A sha the remote lacks is the submitter's unpushed commit; a ref it
-        lacks is a registry line that is wrong for every job of that project,
-        so the two send their readers to different places."""
-        _test_hooks.run = FakeRun([failed(128, f"fatal: {marker} main")])
-
-        with pytest.raises(AppError) as raised:
-            export.fetch_ref(tmp_path, REMOTE, "main")
-
-        assert raised.value.code is FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE
-        assert raised.value.message.startswith(f"{REMOTE} does not serve 'main'")
-        assert "which the registry declares as a companion ref" in raised.value.message
-        assert f"git said: fatal: {marker} main" in raised.value.message
-
-    def test_any_other_fetch_failure_carries_gits_words(self, tmp_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun([failed(128, "fatal: unable to access: Could not resolve host")])
-
-        with pytest.raises(AppError) as raised:
-            export.fetch_ref(tmp_path, REMOTE, "main")
-
-        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert raised.value.message == (
-            f"git fetch {REMOTE} main into {tmp_path}: fatal: unable to access: Could not "
-            "resolve host"
-        )
-
-    def test_a_ref_that_resolves_to_no_commit_is_an_export_failure(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """A tag object pointing at a tree, or a ref written by something that
-        is not git: the fetch succeeds and there is still no commit to
-        archive, which is not the same as a fetch that failed."""
-        _test_hooks.run = FakeRun([ok(""), failed(128, "fatal: not a valid object name")])
-
-        with pytest.raises(AppError) as raised:
-            export.fetch_ref(tmp_path, REMOTE, "main")
-
-        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert raised.value.message.startswith(f"git rev-parse {export.COMPANION_REF} in ")
-
-
 class TestExportingCompanions:
     def test_a_companion_is_mirrored_fetched_and_bundled_at_its_tip(
         self, tmp_path: pathlib.Path
@@ -451,7 +326,7 @@ class TestExportingCompanions:
             "create",
             "--quiet",
             str(archives / f"companion-wagner-austin-MCPs-{SHA}.bundle"),
-            export.COMPANION_REF,
+            mirror_fetch.COMPANION_REF,
         )
         assert runner.timeouts[3] == export.ARCHIVE_TIMEOUT_SECONDS
 
@@ -465,7 +340,7 @@ class TestExportingCompanions:
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message == (
-            f"git bundle create {export.COMPANION_REF} from {tmp_path / 'm.git'}: "
+            f"git bundle create {mirror_fetch.COMPANION_REF} from {tmp_path / 'm.git'}: "
             "fatal: Refusing to create empty bundle."
         )
 

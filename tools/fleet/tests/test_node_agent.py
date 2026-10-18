@@ -23,7 +23,7 @@ from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
-from fleet.core import _test_hooks, dialect, records, stage_repository, staging
+from fleet.core import _test_hooks, dialect, mirror_fetch, records, stage_repository, staging
 from tests._node_agent_fixtures import (
     COMPANION_DIRECTORY,
     COMPANION_REF,
@@ -566,14 +566,15 @@ class TestRefusals:
                 *PROBED,
                 ok(""),
                 failed(128, "missing"),
-                failed(128, "fatal: unable to access: could not resolve host"),
+                *[failed(128, "fatal: unable to access: could not resolve host")]
+                * mirror_fetch.FETCH_ATTEMPTS,
             ]
         )
 
         detail = self._refused_detail(sourced_config, queue_job(status="claimed"))
 
         assert detail.startswith("EXPORT_FAILED: git fetch")
-        assert "could not resolve host" in detail
+        assert "attempt 3: fatal: unable to access: could not resolve host" in detail
 
     def test_a_node_lane_job_without_a_sha_is_a_contract_fault_not_a_refusal(
         self, sourced_config: pathlib.Path

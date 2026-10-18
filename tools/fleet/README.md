@@ -693,7 +693,12 @@ one) and the runner exports THAT commit:
    (`runs/mirrors/<key with / as ->.git`, `git fetch --no-tags <remote>
    <sha>`) BEFORE any lease is taken, so a sha the remote has never seen is
    refused `SHA_NOT_ON_REMOTE` with nothing held, and a project with no
-   `source` is refused `PROJECT_REMOTE_MISSING` by name;
+   `source` is refused `PROJECT_REMOTE_MISSING` by name; a fetch git loses
+   (a reset connection, a TLS drop, a timeout) is sent again, up to three
+   attempts within 900 s, before the job is refused `EXPORT_FAILED` naming
+   each attempt (`fleet.core.mirror_fetch`, MCPs board task dfcdfb48: six
+   such refusals in three days to 2026-10-18, one of which passed on
+   resubmission at the same sha);
 3. `git archive --format=tar.gz <sha>` is staged through the same verified
    transport every dispatch uses, so the tree on the node equals the commit
    by construction, and the staged tree is made a one-commit repository

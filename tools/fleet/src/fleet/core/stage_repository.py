@@ -10,7 +10,7 @@ as it does :func:`fleet.core.dialect.extract_commands`.
 
 from __future__ import annotations
 
-from fleet.core.export import COMPANION_REF
+from fleet.core.mirror_fetch import COMPANION_REF
 
 #: Who a project's staged tree's one commit is authored by, passed to ``git``
 #: with ``-c`` on the commit itself. A companion is cloned with its real
