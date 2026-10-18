@@ -1,7 +1,7 @@
 """A command runner that answers from a script and records every argv.
 
-Shared by the tests of the scripts that operate sedona from the hub
-(``scripts.fleet_host`` and ``scripts.sim_host``): every command they run
+Shared by the tests of the scripts that operate the game host
+(``scripts.fleet_host``, ``scripts.fleet_release`` and ``scripts.sim_host``): every command they run
 goes through ``scripts._test_hooks.run_command``, which these tests replace
 with a :class:`Recorder`, so each test asserts the exact commands sent.
 """

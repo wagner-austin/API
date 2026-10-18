@@ -1,15 +1,14 @@
-"""Tests for operating the fleet on sedona from the hub.
+"""Tests for operating the fleet on the game host.
 
 Every command the script runs goes through ``scripts._test_hooks.run_command``,
 here a recorder that answers by the command's words and keeps every argv, so
-each test asserts the exact commands sent to sedona. The release ladder and
-the secrets file are real files under ``tmp_path``.
+each test asserts the exact commands sent to the host.
 """
 
 from __future__ import annotations
 
-import os
 import runpy
+import shlex
 from collections.abc import Generator
 from pathlib import Path
 
@@ -17,21 +16,22 @@ import pytest
 from scripts.fleet_gate import FLEET_URL, GATE_INSTANCE
 from scripts.fleet_host import (
     HOST_DIR,
+    HOST_FILES,
     PUBLIC_ORIGIN,
-    SEDONA_DOCKER_HOST,
+    REGISTRY_FILE,
+    RELEASES_DIR,
     SMOKE_ATTEMPTS,
     SMOKE_PAUSE_SECONDS,
     down,
     ensure_image,
     image_tag,
     newest_release,
-    pull_edge,
     run,
     smoke,
     stage,
     up,
 )
-from scripts.fleet_remote import SEDONA_SSH, FleetHostError
+from scripts.fleet_remote import GAME_HOST_SSH, FleetHostError, on_host
 
 from scripts import _test_hooks as script_hooks
 from scripts import fleet_host
@@ -39,8 +39,11 @@ from tankpit_bot import _test_hooks as core_hooks
 from tests.scripts._fleet_answers import passing_gate
 from tests.scripts._recorder import Recorder, fail, ok
 
-COMPOSE = f"{HOST_DIR}/docker-compose.yml"
-HOST_ENV = f"{HOST_DIR}/host.env"
+COMPOSE = ["docker", "compose", "-f", f"{HOST_DIR}/docker-compose.yml"]
+COMPOSE += ["--env-file", f"{HOST_DIR}/host.env"]
+
+#: The ladder listing ``find`` prints: two releases, the older first.
+LADDER = "1000.5 v0.1.0-aaaaaaaa\n2000.25 v0.1.0-bbbbbbbb\n"
 
 
 class Answer:
@@ -56,21 +59,17 @@ class Answer:
         self.content = b""
 
 
-def _release(ladder: Path, name: str, *, registry: bool) -> Path:
-    inputs = ladder / name / "clients" / "TankpitBot"
-    (inputs / "data").mkdir(parents=True)
-    (inputs / ".env").write_text("TANKPIT_URL=x\n", encoding="utf-8")
-    (inputs / "accounts.json").write_text("[]\n", encoding="utf-8")
-    if registry:
-        (inputs / "data" / "tank_registry.json").write_text("{}\n", encoding="utf-8")
-    return ladder / name
+def _remote(call: list[str]) -> list[str]:
+    """The words one ssh call ran on the host.
 
+    Args:
+        call: A recorded ``ssh <host> <line>`` argv.
 
-def _secrets(tmp_path: Path) -> Path:
-    secrets = tmp_path / "secrets" / "edge.env"
-    secrets.parent.mkdir()
-    secrets.write_text("TUNNEL_TOKEN=t\n", encoding="utf-8")
-    return secrets
+    Returns:
+        The line, split back into its words.
+    """
+    assert call[:2] == ["ssh", GAME_HOST_SSH]
+    return shlex.split(call[2])
 
 
 @pytest.fixture(autouse=True)
@@ -92,122 +91,91 @@ def _restore_hooks() -> Generator[None, None, None]:
 
 
 def test_newest_release_is_the_last_written(tmp_path: Path) -> None:
-    """The ladder's newest directory by write time is the release, and a stray file is not."""
-    older = _release(tmp_path, "v0.1.0-aaaaaaaa", registry=False)
-    newer = _release(tmp_path, "v0.1.0-bbbbbbbb", registry=False)
-    (tmp_path / "notes.txt").write_text("x", encoding="utf-8")
-    os.utime(older, (1_000, 1_000))
-    os.utime(newer, (2_000, 2_000))
-    assert newest_release(tmp_path) == newer
-    assert image_tag(newer) == "tankpit-fleet:v0.1.0-bbbbbbbb"
+    """The ladder's newest directory by write time is the release, whatever order find prints."""
+    recorder = Recorder({"find": ok("2000.25 v0.1.0-bbbbbbbb\n1000.5 v0.1.0-aaaaaaaa\n")})
+    script_hooks.run_command = recorder
+    assert newest_release(tmp_path) == "v0.1.0-bbbbbbbb"
+    assert _remote(recorder.calls[0]) == [
+        "find", RELEASES_DIR, "-mindepth", "1", "-maxdepth", "1", "-type", "d",
+        "-printf", "%T@ %f\n",
+    ]  # fmt: skip
+    assert image_tag("v0.1.0-bbbbbbbb") == "tankpit-fleet:v0.1.0-bbbbbbbb"
 
 
-@pytest.mark.parametrize("ladder", ["missing", "empty"])
-def test_newest_release_refuses_a_ladder_without_one(tmp_path: Path, ladder: str) -> None:
-    """No release, or no ladder at all, is refused by name."""
-    root = tmp_path / ladder
-    if ladder == "empty":
-        root.mkdir()
+def test_newest_release_refuses_an_empty_ladder(tmp_path: Path) -> None:
+    """A ladder holding no release is refused by name."""
+    script_hooks.run_command = Recorder({"find": ok("")})
     with pytest.raises(FleetHostError) as raised:
-        newest_release(root)
-    assert str(raised.value) == f"FLEET_NO_RELEASE: {root} holds no release; run make release first"
+        newest_release(tmp_path)
+    assert str(raised.value) == (
+        f"FLEET_NO_RELEASE: {GAME_HOST_SSH}:{RELEASES_DIR} holds no release; run make release first"
+    )
 
 
-@pytest.mark.parametrize(("sedona_has_registry", "copied"), [("False", True), ("True", False)])
-def test_stage_sends_committed_files_release_inputs_and_the_token(
-    tmp_path: Path, sedona_has_registry: str, copied: bool
+def test_newest_release_refuses_a_ladder_it_cannot_read(tmp_path: Path) -> None:
+    """A missing ladder is refused with find's own words."""
+    script_hooks.run_command = Recorder({"find": fail("find: No such file or directory")})
+    with pytest.raises(FleetHostError) as raised:
+        newest_release(tmp_path)
+    assert str(raised.value).startswith(f"FLEET_NO_RELEASE: ssh {GAME_HOST_SSH} find ")
+    assert str(raised.value).endswith("exited 1: find: No such file or directory")
+
+
+def test_stage_seeds_the_registry_checks_the_hosts_files_then_sends_heads_files(
+    tmp_path: Path,
 ) -> None:
-    """Stage sends HEAD's files, the release's inputs and the token.
-
-    The registry goes only to a host that has none.
-    """
-    release = _release(tmp_path / "ladder", "v0.1.0-cccccccc", registry=True)
-    secrets = _secrets(tmp_path)
+    """Stage seeds a missing registry, asks for the host's files, then sends HEAD's and host.env."""
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     recorder = Recorder(
         {
             "git show HEAD:./docker-compose.yml": ok("name: tankpitbot\n"),
             "git show HEAD:./edge/nginx.conf": ok("server {}\n"),
-            "Test-Path": ok(f"{sedona_has_registry}\r\n"),
         }
     )
     script_hooks.run_command = recorder
-    stage(tmp_path, release, secrets, scratch)
-    inputs = release / "clients" / "TankpitBot"
-    expected = [
+    stage(tmp_path, "v0.1.0-cccccccc", scratch)
+    held = [f"{HOST_DIR}/{name}" for name in HOST_FILES]
+    registry = f"{RELEASES_DIR}/v0.1.0-cccccccc/clients/TankpitBot/{REGISTRY_FILE}"
+    assert recorder.calls == [
+        on_host(["mkdir", "-p", f"{HOST_DIR}/edge", f"{HOST_DIR}/data", f"{HOST_DIR}/runs"]),
+        on_host(["cp", "--update=none", registry, f"{HOST_DIR}/{REGISTRY_FILE}"]),
+        on_host(["ls", "-1", *held]),
         ["git", "show", "HEAD:./docker-compose.yml"],
         ["git", "show", "HEAD:./edge/nginx.conf"],
-        [
-            "ssh",
-            SEDONA_SSH,
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            "$null = New-Item -ItemType Directory -Force -Path "
-            f"{HOST_DIR}/edge, {HOST_DIR}/data, {HOST_DIR}/runs",
-        ],
         [
             "scp",
             "-q",
             str(scratch / "docker-compose.yml"),
             str(scratch / "host.env"),
-            str(scratch / "edge.env"),
-            str(scratch / ".env"),
-            str(scratch / "accounts.json"),
-            f"{SEDONA_SSH}:{HOST_DIR}/",
+            f"{GAME_HOST_SSH}:{HOST_DIR}/",
         ],
-        ["scp", "-q", str(scratch / "edge" / "nginx.conf"), f"{SEDONA_SSH}:{HOST_DIR}/edge/"],
-        [
-            "ssh",
-            SEDONA_SSH,
-            "powershell",
-            "-NoProfile",
-            "-Command",
-            f"Test-Path {HOST_DIR}/data/tank_registry.json",
-        ],
+        ["scp", "-q", str(scratch / "edge" / "nginx.conf"), f"{GAME_HOST_SSH}:{HOST_DIR}/edge/"],
     ]
-    if copied:
-        expected.append(
-            [
-                "scp",
-                "-q",
-                str(inputs / "data" / "tank_registry.json"),
-                f"{SEDONA_SSH}:{HOST_DIR}/data/",
-            ]
-        )
-    assert recorder.calls == expected
-    assert recorder.staged["docker-compose.yml"] == "name: tankpitbot\n"
-    assert recorder.staged["nginx.conf"] == "server {}\n"
-    assert recorder.staged["host.env"] == "FLEET_IMAGE=tankpit-fleet:v0.1.0-cccccccc\n"
-    assert recorder.staged["edge.env"] == "TUNNEL_TOKEN=t\n"
-    assert recorder.staged[".env"] == "TANKPIT_URL=x\n"
-    assert recorder.staged["accounts.json"] == "[]\n"
-    assert secrets.read_text(encoding="utf-8") == "TUNNEL_TOKEN=t\n"
+    assert recorder.staged == {
+        "docker-compose.yml": "name: tankpitbot\n",
+        "host.env": "FLEET_IMAGE=tankpit-fleet:v0.1.0-cccccccc\n",
+        "nginx.conf": "server {}\n",
+    }
 
 
-def test_stage_skips_a_registry_the_release_does_not_carry(tmp_path: Path) -> None:
-    """A release without a registry sends none, even to a host without one."""
-    release = _release(tmp_path / "ladder", "v0.1.0-dddddddd", registry=False)
-    scratch = tmp_path / "scratch"
-    scratch.mkdir()
-    recorder = Recorder({"Test-Path": ok("False\r\n")})
-    script_hooks.run_command = recorder
-    stage(tmp_path, release, _secrets(tmp_path), scratch)
-    assert recorder.calls[-1][-1] == f"Test-Path {HOST_DIR}/data/tank_registry.json"
+def test_stage_refuses_a_host_without_its_own_files(tmp_path: Path) -> None:
+    """A host lacking the token, the accounts or the registry is refused, naming the file.
 
-
-def test_stage_refuses_without_the_token(tmp_path: Path) -> None:
-    """No token file means no tunnel, refused before anything is sent."""
-    recorder = Recorder({})
-    script_hooks.run_command = recorder
-    missing = tmp_path / "edge.env"
-    with pytest.raises(FleetHostError) as raised:
-        stage(tmp_path, tmp_path, missing, tmp_path)
-    assert str(raised.value) == (
-        f"FLEET_SECRETS_MISSING: {missing} is absent; it holds the tankpit tunnel's TUNNEL_TOKEN"
+    The registry was seeded first, so a host refused for it is one whose
+    release carries none either.
+    """
+    recorder = Recorder(
+        {"ls -1": fail(f"ls: cannot access '{HOST_DIR}/edge.env': No such file or directory")}
     )
-    assert recorder.calls == []
+    script_hooks.run_command = recorder
+    with pytest.raises(FleetHostError) as raised:
+        stage(tmp_path, "v0.1.0-dddddddd", tmp_path)
+    assert str(raised.value).startswith(f"FLEET_HOST_FILES_MISSING: ssh {GAME_HOST_SSH} ls -1 ")
+    assert str(raised.value).endswith(
+        f"exited 1: ls: cannot access '{HOST_DIR}/edge.env': No such file or directory"
+    )
+    assert len(recorder.calls) == 3
 
 
 def test_stage_refuses_a_file_head_does_not_hold(tmp_path: Path) -> None:
@@ -216,78 +184,40 @@ def test_stage_refuses_a_file_head_does_not_hold(tmp_path: Path) -> None:
         {"git show": fail("fatal: path 'docker-compose.yml' does not exist in 'HEAD'\n")}
     )
     with pytest.raises(FleetHostError) as raised:
-        stage(tmp_path, tmp_path, _secrets(tmp_path), tmp_path)
+        stage(tmp_path, "v0.1.0-dddddddd", tmp_path)
     assert str(raised.value) == (
         "FLEET_NOT_COMMITTED: git show HEAD:./docker-compose.yml exited 1: "
         "fatal: path 'docker-compose.yml' does not exist in 'HEAD'"
     )
 
 
-def test_stage_refuses_when_sedona_refuses_a_copy(tmp_path: Path) -> None:
-    """A copy sedona refuses stops the stage by name."""
-    release = _release(tmp_path / "ladder", "v0.1.0-eeeeeeee", registry=False)
+def test_stage_refuses_when_the_host_refuses_a_copy(tmp_path: Path) -> None:
+    """A copy the host refuses stops the stage by name."""
     scratch = tmp_path / "scratch"
     scratch.mkdir()
     script_hooks.run_command = Recorder({"scp": fail("scp: permission denied")})
     with pytest.raises(FleetHostError) as raised:
-        stage(tmp_path, release, _secrets(tmp_path), scratch)
-    sent = [scratch / name for name in ("docker-compose.yml", "host.env", "edge.env", ".env")]
-    sent.append(scratch / "accounts.json")
+        stage(tmp_path, "v0.1.0-eeeeeeee", scratch)
     assert str(raised.value) == (
-        f"FLEET_STAGE_FAILED: scp -q {' '.join(str(path) for path in sent)} "
-        f"{SEDONA_SSH}:{HOST_DIR}/ exited 1: scp: permission denied"
-    )
-
-
-def test_pull_edge_pulls_through_the_hubs_client(tmp_path: Path) -> None:
-    """The edge's images are pulled by the staged compose file, against sedona's daemon."""
-    recorder = Recorder({})
-    script_hooks.run_command = recorder
-    pull_edge(tmp_path, tmp_path / "scratch")
-    assert recorder.calls == [
-        ["docker", "--host", SEDONA_DOCKER_HOST, "compose",
-         "-f", str(tmp_path / "scratch" / "docker-compose.yml"),
-         "--env-file", str(tmp_path / "scratch" / "host.env"),
-         "--profile", "edge", "pull", "public", "tunnel"],
-    ]  # fmt: skip
-
-
-def test_pull_edge_refuses_a_failed_pull(tmp_path: Path) -> None:
-    """A pull the registry refuses is refused with the pull's error."""
-    script_hooks.run_command = Recorder({" pull ": fail("manifest unknown")})
-    with pytest.raises(FleetHostError) as raised:
-        pull_edge(tmp_path, tmp_path)
-    assert str(raised.value) == (
-        f"FLEET_PULL_FAILED: docker --host {SEDONA_DOCKER_HOST} compose "
-        f"-f {tmp_path / 'docker-compose.yml'} --env-file {tmp_path / 'host.env'} "
-        "--profile edge pull public tunnel exited 1: manifest unknown"
+        f"FLEET_STAGE_FAILED: scp -q {scratch / 'docker-compose.yml'} {scratch / 'host.env'} "
+        f"{GAME_HOST_SSH}:{HOST_DIR}/ exited 1: scp: permission denied"
     )
 
 
 def test_ensure_image_builds_only_a_missing_tag(tmp_path: Path) -> None:
-    """A tag sedona holds is not rebuilt; a missing one is built from the snapshot."""
-    release = tmp_path / "v0.1.0-ffffffff"
+    """A tag the host holds is not rebuilt; a missing one is built there from the release."""
     held = Recorder({})
     script_hooks.run_command = held
-    assert ensure_image(tmp_path, release) is False
-    assert held.calls == [
-        [
-            "docker",
-            "--host",
-            SEDONA_DOCKER_HOST,
-            "image",
-            "inspect",
-            "tankpit-fleet:v0.1.0-ffffffff",
-        ]
-    ]
+    assert ensure_image(tmp_path, "v0.1.0-ffffffff") is False
+    assert held.calls == [on_host(["docker", "image", "inspect", "tankpit-fleet:v0.1.0-ffffffff"])]
     missing = Recorder({"image inspect": fail("No such image")})
     script_hooks.run_command = missing
-    assert ensure_image(tmp_path, release) is True
-    assert missing.calls[1] == [
-        "docker", "--host", SEDONA_DOCKER_HOST, "build",
-        "-f", str(release / "clients" / "TankpitBot" / "Dockerfile"),
+    assert ensure_image(tmp_path, "v0.1.0-ffffffff") is True
+    context = f"{RELEASES_DIR}/v0.1.0-ffffffff"
+    assert _remote(missing.calls[1]) == [
+        "docker", "build", "-f", f"{context}/clients/TankpitBot/Dockerfile",
         "-t", "tankpit-fleet:v0.1.0-ffffffff",
-        "--build-arg", "BUILD_REF=v0.1.0-ffffffff", str(release),
+        "--build-arg", "BUILD_REF=v0.1.0-ffffffff", context,
     ]  # fmt: skip
 
 
@@ -296,15 +226,11 @@ def test_ensure_image_refuses_a_failed_build(tmp_path: Path) -> None:
     script_hooks.run_command = Recorder(
         {"image inspect": fail("No such image"), " build ": fail("no space left")}
     )
-    release = tmp_path / "v0.1.0-00000000"
     with pytest.raises(FleetHostError) as raised:
-        ensure_image(tmp_path, release)
-    dockerfile = release / "clients" / "TankpitBot" / "Dockerfile"
-    assert str(raised.value) == (
-        f"FLEET_IMAGE_BUILD_FAILED: docker --host {SEDONA_DOCKER_HOST} build -f {dockerfile} "
-        f"-t tankpit-fleet:v0.1.0-00000000 --build-arg BUILD_REF=v0.1.0-00000000 {release} "
-        "exited 1: no space left"
-    )
+        ensure_image(tmp_path, "v0.1.0-00000000")
+    message = str(raised.value)
+    assert message.startswith(f"FLEET_IMAGE_BUILD_FAILED: ssh {GAME_HOST_SSH} docker build")
+    assert message.endswith("exited 1: no space left")
 
 
 class Pauses:
@@ -362,32 +288,37 @@ def test_smoke_gives_up_naming_the_last_answers() -> None:
     assert pauses.taken == [SMOKE_PAUSE_SECONDS] * (SMOKE_ATTEMPTS - 1)
 
 
-def test_up_stages_builds_composes_smokes_and_gates(tmp_path: Path) -> None:
-    """Up runs the newest release with its edge on sedona, sees a bot tick, and reports it all."""
-    release = _release(tmp_path / "ladder", "v0.1.0-12345678", registry=False)
+def test_up_stages_pulls_builds_composes_smokes_and_gates(tmp_path: Path) -> None:
+    """Up runs the newest release with its edge on the host, sees a bot tick, and reports it all."""
     recorder = Recorder(
-        {"image inspect": fail("No such image"), "Test-Path": ok("True\r\n"), **passing_gate()}
+        {"find": ok(LADDER), "image inspect": fail("No such image"), **passing_gate()}
     )
     script_hooks.run_command = recorder
     script_hooks.http_get = _serving
     script_hooks.sleep_seconds = Pauses()
-    lines = up(tmp_path, tmp_path / "ladder", _secrets(tmp_path))
-    verbs = [call[3] if call[0] == "docker" else call[0] for call in recorder.calls]
-    assert verbs[:10] == [
+    lines = up(tmp_path)
+    remote = [_remote(call) if call[0] == "ssh" else call for call in recorder.calls]
+    verbs = [words[0] if words[0] != "docker" else words[1] for words in remote]
+    assert verbs[:12] == [
+        "find",
+        "mkdir",
+        "cp",
+        "ls",
         "git",
         "git",
-        "ssh",
         "scp",
         "scp",
-        "ssh",
         "compose",
         "image",
         "build",
-        "ssh",
+        "compose",
     ]
+    assert remote[8] == [*COMPOSE, "--profile", "edge", "pull", "public", "tunnel"]
+    assert remote[11] == [
+        *COMPOSE, "--profile", "edge", "up", "-d", "--no-build", "fleet", "public", "tunnel",
+    ]  # fmt: skip
     gate_requests = [
-        "spawn" if call[2] == "powershell" else call[-1].removeprefix(FLEET_URL)
-        for call in recorder.calls[10:]
+        "spawn" if "POST" in words else words[-1].removeprefix(FLEET_URL) for words in remote[12:]
     ]
     assert gate_requests == [
         "/accounts",
@@ -397,45 +328,34 @@ def test_up_stages_builds_composes_smokes_and_gates(tmp_path: Path) -> None:
         "/bots",
         f"/bots/{GATE_INSTANCE}/activity",
     ]
-    assert recorder.calls[6][-5:] == ["--profile", "edge", "pull", "public", "tunnel"]
-    assert recorder.calls[9] == [
-        "ssh",
-        SEDONA_SSH,
-        "docker",
-        "compose",
-        "-f",
-        COMPOSE,
-        "--env-file",
-        HOST_ENV,
-        "--profile",
-        "edge",
-        "up",
-        "-d",
-        "--no-build",
-        "fleet",
-        "public",
-        "tunnel",
-    ]
     assert lines == [
-        f"release {release.name} staged into {SEDONA_SSH}:{HOST_DIR}",
-        "image tankpit-fleet:v0.1.0-12345678 built on sedona",
+        f"release v0.1.0-bbbbbbbb staged into {GAME_HOST_SSH}:{HOST_DIR}",
+        "image tankpit-fleet:v0.1.0-bbbbbbbb built on the host",
         f"fleet and edge up; {PUBLIC_ORIGIN} serves /healthz and /demo/fleet",
         "gate bot 'gate' on Arterial reached tick 2 at fuel 942 in Practice",
     ]
 
 
+def test_up_refuses_a_failed_pull(tmp_path: Path) -> None:
+    """An edge image the registry refuses stops up by name, before any build."""
+    recorder = Recorder({"find": ok(LADDER), " pull ": fail("manifest unknown")})
+    script_hooks.run_command = recorder
+    with pytest.raises(FleetHostError) as raised:
+        up(tmp_path)
+    assert str(raised.value).startswith(f"FLEET_PULL_FAILED: ssh {GAME_HOST_SSH} docker compose")
+    assert str(raised.value).endswith("exited 1: manifest unknown")
+    assert "build" not in " ".join(recorder.calls[-1])
+
+
 def test_up_refuses_when_compose_refuses(tmp_path: Path) -> None:
-    """Compose refusing on sedona is refused by name, before any smoke."""
-    _release(tmp_path / "ladder", "v0.1.0-87654321", registry=False)
+    """Compose refusing on the host is refused by name, before any smoke."""
     script_hooks.run_command = Recorder(
-        {"docker compose": fail("edge.env: no such file"), "Test-Path": ok("True\r\n")}
+        {"find": ok(LADDER), " up -d ": fail("edge.env: no such file")}
     )
     with pytest.raises(FleetHostError) as raised:
-        up(tmp_path, tmp_path / "ladder", _secrets(tmp_path))
-    assert str(raised.value) == (
-        f"FLEET_COMPOSE_FAILED: ssh {SEDONA_SSH} docker compose -f {COMPOSE} --env-file {HOST_ENV} "
-        "--profile edge up -d --no-build fleet public tunnel exited 1: edge.env: no such file"
-    )
+        up(tmp_path)
+    assert str(raised.value).startswith(f"FLEET_COMPOSE_FAILED: ssh {GAME_HOST_SSH} docker compose")
+    assert str(raised.value).endswith("exited 1: edge.env: no such file")
 
 
 def test_down_stops_the_fleet_only(tmp_path: Path) -> None:
@@ -443,22 +363,9 @@ def test_down_stops_the_fleet_only(tmp_path: Path) -> None:
     recorder = Recorder({})
     script_hooks.run_command = recorder
     assert down(tmp_path) == [
-        f"fleet stopped on {SEDONA_SSH}; the edge still answers, and the demo shows it offline"
+        f"fleet stopped on {GAME_HOST_SSH}; the edge still answers, and the demo shows it offline"
     ]
-    assert recorder.calls == [
-        [
-            "ssh",
-            SEDONA_SSH,
-            "docker",
-            "compose",
-            "-f",
-            COMPOSE,
-            "--env-file",
-            HOST_ENV,
-            "stop",
-            "fleet",
-        ]
-    ]
+    assert recorder.calls == [on_host([*COMPOSE, "stop", "fleet"])]
 
 
 def test_main_runs_down_and_prints_its_lines(capsys: pytest.CaptureFixture[str]) -> None:
@@ -466,20 +373,18 @@ def test_main_runs_down_and_prints_its_lines(capsys: pytest.CaptureFixture[str])
     script_hooks.run_command = Recorder({})
     core_hooks.get_argv = lambda: ["fleet_host", "down"]
     fleet_host.main()
-    assert (
-        capsys.readouterr().out
-        == f"fleet stopped on {SEDONA_SSH}; the edge still answers, and the demo shows it offline\n"
+    assert capsys.readouterr().out == (
+        f"fleet stopped on {GAME_HOST_SSH}; the edge still answers, and the demo shows it offline\n"
     )
 
 
-def test_run_up_reads_the_ladder_and_secrets_it_is_given(tmp_path: Path) -> None:
-    """``up`` on the command line runs the newest release of the ladder it is handed."""
-    _release(tmp_path / "ladder", "v0.1.0-abcdef12", registry=False)
-    script_hooks.run_command = Recorder({"Test-Path": ok("True\r\n"), **passing_gate()})
+def test_run_up_runs_the_hosts_newest_release(tmp_path: Path) -> None:
+    """``up`` on the command line runs the newest release on the host's ladder."""
+    script_hooks.run_command = Recorder({"find": ok(LADDER), **passing_gate()})
     script_hooks.http_get = _serving
     script_hooks.sleep_seconds = Pauses()
-    lines = run(["up"], tmp_path, tmp_path / "ladder", _secrets(tmp_path))
-    assert lines[1] == "image tankpit-fleet:v0.1.0-abcdef12 already on sedona"
+    lines = run(["up"], tmp_path)
+    assert lines[1] == "image tankpit-fleet:v0.1.0-bbbbbbbb already on the host"
 
 
 @pytest.mark.parametrize("arguments", [[], ["sideways"], ["up", "down"]])
@@ -490,7 +395,7 @@ def test_run_refuses_anything_else_with_the_usage(
     recorder = Recorder({})
     script_hooks.run_command = recorder
     with pytest.raises(SystemExit) as exited:
-        run(arguments, tmp_path, tmp_path, tmp_path)
+        run(arguments, tmp_path)
     assert exited.value.code == 2
     assert capsys.readouterr().out == "usage: python -m scripts.fleet_host {up|down}\n"
     assert recorder.calls == []

@@ -1,7 +1,7 @@
 """Tests for the bring-up gate.
 
 Every request goes through ``scripts._test_hooks.run_command``; here a fake
-sedona answers each fleet path from a scripted queue, the last answer
+game host answers each fleet path from a scripted queue, the last answer
 repeating, and records the order paths were asked in. The payloads are
 built with the fleet's own encoders, and the spawn body the gate sends is
 read back with the manager's own ``parse_spawn_request``.
@@ -9,8 +9,7 @@ read back with the manager's own ``parse_spawn_request``.
 
 from __future__ import annotations
 
-import base64
-import re
+import shlex
 from collections.abc import Generator
 from pathlib import Path
 
@@ -27,7 +26,7 @@ from scripts.fleet_gate import (
     gate,
     spawn,
 )
-from scripts.fleet_remote import SEDONA_SSH, FleetHostError
+from scripts.fleet_remote import GAME_HOST_SSH, FleetHostError, on_host
 
 from scripts import _test_hooks as script_hooks
 from tankpit_bot.service.fleet_routes import parse_spawn_request
@@ -42,12 +41,12 @@ from tests.scripts._fleet_answers import (
     stats,
 )
 
-#: The key :class:`Sedona` files the PowerShell spawn line under.
+#: The key :class:`GameHost` files the spawn POST under.
 SPAWN = "spawn"
 
 
-class Sedona:
-    """The manager on sedona's loopback, answering each path from a queue."""
+class GameHost:
+    """The manager on the game host's loopback, answering each path from a queue."""
 
     def __init__(self, answers: dict[str, list[script_hooks.CommandResult]]) -> None:
         """Hold the scripted answers.
@@ -71,7 +70,8 @@ class Sedona:
             The next scripted answer for its path.
         """
         self.calls.append(argv)
-        key = SPAWN if argv[2] == "powershell" else argv[-1].removeprefix(FLEET_URL)
+        words = shlex.split(argv[2])
+        key = SPAWN if "POST" in words else words[-1].removeprefix(FLEET_URL)
         self.asked.append(key)
         queue = self.answers[key]
         return queue.pop(0) if len(queue) > 1 else queue[0]
@@ -107,7 +107,7 @@ def pauses() -> Generator[list[float], None, None]:
 
 def test_free_account_skips_every_account_with_a_live_bot(tmp_path: Path) -> None:
     """The first account whose bot is not alive is chosen; a dead bot's account is free."""
-    sedona = Sedona(
+    host = GameHost(
         {
             "/accounts": [accounts("Artax", "Yuppler", "Arterial")],
             "/bots": [
@@ -115,14 +115,14 @@ def test_free_account_skips_every_account_with_a_live_bot(tmp_path: Path) -> Non
             ],
         }
     )
-    script_hooks.run_command = sedona
+    script_hooks.run_command = host
     assert free_account(tmp_path) == "Yuppler"
-    assert sedona.calls[0] == ["ssh", SEDONA_SSH, "curl.exe", "-s", "-f", f"{FLEET_URL}/accounts"]
+    assert host.calls[0] == on_host(["curl", "-s", "-f", f"{FLEET_URL}/accounts"])
 
 
 def test_free_account_refuses_when_every_account_plays(tmp_path: Path) -> None:
     """A fleet whose every account is playing is refused by name."""
-    script_hooks.run_command = Sedona(
+    script_hooks.run_command = GameHost(
         {"/accounts": [accounts("Artax")], "/bots": [fleet(bot_row("a1a", "Artax", alive=True))]}
     )
     with pytest.raises(FleetHostError) as raised:
@@ -131,17 +131,26 @@ def test_free_account_refuses_when_every_account_plays(tmp_path: Path) -> None:
 
 
 def test_spawn_sends_the_request_the_manager_parses(tmp_path: Path) -> None:
-    """The base64 body decodes, through the manager's parser, to the bounded Practice gatherer."""
-    sedona = Sedona({SPAWN: [_spawned("Arterial")]})
-    script_hooks.run_command = sedona
+    """The POST body, read back through the manager's parser, is the bounded Practice gatherer."""
+    host = GameHost({SPAWN: [_spawned("Arterial")]})
+    script_hooks.run_command = host
     row = spawn(tmp_path, "Arterial")
     assert row == bot_row(GATE_INSTANCE, "Arterial", alive=True)
-    argv = sedona.calls[0]
-    assert argv[:5] == ["ssh", SEDONA_SSH, "powershell", "-NoProfile", "-Command"]
-    found = re.search(r"FromBase64String\('([A-Za-z0-9+/=]+)'\)", argv[5])
-    if found is None:
-        pytest.fail(f"the spawn line carries no base64 body: {argv[5]}")
-    assert parse_spawn_request(base64.b64decode(found.group(1))) == SpawnRequestDict(
+    argv = host.calls[0]
+    assert argv[:2] == ["ssh", GAME_HOST_SSH]
+    words = shlex.split(argv[2])
+    assert words[:8] == [
+        "curl",
+        "-s",
+        "-f",
+        "-X",
+        "POST",
+        "-H",
+        "Content-Type: application/json",
+        "--data-binary",
+    ]
+    assert words[9:] == [f"{FLEET_URL}/bots"]
+    assert parse_spawn_request(words[8].encode("utf-8")) == SpawnRequestDict(
         instance=GATE_INSTANCE,
         account="Arterial",
         kills=0,
@@ -151,13 +160,11 @@ def test_spawn_sends_the_request_the_manager_parses(tmp_path: Path) -> None:
         troop="",
         doctrine="",
     )
-    assert f"Invoke-RestMethod -Method Post -Uri {FLEET_URL}/bots" in argv[5]
-    assert '"' not in argv[5]
 
 
 def test_spawn_refused_by_the_manager_is_refused_by_name(tmp_path: Path) -> None:
     """A refused spawn names its code and the manager's words."""
-    script_hooks.run_command = Sedona({SPAWN: [_fail("instance 'gate' is already running")]})
+    script_hooks.run_command = GameHost({SPAWN: [_fail("instance 'gate' is already running")]})
     with pytest.raises(FleetHostError) as raised:
         spawn(tmp_path, "Arterial")
     assert str(raised.value).startswith("FLEET_GATE_SPAWN_FAILED: ssh ")
@@ -168,7 +175,7 @@ def test_the_tail_is_read_only_a_poll_after_the_new_run_is_seen(
     tmp_path: Path, pauses: list[float]
 ) -> None:
     """A stale run's tick never passes: the tail is asked only after started_at caught up."""
-    sedona = Sedona(
+    host = GameHost(
         {
             f"/bots/{GATE_INSTANCE}/stats": [
                 answer({"available": False}),
@@ -179,17 +186,17 @@ def test_the_tail_is_read_only_a_poll_after_the_new_run_is_seen(
             "/bots": [fleet(bot_row(GATE_INSTANCE, "Arterial", alive=True))],
         }
     )
-    script_hooks.run_command = sedona
+    script_hooks.run_command = host
     line = await_first_tick(tmp_path, bot_row(GATE_INSTANCE, "Arterial", alive=True))
     assert line == "gate bot 'gate' on Arterial reached tick 2 at fuel 942 in Practice"
     digest, tail = f"/bots/{GATE_INSTANCE}/stats", f"/bots/{GATE_INSTANCE}/activity"
-    assert sedona.asked == [digest, "/bots", digest, "/bots", digest, "/bots", tail, "/bots", tail]
+    assert host.asked == [digest, "/bots", digest, "/bots", digest, "/bots", tail, "/bots", tail]
     assert pauses == [GATE_PAUSE_SECONDS] * 4
 
 
 def test_a_bot_that_exits_before_its_first_tick_is_refused(tmp_path: Path) -> None:
     """The gate stops waiting the moment the manager reports the bot gone, naming its exit."""
-    script_hooks.run_command = Sedona(
+    script_hooks.run_command = GameHost(
         {
             f"/bots/{GATE_INSTANCE}/stats": [stats(SPAWNED_AT)],
             "/bots": [fleet(bot_row(GATE_INSTANCE, "Arterial", alive=False))],
@@ -202,7 +209,7 @@ def test_a_bot_that_exits_before_its_first_tick_is_refused(tmp_path: Path) -> No
 
 def test_a_gate_the_manager_no_longer_lists_is_refused(tmp_path: Path) -> None:
     """A manager that lost the instance is refused by name, never waited out."""
-    script_hooks.run_command = Sedona(
+    script_hooks.run_command = GameHost(
         {f"/bots/{GATE_INSTANCE}/stats": [stats(SPAWNED_AT)], "/bots": [fleet()]}
     )
     with pytest.raises(FleetHostError) as raised:
@@ -214,7 +221,7 @@ def test_a_bot_that_never_ticks_is_refused_with_the_last_reading(
     tmp_path: Path, pauses: list[float]
 ) -> None:
     """Out of attempts, the gate names the last tail it read."""
-    script_hooks.run_command = Sedona(
+    script_hooks.run_command = GameHost(
         {
             f"/bots/{GATE_INSTANCE}/stats": [stats(SPAWNED_AT)],
             f"/bots/{GATE_INSTANCE}/activity": [activity(1, -1)],
@@ -231,7 +238,7 @@ def test_a_bot_that_never_ticks_is_refused_with_the_last_reading(
 
 def test_a_run_never_seen_is_refused_naming_where_it_stood(tmp_path: Path) -> None:
     """A digest that never reaches the spawn is named with both instants."""
-    script_hooks.run_command = Sedona(
+    script_hooks.run_command = GameHost(
         {
             f"/bots/{GATE_INSTANCE}/stats": [answer({"available": False})],
             "/bots": [fleet(bot_row(GATE_INSTANCE, "Arterial", alive=True))],
@@ -247,18 +254,18 @@ def test_a_run_never_seen_is_refused_naming_where_it_stood(tmp_path: Path) -> No
 
 def test_an_unreachable_manager_is_refused_by_name(tmp_path: Path) -> None:
     """A failed request names FLEET_GATE_UNREACHABLE and curl's words."""
-    script_hooks.run_command = Sedona({"/accounts": [_fail("curl: (7) Failed to connect")]})
+    script_hooks.run_command = GameHost({"/accounts": [_fail("curl: (7) Failed to connect")]})
     with pytest.raises(FleetHostError) as raised:
         free_account(tmp_path)
     assert str(raised.value) == (
-        f"FLEET_GATE_UNREACHABLE: ssh {SEDONA_SSH} curl.exe -s -f {FLEET_URL}/accounts "
+        f"FLEET_GATE_UNREACHABLE: ssh {GAME_HOST_SSH} curl -s -f {FLEET_URL}/accounts "
         "exited 22: curl: (7) Failed to connect"
     )
 
 
 def test_gate_picks_spawns_and_waits(tmp_path: Path) -> None:
     """The whole gate: a free account, one spawn on it, and its first tick."""
-    sedona = Sedona(
+    host = GameHost(
         {
             "/accounts": [accounts("Artax", "Arterial")],
             "/bots": [
@@ -273,6 +280,6 @@ def test_gate_picks_spawns_and_waits(tmp_path: Path) -> None:
             f"/bots/{GATE_INSTANCE}/activity": [activity(3, 1100)],
         }
     )
-    script_hooks.run_command = sedona
+    script_hooks.run_command = host
     assert gate(tmp_path) == "gate bot 'gate' on Arterial reached tick 3 at fuel 1100 in Practice"
-    assert sedona.asked[:3] == ["/accounts", "/bots", SPAWN]
+    assert host.asked[:3] == ["/accounts", "/bots", SPAWN]

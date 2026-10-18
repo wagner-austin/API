@@ -1,4 +1,4 @@
-"""The fleet manager's answers, as sedona's loopback gives them, for the fleet script tests.
+"""The fleet manager's answers, as the game host's loopback gives them, for the script tests.
 
 Built with the fleet's own encoders so a test's answer is exactly what the
 manager would send, and shared by the gate's tests and ``up``'s.
@@ -128,6 +128,6 @@ def passing_gate() -> dict[str, script_hooks.CommandResult | list[script_hooks.C
         f"/bots/{GATE_INSTANCE}/stats": stats(SPAWNED_AT),
         f"/bots/{GATE_INSTANCE}/activity": activity(2, 942),
         "/accounts": accounts("Arterial"),
-        "Invoke-RestMethod": answer(encode_fleet_bot(row)),
+        "-X POST": answer(encode_fleet_bot(row)),
         f"{FLEET_URL}/bots": [fleet(), fleet(row)],
     }
