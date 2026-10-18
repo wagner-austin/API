@@ -23,11 +23,12 @@ source_git_blobs:
   "src/tankpit_bot/sim/server.py": "8ab59cf72cf0df14f6ce3440f584dcfeb525e32e"
   "src/tankpit_bot/sim/server_queries.py": "9b1e55b994e865db0f0b9b99572ac879978bfd50"
 provenance:
+  - "/home/corvis/tankpit-evidence-20261017/manifest.json -- private hash-pinned tv-1 and tv-2 captures; October 18 shared-radar correction."
   - "src/tankpit_bot/sim/emissions.py and sim/combat_emissions.py -- cited here until 2026-09-03. Both were split into the sim/narrate/ package this page already lists (combat, movement, resources, world); the four successors are now pinned in their place rather than the two dead paths being repinned"
   - "runs/bot -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
   - "runs/sniff -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
   - "runs/bot/bot-20260826-003928.capture_session.json -- gitignored runtime capture artifact (moved from source_paths 2026-09-06, code-paths contract)"
-fact_checked: "2026-09-01"
+fact_checked: "2026-10-18"
 confidence: high
 verified: 2026-09-01 (341-session archive sweep, zero-trigger test); 2026-10-08 code re-read against API HEAD for MCPs board task 3d71a8e1 (footnotes moved off the deleted sim/emissions.py onto sim/narrate/, the statistics answer onto server_queries.py, the 0x64 deposit row added from narrate_fuel_deposit)
 hubs: [protocol]
@@ -74,7 +75,6 @@ commands ([[movable-blocks]]).[^2]
 
 | Msg | Family | Received | Own triggers | Zero-trigger arrivals |
 |-----|--------|----------|--------------|----------------------|
-| 0x4F | RadarScanResult | 7,014 | 7,053 radar | **0**[^1] |
 | 0x46 | RadarResult | 7,014 | 7,053 radar | **0**[^1] |
 | 0x4C | MapData | 12,275 | 12,655 map_open | **0**[^1] |
 | — | TeleportLanded | 10,541 | 10,683 teleport | **0**[^1] |
@@ -86,9 +86,19 @@ commands ([[movable-blocks]]).[^2]
 | 0x56 | Statistics | the asking tank's own counters[^8] |
 | 0x5A | ViewportUpdate | the connection's stored window[^9] |
 
-At 7,014-12,275 samples across 341 sessions, zero zero-trigger arrivals
-is decisive: other players' scans and hops would otherwise land in
-sessions where the client never triggered one.[^1]
+The historical zero-trigger counts are session-level observations,
+not proof that every arrival requires that connection's own command.
+The October 17 fleet captures falsify the actor-only classification
+for `0x4F`: tv-1 sends radar at 09:48:56.885 and 09:49:16.954; tv-2
+receives the same decoded container-and-mine payloads as tv-1 in
+both cases, without sending radar between 09:48:45.309 and
+09:49:19. Radar tile data can therefore reach a teammate as well
+as the scanner. This evidence establishes shared `0x4F` delivery,
+not room-wide delivery or shared `0x46` completion. The remaining
+rows retain their cited evidence; the old blanket claim that these
+session-level counts were decisive has been withdrawn.[^13]
+
+[^13]: Private manifest-pinned evidence: `/home/corvis/tankpit-evidence-20261017/tv-1/latest.capture_session.json`, commands 1587/1676 and radar messages 1592/1681; sibling `tv-2/latest.capture_session.json`, command 1387 and all outbound messages through 1482, radar messages 1422/1480. Each pair of decoded radar payloads is identical, including container coordinates/volumes and mine coordinates/teams. Tv-2 receives neither a paired own inventory debit nor `0x46` completion for these two shared updates. See [[retreat-incident-20261017]] for the time-window reconstruction and its clock limits.
 
 0x3F Sync is per-recipient on structure rather than the trigger test —
 it carries no tank id and is a per-connection view resync — and its
