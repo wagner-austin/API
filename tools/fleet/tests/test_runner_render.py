@@ -1,9 +1,7 @@
 """The rendered provision: both scripts, the manual steps, and the payloads.
 
-The hygiene payload constants are asserted here as executable content --
-shellcheck-grade claims a regex can make -- because this module is now the
-source of truth for a script that previously existed only on one machine's
-disk.
+The hygiene payloads themselves are tests/test_ci_clean.py's; here they are
+asserted only as embedded in the provision, byte for byte.
 """
 
 from __future__ import annotations
@@ -13,6 +11,7 @@ import subprocess
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import (
+    ci_clean,
     runner_cache_adopt,
     runner_install,
     runner_job_scope_render,
@@ -124,9 +123,9 @@ class TestLinuxScript:
 
     def test_the_hygiene_payloads_are_embedded_byte_identically(self) -> None:
         script = runner_render.render_provision(_host())["linux_script"]
-        assert runner_render.CI_CLEAN_SCRIPT.rstrip("\n") in script
-        assert runner_render.CI_CLEAN_SERVICE.rstrip("\n") in script
-        assert runner_render.CI_CLEAN_TIMER.rstrip("\n") in script
+        assert ci_clean.CI_CLEAN_SCRIPT.rstrip("\n") in script
+        assert ci_clean.CI_CLEAN_SERVICE.rstrip("\n") in script
+        assert ci_clean.CI_CLEAN_TIMER.rstrip("\n") in script
         assert "systemctl enable --now ci-clean.timer" in script
 
     def test_a_writable_asset_becomes_mkdir_and_chown(self) -> None:
@@ -214,61 +213,6 @@ class TestLinuxScript:
         assert (runner_dir / ".path").read_bytes() == (
             f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}:{runner_render.WSL_LIB}\n"
         ).encode()
-
-    def test_the_ci_clean_payload_gates_on_a_running_worker(self) -> None:
-        assert "Runner.Worker" in runner_render.CI_CLEAN_SCRIPT
-        assert "skipping this pass" in runner_render.CI_CLEAN_SCRIPT
-
-    def test_the_ci_clean_payload_keeps_venvs_of_unknown_provenance(self) -> None:
-        assert "unknown provenance: keep" in runner_render.CI_CLEAN_SCRIPT
-
-    def test_the_ci_clean_payload_prunes_docker_before_the_worker_gate(self) -> None:
-        # The order IS the fix: a prune behind the gate never runs on a host
-        # whose eight runners are never all idle, and that host is lavender.
-        script = runner_render.CI_CLEAN_SCRIPT
-        gate = script.index("pgrep -f 'Runner.Worker'")
-        for command in (
-            "docker container prune -f --filter until=24h",
-            "docker volume prune -f",
-            "docker image prune -f",
-            "docker builder prune -f --filter until=168h",
-            "docker builder prune -f --max-used-space 60gb",
-        ):
-            assert script.index(command) < gate, command
-
-    def test_the_ci_clean_payload_bounds_the_build_cache_by_age_then_by_size(
-        self,
-    ) -> None:
-        # Without these two lines no pass reached BuildKit's cache, and
-        # lavender's daemon held 98.55 GB of it reclaimable on 2026-10-18
-        # (MCPs board task 46c7b11b). The age pass runs first, so the cap
-        # removes least recently used records only from what a week kept.
-        docker_lines = [
-            line
-            for line in runner_render.CI_CLEAN_SCRIPT.splitlines()
-            if line.startswith("docker builder prune")
-        ]
-        assert docker_lines == [
-            "docker builder prune -f --filter until=168h",
-            "docker builder prune -f --max-used-space 60gb",
-        ]
-
-    def test_the_ci_clean_payload_never_prunes_named_volumes_or_tagged_images(
-        self,
-    ) -> None:
-        # --all widens volume prune to named volumes and image prune to every
-        # unused tagged image, the pull cache each job would pay back.
-        docker_lines = [
-            line
-            for line in runner_render.CI_CLEAN_SCRIPT.splitlines()
-            if line.startswith("docker ")
-        ]
-        assert len(docker_lines) == 5
-        assert [line for line in docker_lines if "--all" in line or " -a" in line] == []
-
-    def test_the_ci_clean_timer_fires_daily(self) -> None:
-        assert "OnCalendar=*-*-* 04:00" in runner_render.CI_CLEAN_TIMER
-        assert "Persistent=true" in runner_render.CI_CLEAN_TIMER
 
 
 class TestRerunsOverAHalfBuiltHost:

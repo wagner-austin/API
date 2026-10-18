@@ -10,7 +10,8 @@ held seven, 24 GB of its 33 GB poetry cache, three of them doc-extract-api at
 7.8 GB each, and every one recorded only source paths under retired runs;
 serendipity held 104 at 13.7 GB and sedona 34 at 3.8 GB.
 
-THE RULE IS CI-CLEAN'S (:data:`fleet.core.runner_render.CI_CLEAN_SCRIPT`): a
+ONE RULE FOR BOTH CACHES (:func:`orphan_sweep_lines`, which
+:data:`fleet.core.ci_clean.CI_CLEAN_SCRIPT` embeds too): a
 virtualenv whose recorded source paths, the absolute lines of its ``.pth``
 files, are all gone is an orphan and is removed. One with no recorded path
 is kept, since its provenance is unknown and a virtualenv poetry is still
@@ -62,19 +63,28 @@ def virtualenvs_directory(stage_root: str) -> str:
     return f"{names.cache_root(stage_root)}/{VIRTUALENVS}"
 
 
-def linux_script(venvs: str) -> str:
-    """The sweep as a POSIX sh script.
+def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
+    """The orphan rule as POSIX sh lines, the one copy every sh sweep renders.
+
+    Both this module's node sweep and ci-clean, the CI runner hosts' daily
+    hygiene (:data:`fleet.core.ci_clean.CI_CLEAN_SCRIPT`), embed these
+    lines (MCPs board tasks 346abc45 and ecb13d3d), so the two caches lose a
+    virtualenv by one rule. Each ``.pth`` line is read through ``while read``,
+    so a path holding a space is still one path, and an absolute one is a
+    recorded source. A ``.pth`` file the sweep cannot read stops it, naming
+    the file, under the script's ``set -e``: read as recording nothing, it
+    would keep its virtualenv with no word said.
 
     Args:
-        venvs: The virtualenvs directory.
+        venvs: A shell word naming the virtualenvs directory, quoted by the
+            caller (a literal through :func:`shlex.quote`, or an expansion).
 
     Returns:
-        The script's text. It prints one line, ``venv-sweep: removed <n> of
-        <total> (<mb> MB)``. A virtualenv's source paths are read through a
-        ``while read`` loop, so a path holding a space is still one path.
+        The lines. They leave ``removed``, ``total`` and ``kb`` set and print
+        ``venv-sweep: removed <n> of <total> (<mb> MB)``.
     """
-    lines = (
-        f"venvs={shlex.quote(venvs)}",
+    return (
+        f"venvs={venvs}",
         "total=0",
         "removed=0",
         "kb=0",
@@ -82,12 +92,23 @@ def linux_script(venvs: str) -> str:
         '    for venv in "$venvs"/*/; do',
         '        [ -d "$venv" ] || continue',
         "        total=$((total + 1))",
-        '        sources=$(cat "$venv"lib/python*/site-packages/*.pth 2>/dev/null '
-        "| grep '^/' | sort -u)",
-        '        [ -n "$sources" ] || continue',
-        "        alive=$(printf '%s\\n' \"$sources\" | while IFS= read -r source; do "
-        'if [ -e "$source" ]; then echo 1; break; fi; done)',
-        '        [ -z "$alive" ] || continue',
+        "        recorded=0",
+        "        alive=0",
+        '        for pth in "$venv"lib/python*/site-packages/*.pth; do',
+        '            [ -e "$pth" ] || continue',
+        '            if [ ! -r "$pth" ]; then',
+        '                echo "venv-sweep: cannot read $pth" >&2',
+        "                exit 1",
+        "            fi",
+        '            while IFS= read -r source || [ -n "$source" ]; do',
+        '                case "$source" in /*) ;; *) continue ;; esac',
+        "                recorded=1",
+        '                if [ -e "$source" ]; then alive=1; break; fi',
+        '            done < "$pth"',
+        '            [ "$alive" -eq 0 ] || break',
+        "        done",
+        '        [ "$recorded" -eq 1 ] || continue',
+        '        [ "$alive" -eq 0 ] || continue',
         '        size=$(du -sk "$venv" | cut -f1)',
         '        rm -rf "$venv"',
         "        removed=$((removed + 1))",
@@ -96,7 +117,18 @@ def linux_script(venvs: str) -> str:
         "fi",
         'echo "venv-sweep: removed $removed of $total ($((kb / 1024)) MB)"',
     )
-    return PROLOGUE + "".join(f"{line}\n" for line in lines)
+
+
+def linux_script(venvs: str) -> str:
+    """The sweep as a POSIX sh script.
+
+    Args:
+        venvs: The virtualenvs directory.
+
+    Returns:
+        The script's text: :func:`orphan_sweep_lines` over the directory.
+    """
+    return PROLOGUE + "".join(f"{line}\n" for line in orphan_sweep_lines(shlex.quote(venvs)))
 
 
 def windows_script(venvs: str) -> str:
@@ -219,6 +251,7 @@ __all__ = [
     "SWEEP_STEM",
     "VIRTUALENVS",
     "linux_script",
+    "orphan_sweep_lines",
     "script_for",
     "sweep_on_node",
     "virtualenvs_directory",

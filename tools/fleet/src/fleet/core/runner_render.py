@@ -22,8 +22,8 @@ they were run.
 
 THE HYGIENE PAYLOAD LIVES HERE, NOT ON A BOX. ``ci-clean`` ran only on
 lavender's disk until 2026-09-08, which made it exactly the folklore this
-package exists to end: this module is its source of truth, and the rendered
-provision installs byte-identical copies everywhere.
+package exists to end: :mod:`fleet.core.ci_clean` is its source of truth, and
+the rendered provision installs byte-identical copies everywhere.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
+from fleet.core.ci_clean import CI_CLEAN_SCRIPT, CI_CLEAN_SERVICE, CI_CLEAN_TIMER
 from fleet.core.runner_action_cache import render_fill_lines
 from fleet.core.runner_cache_adopt import render_adopt_lines, render_cache_environment_lines
 from fleet.core.runner_install import RUNNER_VERSION, install_root_for, token_variable
@@ -54,122 +55,6 @@ WSL_LIB = "/usr/lib/wsl/lib"
 
 #: The entries every WSL runner's ``.path`` must carry, in append order.
 RUNNER_PATH_ENTRIES: tuple[str, ...] = (LOCAL_BIN, WSL_LIB)
-
-#: The daily hygiene script, installed to /usr/local/bin/ci-clean.
-#:
-#: DOCKER FIRST, AND UNGATED. The Actions runner removes a job's service
-#: containers but never their anonymous volumes, and by 2026-09-25 lavender
-#: held 8,571 of them, 536 GB, which filled its disk and remounted every
-#: runner's root read-only (board task 9e5c7a17). The workflows now mount a
-#: tmpfs over each declared volume; this is the backstop for whatever image or
-#: job leaks next. It runs ahead of the Runner.Worker gate because Docker
-#: counts its own references -- nothing a running container holds is pruned --
-#: and because a gated pass skips whenever any one of a host's runners is busy,
-#: and lavender has eight.
-#:
-#: THE BUILD CACHE, BOUNDED TWICE (MCPs board task 46c7b11b). Every job that
-#: runs docker build fills BuildKit's cache and no other pass reaches it: on
-#: 2026-10-18T07:32Z lavender's daemon held 103.7 GB of build cache, 98.55 GB
-#: of it reclaimable, while the three prunes above reclaimed 0 B a day. So the
-#: cache no build has used for a week goes, and then the reclaimable cache
-#: above 60 GB, least recently used first, the two passes and the bound
-#: diphtheria's corvis-docker-prune runs on its stack's daemon (MCPs
-#: scripts/host/diphtheria/docker-prune.sh). A record a running build holds is
-#: in use, so neither pass removes it.
-#:
-#: WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
-#: exists (they are per-package-per-runner working state, not duplicates),
-#: everything under any _work tree (in-project venvs persist there by design),
-#: named docker volumes, and every tagged image, which is the pull cache.
-#: WHAT IT PRUNES: containers stopped for a day, anonymous volumes no container
-#: references, dangling images, build cache past the two bounds above, venvs
-#: whose recorded source paths are all gone, poetry wheel artifacts untouched
-#: for 60+ days, tmp download fragments a killed job left behind, and the pip
-#: cache. The poetry half refuses to run
-#: while a Runner.Worker is executing -- a venv mid-use must never race a
-#: delete.
-CI_CLEAN_SCRIPT = """#!/usr/bin/env bash
-# ci-clean: daily hygiene for a CI runner host. Rendered from
-# fleet.core.runner_render -- edit THERE, never here.
-set -euo pipefail
-
-# Docker, ungated: it never prunes what a running container references.
-# `volume prune` takes anonymous volumes only; named ones need --all.
-docker container prune -f --filter until=24h
-docker volume prune -f
-docker image prune -f
-docker builder prune -f --filter until=168h
-docker builder prune -f --max-used-space 60gb
-
-if pgrep -f 'Runner.Worker' >/dev/null 2>&1; then
-    echo "ci-clean: a runner job is executing; skipping this pass."
-    exit 0
-fi
-
-VENVS="$HOME/.cache/pypoetry/virtualenvs"
-ARTIFACTS="$HOME/.cache/pypoetry/artifacts"
-
-reclaimed_kb=0
-
-if [ -d "$VENVS" ]; then
-    for env in "$VENVS"/*/; do
-        [ -d "$env" ] || continue
-        mapfile -t srcs < <(cat "$env"lib/python*/site-packages/*.pth 2>/dev/null \\
-            | grep -E '^/' | sort -u)
-        [ "${#srcs[@]}" -gt 0 ] || continue  # unknown provenance: keep
-        alive=0
-        for s in "${srcs[@]}"; do
-            [ -e "$s" ] && alive=1 && break
-        done
-        if [ "$alive" -eq 0 ]; then
-            size_kb=$(du -sk "$env" | cut -f1)
-            reclaimed_kb=$((reclaimed_kb + size_kb))
-            echo "ci-clean: orphan venv $(basename "$env") (${size_kb}KB)"
-            rm -rf "$env"
-        fi
-    done
-fi
-
-if [ -d "$ARTIFACTS" ]; then
-    before_kb=$(du -sk "$ARTIFACTS" | cut -f1)
-    find "$ARTIFACTS" -type f -name 'tmp*' -mmin +1440 -delete 2>/dev/null || true
-    find "$ARTIFACTS" -type f -mtime +60 -delete 2>/dev/null || true
-    find "$ARTIFACTS" -type d -empty -delete 2>/dev/null || true
-    after_kb=$(du -sk "$ARTIFACTS" | cut -f1)
-    reclaimed_kb=$((reclaimed_kb + before_kb - after_kb))
-fi
-
-if [ -d "$HOME/.cache/pip" ]; then
-    pip_kb=$(du -sk "$HOME/.cache/pip" | cut -f1)
-    rm -rf "$HOME/.cache/pip"
-    reclaimed_kb=$((reclaimed_kb + pip_kb))
-fi
-
-echo "ci-clean: reclaimed $((reclaimed_kb / 1024))MB this pass."
-"""
-
-#: systemd unit for the hygiene pass.
-CI_CLEAN_SERVICE = """[Unit]
-Description=CI runner host hygiene (docker leftovers, poetry orphans, stale artifacts, pip cache)
-
-[Service]
-Type=oneshot
-User=gharunner
-ExecStart=/usr/local/bin/ci-clean
-"""
-
-#: systemd timer for the hygiene pass: daily, because a week of a leak
-#: bounded only by the disk is what filled lavender.
-CI_CLEAN_TIMER = """[Unit]
-Description=Daily CI hygiene pass
-
-[Timer]
-OnCalendar=*-*-* 04:00
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-"""
 
 
 class RenderedProvision(TypedDict):
@@ -359,9 +244,6 @@ def render_provision(spec: HostRunnerSpec) -> RenderedProvision:
 
 
 __all__ = [
-    "CI_CLEAN_SCRIPT",
-    "CI_CLEAN_SERVICE",
-    "CI_CLEAN_TIMER",
     "LOCAL_BIN",
     "RUNNER_PATH_ENTRIES",
     "WSL_LIB",

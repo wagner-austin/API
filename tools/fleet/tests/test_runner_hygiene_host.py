@@ -1,6 +1,6 @@
 """A runner host's daily hygiene, read on it (MCPs board task 46c7b11b).
 
-The unit suite pins what :data:`~fleet.core.runner_render.CI_CLEAN_SCRIPT`
+The unit suite pins what :data:`~fleet.core.ci_clean.CI_CLEAN_SCRIPT`
 says, and nothing read whether the host runs it: lavender's ci-clean
 reclaimed 0 B a day while its daemon's build cache grew to 103.7 GB
 (2026-10-18T07:32Z), because no pass in it reached that cache, and the
@@ -26,7 +26,7 @@ from typing import Final
 import pytest
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core.runner_render import CI_CLEAN_SCRIPT
+from fleet.core.ci_clean import CI_CLEAN_SCRIPT
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
 #: Where the rendered provision installs the script.
