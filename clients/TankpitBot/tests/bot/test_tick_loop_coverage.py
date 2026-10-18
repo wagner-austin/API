@@ -17,11 +17,84 @@ from tankpit_bot.state.types import make_self_state
 from tests.bot._tick_loop_fakes import _FakePage
 from tests.conftest import (
     FakeEnv,
+    FakeFileSystem,
 )
 
 
 class TestEarlyWakeSleep:
     """Tests for the early-wake between-tick sleep."""
+
+    @pytest.mark.parametrize(
+        "kind",
+        [
+            ActionKind.TELEPORT,
+            ActionKind.MAP_OPEN,
+            ActionKind.SCAN,
+            ActionKind.SHOOT,
+        ],
+    )
+    def test_buffered_reply_is_processed_without_sleep(self, kind: ActionKind) -> None:
+        """A reply arriving during publication must not lose the wake."""
+        from tankpit_bot.bot.states import make_in_flight_action
+        from tankpit_bot.bot.tick_loop import _wait_between_ticks
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        action = make_in_flight_action(kind, 148, 238, get_current_time_ms())
+        bot._state_data["in_flight_action"] = action
+        bot._cdp_message_buffer = ["already buffered reply"]
+        waits: list[float] = []
+
+        class RecordingPage(_FakePage):
+            def wait_for_timeout(self, timeout: float) -> None:
+                waits.append(timeout)
+
+        assert _wait_between_ticks(bot, RecordingPage()) == 0
+        assert waits == []
+        assert bot._state_data["in_flight_action"] == action
+        assert bot._cdp_message_buffer == ["already buffered reply"]
+
+    def test_shot_feedback_uses_early_wake_without_movement_action(self) -> None:
+        """Shots have a separate feedback gate but must still wake on input."""
+        from tankpit_bot.bot.tick_loop import _wait_between_ticks
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._ai_state["last_shot_target_id"] = 506
+        waits: list[float] = []
+
+        class ReplyPage(_FakePage):
+            def wait_for_timeout(self, timeout: float) -> None:
+                waits.append(timeout)
+                bot._cdp_message_buffer.append("shot echo")
+
+        assert _wait_between_ticks(bot, ReplyPage()) == 250
+        assert waits == [250.0]
+
+    def test_idle_startup_buffer_retains_pacing(self) -> None:
+        """Pre-session traffic is not a pending action and cannot busy-spin."""
+        from tankpit_bot.bot.tick_loop import _wait_between_ticks
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        bot._cdp_message_buffer = ["pre-session traffic"]
+        assert _wait_between_ticks(bot, _FakePage()) == 2000
+        assert bot._cdp_message_buffer == ["pre-session traffic"]
+
+    def test_wait_does_not_consume_a_rejection_before_the_next_drain(self) -> None:
+        """Only the tick resolver consumes response state, never the sleeper."""
+        from tankpit_bot.bot.states import make_in_flight_action
+        from tankpit_bot.bot.tick_loop import _wait_between_ticks
+        from tankpit_bot.bot.tick_loop_actions import has_in_flight_action
+
+        bot = Bot("https://test.tankpit.com/", headless=True)
+        action = make_in_flight_action(ActionKind.TELEPORT, 148, 238, get_current_time_ms())
+        bot._state_data["in_flight_action"] = action
+        bot.world.last_command_error = 8
+        bot._state_data["state"] = BotState.TELEPORTING
+        bot._cdp_message_buffer = ["next fuel sync"]
+        assert _wait_between_ticks(bot, _FakePage()) == 0
+        assert bot.world.last_command_error == 8
+        assert bot._state_data["in_flight_action"] == action
+        assert has_in_flight_action(bot) is False
+        assert bot.world.last_command_error == -1
 
     def test_idle_wait_sleeps_the_full_window(self) -> None:
         """With no in-flight action the sleep is one uninterrupted window."""
@@ -99,6 +172,40 @@ class TestEarlyWakeSleep:
 
         assert waited == TICK_RATE_MS
         assert waits == [float(_WAKE_SLICE_MS)] * (TICK_RATE_MS // _WAKE_SLICE_MS)
+
+
+def test_immediate_replies_still_spend_the_bounded_session_clock(
+    fake_fs: FakeFileSystem, fake_env: FakeEnv
+) -> None:
+    """Zero requested waits cannot make the session budget stand still."""
+    from pathlib import Path
+
+    from tankpit_bot import _test_hooks
+    from tankpit_bot.bot.states import make_in_flight_action
+    from tankpit_bot.bot.tick_loop import run_tick_loop
+
+    clock_ms = 0
+
+    def advancing_clock() -> int:
+        nonlocal clock_ms
+        clock_ms += 2000
+        return clock_ms
+
+    stop_path = Path("runs/bot/STOP")
+    _test_hooks.get_current_time_ms = advancing_clock
+
+    def stop_runaway_clock(path: Path) -> bool:
+        return path == stop_path and clock_ms > 40000
+
+    # Bounds the test even if elapsed-time accounting is removed.
+    _test_hooks.path_exists = stop_runaway_clock
+    bot = Bot("https://test.tankpit.com/", headless=True)
+    bot._state_data["in_flight_action"] = make_in_flight_action(ActionKind.TELEPORT, 148, 238, 1)
+    bot._cdp_message_buffer = ["queued before session decoding is available"]
+    run_tick_loop(bot, _FakePage(), session_seconds=6, stop_file_path=stop_path)
+    summary = fake_fs.get_written_files()[str(Path("runs/bot/latest.summary.txt"))]
+    assert summary.splitlines()[2:4] == ["Ticks:    2", "Exit:     completed"]
+    assert bot._state_data["in_flight_action"]["kind"] is ActionKind.TELEPORT
 
 
 class TestWireSilenceWatchdog:
