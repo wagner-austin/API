@@ -41,11 +41,16 @@ run given ``--runner-host=<the runners.json host>`` has it, which is what
 
 from __future__ import annotations
 
+import pathlib
+import subprocess
 import sys
 from typing import Final
 
 import pytest
 from platform_core import host_execution
+
+from fleet.cli.runners import load_runner_spec
+from fleet.contracts.runners import HostRunnerSpec
 
 #: This machine's platform, as the markers and the fleet's tags name it.
 HOST_PLATFORM: Final[str] = "windows" if sys.platform == "win32" else "linux"
@@ -80,6 +85,54 @@ PROJECTS: Final[dict[str, str]] = {
 #: The user property a host case records what it read on the host under,
 #: which the run's summary prints so a passed row carries the reading.
 READING_PROPERTY: Final[str] = "host_reading"
+
+
+def command_output(argv: list[str], *, timeout: int = 60) -> str:
+    """Run a command on the host and return its standard output.
+
+    Args:
+        argv: The command.
+        timeout: Its deadline in seconds.
+
+    Returns:
+        What it printed.
+    """
+    return subprocess.run(argv, capture_output=True, text=True, check=True, timeout=timeout).stdout
+
+
+def unit_properties(unit: str, names: tuple[str, ...]) -> dict[str, str]:
+    """Some of a system unit's properties, as systemd reads them.
+
+    Args:
+        unit: The unit.
+        names: The properties.
+
+    Returns:
+        Each property's value, by name.
+    """
+    shown = [flag for name in names for flag in ("-p", name)]
+    text = command_output(["systemctl", "show", unit, *shown])
+    return dict(line.split("=", 1) for line in text.splitlines() if line)
+
+
+#: The roster this checkout carries.
+ROSTER: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
+
+
+@pytest.fixture(name="runner_host")
+def _runner_host(request: pytest.FixtureRequest) -> HostRunnerSpec:
+    """The roster's entry for the runner host this run executes on.
+
+    Args:
+        request: The case's request, whose run names the host.
+
+    Returns:
+        The host's spec.
+    """
+    name: str | None = request.config.getoption(RUNNER_HOST_OPTION)
+    hosts = [host for host in load_runner_spec(str(ROSTER))["hosts"] if host["name"] == name]
+    assert len(hosts) == 1, f"runners.json declares {len(hosts)} host(s) named {name!r}"
+    return hosts[0]
 
 
 class HostReadings:

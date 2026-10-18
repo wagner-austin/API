@@ -34,14 +34,10 @@ from typing import Final
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_int
 
-from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX
-from tests._host import READING_PROPERTY, RUNNER_HOST_OPTION
-
-#: The roster this checkout carries.
-ROSTER: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
+from tests._host import READING_PROPERTY, command_output, unit_properties
 
 #: The cgroup filesystem and the process table.
 CGROUP_ROOT: Final[pathlib.Path] = pathlib.Path("/sys/fs/cgroup")
@@ -103,49 +99,6 @@ PROBE: Final[str] = (
 )
 
 
-@pytest.fixture(name="runner_host")
-def _runner_host(request: pytest.FixtureRequest) -> HostRunnerSpec:
-    """The roster's entry for the host this run executes on.
-
-    Args:
-        request: The case's request, whose run names the host.
-
-    Returns:
-        The host's spec.
-    """
-    name: str | None = request.config.getoption(RUNNER_HOST_OPTION)
-    hosts = [host for host in load_runner_spec(str(ROSTER))["hosts"] if host["name"] == name]
-    assert len(hosts) == 1, f"runners.json declares {len(hosts)} host(s) named {name!r}"
-    return hosts[0]
-
-
-def _output(argv: list[str], *, timeout: int = 60) -> str:
-    """Run a command and return its standard output.
-
-    Args:
-        argv: The command.
-        timeout: Its deadline in seconds.
-
-    Returns:
-        What it printed.
-    """
-    return subprocess.run(argv, capture_output=True, text=True, check=True, timeout=timeout).stdout
-
-
-def _properties(unit: str) -> dict[str, str]:
-    """A unit's state, its configured slice and its cgroup, as systemd reads them.
-
-    Args:
-        unit: The unit.
-
-    Returns:
-        ``ActiveState``, ``Slice`` and ``ControlGroup``, by name.
-    """
-    shown = ("-p", "ActiveState", "-p", "Slice", "-p", "ControlGroup")
-    text = _output(["systemctl", "show", unit, *shown])
-    return dict(line.split("=", 1) for line in text.splitlines() if line)
-
-
 def _runner_units() -> list[str]:
     """Every runner unit systemd has loaded, whatever its state.
 
@@ -153,7 +106,7 @@ def _runner_units() -> list[str]:
         Their names, sorted.
     """
     listing = ("list-units", "actions.runner.*", "--all", "--no-legend", "--plain")
-    text = _output(["systemctl", *listing])
+    text = command_output(["systemctl", *listing])
     return sorted(line.split()[0] for line in text.splitlines() if line)
 
 
@@ -186,7 +139,9 @@ def test_every_runner_unit_runs_in_the_listener_slice_and_every_job_in_its_scope
     assert declared, f"runners.json declares no WSL runner on {runner_host['name']}"
     assert _runner_units() == declared
 
-    placed = {unit: _properties(unit) for unit in declared}
+    placed = {
+        unit: unit_properties(unit, ("ActiveState", "Slice", "ControlGroup")) for unit in declared
+    }
     assert placed == {
         unit: {
             "ActiveState": "active",
@@ -294,7 +249,7 @@ def _stall(run: subprocess.Popen[str]) -> tuple[int, int]:
 def test_a_slice_over_its_high_stalls_its_own_tasks_and_not_an_unbounded_sibling(
     runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
 ) -> None:
-    uid = _output(["id", "-u"]).strip()
+    uid = command_output(["id", "-u"]).strip()
     environment = {"PATH": "/usr/local/bin:/usr/bin:/bin", "XDG_RUNTIME_DIR": f"/run/user/{uid}"}
     tag = f"{runner_host['name']}-{os.getpid()}"
     full = f"fleet-placement-full-{tag}.slice"
