@@ -5,12 +5,17 @@ related: ["[[committed-intent]]", "[[bot-behavior-contract]]", "[[fuel-system]]"
 fact_checked: "2026-10-17"
 confidence: medium
 hubs: [architecture]
-verified: Offline inspection of preserved captures and release source; no live restart or behavior fix.
+verified: Preserved captures and release source inspected; corrective regression tests executed offline without a live restart.
 provenance:
   - "Corvis task d947f299; originating task 6275ecaa, handoff abd5bb45-eb63-4c67-88fe-470f1d411629."
   - "/home/corvis/tankpit-evidence-20261017/manifest.json: 20 files, 104395465 bytes; every size and SHA-256 reverified."
   - "Runtime API release 3888f06b22f5eea63d8e8cb5fe9934143ee7f392; tv-1 run bot-20261017-093852, tank 740 / Yuppler."
 source_paths:
+  - "src/tankpit_bot/bot/ai/escape_policy.py"
+  - "src/tankpit_bot/bot/ai/collect_locks.py"
+  - "src/tankpit_bot/bot/ai/resource_search.py"
+  - "tests/bot/ai/test_retreat_regressions.py"
+  - "tests/bot/test_tick_loop_coverage.py"
   - "src/tankpit_bot/bot/tick_loop.py"
   - "src/tankpit_bot/bot/tick_body.py"
   - "src/tankpit_bot/bot/tick_loop_actions.py"
@@ -28,18 +33,23 @@ source_paths:
   - "src/tankpit_bot/fleetshare/report.py"
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
-  "src/tankpit_bot/bot/tick_loop.py": "507c551e925ac7001eda6d4903964054ee451bb0"
+  "src/tankpit_bot/bot/ai/escape_policy.py": "b82ae280e9b10292de53f265312e350e7efca962"
+  "src/tankpit_bot/bot/ai/collect_locks.py": "24362310ed1be0cbdf169ff31efd4e1478e30a92"
+  "src/tankpit_bot/bot/ai/resource_search.py": "423bfcd2cc3f00b37ffc8817ab857b1750335d33"
+  "tests/bot/ai/test_retreat_regressions.py": "47ffecbc76df1f5cafa1ed87a4d350445fc31fef"
+  "tests/bot/test_tick_loop_coverage.py": "16847e20227f3d5eaf2448fd3faff2fb7b531582"
+  "src/tankpit_bot/bot/tick_loop.py": "66e1a47c4fed13cbcfe7ec05a9a4a09f131557b9"
   "src/tankpit_bot/bot/tick_body.py": "f89288ff6a4b37a57ad41520167638635f2a3d17"
   "src/tankpit_bot/bot/tick_loop_actions.py": "48ea79bf8ae71fcca61b91ffdf552f496fa116e1"
   "src/tankpit_bot/bot/world_sync.py": "902858477bc22a632a38b8a5b2b6618b08be02be"
   "src/tankpit_bot/bot/ai/combat_break.py": "295d58704a009d1f30fa2f09f1f6d0984c2bb6a7"
   "src/tankpit_bot/bot/ai/combat_prep.py": "b527aa154060e6a4dd4f1bce107a470d83ee9f69"
-  "src/tankpit_bot/bot/ai/collect_mode.py": "fce9a51df3f7165c76933a4ecc04e64613e47b9b"
-  "src/tankpit_bot/bot/ai/collect_mode_outcomes.py": "c8d40965837f5e76fa5c62b58ce1663f6df8c57d"
-  "src/tankpit_bot/bot/ai/collect_pickups.py": "25c0f283d658c0de2e45fa7178fab21c9bfc7387"
+  "src/tankpit_bot/bot/ai/collect_mode.py": "9a2b8bb090dd5039effce7eb67405a6d7636254f"
+  "src/tankpit_bot/bot/ai/collect_mode_outcomes.py": "85152d9a6f3a0e32ca1f471a7d28b7d79f71bc43"
+  "src/tankpit_bot/bot/ai/collect_pickups.py": "652a96bec44ae109046be8e59d361b842a1d6a31"
   "src/tankpit_bot/bot/ai/movement.py": "c4df95be78254ee18e2a1d670f4b509a0551ddac"
-  "src/tankpit_bot/bot/ai/larder.py": "cd075da13ac7792a058008d094df9d48b17c5e2c"
-  "src/tankpit_bot/bot/ai/collect_hops.py": "854b07cd406df844615f84a542987305fd417153"
+  "src/tankpit_bot/bot/ai/larder.py": "fb1f4d3bfedbd65b6c08367cd6593619094ec1ea"
+  "src/tankpit_bot/bot/ai/collect_hops.py": "2c0e113d42594c6f015f7115ee8a33a71393b897"
   "src/tankpit_bot/bot/executor.py": "d2430383d3e214d08ce64a5c88d54f649962a620"
   "src/tankpit_bot/state/container_mutations.py": "a6e0c51208b0c438bbe56ef1139d1ac0917bfaba"
   "src/tankpit_bot/fleetshare/report.py": "cfc0608da47dc6e2b559ecd46d6248a054ccdce9"
@@ -48,7 +58,7 @@ source_git_blobs:
 
 # Retreat failures in the 2026-10-17 World run
 
-The engagement break activated. Its delegated action sequence failed to secure fuel or leave both attackers, and the control loop added measurable delay after responses. This is an offline incident diagnosis, not a deployed correction or proof that a particular alternative would have survived. All timestamps below are UTC on October 17; event line numbers are one-based, capture message indexes zero-based.[^1]
+The engagement break activated. Its delegated action sequence failed to secure fuel or leave both attackers, and the control loop added measurable delay after responses. The incident reconstruction describes release `3888f06b2`; the later corrections below are offline-verified source changes, not proof that a particular alternative would have survived. Frontmatter pins describe the corrected tree; the provenance release identifies the historical source. All incident timestamps below are UTC on October 17; event line numbers are one-based, capture message indexes zero-based.[^1]
 
 ## What happened
 
@@ -67,7 +77,7 @@ The table is grounded in events L3212–3282 and L3979–4142 plus the capture's
 
 **The missing 580 fuel is not explained by an old fleet report alone.** Yuppler saw 580 via radar (capture message 1592, 09:48:57.711). Its later belief used tv-2's radar-processing timestamp 09:48:58.672; tv-2 had received that radar at 09:48:57.719. The import preserved that timestamp rather than refreshing it every tick. More decisively, tv-2's viewport patch still advertised 580 at 09:49:13.726, and Yuppler's own landing patch advertised 580 at 09:49:15.762. Using viewport origin plus `(col−1,row−1)` places both entries at (148,249). Yuppler then received fuel=256, a landing confirmation, fuel=256 again, and two remaining-volume-zero receipts. The sibling also received a removal receipt. These facts establish zero credited gain and a removed target, but identify neither a competing consumer nor the server-side reason. Do not invent a gain from the removal or blame a sibling without evidence.[^3]
 
-## Confirmed control-flow gaps
+## Confirmed control-flow gaps in release 3888f06b2
 
 1. **A break does not consistently select escape actions.** `assess_engagement_break` counts one hit; `escape_under_fire_decision` requires three. `refuel_for_hunt` delegates to ordinary `decide_collect_mode`. At two hits the escape gate declines and the equipment-before-fuel order remains eligible. This explains the earlier equipment pickup without requiring a missing break or slow computation.[^4]
 2. **A pickup helper can bypass escape clearance.** The under-fire branch returns `select_and_pickup_fuel` directly. That helper calls `walk_or_teleport`, which implements the prior user instruction to teleport after a mine hit. Its returned teleport never reaches `_hop_escapes_attacker`. The fatal run logs this exact mine-flip branch twice. The 09:49:15.765 landing was only Manhattan 2 from red-7 at (149,248), and 8 from 28824528 at (153,252). The later clearance helper considers only the held combat target and, even there, ultimately permits a trapped candidate; it is not an all-attacker safety guarantee.[^5]
@@ -92,7 +102,7 @@ The tick drains wire at its start, then polls the game log and performs other sy
 
 ## Corrective work and reproducible validation
 
-The following are proposed corrections, not changes made by this investigation. Preserve never-drop combat locks, post-mine movement doctrine, the separate confirmed map-open phase, and displaced-landing sensing while fixing their composition.[^4][^5][^6][^7]
+The following table records the investigation's corrective cases. The subsequent implementation is described below; server interpretation and phase profiling remain open. Preserve never-drop combat locks, post-mine movement doctrine, the separate confirmed map-open phase, and displaced-landing sensing while fixing their composition.[^4][^5][^6][^7]
 
 | Work | Offline validation case |
 |---|---|
@@ -108,6 +118,20 @@ Offline reproduction uses the manifest-preserved files, not `latest.*` on the li
 Scheduling reproduction: construct `Bot` without calling `run`, assign a pending `make_in_flight_action(ActionKind.TELEPORT,148,238,get_current_time_ms())`, preload `_cdp_message_buffer` with one string, and call `_wait_between_ticks` with the existing test `_FakePage` subclass whose `wait_for_timeout` only records requests. Assert return `2000` and waits `[250.0]*8`. The companion baseline command `python -m pytest tests/bot/test_tick_loop_coverage.py::TestEarlyWakeSleep -o addopts='' -q` returned **3 passed**. This demonstrates current behavior through the real wait function; it does not simulate the live server or prove that this branch caused all observed latency.[^8]
 
 The standard `replay_session` deliberately omits executor/in-flight state and fleet exchanges; its planner traces are not a faithful reproduction of this incident's scheduling or shared beliefs. Use the captures for protocol facts and the original event trace for dispatched decisions. No live game was entered during this investigation; the shutdown requirement from the originating handoff remains in force.[^1][^10]
+
+## Corrections after the investigation
+
+Task `afdc4b26` implements the operator's follow-up request to correct and double-check these issues. `escape_policy.py` owns the shared rules: a fuel-resume latch keeps retreat active even at zero, one or two recent hits; without a latch, isolated hits retain the ordinary collection policy. Fuel recovery outranks equipment travel and equipment-plan continuation during that commitment. Combat target ids and the resume latch survive each resulting fuel decision.
+
+Hop candidates are checked **before ranking**, including fuel pickups that movement converts into teleports, locked pickup continuations, larder, equipment, desperation and fuel-dot hops. The actual resolved landing must clear the held target and every fuel-confirmed, wire-fresh attacker with a known position. Clearance uses a 16-tile square envelope: the old Manhattan test wrongly admitted a diagonal eight tiles away on each axis. A rejected top candidate therefore cannot hide a safer second candidate, and the old trapped-hop branch no longer reinstates a rejected landing.
+
+Transit reserves no pickup credit. During measured fire the budget is twice the larger of the observed average hit and the window's per-tick damage rate, plus nine fuel for ring-1 landing displacement. Cost plus that exposure must stay below current fuel. The same selectors re-evaluate after map opening; the captured 41- and 4-fuel margins fail this policy. This is conservative risk pricing, not a guarantee against arbitrary future damage or a new assertion about why the server sent code 8.
+
+A validated committed escape can teleport or open its map before scanning ground it is leaving. A proposed walk still requires the landing scan and any pending mine reveal. If no escape candidate exists, sensing gets its turn before the exhausted-collection outcome. Fuel pickup teleports, including locked continuations, now carry the harvest suppression flag; displaced landings still use the existing scan exception.
+
+The between-tick wait reads pending state without consuming action outcomes. A queued reply returns immediately; fresh traffic wakes pending actions and shots within the 250 ms slice. Idle startup retains its normal wait. The tick's existing movement and shot-feedback gates remain responsible for preventing duplicate commands. Session budgeting counts elapsed iteration time as well as requested waiting, so immediate replies do not freeze the bounded-session budget.
+
+Executable regressions are `tests/bot/ai/test_retreat_regressions.py` and `tests/bot/test_tick_loop_coverage.py::TestEarlyWakeSleep`. They assert fuel-first behavior through hit-window decay, mine-flipped and locked commands, second-attacker and diagonal clearance, safe alternatives, both low-margin refusal shapes, re-evaluation after map fuel loss, pre-walk sensing, queued and arriving shot replies, and preservation of an unconsumed rejection. The original 2000 ms reproduction above documents the **old release**; the corrected queued-reply expectation is zero. The complete package check remains the release gate. Neither the zero-gain 580 landing nor the exact server affordability discrepancy is claimed solved, and no live bot run is part of this correction.
 
 [^1]: Private evidence root `/home/corvis/tankpit-evidence-20261017/`; `tv-1/latest.events.jsonl` SHA-256 `75ae12caad498dab8ec098c9e7149b4e30d40c7fb123e6a51e1844547c4273d0`; original host `sedona-tailnet:C:/fleet/tankpit/runs/bot`. JSONL L3212–3282, L3979–4142; capture message 1719 at 1792230567733 has victim 740, killer 506. Handoff `abd5bb45` records the graceful shutdown and no-restart instruction. All five event files were searched for `outcome=stall_timeout`, zero matches.
 [^2]: `tv-1/latest.capture_session.json`, message indexes 1303–1313, 1648–1699, 1705–1716; exact timestamps shown in the timing table. Refusal messages 1308/1709; outbound 1309/1710; later fuel updates 1311/1712. Event outcome durations: JSONL L3268/L4126. Incoming messages are decoded through the release's protocol; outbound commands decode to (103,56), (148,249), (148,238).
