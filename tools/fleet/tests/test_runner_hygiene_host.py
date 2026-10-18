@@ -89,6 +89,11 @@ PASS_ORDER: Final[tuple[str, ...]] = (
     "cache-generations",
 )
 
+#: The caches the hook names inside a generation, by their directories.
+#: Which of them a generation holds is which tools its jobs ran: the MCPs
+#: TypeScript jobs run npm, its Python jobs pip and then poetry.
+GENERATION_TOOLS: Final[tuple[str, ...]] = ("npm", "pip", "pypoetry")
+
 
 @pytest.mark.host_runner_units
 def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
@@ -171,6 +176,46 @@ def _last_run() -> LastRun:
     return LastRun(after_install, private, len(records), passes)
 
 
+@pytest.mark.host_runner_units
+def test_the_jobs_read_their_caches_from_the_generation_the_hook_chose(
+    runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
+) -> None:
+    """MCPs board task 4b405239, A1: the runner account's home is closed to
+    the fleet's user, so ci-clean, running as that account, reports which
+    generation each runner install's last job read and what the current one
+    holds. A job's tools write into a generation only when the hook named it
+    to them, so what it holds is the jobs' own use of it."""
+    lines = pathlib.Path(CI_CLEAN_REPORT).read_text(encoding="utf-8").splitlines()
+    current = [
+        sweep.split(": generation ")[1].split(" ")[0]
+        for sweep in _fields(lines, "cache-generations: ")
+    ]
+    assert len(current) == 1, f"no current generation in {CI_CLEAN_REPORT}: {current}"
+    readers: dict[str, str] = {}
+    for reader in _fields(lines, "cache-reader: "):
+        install, generation = reader.split(" read generation ")
+        readers[install] = generation
+    held: dict[str, int] = {}
+    for holding in _fields(lines, f"cache-tool: generation {current[0]} holds "):
+        tool, size = holding.removesuffix(" bytes of files)").split(" (")
+        held[tool] = int(size)
+    assert len(held) == len(_fields(lines, "cache-tool: ")), "a holding of another generation"
+
+    assert current[0] in readers.values(), f"no runner install read generation {current[0]}"
+    assert held, f"generation {current[0]} was read and holds nothing"
+    assert {tool.split("/")[0] for tool in held} <= set(GENERATION_TOOLS)
+    for tool in held:
+        if tool.startswith("npm/"):
+            assert readers[tool.removeprefix("npm/")] == current[0]
+    record_property(
+        READING_PROPERTY,
+        f"{runner_host['name']}: generation {current[0]} is current, read last by "
+        + ", ".join(f"{install} ({generation})" for install, generation in sorted(readers.items()))
+        + "; it holds "
+        + ", ".join(f"{tool} {size} bytes" for tool, size in sorted(held.items())),
+    )
+
+
 def _fields(lines: list[str], prefix: str) -> list[str]:
     """The rest of every report line that opens with ``prefix``.
 
@@ -191,8 +236,7 @@ def test_the_job_started_hook_that_hands_each_job_its_cache_generation_is_the_re
     """MCPs board task 4b405239: ci-clean removes the download caches only
     by whole generations, which is safe only while every job reads the
     generation the hook names, so the installed hook must be the render.
-    The runner account's home is closed to the fleet's user, so the
-    generations themselves are measured as that account by the closure."""
+    The generations themselves are read from ci-clean's report, below."""
     hook = pathlib.Path(JOB_HOOK_PATH)
 
     assert hook.read_text(encoding="utf-8") == JOB_HOOK_SCRIPT

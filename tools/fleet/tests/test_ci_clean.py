@@ -44,7 +44,9 @@ def test_the_orphan_rule_runs_over_the_runner_account_s_virtualenvs() -> None:
 def test_the_download_caches_go_only_by_whole_generations() -> None:
     """MCPs board task 4b405239: no pass removes a single cache file, which
     could part a poetry metadata file from its body."""
-    assert ci_clean.CI_CLEAN_CACHES.endswith(ci_clean.GENERATIONS_SWEEP + "\n")
+    caches = ci_clean.CI_CLEAN_CACHES
+    assert caches.index(ci_clean.GENERATIONS_SWEEP) < caches.index(ci_clean.GENERATION_READERS)
+    assert caches.endswith(ci_clean.GENERATION_READERS + "\n")
     assert ci_clean.GENERATIONS_SWEEP.splitlines()[-1] == (
         'remove_unused "$HOME/.cache/fleet-tools" "$HOME/.cache/fleet-jobs"'
     )
@@ -197,6 +199,12 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     idle_runner = home / ".cache" / "fleet-jobs" / "actions-runner-treebot-1"
     idle_runner.mkdir(parents=True)
     (idle_runner / names.GENERATION_MARKER_NAME).write_text(f"{marked}\n", encoding="utf-8")
+    busy_runner = home / ".cache" / "fleet-jobs" / "actions-runner-api-1"
+    busy_runner.mkdir(parents=True)
+    (busy_runner / names.GENERATION_MARKER_NAME).write_text(f"{current}\n", encoding="utf-8")
+    npm = tools / current / "npm" / "actions-runner-api-1" / "_cacache"
+    npm.mkdir(parents=True)
+    (npm / "index").write_bytes(bytes(3000))
 
     ran = _run_caches(tmp_path, home)
 
@@ -204,6 +212,11 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     assert ran.stdout.splitlines() == [
         "venv-sweep: removed 1 of 3 (2 MB)",
         f"cache-generations: {tools}: generation {current} current, removed 1 of 3 (1 MB)",
+        f"cache-reader: actions-runner-api-1 read generation {current}",
+        f"cache-reader: actions-runner-treebot-1 read generation {marked}",
+        f"cache-tool: generation {current} holds npm (3000 bytes of files)",
+        f"cache-tool: generation {current} holds npm/actions-runner-api-1 (3000 bytes of files)",
+        f"cache-tool: generation {current} holds pypoetry ({MIB} bytes of files)",
     ]
     assert not orphan.exists()
     assert [serving.exists(), unknown.exists()] == [True, True]
@@ -211,6 +224,21 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
         [marked, current, names.CURRENT_GENERATION_NAME]
     )
     assert not (tools / unread).exists()
+
+
+@pytest.mark.host_linux
+def test_a_host_no_job_has_run_on_says_it_has_no_generation(tmp_path: pathlib.Path) -> None:
+    home = tmp_path / "home"
+    (home / ".cache" / "pypoetry" / "virtualenvs").mkdir(parents=True)
+
+    ran = _run_caches(tmp_path, home)
+
+    assert ran.returncode == 0, ran.stderr
+    assert ran.stdout.splitlines() == [
+        "venv-sweep: removed 0 of 0 (0 MB)",
+        f"cache-generations: {home}/.cache/fleet-tools: none yet",
+        "cache-reader: no generation yet",
+    ]
 
 
 @pytest.mark.host_linux

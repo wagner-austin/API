@@ -47,7 +47,9 @@ each run writes :data:`CI_CLEAN_REPORT` in the state directory systemd makes
 for the service: everything the passes printed, the instant it started, the
 sha256 of the script that ran, and the daemon's build cache records as its
 engine API counts them, in bytes, after the prune. The runner host's hygiene
-case reads it against the render and :data:`BUILD_CACHE_BOUND_GIB`.
+case reads it against the render and :data:`BUILD_CACHE_BOUND_GIB`, and reads
+the jobs' use of the generations from it (:data:`GENERATION_READERS`), since
+the runner account's home is closed to the fleet's user.
 
 WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
 exists (per-package working state the runners share, not duplicates),
@@ -59,6 +61,7 @@ from __future__ import annotations
 
 from typing import Final
 
+from fleet.core import names
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
 from fleet.core.tool_caches import SH_REMOVE_UNUSED
 
@@ -139,6 +142,34 @@ GENERATIONS_SWEEP: Final = "\n".join(
     (*SH_REMOVE_UNUSED, "as=", f'remove_unused "{RUNNER_TOOLS}" "{RUNNER_MARKERS}"')
 )
 
+#: What each runner install's last job read and what the current generation
+#: holds, the jobs' own use of the generations, which the runner host's
+#: hygiene case reads from the report: a job's tools write into a generation
+#: only when the hook named it to them. npm's caches are listed one per
+#: install, the others whole.
+GENERATION_READERS: Final = "\n".join(
+    (
+        f'if [ -f "{RUNNER_TOOLS}/{names.CURRENT_GENERATION_NAME}" ]; then',
+        f'    current=$(cat "{RUNNER_TOOLS}/{names.CURRENT_GENERATION_NAME}")',
+        f'    for marker in "{RUNNER_MARKERS}"/*/{names.GENERATION_MARKER_NAME}; do',
+        '        read_generation=$(cat "$marker")',
+        "        install=${marker%/*}",
+        '        echo "cache-reader: ${install##*/} read generation $read_generation"',
+        "    done",
+        f'    held_root="{RUNNER_TOOLS}/$current"',
+        '    held=$(find "$held_root" -mindepth 1 -maxdepth 2 -type d'
+        ' \\( -path "$held_root/npm/*" -o ! -path "$held_root/*/*" \\) -printf \'%P\\n\' | sort)',
+        "    for tool in $held; do",
+        "        size=$(find \"$held_root/$tool\" -type f -printf '%s\\n'"
+        " | awk '{ total += $1 } END { print total + 0 }')",
+        '        echo "cache-tool: generation $current holds $tool ($size bytes of files)"',
+        "    done",
+        "else",
+        '    echo "cache-reader: no generation yet"',
+        "fi",
+    )
+)
+
 #: The Python half of :data:`CI_CLEAN_SCRIPT`, separate so a test executes it
 #: against a home of its own without a docker daemon.
 CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source path stays
@@ -147,6 +178,9 @@ CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source
 
 # npm's, pip's and poetry's download caches, a whole generation at a time.
 {GENERATIONS_SWEEP}
+
+# Which generation the jobs read, and what they wrote into the current one.
+{GENERATION_READERS}
 """
 
 #: The daily hygiene script, installed to /usr/local/bin/ci-clean.
@@ -212,6 +246,7 @@ __all__ = [
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
     "GENERATIONS_SWEEP",
+    "GENERATION_READERS",
     "ORPHAN_SWEEP",
     "REPORT_BUILD_CACHE",
     "REPORT_DIGEST",
