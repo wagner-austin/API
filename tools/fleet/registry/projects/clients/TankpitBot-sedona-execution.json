@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 10,
+  "required_tags": [
+    "windows"
+  ],
+  "node": "sedona",
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "clients/TankpitBot-sedona-execution",
+    "install": [],
+    "companions": []
+  }
+}

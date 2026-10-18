@@ -287,6 +287,29 @@ def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("host", "tag"), [("sedona", NodeTag.WINDOWS), ("colossus", NodeTag.LINUX)]
+)
+def test_tankpits_move_is_measured_on_the_host_that_holds_each_end(host: str, tag: NodeTag) -> None:
+    """Each end of TankPit's move is checked by a project pinned to its host.
+
+    sedona holds the directory the move copied and colossus the copy, the
+    release and its image (board task c481c259), so each project lands on
+    that node alone, which carries the platform tag it names.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, f"clients/TankpitBot-{host}-execution")
+    assert project["node"] == host
+    assert project["required_tags"] == (tag,)
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path=f"clients/TankpitBot-{host}-execution",
+        install=(),
+        companions=(),
+    )
+    assert require_node(workspace, host)["platform"] == tag.value
+
+
 def test_tankpitbot_runs_its_ordinary_check_on_each_platform() -> None:
     """clients/TankpitBot checks on a Windows node and clients/TankpitBot-linux on a Linux one.
 
