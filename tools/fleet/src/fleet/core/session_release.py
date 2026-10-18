@@ -13,34 +13,48 @@ ruled (card 6b697bb4, 'build sealed releases for both') that the fleet-agent
 runs only a sealed release, the way the supervisors, the fleet audit and the
 hub cleanup already did.
 
-WHAT THIS DOES. MCPs ``scripts/ops/prepare-release.ps1 -Kind session-verbs``
-checks a release out at a full commit, builds session-audit's own
-environment inside it, runs its checks and seals it; MCPs
-``scripts/ops/register-session-verbs.ps1`` refuses anything but such a
-release and points :data:`POINTER_NAME` in the release store at it. Before
-every verb, :func:`active_session_release` reads that pointer, runs the
-release's own ``scripts/ops/verify-release.ps1`` (MCPs ``Read-Release``,
-which recomputes the payload digest and compares it and the detached
-commit with the seal), and requires the verifier to name exactly the
-release the pointer named. The verb then runs that release's session-audit
-with its sealed environment and its registry. The job's closing detail
-names the release id and revision.
+WHAT THIS DOES. MCPs cuts a session-verbs release at a full commit, builds
+session-audit's own environment inside it, runs its checks, seals it, and
+points :data:`POINTER_NAME` in the kind's store at it. Before every verb,
+:func:`active_session_release` reads that pointer, runs the release's own
+maketools ``verify-release`` (MCPs ``release/seal.py`` ``verify_release``,
+which recomputes the payload digest and compares it and the detached commit
+with the seal), and requires the verifier to name exactly the release the
+pointer named. The verb then runs that release's session-audit with its
+sealed environment and its registry. The job's closing detail names the
+release id and revision.
 
-NO FALLBACK. No pointer, a malformed one, a release that fails its seal or
-a verifier whose answer is not the pointer's release refuses the job with a
-named code, and nothing runs; running the checkout or ``origin/main`` on the
-day the release is missing is exactly what the ruling removed.
+THE STORE IS THE PLATFORM'S (MCPs board task 315111e4). The sessions duty
+moved to diphtheria, a Linux host, on 2026-10-18, and its first kill was
+refused because this module read the store only from ``LOCALAPPDATA``, which
+Linux does not set. MCPs keeps every kind's store under one per-user base per
+platform (maketools ``release/store.py`` ``STORE_BASE``), and
+:data:`STORE_BASES` says the same: ``<LOCALAPPDATA>/Corvis`` on Windows,
+``<HOME>/.local/share/corvis`` on Linux. This package cannot import
+maketools, which lives in another repository and environment, so the pair is
+written here and the verifier, which is maketools, is the release's own.
 
-WHY POWERSHELL FOR THE CHECK. The seal is MCPs' digest
-(``scripts/lib/release.ps1``), one implementation for every release kind; a
-second copy of it here would be the fork that drifts first. The verifier is
-inside the payload it checks, as every kind's registration is.
+NO FALLBACK. An unknown platform, an unset base variable, no pointer, a
+malformed one, a release that fails its seal or a verifier whose answer is
+not the pointer's release refuses the job with a named code, and nothing
+runs; running the checkout or ``origin/main`` on the day the release is
+missing is exactly what the ruling removed.
+
+WHY THE RELEASE'S OWN MAKETOOLS. The seal is MCPs' digest, one
+implementation for every release kind; a second copy of it here would be the
+fork that drifts first. The verifier is inside the payload it checks, as
+every kind's registration is, and maketools runs on the standard library
+alone, so this process's own interpreter runs it with ``-I`` and ``-B``: no
+environment of ours reaches it and it writes no bytecode into the sealed
+tree. It replaced ``verify-release.ps1``, which only Windows could run.
 """
 
 from __future__ import annotations
 
 import pathlib
 import re
+import sys
+from collections.abc import Mapping
 from typing import Final, TypedDict
 
 from platform_core.json_utils import load_json_str
@@ -48,12 +62,19 @@ from platform_core.json_utils import load_json_str
 from fleet.core import _test_hooks
 from fleet.core.commit_tree import step_refusal
 
-#: The release kind a session verb runs, as MCPs ``release-kinds.ps1`` names it.
+#: The release kind a session verb runs, as MCPs ``release-kinds.json`` names it.
 KIND: Final = "session-verbs"
 
-#: The release store under ``%LOCALAPPDATA%``, as MCPs
-#: ``register-session-verbs.ps1`` writes it.
-STORE: Final = pathlib.PurePosixPath("Corvis/session-verbs-releases")
+#: Where each platform keeps every release kind's store: the environment
+#: variable naming the per-user root, and the base under it, as MCPs
+#: maketools ``release/store.py`` ``STORE_BASE`` lays them out.
+STORE_BASES: Final[Mapping[str, tuple[str, pathlib.PurePosixPath]]] = {
+    "win32": ("LOCALAPPDATA", pathlib.PurePosixPath("Corvis")),
+    "linux": ("HOME", pathlib.PurePosixPath(".local/share/corvis")),
+}
+
+#: The kind's store under its platform's base.
+STORE: Final = pathlib.PurePosixPath(f"{KIND}-releases")
 
 #: The pointer file in the store naming the active release.
 POINTER_NAME: Final = "active.json"
@@ -61,8 +82,12 @@ POINTER_NAME: Final = "active.json"
 #: The pointer's keys, in the order MCPs writes them.
 POINTER_KEYS: Final[tuple[str, ...]] = ("kind", "release", "revision", "root")
 
-#: The verifier inside a release, relative to its checkout.
-VERIFIER: Final = pathlib.PurePosixPath("scripts/ops/verify-release.ps1")
+#: The verifier inside a release, relative to its checkout: maketools'
+#: launcher, which puts the release's own maketools source on the path.
+VERIFIER: Final = pathlib.PurePosixPath("packages/maketools/scripts/run.py")
+
+#: The maketools command that checks a release's seal and names it.
+VERIFY_COMMAND: Final = "verify-release"
 
 #: The source registry inside a release, passed to every verb.
 REGISTRY_DIR: Final = pathlib.PurePosixPath("mcp-shared/src/source-registry")
@@ -75,8 +100,11 @@ VERIFY_TIMEOUT_SECONDS: Final[int] = 300
 #: A full commit id, as a release receipt records it.
 REVISION_PATTERN: Final = re.compile(r"^[0-9a-f]{40}$")
 
-#: Detail prefix when the environment names no local application data root.
-NO_APPDATA_CODE: Final = "SESSION_RELEASE_NO_APPDATA"
+#: Detail prefix when this process runs on a platform with no store base.
+PLATFORM_UNSUPPORTED_CODE: Final = "SESSION_RELEASE_PLATFORM_UNSUPPORTED"
+
+#: Detail prefix when the environment names no root for the platform's store.
+NO_STORE_BASE_CODE: Final = "SESSION_RELEASE_NO_STORE_BASE"
 
 #: Detail prefix when no release has been activated.
 NOT_ACTIVE_CODE: Final = "SESSION_RELEASE_NOT_ACTIVE"
@@ -107,21 +135,35 @@ class SessionRelease(TypedDict):
     registry_dir: str
 
 
-def pointer_path() -> pathlib.Path | str:
-    """Locate the active-release pointer.
+def pointer_path(operating_system: str) -> pathlib.Path | str:
+    """Locate the active-release pointer in this platform's store.
+
+    Args:
+        operating_system: The platform this runner is on, as
+            ``sys.platform`` names it; the caller passes it so one suite
+            reads every platform's store.
 
     Returns:
-        ``%LOCALAPPDATA%/Corvis/session-verbs-releases/active.json``, or a
-        refusal detail when the environment names no ``LOCALAPPDATA``.
+        ``<base>/session-verbs-releases/active.json`` under the platform's
+        :data:`STORE_BASES` root, or a refusal detail when the platform has
+        no store base or the environment names no root for it.
     """
-    appdata = _test_hooks.env("LOCALAPPDATA")
-    # The env seam answers None for unset and blank alike.
-    if appdata is None:
+    base = STORE_BASES.get(operating_system)
+    if base is None:
         return (
-            f"{NO_APPDATA_CODE}: LOCALAPPDATA is unset in this runner's environment, so the "
-            "session-verbs release store cannot be found; nothing was run"
+            f"{PLATFORM_UNSUPPORTED_CODE}: this runner is on {operating_system!r}, and a "
+            f"session-verbs release store is kept only on {', '.join(STORE_BASES)}; "
+            "nothing was run"
         )
-    return pathlib.Path(appdata) / STORE / POINTER_NAME
+    variable, relative = base
+    root = _test_hooks.env(variable)
+    # The env seam answers None for unset and blank alike.
+    if root is None:
+        return (
+            f"{NO_STORE_BASE_CODE}: {variable} is unset in this runner's environment, so the "
+            f"{operating_system} session-verbs release store cannot be found; nothing was run"
+        )
+    return pathlib.Path(root) / relative / STORE / POINTER_NAME
 
 
 def _pointed(path: pathlib.Path) -> SessionRelease | str:
@@ -135,8 +177,9 @@ def _pointed(path: pathlib.Path) -> SessionRelease | str:
     """
     if not _test_hooks.file_exists(path):
         return (
-            f"{NOT_ACTIVE_CODE}: {path} does not exist; activate a sealed session-verbs "
-            "release with MCPs make register-session-verbs RELEASE=<root>; nothing was run"
+            f"{NOT_ACTIVE_CODE}: {path} does not exist, so no sealed session-verbs release "
+            "is active on this machine; MCPs activates one on the host of the sessions "
+            "duty; nothing was run"
         )
     record = load_json_str(_test_hooks.read_text(path))
     if not isinstance(record, dict) or tuple(record) != POINTER_KEYS:
@@ -163,39 +206,53 @@ def _pointed(path: pathlib.Path) -> SessionRelease | str:
     )
 
 
-def active_session_release() -> SessionRelease | str:
+def verify_argv(root: pathlib.Path) -> tuple[str, ...]:
+    """The release's own verifier, run against its checkout.
+
+    Args:
+        root: The release's checkout.
+
+    Returns:
+        This interpreter, isolated and writing no bytecode, on the release's
+        maketools launcher with ``verify-release --root <root> --kind
+        session-verbs``.
+    """
+    return (
+        sys.executable,
+        "-I",
+        "-B",
+        str(root / VERIFIER),
+        VERIFY_COMMAND,
+        "--root",
+        str(root),
+        "--kind",
+        KIND,
+    )
+
+
+def active_session_release(operating_system: str) -> SessionRelease | str:
     """Find the active session-verbs release and verify its seal.
+
+    Args:
+        operating_system: The platform this runner is on, as
+            ``sys.platform`` names it, which decides where its store is.
 
     Returns:
         The verified release, or a ``CODE: message`` refusal detail for the
         queue when there is none, its pointer is malformed, its seal does
         not verify, or the verifier names another release.
     """
-    path = pointer_path()
+    path = pointer_path(operating_system)
     if isinstance(path, str):
         return path
     release = _pointed(path)
     if isinstance(release, str):
         return release
     root = release["root"]
-    verifier = root / VERIFIER
-    result = _test_hooks.run(
-        (
-            "powershell.exe",
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-File",
-            str(verifier),
-            "-Root",
-            str(root),
-            "-Kind",
-            KIND,
-        ),
-        timeout_seconds=VERIFY_TIMEOUT_SECONDS,
-    )
+    result = _test_hooks.run(verify_argv(root), timeout_seconds=VERIFY_TIMEOUT_SECONDS)
+    verifier = str(root / VERIFIER)
     if result["returncode"] != 0:
-        return step_refusal(UNSEALED_CODE, str(verifier), result)
+        return step_refusal(UNSEALED_CODE, verifier, result)
     expected = (
         f"RELEASE_VERIFIED kind={KIND} release={release['release']} "
         f"revision={release['revision']} root={root}"
@@ -213,17 +270,21 @@ __all__ = [
     "ANSWER_MISMATCH_CODE",
     "KIND",
     "NOT_ACTIVE_CODE",
-    "NO_APPDATA_CODE",
+    "NO_STORE_BASE_CODE",
+    "PLATFORM_UNSUPPORTED_CODE",
     "POINTER_INVALID_CODE",
     "POINTER_KEYS",
     "POINTER_NAME",
     "REGISTRY_DIR",
     "REVISION_PATTERN",
     "STORE",
+    "STORE_BASES",
     "UNSEALED_CODE",
     "VERIFIER",
+    "VERIFY_COMMAND",
     "VERIFY_TIMEOUT_SECONDS",
     "SessionRelease",
     "active_session_release",
     "pointer_path",
+    "verify_argv",
 ]

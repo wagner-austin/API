@@ -292,8 +292,9 @@ def session_job(
     target = job["session_target"] if job["session_target"] is not None else ""
     # The verb runs the active sealed session-verbs release, verified for
     # this job, and nothing else (MCPs board task c7c2527d); no release, or
-    # one that fails its seal, refuses the job with nothing run.
-    release = session_release.active_session_release()
+    # one that fails its seal, refuses the job with nothing run. Its store
+    # is this machine's platform's (board task 315111e4).
+    release = session_release.active_session_release(sys.platform)
     if isinstance(release, str):
         return _refuse_hub_job(credentials, job, identity, detail=release)
     invocation = restart.session_invocation(

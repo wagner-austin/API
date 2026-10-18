@@ -2,9 +2,10 @@
 
 Shared by ``test_session_release`` (finding and verifying the release) and
 ``test_agent_restart`` (the tick that does so before every session verb), so
-the pointer MCPs ``register-session-verbs.ps1`` writes, the verifier call and
-its answer are written down once. The pointer is planted for real under a
-per-test ``LOCALAPPDATA``: the release is found through the real
+the pointer MCPs writes, the verifier call and its answer are written down
+once. The pointer is planted for real in the store of the platform the
+suite runs on (the agent passes ``sys.platform``), under a per-test root
+the environment names: the release is found through the real
 ``file_exists`` and ``read_text`` hooks, so what a test plants is what the
 code reads.
 """
@@ -12,21 +13,55 @@ code reads.
 from __future__ import annotations
 
 import pathlib
+import sys
 from typing import Final
 
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from fleet.core import _test_hooks, session_release
+from fleet.core import _test_hooks
 from fleet.core.session_release import SessionRelease
 from tests._queue_fakes import FakeEnv, queue_env
 from tests.conftest import ok
 
-#: The release id: a candidate directory name as MCPs ``release-build.ps1``
-#: makes it, a GUID without hyphens.
+#: The release id: a candidate directory name as MCPs makes it, a GUID
+#: without hyphens.
 RELEASE_ID: Final = "3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6"
 
 #: The commit the release was checked out at.
 REVISION: Final = "58efcb92d6c1e0a4b3f2e1d0c9b8a7f6e5d4c3b2"
+
+#: Each platform's store root variable and the store under it, as MCPs
+#: maketools ``release/store.py`` lays them out, written out rather than read
+#: from the module under test.
+STORES: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
+    "win32": ("LOCALAPPDATA", ("Corvis", "session-verbs-releases")),
+    "linux": ("HOME", (".local", "share", "corvis", "session-verbs-releases")),
+}
+
+
+def store_root(tmp_path: pathlib.Path) -> pathlib.Path:
+    """The per-test directory the platform's root variable names.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        The directory the environment names.
+    """
+    return tmp_path / "root"
+
+
+def store(tmp_path: pathlib.Path) -> pathlib.Path:
+    """The kind's store for the platform the suite runs on.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        ``<root>/.local/share/corvis/session-verbs-releases`` on Linux,
+        ``<root>/Corvis/session-verbs-releases`` on Windows.
+    """
+    return store_root(tmp_path).joinpath(*STORES[sys.platform][1])
 
 
 def release_root(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -36,25 +71,13 @@ def release_root(tmp_path: pathlib.Path) -> pathlib.Path:
         tmp_path: The test's temporary directory.
 
     Returns:
-        ``<LOCALAPPDATA>/Corvis/session-verbs-releases/<id>/MCPs``.
+        ``<store>/<id>/MCPs``.
     """
-    return appdata(tmp_path) / session_release.STORE / RELEASE_ID / "MCPs"
-
-
-def appdata(tmp_path: pathlib.Path) -> pathlib.Path:
-    """The per-test ``LOCALAPPDATA``.
-
-    Args:
-        tmp_path: The test's temporary directory.
-
-    Returns:
-        The directory the environment names.
-    """
-    return tmp_path / "appdata"
+    return store(tmp_path) / RELEASE_ID / "MCPs"
 
 
 def pointer_file(tmp_path: pathlib.Path) -> pathlib.Path:
-    """The active-release pointer under the per-test ``LOCALAPPDATA``.
+    """The active-release pointer in the per-test store.
 
     Args:
         tmp_path: The test's temporary directory.
@@ -62,16 +85,17 @@ def pointer_file(tmp_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The ``active.json`` path.
     """
-    return appdata(tmp_path) / session_release.STORE / session_release.POINTER_NAME
+    return store(tmp_path) / "active.json"
 
 
 def point_environment(tmp_path: pathlib.Path) -> None:
-    """Give the agent's environment the queue's variables and the test's ``LOCALAPPDATA``.
+    """Give the agent the queue's variables and the platform's store root.
 
     Args:
         tmp_path: The test's temporary directory.
     """
-    _test_hooks.env = FakeEnv({**queue_env().values, "LOCALAPPDATA": str(appdata(tmp_path))})
+    variable = STORES[sys.platform][0]
+    _test_hooks.env = FakeEnv({**queue_env().values, variable: str(store_root(tmp_path))})
 
 
 def write_pointer(tmp_path: pathlib.Path, record: JSONObject) -> pathlib.Path:
@@ -92,7 +116,7 @@ def write_pointer(tmp_path: pathlib.Path, record: JSONObject) -> pathlib.Path:
 
 
 def pointer_record(tmp_path: pathlib.Path) -> JSONObject:
-    """The pointer MCPs ``register-session-verbs.ps1`` writes for the planted release.
+    """The pointer MCPs writes for the planted release.
 
     Args:
         tmp_path: The test's temporary directory.
@@ -101,7 +125,7 @@ def pointer_record(tmp_path: pathlib.Path) -> JSONObject:
         The record, its keys in MCPs' order.
     """
     return {
-        "kind": session_release.KIND,
+        "kind": "session-verbs",
         "release": RELEASE_ID,
         "revision": REVISION,
         "root": str(release_root(tmp_path)),
@@ -109,7 +133,7 @@ def pointer_record(tmp_path: pathlib.Path) -> JSONObject:
 
 
 def plant_release(tmp_path: pathlib.Path) -> SessionRelease:
-    """Activate the planted release, as a registration would.
+    """Activate the planted release, as MCPs would.
 
     Args:
         tmp_path: The test's temporary directory.
@@ -124,8 +148,20 @@ def plant_release(tmp_path: pathlib.Path) -> SessionRelease:
         release=RELEASE_ID,
         revision=REVISION,
         root=root,
-        registry_dir=str(root / session_release.REGISTRY_DIR),
+        registry_dir=str(root / "mcp-shared" / "src" / "source-registry"),
     )
+
+
+def verifier(tmp_path: pathlib.Path) -> pathlib.Path:
+    """The planted release's own maketools launcher.
+
+    Args:
+        tmp_path: The test's temporary directory.
+
+    Returns:
+        ``<root>/packages/maketools/scripts/run.py``.
+    """
+    return release_root(tmp_path) / "packages" / "maketools" / "scripts" / "run.py"
 
 
 def verify_call(tmp_path: pathlib.Path) -> tuple[str, ...]:
@@ -135,25 +171,25 @@ def verify_call(tmp_path: pathlib.Path) -> tuple[str, ...]:
         tmp_path: The test's temporary directory.
 
     Returns:
-        The release's own ``verify-release.ps1`` against its root and kind.
+        This interpreter, isolated, on the release's own maketools
+        ``verify-release`` against its root and kind.
     """
     root = release_root(tmp_path)
     return (
-        "powershell.exe",
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        str(root / session_release.VERIFIER),
-        "-Root",
+        sys.executable,
+        "-I",
+        "-B",
+        str(verifier(tmp_path)),
+        "verify-release",
+        "--root",
         str(root),
-        "-Kind",
-        session_release.KIND,
+        "--kind",
+        "session-verbs",
     )
 
 
 def verified_line(tmp_path: pathlib.Path) -> str:
-    """The line MCPs ``verify-release.ps1`` prints for the planted release.
+    """The line MCPs maketools ``verify-release`` prints for the planted release.
 
     Args:
         tmp_path: The test's temporary directory.
@@ -162,7 +198,7 @@ def verified_line(tmp_path: pathlib.Path) -> str:
         ``RELEASE_VERIFIED kind=... release=... revision=... root=...``.
     """
     return (
-        f"RELEASE_VERIFIED kind={session_release.KIND} release={RELEASE_ID} "
+        f"RELEASE_VERIFIED kind=session-verbs release={RELEASE_ID} "
         f"revision={REVISION} root={release_root(tmp_path)}"
     )
 
@@ -182,13 +218,16 @@ def verify_reply(tmp_path: pathlib.Path) -> _test_hooks.CommandResult:
 __all__ = [
     "RELEASE_ID",
     "REVISION",
-    "appdata",
+    "STORES",
     "plant_release",
     "point_environment",
     "pointer_file",
     "pointer_record",
     "release_root",
+    "store",
+    "store_root",
     "verified_line",
+    "verifier",
     "verify_call",
     "verify_reply",
     "write_pointer",
