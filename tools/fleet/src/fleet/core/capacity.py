@@ -178,6 +178,11 @@ def assess(
     refuses a pin naming a node it does not declare, and every node's host
     is its registry name, so the node is matched by its host.
 
+    A NODE THAT CHECKS ONLY ITS PINNED PROJECTS REFUSES EVERY OTHER ONE, next,
+    for the same reason in reverse (MCPs board task d577036f): its own work
+    leaves a check no margin under the budget, and nothing about the node
+    changes that, so a project any other node can run is that node's.
+
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
@@ -190,6 +195,16 @@ def assess(
                 f"{node['host']} is not {pinned}: the project runs on {pinned} alone, because "
                 "it reads what only that host holds, so the answer is that node and never "
                 "this one."
+            ),
+        )
+    if pinned is None and node["budget"]["pinned_checks_only"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_NOT_PINNED,
+            reason=(
+                f"{node['host']} checks only the projects pinned to it: its own work leaves a "
+                "check no margin under the 300 s budget, so the answer is any other node "
+                "this project's tags fit."
             ),
         )
     missing = missing_tags(carried, project["required_tags"])
@@ -358,6 +373,9 @@ def room_for_any(
     bound has to be the least any claimable job needs: one worker of the
     registered project with the smallest worker_ram_gb whose required tags
     this runner carries. The per-project assess after the claim is unchanged.
+    On a node that checks only its pinned projects, only those are servable,
+    and the hypothetical job is pinned to the node judged, so the pin rules
+    in :func:`assess` weigh it as the node's own.
 
     Args:
         node: The node's declaration.
@@ -371,17 +389,26 @@ def room_for_any(
         can serve (disk for a staged tree, then cores and memory after the
         owner's reservation and the node's live runs), else the ``CODE: reason`` line
         saying why it can take nothing, worded as :func:`assess` would word
-        the same refusal, or ``NODE_LACKS_TAG`` when no registered project's
-        tags fit this runner at all.
+        the same refusal, ``NODE_LACKS_TAG`` when no registered project's
+        tags fit this runner at all, or ``NODE_NOT_PINNED`` when some fit and
+        the node checks only its pinned projects and none is pinned to it.
     """
-    servable = [
-        project["worker_ram_gb"] for project in projects if set(project["required_tags"]) <= tags
-    ]
-    if not servable:
+    fitting = [project for project in projects if set(project["required_tags"]) <= tags]
+    if not fitting:
         carried = ", ".join(sorted(tag.value for tag in tags)) or "no tags"
         return (
             f"{FleetErrorCode.NODE_LACKS_TAG.value}: this runner carries {carried}, and no "
             "registered project's required tags fit it"
+        )
+    servable = [
+        project["worker_ram_gb"]
+        for project in fitting
+        if project["node"] == node["host"] or not node["budget"]["pinned_checks_only"]
+    ]
+    if not servable:
+        return (
+            f"{FleetErrorCode.NODE_NOT_PINNED.value}: {node['host']} checks only the projects "
+            "pinned to it, and no project this runner's tags fit is pinned to it"
         )
     default_tenant = ProjectConfig(
         worker_ram_gb=min(servable),
@@ -391,7 +418,7 @@ def room_for_any(
         external_paths=(),
         required_tags=(),
         source=None,
-        node=None,
+        node=node["host"],
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:

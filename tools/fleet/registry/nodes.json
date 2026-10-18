@@ -17,7 +17,8 @@
         "reserved_ram_gb": 4.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": null
+        "checks_at_once": null,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": true,
@@ -45,7 +46,8 @@
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": null
+        "checks_at_once": null,
+        "pinned_checks_only": false
       },
       "enabled": false,
       "test_database": false,
@@ -68,7 +70,8 @@
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": 1
+        "checks_at_once": 1,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": true,
@@ -96,7 +99,8 @@
         "reserved_ram_gb": 2.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": 1
+        "checks_at_once": 1,
+        "pinned_checks_only": true
       },
       "enabled": true,
       "test_database": true,
@@ -124,7 +128,8 @@
         "reserved_ram_gb": 6.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": 1
+        "checks_at_once": 1,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": true,
@@ -147,7 +152,8 @@
         "reserved_ram_gb": 4.0,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": 1
+        "checks_at_once": 1,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": false,
@@ -170,7 +176,8 @@
         "reserved_ram_gb": 2.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": null
+        "checks_at_once": null,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": false,
@@ -193,7 +200,8 @@
         "reserved_ram_gb": 1.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
-        "checks_at_once": null
+        "checks_at_once": null,
+        "pinned_checks_only": false
       },
       "enabled": true,
       "test_database": true,

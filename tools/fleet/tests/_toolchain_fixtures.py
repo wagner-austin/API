@@ -309,6 +309,7 @@ def node(
             worker_ram_gb=1.1,
             max_disk_gb=20.0,
             checks_at_once=None,
+            pinned_checks_only=False,
         ),
     )
 

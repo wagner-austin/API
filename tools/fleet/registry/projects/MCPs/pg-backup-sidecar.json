@@ -10,6 +10,7 @@
     "cxx",
     "stack"
   ],
+  "node": "diphtheria",
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "pg-backup-sidecar",

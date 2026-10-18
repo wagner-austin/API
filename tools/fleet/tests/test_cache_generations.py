@@ -63,6 +63,7 @@ def _node(platform: NodePlatform, stage_root: str, docker: str | None) -> NodeCo
             "worker_ram_gb": 1.1,
             "max_disk_gb": 40.0,
             "checks_at_once": None,
+            "pinned_checks_only": False,
         },
     )
 

@@ -111,6 +111,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                         worker_ram_gb=1.1,
                         max_disk_gb=20.0,
                         checks_at_once=None,
+                        pinned_checks_only=False,
                     ),
                 )
             )

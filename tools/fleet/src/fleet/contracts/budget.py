@@ -31,6 +31,7 @@ from platform_core.json_utils import (
     JSONTypeError,
     JSONValue,
     optional_int,
+    require_bool,
     require_float,
     require_int,
 )
@@ -68,6 +69,18 @@ class NodeBudget(TypedDict):
             took 162 s alone (build 48.8 s, suite 109.5 s) and 306 s beside
             MCPs/execution-elevated with 2 + 2 workers inside the pool's 4
             (build 73.7 s, suite 195.6 s), over its 300 s budget.
+        pinned_checks_only: Whether the node checks only the projects pinned
+            to it, leaving every other project to the nodes whose own work
+            leaves a check its margin. Declared for diphtheria (MCPs board
+            task d577036f), which runs the production stack: in the 7 days to
+            2026-10-18 it ran 10 of its 341 checks past the 300 s budget with
+            their tests passing, against 3 of about 1,500 on the other nodes,
+            meeting transcription running beside 85 percent of its large
+            suites inside its reserved cores at CPU pressure of 2 to 4
+            percent. Given 3 workers there on 2026-10-18, MCPs/watcher,
+            doc-extract-api and mcp-shared took 192 s, 270 s and 302 s
+            against their 218 s, 205 s and 244 s averages at 2, so no grant
+            buys the margin back.
     """
 
     reserved_cores: int
@@ -75,6 +88,7 @@ class NodeBudget(TypedDict):
     worker_ram_gb: float
     max_disk_gb: float
     checks_at_once: int | None
+    pinned_checks_only: bool
 
 
 def admissible_workers(budget: NodeBudget, *, logical_cores: int, free_ram_gb: float) -> int:
@@ -123,6 +137,7 @@ def encode_node_budget(budget: NodeBudget) -> JSONObject:
         "worker_ram_gb": budget["worker_ram_gb"],
         "max_disk_gb": budget["max_disk_gb"],
         "checks_at_once": budget["checks_at_once"],
+        "pinned_checks_only": budget["pinned_checks_only"],
     }
 
 
@@ -170,6 +185,7 @@ def decode_node_budget(value: JSONValue) -> NodeBudget:
         worker_ram_gb=worker_ram_gb,
         max_disk_gb=max_disk_gb,
         checks_at_once=_decode_checks_at_once(value),
+        pinned_checks_only=require_bool(value, "pinned_checks_only"),
     )
 
 

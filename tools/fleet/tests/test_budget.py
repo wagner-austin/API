@@ -27,6 +27,7 @@ def _budget(
     worker_ram_gb: float = 1.1,
     max_disk_gb: float = 20.0,
     checks_at_once: int | None = None,
+    pinned_checks_only: bool = False,
 ) -> NodeBudget:
     """Build a budget, letting a test name only the field it is about.
 
@@ -36,6 +37,7 @@ def _budget(
         worker_ram_gb: Memory one test worker holds.
         max_disk_gb: Disk reserved for staged trees.
         checks_at_once: Budgeted checks the node's CPUs carry at once.
+        pinned_checks_only: Whether the node checks only its pinned projects.
 
     Returns:
         The budget.
@@ -46,6 +48,7 @@ def _budget(
         worker_ram_gb=worker_ram_gb,
         max_disk_gb=max_disk_gb,
         checks_at_once=checks_at_once,
+        pinned_checks_only=pinned_checks_only,
     )
 
 
@@ -151,4 +154,21 @@ class TestDecode:
         declared["checks_at_once"] = "one"
 
         with pytest.raises(JSONTypeError, match="'checks_at_once' must be an integer"):
+            decode_node_budget(declared)
+
+    def test_a_node_that_checks_only_its_pinned_projects_survives_encoding(self) -> None:
+        """diphtheria's declaration (MCPs board task d577036f)."""
+        original = _budget(checks_at_once=1, pinned_checks_only=True)
+
+        decoded = decode_node_budget(load_json_str(dump_json_str(encode_node_budget(original))))
+        assert decoded == original
+        assert decoded["pinned_checks_only"] is True
+
+    def test_a_budget_that_does_not_say_whether_it_checks_only_pinned_projects_is_refused(
+        self,
+    ) -> None:
+        declared = encode_node_budget(_budget())
+        del declared["pinned_checks_only"]
+
+        with pytest.raises(JSONTypeError, match="pinned_checks_only"):
             decode_node_budget(declared)

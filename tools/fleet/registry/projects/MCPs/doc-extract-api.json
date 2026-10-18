@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 0.3,
-  "minimum_workers": 3,
+  "minimum_workers": 2,
   "expected_minutes": 8,
   "exclusive_resources": [
     "corvis-fleet-testdb"
@@ -10,6 +10,7 @@
     "cxx",
     "stack"
   ],
+  "node": "diphtheria",
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "doc-extract-api",

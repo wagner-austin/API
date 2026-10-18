@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 0.5,
-  "minimum_workers": 3,
+  "minimum_workers": 2,
   "expected_minutes": 12,
   "required_tags": [
     "cxx"

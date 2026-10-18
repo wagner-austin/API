@@ -47,6 +47,7 @@ def _node(
     platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
     checks_at_once: int | None = None,
+    pinned_checks_only: bool = False,
 ) -> NodeConfig:
     """Build a node declaration.
 
@@ -59,6 +60,7 @@ def _node(
         platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
         checks_at_once: Budgeted checks its CPUs carry at once, or None.
+        pinned_checks_only: Whether it checks only the projects pinned to it.
 
     Returns:
         The node.
@@ -84,6 +86,7 @@ def _node(
             worker_ram_gb=1.1,
             max_disk_gb=max_disk_gb,
             checks_at_once=checks_at_once,
+            pinned_checks_only=pinned_checks_only,
         ),
     )
 

@@ -87,6 +87,7 @@ def _host() -> NodeConfig:
             worker_ram_gb=1.1,
             max_disk_gb=40.0,
             checks_at_once=None,
+            pinned_checks_only=False,
         ),
     )
 
@@ -118,6 +119,7 @@ def _wsl_node() -> NodeConfig:
             worker_ram_gb=1.1,
             max_disk_gb=40.0,
             checks_at_once=None,
+            pinned_checks_only=False,
         ),
     )
 
