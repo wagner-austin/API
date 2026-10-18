@@ -6797,3 +6797,9 @@ swap free never below 2090572 kB, a highest load of 26.6 on 20 cores and
 no new oom-kill line. Each per-bot encoder held about 440 MB and the
 four-up one 1.43 GB. At the operator's request every bot was drained and the fleet stopped at 09:51:32 UTC, and the
 TV was sent a UPnP Stop at 09:54 UTC.
+
+## [2026-10-17] Offline incident investigation | World-run retreat failures
+
+Pages written: [[retreat-incident-20261017]].
+Pages updated: architecture hub and index navigation/counts.
+Notes: Corvis task d947f299 continues 6275ecaa handoff abd5bb45 against runtime release 3888f06b2. Verified all 20 saved artifacts and decoded both bots' relevant packets. Confirmed the escape hit-floor mismatch, pickup-to-teleport clearance bypass, sensing priority and pre-buffered-response sleep. Corrected two initial hypotheses: both fuel refusals arrived in 61–62 ms, and the missing 580 fuel was still advertised in the landing viewport. Root cause of the no-gain landing and the immediate affordability refusals remains unresolved; the page specifies offline validation cases and timing limitations. No live game entered and no runtime behavior changed.
