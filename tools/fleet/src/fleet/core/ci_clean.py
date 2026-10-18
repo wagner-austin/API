@@ -46,7 +46,7 @@ Private at 2026-10-18T14:28Z, ten hours of builds after its 04:00 pass. So
 each run writes :data:`CI_CLEAN_REPORT` in the state directory systemd makes
 for the service: everything the passes printed, the instant it started, the
 sha256 of the script that ran, and the daemon's build cache records as its
-engine API counts them, in bytes, after the prune. The runner host's hygiene
+engine API counts them, in bytes, before the prunes and after them. The runner host's hygiene
 case reads it against the render and :data:`BUILD_CACHE_BOUND_GIB`, and reads
 the jobs' use of the generations from it (:data:`GENERATION_READERS`), since
 the runner account's home is closed to the fleet's user.
@@ -78,6 +78,7 @@ CI_CLEAN_REPORT: Final = f"/var/lib/{STATE_DIRECTORY_NAME}/last-run"
 REPORT_STARTED: Final = "started: "
 REPORT_DIGEST: Final = "script-sha256: "
 REPORT_BUILD_CACHE: Final = "build-cache: "
+REPORT_BUILD_CACHE_BEFORE: Final = "build-cache-before: "
 
 
 def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
@@ -193,6 +194,11 @@ set -euo pipefail
 report="${{STATE_DIRECTORY:?ci-clean runs as {STATE_DIRECTORY_NAME}.service}}/last-run"
 started=$(date +%s)
 digest=$(sha256sum "$0")
+# The build cache as the daemon's engine API counts it, in bytes, before the
+# prunes and again after them: one line of JSON each, too long for the
+# journal, so they go to the report alone.
+build_cache_url='http://localhost/system/df?type=build-cache'
+build_cache_before=$(curl -sf --unix-socket /var/run/docker.sock "$build_cache_url")
 {{
 # Docker: it never prunes what a running container or build references.
 # `volume prune` takes anonymous volumes only; named ones need --all.
@@ -204,11 +210,10 @@ docker builder prune -f --max-used-space {BUILD_CACHE_BOUND_GIB}gb
 
 {CI_CLEAN_CACHES}}} | tee "$report.pending"
 
-# The build cache as the daemon's engine API counts it, in bytes: one line
-# of JSON too long for the journal, so it goes to the report alone.
-build_cache=$(curl -sf --unix-socket /var/run/docker.sock 'http://localhost/system/df?type=build-cache')
+build_cache=$(curl -sf --unix-socket /var/run/docker.sock "$build_cache_url")
 printf '%s\\n' "{REPORT_STARTED}$started" "{REPORT_DIGEST}${{digest%% *}}" \\
     | tee -a "$report.pending"
+printf '%s\\n' "{REPORT_BUILD_CACHE_BEFORE}$build_cache_before" >> "$report.pending"
 printf '%s\\n' "{REPORT_BUILD_CACHE}$build_cache" >> "$report.pending"
 mv -f "$report.pending" "$report"
 echo "ci-clean: reported to $report"
@@ -249,6 +254,7 @@ __all__ = [
     "GENERATION_READERS",
     "ORPHAN_SWEEP",
     "REPORT_BUILD_CACHE",
+    "REPORT_BUILD_CACHE_BEFORE",
     "REPORT_DIGEST",
     "REPORT_STARTED",
     "STATE_DIRECTORY_NAME",

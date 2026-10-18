@@ -65,20 +65,36 @@ def test_the_python_half_follows_the_docker_prunes_inside_the_reported_group() -
     assert max(prunes) < len(group) - len(caches)
 
 
-def test_every_run_reports_its_digest_its_start_and_the_build_cache_after_the_prune() -> None:
+def _commands(lines: list[str]) -> list[str]:
+    """The lines of a script that are neither blank nor comments.
+
+    Args:
+        lines: The script's lines.
+
+    Returns:
+        Those lines, in order.
+    """
+    return [line for line in lines if line and not line.startswith("#")]
+
+
+def test_every_run_reports_its_digest_its_start_and_the_build_cache_around_the_prunes() -> None:
     """MCPs board tasks 46c7b11b and ecb13d3d, A2: the host case reads
-    which copy ran, when, and the cache the size pass left, from this."""
+    which copy ran, when, and the cache before the prunes and after them."""
     lines = ci_clean.CI_CLEAN_SCRIPT.splitlines()
-    opened = lines.index("{")
-    head = lines[:opened]
-    assert head[-3] == 'report="${STATE_DIRECTORY:?ci-clean runs as ci-clean.service}/last-run"'
-    assert head[-2:] == ["started=$(date +%s)", 'digest=$(sha256sum "$0")']
+    head = _commands(lines[: lines.index("{")])
+    assert head[-5:] == [
+        'report="${STATE_DIRECTORY:?ci-clean runs as ci-clean.service}/last-run"',
+        "started=$(date +%s)",
+        'digest=$(sha256sum "$0")',
+        "build_cache_url='http://localhost/system/df?type=build-cache'",
+        'build_cache_before=$(curl -sf --unix-socket /var/run/docker.sock "$build_cache_url")',
+    ]
     tail = lines[lines.index('} | tee "$report.pending"') + 1 :]
-    assert [line for line in tail if line and not line.startswith("#")] == [
-        "build_cache=$(curl -sf --unix-socket /var/run/docker.sock "
-        "'http://localhost/system/df?type=build-cache')",
+    assert _commands(tail) == [
+        'build_cache=$(curl -sf --unix-socket /var/run/docker.sock "$build_cache_url")',
         'printf \'%s\\n\' "started: $started" "script-sha256: ${digest%% *}" \\',
         '    | tee -a "$report.pending"',
+        'printf \'%s\\n\' "build-cache-before: $build_cache_before" >> "$report.pending"',
         'printf \'%s\\n\' "build-cache: $build_cache" >> "$report.pending"',
         'mv -f "$report.pending" "$report"',
         'echo "ci-clean: reported to $report"',

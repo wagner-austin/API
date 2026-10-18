@@ -43,6 +43,7 @@ from fleet.core.ci_clean import (
     CI_CLEAN_REPORT,
     CI_CLEAN_SCRIPT,
     REPORT_BUILD_CACHE,
+    REPORT_BUILD_CACHE_BEFORE,
     REPORT_DIGEST,
     REPORT_STARTED,
 )
@@ -124,8 +125,9 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
         f"{runner_host['name']}: {CI_CLEAN_PATH} is the render of CI_CLEAN_SCRIPT, "
         f"{CI_CLEAN_TIMER} enabled and fired {since} s ago, its last run {service['Result']} "
         f"with status {service['ExecMainStatus']}; {CI_CLEAN_REPORT} says the render ran "
-        f"{report.after_install} s after it was installed and left {report.private} bytes of "
-        f"private build cache, {report.records} records, against {BOUND_BYTES}; it reported "
+        f"{report.after_install} s after it was installed and took the private build cache "
+        f"from {report.before} bytes to {report.private}, {report.records} records, against "
+        f"{BOUND_BYTES}; it reported "
         + "; ".join(report.passes)
         + "; the host daemon's build cache now reads "
         + ", ".join(" ".join(total) for total in totals),
@@ -136,6 +138,7 @@ class LastRun(NamedTuple):
     """What :data:`CI_CLEAN_REPORT` says of the last run, read against the render."""
 
     after_install: int
+    before: int
     private: int
     records: int
     passes: tuple[str, ...]
@@ -147,8 +150,9 @@ def _last_run() -> LastRun:
     The report names the sha256 of the script that ran, which must be the
     render's, and its start, which must follow the installed script's mtime,
     so an old copy's success never reads as the render's. The build cache
-    records it holds are the daemon's own count in bytes after the size
-    pass, which bounds the private ones, those no other record shares.
+    records it holds are the daemon's own count in bytes before the prunes
+    and after the size pass, which bounds the private ones, those no other
+    record shares.
 
     Returns:
         The reading.
@@ -165,15 +169,30 @@ def _last_run() -> LastRun:
     passes = tuple(line for line in lines if line.startswith(PASS_LINES))
     assert [line.split(":")[0] for line in passes] == list(PASS_ORDER)
 
-    cache = _fields(lines, REPORT_BUILD_CACHE)
-    assert len(cache) == 1
-    body = narrow_json_to_dict(load_json_str(cache[0]))
+    before, _ = _private_build_cache(lines, REPORT_BUILD_CACHE_BEFORE)
+    private, records = _private_build_cache(lines, REPORT_BUILD_CACHE)
+    assert private <= BOUND_BYTES, f"{private} bytes of private build cache after the prune"
+    return LastRun(after_install, before, private, records, passes)
+
+
+def _private_build_cache(lines: list[str], prefix: str) -> tuple[int, int]:
+    """The private bytes of one build cache reading in the report, and its records.
+
+    Args:
+        lines: The report's lines.
+        prefix: How the reading's one line opens.
+
+    Returns:
+        The bytes no other record shares, and how many records there are.
+    """
+    reading = _fields(lines, prefix)
+    assert len(reading) == 1, f"{len(reading)} lines open with {prefix!r}"
+    body = narrow_json_to_dict(load_json_str(reading[0]))
     records = [narrow_json_to_dict(record) for record in require_list(body, "BuildCache")]
     private = sum(
         require_int(record, "Size") for record in records if not require_bool(record, "Shared")
     )
-    assert private <= BOUND_BYTES, f"{private} bytes of private build cache after the prune"
-    return LastRun(after_install, private, len(records), passes)
+    return private, len(records)
 
 
 @pytest.mark.host_runner_units
