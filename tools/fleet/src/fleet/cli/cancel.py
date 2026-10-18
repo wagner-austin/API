@@ -109,6 +109,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         loaded.leases,
         loaded.ledger,
         loaded.feed,
+        loaded.retires,
         node=node,
         row=row,
         outcome=LedgerOutcome.CANCELLED,

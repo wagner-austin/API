@@ -48,7 +48,7 @@ from fleet.cli import _config
 from fleet.contracts.ledger import LedgerEntry, is_live
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import cache_generations, collect, dispatch, records, retire
+from fleet.core import cache_generations, collect, dispatch, records, retire_owed
 
 _log = get_logger(__name__)
 
@@ -113,7 +113,7 @@ def collect_one(loaded: _config.LoadedWorkspace, row: LedgerEntry) -> str:
     detail = collect.describe(node, run_id=row["run_id"], exit_code=exit_code)
     # Before the row closes, so a retire that fails leaves it live to be
     # collected again (fleet.core.retire).
-    retire.retire_on_node(node, run_id=row["run_id"])
+    retire_owed.retire_or_raise(loaded.retires, node, alias=row["node"], run_id=row["run_id"])
     dispatch.finish(
         loaded.leases,
         loaded.ledger,

@@ -174,6 +174,7 @@ def stop_lost(
                 loaded.leases,
                 loaded.ledger,
                 loaded.feed,
+                loaded.retires,
                 node=node,
                 row=row,
                 outcome=LedgerOutcome.LOST,

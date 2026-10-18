@@ -23,7 +23,7 @@ import pathlib
 
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.core import cache_generations, dialect, dispatch, names, remote, retire
+from fleet.core import cache_generations, dialect, dispatch, names, remote, retire_owed
 
 
 def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
@@ -57,6 +57,7 @@ def stop_and_finish(
     loaded_leases: pathlib.Path,
     loaded_ledger: pathlib.Path,
     loaded_feed: pathlib.Path,
+    loaded_retires: pathlib.Path,
     *,
     node: NodeConfig,
     row: LedgerEntry,
@@ -73,6 +74,7 @@ def stop_and_finish(
         loaded_leases: The lease file.
         loaded_ledger: The ledger file.
         loaded_feed: The feed file.
+        loaded_retires: The retire record file, which records the retire done.
         node: The node it was dispatched to.
         row: The running row this supersedes.
         outcome: How the dispatch ended.
@@ -85,13 +87,13 @@ def stop_and_finish(
 
     Raises:
         AppError: As :func:`stop_on_node` and
-            :func:`fleet.core.retire.retire_on_node` describe, with the row
-            still live.
+            :func:`fleet.core.retire_owed.retire_or_raise` describe, with the
+            row still live.
     """
     stop_on_node(node, run_id=row["run_id"])
     # After the stop, so nothing the build started still holds a file in
     # the directory; before the row closes, for the same reason the stop is.
-    retire.retire_on_node(node, run_id=row["run_id"])
+    retire_owed.retire_or_raise(loaded_retires, node, alias=row["node"], run_id=row["run_id"])
     closing = dispatch.finish(
         loaded_leases,
         loaded_ledger,

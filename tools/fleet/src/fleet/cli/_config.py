@@ -156,9 +156,9 @@ class LoadedWorkspace:
         """Absolute path to the append-only record of retires owed and done.
 
         Beside the ledger, because it is this machine's running state as the
-        ledger is: the runs whose settle closed their row but could not
-        retire their directory (:mod:`fleet.core.retire_owed`, MCPs board
-        task 8776b828).
+        ledger is: every run's directory from its lease until a retire of it
+        is done (:mod:`fleet.core.retire_owed`, MCPs board tasks 8776b828
+        and 3d9eec0d).
 
         Returns:
             The resolved path.

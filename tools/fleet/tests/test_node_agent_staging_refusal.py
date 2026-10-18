@@ -232,3 +232,5 @@ class TestAnotherDispatchesLeaseStands:
         assert detail.startswith(f"{FleetErrorCode.LEASE_HELD}: ")
         assert leases.held_leases(loaded.leases, now_unix=DEMO_NOW) == (holder,)
         assert [e for e in records.read_feed(loaded.feed) if e["run_id"] == DEMO_RUN_ID] == []
+        # It took no lease and staged nothing, so it owes no retire (MCPs board task 3d9eec0d).
+        assert not loaded.retires.exists()

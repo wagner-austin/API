@@ -22,6 +22,13 @@ this module returned is the one place that knows it acquired it.
 The feed gets the terminal ``refused`` event here too, so a subscriber that
 read ``leased`` for the run reads its end rather than a run that never
 reports again.
+
+ON THE NODE, IT LEAVES WHAT IT STAGED. :func:`take` records the run's retire
+owed beside the lease, so the next collect pass after :func:`abandon` gives
+the lease back retires the run's directory and its staging directory as it
+retires a settled run's (:mod:`fleet.core.retire_owed`, MCPs board task
+3d9eec0d), and so does the first pass after the lease of a launch whose
+runner ended has lapsed.
 """
 
 from __future__ import annotations
@@ -33,7 +40,7 @@ from fleet.contracts.feed import FeedEvent, FeedKind
 from fleet.contracts.lease import Lease
 from fleet.contracts.project import ProjectConfig, lease_seconds
 from fleet.contracts.resources import scoped
-from fleet.core import _test_hooks, leases, records
+from fleet.core import _test_hooks, leases, records, retire_owed
 
 #: How much longer than its estimate a dispatch may hold its lease.
 #:
@@ -209,6 +216,7 @@ def emit(
 def take(
     loaded_leases: pathlib.Path,
     loaded_feed: pathlib.Path,
+    loaded_retires: pathlib.Path,
     *,
     node_name: str,
     project: str,
@@ -218,11 +226,16 @@ def take(
     session_id: str,
     node_local: tuple[str, ...],
 ) -> Lease:
-    """Name the dispatch, acquire its lease, and announce it on the feed.
+    """Name the dispatch, acquire its lease, record its retire owed, and announce it on the feed.
+
+    The retire is owed from the lease, before anything is staged, so a run
+    that never settles is retired by a later collect pass rather than left
+    on its node (:mod:`fleet.core.retire_owed`, MCPs board task 3d9eec0d).
 
     Args:
         loaded_leases: The lease file.
         loaded_feed: The feed file.
+        loaded_retires: The retire record file.
         node_name: The node's workspace name.
         project: Repo-relative project path.
         plan: The project's declaration.
@@ -251,6 +264,7 @@ def take(
         now_unix=now_unix,
     )
     leases.acquire(loaded_leases, lease, now_unix=now_unix)
+    retire_owed.owe(loaded_retires, alias=node_name, run_id=lease["run_id"])
     emit(
         loaded_feed,
         run_id=lease["run_id"],

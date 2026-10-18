@@ -286,6 +286,7 @@ def start(
     loaded_leases: pathlib.Path,
     loaded_ledger: pathlib.Path,
     loaded_feed: pathlib.Path,
+    loaded_retires: pathlib.Path,
     *,
     node_name: str,
     node: NodeConfig,
@@ -311,6 +312,8 @@ def start(
         loaded_leases: The lease file.
         loaded_ledger: The ledger file.
         loaded_feed: The feed file.
+        loaded_retires: The retire record file, which owes the run's
+            retire from its lease.
         node_name: The node's workspace name.
         node: Its declaration.
         project: Repo-relative project path.
@@ -334,6 +337,7 @@ def start(
     lease = run_lease.take(
         loaded_leases,
         loaded_feed,
+        loaded_retires,
         node_name=node_name,
         project=project,
         plan=plan,

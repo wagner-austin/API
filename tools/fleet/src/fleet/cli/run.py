@@ -231,6 +231,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         loaded.leases,
         loaded.ledger,
         loaded.feed,
+        loaded.retires,
         node_name=node_name,
         node=node,
         project=project,

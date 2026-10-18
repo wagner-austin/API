@@ -1,6 +1,6 @@
 """Retiring a settled dispatch's directory (MCPs board task bfca20e6).
 
-:func:`fleet.core.retire.retire_on_node` is asked, per platform, which script
+:func:`fleet.core.retire.attempt_retire_on_node` is asked, per platform, which script
 it sends where; the ``sh`` rendering is then executed for real under this
 host's bash against a stage root laid out under ``tmp_path``, run twice to
 show a retire that already happened is not an error. The PowerShell rendering
@@ -14,7 +14,7 @@ import pathlib
 import subprocess
 
 import pytest
-from platform_core.errors import AppError, FleetErrorCode
+from platform_core.errors import FleetErrorCode
 
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.core import _test_hooks, dialect, names, retire
@@ -86,8 +86,10 @@ def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transc
     runner = FakeRun(retire_replies()[:2])
     _test_hooks.run = runner
 
-    kept = retire.retire_on_node(node, run_id=DEMO_RUN_ID)
+    outcome = retire.attempt_retire_on_node(node, run_id=DEMO_RUN_ID)
 
+    assert outcome["failure"] is None
+    kept = names.retained_log_path(root, DEMO_RUN_ID)
     assert kept == f"{root}/logs/{DEMO_RUN_ID}.log"
     # The script sent and run, and no generations' removal: each caller
     # sends that once its row is closed (MCPs board task 8993c306).
@@ -118,7 +120,7 @@ def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() 
     runner = FakeRun(retire_replies()[:2])
     _test_hooks.run = runner
 
-    retire.retire_on_node(node, run_id=DEMO_RUN_ID)
+    assert retire.attempt_retire_on_node(node, run_id=DEMO_RUN_ID)["failure"] is None
 
     assert retire.runs_isolated(node)
     assert not retire.runs_isolated(_node(NodePlatform.LINUX))
@@ -151,17 +153,19 @@ def test_a_windows_node_has_no_isolated_copy_to_retire() -> None:
         (failed(1, "Remove-Item: access denied"), FleetErrorCode.DISPATCH_FAILED),
     ],
 )
-def test_a_retire_that_fails_raises_its_transport_code(
+def test_a_retire_that_fails_reports_its_transport_code(
     result: _test_hooks.CommandResult, code: FleetErrorCode
 ) -> None:
-    """The stop and the hub's collect retire before the row closes, so a
-    failure is raised for the next tick to settle the run again."""
+    """The retire record's writer tells a node that did not answer from one
+    that answered and failed (fleet.core.retire_owed), so both are values."""
     _test_hooks.run = FakeRun([ok(""), result])
 
-    with pytest.raises(AppError) as raised:
-        retire.retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
+    failure = retire.attempt_retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)[
+        "failure"
+    ]
 
-    assert raised.value.code is code
+    codes = [failure["code"]] if failure is not None else []
+    assert codes == [code]
 
 
 def test_each_holder_the_retire_ended_is_logged_by_its_line(
@@ -177,7 +181,7 @@ def test_each_holder_the_retire_ended_is_logged_by_its_line(
     _test_hooks.run = FakeRun(replies)
 
     with caplog.at_level("INFO"):
-        retire.retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
+        retire.attempt_retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
 
     messages = [record.getMessage() for record in caplog.records]
     assert [message for message in messages if message.startswith("retire ")] == [

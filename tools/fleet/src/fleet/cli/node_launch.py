@@ -116,7 +116,9 @@ def launch_claimed(
     e12affc5, where job 7143a25e was refused ``LEASE_HELD`` by the dead run
     of job 4d8b28a9 with 793 s of its lease left. A ``LEASE_HELD`` out of the
     lease itself gives nothing back, because that lease is another run's
-    (:mod:`fleet.core.run_lease`).
+    (:mod:`fleet.core.run_lease`). What it staged is owed a retire from the
+    lease on, which the next collect pass sends once the lease is back
+    (:mod:`fleet.core.retire_owed`, MCPs board task 3d9eec0d).
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -133,6 +135,7 @@ def launch_claimed(
         lease = run_lease.take(
             loaded.leases,
             loaded.feed,
+            loaded.retires,
             node_name=alias,
             project=job["project"],
             plan=prepared["plan"],

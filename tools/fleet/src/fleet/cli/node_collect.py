@@ -449,6 +449,7 @@ def stop_cancelled_run(
             loaded.leases,
             loaded.ledger,
             loaded.feed,
+            loaded.retires,
             node=node,
             row=row,
             outcome=LedgerOutcome.CANCELLED,
@@ -501,7 +502,13 @@ def collect_pass(
     # First, so a retire a settle of this pass owes waits for the next pass
     # rather than meeting the node that just missed it again at once
     # (MCPs board task 8776b828).
-    retire_owed.retire_owed(loaded.retires, require_node(loaded.workspace, alias), alias=alias)
+    retire_owed.retire_owed(
+        loaded.retires,
+        require_node(loaded.workspace, alias),
+        alias=alias,
+        leases_path=loaded.leases,
+        ledger_path=loaded.ledger,
+    )
     held = queue.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     holder.hold(running)

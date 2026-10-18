@@ -43,8 +43,9 @@ runs/
   ledger.jsonl    append-only; every dispatch ever made from this machine
   feed.jsonl      append-only; the event stream subscribers tail
   leases.json     live state; who holds which project's environment
-  retires.jsonl   append-only; each settled run whose node did not answer its
-                  retire, owed until a later collect pass retires it
+  retires.jsonl   append-only; every run owed its directory's retire from its
+                  lease, until a retire is done; a collect pass retires each
+                  owed run no lease or running ledger row still holds
   mirrors/        one bare git mirror per sourced project; the node runners
                   fetch a submitted sha into it and archive it from there
   host-claims/    live state; each node's claims whose launch is under way,
@@ -420,6 +421,14 @@ removed after the row and the queue job are closed, not inside the retire,
 since housekeeping's script round trip stood between a finished check and
 its close (11 to 24 s per settle on loki and sedona); a removal that fails
 after the close leaves nothing a later one does not remove.
+
+**A run that never settles is retired too** (MCPs board task 3d9eec0d). The
+lease records the run's retire owed in `runs/retires.jsonl` before anything is
+staged, so a run refused while staging, which gives its lease back, and a
+launch whose runner ended, whose lease lapses, are retired by the next collect
+pass on their node as a settled run whose node missed the retire is. Before:
+12 run directories on six nodes, measured 2026-10-18, from runs the feed ends
+at `refused` or at `leased` or `staged`, none of them in the record.
 
 **Every cache on a node has an owner that bounds it** (MCPs board task
 346abc45), measured 2026-10-18 before the change:

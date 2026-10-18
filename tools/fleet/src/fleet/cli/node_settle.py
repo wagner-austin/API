@@ -15,7 +15,7 @@ and board call comes first: a refusal anywhere in them leaves the row live
 and the directory where it was, so the next poll settles the run again from
 the start, as if it had just ended. The verdict names the transcript where
 the retire will keep it (:func:`fleet.core.names.retained_log_path`, the
-path :func:`fleet.core.retire.retire_on_node` returns).
+path :func:`fleet.core.retire_owed.retire_or_raise` returns).
 
 What a refusal can still repeat: a task-less job's verdict, posted to its
 submitter's feed before the close, is posted again when the close is refused
@@ -26,8 +26,9 @@ After the close, the ledger row is finished (this machine's files) and the
 directory retired (the node). A RETIRE THE NODE DID NOT ANSWER IS OWED, NOT
 RAISED (MCPs board task 8776b828): the row and the queue job are already
 closed, so no later settle would retry it, and raising ended the serve and
-every run it held. It is recorded beside the ledger and each later collect
-pass sends it until the node answers (:mod:`fleet.core.retire_owed`); until
+every run it held. The record beside the ledger has owed it since the
+run's lease and each later collect pass sends it until the node answers
+(:mod:`fleet.core.retire_owed`, MCPs board task 3d9eec0d); until
 then the verdict names a transcript not yet moved. A retire the node
 answered and failed still raises, so the serve's log says so.
 

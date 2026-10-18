@@ -1,11 +1,12 @@
-"""The record of every retire a node runner could not finish when it settled a run.
+"""The record of every run's directory, from its lease until its retire is done.
 
 One JSON object per line beside the ledger, appended and never rewritten,
-like the ledger and the feed (:mod:`fleet.core.records`). A settle closes the
-queue job and the ledger row before it retires the run's directory
-(:mod:`fleet.cli.node_settle`), so a retire the node did not answer has no
-live row left to be settled again: this record is what a later pass reads to
-retire it (:mod:`fleet.core.retire_owed`, MCPs board task 8776b828).
+like the ledger and the feed (:mod:`fleet.core.records`). A run is recorded
+``owed`` when its lease is taken, before anything is staged on its node, so a
+run that never settles, refused while staging or left by a runner that ended,
+is in it as surely as one whose settle's retire the node did not answer: this
+record is what a later pass reads to retire it (:mod:`fleet.core.retire_owed`,
+MCPs board tasks 8776b828 and 3d9eec0d).
 
 A run's CURRENT state is its last line. ``owed`` is the only state a pass
 acts on; ``retired`` and ``failed`` end it, so no directory is retired twice
@@ -24,8 +25,8 @@ from typing_extensions import TypedDict
 class RetireState(StrEnum):
     """Where one run's retire stands; each value is a line's word.
 
-    ``owed`` is written when the node did not answer the retire, ``retired``
-    when a later pass's retire was answered, and ``failed`` when the node
+    ``owed`` is written when the run's lease is taken, ``retired`` when a
+    retire was answered and done, and ``failed`` when the node
     answered and the retire failed there, which is raised by name and never
     retried, as a settle's failed retire never was.
     """
@@ -43,8 +44,9 @@ class RetireRecord(TypedDict):
         node: The node's workspace name, so a runner retries only its own.
         state: What happened.
         at_unix: When, whole seconds since the epoch.
-        detail: Why: the transport's message for ``owed`` and ``failed``,
-            where the transcript is kept for ``retired``.
+        detail: Why: that the lease is held for ``owed``, the transport's
+            message for ``failed``, where the transcript is kept for
+            ``retired``.
     """
 
     run_id: str
