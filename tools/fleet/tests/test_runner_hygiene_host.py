@@ -8,8 +8,12 @@ provision that installs it is rendered for an operator to run, so a host can
 keep an old copy. This case reads, on the runner host, that the installed
 script is the render byte for byte, that its timer is enabled and fired within
 a day, and that its last run succeeded, which under the script's ``set -euo
-pipefail`` means every docker prune in it did. It records the daemon's build
-cache as BuildKit counts it, the figure the size pass bounds.
+pipefail`` means every docker prune in it did. The run's own report then says
+that the render is what ran, after it was installed, that every pass printed
+its closing line, and that the private build cache the size pass left is
+within its bound (MCPs board tasks 46c7b11b and ecb13d3d, A2): read now, the
+cache holds a day of builds since. It records the daemon's build cache as
+BuildKit counts it now.
 
 The fleet project ``tools/fleet-execution-runners``, pinned to the runner
 host's node, runs it as the fleet's own user, whose ``docker`` group reaches
@@ -18,15 +22,30 @@ the host's daemon on its socket.
 
 from __future__ import annotations
 
+import hashlib
 import pathlib
 import time
 from collections.abc import Callable
-from typing import Final
+from typing import Final, NamedTuple
 
 import pytest
+from platform_core.json_utils import (
+    load_json_str,
+    narrow_json_to_dict,
+    require_bool,
+    require_int,
+    require_list,
+)
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core.ci_clean import CI_CLEAN_SCRIPT
+from fleet.core.ci_clean import (
+    BUILD_CACHE_BOUND_GIB,
+    CI_CLEAN_REPORT,
+    CI_CLEAN_SCRIPT,
+    REPORT_BUILD_CACHE,
+    REPORT_DIGEST,
+    REPORT_STARTED,
+)
 from fleet.core.runner_job_scope_render import JOB_HOOK_PATH, JOB_HOOK_SCRIPT
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
@@ -47,6 +66,28 @@ HOST_DOCKER: Final[str] = "unix:///var/run/docker.sock"
 
 #: How ``docker buildx du`` opens the lines of its totals.
 CACHE_TOTALS: Final[tuple[str, ...]] = ("Private:", "Reclaimable:", "Total:")
+
+#: The size pass's bound in bytes: docker's ``gb`` counts 1024**3.
+BOUND_BYTES: Final[int] = BUILD_CACHE_BOUND_GIB * 1024**3
+
+#: How each pass's closing line opens in the report, as docker 29.1.3 prints
+#: its prunes' (read on lavender's journal on 2026-10-18) and the cache half
+#: its own.
+PASS_LINES: Final[tuple[str, ...]] = (
+    "Total reclaimed space:",
+    "Total:",
+    "venv-sweep:",
+    "cache-generations:",
+)
+
+#: The passes in the order the script runs them: the container, volume and
+#: image prunes, the build cache's age and size passes, then the cache half.
+PASS_ORDER: Final[tuple[str, ...]] = (
+    *("Total reclaimed space",) * 3,
+    *("Total",) * 2,
+    "venv-sweep",
+    "cache-generations",
+)
 
 
 @pytest.mark.host_runner_units
@@ -69,6 +110,7 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
     service = unit_properties(CI_CLEAN_SERVICE, ("Result", "ExecMainStatus"))
     assert service == {"Result": "success", "ExecMainStatus": "0"}
 
+    report = _last_run()
     du = command_output(["docker", "-H", HOST_DOCKER, "buildx", "du"], timeout=300)
     totals = [line.split() for line in du.splitlines() if line.startswith(CACHE_TOTALS)]
     assert [total[0] for total in totals] == list(CACHE_TOTALS)
@@ -76,9 +118,70 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
         READING_PROPERTY,
         f"{runner_host['name']}: {CI_CLEAN_PATH} is the render of CI_CLEAN_SCRIPT, "
         f"{CI_CLEAN_TIMER} enabled and fired {since} s ago, its last run {service['Result']} "
-        f"with status {service['ExecMainStatus']}; the host daemon's build cache reads "
+        f"with status {service['ExecMainStatus']}; {CI_CLEAN_REPORT} says the render ran "
+        f"{report.after_install} s after it was installed and left {report.private} bytes of "
+        f"private build cache, {report.records} records, against {BOUND_BYTES}; it reported "
+        + "; ".join(report.passes)
+        + "; the host daemon's build cache now reads "
         + ", ".join(" ".join(total) for total in totals),
     )
+
+
+class LastRun(NamedTuple):
+    """What :data:`CI_CLEAN_REPORT` says of the last run, read against the render."""
+
+    after_install: int
+    private: int
+    records: int
+    passes: tuple[str, ...]
+
+
+def _last_run() -> LastRun:
+    """Read the last run's report and hold it to the render and the bound.
+
+    The report names the sha256 of the script that ran, which must be the
+    render's, and its start, which must follow the installed script's mtime,
+    so an old copy's success never reads as the render's. The build cache
+    records it holds are the daemon's own count in bytes after the size
+    pass, which bounds the private ones, those no other record shares.
+
+    Returns:
+        The reading.
+    """
+    lines = pathlib.Path(CI_CLEAN_REPORT).read_text(encoding="utf-8").splitlines()
+    assert _fields(lines, REPORT_DIGEST) == [
+        hashlib.sha256(CI_CLEAN_SCRIPT.encode("utf-8")).hexdigest()
+    ]
+    started = _fields(lines, REPORT_STARTED)
+    assert len(started) == 1
+    after_install = int(started[0]) - int(CI_CLEAN_PATH.stat().st_mtime)
+    assert after_install >= 0, f"the last run started {-after_install} s before the install"
+
+    passes = tuple(line for line in lines if line.startswith(PASS_LINES))
+    assert [line.split(":")[0] for line in passes] == list(PASS_ORDER)
+
+    cache = _fields(lines, REPORT_BUILD_CACHE)
+    assert len(cache) == 1
+    body = narrow_json_to_dict(load_json_str(cache[0]))
+    records = [narrow_json_to_dict(record) for record in require_list(body, "BuildCache")]
+    private = sum(
+        require_int(record, "Size") for record in records if not require_bool(record, "Shared")
+    )
+    assert private <= BOUND_BYTES, f"{private} bytes of private build cache after the prune"
+    return LastRun(after_install, private, len(records), passes)
+
+
+def _fields(lines: list[str], prefix: str) -> list[str]:
+    """The rest of every report line that opens with ``prefix``.
+
+    Args:
+        lines: The report's lines.
+        prefix: How the wanted lines open.
+
+    Returns:
+        Each such line without its prefix, in order.
+    """
+    return [line.removeprefix(prefix) for line in lines if line.startswith(prefix)]
 
 
 @pytest.mark.host_runner_units

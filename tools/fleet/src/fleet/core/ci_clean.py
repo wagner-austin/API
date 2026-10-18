@@ -39,6 +39,16 @@ its own reason a running job is safe from it:
   files nothing had read for 14 days, which could part a poetry metadata
   file from its body and fail every later lock with ``IncompleteRead``.
 
+EVERY RUN REPORTS ITSELF (MCPs board tasks 46c7b11b and ecb13d3d, A2). A
+service's last result says nothing of which copy of the script ran, and the
+build cache is bounded only right after the prune: lavender's read 68.73 GB
+Private at 2026-10-18T14:28Z, ten hours of builds after its 04:00 pass. So
+each run writes :data:`CI_CLEAN_REPORT` in the state directory systemd makes
+for the service: everything the passes printed, the instant it started, the
+sha256 of the script that ran, and the daemon's build cache records as its
+engine API counts them, in bytes, after the prune. The runner host's hygiene
+case reads it against the render and :data:`BUILD_CACHE_BOUND_GIB`.
+
 WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
 exists (per-package working state the runners share, not duplicates),
 everything under any _work tree (in-project venvs persist there by design),
@@ -51,6 +61,20 @@ from typing import Final
 
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
 from fleet.core.tool_caches import SH_REMOVE_UNUSED
+
+#: The size pass's bound, in docker's ``gb``, which counts 1024**3 bytes.
+BUILD_CACHE_BOUND_GIB: Final = 60
+
+#: The state directory systemd makes for the service, owned by its user.
+STATE_DIRECTORY_NAME: Final = "ci-clean"
+
+#: The report each run leaves, readable by every account on the host.
+CI_CLEAN_REPORT: Final = f"/var/lib/{STATE_DIRECTORY_NAME}/last-run"
+
+#: How the report's own lines open, after what the passes printed.
+REPORT_STARTED: Final = "started: "
+REPORT_DIGEST: Final = "script-sha256: "
+REPORT_BUILD_CACHE: Final = "build-cache: "
 
 
 def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
@@ -131,23 +155,39 @@ CI_CLEAN_SCRIPT: Final = f"""#!/usr/bin/env bash
 # fleet.core.ci_clean -- edit THERE, never here.
 set -euo pipefail
 
+# The service's StateDirectory= names where each run's report goes.
+report="${{STATE_DIRECTORY:?ci-clean runs as {STATE_DIRECTORY_NAME}.service}}/last-run"
+started=$(date +%s)
+digest=$(sha256sum "$0")
+{{
 # Docker: it never prunes what a running container or build references.
 # `volume prune` takes anonymous volumes only; named ones need --all.
 docker container prune -f --filter until=24h
 docker volume prune -f
 docker image prune -f
 docker builder prune -f --filter until=168h
-docker builder prune -f --max-used-space 60gb
+docker builder prune -f --max-used-space {BUILD_CACHE_BOUND_GIB}gb
 
-{CI_CLEAN_CACHES}"""
+{CI_CLEAN_CACHES}}} | tee "$report.pending"
+
+# The build cache as the daemon's engine API counts it, in bytes: one line
+# of JSON too long for the journal, so it goes to the report alone.
+build_cache=$(curl -sf --unix-socket /var/run/docker.sock 'http://localhost/system/df?type=build-cache')
+printf '%s\\n' "{REPORT_STARTED}$started" "{REPORT_DIGEST}${{digest%% *}}" \\
+    | tee -a "$report.pending"
+printf '%s\\n' "{REPORT_BUILD_CACHE}$build_cache" >> "$report.pending"
+mv -f "$report.pending" "$report"
+echo "ci-clean: reported to $report"
+"""
 
 #: systemd unit for the hygiene pass.
-CI_CLEAN_SERVICE: Final = """[Unit]
+CI_CLEAN_SERVICE: Final = f"""[Unit]
 Description=CI runner host hygiene (docker leftovers, poetry orphans, unread cache generations)
 
 [Service]
 Type=oneshot
 User=gharunner
+StateDirectory={STATE_DIRECTORY_NAME}
 ExecStart=/usr/local/bin/ci-clean
 """
 
@@ -165,11 +205,17 @@ WantedBy=timers.target
 """
 
 __all__ = [
+    "BUILD_CACHE_BOUND_GIB",
     "CI_CLEAN_CACHES",
+    "CI_CLEAN_REPORT",
     "CI_CLEAN_SCRIPT",
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
     "GENERATIONS_SWEEP",
     "ORPHAN_SWEEP",
+    "REPORT_BUILD_CACHE",
+    "REPORT_DIGEST",
+    "REPORT_STARTED",
+    "STATE_DIRECTORY_NAME",
     "orphan_sweep_lines",
 ]

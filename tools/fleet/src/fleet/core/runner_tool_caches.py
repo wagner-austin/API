@@ -24,6 +24,15 @@ a time, so its marker names the generation its job reads, and ci-clean
 removes a generation only whole, when no runner's marker names it
 (:data:`fleet.core.tool_caches.SH_REMOVE_UNUSED`).
 
+npm's cache inside the generation is one per runner install, because the
+runners on a host run jobs at once under one account and npm's cache is not
+built for concurrent writers: MCPs run 34282820805 read a tarball npm itself
+had just written as corrupted, and its embed-api job failed with ``ETXTBSY``.
+MCPs' setup-workspace action keyed a cache per repository and runner under
+the home for that reason, which no removal owned; the install's directory
+is unique on its host, so keying by it keeps the isolation inside the
+generation.
+
 Poetry's virtualenvs stay where they were, :data:`RUNNER_VIRTUALENVS`: a
 runner's checkout keeps its path from job to job, so its virtualenv is
 reused, and ci-clean's orphan rule removes one whose sources are gone.
@@ -65,7 +74,7 @@ HOOK_LINES: Final = (
     "    printf 'POETRY_CACHE_DIR=%s\\n' \"$tool_cache/pypoetry\"",
     f"    printf 'POETRY_VIRTUALENVS_PATH=%s\\n' \"{RUNNER_VIRTUALENVS}\"",
     "    printf 'PIP_CACHE_DIR=%s\\n' \"$tool_cache/pip\"",
-    "    printf 'npm_config_cache=%s\\n' \"$tool_cache/npm\"",
+    "    printf 'npm_config_cache=%s\\n' \"$tool_cache/npm/${install_root##*/}\"",
     '} >> "$GITHUB_ENV"',
     'echo "fleet-runner-job-started: npm, pip and poetry read cache generation $generation"',
 )

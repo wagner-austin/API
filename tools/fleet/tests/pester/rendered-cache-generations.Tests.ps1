@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
 
-    function New-Generation {
+    function Initialize-Generation {
         param([string]$Tools, [long]$SecondsAgo)
         $name = [string]([DateTimeOffset]::UtcNow.ToUnixTimeSeconds() - $SecondsAgo)
         $artifacts = Join-Path $Tools "$name\pypoetry\artifacts"
@@ -21,7 +21,7 @@ BeforeAll {
         return $name
     }
 
-    function New-Stage {
+    function Initialize-Stage {
         $stage = Join-Path $TestDrive ('stage-' + [guid]::NewGuid().ToString('N'))
         $tools = Join-Path $stage 'cache\tools'
         [void][System.IO.Directory]::CreateDirectory($tools)
@@ -31,11 +31,11 @@ BeforeAll {
 
 Describe 'The cache generations removal' {
     It 'removes only a generation that is not current, that no run names and that has been out of use over an hour' {
-        $layout = New-Stage
-        $unread = New-Generation $layout.Tools (30 * 86400)
-        $marked = New-Generation $layout.Tools (16 * 86400)
-        $current = New-Generation $layout.Tools 7200
-        $racing = New-Generation $layout.Tools 60
+        $layout = Initialize-Stage
+        $unread = Initialize-Generation $layout.Tools (30 * 86400)
+        $marked = Initialize-Generation $layout.Tools (16 * 86400)
+        $current = Initialize-Generation $layout.Tools 7200
+        $racing = Initialize-Generation $layout.Tools 60
         [System.IO.File]::WriteAllText((Join-Path $layout.Tools 'current'), $current)
         $run = Join-Path $layout.Stage 'MCPs-search-sedona-1792000000'
         [void][System.IO.Directory]::CreateDirectory($run)
@@ -51,9 +51,9 @@ Describe 'The cache generations removal' {
         }
     }
     It 'keeps every generation within the hour after the current one started' {
-        $layout = New-Stage
-        $previous = New-Generation $layout.Tools (15 * 86400)
-        $current = New-Generation $layout.Tools 600
+        $layout = Initialize-Stage
+        $previous = Initialize-Generation $layout.Tools (15 * 86400)
+        $current = Initialize-Generation $layout.Tools 600
         [System.IO.File]::WriteAllText((Join-Path $layout.Tools 'current'), $current)
 
         Invoke-Rendered 'dialect-cache-generations' @{ StageRoot = $layout.Stage } |
@@ -66,8 +66,8 @@ Describe 'The cache generations removal' {
             Should -BeExactly "cache-generations: $stage/cache/tools: none yet"
     }
     It 'stops at an entry that is no generation, naming it' {
-        $layout = New-Stage
-        $current = New-Generation $layout.Tools 7200
+        $layout = Initialize-Stage
+        $current = Initialize-Generation $layout.Tools 7200
         [System.IO.File]::WriteAllText((Join-Path $layout.Tools 'current'), $current)
         [void][System.IO.Directory]::CreateDirectory((Join-Path $layout.Tools 'npm'))
 

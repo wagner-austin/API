@@ -61,7 +61,7 @@ def test_a_job_is_handed_its_generation_and_its_install_marks_it(tmp_path: pathl
         f"POETRY_CACHE_DIR={cache}/pypoetry",
         f"POETRY_VIRTUALENVS_PATH={home}/.cache/pypoetry/virtualenvs",
         f"PIP_CACHE_DIR={cache}/pip",
-        f"npm_config_cache={cache}/npm",
+        f"npm_config_cache={cache}/npm/actions-runner-api-1",
     ]
     assert ran.stdout == (
         f"fleet-runner-job-started: npm, pip and poetry read cache generation {generation}\n"

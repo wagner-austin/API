@@ -51,10 +51,47 @@ def test_the_download_caches_go_only_by_whole_generations() -> None:
     assert "-atime" not in ci_clean.CI_CLEAN_SCRIPT
 
 
-def test_the_python_half_follows_the_docker_prunes() -> None:
-    assert ci_clean.CI_CLEAN_SCRIPT.endswith(ci_clean.CI_CLEAN_CACHES)
-    assert ci_clean.CI_CLEAN_SCRIPT.startswith("#!/usr/bin/env bash\n")
-    assert "set -euo pipefail\n" in ci_clean.CI_CLEAN_SCRIPT
+def test_the_python_half_follows_the_docker_prunes_inside_the_reported_group() -> None:
+    lines = ci_clean.CI_CLEAN_SCRIPT.splitlines()
+    assert lines[0] == "#!/usr/bin/env bash"
+    assert lines.index("set -euo pipefail") < lines.index("{")
+    group = lines[lines.index("{") + 1 : lines.index('} | tee "$report.pending"')]
+    caches = ci_clean.CI_CLEAN_CACHES.rstrip("\n").splitlines()
+    assert group[len(group) - len(caches) :] == caches
+    prunes = [index for index, line in enumerate(group) if line.startswith("docker ")]
+    assert len(prunes) == 5
+    assert max(prunes) < len(group) - len(caches)
+
+
+def test_every_run_reports_its_digest_its_start_and_the_build_cache_after_the_prune() -> None:
+    """MCPs board tasks 46c7b11b and ecb13d3d, A2: the host case reads
+    which copy ran, when, and the cache the size pass left, from this."""
+    lines = ci_clean.CI_CLEAN_SCRIPT.splitlines()
+    opened = lines.index("{")
+    head = lines[:opened]
+    assert head[-3] == 'report="${STATE_DIRECTORY:?ci-clean runs as ci-clean.service}/last-run"'
+    assert head[-2:] == ["started=$(date +%s)", 'digest=$(sha256sum "$0")']
+    tail = lines[lines.index('} | tee "$report.pending"') + 1 :]
+    assert [line for line in tail if line and not line.startswith("#")] == [
+        "build_cache=$(curl -sf --unix-socket /var/run/docker.sock "
+        "'http://localhost/system/df?type=build-cache')",
+        'printf \'%s\\n\' "started: $started" "script-sha256: ${digest%% *}" \\',
+        '    | tee -a "$report.pending"',
+        'printf \'%s\\n\' "build-cache: $build_cache" >> "$report.pending"',
+        'mv -f "$report.pending" "$report"',
+        'echo "ci-clean: reported to $report"',
+    ]
+
+
+def test_the_report_lies_in_the_state_directory_systemd_makes_for_the_service() -> None:
+    # systemd makes StateDirectory= under /var/lib for a system service,
+    # owned by its User=, and hands the path to it as STATE_DIRECTORY.
+    assert ci_clean.CI_CLEAN_SERVICE.splitlines()[5:8] == [
+        "User=gharunner",
+        "StateDirectory=ci-clean",
+        "ExecStart=/usr/local/bin/ci-clean",
+    ]
+    assert ci_clean.CI_CLEAN_REPORT == "/var/lib/ci-clean/last-run"
 
 
 def test_the_build_cache_is_bounded_by_age_then_by_size() -> None:
