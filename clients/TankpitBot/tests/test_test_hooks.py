@@ -165,6 +165,7 @@ def test_real_replace_text_creates_parent_directories(tmp_path: Path) -> None:
     assert target.read_text(encoding="utf-8") == "first"
 
 
+@pytest.mark.host_windows
 def test_real_replace_text_drops_the_beat_under_reader_contention(tmp_path: Path) -> None:
     """Windows destination-open law: the previous content stays current.
 
@@ -181,6 +182,59 @@ def test_real_replace_text_drops_the_beat_under_reader_contention(tmp_path: Path
 
     with target.open("r", encoding="utf-8"):
         _real_replace_text(target, "new")
+
+    assert target.read_text(encoding="utf-8") == "old"
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+@pytest.mark.host_linux
+def test_real_replace_text_lands_while_a_reader_holds_the_old_file(tmp_path: Path) -> None:
+    """Linux replaces a held destination, and the reader keeps the old file whole.
+
+    The move swaps which file the name points at; a reader that opened
+    the old one goes on reading it to the end. Readers still never see
+    a torn file, and nothing waits a beat.
+    """
+    from tankpit_bot._test_hooks import _real_replace_text
+
+    target = tmp_path / "knowledge.json"
+    target.write_text("old", encoding="utf-8")
+
+    with target.open("r", encoding="utf-8") as reader:
+        _real_replace_text(target, "new")
+        held = reader.read()
+
+    assert held == "old"
+    assert target.read_text(encoding="utf-8") == "new"
+    assert list(tmp_path.glob("*.tmp")) == []
+
+
+def test_replace_text_drops_the_beat_when_the_move_is_refused(tmp_path: Path) -> None:
+    """The dropped beat itself, on every platform, through the move's seam.
+
+    Only Windows refuses the move, so the stand-in raises what it
+    raises there (``ERROR_SHARING_VIOLATION``, which CPython maps to
+    ``EACCES``) and the drop is held to the same law on a Linux run.
+    """
+    import errno
+
+    from tankpit_bot._test_hooks import _real_replace_text, fs
+
+    def refused_as_windows_refuses(source: Path, target: Path) -> None:
+        raise PermissionError(
+            errno.EACCES,
+            "The process cannot access the file because it is being used by another process",
+            str(target),
+        )
+
+    target = tmp_path / "knowledge.json"
+    target.write_text("old", encoding="utf-8")
+    original_rename = fs.rename_file
+    fs.rename_file = refused_as_windows_refuses
+    try:
+        _real_replace_text(target, "new")
+    finally:
+        fs.rename_file = original_rename
 
     assert target.read_text(encoding="utf-8") == "old"
     assert list(tmp_path.glob("*.tmp")) == []
@@ -233,13 +287,18 @@ def test_real_file_marker_identity_changes_when_the_path_is_recreated(
     """A new file under the same name is a different file.
 
     This is what tells the incremental reader that a bot started a new
-    run, rather than that its old one grew.
+    run, rather than that its old one grew. The first file is moved
+    aside rather than deleted: Linux may give a deleted file's inode
+    number to the next file created (ziggurat's ext4 did, failing this
+    case on 2026-10-18), so a marker read after a delete can name the new
+    file with the old number, and only a file that still exists is a
+    different file by number on every platform.
     """
     target = tmp_path / "latest.events.jsonl"
     target.write_text("first run\n", encoding="utf-8")
     before, _ = _test_hooks._real_file_marker(target)
 
-    target.unlink()
+    target.rename(tmp_path / "previous.events.jsonl")
     target.write_text("second run\n", encoding="utf-8")
     after, _ = _test_hooks._real_file_marker(target)
 

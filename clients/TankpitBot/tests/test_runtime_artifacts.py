@@ -25,11 +25,13 @@ def test_build_bot_run_artifacts() -> None:
     """Sole-bot artifacts use stable latest paths plus timestamped archives."""
     artifacts = build_bot_run_artifacts("20260331-230405", "")
 
-    assert artifacts["log_dir"] == "runs\\bot"
-    assert artifacts["latest_log_path"] == "runs\\bot\\latest.log"
-    assert artifacts["archive_log_path"] == "runs\\bot\\bot-20260331-230405.log"
-    assert artifacts["latest_events_path"] == "runs\\bot\\latest.events.jsonl"
-    assert artifacts["archive_events_path"] == "runs\\bot\\bot-20260331-230405.events.jsonl"
+    assert artifacts["log_dir"] == str(Path("runs/bot"))
+    assert artifacts["latest_log_path"] == str(Path("runs/bot/latest.log"))
+    assert artifacts["archive_log_path"] == str(Path("runs/bot/bot-20260331-230405.log"))
+    assert artifacts["latest_events_path"] == str(Path("runs/bot/latest.events.jsonl"))
+    assert artifacts["archive_events_path"] == str(
+        Path("runs/bot/bot-20260331-230405.events.jsonl")
+    )
 
 
 def test_instance_namespaces_every_bot_artifact() -> None:
@@ -40,10 +42,12 @@ def test_instance_namespaces_every_bot_artifact() -> None:
     """
     artifacts = build_bot_run_artifacts("20260331-230405", "alpha")
 
-    assert artifacts["log_dir"] == "runs\\bot\\alpha"
-    assert artifacts["latest_log_path"] == "runs\\bot\\alpha\\latest.log"
-    assert artifacts["archive_log_path"] == "runs\\bot\\alpha\\bot-20260331-230405.log"
-    assert artifacts["latest_capture_path"] == "runs\\bot\\alpha\\latest.capture_session.json"
+    assert artifacts["log_dir"] == str(Path("runs/bot/alpha"))
+    assert artifacts["latest_log_path"] == str(Path("runs/bot/alpha/latest.log"))
+    assert artifacts["archive_log_path"] == str(Path("runs/bot/alpha/bot-20260331-230405.log"))
+    assert artifacts["latest_capture_path"] == str(
+        Path("runs/bot/alpha/latest.capture_session.json")
+    )
 
 
 def test_the_stop_sentinel_sits_beside_the_run_log() -> None:
@@ -81,16 +85,16 @@ def test_build_sniff_run_artifacts() -> None:
     """Sniffer run artifacts include latest and archived capture outputs."""
     artifacts = build_sniff_run_artifacts("20260331-230405")
 
-    assert artifacts["log_dir"] == "runs\\sniff"
-    assert artifacts["latest_log_path"] == "runs\\sniff\\latest.log"
-    assert artifacts["archive_log_path"] == "runs\\sniff\\sniff-20260331-230405.log"
-    assert artifacts["latest_capture_path"] == "runs\\sniff\\latest.capture_session.json"
-    assert artifacts["archive_capture_path"] == (
-        "runs\\sniff\\sniff-20260331-230405.capture_session.json"
+    assert artifacts["log_dir"] == str(Path("runs/sniff"))
+    assert artifacts["latest_log_path"] == str(Path("runs/sniff/latest.log"))
+    assert artifacts["archive_log_path"] == str(Path("runs/sniff/sniff-20260331-230405.log"))
+    assert artifacts["latest_capture_path"] == str(Path("runs/sniff/latest.capture_session.json"))
+    assert artifacts["archive_capture_path"] == str(
+        Path("runs/sniff/sniff-20260331-230405.capture_session.json")
     )
-    assert artifacts["latest_summary_path"] == "runs\\sniff\\latest.session_summary.json"
-    assert artifacts["archive_summary_path"] == (
-        "runs\\sniff\\sniff-20260331-230405.session_summary.json"
+    assert artifacts["latest_summary_path"] == str(Path("runs/sniff/latest.session_summary.json"))
+    assert artifacts["archive_summary_path"] == str(
+        Path("runs/sniff/sniff-20260331-230405.session_summary.json")
     )
 
 
@@ -118,12 +122,14 @@ def test_build_probe_run_artifacts() -> None:
     """Probe run artifacts include the probe name in latest+archive filenames."""
     artifacts = build_probe_run_artifacts("fuel", "20260331-230405")
 
-    assert artifacts["log_dir"] == "runs\\probe"
+    assert artifacts["log_dir"] == str(Path("runs/probe"))
     assert artifacts["probe_name"] == "fuel"
-    assert artifacts["latest_log_path"] == "runs\\probe\\latest.fuel.log"
-    assert artifacts["archive_log_path"] == "runs\\probe\\fuel-20260331-230405.log"
-    assert artifacts["latest_events_path"] == "runs\\probe\\latest.fuel.events.jsonl"
-    assert artifacts["archive_events_path"] == ("runs\\probe\\fuel-20260331-230405.events.jsonl")
+    assert artifacts["latest_log_path"] == str(Path("runs/probe/latest.fuel.log"))
+    assert artifacts["archive_log_path"] == str(Path("runs/probe/fuel-20260331-230405.log"))
+    assert artifacts["latest_events_path"] == str(Path("runs/probe/latest.fuel.events.jsonl"))
+    assert artifacts["archive_events_path"] == str(
+        Path("runs/probe/fuel-20260331-230405.events.jsonl")
+    )
 
 
 def test_build_probe_run_artifacts_rejects_empty_name() -> None:

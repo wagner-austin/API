@@ -18,6 +18,15 @@ start a stranger-visible bot for each one. ``make execution`` runs only these
 cases and fails on a skip or on none, and that is the check of the fleet
 project ``clients/TankpitBot-execution``, which requires the ``windows`` and
 ``ffmpeg`` tags; every Windows node ships Edge.
+
+Two more markers, ``host_windows`` and ``host_linux``, bind a case to what
+one platform's operating system does where the other's differs: a file
+replaced while a reader holds it open, and the exit code of a process its
+parent has already collected (board task 8c6874a3). The ordinary run
+skips a case bound to the other platform and runs the rest, so
+``clients/TankpitBot`` (a Windows node) runs the Windows half and
+``clients/TankpitBot-linux`` (a Linux node) the Linux half, each at the
+commit it checks.
 """
 
 from __future__ import annotations
@@ -34,12 +43,19 @@ LIVE_DEMO_MARKER: Final[str] = "host_live_demo"
 #: The fleet project whose check is this package's execution run.
 PROJECT: Final[str] = "clients/TankpitBot-execution"
 
+#: The fleet project whose check is this package's ordinary run on Linux.
+LINUX_PROJECT: Final[str] = "clients/TankpitBot-linux"
+
+#: The marker binding a case to each platform's operating system.
+WINDOWS_MARKER: Final[str] = "host_windows"
+LINUX_MARKER: Final[str] = "host_linux"
+
 #: This package's host cases, as platform_core's host-execution run reads them.
 PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan(
-    markers={},
+    markers={WINDOWS_MARKER: "windows", LINUX_MARKER: "linux"},
     execution_only={LIVE_DEMO_MARKER: "windows"},
     needs={LIVE_DEMO_MARKER: "needs the live demo service, a node's ffmpeg and its Edge"},
-    projects={"windows": PROJECT},
+    projects={"windows": PROJECT, "linux": LINUX_PROJECT},
     here="windows" if sys.platform == "win32" else "linux",
 )
 
