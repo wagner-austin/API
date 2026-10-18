@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 import webbrowser
 from pathlib import Path
@@ -59,3 +60,36 @@ def test_open_in_browser_hands_the_url_to_the_preferred_browser(tmp_path: Path) 
 
     assert open_in_browser(URL) is True
     assert received.read_text(encoding="utf-8") == URL
+
+
+def test_open_in_browser_says_so_when_the_browser_did_not_open(tmp_path: Path) -> None:
+    """A browser program that fails makes open_in_browser answer False.
+
+    The check review of audit ac5813df measured that an opener answering
+    True whatever webbrowser.open said passed every case above (MCPs board
+    task 41c0a997). webbrowser.open tries each registered browser in turn,
+    and on Windows the platform's own default is always among them, so a
+    failing browser registered here would fall through to a real one. So the
+    case runs in a child interpreter whose try order holds only a program
+    that exits 1, and this process's webbrowser is left as it was.
+    """
+    child = tmp_path / "child.py"
+    child.write_text(
+        "import sys, webbrowser\n"
+        "from platform_core.oauth import open_in_browser\n"
+        "failing = webbrowser.GenericBrowser([sys.executable, '-c', 'raise SystemExit(1)', '%s'])\n"
+        "webbrowser.register('platform-core-failing', None, failing, preferred=True)\n"
+        "webbrowser._tryorder = ['platform-core-failing']\n"
+        "print(open_in_browser(sys.argv[1]))\n",
+        encoding="utf-8",
+    )
+
+    ran = subprocess.run(
+        [sys.executable, str(child), URL],
+        capture_output=True,
+        text=True,
+        check=False,
+        stdin=subprocess.DEVNULL,
+    )
+
+    assert (ran.returncode, ran.stdout, ran.stderr) == (0, "False\n", "")
