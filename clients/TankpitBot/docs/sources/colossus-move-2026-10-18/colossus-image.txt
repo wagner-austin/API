@@ -1,6 +1,0 @@
-# 2026-10-18T12:25:23Z colossus: docker image ls tankpit-fleet
-tankpit-fleet:v0.1.0-8eae60c48 dc2b75b1e0c3
-# docker ps -a --filter name=tankpit --format {{.Names}}
-# ls /home/user/tankpit-releases
-v0.1.0-8eae60c48
-# end

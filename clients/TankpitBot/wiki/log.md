@@ -6845,3 +6845,22 @@ sha256 `6729dd87…`; the sim's `sim-db` volume moved by `tar`, as
 No container was started on colossus and no bot was spawned: the
 operator asked on 2026-10-17 that none be until he resumes, and `up`
 ends by spawning the bring-up gate's Practice bot.
+
+## [2026-10-18] verify | The move is measured on each host by the fleet
+
+Audit 85ae66f7 held that listings this session committed proved only
+what was written into them. `scripts/colossus_move.py` now measures the
+move where it happened. `make colossus-move-sedona` hashes sedona's runs
+and data against `docs/sources/colossus-move-2026-10-18/sedona-runs-data.sha256.txt`.
+`make colossus-move-colossus` hashes the copy on colossus against the same
+listing, requires release `v0.1.0-8eae60c48` on the ladder and its image
+built after it, and requires no container named `tankpit` or started from
+that image. The fleet projects `clients/TankpitBot-sedona-execution` and
+`clients/TankpitBot-colossus-execution` run each on its own node. At
+15:28Z both trees hashed to the listing, 614 of 614 files. The colossus
+measurement refuses once the fleet is resumed, by design.
+
+The recorded-move test and its two colossus captures are removed. Its
+docstring had called the sedona listing unedited, but the listing was
+printed by a PowerShell script that lowercased the hashes and wrote
+relative paths, then had its CRs stripped and was sorted on ziggurat.

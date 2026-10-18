@@ -10,7 +10,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 OUTPUT ?=
 CONFORMANCE_BASELINE := wiki/sources/conformance_baseline.json
 
-.PHONY: help lint test check _check-unbudgeted _deps _lint-prep _lint-guard _lint-mypy _test-suite execution install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release sim-up sim-down
+.PHONY: help lint test check _check-unbudgeted _deps _lint-prep _lint-guard _lint-mypy _test-suite execution install digest sniff teleport-probe teleport-probe-safe teleport-probe-aggressive teleport-probe-full enemy-teleport-probe enemy-teleport-probe-map enemy-teleport-probe-nearest bot-watch respawn-watch key-probe radar-watch density-probe viewport-probe fuel-probe fuel-drill equipment-probe movement-probe combat-probe cadence-probe weave-probe track bot run up down dev analyze analyze-timing queue-probe download-fields decode analyze-viewport analyze-recipient-policy analyze-response-shapes analyze-command-coverage sim-baseline sim-control smoke debug-run audit conformance-baseline container-census wiki-anchors roundtrip sim-run sim-run-practice sim-field shadow larder-probe mine-landing-probe corpus-audit release sim-up sim-down colossus-move-sedona colossus-move-colossus
 
 help:
 	@echo ""
@@ -30,6 +30,8 @@ help:
 	@echo "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
 	@echo "  make sim-field ARGS=...          two production bots on one field (ARGS=--practice, --rounds N)"
 	@echo "  make sim-up / sim-down           start / stop the sim server on the game host (by hand only)"
+	@echo "  make colossus-move-sedona        on sedona: its runs and data still hash to the move's listing"
+	@echo "  make colossus-move-colossus      on colossus: the copy, the release, its image, no container"
 	@echo "  make install                     poetry install + playwright chromium"
 	@echo ""
 	@echo "Live action probes (need browser + accounts.json):"
@@ -500,3 +502,16 @@ sim-down:
 	@echo ""
 	@echo "=== sim-down, stopping the sim and its database on the game host, accounts kept"
 	poetry run python -m scripts.sim_host down
+
+# The move from sedona to colossus, measured on each host by the fleet
+# (board task c481c259): clients/TankpitBot-sedona-execution runs the first
+# on sedona and clients/TankpitBot-colossus-execution the second on colossus,
+# each node-pinned. scripts/colossus_move.py says what each reads and why the
+# colossus one refuses once the fleet is up.
+colossus-move-sedona:
+	poetry sync
+	poetry run python -m scripts.colossus_move sedona
+
+colossus-move-colossus:
+	poetry sync
+	poetry run python -m scripts.colossus_move colossus
