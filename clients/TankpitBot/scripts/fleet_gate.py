@@ -25,15 +25,14 @@ answer for ``TELEMETRY_CACHE_TTL_MS`` (2 s), so the activity tail is read
 only on a later poll, :data:`GATE_PAUSE_SECONDS` (3 s) after the run was
 seen. Every answer it can see by then was folded from the new run.
 
-The manager listens on sedona's loopback only, so every request is a
-``curl.exe`` or PowerShell line run over ssh, through
-:func:`scripts.fleet_remote.run_checked`. A request that fails is refused
-by name, and the gate never retries around it.
+The manager listens on the game host's loopback only, so every request is
+a ``curl`` run over ssh, through :func:`scripts.fleet_remote.run_checked`.
+A request that fails is refused by name, and the gate never retries
+around it.
 """
 
 from __future__ import annotations
 
-import base64
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final
@@ -50,7 +49,7 @@ from platform_core.json_utils import (
 )
 
 from scripts import _test_hooks as script_hooks
-from scripts.fleet_remote import SEDONA_SSH, FleetHostError, on_sedona, run_checked
+from scripts.fleet_remote import FleetHostError, on_host, run_checked
 from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.service.fleet_bot import FleetBotDict
 from tankpit_bot.service.fleet_wire import (
@@ -60,7 +59,7 @@ from tankpit_bot.service.fleet_wire import (
     encode_spawn_request,
 )
 
-#: The fleet manager, as sedona itself reaches it.
+#: The fleet manager, as the game host itself reaches it.
 FLEET_URL: Final[str] = "http://127.0.0.1:27300"
 
 #: The gate bot's instance name, reused by every ``up``.
@@ -81,7 +80,7 @@ GATE_PAUSE_SECONDS: Final[float] = 3.0
 
 
 def _fleet_get(project_root: Path, path: str) -> JSONObject:
-    """Ask the manager one GET on sedona's loopback.
+    """Ask the manager one GET on the game host's loopback.
 
     Args:
         project_root: Where to run ssh from.
@@ -96,7 +95,7 @@ def _fleet_get(project_root: Path, path: str) -> JSONObject:
         JSONTypeError: When the answer is not a JSON object.
     """
     body = run_checked(
-        ["ssh", SEDONA_SSH, "curl.exe", "-s", "-f", f"{FLEET_URL}{path}"],
+        on_host(["curl", "-s", "-f", f"{FLEET_URL}{path}"]),
         project_root,
         "FLEET_GATE_UNREACHABLE",
     )
@@ -129,10 +128,6 @@ def free_account(project_root: Path) -> str:
 def spawn(project_root: Path, account: str) -> FleetBotDict:
     """Spawn the gate bot and return the manager's row for it.
 
-    The body travels base64-encoded because the line passes through
-    sedona's cmd.exe before PowerShell reads it, and cmd.exe would take
-    the JSON's double quotes for its own.
-
     Args:
         project_root: Where to run ssh from.
         account: The account to play on.
@@ -157,14 +152,19 @@ def spawn(project_root: Path, account: str) -> FleetBotDict:
             )
         )
     )
-    encoded = base64.b64encode(body.encode("utf-8")).decode("ascii")
-    command = (
-        "$ErrorActionPreference = 'Stop'; "
-        f"$body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('{encoded}')); "
-        "ConvertTo-Json -Compress -InputObject (Invoke-RestMethod -Method Post "
-        f"-Uri {FLEET_URL}/bots -ContentType application/json -Body $body)"
-    )
-    answer = run_checked(on_sedona(command), project_root, "FLEET_GATE_SPAWN_FAILED")
+    post = [
+        "curl",
+        "-s",
+        "-f",
+        "-X",
+        "POST",
+        "-H",
+        "Content-Type: application/json",
+        "--data-binary",
+        body,
+        f"{FLEET_URL}/bots",
+    ]
+    answer = run_checked(on_host(post), project_root, "FLEET_GATE_SPAWN_FAILED")
     return decode_fleet_bot(narrow_json_to_dict(load_json_str(answer)))
 
 
