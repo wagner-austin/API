@@ -4,6 +4,7 @@ Provides reusable OAuth 2.0 functionality including:
 - PKCE (Proof Key for Code Exchange) generation
 - Token expiry checking
 - Authorization URL building
+- Showing the user the authorization page
 - Token exchange and refresh
 
 All functions are designed to be provider-agnostic. Provider-specific
@@ -19,6 +20,7 @@ import base64
 import hashlib
 import secrets
 import urllib.parse
+import webbrowser
 from collections.abc import Callable
 
 from platform_core.errors import AppError, OAuthErrorCode
@@ -180,6 +182,43 @@ def generate_state() -> str:
         URL-safe random string for OAuth state parameter.
     """
     return secrets.token_urlsafe(32)
+
+
+def open_in_browser(url: str) -> bool:
+    """Open a URL in the host's browser.
+
+    Args:
+        url: The page to open.
+
+    Returns:
+        webbrowser's answer: False when no browser on the host opened it.
+    """
+    return webbrowser.open(url)
+
+
+def open_authorization_page(
+    url: str,
+    *,
+    open_browser: Callable[[str], bool],
+    console_output: Callable[[str], None],
+) -> None:
+    """Show the user a desktop sign-in's authorization page.
+
+    The URL is printed before the browser is asked, so a host with no
+    browser still shows it, and a browser that did not open is said in so
+    many words. platform_calendar and platform_email each had their own copy
+    of this step, and each discarded webbrowser.open's answer and then asked
+    for a code from a page the user may never have seen.
+
+    Args:
+        url: The authorization URL (from build_authorization_url).
+        open_browser: Opens a URL, True when a browser opened it
+            (open_in_browser in production).
+        console_output: Prints one message to the user.
+    """
+    console_output(f"Open this URL to authorize:\n{url}")
+    if not open_browser(url):
+        console_output("No browser opened it; open the URL above yourself.")
 
 
 # =============================================================================
@@ -397,5 +436,7 @@ __all__ = [
     "generate_code_verifier",
     "generate_state",
     "is_token_expired",
+    "open_authorization_page",
+    "open_in_browser",
     "refresh_access_token",
 ]
