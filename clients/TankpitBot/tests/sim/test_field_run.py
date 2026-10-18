@@ -3,10 +3,10 @@
 The bots are REAL — two ``Bot`` instances playing the unmodified
 ``_tick_once`` against one :class:`SimServer`, each over its own link —
 and their artifacts land in the fake file system. The arena run is
-deterministic on the all-ground test terrain: each bot hunts the other,
-finds no landing it will commit to, and leaves through the production
-``no_viable_targets`` exit, tank 10 at round 8 and tank 9 at round 9.
-That is what lets the departure path be asserted rather than hoped for.
+deterministic on the all-ground test terrain: both bots fire, tank 10
+recovers fuel before exhausting productive collection, and tank 9 later
+leaves with no viable target. The departure assertions verify this
+protocol lifecycle without prescribing how many recovery ticks it takes.
 """
 
 from __future__ import annotations
@@ -143,18 +143,23 @@ def test_a_bot_that_exits_leaves_the_field_and_its_rival_is_told(
     """The production exit sends the quit, the tank leaves, the rival reads the 0x29.
 
     Tank 10 exits first, so tank 9 is still connected to receive its
-    departure; tank 9 leaves a round later to an empty room, which ends
+    departure; tank 9 later leaves an empty room, which ends
     the field before its round budget.
     """
     result = _arena()
 
     nine, ten = result["clients"]
-    assert (ten["rounds_played"], nine["rounds_played"], result["rounds_played"]) == (8, 9, 10)
+    assert 0 < ten["rounds_played"] < nine["rounds_played"] < 40
+    assert result["rounds_played"] == nine["rounds_played"] + 1
     for client in (nine, ten):
         assert client["departed"]
         assert not client["alive"]
-        assert client["exit_reason"] == SessionExitReason.NO_VIABLE_TARGETS
-        assert "no affordable enemy" in client["exit_detail"]
+        assert client["deaths"] == 0
+    assert nine["exit_reason"] == SessionExitReason.NO_VIABLE_TARGETS
+    assert "no affordable enemy" in nine["exit_detail"]
+    assert ten["exit_reason"] == SessionExitReason.NO_PRODUCTIVE_COLLECT
+    assert "fuel=1100" in ten["exit_detail"]
+    assert "no reachable equipment" in ten["exit_detail"]
     assert _received(_field_fs, Path(nine["capture_path"]), 0x29) == [
         {
             "msg_type": 0x29,
@@ -172,17 +177,20 @@ def test_a_bot_that_exits_leaves_the_field_and_its_rival_is_told(
 
 
 def test_the_two_bots_fight_each_other(_field_fs: FakeFileSystem) -> None:
-    """Multi-tank combat on demand: bot 9's own shots at bot 10 cross the wire.
+    """Both bots fire and each connection receives the same shot events.
 
-    Every 0x53 tank 9 fires is a shot at tank 10, the only other tank on
-    the arena field, and tank 10's connection sees them too.
+    The arena contains only these rivals, so a shot must name one of
+    them and be visible to the other connection as well as its shooter.
     """
-    result = _arena()
+    # End while both rivals are connected; a departing rival cannot
+    # receive a shot dispatched later in its final field round.
+    result = _arena(rounds=7)
 
     nine, ten = result["clients"]
+    assert nine["exit_reason"] == ten["exit_reason"] == "rounds_exhausted"
     shots = _shots(_received(_field_fs, Path(nine["capture_path"]), 0x53))
     assert shots
-    assert {shot["shooter_id"] for shot in shots} == {9}
+    assert {shot["shooter_id"] for shot in shots} == {9, 10}
     assert _shots(_received(_field_fs, Path(ten["capture_path"]), 0x53)) == shots
 
 
