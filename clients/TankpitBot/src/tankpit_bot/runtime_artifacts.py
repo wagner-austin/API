@@ -22,8 +22,8 @@ TANK_REGISTRY_PATH = Path("data") / "tank_registry.json"
 Operator state like ``accounts.json``, not a build artifact: it is
 filled by entering each colour once and reading the rank off the wire,
 because nothing reports the rank of a colour the account is not
-currently playing. ``make release`` copies it into the snapshot for
-the same reason it copies ``accounts.json``."""
+currently playing. The committed copy seeds a game host that has none;
+after that the host's copy is the ledger (``scripts/fleet_host.py``)."""
 
 _RUNS_DIR = Path("runs")
 
