@@ -300,8 +300,9 @@ class TestAuthorizeGmail:
 
         opened_urls: list[str] = []
 
-        def _open_browser(url: str) -> None:
+        def _open_browser(url: str) -> bool:
             opened_urls.append(url)
+            return True
 
         output_hook, input_hook = make_fake_console(["auth_code_123"])
 
@@ -336,8 +337,8 @@ class TestAuthorizeGmail:
         """Test that empty code raises AppError."""
         creds = _make_credentials()
 
-        def _open_browser(_url: str) -> None:
-            pass
+        def _open_browser(_url: str) -> bool:
+            return True
 
         output_hook, input_hook = make_fake_console([""])
 
@@ -422,8 +423,8 @@ class TestGmailLoadOrAuthorize:
 
         hooks.http_post = _fake_http_post
 
-        def _open_browser(_url: str) -> None:
-            pass
+        def _open_browser(_url: str) -> bool:
+            return True
 
         output_hook, input_hook = make_fake_console(["auth_code"])
         hooks.open_browser = _open_browser
@@ -458,8 +459,8 @@ class TestGmailLoadOrAuthorize:
         )
         hooks.http_post = make_fake_http_send(response)
 
-        def _open_browser(_url: str) -> None:
-            pass
+        def _open_browser(_url: str) -> bool:
+            return True
 
         output_hook, input_hook = make_fake_console(["auth_code"])
         hooks.open_browser = _open_browser

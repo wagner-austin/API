@@ -211,13 +211,6 @@ def _prod_load_gmail_credentials() -> OAuthCredentials:
     )
 
 
-def _prod_open_browser(url: str) -> None:
-    """Production browser opener."""
-    import webbrowser
-
-    webbrowser.open(url)
-
-
 def _prod_current_time() -> int:
     """Production current time in seconds since epoch."""
     import time

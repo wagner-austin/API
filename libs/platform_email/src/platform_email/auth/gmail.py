@@ -18,13 +18,14 @@ from platform_core.json_utils import (
     require_str,
 )
 from platform_core.logging import get_logger
-
-from platform_email.auth.common import (
+from platform_core.oauth import (
     generate_code_challenge,
     generate_code_verifier,
     generate_state,
-    is_token_expired,
+    open_authorization_page,
 )
+
+from platform_email.auth.common import is_token_expired
 from platform_email.config import GMAIL_AUTH_URL, GMAIL_EMAIL_SCOPES, GMAIL_TOKEN_URL
 from platform_email.testing import hooks
 from platform_email.types import OAuthCredentials, OAuthTokens, TokenType
@@ -234,7 +235,9 @@ def authorize_gmail(credentials: OAuthCredentials) -> OAuthTokens:
     state = generate_state()
 
     auth_url = build_gmail_auth_url(credentials, code_challenge=code_challenge, state=state)
-    hooks.open_browser(auth_url)
+    open_authorization_page(
+        auth_url, open_browser=hooks.open_browser, console_output=hooks.console_output
+    )
 
     hooks.console_output("\nAfter authorizing, copy the authorization code from the browser.")
     hooks.console_output("If using localhost redirect, the code is in the URL after 'code='")

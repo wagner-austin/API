@@ -1,15 +1,11 @@
-"""Common OAuth utilities shared between providers.
+"""Token expiry for both providers, read against the hooks' clock.
 
-Re-exports PKCE and token utilities from platform_core.oauth.
+The PKCE helpers and the authorization page come from platform_core.oauth,
+which each flow imports directly.
 """
 
 from __future__ import annotations
 
-from platform_core.oauth import (
-    generate_code_challenge,
-    generate_code_verifier,
-    generate_state,
-)
 from platform_core.oauth import (
     is_token_expired as _core_is_token_expired,
 )
@@ -39,8 +35,5 @@ def is_token_expired(tokens: OAuthTokens, *, buffer_seconds: int = 60) -> bool:
 
 
 __all__ = [
-    "generate_code_challenge",
-    "generate_code_verifier",
-    "generate_state",
     "is_token_expired",
 ]

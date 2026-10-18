@@ -46,12 +46,7 @@ Example usage (Gmail):
 from platform_core.errors import AppError, EmailErrorCode
 
 # Auth - Common
-from platform_email.auth.common import (
-    generate_code_challenge,
-    generate_code_verifier,
-    generate_state,
-    is_token_expired,
-)
+from platform_email.auth.common import is_token_expired
 
 # Auth - Gmail
 from platform_email.auth.gmail import (
@@ -232,9 +227,6 @@ __all__ = [
     "encode_outlook_oauth_config",
     "exchange_gmail_code_for_tokens",
     "exchange_outlook_code_for_tokens",
-    "generate_code_challenge",
-    "generate_code_verifier",
-    "generate_state",
     "get_gmail_credentials_path",
     "get_gmail_tokens_path",
     "get_outlook_credentials_path",

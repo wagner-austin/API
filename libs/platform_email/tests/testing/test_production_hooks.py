@@ -5,7 +5,6 @@ from __future__ import annotations
 import io
 import sys
 import threading
-import webbrowser
 from collections.abc import Generator
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -26,7 +25,6 @@ from platform_email._prod_hooks import (
     _prod_http_get,
     _prod_http_patch,
     _prod_http_post,
-    _prod_open_browser,
     _prod_outlook_credentials_path,
     _prod_outlook_tokens_path,
     _prod_read_file,
@@ -114,36 +112,6 @@ class TestProdConsoleOperations:
             assert result == "test input"
         finally:
             sys.stdin = old_stdin
-
-
-class TestProdOpenBrowser:
-    """Tests for _prod_open_browser."""
-
-    def test_open_browser_hands_the_url_to_the_preferred_browser(self, tmp_path: Path) -> None:
-        """webbrowser opens the URL with the browser registered first.
-
-        Here that is a real program that records the URL it was given, so
-        the host's own browser is never started: a real webbrowser.open on
-        colossus started a snap firefox in a scope of its own, which outlived
-        its fleet run of this suite by a week (measured 2026-10-18, MCPs
-        board task 346abc45). webbrowser keeps the registration for the rest
-        of this process; nothing else in the suite opens a browser.
-        """
-        received = tmp_path / "received"
-        recorder = tmp_path / "recorder.py"
-        recorder.write_text(
-            "import pathlib, sys\n"
-            "pathlib.Path(sys.argv[1]).write_text(sys.argv[2], encoding='utf-8')\n",
-            encoding="utf-8",
-        )
-        command = [sys.executable, str(recorder), str(received), "%s"]
-        webbrowser.register(
-            "platform-email-recorder", None, webbrowser.GenericBrowser(command), preferred=True
-        )
-
-        _prod_open_browser("data:text/html,<html></html>")
-
-        assert received.read_text(encoding="utf-8") == "data:text/html,<html></html>"
 
 
 class TestProdPathHooks:
