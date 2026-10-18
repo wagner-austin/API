@@ -208,6 +208,25 @@ class ReplaceTextProtocol(Protocol):
         ...
 
 
+class RenameFileProtocol(Protocol):
+    """Protocol for moving one file onto another path, replacing it."""
+
+    def __call__(self, source: Path, target: Path) -> None:
+        """Move ``source`` onto ``target`` in one filesystem operation.
+
+        Args:
+            source: The file to move.
+            target: The path it lands at; a file already there is replaced.
+
+        Raises:
+            PermissionError: On Windows, while any process holds ``target``
+                open without ``FILE_SHARE_DELETE``, as CPython opens every
+                file. Linux replaces a held file; its reader keeps the old
+                one.
+        """
+        ...
+
+
 def _real_replace_text(path: Path, content: str) -> None:
     """Real implementation: write a per-process temp file, then os.replace().
 
@@ -220,7 +239,9 @@ def _real_replace_text(path: Path, content: str) -> None:
     contention law is: DROP this beat. The previous complete content
     stays current, the staging file is removed, and the next tick's
     write refreshes — readers still never observe a torn file, which
-    is the contract.
+    is the contract. Linux replaces a held destination and refuses
+    nothing here, so the move goes through :data:`rename_file`, which
+    a test hands Windows' refusal on any platform.
 
     Args:
         path: Final file path.
@@ -230,7 +251,7 @@ def _real_replace_text(path: Path, content: str) -> None:
     staging = path.with_name(f"{path.name}.{os.getpid()}.tmp")
     staging.write_text(content, encoding="utf-8")
     try:
-        staging.replace(path)
+        rename_file(staging, path)
     except PermissionError:
         _fs_log.info(
             "replace_text contention on %s: destination held open by a "
@@ -238,6 +259,16 @@ def _real_replace_text(path: Path, content: str) -> None:
             path,
         )
         staging.unlink(missing_ok=True)
+
+
+def _real_rename_file(source: Path, target: Path) -> None:
+    """Real implementation using :meth:`Path.replace`.
+
+    Args:
+        source: The file to move.
+        target: The path it lands at.
+    """
+    source.replace(target)
 
 
 def _real_create_text_exclusive(path: Path, content: str) -> bool:
@@ -383,6 +414,9 @@ def _real_glob_paths(directory: Path, pattern: str) -> list[Path]:
 
 create_text_exclusive: CreateTextExclusiveProtocol = _real_create_text_exclusive
 replace_text: ReplaceTextProtocol = _real_replace_text
+#: Read by :func:`_real_replace_text` from this module, so a test swaps it
+#: here (``tankpit_bot._test_hooks.fs.rename_file``), not on the package.
+rename_file: RenameFileProtocol = _real_rename_file
 write_text: WriteTextProtocol = _real_write_text
 write_bytes: WriteBytesProtocol = _real_write_bytes
 read_text: ReadTextProtocol = _real_read_text
@@ -401,6 +435,7 @@ __all__ = [
     "PathExistsProtocol",
     "ReadTextProtocol",
     "RemoveFileProtocol",
+    "RenameFileProtocol",
     "ReplaceTextProtocol",
     "WriteBytesProtocol",
     "WriteTextProtocol",
@@ -410,6 +445,7 @@ __all__ = [
     "path_exists",
     "read_text",
     "remove_file",
+    "rename_file",
     "replace_text",
     "write_bytes",
     "write_text",
