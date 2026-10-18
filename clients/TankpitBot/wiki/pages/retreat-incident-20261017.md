@@ -2,7 +2,7 @@
 title: Retreat failures in the 2026-10-17 World run
 tags: [incident, combat, retreat, scheduling, fuel]
 related: ["[[committed-intent]]", "[[bot-behavior-contract]]", "[[fuel-system]]", "[[fleet-coordination]]", "[[teleport-mechanics]]"]
-fact_checked: "2026-10-17"
+fact_checked: "2026-10-18"
 confidence: medium
 hubs: [architecture]
 verified: Preserved captures and release source inspected; corrective regression tests executed offline without a live restart.
@@ -11,6 +11,12 @@ provenance:
   - "/home/corvis/tankpit-evidence-20261017/manifest.json: 20 files, 104395465 bytes; every size and SHA-256 reverified."
   - "Runtime API release 3888f06b22f5eea63d8e8cb5fe9934143ee7f392; tv-1 run bot-20261017-093852, tank 740 / Yuppler."
 source_paths:
+  - "src/tankpit_bot/analysis/scan.py"
+  - "src/tankpit_bot/container/decoders/events.py"
+  - "src/tankpit_bot/browser/cdp_utils.py"
+  - "src/tankpit_bot/browser/cdp_service.py"
+  - "src/tankpit_bot/physics/costs.py"
+  - "tpclient.js"
   - "src/tankpit_bot/bot/ai/escape_policy.py"
   - "src/tankpit_bot/bot/ai/collect_locks.py"
   - "src/tankpit_bot/bot/ai/resource_search.py"
@@ -33,6 +39,12 @@ source_paths:
   - "src/tankpit_bot/fleetshare/report.py"
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
+  "src/tankpit_bot/analysis/scan.py": "808b553d59c0a4e80e0907c8fef7c28bf8843cbc"
+  "src/tankpit_bot/container/decoders/events.py": "c2a81cd5ffe3b478915f5a5f2b85550bcf210577"
+  "src/tankpit_bot/browser/cdp_utils.py": "810b4d1eb9fbba0f598b3bf6c0ac2da4b55463a3"
+  "src/tankpit_bot/browser/cdp_service.py": "fb0dd48c72ebafba5a165c28c90bba3a2bb1f06c"
+  "src/tankpit_bot/physics/costs.py": "cfd4ecc3b7dca858aebb7fdc7e4b5c9f93d77f62"
+  "tpclient.js": "cb253fe55b10221291a35382d2f4e2efcd02f2ff"
   "src/tankpit_bot/bot/ai/escape_policy.py": "b82ae280e9b10292de53f265312e350e7efca962"
   "src/tankpit_bot/bot/ai/collect_locks.py": "24362310ed1be0cbdf169ff31efd4e1478e30a92"
   "src/tankpit_bot/bot/ai/resource_search.py": "423bfcd2cc3f00b37ffc8817ab857b1750335d33"
@@ -76,6 +88,42 @@ The table is grounded in events L3212–3282 and L3979–4142 plus the capture's
 **Both fuel refusals were fast on the wire.** They arrived 62 ms and 61 ms after the corresponding sends, before the next −45 fuel update. The event ledger's 1082/1416 ms durations include local handling; they are not server execution times. Fuel updates arrived 311/1045 ms **after** the respective refusal. Thus the earlier inference “damage while a long teleport was executing caused the refusal” is not established. Unreported server fuel changes, the server's affordability rule, and resolved landing cost remain alternatives. Decoding the actual outbound commands confirmed the intended coordinates, excluding a mislabeled destination in these two sends.[^2]
 
 **The missing 580 fuel is not explained by an old fleet report alone.** Yuppler saw 580 via radar (capture message 1592, 09:48:57.711). Its later belief used tv-2's radar-processing timestamp 09:48:58.672; tv-2 had received that radar at 09:48:57.719. The import preserved that timestamp rather than refreshing it every tick. More decisively, tv-2's viewport patch still advertised 580 at 09:49:13.726, and Yuppler's own landing patch advertised 580 at 09:49:15.762. Using viewport origin plus `(col−1,row−1)` places both entries at (148,249). Yuppler then received fuel=256, a landing confirmation, fuel=256 again, and two remaining-volume-zero receipts. The sibling also received a removal receipt. These facts establish zero credited gain and a removed target, but identify neither a competing consumer nor the server-side reason. Do not invent a gain from the removal or blame a sibling without evidence.[^3]
+
+## Further fuel investigation on October 18
+
+The zero-credit signature repeats outside the fatal engagement. Across the five preserved captures, there are 140 outbound teleports and 138 landing confirmations. Restricting each landing to the interval before its next non-keepalive, recognized gameplay command gives 42 cases with both a container update within Manhattan distance one of the actual landing and a subsequent own-tank fuel reading. Of these, 31 first readings increase and 11 stay unchanged. These are conditional counts in this five-run sample, not a measured server failure rate. Every unchanged case has a positive container volume in the landing viewport and two subsequent zero-volume updates for that tile.[^11]
+
+| Run | Teleport send index | Landing index | Next fuel index | Fuel at landing / next | Container tile | Advertised volume | Zero-volume indexes |
+|---|---:|---:|---:|---:|---|---:|---|
+| tv-1 | 618 | 625 | 626 | 734 / 734 | (85,20) | 706 | 627,628 |
+| tv-1 | 1656 | 1670 | 1671 | 256 / 256 | (148,249) | 580 | 1672,1673 |
+| tv-1 | 1892 | 1899 | 1900 | 789 / 789 | (164,236) | 501 | 1901,1902 |
+| tv-2 | 1080 | 1085 | 1086 | 1186 / 1186 | (41,120) | 1098 | 1087,1088 |
+| tv-2 | 1370 | 1378 | 1379 | 867 / 867 | (138,244) | 321 | 1380,1381 |
+| tv-2 | 1689 | 1695 | 1696 | 915 / 915 | (164,238) | 263 | 1697,1698 |
+| tv-3 | 285 | 290 | 291 | 752 / 752 | (123,152) | 616 | 292,293 |
+| tv-3 | 1284 | 1289 | 1290 | 962 / 962 | (40,148) | 318 | 1291,1292 |
+| tv-3 | 1518 | 1523 | 1524 | 765 / 765 | (19,144) | 923 | 1525,1526 |
+| tv-3 | 1717 | 1722 | 1723 | 724 / 724 | (105,188) | 687 | 1724,1725 |
+| tv-4 | 336 | 342 | 343 | 762 / 762 | (60,163) | 540 | 344,345 |
+
+Extending each inspection 6.5 seconds past its landing avoids treating the first reading as the end of the evidence. The fatal tv-1 case reads 256→211→201 after a radar command, then 156→150→220→175 around the separate pickup at (153,251). There is no delayed 580 credit in that interval. One important control is tv-3 landing 1523: after radar, fuel becomes 755, then 1000, but the accompanying container update is at **(20,144)** with 603 remaining, whereas the zero-credit landing removed **(19,144)**. This later adjacent pickup must not be attributed to the original 923-volume container. Other later increases in these windows follow new pickup commands; an indefinitely delayed credit cannot be excluded by a finite window.[^11]
+
+The wire also rules out a local arithmetic-only explanation for the 580 case: decoded gameplay bodies at tv-1 indexes 1662, 1669 and 1671 are byte-identical and all report fuel 256. The archived browser client treats `0x43` as a tile-cache update; it does not infer a fuel gain or name a recipient. Our decoder's `container_pickup` name therefore must not be read as confirmation that the observing tank received the removed contents. None of the other four recorded bots shows a corresponding 580 gain in the 09:49:12–18 window. This excludes an observed sibling receipt in that window, not every possible competing consumer.[^12]
+
+Successful controls also eliminate two simple proposed explanations for code 8:[^13]
+
+| Control | Observed fuel accounting | Implication |
+|---|---|---|
+| demo-1 send 09:45:00.139, (117,99)→(120,28) | 433−426=7 before pickup; Manhattan cost would be 444 | Neither a universal 100-fuel landing reserve nor Manhattan affordability explains all teleports. |
+| tv-1 send 09:47:10.659, (197,49)→(136,10) | Send fuel 516; incoming hit leaves 471; teleport costs 434 and leaves 37 before pickup | The same tank can land with less than the earlier refused hop's apparent 41-fuel margin. |
+| tv-2 send 09:49:38.784 | Send fuel 343; incoming hits leave 208; teleport costs 207 and leaves 1 before pickup | A positive one-fuel landing is accepted even in a sequence with incoming damage. |
+
+These controls do not prove what fuel or resolved destination the server used for either rejection. Unreported state changes and destination-dependent acceptance remain open. The client-side Euclidean charge calculation should not be replaced with an invented minimum reserve or Manhattan formula on this evidence.[^13]
+
+For reproduction, use the existing decode pipeline described below, retaining each original message index and sorting by `timestamp_ms`. Resolve the player's id from a self status carrying fuel; track its absolute fuel and position, open a window at each outbound teleport, and identify the matching landing confirmation. In each window compare the last own fuel at confirmation with the first subsequent own fuel, and join nearby container updates to the landing viewport using `(left+col−1, top+row−1)`. Close the window at the next recognized gameplay command; then inspect the following 6.5 seconds separately for deferred gains and other pickups. This separates the census criterion from the later-credit check.[^11]
+
+Within-session send/receive deltas use CDP timestamps mapped through one anchored clock offset. Separate browser sessions anchor independently, so millisecond ordering across tv-1 and tv-2 is not a global server chronology. The repeated signature narrows the investigation to server-reported container/fuel behavior, but does not distinguish stale server map state, competing consumption, and other server collection rules. No new live run or guessed protocol correction was used to produce these findings.[^14]
 
 ## Confirmed control-flow gaps in release 3888f06b2
 
@@ -143,3 +191,7 @@ Executable regressions are `tests/bot/ai/test_retreat_regressions.py` and `tests
 [^8]: `src/tankpit_bot/bot/tick_loop.py`, `_wait_between_ticks`; `src/tankpit_bot/bot/tick_loop_actions.py`, `has_in_flight_action`. Offline reproduction and three existing early-wake cases executed against release-equivalent source on 2026-10-17 Pacific time, without a browser session.
 [^9]: `src/tankpit_bot/bot/tick_body.py`, `_tick_once` and `_accept_dispatched_decision`; `src/tankpit_bot/bot/tick_loop.py`, `run_tick_loop`; `src/tankpit_bot/bot/world_sync.py`, `drain_messages`. No per-phase CPU profiling was preserved; the capture timestamps and second-resolution event processing times are different clocks of observation.
 [^10]: `src/tankpit_bot/replay/engine.py`, module contract and `replay_session`: received frames are grouped into nominal tick batches, planner is evaluated without execution masking, and each replay owns a fresh world service.
+[^11]: The five manifest-pinned `latest.capture_session.json` files under the private evidence root; zero-based indexes in the table. Follow-up windows are measured from landing timestamps through +6500 ms. In particular, tv-1 messages 1670–1702 and tv-3 messages 1523–1533 distinguish later actions and adjacent gains. `src/tankpit_bot/analysis/scan.py`, `load_capture_session` and `decode_session_frames`, define the existing load/split/XOR pipeline used for the offline comparison.
+[^12]: Private tv-1 messages 1662, 1669, 1671–1673; all five captures' gameplay commands and own fuel readings from 09:49:12 through 09:49:18. `src/tankpit_bot/container/decoders/events.py` decodes cache coordinates and remaining volume without a consumer id. Archived `tpclient.js`, `$g.prototype.h` and the `V.C=$g` registration, apply the remaining cache value to a tile.
+[^13]: Manifest-pinned demo-1, tv-1 and tv-2 captures at the outbound timestamps in the controls table, subsequent own position, absolute fuel and landing messages. `src/tankpit_bot/physics/costs.py`, `teleport_cost`, computes integer Euclidean cost; the controls compare its result with the observed charge before pickup.
+[^14]: `src/tankpit_bot/browser/cdp_service.py`, `_record_frame`, calls `CDPClock.to_unix_ms`; `src/tankpit_bot/browser/cdp_utils.py`, `CDPClock`, anchors the first CDP timestamp to local wall time and reuses that offset within the session.
