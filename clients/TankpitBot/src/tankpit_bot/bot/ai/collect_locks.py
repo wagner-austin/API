@@ -294,7 +294,12 @@ def continue_or_release_fuel_lock(
         target_x,
         target_y,
         ReasonKind.FUEL_LOCKED,
-        set_resource_target(base_state, "fuel", target_x, target_y),
+        AIStateDict(
+            **{
+                **set_resource_target(base_state, "fuel", target_x, target_y),
+                "suppress_landing_scan": locked_command["cmd_type"] == "teleport",
+            }
+        ),
         ctx.equip,
         reason_context={"volume": locked_target["volume"]},
     )

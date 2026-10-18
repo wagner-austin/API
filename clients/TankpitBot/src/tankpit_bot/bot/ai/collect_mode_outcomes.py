@@ -22,6 +22,7 @@ from tankpit_bot.bot.ai.context import (
     DecideCtx,
     make_decision,
 )
+from tankpit_bot.bot.ai.escape_policy import escape_hop_permitted, escape_required
 from tankpit_bot.bot.ai.intent import (
     PlanReleaseReason,
     current_collect_plan,
@@ -48,14 +49,6 @@ from tankpit_bot.fleetshare.types import FleetRole
 from tankpit_bot.runtime_logging import emit_ai
 from tankpit_bot.state.viewport_geometry import viewport_visible_bounds
 
-# Sustained-fire floor for the escape verb law. Historically matched
-# the break assessment's 3-hit floor; the break floor dropped to 1 on
-# 2026-08-26 (spaced-fire death) and THIS one deliberately did not:
-# the escape verb law rewrites movement choices wholesale, and a
-# single confirmed hit is not "under fire" for that purpose — the
-# projection math already prices lone hits into the break decision.
-_SUSTAINED_FIRE_HIT_FLOOR = 3
-
 _MAP_ANSWER_WAIT_MS = 4_000
 """How long the out-of-fuel exit waits on an in-flight map answer.
 
@@ -78,16 +71,6 @@ only in the (wait, cooldown] gap between the two windows."""
 # ticks 95-107: twelve consecutive rejected walk-pickups under
 # purple-1's fire, fuel 972->663, before the hop rung finally won.
 _MOVEMENT_DEAD_REJECTION_FLOOR = 2
-
-# An escape hop must actually ESCAPE: a landing inside the attacker's
-# viewport reach keeps the tank in the firing line (flag 1 of run
-# bot-20260730-025x: the escape teleported ONE tile, then three, both
-# map-open ticks paid, both landings still under red-6's guns --
-# because the larder score min(vol, deficit)/cost structurally favors
-# the NEAREST fuel, i.e. staying in the kill zone). One full viewport
-# of separation is the user-confirmed pursuit horizon: enemies do not
-# quickly follow a tank that leaves their view.
-_ESCAPE_CLEARANCE_TILES = 16
 
 
 def exhausted_collect_outcome(
@@ -211,36 +194,11 @@ def exhausted_collect_outcome(
     )
 
 
-def _hop_escapes_attacker(
-    base_state: AIStateDict,
-    decision: TickDecisionDict,
-) -> bool:
-    """Return True when a hop decision leaves the attacker's reach.
-
-    Args:
-        base_state: AI state carrying the held combat lock (the
-            attacker the escape is fleeing).
-        decision: Candidate hop decision.
-
-    Returns:
-        True when there is no known attacker, the decision is not a
-        teleport, or the landing clears the attacker's viewport
-        envelope.
-    """
-    if base_state["combat_target_id"] == -1:
-        return True
-    command = decision["command"]
-    if command["cmd_type"] != "teleport":
-        return True
-    separation = abs(command["target_x"] - base_state["combat_target_x"]) + abs(
-        command["target_y"] - base_state["combat_target_y"]
-    )
-    return separation >= _ESCAPE_CLEARANCE_TILES
-
-
 def escape_under_fire_decision(
     ctx: DecideCtx,
     base_state: AIStateDict,
+    *,
+    allow_exhaustion: bool = True,
 ) -> TickDecisionDict | None:
     """Escape by hop when collecting under measured sustained fire.
 
@@ -256,6 +214,9 @@ def escape_under_fire_decision(
     Args:
         ctx: Decision context.
         base_state: AI state for the produced command.
+        allow_exhaustion: Whether every sensing gate has already had its
+            chance; false during the pre-scan escape lookup so unknown
+            ground can still be revealed before declaring no route.
 
     Returns:
         Hop (or exhausted-outcome) decision while under fire, or
@@ -265,7 +226,7 @@ def escape_under_fire_decision(
     fire_hits, _fire_fuel = ctx.ws.get_incoming_damage_window(
         ctx.timestamp_ms, INCOMING_RATE_WINDOW_MS, WIRE_PRESENCE_TTL_MS
     )
-    if fire_hits < _SUSTAINED_FIRE_HIT_FLOOR:
+    if not escape_required(ctx, base_state):
         return None
     # Movement law under fire (user, 2026-07-30, flag 4 of run
     # bot-20260730-025x): "a tele is 2 ticks. walking is 1 tick. and
@@ -278,18 +239,9 @@ def escape_under_fire_decision(
         "collecting under fire (%d hits in window) - walk in-viewport fuel or hop OUT",
         fire_hits,
     )
-    # Committed-plan continuity ([[committed-intent]], s8-2 receipt of
-    # run bot-20260730-025337: an escape hop landed ON its target and
-    # the next derivation re-selected a teleport to the tile the tank
-    # was standing on, burning a map-open tick): a held plan whose
-    # purpose is served from HERE is finished first — the continuation
-    # is one action (a pickup, or the single blessed-under-fire step),
-    # so re-deriving can only add exposure, never remove it.
-    plan = current_collect_plan(base_state)
-    if plan is not None and plan_completes_here(plan, ctx.self_state["x"], ctx.self_state["y"]):
-        locked_decision, base_state = continue_or_release_lock(ctx, base_state)
-        if locked_decision is not None:
-            return locked_decision
+    locked_decision, base_state = _complete_escape_plan_here(ctx, base_state)
+    if locked_decision is not None:
+        return locked_decision
     # Movement-dead check: when the server has refused this tank's
     # movement _MOVEMENT_DEAD_REJECTION_FLOOR times inside the fire
     # window, every further walk plan is fantasy — the walk rung is
@@ -309,7 +261,7 @@ def escape_under_fire_decision(
         if fuel_walk is not None:
             return fuel_walk
     larder_under_fire = larder_harvest(ctx, base_state)
-    if larder_under_fire is not None and _hop_escapes_attacker(base_state, larder_under_fire):
+    if larder_under_fire is not None:
         return larder_under_fire
     escape_hop = make_resource_search_hop(
         ctx,
@@ -318,14 +270,46 @@ def escape_under_fire_decision(
         reason=ReasonKind.SEARCH_COLLECT_LOCAL,
         ai_state=base_state,
     )
-    if escape_hop is not None and _hop_escapes_attacker(base_state, escape_hop):
+    if escape_hop is not None:
         return escape_hop
-    # Nothing clears the attacker's envelope: any movement still beats
-    # standing in the firing line drinking dregs.
-    trapped_fallback = larder_under_fire if larder_under_fire is not None else escape_hop
-    if trapped_fallback is not None:
-        return trapped_fallback
+    if not allow_exhaustion:
+        return None
     return exhausted_collect_outcome(ctx, base_state)
+
+
+def _complete_escape_plan_here(
+    ctx: DecideCtx,
+    base_state: AIStateDict,
+) -> tuple[TickDecisionDict | None, AIStateDict]:
+    """Finish a nearby held plan only when it still serves the retreat.
+
+    Args:
+        ctx: Current position and route evidence.
+        base_state: Held plan and committed fuel-recovery obligation.
+
+    Returns:
+        An eligible continuation and the state after any plan release.
+        A mine-flipped continuation is judged as its actual teleport.
+    """
+    plan = current_collect_plan(base_state)
+    if (
+        plan is None
+        or not plan_completes_here(plan, ctx.self_state["x"], ctx.self_state["y"])
+        or (
+            base_state["break_escape_until_fuel"] > 0
+            and base_state["resource_target_kind"] != "fuel"
+        )
+    ):
+        return None, base_state
+    decision, base_state = continue_or_release_lock(ctx, base_state)
+    if decision is None:
+        return None, base_state
+    command = decision["command"]
+    if command["cmd_type"] == "teleport" and not escape_hop_permitted(
+        ctx, command["target_x"], command["target_y"]
+    ):
+        return None, base_state
+    return decision, base_state
 
 
 def desync_rescan_decision(

@@ -266,9 +266,36 @@ def _sense_and_safety_gates(
         ``None`` when all gates pass) and the state the remaining
         cascade must thread.
     """
+    # A committed retreat may leave by a validated teleport without
+    # paying for a scan of ground it will not walk. Walking still waits
+    # for the landing/mine reveal, including displaced harvest landings.
+    retreat = None
+    if base_state["break_escape_until_fuel"] > ctx.fuel:
+        retreat = escape_under_fire_decision(ctx, base_state, allow_exhaustion=False)
+        if retreat is not None and retreat["command"]["cmd_type"] in ("teleport", "map_open"):
+            return retreat, base_state
+
     landing_scan, base_state = scan_on_landing_decision(ctx, base_state)
     if landing_scan is not None:
         return landing_scan, base_state
+
+    if retreat is not None:
+        mine_reveal = mine_reveal_scan_decision(ctx, base_state)
+        if mine_reveal is not None:
+            return mine_reveal, base_state
+        # Preserve the landing latch consumed above on the chosen walk.
+        return TickDecisionDict(
+            **{
+                **retreat,
+                "updated_ai_state": AIStateDict(
+                    **{
+                        **retreat["updated_ai_state"],
+                        "last_landing_scan_viewport": base_state["last_landing_scan_viewport"],
+                        "suppress_landing_scan": base_state["suppress_landing_scan"],
+                    }
+                ),
+            }
+        ), base_state
 
     return_fire = collect_return_fire(ctx, base_state)
     if return_fire is not None:

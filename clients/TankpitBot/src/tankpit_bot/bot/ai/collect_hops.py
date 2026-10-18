@@ -17,6 +17,7 @@ from tankpit_bot.bot.ai.collect_common import (
 )
 from tankpit_bot.bot.ai.context import DecideCtx, make_decision
 from tankpit_bot.bot.ai.equipment_search import find_all_tracked_equipment
+from tankpit_bot.bot.ai.escape_policy import escape_hop_permitted
 from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain, is_riding_ferry
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.intent import set_resource_target
@@ -252,7 +253,7 @@ def hop_toward_equipment(
             own_ground += 1
             continue
         cost = teleport_cost(sx, sy, landing_x, landing_y)
-        if ctx.fuel - cost < landing_reserve:
+        if ctx.fuel - cost < landing_reserve or not escape_hop_permitted(ctx, *landing):
             reserve_blocked += 1
             continue
         if best_container is None or cost < best_cost:
@@ -337,9 +338,10 @@ def larder_harvest(
         Larder hop decision, or ``None`` when the larder is empty or
         unprofitable and the tick belongs to discovery.
     """
-    equipment_hop = hop_toward_equipment(ctx, base_state)
-    if equipment_hop is not None:
-        return equipment_hop
+    if base_state["break_escape_until_fuel"] <= ctx.fuel:
+        equipment_hop = hop_toward_equipment(ctx, base_state)
+        if equipment_hop is not None:
+            return equipment_hop
     return _hop_toward_fuel_larder(ctx, base_state)
 
 
@@ -474,7 +476,7 @@ def desperation_fuel_hop(
             continue
         landing_x, landing_y = landing
         cost = teleport_cost(sx, sy, landing_x, landing_y)
-        if cost <= 0 or cost > ctx.fuel:
+        if cost <= 0 or cost > ctx.fuel or not escape_hop_permitted(ctx, *landing):
             continue
         if best_container is None or cost < best_cost:
             best_cost = cost

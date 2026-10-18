@@ -14,6 +14,7 @@ from tankpit_bot.bot.ai.equipment_search import (
     find_equipment_candidates,
     find_fuel_candidates,
 )
+from tankpit_bot.bot.ai.escape_policy import escape_hop_permitted
 from tankpit_bot.bot.ai.intent import set_resource_target
 from tankpit_bot.bot.ai.mine_clearance import (
     clearance_shot_pending,
@@ -318,6 +319,10 @@ def _first_walkworthy_fuel(
         command = walk_or_teleport(ctx, container["x"], container["y"], pickup_kind="fuel")
         if command is None:
             continue
+        if command["cmd_type"] == "teleport" and not escape_hop_permitted(
+            ctx, command["target_x"], command["target_y"]
+        ):
+            continue
         return (container, command)
     return None
 
@@ -349,7 +354,12 @@ def select_and_pickup_fuel(
         target_x,
         target_y,
         ReasonKind.FUEL_COLLECT,
-        set_resource_target(base_state, "fuel", target_x, target_y),
+        AIStateDict(
+            **{
+                **set_resource_target(base_state, "fuel", target_x, target_y),
+                "suppress_landing_scan": command["cmd_type"] == "teleport",
+            }
+        ),
         ctx.equip,
         reason_context={"volume": container["volume"]},
     )

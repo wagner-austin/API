@@ -32,6 +32,7 @@ from tankpit_bot.bot.ai.context import (
     make_decision,
     teleport_fuel_cost_to,
 )
+from tankpit_bot.bot.ai.escape_policy import escape_hop_permitted
 from tankpit_bot.bot.ai.intent import PlanReleaseReason, release_collect_plan
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
 from tankpit_bot.bot.ai.scoring_types import (
@@ -246,7 +247,9 @@ def _dot_hop_rejection(
         return "own_tile"
     if ctx.terrain is not None and not ctx.terrain.is_passable(target_x, target_y):
         return "impassable"
-    if not can_afford_teleport(ctx, target_x, target_y):
+    if not can_afford_teleport(ctx, target_x, target_y) or not escape_hop_permitted(
+        ctx, target_x, target_y
+    ):
         return "unaffordable"
     if not is_viewport_untouched(
         ctx.world["scanned_tiles"],

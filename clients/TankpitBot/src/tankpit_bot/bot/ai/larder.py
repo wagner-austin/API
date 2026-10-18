@@ -26,6 +26,7 @@ from typing_extensions import TypedDict
 from tankpit_bot._test_hooks import TerrainMapProtocol
 from tankpit_bot.bot.ai.collect_common import split_fresh_hop_sightings
 from tankpit_bot.bot.ai.context import DecideCtx
+from tankpit_bot.bot.ai.escape_policy import escape_hop_permitted
 from tankpit_bot.bot.ai.ferry import SurfaceRouteTerrain, is_riding_ferry
 from tankpit_bot.bot.ai.ferry_landing import find_ferry_boarding_tile
 from tankpit_bot.bot.ai.mode_gates import hunt_entry_permitted
@@ -315,7 +316,11 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
         # stays absolute: fuel is health, so the teleport itself must
         # be payable with life left over (arriving at zero is
         # deactivation, and no landing pickup outruns being dead).
-        if cost >= ctx.fuel or ctx.fuel - cost + gain < reserve:
+        if (
+            cost >= ctx.fuel
+            or ctx.fuel - cost + gain < reserve
+            or not escape_hop_permitted(ctx, landing_x, landing_y)
+        ):
             reserve_blocked += 1
             continue
         if gain <= cost:
