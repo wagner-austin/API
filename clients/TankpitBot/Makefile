@@ -476,27 +476,27 @@ analyze-viewport:
 # the registry, and no recipe here reads a secret.
 release:
 	@echo ""
-	@echo "==> release (freeze HEAD onto the game host's ladder)"
+	@echo "=== release, freezing HEAD onto the game host's ladder"
 	poetry run python -m scripts.fleet_release
 
 up:
 	@echo ""
-	@echo "==> up (the fleet on the game host: newest release, containerized, with its public edge)"
+	@echo "=== up, the newest release as the fleet container on the game host, with its public edge"
 	poetry run python -m scripts.fleet_host up
 
 down:
 	@echo ""
-	@echo "==> down (drain every bot on the game host, then stop the container)"
+	@echo "=== down, draining every bot on the game host, then stopping the container"
 	poetry run python -m scripts.fleet_host down
 
 # The sim server on the game host (MCPs board task ff035b0d): started only
 # by hand, never on its own; scripts/sim_host.py says what it stages and why.
 sim-up:
 	@echo ""
-	@echo "==> sim-up (the sim server on the game host, built from HEAD, on its loopback)"
+	@echo "=== sim-up, the sim server on the game host, built from HEAD, on its loopback"
 	poetry run python -m scripts.sim_host up
 
 sim-down:
 	@echo ""
-	@echo "==> sim-down (stop the sim and its database on the game host; accounts are kept)"
+	@echo "=== sim-down, stopping the sim and its database on the game host, accounts kept"
 	poetry run python -m scripts.sim_host down
