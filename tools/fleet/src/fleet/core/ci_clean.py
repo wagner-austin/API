@@ -31,17 +31,13 @@ its own reason a running job is safe from it:
 - a virtualenv goes only when every source path its ``.pth`` files record is
   gone, and a running job's checkout is not (:func:`orphan_sweep_lines`); one
   recording no path is kept, since poetry may still be creating it.
-- poetry's artifacts and repository cache and pip's cache lose only the files
-  nothing has read for :data:`CACHE_UNREAD_DAYS` days, then the directories
-  that left empty and unchanged as long. A job reading a file moves its atime,
-  at least daily on a ``relatime`` mount (lavender's root, 2026-10-18), so a
-  file a job uses is never that old; and a download fragment a killed job left
-  goes after a day, since a live one is newer.
-
-On 2026-10-18T10:12Z lavender's poetry cache held 31 GB of virtualenvs, eight,
-each read within two days and none an orphan; 8.8 GB of artifacts, 8 files of
-405 unread for 14 days; and 8.9 GB of repository cache, 2837 files of 4106 and
-8.97 GB unread for 14 days.
+- poetry's, pip's and npm's download caches go only a whole generation at a
+  time, one no runner install's marker names
+  (:data:`fleet.core.tool_caches.SH_REMOVE_UNUSED`, MCPs board task
+  4b405239): each job reads the generation its job-started hook chose
+  (:mod:`fleet.core.runner_tool_caches`). Until then this pass removed single
+  files nothing had read for 14 days, which could part a poetry metadata
+  file from its body and fail every later lock with ``IncompleteRead``.
 
 WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
 exists (per-package working state the runners share, not duplicates),
@@ -53,8 +49,8 @@ from __future__ import annotations
 
 from typing import Final
 
-#: How long a cache file may go unread before the daily pass removes it.
-CACHE_UNREAD_DAYS: Final = 14
+from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
+from fleet.core.tool_caches import SH_REMOVE_UNUSED
 
 
 def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
@@ -111,44 +107,22 @@ def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
 
 
 #: The orphan rule over the runner account's poetry virtualenvs.
-ORPHAN_SWEEP: Final = "\n".join(orphan_sweep_lines('"$POETRY/virtualenvs"'))
+ORPHAN_SWEEP: Final = "\n".join(orphan_sweep_lines(f'"{RUNNER_VIRTUALENVS}"'))
+
+#: The removal rule over the runner account's generations, against each
+#: runner install's marker.
+GENERATIONS_SWEEP: Final = "\n".join(
+    (*SH_REMOVE_UNUSED, "as=", f'remove_unused "{RUNNER_TOOLS}" "{RUNNER_MARKERS}"')
+)
 
 #: The Python half of :data:`CI_CLEAN_SCRIPT`, separate so a test executes it
 #: against a home of its own without a docker daemon.
-CI_CLEAN_CACHES: Final = f"""POETRY="$HOME/.cache/pypoetry"
-UNREAD_DAYS={CACHE_UNREAD_DAYS}
-reclaimed_kb=0
-
-# Removes the files under $1 that nothing has read for UNREAD_DAYS days, then
-# the directories that left empty and unchanged as long, and counts the space.
-# -ignore_readdir_race: a running job may remove a file between the listing
-# and the test, and that file is not this pass's to report.
-prune_unread() {{
-    [ -d "$1" ] || return 0
-    local freed_kb
-    freed_kb=$(find "$1" -ignore_readdir_race -type f -atime +"$UNREAD_DAYS" \\
-        -printf '%k\\n' -delete | awk '{{ s += $1 }} END {{ print s + 0 }}')
-    find "$1" -ignore_readdir_race -mindepth 1 -type d -empty \\
-        -mtime +"$UNREAD_DAYS" -delete
-    reclaimed_kb=$((reclaimed_kb + freed_kb))
-    echo "ci-clean: $1: ${{freed_kb}}KB unread for $UNREAD_DAYS days"
-}}
-
-# The orphan rule; a virtualenv recording no source path stays
+CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source path stays
 # (unknown provenance: keep).
 {ORPHAN_SWEEP}
-reclaimed_kb=$((reclaimed_kb + kb))
 
-if [ -d "$POETRY/artifacts" ]; then
-    fragments_kb=$(find "$POETRY/artifacts" -ignore_readdir_race -type f -name 'tmp*' \\
-        -mmin +1440 -printf '%k\\n' -delete | awk '{{ s += $1 }} END {{ print s + 0 }}')
-    reclaimed_kb=$((reclaimed_kb + fragments_kb))
-fi
-prune_unread "$POETRY/artifacts"
-prune_unread "$POETRY/cache"
-prune_unread "$HOME/.cache/pip"
-
-echo "ci-clean: reclaimed $((reclaimed_kb / 1024))MB this pass."
+# npm's, pip's and poetry's download caches, a whole generation at a time.
+{GENERATIONS_SWEEP}
 """
 
 #: The daily hygiene script, installed to /usr/local/bin/ci-clean.
@@ -169,7 +143,7 @@ docker builder prune -f --max-used-space 60gb
 
 #: systemd unit for the hygiene pass.
 CI_CLEAN_SERVICE: Final = """[Unit]
-Description=CI runner host hygiene (docker leftovers, poetry orphans, unread caches)
+Description=CI runner host hygiene (docker leftovers, poetry orphans, unread cache generations)
 
 [Service]
 Type=oneshot
@@ -191,11 +165,11 @@ WantedBy=timers.target
 """
 
 __all__ = [
-    "CACHE_UNREAD_DAYS",
     "CI_CLEAN_CACHES",
     "CI_CLEAN_SCRIPT",
     "CI_CLEAN_SERVICE",
     "CI_CLEAN_TIMER",
+    "GENERATIONS_SWEEP",
     "ORPHAN_SWEEP",
     "orphan_sweep_lines",
 ]

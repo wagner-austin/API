@@ -22,7 +22,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
-from fleet.core import runner_job_scope_render, runner_render
+from fleet.core import runner_job_scope_render, runner_render, runner_tool_caches
 from tests._host_bash import host_bash
 from tests.test_runner_slice import _roster_host
 
@@ -454,10 +454,14 @@ def _install() -> RunnerInstall:
 
 
 class TestTheRenderedPieces:
-    def test_the_hook_hands_the_job_to_root_and_nothing_else(self) -> None:
-        script = runner_job_scope_render.JOB_HOOK_SCRIPT
+    def test_the_hook_gives_the_job_its_cache_generation_then_hands_it_to_root(self) -> None:
+        """MCPs board task 4b405239: the generation lines run first, under
+        the hook's strict options, and root's move ends it."""
+        lines = runner_job_scope_render.JOB_HOOK_SCRIPT.splitlines()
         assert runner_job_scope_render.JOB_HOOK_PATH.endswith(".sh")
-        assert script.splitlines()[-1] == "exec sudo -n /usr/local/sbin/fleet-runner-job-scope"
+        strict = lines.index("set -euo pipefail")
+        assert lines[strict + 1 : -1] == list(runner_tool_caches.HOOK_LINES)
+        assert lines[-1] == "exec sudo -n /usr/local/sbin/fleet-runner-job-scope"
 
     def test_sudo_admits_the_helper_with_no_argument_only(self) -> None:
         assert runner_job_scope_render.SUDOERS_RULE == (

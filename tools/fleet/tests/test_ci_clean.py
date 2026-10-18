@@ -1,14 +1,13 @@
 """ci-clean, the CI runner hosts' daily hygiene (:mod:`fleet.core.ci_clean`).
 
-Its Python half is executed for real against a home this suite lays out,
-with atimes and mtimes set where each rule draws its line, because the rules
-are find predicates whose meaning only GNU find on Linux settles; a string
-assertion would pass a script that deletes everything or nothing.
+Its Python half is executed for real against a home this suite lays out:
+virtualenvs whose recorded sources are gone or alive, and cache generations
+that runner installs' markers name or do not, because a string assertion
+would pass a script that deletes everything or nothing.
 """
 
 from __future__ import annotations
 
-import os
 import pathlib
 import shlex
 import subprocess
@@ -17,13 +16,14 @@ from typing import Final
 
 import pytest
 
-from fleet.core import ci_clean
+from fleet.core import ci_clean, names
+from fleet.core.runner_tool_caches import RUNNER_VIRTUALENVS
 from tests._host_bash import host_bash
 
 #: One day in seconds.
 DAY: Final = 86400
 
-#: What each laid-out cache file holds: one MiB, which ext4 counts as 1024 KB.
+#: What each laid-out cache file holds: one MiB.
 MIB: Final = 1024 * 1024
 
 
@@ -36,9 +36,19 @@ def test_no_pass_waits_for_the_runners_to_be_idle() -> None:
 
 
 def test_the_orphan_rule_runs_over_the_runner_account_s_virtualenvs() -> None:
-    rule = "\n".join(ci_clean.orphan_sweep_lines('"$POETRY/virtualenvs"'))
+    rule = "\n".join(ci_clean.orphan_sweep_lines(f'"{RUNNER_VIRTUALENVS}"'))
     assert rule in ci_clean.CI_CLEAN_SCRIPT
     assert "unknown provenance: keep" in ci_clean.CI_CLEAN_SCRIPT
+
+
+def test_the_download_caches_go_only_by_whole_generations() -> None:
+    """MCPs board task 4b405239: no pass removes a single cache file, which
+    could part a poetry metadata file from its body."""
+    assert ci_clean.CI_CLEAN_CACHES.endswith(ci_clean.GENERATIONS_SWEEP + "\n")
+    assert ci_clean.GENERATIONS_SWEEP.splitlines()[-1] == (
+        'remove_unused "$HOME/.cache/fleet-tools" "$HOME/.cache/fleet-jobs"'
+    )
+    assert "-atime" not in ci_clean.CI_CLEAN_SCRIPT
 
 
 def test_the_python_half_follows_the_docker_prunes() -> None:
@@ -78,22 +88,21 @@ def test_the_timer_fires_daily_and_catches_a_missed_start() -> None:
     assert "Persistent=true" in ci_clean.CI_CLEAN_TIMER
 
 
-def _file(path: pathlib.Path, *, read_days_ago: int, changed_days_ago: int) -> pathlib.Path:
-    """Write one MiB at a path, last read and last changed so many days ago.
+def _generation(tools: pathlib.Path, *, days_ago: int) -> str:
+    """Lay out a cache generation started some days ago, holding one MiB.
 
     Args:
-        path: The file.
-        read_days_ago: Its atime, in days before now.
-        changed_days_ago: Its mtime, in days before now.
+        tools: The generations directory.
+        days_ago: How long ago it started.
 
     Returns:
-        The path.
+        Its name.
     """
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b"\x01" * MIB)
-    now = time.time()
-    os.utime(path, (now - read_days_ago * DAY, now - changed_days_ago * DAY))
-    return path
+    name = str(int(time.time()) - days_ago * DAY)
+    artifacts = tools / name / "pypoetry" / "artifacts"
+    artifacts.mkdir(parents=True)
+    (artifacts / "torch.whl").write_bytes(bytes(MIB))
+    return name
 
 
 def _virtualenv(venvs: pathlib.Path, name: str, sources: list[str]) -> pathlib.Path:
@@ -133,52 +142,38 @@ def _run_caches(tmp_path: pathlib.Path, home: pathlib.Path) -> subprocess.Comple
 
 
 @pytest.mark.host_linux
-def test_the_python_half_removes_only_orphans_unread_files_and_stale_fragments(
+def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     tmp_path: pathlib.Path,
 ) -> None:
     home = tmp_path / "home"
-    poetry = home / ".cache" / "pypoetry"
+    venvs = home / ".cache" / "pypoetry" / "virtualenvs"
     checkout = tmp_path / "runner" / "_work" / "src"
     checkout.mkdir(parents=True)
-    orphan = _virtualenv(poetry / "virtualenvs", "gone-py3.11", [str(tmp_path / "retired")])
-    serving = _virtualenv(poetry / "virtualenvs", "alive-py3.11", [str(checkout)])
-    unknown = _virtualenv(poetry / "virtualenvs", "unknown-py3.11", ["import _virtualenv"])
-    pypi = poetry / "cache" / "repositories" / "PyPI"
-    pip = home / ".cache" / "pip" / "http"
-    unread = [
-        _file(poetry / "artifacts" / "a" / "old.whl", read_days_ago=20, changed_days_ago=60),
-        _file(pypi / "old", read_days_ago=20, changed_days_ago=20),
-        _file(pip / "old", read_days_ago=20, changed_days_ago=20),
-    ]
-    read = [
-        _file(poetry / "artifacts" / "b" / "used.whl", read_days_ago=1, changed_days_ago=60),
-        _file(pypi / "used", read_days_ago=0, changed_days_ago=30),
-        _file(pip / "used", read_days_ago=2, changed_days_ago=2),
-    ]
-    stale_fragment = _file(poetry / "artifacts" / "tmpab12", read_days_ago=0, changed_days_ago=2)
-    live_fragment = _file(poetry / "artifacts" / "tmpcd34", read_days_ago=0, changed_days_ago=0)
-    empty_old = poetry / "cache" / "empty-old"
-    empty_old.mkdir()
-    os.utime(empty_old, (time.time() - 20 * DAY, time.time() - 20 * DAY))
-    empty_new = poetry / "cache" / "empty-new"
-    empty_new.mkdir()
+    orphan = _virtualenv(venvs, "gone-py3.11", [str(tmp_path / "retired")])
+    serving = _virtualenv(venvs, "alive-py3.11", [str(checkout)])
+    unknown = _virtualenv(venvs, "unknown-py3.11", ["import _virtualenv"])
+    tools = home / ".cache" / "fleet-tools"
+    unread = _generation(tools, days_ago=30)
+    marked = _generation(tools, days_ago=16)
+    current = _generation(tools, days_ago=1)
+    (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
+    idle_runner = home / ".cache" / "fleet-jobs" / "actions-runner-treebot-1"
+    idle_runner.mkdir(parents=True)
+    (idle_runner / names.GENERATION_MARKER_NAME).write_text(f"{marked}\n", encoding="utf-8")
 
     ran = _run_caches(tmp_path, home)
 
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout.splitlines() == [
         "venv-sweep: removed 1 of 3 (2 MB)",
-        f"ci-clean: {poetry}/artifacts: 1024KB unread for 14 days",
-        f"ci-clean: {poetry}/cache: 1024KB unread for 14 days",
-        f"ci-clean: {home}/.cache/pip: 1024KB unread for 14 days",
-        "ci-clean: reclaimed 6MB this pass.",
+        f"cache-generations: {tools}: generation {current} current, removed 1 of 3 (1 MB)",
     ]
     assert not orphan.exists()
     assert [serving.exists(), unknown.exists()] == [True, True]
-    assert [path.exists() for path in unread] == [False, False, False]
-    assert [path.exists() for path in read] == [True, True, True]
-    assert [stale_fragment.exists(), live_fragment.exists()] == [False, True]
-    assert [empty_old.exists(), empty_new.exists()] == [False, True]
+    assert sorted(entry.name for entry in tools.iterdir()) == sorted(
+        [marked, current, names.CURRENT_GENERATION_NAME]
+    )
+    assert not (tools / unread).exists()
 
 
 @pytest.mark.host_linux

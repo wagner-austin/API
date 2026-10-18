@@ -6,10 +6,9 @@ which removes every generation under the node's cache root, and under
 execdocker's on a node that runs docker projects' builds as that user
 (:func:`fleet.core.retire.runs_isolated`), that is not current, that
 no run directory still on the node names in its marker, and that has not
-been current for :data:`REMOVAL_GRACE_SECONDS`. The grace covers a build
-that read the current name just before it changed: it writes its marker in
-the next line. Each generation goes whole, so no tool ever finds half of one
-of its own entries.
+been current for :data:`~fleet.core.tool_caches.REMOVAL_GRACE_SECONDS`, by
+:data:`~fleet.core.tool_caches.SH_REMOVE_UNUSED`, the rule ci-clean runs over
+the CI runner hosts' caches too. On Windows the same rule is PowerShell.
 """
 
 from __future__ import annotations
@@ -26,14 +25,9 @@ from fleet.core.dialect_linux import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_CACHE, EXEC_HOME_LINE, EXEC_STAGE
 from fleet.core.powershell_text import STRICT_HEADER
 from fleet.core.script_values import scriptable
-from fleet.core.tool_caches import tool_caches_directory
+from fleet.core.tool_caches import REMOVAL_GRACE_SECONDS, SH_REMOVE_UNUSED, tool_caches_directory
 
 _log = get_logger(__name__)
-
-#: How long a generation that stopped being current is kept even with no
-#: marker naming it: a build reads the current name and writes its marker
-#: one line later, so an hour covers any build that read it.
-REMOVAL_GRACE_SECONDS: Final = 3600
 
 #: The removal script's name under the stage root. One name for every run,
 #: so no two removals of one process run at once (:data:`REMOVING`).
@@ -58,43 +52,8 @@ def linux_script(stage_root: str, *, isolated: bool) -> str:
         The script's text, printing one line per cache root it judged.
     """
     tools = tool_caches_directory(names.cache_root(stage_root))
-    current = names.CURRENT_GENERATION_NAME
     lines = (
-        "remove_unused() {",
-        "    tools=$1",
-        "    stage=$2",
-        f'    if ! $as test -f "$tools/{current}"; then',
-        '        echo "cache-generations: $tools: none yet"',
-        "        return 0",
-        "    fi",
-        f'    current=$($as cat "$tools/{current}")',
-        "    now=$(date +%s)",
-        '    used=$($as find "$stage" -mindepth 2 -maxdepth 2 '
-        f"-name {names.GENERATION_MARKER_NAME} -exec cat {{}} +)",
-        "    total=0",
-        "    removed=0",
-        "    kb=0",
-        '    for entry in $($as ls "$tools"); do',
-        f'        [ "$entry" != {current} ] || continue',
-        '        case "$entry" in',
-        "            *[!0-9]*)",
-        '                echo "cache-generations: $tools/$entry is no generation" >&2',
-        "                exit 1",
-        "                ;;",
-        "        esac",
-        "        total=$((total + 1))",
-        '        [ "$entry" != "$current" ] || continue',
-        '        if printf \'%s\\n\' "$used" | grep -qxF "$entry"; then continue; fi',
-        "        newest=$((entry > current ? entry : current))",
-        f"        [ $((now - newest)) -gt {REMOVAL_GRACE_SECONDS} ] || continue",
-        '        size=$($as du -sk "$tools/$entry" | cut -f1)',
-        '        $as rm -rf "$tools/$entry"',
-        "        removed=$((removed + 1))",
-        "        kb=$((kb + size))",
-        "    done",
-        '    echo "cache-generations: $tools: generation $current current, '
-        'removed $removed of $total ($((kb / 1024)) MB)"',
-        "}",
+        *SH_REMOVE_UNUSED,
         "as=",
         f"remove_unused {shlex.quote(tools)} {shlex.quote(stage_root)}",
     )
@@ -240,7 +199,6 @@ def remove_unused_on_node(node: NodeConfig) -> str:
 
 
 __all__ = [
-    "REMOVAL_GRACE_SECONDS",
     "REMOVAL_STEM",
     "REMOVING",
     "linux_script",

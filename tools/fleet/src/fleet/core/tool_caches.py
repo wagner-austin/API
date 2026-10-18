@@ -40,6 +40,57 @@ GENERATION_DAYS: Final = 14
 #: :data:`GENERATION_DAYS` in seconds, as the scripts compare it.
 GENERATION_SECONDS: Final = GENERATION_DAYS * 86400
 
+#: How long a generation that stopped being current is kept even with no
+#: marker naming it: a build reads the current name and writes its marker
+#: one line later, so an hour covers any build that read it.
+REMOVAL_GRACE_SECONDS: Final = 3600
+
+#: The removal rule as a POSIX sh function, ``remove_unused TOOLS MARKERS``:
+#: every generation under TOOLS that is not current, that no
+#: :data:`~fleet.core.names.GENERATION_MARKER_NAME` one directory below
+#: MARKERS names, and that stopped being current over
+#: :data:`REMOVAL_GRACE_SECONDS` ago goes whole. Every file operation takes
+#: the caller's ``$as`` prefix, empty or ``sudo -n``. The fleet nodes run it
+#: after each retire (:mod:`fleet.core.cache_generations`) and ci-clean daily
+#: on a CI runner host (:mod:`fleet.core.ci_clean`); it prints one line.
+SH_REMOVE_UNUSED: Final = (
+    "remove_unused() {",
+    "    tools=$1",
+    "    stage=$2",
+    f'    if ! $as test -f "$tools/{names.CURRENT_GENERATION_NAME}"; then',
+    '        echo "cache-generations: $tools: none yet"',
+    "        return 0",
+    "    fi",
+    f'    current=$($as cat "$tools/{names.CURRENT_GENERATION_NAME}")',
+    "    now=$(date +%s)",
+    '    used=$($as find "$stage" -mindepth 2 -maxdepth 2 '
+    f"-name {names.GENERATION_MARKER_NAME} -exec cat {{}} +)",
+    "    total=0",
+    "    removed=0",
+    "    kb=0",
+    '    for entry in $($as ls "$tools"); do',
+    f'        [ "$entry" != {names.CURRENT_GENERATION_NAME} ] || continue',
+    '        case "$entry" in',
+    "            *[!0-9]*)",
+    '                echo "cache-generations: $tools/$entry is no generation" >&2',
+    "                exit 1",
+    "                ;;",
+    "        esac",
+    "        total=$((total + 1))",
+    '        [ "$entry" != "$current" ] || continue',
+    '        if printf \'%s\\n\' "$used" | grep -qxF "$entry"; then continue; fi',
+    "        newest=$((entry > current ? entry : current))",
+    f"        [ $((now - newest)) -gt {REMOVAL_GRACE_SECONDS} ] || continue",
+    '        size=$($as du -sk "$tools/$entry" | cut -f1)',
+    '        $as rm -rf "$tools/$entry"',
+    "        removed=$((removed + 1))",
+    "        kb=$((kb + size))",
+    "    done",
+    '    echo "cache-generations: $tools: generation $current current, '
+    'removed $removed of $total ($((kb / 1024)) MB)"',
+    "}",
+)
+
 
 def tool_caches_directory(cache_root: str) -> str:
     """Where a cache root keeps its generations.
@@ -113,6 +164,8 @@ def powershell_build_lines() -> tuple[str, ...]:
 __all__ = [
     "GENERATION_DAYS",
     "GENERATION_SECONDS",
+    "REMOVAL_GRACE_SECONDS",
+    "SH_REMOVE_UNUSED",
     "powershell_build_lines",
     "sh_build_lines",
     "tool_caches_directory",

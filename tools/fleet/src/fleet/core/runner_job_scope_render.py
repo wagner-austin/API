@@ -17,7 +17,9 @@ which carries no bound, and each job is moved into a scope of
 
 1. A per-runner drop-in sets ``ACTIONS_RUNNER_HOOK_JOB_STARTED`` to
    :data:`JOB_HOOK_PATH`, which the runner runs, before the job's steps, as
-   a descendant of the job's ``Runner.Worker``.
+   a descendant of the job's ``Runner.Worker``. It first hands the job its
+   package caches' generation (:mod:`fleet.core.runner_tool_caches`, MCPs
+   board task 4b405239).
 2. The hook runs :data:`JOB_SCOPE_PATH` as root through a sudoers rule that
    permits that one command with no argument.
 3. The helper walks its own ancestors to the ``Runner.Worker``, refuses one
@@ -43,6 +45,7 @@ from __future__ import annotations
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
 from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
+from fleet.core.runner_tool_caches import HOOK_LINES
 from fleet.core.script_values import scriptable
 
 #: Where the helper is installed.
@@ -83,14 +86,18 @@ ADOPTION_GRACE_SECONDS = 300
 MOVE_WAIT_SECONDS = 5
 
 #: The hook.
-JOB_HOOK_SCRIPT = f"""#!/usr/bin/env bash
-# fleet-runner-job-started.sh -- rendered by fleet-runners (MCPs board task 715b9ec5).
+JOB_HOOK_SCRIPT = (
+    f"""#!/usr/bin/env bash
+# fleet-runner-job-started.sh -- rendered by fleet-runners (MCPs board tasks 715b9ec5, 4b405239).
 # The runners' job-started hook ({HOOK_VARIABLE}): before the job's first
-# step, root moves this job's Runner.Worker out of its listener's cgroup into
-# a scope of {CI_SLICE_NAME}. A refusal fails the job by name.
+# step, the job is given its package caches' generation (fleet.core.runner_tool_caches),
+# then root moves its Runner.Worker out of its listener's cgroup into a scope
+# of {CI_SLICE_NAME}. A refusal fails the job by name.
 set -euo pipefail
-exec sudo -n {JOB_SCOPE_PATH}
 """
+    + "".join(f"{line}\n" for line in HOOK_LINES)
+    + f"exec sudo -n {JOB_SCOPE_PATH}\n"
+)
 
 #: The helper.
 JOB_SCOPE_SCRIPT = (

@@ -27,6 +27,7 @@ import pytest
 
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core.ci_clean import CI_CLEAN_SCRIPT
+from fleet.core.runner_job_scope_render import JOB_HOOK_PATH, JOB_HOOK_SCRIPT
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
 #: Where the rendered provision installs the script.
@@ -77,4 +78,23 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
         f"{CI_CLEAN_TIMER} enabled and fired {since} s ago, its last run {service['Result']} "
         f"with status {service['ExecMainStatus']}; the host daemon's build cache reads "
         + ", ".join(" ".join(total) for total in totals),
+    )
+
+
+@pytest.mark.host_runner_units
+def test_the_job_started_hook_that_hands_each_job_its_cache_generation_is_the_render(
+    runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
+) -> None:
+    """MCPs board task 4b405239: ci-clean removes the download caches only
+    by whole generations, which is safe only while every job reads the
+    generation the hook names, so the installed hook must be the render.
+    The runner account's home is closed to the fleet's user, so the
+    generations themselves are measured as that account by the closure."""
+    hook = pathlib.Path(JOB_HOOK_PATH)
+
+    assert hook.read_text(encoding="utf-8") == JOB_HOOK_SCRIPT
+    record_property(
+        READING_PROPERTY,
+        f"{runner_host['name']}: {JOB_HOOK_PATH} is the render of JOB_HOOK_SCRIPT, "
+        f"{len(JOB_HOOK_SCRIPT.splitlines())} lines",
     )
