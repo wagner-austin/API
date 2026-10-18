@@ -1,6 +1,6 @@
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check _check-unbudgeted execution execution-runners render-powershell render-documents
+.PHONY: lint test check _check-unbudgeted execution execution-runners execution-hub render-powershell render-documents
 
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
@@ -53,6 +53,15 @@ execution:
 execution-runners:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --runner-host=lavender --no-cov
+
+# The hub's cases (MCPs board task 3d9eec0d): every enabled node's stage root,
+# read over the hub's ssh against the node runners' records in the API
+# checkout the hub's ticks run with. The fleet runs it as
+# tools/fleet-execution-hub, pinned to the hub; --fleet-hub names that
+# checkout, and no other run has its records.
+execution-hub:
+	poetry sync --with dev
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --fleet-hub=$(HOME)/PROJECTS/API --no-cov
 
 # The committed copies of every PowerShell script this package renders
 # (fleet.core.rendered_powershell, MCPs board task d69786fa). They are

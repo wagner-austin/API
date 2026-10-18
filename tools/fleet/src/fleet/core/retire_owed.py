@@ -294,8 +294,11 @@ def owed_on(path: pathlib.Path, *, alias: str) -> tuple[str, ...]:
     return tuple(run_id for run_id, state in latest.items() if state is RetireState.OWED)
 
 
-def _live(leases_path: pathlib.Path, ledger_path: pathlib.Path) -> frozenset[str]:
+def live_runs(leases_path: pathlib.Path, ledger_path: pathlib.Path) -> frozenset[str]:
     """The runs a retire must not touch yet: a held lease, or a running ledger row.
+
+    Also what the hub's stage-root case reads a run directory against
+    (``tests/test_stage_roots_hub.py``).
 
     Args:
         leases_path: The lease file.
@@ -338,7 +341,7 @@ def retire_owed(
     owed = owed_on(path, alias=alias)
     if not owed:
         return
-    live = _live(leases_path, ledger_path)
+    live = live_runs(leases_path, ledger_path)
     retired = 0
     for run_id in owed:
         if run_id in live:
@@ -352,4 +355,14 @@ def retire_owed(
         cache_generations.remove_unused_on_node(node)
 
 
-__all__ = ["RETIRES_FILE", "owe", "owed_on", "retire_or_owe", "retire_or_raise", "retire_owed"]
+__all__ = [
+    "RETIRES_FILE",
+    "RETIRE_TURN",
+    "RETIRE_TURNS_DIRECTORY",
+    "live_runs",
+    "owe",
+    "owed_on",
+    "retire_or_owe",
+    "retire_or_raise",
+    "retire_owed",
+]

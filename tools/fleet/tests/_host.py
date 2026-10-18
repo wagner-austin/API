@@ -37,6 +37,12 @@ board task 715b9ec5, A3). No platform has that capability: the Linux
 execution run deselects such a case, the ordinary run skips it, and only a
 run given ``--runner-host=<the runners.json host>`` has it, which is what
 ``tools/fleet-execution-runners`` passes from the one node it is pinned to.
+
+A FIFTH, ``host_fleet_hub``, binds a case to the hub, whose node runners
+hold the fleet's records and whose ssh reaches every node, and reads every
+enabled node's stage root against those records (MCPs board task 3d9eec0d).
+Only a run given ``--fleet-hub=<the hub's API checkout>`` has it, which is
+what ``tools/fleet-execution-hub`` passes from the hub it is pinned to.
 """
 
 from __future__ import annotations
@@ -75,11 +81,27 @@ RUNNER_HOST_MARKER: Final[str] = "host_runner_units"
 #: fleet project of :data:`RUNNER_HOST` passes, from the one node it is pinned to.
 RUNNER_HOST_OPTION: Final[str] = "--runner-host"
 
+#: The capability of the hub whose node runners hold the fleet's records,
+#: whose cases read every enabled node's stage root against them (MCPs board
+#: task 3d9eec0d).
+FLEET_HUB: Final[str] = "fleet-hub"
+
+#: The marker for a case that reads the hub's records and its nodes, run only
+#: by the hub's execution run.
+FLEET_HUB_MARKER: Final[str] = "host_fleet_hub"
+
+#: The option naming the API checkout whose ``tools/fleet`` holds the hub's
+#: records and registry, the ``--api-root`` its ticks run with. Given, the
+#: run's capability is :data:`FLEET_HUB`; it is what the fleet project of
+#: :data:`FLEET_HUB` passes, from the hub it is pinned to.
+FLEET_HUB_OPTION: Final[str] = "--fleet-hub"
+
 #: The fleet project that runs each capability's host cases.
 PROJECTS: Final[dict[str, str]] = {
     "windows": "tools/fleet-execution",
     "linux": "tools/fleet-execution-linux",
     RUNNER_HOST: "tools/fleet-execution-runners",
+    FLEET_HUB: "tools/fleet-execution-hub",
 }
 
 #: The user property a host case records what it read on the host under,
@@ -135,6 +157,21 @@ def _runner_host(request: pytest.FixtureRequest) -> HostRunnerSpec:
     return hosts[0]
 
 
+@pytest.fixture(name="fleet_hub")
+def _fleet_hub(request: pytest.FixtureRequest) -> pathlib.Path:
+    """The hub's API checkout, whose ``tools/fleet`` holds its records.
+
+    Args:
+        request: The case's request, whose run names the checkout.
+
+    Returns:
+        The checkout.
+    """
+    named: str | None = request.config.getoption(FLEET_HUB_OPTION)
+    assert named is not None, f"{FLEET_HUB_OPTION} is unset: this run is not the hub's"
+    return pathlib.Path(named)
+
+
 class HostReadings:
     """Prints each passed case's host readings, on the process that reports the run.
 
@@ -184,10 +221,15 @@ def plan_for(here: str) -> host_execution.HostExecutionPlan:
     """
     return host_execution.HostExecutionPlan(
         markers={marker: platform for platform, marker in MARKERS.items()},
-        execution_only={EXECUTION_ONLY_MARKER: "linux", RUNNER_HOST_MARKER: RUNNER_HOST},
+        execution_only={
+            EXECUTION_ONLY_MARKER: "linux",
+            RUNNER_HOST_MARKER: RUNNER_HOST,
+            FLEET_HUB_MARKER: FLEET_HUB,
+        },
         needs={
             EXECUTION_ONLY_MARKER: "needs a node's execdocker user and its rootless daemon",
             RUNNER_HOST_MARKER: "needs a host that runs the fleet's WSL runner units",
+            FLEET_HUB_MARKER: "needs the hub's records and its ssh to every node",
         },
         projects=PROJECTS,
         here=here,
@@ -206,6 +248,11 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         default=None,
         help="the runners.json host this run executes on, making it that host's execution run",
     )
+    parser.addoption(
+        FLEET_HUB_OPTION,
+        default=None,
+        help="the hub's API checkout, whose records this run reads, making it the hub's run",
+    )
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -215,7 +262,15 @@ def pytest_configure(config: pytest.Config) -> None:
         config: The run's configuration.
     """
     host: str | None = config.getoption(RUNNER_HOST_OPTION)
-    plan = plan_for(HOST_PLATFORM if host is None else RUNNER_HOST)
+    hub: str | None = config.getoption(FLEET_HUB_OPTION)
+    if host is not None and hub is not None:
+        raise pytest.UsageError(f"{RUNNER_HOST_OPTION} and {FLEET_HUB_OPTION} name two runs")
+    here = HOST_PLATFORM
+    if host is not None:
+        here = RUNNER_HOST
+    if hub is not None:
+        here = FLEET_HUB
+    plan = plan_for(here)
     config.stash[PLAN_KEY] = plan
     host_execution.configure(config, plan)
     if not hasattr(config, "workerinput"):

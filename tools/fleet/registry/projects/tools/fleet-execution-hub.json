@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 5,
+  "required_tags": [
+    "linux"
+  ],
+  "node": "diphtheria",
+  "source": {
+    "remote": "https://github.com/wagner-austin/API.git",
+    "path": "tools/fleet-execution-hub",
+    "install": [],
+    "companions": []
+  }
+}

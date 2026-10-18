@@ -30,7 +30,7 @@ from fleet.cli.runners import load_runner_spec
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_node, require_project
-from tests._host import RUNNER_HOST_OPTION
+from tests._host import FLEET_HUB_OPTION, RUNNER_HOST_OPTION
 from tests._registry import shipped_document
 
 
@@ -127,6 +127,30 @@ def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
     host = require_node(workspace, "lavender-wsl")["wsl_host"]
     declared = [each["name"] for each in load_runner_spec(str(PACKAGE / "runners.json"))["hosts"]]
     assert (named, host in declared) == ([host], True)
+
+
+def test_the_hub_s_cases_run_on_the_hub_as_the_fleet_user() -> None:
+    """tools/fleet-execution-hub reads every node's stage root against the hub's records.
+
+    It is pinned to the hub, whose fleet user's ssh reaches every node and
+    whose API checkout holds the node runners' records, the checkout its
+    recipe names to the case, and it requires no ``docker`` tag, which would
+    isolate it as execdocker, an account with neither (MCPs board task
+    3d9eec0d).
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "tools/fleet-execution-hub")
+    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX,), "diphtheria")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="tools/fleet-execution-hub",
+        install=(),
+        companions=(),
+    )
+    recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
+    given = f"{FLEET_HUB_OPTION}="
+    named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]
+    assert named == ["$(HOME)/PROJECTS/API"]
 
 
 def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:

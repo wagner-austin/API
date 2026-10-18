@@ -58,6 +58,7 @@ DIPHTHERIA_PINNED = (
     "MCPs/phone-device-execution",
     "MCPs/phone-release-execution",
     "MCPs/transcriber-api",
+    "tools/fleet-execution-hub",
 )
 
 

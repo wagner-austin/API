@@ -1209,6 +1209,17 @@ sibling, and require the probe inside it to stall and the sibling's not to.
 Each prints what it read as a `host reading:` line. It is no roll or deploy
 gate: a runner a job holds mid-move fails it, which is what it is for.
 
+`tools/fleet-execution-hub` is this package's too (MCPs board task 3d9eec0d),
+pinned to `diphtheria`, the hub. Its `make check` is this package's
+`execution-hub`, which passes `--fleet-hub=$(HOME)/PROJECTS/API`, the checkout
+the hub's ticks run with, and so runs only the `host_fleet_hub` case: it
+lists every enabled node's stage root over the hub's ssh and fails on any
+run's directory, staging directory or root script whose run is neither live
+(a held lease or a running ledger row in that checkout's records) nor still
+owed a retire in `runs/retires.jsonl`, and on any node it cannot read. It
+prints each node's count as a `host reading:` line, and it is no roll or
+deploy gate.
+
 `MCPs/execution-netboot-diphtheria` (MCPs board task d387271d) is pinned to
 `diphtheria` because its case arms and serves a clean Secure Boot VM's
 install through MCPs' `fleet-netboot`, which mints the VM its own tailnet
