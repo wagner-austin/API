@@ -6803,3 +6803,8 @@ TV was sent a UPnP Stop at 09:54 UTC.
 Pages written: [[retreat-incident-20261017]].
 Pages updated: architecture hub and index navigation/counts.
 Notes: Corvis task d947f299 continues 6275ecaa handoff abd5bb45 against runtime release 3888f06b2. Verified all 20 saved artifacts and decoded both bots' relevant packets. Confirmed the escape hit-floor mismatch, pickup-to-teleport clearance bypass, sensing priority and pre-buffered-response sleep. Corrected two initial hypotheses: both fuel refusals arrived in 61–62 ms, and the missing 580 fuel was still advertised in the landing viewport. Root cause of the no-gain landing and the immediate affordability refusals remains unresolved; the page specifies offline validation cases and timing limitations. No live game entered and no runtime behavior changed.
+
+## [2026-10-17] Retreat corrections | Offline regression verification
+
+Pages updated: [[retreat-incident-20261017]].
+Notes: Corvis task afdc4b26 implements the follow-up request to correct and double-check the incident. Committed fuel retreat now survives hit-window decay, actual hop candidates clear all fresh attackers and budget transit exposure, and rejected high-scoring landings cannot hide safer alternatives. Mine-flipped and locked fuel hops carry harvest scan semantics; walking still requires landing and mine sensing. Buffered movement and shot replies wake promptly without consuming outcomes in the sleeper, and elapsed work advances bounded sessions. Regression cases include the 41/4 fuel margins, diagonal clearance, both pickup routes, a second attacker, sensing before exhaustion, and pending-action preservation. No live game or restart; server-side zero-gain and refusal causes remain open.
