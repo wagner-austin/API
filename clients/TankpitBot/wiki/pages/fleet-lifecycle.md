@@ -137,8 +137,8 @@ this work.
 
 | Command | Effect |
 |---|---|
-| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era), run on the hub against SEDONA, the game host, since 2026-09-28: resolve the newest release, stage the committed compose file, `edge/nginx.conf` and the release's `.env` and `accounts.json` into `C:/fleet/tankpit` on sedona, build the image there if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, compose the fleet CONTAINER up with its public edge (the `/demo/`-only filter and tankpit's own tunnel), and wait for `https://tankpit.austinwagner.org` to serve; since 2026-09-28 it ends with the bring-up gate, `scripts/fleet_gate.py`'s `gate`, which spawns one bounded Practice bot and waits for its first tick, so an `up` that exits 0 has been seen playing the game as well as serving.[^10] |
-| `make down` | Drain on sedona: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). The edge stays up and the demo reads offline.[^10] |
+| `make up` | THE fleet command (operator consolidation 2026-09-02, [[fleet-forage-allocation]] era), run against the game host over plain ssh (sedona from 2026-09-28, colossus since 2026-10-18, board task `c481c259`): resolve the newest release on the host's ladder, seed the tank registry from it only while the host has none, refuse a host lacking its own `.env`, `accounts.json`, tunnel token or registry, stage the committed compose file and `edge/nginx.conf` into `/home/user/tankpit`, build the image there if the tag (`tankpit-fleet:v<ver>-<sha>`) does not exist yet, compose the fleet CONTAINER up with its public edge (the `/demo/`-only filter and tankpit's own tunnel), and wait for `https://tankpit.austinwagner.org` to serve; since 2026-09-28 it ends with the bring-up gate, `scripts/fleet_gate.py`'s `gate`, which spawns one bounded Practice bot and waits for its first tick, so an `up` that exits 0 has been seen playing the game as well as serving.[^10] |
+| `make down` | Drain on the game host: `docker stop`'s SIGTERM enters `drain_on_interrupt`, every bot quits to the lobby, the container exits after the last one (grace 10 m). The edge stays up and the demo reads offline.[^10] |
 | `make dev` | The only other manager: hot tree, foreground, development only — Ctrl+C drains. |
 
 Retired the same day, one system not two: `make fleet` (foreground
@@ -223,11 +223,11 @@ child console to a file. The path constant died with the launcher on
       `test_liveness_never_depends_on_recovering_an_exit_code`
       (`tests/service/test_fleet_process_hooks.py`). Diagnosed live
       2026-09-01, see `wiki/log.md`.
-[^10]: `up`, `stage`, `pull_edge`, `ensure_image`, `smoke` and `down`
-      in `scripts/fleet_host.py`, whose module docstring lists what is
-      staged and from where; the `public` and `tunnel` services under
-      profile `edge` in `docker-compose.yml`. The move is MCPs board task
-      `077204e8`. The bring-up gate is `gate` in `scripts/fleet_gate.py`
+[^10]: `up`, `stage`, `ensure_image`, `smoke` and `down`
+      in `scripts/fleet_host.py`, whose module docstring lists what the
+      host holds and what is staged; the `public` and `tunnel` services under
+      profile `edge` in `docker-compose.yml`. The move to sedona is MCPs
+      board task `077204e8`, and the move to colossus board task `c481c259`. The bring-up gate is `gate` in `scripts/fleet_gate.py`
       (`free_account`, `spawn`, `_still_alive`), called last by `up`
       since `72c76d556` (2026-09-28, repo API); the ssh and command
       helpers moved out of `fleet_host.py` into `scripts/fleet_remote.py`

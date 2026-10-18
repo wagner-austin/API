@@ -149,13 +149,14 @@ with `play.html` into `/app/web`. `sim-server.compose.json` passes
 `--web-root /app/web`. The page loads its modules, key, terrain and
 socket relative to its own URL, which must end in a slash.
 
-Since 2026-10-13 the image runs on sedona, started by hand with
-`make sim-up` ([[sim-network-server]], "On sedona, started by hand"),
-and answers on sedona's loopback only. A browser on the hub reaches it
-through a forward of that port:
+Since 2026-10-13 the image runs on the game host, started by hand with
+`make sim-up` ([[sim-network-server]], "On the game host, started by
+hand"), and answers on the host's loopback only. The host was sedona
+until 2026-10-18 and is colossus since. A browser on another machine
+reaches it through a forward of that port:
 
 ```
-ssh -N -L 8765:127.0.0.1:8765 austi@100.95.76.122
+ssh -N -L 8765:127.0.0.1:8765 user@100.111.149.33
 # open http://127.0.0.1:8765/ while it runs
 ```
 

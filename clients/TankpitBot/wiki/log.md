@@ -6808,3 +6808,40 @@ Notes: Corvis task d947f299 continues 6275ecaa handoff abd5bb45 against runtime 
 
 Pages updated: [[retreat-incident-20261017]].
 Notes: Corvis task afdc4b26 implements the follow-up request to correct and double-check the incident. Committed fuel retreat now survives hit-window decay, actual hop candidates clear all fresh attackers and budget transit exposure, and rejected high-scoring landings cannot hide safer alternatives. Mine-flipped and locked fuel hops carry harvest scan semantics; walking still requires landing and mine sensing. Buffered movement and shot replies wake promptly without consuming outcomes in the sleeper, and elapsed work advances bounded sessions. Regression cases include the 41/4 fuel margins, diagonal clearance, both pickup routes, a second attacker, sensing before exhaustion, and pending-action preservation. No live game or restart; server-side zero-gain and refusal causes remain open.
+
+## [2026-10-18] move | The game host is colossus, and nothing is read from Windows
+
+Pages updated: [[make-targets]], [[fleet-lifecycle]], [[sim-network-server]], [[sim-web-client]].
+
+Board task `c481c259`. The operator, 2026-10-18, asked whether sedona,
+serendipity and pendragon should become Linux machines now: "we dont
+rwally.plan on ising windows ever again tbh". On sedona the fleet ran in
+Docker Desktop's VM, whose 9p mounts returned ENOMEM on reads and whose
+memory ceiling ran out on 2026-10-17, and it was operated from austinpc,
+which held the release ladder, the tunnel token and the gitignored
+accounts and is being retired.
+
+The game host is now colossus (`user@100.111.149.33`), on the home
+network with the TV. It holds everything: `/home/user/tankpit` is the
+compose project with its own `.env`, `accounts.json`, `edge.env` and
+`data/tank_registry.json` (seeded from the release only while the host
+has none, as before); `/home/user/tankpit-releases` is the ladder
+`make release` fills (`scripts/fleet_release.py`, a `git archive` of
+HEAD unpacked as `<name>.partial` and renamed in); `/home/user/tankpit-sim`
+holds the sim's compose project and its own `secrets.env`. Every host
+command is `scripts/fleet_remote.py`'s `on_host`, one quoted line over
+plain ssh; the PowerShell lines, `curl.exe`, the base64 spawn body and
+the Docker Desktop credential-helper workaround are gone.
+
+Sedona's `C:/fleet/tankpit/runs` (612 files, 2,166,099,774 bytes) and
+`data` (2 files, 7,887 bytes) were copied to
+`/home/user/tankpit-archive/sedona-2026-10-18` on colossus, every file's
+sha256 equal on both ends, for the retreat investigation that asked
+they be kept; sedona's copy was only read. The host's four files came
+from sedona's `C:/fleet/tankpit`, the registry matching the archive's
+sha256 `6729dd87…`; the sim's `sim-db` volume moved by `tar`, as
+[[sim-network-server]] records.
+
+No container was started on colossus and no bot was spawned: the
+operator asked on 2026-10-17 that none be until he resumes, and `up`
+ends by spawning the bring-up gate's Practice bot.

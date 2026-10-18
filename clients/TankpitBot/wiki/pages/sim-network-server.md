@@ -188,15 +188,18 @@ does the same for a database no server has opened.
   `sim_sessions` row was written (`1001|1|field05_r.gif|5|2|0|0`), and
   the account kept rank 2.
 
-## On sedona, started by hand
+## On the game host, started by hand
 
-Sedona owns the game servers, and since 2026-10-13 that includes this
-one (MCPs board task `ff035b0d`). It runs only when asked. The operator,
-2026-10-13: "make sure it doesnt auro stsrt or anything i csn maniallt
-stsrt it wheb needed". From `clients/TankpitBot` on the hub:
+The game host owns the game servers, and since 2026-10-13 that includes
+this one (MCPs board task `ff035b0d`). The game host was sedona until
+2026-10-18 and is colossus, a Linux machine, since (board task
+`c481c259`). It runs only when asked. The operator, 2026-10-13: "make
+sure it doesnt auro stsrt or anything i csn maniallt stsrt it wheb
+needed". From `clients/TankpitBot` in any checkout that can ssh to the
+host:
 
 ```
-make sim-up      # build HEAD's image on sedona if missing, start, and see it serve
+make sim-up      # build HEAD's image on the host if missing, start, and see it serve
 make sim-down    # stop the sim and its database; the accounts stay
 ```
 
@@ -204,30 +207,36 @@ make sim-down    # stop the sim and its database; the accounts stay
 `tankpit-sim-serve` from the package image, and `sim-db` runs
 `postgres:16-bookworm` with the accounts in the named volume `sim-db`,
 which outlives every `down`. The sim waits for a healthy database,
-publishes port 8765 on sedona's loopback only, and both services carry
-`restart: "no"`, so a reboot of sedona or of its Docker leaves them off.
+publishes port 8765 on the host's loopback only, and both services carry
+`restart: "no"`, so a reboot of the host or of its Docker leaves them off.
 The file is JSON, which compose reads as it reads YAML, so the package's
 own JSON decoders test it against the CLI: its command must parse as the
 server's flags and name the rooms it opens.[^9]
 
-`scripts/sim_host.py` is what the two targets run. `up` stages the
-compose file as committed at HEAD and a `sim.env` naming the image and
-carrying the database password from `~/.tankpit-secrets/sim.env` on the
-hub, which no repository holds, into `C:/fleet/tankpit-sim` on sedona.
-It pulls the database image through the hub's docker client (Docker
-Desktop's credential helper fails in an ssh logon), builds
-`tankpit-sim:<HEAD's short sha>` on sedona from a `git archive` of HEAD
-only when sedona lacks that tag, starts compose, and asks sedona's
-loopback for room 1's terrain until the whole 65,536-byte field arrives.
-An `up` that exits 0 has been seen serving.[^10]
+`scripts/sim_host.py` is what the two targets run. `up` refuses a host
+without its own `secrets.env`, the database password no repository
+holds, in `/home/user/tankpit-sim`; stages the compose file as committed
+at HEAD and a `sim.env` naming the image there; pulls the database image
+on the host; builds `tankpit-sim:<HEAD's short sha>` on the host from
+HEAD's tree, unpacked there by `scripts/fleet_release.py`'s `send_head`
+and removed after the build, only when the host lacks that tag; starts
+compose with both env files; and asks the host's loopback for room 1's
+terrain until the whole 65,536-byte field arrives. An `up` that exits 0
+has been seen serving.[^10]
 
-That smoke failed twice on its first day, both times on quoting rather
-than on the sim. ssh joins its remote arguments with spaces for sedona's
-`cmd.exe`, so a curl format holding a space split into two words. The
-hub's ssh is Git's MSYS build, which brace-expands an unquoted argument
-on its own command line, so a format without the space lost its braces.
-The format now rides single-quoted inside one PowerShell command, which
-Python's command line quotes whole.
+That smoke failed twice on its first day on sedona, both times on
+quoting rather than on the sim: ssh joined its remote arguments with
+spaces for sedona's `cmd.exe`, and the hub's MSYS ssh brace-expanded an
+unquoted argument. On colossus every remote command is one
+`shlex.join`-quoted line read by the host's shell, so the format reaches
+curl as one word.
+
+The accounts moved with the host on 2026-10-18: sedona's `sim-db` volume
+was exported with `tar` (sha256 `f9dbdadf…` on both ends, 48,640,000
+bytes), kept in `/home/user/tankpit-archive/sedona-2026-10-18/sim-db.tar`
+on colossus, and restored into a volume labelled for the `tankpit-sim`
+compose project, whose 1,279 files `diff -r` read identical to the
+archive's.
 
 Checked live on 2026-10-13: the three accounts and six sessions from the
 hub's database were loaded into `sim-db`, `make sim-up` at API
@@ -261,4 +270,4 @@ bot speaking this socket directly is the next client.
 [^7]: `src/tankpit_bot/sim/net_store.py`, `PostgresAccountBook`, `SCHEMA` and `connect_store`; `src/tankpit_bot/sim/net_room.py`, `NetRoom.leave`; `src/tankpit_bot/sim/net_host.py`, `NetHost._unseat`; `tests/sim/test_net_host.py`, `test_a_seat_that_leaves_is_recorded_and_the_account_rejoins_as_it_left`; `tests/sim/test_net_store.py`, `test_a_seat_updates_the_account_and_adds_a_session_in_one_commit`.
 [^8]: `src/tankpit_bot/sim/net_server.py`, `serve_rooms` and `NetServer.tick_for`; `tests/sim/test_net_server.py`, `test_a_signal_stops_the_server_after_the_tick_in_play` and `test_closing_the_listener_records_every_seat_still_in_play`.
 [^9]: `sim-server.compose.json`, the `sim` and `sim-db` services; `tests/sim/test_sim_compose.py`, `test_the_command_serves_from_the_database_beside_it`, `test_it_publishes_the_port_the_server_binds_on_loopback_only`, `test_neither_service_starts_on_its_own`, `test_the_accounts_live_in_a_named_volume` and `test_the_sim_waits_for_a_healthy_database`.
-[^10]: `scripts/sim_host.py`, `stage`, `pull_database`, `ensure_image`, `smoke`, `up` and `down`; `tests/scripts/test_sim_host.py`, `test_up_stages_pulls_builds_composes_and_smokes`, `test_ensure_image_keeps_a_tag_sedona_holds`, `test_smoke_quotes_the_curl_format_inside_one_command` and `test_down_stops_the_sim_and_its_database`.
+[^10]: `scripts/sim_host.py`, `stage`, `ensure_image`, `smoke`, `up` and `down`, and `scripts/fleet_release.py`'s `send_head`; `tests/scripts/test_sim_host.py`, `test_up_stages_pulls_builds_composes_and_smokes`, `test_ensure_image_builds_heads_tree_on_the_host_and_removes_it`, `test_smoke_hands_the_curl_format_to_the_host_as_one_word` and `test_down_stops_the_sim_and_its_database`.
