@@ -1210,7 +1210,14 @@ copies only `TAILSCALE_API_KEY` from that host's workspace `.env` into the
 export, after the steps whose untracked files the node stores, so the key is
 never stored with the tree. Its server listens on the definition's fixed
 port, so `netboot-http-8780` is its exclusive resource and two runs never
-start at once.
+start at once. Its `worker_ram_gb` is 1.0, not the VM's 7.5 GB, because the
+case maps the VM's memory from a shared file on the fleet cache's disk:
+the guest's pages are file cache the kernel writes back and reclaims, where
+anonymous memory would take room the stack's capped containers are still
+promised. Declared at 8.5 GB the job never fit, since diphtheria measured
+3.6 GB left after those promises on 2026-10-18 15:45Z, and job 86c7afcc sat
+queued for three hours; 1.0 GB is qemu, which held 29 MB anonymous at the
+firmware, and the case's node processes, which its check-in line prints.
 
 ## The staged tree is made a git repository, and that is not decoration
 

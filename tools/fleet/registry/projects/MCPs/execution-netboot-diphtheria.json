@@ -1,5 +1,5 @@
 {
-  "worker_ram_gb": 8.5,
+  "worker_ram_gb": 1.0,
   "minimum_workers": 1,
   "expected_minutes": 30,
   "exclusive_resources": [
