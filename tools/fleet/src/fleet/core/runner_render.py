@@ -67,14 +67,25 @@ RUNNER_PATH_ENTRIES: tuple[str, ...] = (LOCAL_BIN, WSL_LIB)
 #: and because a gated pass skips whenever any one of a host's runners is busy,
 #: and lavender has eight.
 #:
+#: THE BUILD CACHE, BOUNDED TWICE (MCPs board task 46c7b11b). Every job that
+#: runs docker build fills BuildKit's cache and no other pass reaches it: on
+#: 2026-10-18T07:32Z lavender's daemon held 103.7 GB of build cache, 98.55 GB
+#: of it reclaimable, while the three prunes above reclaimed 0 B a day. So the
+#: cache no build has used for a week goes, and then the reclaimable cache
+#: above 60 GB, least recently used first, the two passes and the bound
+#: diphtheria's corvis-docker-prune runs on its stack's daemon (MCPs
+#: scripts/host/diphtheria/docker-prune.sh). A record a running build holds is
+#: in use, so neither pass removes it.
+#:
 #: WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
 #: exists (they are per-package-per-runner working state, not duplicates),
 #: everything under any _work tree (in-project venvs persist there by design),
 #: named docker volumes, and every tagged image, which is the pull cache.
 #: WHAT IT PRUNES: containers stopped for a day, anonymous volumes no container
-#: references, dangling images, venvs whose recorded source paths are all
-#: gone, poetry wheel artifacts untouched for 60+ days, tmp download fragments
-#: a killed job left behind, and the pip cache. The poetry half refuses to run
+#: references, dangling images, build cache past the two bounds above, venvs
+#: whose recorded source paths are all gone, poetry wheel artifacts untouched
+#: for 60+ days, tmp download fragments a killed job left behind, and the pip
+#: cache. The poetry half refuses to run
 #: while a Runner.Worker is executing -- a venv mid-use must never race a
 #: delete.
 CI_CLEAN_SCRIPT = """#!/usr/bin/env bash
@@ -87,6 +98,8 @@ set -euo pipefail
 docker container prune -f --filter until=24h
 docker volume prune -f
 docker image prune -f
+docker builder prune -f --filter until=168h
+docker builder prune -f --max-used-space 60gb
 
 if pgrep -f 'Runner.Worker' >/dev/null 2>&1; then
     echo "ci-clean: a runner job is executing; skipping this pass."

@@ -231,8 +231,27 @@ class TestLinuxScript:
             "docker container prune -f --filter until=24h",
             "docker volume prune -f",
             "docker image prune -f",
+            "docker builder prune -f --filter until=168h",
+            "docker builder prune -f --max-used-space 60gb",
         ):
             assert script.index(command) < gate, command
+
+    def test_the_ci_clean_payload_bounds_the_build_cache_by_age_then_by_size(
+        self,
+    ) -> None:
+        # Without these two lines no pass reached BuildKit's cache, and
+        # lavender's daemon held 98.55 GB of it reclaimable on 2026-10-18
+        # (MCPs board task 46c7b11b). The age pass runs first, so the cap
+        # removes least recently used records only from what a week kept.
+        docker_lines = [
+            line
+            for line in runner_render.CI_CLEAN_SCRIPT.splitlines()
+            if line.startswith("docker builder prune")
+        ]
+        assert docker_lines == [
+            "docker builder prune -f --filter until=168h",
+            "docker builder prune -f --max-used-space 60gb",
+        ]
 
     def test_the_ci_clean_payload_never_prunes_named_volumes_or_tagged_images(
         self,
@@ -244,7 +263,7 @@ class TestLinuxScript:
             for line in runner_render.CI_CLEAN_SCRIPT.splitlines()
             if line.startswith("docker ")
         ]
-        assert len(docker_lines) == 3
+        assert len(docker_lines) == 5
         assert [line for line in docker_lines if "--all" in line or " -a" in line] == []
 
     def test_the_ci_clean_timer_fires_daily(self) -> None:
