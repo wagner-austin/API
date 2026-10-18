@@ -29,7 +29,7 @@ help:
 	@echo "  make sim-run                     production bot vs the simulator on real terrain (free soak)"
 	@echo "  make sim-run-practice            production bot vs the CERTIFIED practice-bot roster"
 	@echo "  make sim-field ARGS=...          two production bots on one field (ARGS=--practice, --rounds N)"
-	@echo "  make sim-up / sim-down           start / stop the sim server on sedona (by hand only)"
+	@echo "  make sim-up / sim-down           start / stop the sim server on the game host (by hand only)"
 	@echo "  make install                     poetry install + playwright chromium"
 	@echo ""
 	@echo "Live action probes (need browser + accounts.json):"
@@ -56,8 +56,9 @@ help:
 	@echo "  make track                       enemy tracking probe (wire vs JS truth)"
 	@echo "  make bot                         live HFSM bot"
 	@echo "  make run                         5-min timed session + scorecard"
-	@echo "  make up                          THE fleet command: newest release to image to container on sedona, with its public edge (run from the Windows hub)"
-	@echo "  make down                        drain every bot to the lobby, then stop the container on sedona (run from the Windows hub)"
+	@echo "  make release                     freeze HEAD onto the game host's release ladder"
+	@echo "  make up                          THE fleet command: newest release to image to container on the game host, with its public edge"
+	@echo "  make down                        drain every bot to the lobby, then stop the container on the game host"
 	@echo "  make dev                         fleet manager on the HOT TREE, foreground (development only)"
 	@echo "  make analyze                     issue report + run audit + cross-session stats"
 	@echo "  make digest                      compact per-run truth table (works on crashed runs)"
@@ -439,10 +440,11 @@ analyze-viewport:
 
 # THE fleet lifecycle is ONE pair (operator order 2026-09-02: "one
 # single command we use to start this ish"): ``make up`` runs the
-# fleet CONTAINER from the newest release ON SEDONA, the game host
-# (since 2026-09-28, MCPs board task 077204e8; scripts/fleet_host.py
-# says what it stages there and from where) -- it resolves the release,
-# builds its image on sedona if that exact tag does not exist yet
+# fleet CONTAINER from the newest release ON COLOSSUS, the game host
+# (sedona's from 2026-09-28, MCPs board task 077204e8; colossus's since
+# 2026-10-18, board task c481c259; scripts/fleet_host.py says what the
+# host holds and what up stages) -- it resolves the release,
+# builds its image on the host if that exact tag does not exist yet
 # (tankpit-fleet:v<ver>-<sha>, built FROM the snapshot so the tag
 # carries the ladder's sha and a hot-tree build can never masquerade
 # as a release), then composes it up with its public edge (the
@@ -462,65 +464,39 @@ analyze-viewport:
 # excluded by construction -- git archive reads HEAD). The fleet manager
 # and live sessions run from the snapshot so hot-tree surgery can never
 # crash them (2026-08-28: deleting a runtime-read file killed a live
-# session). Versioning is the folder name:
-# C:\Users\Test\PROJECTS\tankpit-releases\v<version>-<short-sha>.
+# session). Versioning is the folder name on the host:
+# /home/user/tankpit-releases/v<version>-<short-sha>
+# (scripts/fleet_release.py).
 #
 # The retired host-mode targets (fleet / fleet-dev / up-docker /
-# down-docker / image, 2026-09-02): one system, not two. TRANSITION
-# NOTE: a container manager cannot adopt HOST bot processes -- drain
-# any pre-container host fleet (poetry run tankpit-fleet-down from
-# its release folder) before the first containerized ``make up``, or
-# its spawn records on the shared runs/ volume will read as dead.
+# down-docker / image, 2026-09-02): one system, not two.
 #
-# WINDOWS-ONLY, and fenced as such: the release ladder lives at a Windows
-# path on the hub, and the fleet on sedona is operated from the hub,
-# which holds the tunnel token (~/.tankpit-secrets). The else arm refuses with the
-# reason so a Linux checkout gets an answer rather than a parse error.
-ifeq ($(OS),Windows_NT)
+# Each target drives the host over ssh, so it runs from any checkout that
+# can reach colossus; the host holds the tunnel token, the accounts and
+# the registry, and no recipe here reads a secret.
 release:
-	@Write-Host ""
-	@Write-Host "==> release (frozen runnable snapshot for the fleet)" -ForegroundColor Cyan
-	$$sha = (git rev-parse --short HEAD).Trim(); $$ver = (Select-String -Path pyproject.toml -Pattern 'version = .(\d+\.\d+\.\d+).').Matches[0].Groups[1].Value; $$dest = "C:\Users\Test\PROJECTS\tankpit-releases\v$$ver-$$sha"; if (Test-Path $$dest) { Write-Host "[release] $$dest already exists; nothing to do" -ForegroundColor Yellow } else { New-Item -ItemType Directory -Force $$dest | Out-Null; git -C ..\.. archive --format=zip HEAD clients/TankpitBot libs/platform_core libs/monorepo_guards -o "$$dest\snapshot.zip"; Expand-Archive "$$dest\snapshot.zip" -DestinationPath $$dest; Remove-Item "$$dest\snapshot.zip";Copy-Item accounts.json "$$dest\clients\TankpitBot\"; Copy-Item .env "$$dest\clients\TankpitBot\"; if (Test-Path data/tank_registry.json) { New-Item -ItemType Directory -Force "$$dest/clients/TankpitBot/data" | Out-Null; Copy-Item data/tank_registry.json "$$dest/clients/TankpitBot/data/" }; New-Item -ItemType Directory -Force "$$dest\clients\TankpitBot\runs" | Out-Null; Push-Location "$$dest\clients\TankpitBot"; poetry install --only main; Pop-Location; Write-Host "[release] built $$dest" -ForegroundColor Green; Write-Host "[release] activate: 'make down' then 'make up' -- up builds this release's image on first run" -ForegroundColor DarkGray }
+	@echo ""
+	@echo "==> release (freeze HEAD onto the game host's ladder)"
+	poetry run python -m scripts.fleet_release
 
 up:
-	@Write-Host ""
-	@Write-Host "==> up (the fleet on sedona: newest release, containerized, with its public edge)" -ForegroundColor Cyan
+	@echo ""
+	@echo "==> up (the fleet on the game host: newest release, containerized, with its public edge)"
 	poetry run python -m scripts.fleet_host up
 
 down:
-	@Write-Host ""
-	@Write-Host "==> down (drain every bot on sedona, then stop the container)" -ForegroundColor Cyan
+	@echo ""
+	@echo "==> down (drain every bot on the game host, then stop the container)"
 	poetry run python -m scripts.fleet_host down
 
-# The sim server on sedona (MCPs board task ff035b0d): started only by hand,
-# never on its own; scripts/sim_host.py says what it stages and why.
+# The sim server on the game host (MCPs board task ff035b0d): started only
+# by hand, never on its own; scripts/sim_host.py says what it stages and why.
 sim-up:
-	@Write-Host ""
-	@Write-Host "==> sim-up (the sim server on sedona, built from HEAD, on its loopback)" -ForegroundColor Cyan
+	@echo ""
+	@echo "==> sim-up (the sim server on the game host, built from HEAD, on its loopback)"
 	poetry run python -m scripts.sim_host up
 
 sim-down:
-	@Write-Host ""
-	@Write-Host "==> sim-down (stop the sim and its database on sedona; accounts are kept)" -ForegroundColor Cyan
+	@echo ""
+	@echo "==> sim-down (stop the sim and its database on the game host; accounts are kept)"
 	poetry run python -m scripts.sim_host down
-else
-release:
-	@echo "release is Windows-only (the release ladder is C:/Users/Test/PROJECTS/tankpit-releases on the hub)"
-	@exit 1
-
-up:
-	@echo "up is Windows-only (the fleet container is operated from the hub, where the release ladder lives)"
-	@exit 1
-
-down:
-	@echo "down is Windows-only (the fleet container is operated from the hub, where the release ladder lives)"
-	@exit 1
-
-sim-up:
-	@echo "sim-up is Windows-only (the sim is operated on sedona from the hub, which holds its secrets)"
-	@exit 1
-
-sim-down:
-	@echo "sim-down is Windows-only (the sim is operated on sedona from the hub, which holds its secrets)"
-	@exit 1
-endif

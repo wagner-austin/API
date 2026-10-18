@@ -6,12 +6,12 @@
 #
 # The FLEET (manager + N bot processes in ONE container — the spawner
 # forks `sys.executable -c` children, so it works unchanged inside)
-# runs on sedona, the game host, with its public edge beside it:
-#     make release              # freeze a runnable snapshot on the hub
-#     make up                   # scripts/fleet_host.py: stage this file,
-#                               # edge/ and the release's inputs on
-#                               # sedona, build the release's image
-#                               # there, compose up fleet + edge
+# runs on colossus, the game host, with its public edge beside it:
+#     make release              # freeze HEAD onto the host's release ladder
+#     make up                   # scripts/fleet_host.py: stage this file
+#                               # and edge/ on the host, build the
+#                               # release's image there, compose up
+#                               # fleet + edge
 #     make down                 # graceful drain (docker stop -> SIGTERM ->
 #                               # drain_on_interrupt; every bot quits to
 #                               # the lobby before the manager exits)
@@ -66,7 +66,7 @@ services:
       # the same numbers through the per-tick hud.json mirror.
       TANKPIT_HUD_OVERLAY: "false"
       # The operator's TV, for POST /tv/cast (tankpit_bot.service.tv):
-      # its DLNA AVTransport control URL on the home wifi sedona shares
+      # its DLNA AVTransport control URL on the home network the game host shares
       # (a Samsung UN50NU6900, found at 192.168.10.125 on 2026-10-17),
       # and the four-up stream's URL as the TV fetches it -- the public
       # edge, because the TV cannot reach this container.
@@ -202,8 +202,8 @@ services:
     # HTTP/2 to the edge, not QUIC: QUIC connections flapped on
     # 2026-09-17 on this host's neighbours while http2 tunnels held.
     command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "run", "--url", "http://public:80"]
-    # TUNNEL_TOKEN, staged from the hub's ~/.tankpit-secrets/edge.env by
-    # scripts/fleet_host.py and never committed.
+    # TUNNEL_TOKEN, the game host's own file beside this one, which
+    # scripts/fleet_host.py refuses to run without and nothing commits.
     env_file:
       - edge.env
     depends_on:
