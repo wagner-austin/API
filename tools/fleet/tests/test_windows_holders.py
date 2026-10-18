@@ -42,6 +42,9 @@ def test_the_restart_manager_session_is_ended_however_the_query_ends() -> None:
 
 
 def test_the_lines_filter_on_start_time_then_refuse_or_end_each_holder() -> None:
+    """Each lookup is a collection the step runs over, so a holder that exits
+    after the filter is skipped rather than failing the retire under strict
+    mode (sedona, 2026-10-18T20:29:43Z, MCPs board task 3d9eec0d)."""
     lines = end_holders_lines(path_variable="$Log")
     compiled = add_type_lines(HOLDERS_TYPE, HOLDERS_SOURCE)
 
@@ -50,16 +53,19 @@ def test_the_lines_filter_on_start_time_then_refuse_or_end_each_holder() -> None
         "$holders = @([FleetNode.FileHolders]::List($Log) | Where-Object { "
         "[FleetNode.FileHolders]::StartTimeOf($_.Pid) -eq $_.StartTime })",
         "foreach ($holder in $holders) {",
-        '    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($holder.Pid)"',
-        '    $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"',
-        "    if ($EndableTypes -notcontains $holder.AppType) {",
-        f'        throw "{HOLDER_PROTECTED}: $named, of Restart Manager type '
+        "    foreach ($process in @(Get-CimInstance Win32_Process "
+        '-Filter "ProcessId=$($holder.Pid)")) {',
+        '        $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"',
+        "        if ($EndableTypes -notcontains $holder.AppType) {",
+        f'            throw "{HOLDER_PROTECTED}: $named, of Restart Manager type '
         '$($holder.AppType), holds $Log"',
+        "        }",
+        "        foreach ($running in @(Get-Process | Where-Object { $_.Id -eq $holder.Pid })) {",
+        f'            Write-Output "{HOLDER_ENDED}: $named held $Log"',
+        "            Stop-Process -InputObject $running -Force",
+        "            $running.WaitForExit()",
+        "        }",
         "    }",
-        f'    Write-Output "{HOLDER_ENDED}: $named held $Log"',
-        "    $running = Get-Process -Id $holder.Pid",
-        "    Stop-Process -InputObject $running -Force",
-        "    $running.WaitForExit()",
         "}",
     )
 

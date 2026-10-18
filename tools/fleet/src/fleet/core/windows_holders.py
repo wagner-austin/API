@@ -186,7 +186,14 @@ def end_holders_lines(*, path_variable: str) -> tuple[str, ...]:
     A holder whose id no longer names a process started when Restart
     Manager said it did (``StartTimeOf`` answers 0 for an id nothing holds)
     has already let go and is filtered out; each one left is looked up in
-    ``Win32_Process`` for its image and command line. ``$EndableTypes`` is a
+    ``Win32_Process`` for its image and command line, then in the process
+    table to be ended, each lookup a collection the step runs over, so a
+    holder that exits after the filter has let go too and is neither
+    refused, printed nor ended. Until MCPs board task 3d9eec0d each lookup
+    was one value, and a holder gone by then made the retire fail on
+    ``$process.Name`` under strict mode: sedona's retire of
+    MCPs-fleet-mcp-sedona-1792355094 two seconds after its build ended, on
+    2026-10-18T20:29:43Z, left 75802 files. ``$EndableTypes`` is a
     parameter of the render, defaulting to :data:`ENDABLE_APP_TYPES`, so the
     Pester suite can make an ordinary holder read as protected.
 
@@ -208,16 +215,19 @@ def end_holders_lines(*, path_variable: str) -> tuple[str, ...]:
         f"$holders = @([{HOLDERS_TYPE}]::List({path_variable}) | Where-Object {{ "
         f"[{HOLDERS_TYPE}]::StartTimeOf($_.Pid) -eq $_.StartTime }})",
         "foreach ($holder in $holders) {",
-        '    $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($holder.Pid)"',
-        '    $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"',
-        "    if ($EndableTypes -notcontains $holder.AppType) {",
-        f'        throw "{HOLDER_PROTECTED}: $named, of Restart Manager type '
+        "    foreach ($process in @(Get-CimInstance Win32_Process "
+        '-Filter "ProcessId=$($holder.Pid)")) {',
+        '        $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"',
+        "        if ($EndableTypes -notcontains $holder.AppType) {",
+        f'            throw "{HOLDER_PROTECTED}: $named, of Restart Manager type '
         f'$($holder.AppType), holds {path_variable}"',
+        "        }",
+        "        foreach ($running in @(Get-Process | Where-Object { $_.Id -eq $holder.Pid })) {",
+        f'            Write-Output "{HOLDER_ENDED}: $named held {path_variable}"',
+        "            Stop-Process -InputObject $running -Force",
+        "            $running.WaitForExit()",
+        "        }",
         "    }",
-        f'    Write-Output "{HOLDER_ENDED}: $named held {path_variable}"',
-        "    $running = Get-Process -Id $holder.Pid",
-        "    Stop-Process -InputObject $running -Force",
-        "    $running.WaitForExit()",
         "}",
     )
 

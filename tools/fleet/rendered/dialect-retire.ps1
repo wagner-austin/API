@@ -149,15 +149,17 @@ if (Test-Path -LiteralPath $Log) {
     }
     $holders = @([FleetNode.FileHolders]::List($Log) | Where-Object { [FleetNode.FileHolders]::StartTimeOf($_.Pid) -eq $_.StartTime })
     foreach ($holder in $holders) {
-        $process = Get-CimInstance Win32_Process -Filter "ProcessId=$($holder.Pid)"
-        $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"
-        if ($EndableTypes -notcontains $holder.AppType) {
-            throw "FLEET_RETIRE_HOLDER_PROTECTED: $named, of Restart Manager type $($holder.AppType), holds $Log"
+        foreach ($process in @(Get-CimInstance Win32_Process -Filter "ProcessId=$($holder.Pid)")) {
+            $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"
+            if ($EndableTypes -notcontains $holder.AppType) {
+                throw "FLEET_RETIRE_HOLDER_PROTECTED: $named, of Restart Manager type $($holder.AppType), holds $Log"
+            }
+            foreach ($running in @(Get-Process | Where-Object { $_.Id -eq $holder.Pid })) {
+                Write-Output "FLEET_RETIRE_HOLDER_ENDED: $named held $Log"
+                Stop-Process -InputObject $running -Force
+                $running.WaitForExit()
+            }
         }
-        Write-Output "FLEET_RETIRE_HOLDER_ENDED: $named held $Log"
-        $running = Get-Process -Id $holder.Pid
-        Stop-Process -InputObject $running -Force
-        $running.WaitForExit()
     }
     Move-Item -Force -LiteralPath $Log -Destination $Retained
 }
