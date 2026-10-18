@@ -1,0 +1,14 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 10,
+  "required_tags": ["linux"],
+  "node": "diphtheria",
+  "exclusive_resources": ["corvis-phone-device-tests"],
+  "source": {
+    "remote": "https://github.com/wagner-austin/MCPs.git",
+    "path": "phone-companion/device-execution",
+    "install": [],
+    "companions": []
+  }
+}

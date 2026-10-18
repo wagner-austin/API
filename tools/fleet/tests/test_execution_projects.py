@@ -33,6 +33,52 @@ from fleet.contracts.workspace import decode_fleet_workspace, require_node, requ
 from tests._host import RUNNER_HOST_OPTION
 from tests._registry import shipped_document
 
+
+@pytest.mark.parametrize(
+    ("name", "directory", "tags"),
+    [
+        ("phone-device-execution", "phone-companion/device-execution", (NodeTag.LINUX,)),
+        ("phone-release-execution", "execution/phone", (NodeTag.LINUX, NodeTag.CXX)),
+    ],
+)
+def test_phone_lanes_use_the_declared_usb_route_and_serialize_device_access(
+    name: str, directory: str, tags: tuple[NodeTag, ...]
+) -> None:
+    """Actual Android execution and S23 release checks share one device lease.
+
+    Diphtheria's fleet SSH route reaches AustinPC's USB Pixel. AustinPC is
+    deliberately not made a fleet build node. The S23 subdirectory runs
+    execution's explicit phone config, so its build selects that parent npm
+    workspace rather than treating the subdirectory as a new package.
+    """
+    project = require_project(decode_fleet_workspace(shipped_document()), f"MCPs/{name}")
+    assert project["node"] == "diphtheria"
+    assert project["required_tags"] == tags
+    assert project["exclusive_resources"] == ("corvis-phone-device-tests",)
+    install = (
+        ()
+        if name == "phone-device-execution"
+        else (
+            InstallStep(phase="install", argv=("npm", "ci", "--ignore-scripts")),
+            InstallStep(
+                phase="workspace-build",
+                argv=(
+                    "node",
+                    "scripts/ci-build-consumed-workspaces.mjs",
+                    "execution",
+                ),
+            ),
+            InstallStep(phase="workspace-build", argv=("npm", "rebuild", "mcp-shared")),
+        )
+    )
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path=directory,
+        install=install,
+        companions=(),
+    )
+
+
 #: This package, whose recipe and roster the runner host's suite reads.
 PACKAGE: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parent.parent
 
