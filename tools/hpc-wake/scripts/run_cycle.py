@@ -46,6 +46,7 @@ task e6f2c511).
 
 from __future__ import annotations
 
+import datetime
 import os
 import pathlib
 import sys
@@ -413,8 +414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if log.exists() and log.stat().st_size > _LOG_LIMIT_BYTES:
         log.unlink()
 
-    now = _test_hooks.now()
-    stamp = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+    stamp = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     env = {**os.environ, **environment}
     outcomes: list[tuple[str, int]] = []
     ran: list[str] = []

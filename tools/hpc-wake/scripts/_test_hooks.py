@@ -1,16 +1,15 @@
 """Internal hooks for dependency injection (underscore = private).
 
-Two seams. The process runner the scheduled entry point hands the bridge
-command to: production binds :func:`_default_run_process`; tests rebind it
+One seam: the process runner the scheduled entry point hands the bridge
+command to. Production binds :func:`_default_run_process`; tests rebind it
 to a recording fake, which is how the entry point's own lines are covered
-without this suite ever posting to the board. And the clock,
-since 2026-09-21, because the tick now writes a health record carrying an
-instant, and a test asserting a stamp it cannot control asserts nothing.
+without this suite ever posting to the board. The clock seam beside it went
+with the health record it stamped (MCPs board task 6a2eb905): the log
+header is the one stamp left, and no test controls it.
 """
 
 from __future__ import annotations
 
-import datetime
 import pathlib
 import subprocess
 from collections.abc import Mapping, Sequence
@@ -100,22 +99,4 @@ def _default_run_process(
     )
 
 
-class Now(Protocol):
-    """The clock the tick stamps its log header and health record with."""
-
-    def __call__(self) -> datetime.datetime:
-        """Return the current instant, timezone-aware UTC."""
-        ...
-
-
-def _utc_now() -> datetime.datetime:
-    """Production's clock.
-
-    Returns:
-        The current instant, timezone-aware UTC.
-    """
-    return datetime.datetime.now(datetime.UTC)
-
-
 run_process: RunProcess = _default_run_process
-now: Now = _utc_now
