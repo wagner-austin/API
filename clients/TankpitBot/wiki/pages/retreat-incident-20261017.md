@@ -11,6 +11,8 @@ provenance:
   - "/home/corvis/tankpit-evidence-20261017/manifest.json: 20 files, 104395465 bytes; every size and SHA-256 reverified."
   - "Runtime API release 3888f06b22f5eea63d8e8cb5fe9934143ee7f392; tv-1 run bot-20261017-093852, tank 740 / Yuppler."
 source_paths:
+  - "src/tankpit_bot/sniffer/world_state_dispatch.py"
+  - "tests/sniffer/test_enemy_refuel_dispatch.py"
   - "src/tankpit_bot/state/fuel_confidence.py"
   - "src/tankpit_bot/state/tank_mutations.py"
   - "src/tankpit_bot/sniffer/world_state_tiles.py"
@@ -48,6 +50,8 @@ source_paths:
   - "src/tankpit_bot/fleetshare/report.py"
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
+  "src/tankpit_bot/sniffer/world_state_dispatch.py": "f3fcce75692cb5857b787b32e707376e4f6aabf8"
+  "tests/sniffer/test_enemy_refuel_dispatch.py": "c213cc0a1b1e5cfac1e84826a1824f891dc793d7"
   "src/tankpit_bot/state/fuel_confidence.py": "2e3b1301bd85c720fe70d94260b312fdf87e7f8a"
   "src/tankpit_bot/state/tank_mutations.py": "d3ab81a2cc867b75322a379a785c9cc00da810b9"
   "src/tankpit_bot/sniffer/world_state_tiles.py": "d636e4d712145a24e56fff37ce70b2c066487558"
@@ -55,7 +59,7 @@ source_git_blobs:
   "src/tankpit_bot/bot/ai/equipment_search.py": "b23f9cd58a5fb80f878e1f9a897dc348f760a647"
   "tests/world_state/test_fuel_confidence.py": "d6f8d98f1f3b92769f3edb1107aaa668d1ea7c80"
   "tests/bot/ai/test_suspect_fuel.py": "e50b3d842171809bc6525f35df63dc79dc51759f"
-  "src/tankpit_bot/sniffer/world_state_tanks.py": "52d730f73c82657055e931d2bf29d1e0648edbdf"
+  "src/tankpit_bot/sniffer/world_state_tanks.py": "89c0f3768535075e282b4d9b55b524c80768da3b"
   "src/tankpit_bot/sniffer/world_state_containers.py": "5db49ebf63ccd417658d6c29a39c01f6ee662a58"
   "src/tankpit_bot/analysis/scan.py": "808b553d59c0a4e80e0907c8fef7c28bf8843cbc"
   "src/tankpit_bot/container/decoders/events.py": "c2a81cd5ffe3b478915f5a5f2b85550bcf210577"
@@ -157,7 +161,7 @@ The October 19 correction implements a conservative local inference in `containe
 
 Walk candidate ranking, fuel-lock replacement, larder scoring and desperation-hop scoring prefer higher-confidence eligible fuel before their existing value/distance criteria. A sole suspect target remains eligible under the existing safety gates: partial enemy consumption is possible. Repeated viewport advertisements, fleet reports and synthetic known-resource radar refreshes retain suspicion. An explicit radar quantity or 0x43 remaining-volume correction restores confidence; an explicit zero removes the target. This does not change retreat exposure budgeting or assign an exact enemy transfer.[^17]
 
-Container receipt diagnostics now say “Container cleared” or “Container updated … fuel remains”, because the receipt identifies no collector. Regression tests cover the observed 580-fuel pattern, exclusions, repeated status, refresh authority, partial consumption, target ranking, held-lock preference and sole-target recovery. The correction is verified offline; it does not prove a particular alternate move would have survived, and no live restart is part of it.[^17]
+Container receipt diagnostics now say “Container cleared” or “Container updated … fuel remains”, because the receipt identifies no collector. Regression tests cover the observed 580-fuel pattern, exclusions, repeated status, refresh authority, partial consumption, target ranking, held-lock preference and sole-target recovery. The real 0x2E dispatcher now passes the reported enemy rank alongside its fuel tier; a dispatcher regression distinguishes unchanged-rank refueling from promotion. The correction is verified offline; it does not prove a particular alternate move would have survived, and no live restart is part of it.[^17]
 
 ## Confirmed control-flow gaps in release 3888f06b2
 

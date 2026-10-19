@@ -191,6 +191,7 @@ def update_world_state_from_tank_damage(
     ws: WorldService,
     tank_id: int,
     damage_state: int,
+    rank: int | None = None,
 ) -> None:
     """Update tank damage from a TankStatusSync (0x2E) wire message.
 
@@ -203,6 +204,7 @@ def update_world_state_from_tank_damage(
         ws: World service instance.
         tank_id: Tank whose damage tier is being synced.
         damage_state: New damage tier (0-3).
+        rank: Wire rank when the status includes it; absent fields preserve it.
     """
     previous = ws.world_state["tanks"].get(str(tank_id))
     if previous is None:
@@ -214,6 +216,7 @@ def update_world_state_from_tank_damage(
         storage_source=previous["source"],
         fact_source=FactSource.WIRE_0X2E_TANK_STATUS_SYNC,
         damage_state=damage_state,
+        rank=rank,
     )
     ws.world_state = apply_tank_observation(ws.world_state, obs)
     if previous["damage_state"] != damage_state:

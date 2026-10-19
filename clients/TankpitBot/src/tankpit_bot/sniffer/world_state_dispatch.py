@@ -178,7 +178,7 @@ def _dispatch_tank_state(ws: WorldService, decoded: protocol.BinaryMessage) -> b
             "promo_state": int(promo),
             "rank": int(rank),
         }:
-            update_world_state_from_tank_damage(ws, tid, dmg)
+            update_world_state_from_tank_damage(ws, tid, dmg, rank)
             # promo_state is a live promotion-PROGRESS counter (JS
             # Og.h ``g`` field): it climbs with damage dealt and
             # RESETS to 0 at the promoting kill, at which tick the
