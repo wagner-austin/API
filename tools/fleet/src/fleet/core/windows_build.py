@@ -30,6 +30,7 @@ from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
     POETRY_KEYRING_OFF,
+    REGISTRY_VARIABLE,
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import PHASE_MARKER
@@ -195,6 +196,7 @@ def build_script(
         f"$env:{AGENT_LABEL_VARIABLE} = '{label}'",
         f"$env:{CACHE_VARIABLE} = $CacheRoot",
         f"$env:{WORKSPACE_VARIABLE} = '{scriptable(path or '.', label='workspace')}'",
+        f'$env:{REGISTRY_VARIABLE} = "{names.registry_directory("$Target")}"',
         '$env:PATH = "$GitBin;$env:PATH"',
         "function Invoke-Logged {",
         "    param([string]$Shell, [string]$Command)",

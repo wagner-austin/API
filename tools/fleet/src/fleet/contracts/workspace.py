@@ -33,12 +33,8 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import (
-    NodeConfig,
-    NodePlatform,
-    decode_node_config,
-    encode_node_config,
-)
+from fleet.contracts.machine import Machine, decode_machine, encode_machine
+from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.pins import check_pinned_nodes
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
@@ -62,21 +58,20 @@ class FleetWorkspace(TypedDict):
     """Everything a fleet command needs that is not on the command line.
 
     Attributes:
-        nodes: The machines that may be dispatched to, keyed by the name a
-            command's ``--node`` takes. The key is the workspace's name for
-            the machine and ``NodeConfig.host`` is its SSH alias; they are
-            usually the same string and are deliberately separate fields, so
-            renaming a node in the workspace does not require the ssh config
-            to agree.
-        not_dispatchable: Machines this workspace deliberately will NOT
-            dispatch to, keyed by their registry name, each carrying why.
-            SILENCE IS NOT A DECISION, which is the whole reason this field
-            exists: a machine simply absent from ``nodes`` is
-            indistinguishable from one nobody has got round to adding, and
-            ``austinpc`` -- the hub the dispatcher itself runs on, enabled
-            and 24-core in the identity registry -- had been reading as both
-            for weeks. Named here, its absence becomes a claim the drift
-            check can honour; absent from both, it is drift.
+        machines: Every machine of the fleet, the roster's one file each
+            (:mod:`fleet.contracts.machine`, MCPs board task e447de72),
+            keyed by name.
+        nodes: The machines that declare what dispatch may take from them,
+            keyed by the name a command's ``--node`` takes, which is also
+            ``NodeConfig.host``, the machine's SSH alias. Read from
+            :attr:`machines`, never declared apart from them.
+        not_dispatchable: The machines whose runners claim no work by
+            decision, each carrying why: a machine whose ``dispatch`` is a
+            reason, and a declared node whose dispatch is held. SILENCE IS
+            NOT A DECISION: ``austinpc``, the hub the dispatcher ran on,
+            enabled and 24-core, read for weeks as both excluded and
+            forgotten, and a roster file cannot leave ``dispatch`` out, so
+            every machine says which.
         projects: The work that may be dispatched, keyed by repo-relative
             path.
         data_paths: Per repository, keyed by the remote its projects declare,
@@ -139,6 +134,7 @@ class FleetWorkspace(TypedDict):
         leases: Path to the live lease file. The only mutable one.
     """
 
+    machines: dict[str, Machine]
     nodes: dict[str, NodeConfig]
     not_dispatchable: dict[str, str]
     projects: dict[str, ProjectConfig]
@@ -210,11 +206,13 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         workspace: The workspace to encode.
 
     Returns:
-        JSON-serialisable mapping carrying every field.
+        JSON-serialisable mapping carrying every field, the machines as
+        :func:`fleet.contracts.machine.encode_machine` writes them.
     """
     return {
-        "nodes": {name: encode_node_config(node) for name, node in workspace["nodes"].items()},
-        "not_dispatchable": dict(workspace["not_dispatchable"]),
+        "machines": {
+            name: encode_machine(machine) for name, machine in workspace["machines"].items()
+        },
         "projects": {
             path: encode_project_config(project) for path, project in workspace["projects"].items()
         },
@@ -289,58 +287,6 @@ def _decode_node_local_resources(
                 f"exclusive_resources; a misspelt name would leave the real one fleet-wide"
             )
     return names
-
-
-def _decode_not_dispatchable(value: JSONObject, nodes: dict[str, NodeConfig]) -> dict[str, str]:
-    """Read the deliberate exclusions, refusing an empty or contradicted one.
-
-    THE REASON IS REQUIRED AND MAY NOT BE BLANK. An exclusion whose reason is
-    an empty string carries no more than absence did, which is the thing this
-    field exists to stop being ambiguous. The next reader has to be able to
-    tell "we decided against this machine, here is why" from "nobody has got
-    round to it".
-
-    A DISABLED NODE MAY CARRY ITS REASON HERE. A node that stays declared
-    because something else reads its declaration (lavender, the ``wsl_host``
-    of lavender-wsl, retired from Windows dispatch on 2026-09-29 by MCPs
-    board task 7e467416) and sets ``enabled: false`` says the same thing as
-    its exclusion, and the reason is what lets the registry reconciliation
-    (:func:`fleet.core.registry.compare`) tell that decision from capacity
-    nobody is using. Only an ENABLED node named here is a contradiction.
-
-    Args:
-        value: The workspace object.
-        nodes: The already-decoded dispatch targets.
-
-    Returns:
-        Machine name to why this workspace will not dispatch to it. Empty is
-        allowed -- a fleet that excludes nothing is a real answer, unlike a
-        fleet that declares no nodes.
-
-    Raises:
-        JSONTypeError: If the field is missing, is not an object, a reason is
-            not a non-empty string, or a name is BOTH declared as an enabled
-            node and excluded. That last one is a document that says two
-            opposite things, and picking either would be a guess.
-    """
-    declared = require_dict(value, "not_dispatchable")
-    excluded: dict[str, str] = {}
-    for name in sorted(declared):
-        reason = require_str(declared, name)
-        if not reason:
-            raise JSONTypeError(
-                f"not_dispatchable[{name!r}] has an empty reason. An exclusion with no reason "
-                "says no more than leaving the machine out entirely, which is the ambiguity "
-                "this field exists to remove."
-            )
-        if name in nodes and nodes[name]["enabled"]:
-            raise JSONTypeError(
-                f"{name!r} is declared both as an enabled node and as not_dispatchable. "
-                "The workspace says two opposite things about the same machine and neither "
-                "reading is safe to pick."
-            )
-        excluded[name] = reason
-    return excluded
 
 
 def _decode_node_serve_seconds(value: JSONObject) -> int:
@@ -491,11 +437,11 @@ def _check_wsl_hosts(nodes: dict[str, NodeConfig]) -> dict[str, NodeConfig]:
         declared = nodes.get(host)
         if declared is None:
             raise JSONTypeError(
-                f"nodes[{name!r}].wsl_host names {host!r}, which is not a node of this workspace"
+                f"machines[{name!r}].guest names {host!r}, which declares no dispatch capacity"
             )
         if declared["platform"] is not NodePlatform.WINDOWS:
             raise JSONTypeError(
-                f"nodes[{name!r}].wsl_host names {host!r}, a {declared['platform'].value} node; "
+                f"machines[{name!r}].guest names {host!r}, a {declared['platform'].value} node; "
                 "only a windows node runs WSL"
             )
     return nodes
@@ -530,18 +476,33 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, the node or project mapping is empty, a machine is both
-            declared and excluded, a node-local resource is declared by no
-            project, a node's ``wsl_host`` is not another Windows node, a
+            mistyped, the machine or project mapping is empty, no machine
+            declares capacity, a machine fails
+            :func:`fleet.contracts.machine.decode_machine`, a node-local
+            resource is declared by no project, a node's ``wsl_host`` is not
+            another Windows node, a
             project is pinned to a node it cannot match, the
             node serve or poll lies outside its bounds, or a node or project fails
             its own decoder.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"workspace must be a JSON object, got {type(value).__name__}")
+    machines = {
+        name: decode_machine(name, machine)
+        for name, machine in _decode_named(value, "machines").items()
+    }
     nodes = _check_wsl_hosts(
-        {name: decode_node_config(node) for name, node in _decode_named(value, "nodes").items()}
+        {
+            name: node
+            for name, machine in machines.items()
+            if (node := machine["dispatch"]) is not None
+        }
     )
+    if not nodes:
+        raise JSONTypeError(
+            "no machine declares what dispatch may take from it; the workspace could dispatch "
+            "nothing, and every command would fail naming an empty list"
+        )
     projects = check_pinned_nodes(
         {
             path: decode_project_config(project)
@@ -550,8 +511,13 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         nodes,
     )
     return FleetWorkspace(
+        machines=machines,
         nodes=nodes,
-        not_dispatchable=_decode_not_dispatchable(value, nodes),
+        not_dispatchable={
+            name: held
+            for name, machine in machines.items()
+            if (held := machine["held"]) is not None
+        },
         projects=projects,
         data_paths=_decode_data_paths(value, projects),
         node_local_resources=_decode_node_local_resources(value, projects),

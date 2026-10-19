@@ -27,7 +27,6 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import narrow_json_to_dict
 
 from fleet.cli import _config, run
 from fleet.contracts.budget import NodeBudget
@@ -36,6 +35,7 @@ from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.node_choice import Unassessed, first_fit
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document, machines_of
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -200,7 +200,7 @@ class TestFirstFitWeighsWhatAnswered:
         """NOTHING FAILED HERE. Every node is switched off in the workspace,
         so no ssh was sent and no machine declined to answer. Calling that
         NODE_UNREACHABLE sends the reader to the tailnet to debug a network
-        that is fine, when the fix is one boolean in registry/nodes.json."""
+        that is fine, when the fix is one boolean in a registry/machines file."""
         with pytest.raises(AppError) as excinfo:
             first_fit(
                 (),
@@ -300,11 +300,7 @@ class TestAnAsleepNodeDoesNotBlockADispatch:
         _test_hooks.now = FakeClock(DEMO_NOW)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         document = workspace_document()
-        nodes = narrow_json_to_dict(document["nodes"])
-        asleep = dict(narrow_json_to_dict(nodes["lavender"]))
-        asleep["host"] = "asleep"
-        nodes["asleep"] = asleep
-        document["nodes"] = nodes
+        machines_of(document)["asleep"] = machine_document()
         return write_registry(tmp_path / "registry", document)
 
     def test_the_dispatch_lands_on_the_node_that_is_awake(
@@ -317,7 +313,7 @@ class TestAnAsleepNodeDoesNotBlockADispatch:
             [
                 ok(""),  # asleep: send probe script
                 failed(255, "bad handshake"),  # asleep: ssh dies
-                *dispatch_replies(staging.digest(payload)),  # lavender takes it
+                *dispatch_replies(staging.digest(payload), two_node_config),  # lavender takes it
             ]
         )
 

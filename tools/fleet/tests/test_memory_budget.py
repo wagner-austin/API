@@ -80,7 +80,7 @@ def test_the_measured_split_of_the_afternoon_is_refused_naming_all_four_numbers(
     assert budget_gaps(workspace, _runners()) == (
         "lavender-wsl: CI slice 18 GB + reservation 12.0 GB + smallest job 0.25 GB is 30.25 "
         "GB, past its 25.4 GB, so while CI holds its cap the node can never dispatch; lower "
-        "the reservation in registry/nodes.json or the slice in runners.json",
+        "the reservation in registry/machines/lavender-wsl.json or the slice in runners.json",
     )
 
 

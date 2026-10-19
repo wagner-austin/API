@@ -1,4 +1,11 @@
 {
+  "identity": {
+    "sshKeyFingerprint": "SHA256:XN+1LW4Tf+WXX/YnINDKMFre473JdevA1C8bpIzdPsA",
+    "sshPublicKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKamcwpPoJspU8l3rNMwrCCegSs85JuKiH8I2zyFGdX8",
+    "cloudflareZone": "austinwagner.org",
+    "cloudflareAccountId": "d76ad248be178064b3a366d6add72e62",
+    "uciVpnProfileSha256": "b707fffa842ff7e8460c4a73a75323ff84f1f0d8af59662129b2a201fee7ecf9"
+  },
   "node_local_resources": [
     "corvis-fleet-testdb"
   ],

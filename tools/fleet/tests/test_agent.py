@@ -37,6 +37,7 @@ from tests._agent_cli import agent_argv, sessions_argv
 from tests._hub_tick import UNROLLED, UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document, machine_of, machines_of
 from tests.conftest import FakeRun, failed, ok, workspace_document
 
 #: The board's variables for the observe pass, with the url overridden so
@@ -121,31 +122,32 @@ class TestTheSessionsLane:
 
         assert endpoint.tools == []
 
-    @pytest.mark.parametrize(
-        ("extra", "named"),
-        [
-            ([agent.REGISTRY_FLAG, "fleet-nodes.json"], "--registry"),
-            ([agent.MCPS_ROOT_FLAG, "MCPs"], "--mcps-root"),
-            (
-                [agent.MCPS_ROOT_FLAG, "MCPs", agent.REGISTRY_FLAG, "fleet-nodes.json"],
-                "--mcps-root or --registry",
-            ),
-        ],
-    )
-    def test_a_sessions_tick_refuses_the_hub_passes_flags(
-        self, config_path: pathlib.Path, repo: pathlib.Path, extra: list[str], named: str
+    def test_a_sessions_tick_refuses_the_hub_passes_flag(
+        self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 
         with pytest.raises(ValueError) as refused:
-            agent.main([*sessions_argv(config_path, repo, "ziggurat"), *extra])
+            agent.main(
+                [*sessions_argv(config_path, repo, "ziggurat"), agent.MCPS_ROOT_FLAG, "MCPs"]
+            )
 
         assert str(refused.value) == (
-            f"FLEET_AGENT_USAGE: the sessions lane takes no {named}; only a hub tick "
-            "publishes and observes"
+            "FLEET_AGENT_USAGE: the sessions lane takes no --mcps-root; only a hub tick "
+            "rebuilds the bases"
         )
         assert endpoint.tools == []
+
+    def test_the_identity_registry_flag_is_gone(
+        self, config_path: pathlib.Path, repo: pathlib.Path
+    ) -> None:
+        """The machines are the registry's own (MCPs board task e447de72), so
+        a tick naming MCPs' old roster is refused as unknown, not ignored."""
+        _test_hooks.http_post = FakeQueue([])
+
+        with pytest.raises(ValueError, match="unknown argument '--registry'"):
+            agent.main([*agent_argv(config_path, repo), "--registry", "fleet-nodes.json"])
 
     @pytest.mark.parametrize("word", ["node", "hub-announce", ""])
     def test_a_lane_this_runner_does_not_claim_is_refused(self, word: str) -> None:
@@ -194,12 +196,12 @@ class TestCredentialsAndEntryPoint:
         still read: a runner whose registry does not decode has no business
         claiming, and the node runners beside it read the same registry."""
         document = workspace_document()
-        document["nodes"] = {}
+        machine_of(document, "lavender")["dispatch"] = "never dispatched to"
         broken = write_registry(tmp_path / "registry", document)
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
 
-        with pytest.raises(JSONTypeError, match="workspace declares no nodes"):
+        with pytest.raises(JSONTypeError, match="no machine declares what dispatch may take"):
             agent.main(agent_argv(broken, repo))
 
         assert endpoint.tools == []
@@ -322,58 +324,27 @@ class TestAnnounce:
 
 
 def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Write an identity registry with one worker and the hub, as the real file
-    is shaped.
+    """Write a registry whose roster holds a hub, a worker that sleeps, and one to observe.
 
     Args:
         tmp_path: pytest's per-test temporary directory.
 
     Returns:
-        The registry's path.
+        The registry's directory.
     """
-    path = tmp_path / "fleet-nodes.json"
-    path.write_text(
-        dump_json_str(
-            {
-                "nodes": [
-                    {
-                        "name": "austinpc",
-                        "role": "hub",
-                        "user": "Test",
-                        "enabled": True,
-                        "platform": "windows",
-                        "gpu": {
-                            "probe": "nvidia-smi",
-                            "measured": "2026-09-20",
-                            "adapter": "NVIDIA GeForce RTX 3090 Ti",
-                            "vramMib": 24564,
-                            "driver": "591.86",
-                        },
-                        "test_database": False,
-                    },
-                    {
-                        "name": "serendipity",
-                        "role": "worker",
-                        "user": "austi",
-                        "enabled": True,
-                        "platform": "windows",
-                        "gpu": None,
-                        "test_database": False,
-                    },
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-    return path
+    document = workspace_document()
+    machines = machines_of(document)
+    machines["austinpc"] = machine_document(role="hub", dispatch="the hub")
+    machines["serendipity"] = machine_document(role="worker", dispatch="observed only")
+    machine_of(document, "lavender")["enabled"] = False
+    return write_registry(tmp_path / "observed", document)
 
 
 class TestObservingSessions:
     """The second pass: the fleet's Claude Code sessions into the board's ledger."""
 
-    def test_a_registry_makes_the_tick_walk_the_workers_after_the_queue_work(
+    def test_the_tick_walks_the_rosters_workers_after_the_queue_work(
         self,
-        config_path: pathlib.Path,
         repo: pathlib.Path,
         tmp_path: pathlib.Path,
         caplog: pytest.LogCaptureFixture,
@@ -384,12 +355,7 @@ class TestObservingSessions:
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
-            assert (
-                agent.main(
-                    [*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))]
-                )
-                == 0
-            )
+            assert agent.main(agent_argv(_registry(tmp_path), repo)) == 0
 
         # The queue pass ran, the hub was skipped, the one worker was asked
         # and its silence was logged as an outcome rather than raised.
@@ -403,7 +369,7 @@ class TestObservingSessions:
         ]
 
     def test_a_worker_that_answers_is_recorded_on_the_board(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+        self, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun(
@@ -431,15 +397,18 @@ class TestObservingSessions:
         )
         _test_hooks.http_post = endpoint
 
-        agent.main([*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))])
+        agent.main(agent_argv(_registry(tmp_path), repo))
 
         assert endpoint.tools == ["dispatch_claim", "task_session_observe"]
         assert endpoint.arguments[1]["machine"] == "win32:serendipity"
         assert endpoint.arguments[1]["agent"] == "fleet-hub-austinpc"
 
-    def test_without_a_registry_the_tick_says_so_and_touches_no_node(
+    def test_a_roster_with_nothing_to_observe_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
+        """The shared roster's one machine is a hub, which pcsession-mcp
+        observes on its own mount, so no node is asked and the board's key,
+        unset here, is never read."""
         run = FakeRun([*UNROLLED_TICK])
         _test_hooks.run = run
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
@@ -454,7 +423,10 @@ class TestObservingSessions:
         assert run.calls == [*unrolled_calls(repo)]
         assert endpoint.tools == ["dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
-        assert "session observation skipped: no --registry given" in messages
+        assert (
+            "observed no session: none of the roster's 1 machine(s) is an enabled worker, "
+            "vpn-jump or session host"
+        ) in messages
         assert "hub lane empty" in messages
         assert any(
             message.startswith("published nothing: FLEET_ROLL_REF_UNRESOLVED: ")
@@ -466,7 +438,7 @@ class TestObservingSessions:
         )
 
     def test_the_board_key_is_required_only_once_the_queue_work_is_done(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+        self, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         """The two secrets are different containers' keys. A tick refused
         for the board's before the queue pass ran would stall dispatch on a
@@ -476,9 +448,7 @@ class TestObservingSessions:
         _test_hooks.http_post = endpoint
 
         with pytest.raises(AppError) as raised:
-            agent.main(
-                [*agent_argv(config_path, repo), agent.REGISTRY_FLAG, str(_registry(tmp_path))]
-            )
+            agent.main(agent_argv(_registry(tmp_path), repo))
 
         assert raised.value.code is BoardWatchErrorCode.API_KEY_MISSING
         assert endpoint.tools == ["dispatch_claim"]

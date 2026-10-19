@@ -182,9 +182,11 @@ class TestTheToolTagsAClaimCarries:
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
             "lavender (lavender) declares gpu none but nvidia-smi reports 'NVIDIA GeForce GTX "
-            "1630, 7.5', so it claims with the gpu tag; correct gpu in registry/nodes.json",
+            "1630, 7.5', so it claims with the gpu tag; correct gpu in its registry/machines "
+            "file",
             "lavender (lavender) declares cxx none but its probe reports cxx '17.14.37710.0', so "
-            "it claims with the cxx tag; set cxx to '17.14.37710.0' in registry/nodes.json",
+            "it claims with the cxx tag; set cxx to '17.14.37710.0' in its registry/machines "
+            "file",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,

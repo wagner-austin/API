@@ -127,7 +127,9 @@ class TestTheFailure:
         self, sourced_config: pathlib.Path
     ) -> None:
         payload = prebuilt_export(sourced_config)
-        _test_hooks.run = FakeRun(claim_replies(staging.digest(payload), commit_present=True))
+        _test_hooks.run = FakeRun(
+            claim_replies(staging.digest(payload), registry=sourced_config, commit_present=True)
+        )
         claimed = queue_job(status="claimed", taskId=VERDICT_TASK)
         queue = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": claimed})])
         # Calls 0 to 2 are the list, the claim and the tick's record; 3 is

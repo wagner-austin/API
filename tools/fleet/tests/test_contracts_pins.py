@@ -2,7 +2,7 @@
 
 MCPs' served lanes each name the search host whose own container they read,
 so the key must survive encoding, be absent for every other project, and
-name a node the workspace declares under its own host.
+name a node the workspace declares, whose host is that name.
 """
 
 from __future__ import annotations
@@ -61,10 +61,12 @@ def test_a_project_pinned_to_an_undeclared_node_is_refused() -> None:
     )
 
 
-def test_a_pin_to_a_node_whose_host_is_another_name_is_refused() -> None:
-    """capacity.assess matches the pin against the weighing node's host."""
+def test_a_pinned_node_s_host_is_the_name_it_is_pinned_by() -> None:
+    """capacity.assess matches the pin against the weighing node's host,
+    which is the machine file's name, so every declared pin matches."""
     encoded = encode_fleet_workspace(_workspace())
     pinned = {**encode_project_config(_project()), "node": "loki"}
 
-    with pytest.raises(JSONTypeError, match="pinned to node 'loki', whose host is 'lavender'"):
-        decode_fleet_workspace({**encoded, "projects": {"MCPs/served": pinned}})
+    decoded = decode_fleet_workspace({**encoded, "projects": {"MCPs/served": pinned}})
+
+    assert decoded["nodes"]["loki"]["host"] == "loki"

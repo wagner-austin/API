@@ -9,7 +9,7 @@ worker. Every tick answered ``NODE_OWNER_RESERVED`` from 17:15Z, and the
 testdb queue stood still with twelve rows, by declaration rather than by
 load.
 
-The two numbers live in two files (``runners.json`` and ``registry/nodes.json``) and
+The two numbers live in two files (``runners.json`` and ``registry/machines``) and
 were each reasonable alone. This is the check that reads both: for every
 node, the CI slice its host may run inside the node (none unless the node's
 ``wsl_host`` is a runners.json host with a slice), plus the node's
@@ -88,7 +88,7 @@ def budget_gaps(workspace: FleetWorkspace, runners: RunnerSpec) -> tuple[str, ..
                 f"{name}: CI slice {cap} GB + reservation {reserved:.1f} GB + smallest job "
                 f"{job:.2f} GB is {cap + reserved + job:.2f} GB, past its {node['ram_gb']:.1f} "
                 "GB, so while CI holds its cap the node can never dispatch; lower the "
-                "reservation in registry/nodes.json or the slice in runners.json"
+                f"reservation in registry/machines/{name}.json or the slice in runners.json"
             )
     return tuple(gaps)
 

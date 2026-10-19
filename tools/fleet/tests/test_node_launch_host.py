@@ -42,6 +42,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_RUN_ID, PROBE_OK, FakeRun, ok
 
@@ -71,10 +72,7 @@ def _one_check_at_once(config_path: pathlib.Path) -> None:
     """
     document = read_workspace_document(config_path)
     assert isinstance(document, dict)
-    nodes = document["nodes"]
-    assert isinstance(nodes, dict)
-    lavender = nodes["lavender"]
-    assert isinstance(lavender, dict)
+    lavender = dispatch_of(document, "lavender")
     budget = lavender["budget"]
     assert isinstance(budget, dict)
     lavender["elevated"] = True
@@ -169,7 +167,7 @@ class TestTwoRunnersOfOneHost:
         release = threading.Event()
         _test_hooks.run = ThreadRoutedRun(
             claims=FakeRun([*PROBED, *ELEVATED_PROBED, *ELEVATED_PROBED, *ELEVATED_PROBED]),
-            launches=FakeRun(launch_steps(digest, commit_present=True)),
+            launches=FakeRun(launch_steps(digest, registry=sourced_config, commit_present=True)),
             release=release,
         )
         claims = FakeQueue(

@@ -1,0 +1,20 @@
+{
+  "role": "client",
+  "platform": "linux",
+  "user": null,
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "none",
+  "tailnetIp": "100.70.221.33",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Android phone (Termux). A client of the fleet, never a target of provisioning. ENABLED 2026-09-15 on the operator's word, correcting a row that read false while the phone was the most active device on the tailnet. `enabled` is INERT for this role and flipping it probes nothing: audit.ts filters `role !== \"client\"` before it builds its target list, and the role table in README.md gives client `no` at step 8. So this field is documentation here, not a switch, and it should say what is true — a false row invited the reading that the phone was off.",
+  "dispatch": "An Android phone in Termux. A client of the fleet and never a target: it submits dispatches, it does not run them. Named here rather than left silent because that is a permanent decision, not a machine waiting to be onboarded."
+}

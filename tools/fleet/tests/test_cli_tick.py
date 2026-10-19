@@ -94,8 +94,6 @@ class TestTheLanes:
                 "hub",
                 "--mcps-root",
                 str(mcps),
-                "--registry",
-                str(mcps / "fleet-mcp" / "fleet-nodes.json"),
             ),
             stem="fleet-agent",
             header="hub",

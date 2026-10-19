@@ -13,8 +13,8 @@
         "driver_version": "551.23"
       },
       "budget": {
-        "reserved_cores": 4,
-        "reserved_ram_gb": 4.0,
+        "reserved_cores": 2,
+        "reserved_ram_gb": 1.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
         "checks_at_once": null,
@@ -66,8 +66,8 @@
       "ram_gb": 31.0,
       "gpu": null,
       "budget": {
-        "reserved_cores": 4,
-        "reserved_ram_gb": 6.0,
+        "reserved_cores": 2,
+        "reserved_ram_gb": 1.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
         "checks_at_once": 1,
@@ -148,8 +148,8 @@
       "ram_gb": 15.7,
       "gpu": null,
       "budget": {
-        "reserved_cores": 4,
-        "reserved_ram_gb": 4.0,
+        "reserved_cores": 2,
+        "reserved_ram_gb": 1.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
         "checks_at_once": 1,
@@ -172,8 +172,8 @@
       "ram_gb": 11.7,
       "gpu": null,
       "budget": {
-        "reserved_cores": 8,
-        "reserved_ram_gb": 2.5,
+        "reserved_cores": 2,
+        "reserved_ram_gb": 1.5,
         "worker_ram_gb": 1.1,
         "max_disk_gb": 40.0,
         "checks_at_once": null,

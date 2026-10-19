@@ -19,13 +19,13 @@ import pytest
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import node_agent
-from fleet.contracts.node import encode_node_config
 from fleet.contracts.project import encode_project_config
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_document
 from tests._queue_fakes import FakeQueue
 from tests._registry import shipped_document, write_registry
+from tests._roster_fixtures import machine_of
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, FakeRun, ok
 
@@ -36,7 +36,7 @@ __all__ = ["_credentials_in_env"]
 GRANDMA = "services/grandma-api"
 WAITING = ("libs/platform_core", "tools/fleet", "tools/maketools")
 
-#: pendragon with room for a run: 9.0 GB free of its 11.7 against its 2.5 GB
+#: pendragon with room for a run: 9.0 GB free of its 11.7 against its 1.5 GB
 #: owner reservation.
 PENDRAGON_ROOM = "free_ram_gb=9.0\nfree_disk_gb=400.0\nreserved_cores=0\n"
 
@@ -51,9 +51,10 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    real = decode_fleet_workspace(shipped_document())
+    shipped = shipped_document()
+    real = decode_fleet_workspace(shipped)
     document = sourced_document((NPM_CI,))
-    document["nodes"] = {"pendragon": encode_node_config(real["nodes"]["pendragon"])}
+    document["machines"] = {"pendragon": machine_of(shipped, "pendragon")}
     projects = document["projects"]
     assert isinstance(projects, dict)
     for name in (GRANDMA, *WAITING):

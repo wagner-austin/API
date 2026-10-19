@@ -41,7 +41,6 @@ STAND_IN_FILES: dict[str, str] = {
     "libs/platform_core/src/platform_core/__init__.py": "",
     "libs/monorepo_guards/src/monorepo_guards/__init__.py": "",
     "tools/board-watch/src/board_watch/__init__.py": "",
-    "tools/fleet/registry/nodes.json": "{}\n",
     "tools/fleet/registry/settings.json": "{}\n",
 }
 

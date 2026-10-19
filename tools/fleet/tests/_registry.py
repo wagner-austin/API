@@ -15,9 +15,9 @@ from typing import Final
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.core.workspace_files import (
-    NODES_FILE,
-    NODES_KEYS,
-    PROJECT_SUFFIX,
+    JSON_SUFFIX,
+    MACHINES_DIRECTORY,
+    MACHINES_KEY,
     PROJECTS_DIRECTORY,
     PROJECTS_KEY,
     SETTINGS_FILE,
@@ -57,28 +57,29 @@ def write_registry(directory: pathlib.Path, document: JSONObject) -> pathlib.Pat
 
     Args:
         directory: Where the registry goes; created, or replaced.
-        document: A workspace document, split as the shipped registry is: its
-            node keys to ``nodes.json``, each project to its own file, and the
-            rest to ``settings.json``.
+        document: A workspace document, split as the shipped registry is:
+            each machine to its own file, each project to its own file, and
+            the rest to ``settings.json``.
 
     Returns:
         The directory, ready to pass as ``--config``.
 
     Raises:
-        TypeError: When ``document``'s projects are not an object.
+        TypeError: When ``document``'s machines or projects are not an object.
     """
-    projects = document[PROJECTS_KEY]
-    if not isinstance(projects, dict):
-        raise TypeError(f"projects must be an object, got {type(projects).__name__}")
     if directory.exists():
         shutil.rmtree(directory)
-    _write(directory / NODES_FILE, {k: v for k, v in document.items() if k in NODES_KEYS})
+    split = ((MACHINES_KEY, MACHINES_DIRECTORY), (PROJECTS_KEY, PROJECTS_DIRECTORY))
+    for key, subdirectory in split:
+        named = document[key]
+        if not isinstance(named, dict):
+            raise TypeError(f"{key} must be an object, got {type(named).__name__}")
+        for name, entry in named.items():
+            _write(directory / subdirectory / f"{name}{JSON_SUFFIX}", entry)
     _write(
         directory / SETTINGS_FILE,
-        {k: v for k, v in document.items() if k not in NODES_KEYS and k != PROJECTS_KEY},
+        {k: v for k, v in document.items() if k not in (MACHINES_KEY, PROJECTS_KEY)},
     )
-    for key, entry in projects.items():
-        _write(directory / PROJECTS_DIRECTORY / f"{key}{PROJECT_SUFFIX}", entry)
     return directory
 
 

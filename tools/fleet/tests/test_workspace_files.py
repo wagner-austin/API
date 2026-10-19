@@ -39,8 +39,7 @@ def _document() -> JSONObject:
         A fresh document.
     """
     return {
-        "nodes": {"sedona": {"marker": "node"}},
-        "not_dispatchable": {},
+        "machines": {"sedona": {"marker": "machine"}},
         "ledger": "runs/ledger.jsonl",
         "projects": dict(PROJECTS),
     }
@@ -58,9 +57,12 @@ def test_the_shipped_registry_assembles_into_a_workspace_that_decodes() -> None:
         == len(list((SHIPPED_REGISTRY / "projects").rglob("*.json")))
     )
     assert "MCPs/packages/wiki-check" in workspace["projects"]
+    assert sorted(workspace["machines"]) == sorted(
+        path.stem for path in (SHIPPED_REGISTRY / "machines").glob("*.json")
+    )
     assert set(document) - {"projects"} == {
-        "nodes",
-        "not_dispatchable",
+        "machines",
+        "identity",
         "node_local_resources",
         "data_paths",
         "node_serve_seconds",
@@ -80,8 +82,10 @@ def test_every_shipped_registry_file_is_at_most_six_hundred_lines() -> None:
         if path.is_file()
     }
 
-    assert {"nodes.json", "settings.json"} < set(lines)
-    assert len(lines) == 2 + len(list((SHIPPED_REGISTRY / "projects").rglob("*.json")))
+    named = [*(SHIPPED_REGISTRY / "machines").glob("*.json")]
+    named += (SHIPPED_REGISTRY / "projects").rglob("*.json")
+    assert {"nodes.json", "settings.json", "machines/sedona.json"} < set(lines)
+    assert len(lines) == 2 + len(named)
     assert {name: count for name, count in lines.items() if count > MAX_FILE_LINES} == {}
 
 
@@ -116,34 +120,35 @@ def test_a_file_holding_no_object_is_refused_naming_it(tmp_path: pathlib.Path) -
         read_workspace_document(registry)
 
 
-def test_a_nodes_file_holding_anything_but_its_two_objects_is_refused(
-    tmp_path: pathlib.Path,
-) -> None:
-    registry = write_registry(tmp_path / "registry", _document())
-    (registry / "nodes.json").write_text('{"nodes": {}}\n', encoding="utf-8")
+def test_each_machine_is_keyed_by_its_file_s_stem(tmp_path: pathlib.Path) -> None:
+    machines: JSONObject = {"sedona": {"marker": "s"}, "lavender-wsl": {"marker": "w"}}
+    registry = write_registry(tmp_path / "registry", {**_document(), "machines": machines})
 
-    with pytest.raises(
-        JSONTypeError, match=r"nodes\.json must hold exactly nodes, not_dispatchable, got nodes$"
-    ):
-        read_workspace_document(registry)
+    assert list(require_dict(read_workspace_document(registry), "machines")) == [
+        "lavender-wsl",
+        "sedona",
+    ]
 
 
-def test_a_settings_file_holding_nodes_or_projects_is_refused(tmp_path: pathlib.Path) -> None:
+def test_a_settings_file_holding_machines_or_projects_is_refused(tmp_path: pathlib.Path) -> None:
     registry = write_registry(tmp_path / "registry", _document())
     (registry / "settings.json").write_text(
-        '{"ledger": "runs/ledger.jsonl", "projects": {}, "nodes": {}}\n', encoding="utf-8"
+        '{"ledger": "runs/ledger.jsonl", "projects": {}, "machines": {}}\n', encoding="utf-8"
     )
 
     with pytest.raises(
         JSONTypeError,
-        match=r"settings\.json holds nodes, projects, which belong in nodes\.json or under "
+        match=r"settings\.json holds machines, projects, which belong under machines/ or "
         r"projects/$",
     ):
         read_workspace_document(registry)
 
 
-def test_a_registry_with_no_project_file_is_refused(tmp_path: pathlib.Path) -> None:
-    registry = write_registry(tmp_path / "registry", {**_document(), "projects": {}})
+@pytest.mark.parametrize("key", ["machines", "projects"])
+def test_a_registry_with_no_file_under_a_directory_is_refused(
+    tmp_path: pathlib.Path, key: str
+) -> None:
+    registry = write_registry(tmp_path / "registry", {**_document(), key: {}})
 
-    with pytest.raises(JSONTypeError, match=r"projects declares no project$"):
+    with pytest.raises(JSONTypeError, match=rf"registry[/\\]{key} declares nothing$"):
         read_workspace_document(registry)

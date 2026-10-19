@@ -27,11 +27,13 @@ Direct3D 11 and refuses every other platform by name
 names neither. ``gpu`` because that same suite drives a real scene on the
 machine's GPU and is too slow to run under the software rasteriser; the tag
 means a CUDA device ``nvidia-smi`` reports, which is what ``gpu`` on the
-node contract has always meant, and NOT an integrated adapter. The identity
-registry (``fleet-mcp/fleet-nodes.json``) records both kinds per node with
-the probe that measured each, so which windows nodes may carry this tag is a
-recorded fact rather than a guess: on 2026-09-21 austinpc, sedona and
-lavender, and diphtheria on linux. ``testdb`` because 17 MCPs packages start
+node contract has always meant, and NOT an integrated adapter. The fleet
+audit's inventory reads every node's devices through ``nvidia-smi`` on each
+pass, and its ``roster.gpu`` row fails a node whose declaration here names a
+device the inventory does not find, or names none where it finds one (MCPs
+board task e447de72), so which nodes may carry this tag is a measured fact
+rather than a guess: on 2026-10-19 sedona, lavender, lavender-wsl and
+diphtheria. ``testdb`` because 17 MCPs packages start
 their suites from ``packages/db``'s global test setup, which needs a migrated
 ``corvis_test`` and its owner role, and a node without its own container
 cannot reach one (MCPs board task 6bbfd171, measured 2026-09-26): the tag

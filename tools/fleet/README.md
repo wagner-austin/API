@@ -33,9 +33,13 @@ structural — a shared mutable environment with no lock — not a rogue killer.
 
 ```
 registry/         the workspace, split by concern (MCPs board task 4a78c916)
-  nodes.json      where the nodes are, and the machines that are not nodes
+  machines/       the fleet's one roster, one file per machine, named by it
+                  (machines/loki.json is loki): who it is, how it is
+                  reached, and what dispatch may take from it (MCPs board
+                  task e447de72; see "The roster" below)
   settings.json   fleet-wide settings: data paths, serve and poll seconds,
-                  the record paths below
+                  the record paths below, and under identity the fleet's
+                  ssh key, Cloudflare zone and account and VPN profile digest
   projects/       one file per project, named by its path (projects/MCPs/
                   mcp-shared.json is MCPs/mcp-shared): what it costs, what it
                   needs and where its commits come from (source)
@@ -237,9 +241,11 @@ therefore four passes, in this order:
    came from (MCPs board task `5a3865bf`). The script goes out in the
    node's dialect, PowerShell or `sh`, chosen from the registry's
    `platform` like every other remote act (board task `cd5010c4`). The hub
-   is not visited: its own directory is recorded by `pcsession-mcp`. Only when `--registry` names
-   `fleet-mcp/fleet-nodes.json`; without it the tick logs that observation
-   was skipped. A node that is asleep is one logged line, not a failed tick.
+   is not visited: its own directory is recorded by `pcsession-mcp`. The
+   machines visited are the roster's enabled workers, vpn-jumps and session
+   hosts (`fleet.core.observe.observable`); with none, the tick logs that
+   it observed nothing and reads no credential. A node that is asleep is
+   one logged line, not a failed tick.
    This pass writes to the **taskboard**, so it needs `TASKBOARD_MCP_API_KEY`
    (mcp-taskboard's `MCP_INTERNAL_KEY`) beside the queue's key.
 4. **reap** — read the roster (`runners.json` at the rolled commit) and, for
@@ -262,8 +268,7 @@ export TASKBOARD_MCP_API_KEY=...  # mcp-taskboard's MCP_INTERNAL_KEY (observe pa
 export CORVIS_TENANT_ID=...       # the tenant whose queue this serves
 while true; do
   fleet-agent --config registry --agent fleet-hub-diphtheria \
-              --session <uuid> --repo-root ~/PROJECTS/API \
-              --registry ~/PROJECTS/MCPs/fleet-mcp/fleet-nodes.json
+              --session <uuid> --repo-root ~/PROJECTS/API
   sleep 30
 done
 ```
@@ -304,7 +309,8 @@ never where it runs. Before the job is reported started it checks the
 release's seal with that release's own verifier (`fleet.core.sealed_release`,
 the check the session verbs make too) and reads `TAILSCALE_API_KEY` from the
 env file; then it runs the release's own `fleet-netboot arm --node <machine>
---registry <release>/fleet-mcp/fleet-nodes.json`, with the seal's revision as
+--registry <the registry directory the tick loaded>`, whose `machines/` names
+each machine's boot MAC, with the seal's revision as
 `--commit` and the key in the arm's environment alone
 (`fleet.core.netboot_arm`). Exit 0 with one `NETBOOT ARMED` line closes it
 `passed` with that line, which names the key's id and never the key. A refusal
@@ -341,12 +347,12 @@ queues behind a check because no runner ever asks for both at once
 (`test_agent.py` pins the hub claim; `test_node_agent.py` the node claim).
 
 **Every enabled node has a runner of its own, on the hub.** `fleet-node-agent
---config fleet.json --node <alias>` is one tick for one node
+--config registry --node <alias>` is one tick for one node
 (`fleet.cli.node_agent`). Every tick is a job of the MCPs hub runner (MCPs
 board task b27bd34a): one resident loop, `session_audit.hub_runner`, kept
 alive by the `corvis-hub-runner` task, runs every row of MCPs
 `scripts/fleet/hub-jobs.json`, and its fleet rows expand to one job per node
-`registry/nodes.json` enables, a second for one declaring `elevated`, and the
+`registry/machines/` dispatches to, a second for one declaring `elevated`, and the
 hub's own. Each job runs `poetry.exe` running `python -m fleet.cli.tick`,
 never `powershell.exe`, which can stall before its engine loads under S4U on
 the hub (MCPs board task 94ac1c4f), under the operator's account at RunLevel
@@ -489,10 +495,10 @@ MCPs/scripts/ps-harness job 7c16305c, submitted with `[windows]` on
 2026-10-03, reached no runner for hours. An elevated runner whose lane
 matched nothing asks once more with its tags less `elevated`, for only the
 elevated projects it fits (`fleet.cli.node_claim.claim_untagged`), and its
-tick log names the missing tag. The identity registry's
-measured `gpu` column and this workspace's declared `gpu` are reconciled by
-`fleet-nodes --registry` beside `enabled` and `platform`, so the tags the
-runners claim by are the tags the roster agrees on.
+tick log names the missing tag. This workspace's declared `gpu` is held to
+the CUDA devices the fleet audit's inventory measures through `nvidia-smi`
+on every pass (its `roster.gpu` row, MCPs board task e447de72), so the
+tags the hub plans by are the devices the nodes have.
 
 **`testdb` is the one tag the roster does not measure** (MCPs board task
 6bbfd171). A node declares `test_database: true` when it runs
@@ -668,10 +674,10 @@ pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
 `test_runner_contracts.py` fails if a tagged tool apt can supply is missing
 from that list or Chrome's path from those assets. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
-disappears takes its tag with it. Each difference from `registry/nodes.json` is logged
+disappears takes its tag with it. Each difference from the node's machine file is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its
 probe reports cxx '17.14.37710.0', so it claims with the cxx tag; set cxx to
-'17.14.37710.0' in registry/nodes.json`, because the hub's own planning (`fleet-run`,
+'17.14.37710.0' in its registry/machines file`, because the hub's own planning (`fleet-run`,
 preflight) still reads the declaration without asking the node. Until this
 change a node whose answer differed from its declaration claimed nothing at
 all, for every job. Measured 2026-10-02, every dispatchable node's answer
@@ -920,19 +926,124 @@ open, tailscale direct: alive and overloaded, not down). That is why
 `lavender-wsl` reserves 8 of its 16 cores and the linux probe reads the CI
 slice, and both still bound every grant.
 
-## `enabled`, and why the fleet is written down twice
+## The roster, and `enabled`
 
-Every node in `registry/nodes.json` declares `enabled`, and the decoder refuses a node
-that leaves it out. Neither default is safe: defaulting it to `true` is the
-defect this field was added for, and defaulting it to `false` would silently
-shrink the fleet with nothing to notice the missing capacity.
+**The fleet is written down once**, one file per machine under
+`registry/machines/`, named by the machine (MCPs board task e447de72).
+Until 2026-10-19 it was written down twice: MCPs `fleet-mcp/fleet-nodes.json`
+held every machine on the tailnet with its identity and reach, and
+`registry/nodes.json` here held the machines dispatch may use with what each
+can take. Both declared `enabled` and `platform`, each declared a `gpu` and a
+`test_database`, and nothing held them together but a comparison a session
+ran by hand. On 2026-09-05 they disagreed about whether loki should answer,
+and every auto-select dispatch paid an ssh timeout rediscovering it; on
+2026-10-19 lacrymal's `test_database` read true here and false there until a
+session noticed. The operator, that day: "One roster. Fold fleet-nodes.json
+into the API registry and have everything read it." It lives here because
+every dispatch must work with no MCPs checkout present, and MCPs already
+reads this registry. Each runner stages the registry it read beside every
+run and exports its path as `CORVIS_FLEET_REGISTRY`, so a suite on a node
+reads the roster the runner that launched it read.
+
+**A machine's file** carries what this package decodes
+(`fleet.contracts.machine`) and what MCPs `fleet-mcp` decodes beside it
+(`fleet-mcp/src/registry-types.ts` documents every field):
+
+| field | what it says |
+|---|---|
+| `role` | `hub` (reaches everything else, runs the docker fleet), `vpn-jump` (holds the UCI VPN and proxies to hpc3; MUST have a Cloudflare tunnel, because a node holding the VPN loses its tailnet endpoint), `worker`, `session-host` (runs the operator's Claude Code sessions), or `client` (reaches the fleet, never provisioned by us: the phone) |
+| `platform`, `user` | the dialect every script to it is rendered in, and the account the fleet provisioned (null for a client) |
+| `enabled`, `disabledUntil` | whether it is expected to answer at all, and the date a time-bound disable ends |
+| `tailnetIp`, `tunnel`, `reachKey`, `bootMac`, `duties`, `ciWorkersPerRunner` | how it is reached and what it holds, read by MCPs `fleet-mcp` |
+| `ledger_observer` | which arm records its sessions in the agent session ledger |
+| `guest` | null, or `{host, sshPort}` for a machine reached through the one it runs inside |
+| `boot` | what it must bring back after a reboot beyond sshd and Tailscale |
+| `dispatch` | the reason it takes no dispatched work, or what dispatch may take from it with `held` |
+| `notes` | prose for a reader; nothing parses it |
+
+The fleet-wide identity (the fleet's ssh key and its fingerprint, the
+Cloudflare zone and account, and `uciVpnProfileSha256`, the SHA-256 of
+`uci-duo-profile.xml` measured byte-identical on loki and sedona on
+2026-09-04, so a vpn-jump whose profile differs is known not to run the
+working nodes' VPN config) is `settings.json`'s `identity`.
+
+**Add a machine here first, as one new file**, which MCPs `fleet-mcp`'s
+`fleet-enroll` writes, then audit it. On the new machine, at its console,
+the `fleet-node-setup` skill from a CORVIS stick (repo `corvis-stick`,
+`stick-templates/skills/fleet-node-setup/`) provisions sshd, the key, the
+ACLs, hardening and power policy, then re-measures all of it and exits
+non-zero if any did not take.
+
+**Enabling or disabling a machine is one edit and an audit.** `enabled` is
+said once, in its file, and decides both what the audit expects and whether
+work may be sent there. Then re-run the host-side `fleet-audit` on the hub:
+the corvis `fleet_*` tools serve a stored snapshot and probe nothing (a
+container on the compose network has no route to a 100.x address), so until
+the audit re-runs they keep reporting the old state and are not wrong to. A
+scheduled task also runs it every twenty minutes.
+
+**A time-bound disable goes in `disabledUntil`, never in `notes`.** A date in
+prose has no reader: loki's note said "re-enable on 2026-09-08", and on
+2026-09-09 it was still disabled while a session reported HPC3 transport down
+and named that very disable as why the fallback jump host was unavailable.
+`disabledUntil` is compared against the clock on every audit: on and after
+that date the machine reports as DISABLE EXPIRED and the run exits non-zero
+until somebody re-enables it or moves the date. Null is a standing gap, a box
+that cannot answer and has no known return date.
+
+**`ledger_observer` declares which arm records the machine's sessions** in
+the agent session ledger (MCPs board task c90b6fb7): `pcsession`
+(pcsession-mcp's observer on the hub, every 30 s), `fleet-arm` (this
+package's observe pass, every 3 minutes) or `none`. The audit reads the
+machine's watermark from `agent_session_observer_passes` (MCPs mig 529) and
+reports `LEDGER NOT OBSERVED <node> <age>`, exiting non-zero, when it is
+older than three of that arm's ticks or was never stamped.
+
+**`guest` names the machine a node runs inside** (MCPs board task c4fc4f3e).
+The first is lavender-wsl, lavender's WSL2 Ubuntu: the hub's ssh config
+reaches it through lavender's sshd, which runs `nc` to
+`127.0.0.1:<sshPort>` inside the distro, and its sshd binds that loopback
+address alone. A guest has no tailnet device, so its `tailnetIp` is its
+host's, the tailnet policy owes it no hosts entry, and the audit judges its
+sshd bind and AllowUsers against 127.0.0.1. Here the guest's host is the
+node's `wsl_host`, which the decoder refuses unless it is a Windows node of
+the roster, and which the host report reads when the guest does not answer.
+
+**`boot` is what a machine must bring back after a reboot** beyond sshd and
+Tailscale, which the audit holds every owned machine to without a
+declaration (MCPs `fleet-mcp/src/standard-boot.ts`, board task ebc80a03).
+Each unit is a windows-service, scheduled-task, systemd, wsl-systemd or
+listener, and says in `purpose` what breaks without it, because that is what
+the alert has to say. Declared from a measurement of the machine, never from
+memory; `units: []` says it carries nothing else.
+
+**`dispatch` is required, and silence is not a reason.** A string is why the
+machine takes no dispatched work and declares no capacity: `austinpc`, the
+hub, sat for weeks enabled, 24 logical cores and invisible to the scheduler,
+with no way to tell a decision from an oversight, and its file now says why.
+An object is what dispatch may take from it (stage root, cores, RAM, CUDA
+device, test database, toolchain, budget), with `held` null when its runners
+claim work or the reason they do not. A node dispatches exactly when its
+machine is enabled and not held, and a held reason on a machine that is off
+is refused, since a machine that is off claims nothing already. lavender's
+Windows lane was held that way on 2026-09-29 (MCPs board task 7e467416): it
+keeps its capacity because lavender-wsl's `guest` names it, and stays
+enabled because the audit and the session observer still visit it, so a
+runner whose scheduled task outlived the retirement logs `lavender is
+disabled in registry/machines/lavender.json; claiming nothing` and asks the
+node nothing.
+
+Every machine declares `enabled`, and the decoder refuses one that leaves it
+out. Neither default is safe: defaulting it to `true` is the defect this
+field was added for, and defaulting it to `false` would silently shrink the
+fleet with nothing to notice the missing capacity.
 
 **"Was never asked" is not "did not answer."** Three states, three codes,
 three different next actions:
 
 | state | what happened | what to do |
 |---|---|---|
-| `NODE_DISABLED` | deliberately off; not probed at all | edit `registry/nodes.json` |
+| `NODE_DISABLED` | deliberately off; not probed at all | edit its `registry/machines` file |
 | `NODE_UNREACHABLE` | should have answered, did not | check the tailnet |
 | `NODE_MEMORY_EXHAUSTED` | answered, no room | wait |
 
@@ -942,88 +1053,6 @@ an unreachable one is: running somewhere else answers a question nobody asked.
 In auto-select a disabled node is skipped **without an ssh call**, which is the
 whole saving — the alternative costs a ten-second `ConnectTimeout` per node per
 dispatch.
-
-The fleet is described in two repositories and the columns barely overlap:
-
-| file | carries |
-|---|---|
-| `MCPs/fleet-mcp/fleet-nodes.json` | name, role, user, **platform**, tailnet address, **enabled**, tunnel, notes — every machine on the tailnet, including ones nothing dispatches to |
-| `API/tools/fleet/registry/nodes.json` | host, **platform**, stage root, cores, RAM, GPU, budget, **enabled**, test database — what a dispatch may take |
-
-Merging them would put a Cloudflare tunnel id beside a worker-RAM budget and
-make this repo depend on a checkout of the other one, which dispatch must work
-without. They are two views. The one fact they share is whether a machine is
-expected to answer, and on 2026-09-05 they disagreed about it: the identity
-registry marked `loki` off for a trip, this workspace had no field to learn
-that into, and every auto-select dispatch paid an ssh timeout rediscovering it
-until one was refused outright.
-
-**Which copy is authoritative:** `fleet-nodes.json` owns *which machines exist
-and whether one should answer*; this file owns *what a machine can run*. The
-dependency only runs that way — `stage_root` and `ram_gb` are meaningless for a
-box that cannot be reached, while `tailnetIp` and `user` mean something with no
-capacity data at all — so `enabled` here is a **replica**, and when the two
-disagree the registry is right until somebody changes it on purpose. Agreed
-2026-09-05 between the owners of the two files (`opus-fleet-mcp-0904` for the
-registry, this package for the workspace) and **not yet ratified by the
-operator**; if it goes the other way, moving it is cheaper than the fork was.
-
-So they are made **checkable** against each other:
-
-```bash
-fleet-nodes --config registry --registry ../../../MCPs/fleet-mcp/fleet-nodes.json
-```
-
-One line per disagreement — each saying which way it runs and what it costs,
-because the directions call for opposite edits — and exit 1. This is detection,
-not prevention: nothing stops somebody editing one file and not the other, it
-stops that going unnoticed.
-
-Seven ways they can disagree, and on agreement the command says how many nodes
-it compared (`N node(s) agree with <path> on enabled, platform, gpu and
-test_database`):
-
-| disagreement | what it costs |
-|---|---|
-| enabled here, disabled there | an ssh timeout on every auto-select dispatch |
-| disabled here, enabled there | capacity that exists and is not being used |
-| here, and the registry never heard of it | unprovisioned, or renamed on one side |
-| enabled there, unmentioned here | capacity nobody has decided about |
-| platform differs | every script goes out in the wrong dialect; a parse error that reads as the node's fault |
-| gpu declared here, none measured there (or the reverse) | a `gpu` job matched on the declaration runs, or never runs, on the wrong box |
-| `test_database` differs | one of the two files is wrong about which nodes take a Postgres-backed check (MCPs board task daae17f2) |
-
-The gpu row compares this file's declared `gpu` (a CUDA device or `null`)
-with the registry's measured column: a CUDA device iff its `probe` is
-`nvidia-smi`; `null`, or an adapter the Win32 video-controller probe found,
-is none.
-
-**The last one is why `registry/nodes.json` has `not_dispatchable`.** A machine that is
-merely *absent* from `nodes` is indistinguishable from one nobody has got round
-to adding — and `austinpc`, the hub this dispatcher runs on, sat in exactly
-that gap for weeks: enabled in the registry, 24 logical cores, invisible to the
-scheduler, with no way to tell a decision from an oversight. Named in
-`not_dispatchable` with its reason, the absence becomes a claim the check can
-honour. That map is not a suppression list: a machine that is *off* in the
-registry is never reported, so nothing needs pre-silencing, and a box being
-onboarded (the Surface Go) must stay out of it so the check speaks up the day
-it comes online.
-
-A name that is an ENABLED node and also in `not_dispatchable` is refused at
-load. The document would be saying two opposite things about one machine, and
-the quiet guess — excluded wins — would silently drop a node somebody declared
-with full capacity numbers. A DISABLED node may carry its reason there, and
-then the reconciliation reads it as a decision rather than capacity nobody is
-using: lavender's Windows lane was retired that way on 2026-09-29 (MCPs board
-task 7e467416). It stays declared because lavender-wsl names it as its
-`wsl_host`, and stays enabled in the registry because the audit and the
-session observer still visit it. A runner whose scheduled task outlived the
-retirement logs `lavender is disabled in registry/nodes.json; claiming nothing` and
-asks the node nothing.
-
-**The path is passed, never searched for.** Omitting the flag claims no
-reconciliation at all, and a version that hunted for the other repo would
-report agreement on any machine where it merely failed to find it.
 
 ## The lease is the part that fixes incident (1)
 
@@ -1158,11 +1187,11 @@ declared `tags` column would be a second copy of those facts, and the copy is
 the one that drifts: a box whose card was pulled would keep its `gpu` tag
 until somebody remembered the list. Derived, the tag is exactly as true as the
 measurement, and `gpu` keeps the meaning it has always had here — a CUDA
-device `nvidia-smi` reports, never an integrated adapter. The identity
-registry records both kinds per node with the probe that measured each
-(`fleet-nodes.json` `gpu`, same task), which is how "which windows nodes may
-carry this tag" is a recorded fact: austinpc, sedona and lavender, and
-diphtheria on linux, as of 2026-09-21.
+device `nvidia-smi` reports, never an integrated adapter. The fleet audit's
+`roster.gpu` row holds each declaration to the devices its inventory reads
+through `nvidia-smi` on every pass (MCPs board task e447de72), which is how
+"which nodes may carry this tag" is a measured fact: sedona, lavender,
+lavender-wsl and diphtheria, as of 2026-10-19.
 
 The planner checks tags **first**, before disk, cores and memory, and
 refuses with `NODE_LACKS_TAG` naming the tags missing:
@@ -1482,8 +1511,8 @@ refusing, and two of the three nodes are laptops.
 ## Two dialects, chosen by the node's declared `platform`
 
 Every node declares `platform` (`windows` or `linux`), and the identity
-registry declares the same field; `fleet-nodes --registry` reports the two
-disagreeing, because every script goes out in the declared platform's dialect
+registry declares the same field; the fleet audit's `roster.agrees` row
+fails a node the two disagree on, because every script goes out in the declared platform's dialect
 and the wrong one is a parse error on the far side that reads as the node's
 fault. `fleet.core.dialect` names the acts once as a protocol and
 `dialect_windows` / `dialect_linux` render each: how a file is written over

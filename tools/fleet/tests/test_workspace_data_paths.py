@@ -25,6 +25,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue
 
 from fleet.contracts.workspace import decode_fleet_workspace
+from tests._roster_fixtures import machine_document
 
 #: The API monorepo, whose eight data directories are the real subject.
 API: Final[str] = "https://github.com/wagner-austin/API.git"
@@ -49,33 +50,7 @@ def _document(
         The document, ready for :func:`decode_fleet_workspace`.
     """
     return {
-        "nodes": {
-            "lavender": {
-                "host": "lavender",
-                "platform": "windows",
-                "stage_root": "C:/fleet/stage",
-                "logical_cores": 24,
-                "ram_gb": 63.7,
-                "gpu": None,
-                "enabled": True,
-                "test_database": False,
-                "rust": None,
-                "cxx": None,
-                "docker": None,
-                "stack": None,
-                "elevated": False,
-                "wsl_host": None,
-                "budget": {
-                    "reserved_cores": 4,
-                    "reserved_ram_gb": 8.0,
-                    "worker_ram_gb": 1.1,
-                    "max_disk_gb": 20.0,
-                    "checks_at_once": None,
-                    "pinned_checks_only": False,
-                },
-            }
-        },
-        "not_dispatchable": {},
+        "machines": {"lavender": machine_document()},
         "projects": {
             "the-project": {
                 "worker_ram_gb": 1.1,

@@ -9,13 +9,12 @@ by reading a workflow's assert step or a board post. ``fleet-runners audit``
 scores a host against this roster; ``fleet-runners render`` emits the converge
 script for a new one.
 
-THIS IS THE THIRD MACHINE DOCUMENT, NOT A COPY OF THE OTHER TWO. The fleet is
-already written down twice -- ``fleet-mcp/fleet-nodes.json`` (MCPs) owns which
-machines exist and whether one should answer; ``registry/`` here owns what a
-machine can run for DISPATCH. This roster owns what a machine serves to
-GITHUB ACTIONS: runner installs, their labels, and the host assets their job
-classes require. The columns barely overlap, and merging them was already
-considered and rejected once (see :mod:`fleet.core.registry`).
+THIS IS A SECOND MACHINE DOCUMENT, NOT A COPY OF THE FIRST. The fleet's
+roster, ``registry/machines`` (:mod:`fleet.contracts.machine`), owns which
+machines exist, whether one should answer and what it can run for DISPATCH.
+This roster owns what a machine serves to GITHUB ACTIONS: runner installs,
+their labels, and the host assets their job classes require, none of which
+the fleet's roster declares.
 
 ABSENCE IS NOT A STATE, same rule as :mod:`fleet.contracts.node`: optional
 concepts are spelled as explicit ``null`` rather than omitted keys, so a host
@@ -136,8 +135,8 @@ class HostRunnerSpec(TypedDict):
     """One machine serving GitHub Actions, and everything it must hold.
 
     Attributes:
-        name: The host's fleet name, matching ``registry/nodes.json`` and
-            ``fleet-nodes.json`` so the three documents can be joined.
+        name: The host's fleet name, a machine of ``registry/machines``, so
+            the two documents can be joined.
         host: SSH destination -- an alias from ``~/.ssh/config``, the same
             rule as :class:`fleet.contracts.node.NodeConfig`.
         wsl_distro: The WSL distribution the runners live inside. Required
@@ -525,8 +524,7 @@ def decode_runner_spec(value: JSONValue) -> RunnerSpec:
         JSONTypeError: If the value is not an object, ``hosts`` is missing
             or holds a non-object, two hosts share a name, or the roster is
             empty. An empty roster audits nothing and exits 0, which reads
-            exactly like a healthy fleet -- the same trap ``fleet-nodes
-            --probe never`` refuses one module over.
+            exactly like a healthy fleet.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"runner spec must be a JSON object, got {type(value).__name__}")

@@ -86,7 +86,7 @@ def _dispatch(config_path: pathlib.Path, repo: pathlib.Path) -> None:
         repo: The synthetic monorepo root.
     """
     payload = prebuilt_archive(config_path, repo)
-    _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+    _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
     run.main(
         [
             _config.CONFIG_FLAG,

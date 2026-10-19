@@ -59,6 +59,7 @@ from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
     POETRY_KEYRING_OFF,
+    REGISTRY_VARIABLE,
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import sh_phase_lines
@@ -130,16 +131,18 @@ def isolated_build_lines(
         f'exec_uid="$(id -u {EXEC_USER})"',
         EXEC_HOME_LINE,
         f'exec_root="{exec_root(run)}"',
+        f'exec_registry="{names.registry_directory(exec_root(run))}"',
         f'exec_cache="{EXEC_CACHE}"',
-        'sudo -n rm -rf "$exec_root"',
-        'sudo -n mkdir -p "$exec_root" "$exec_cache"',
+        'sudo -n rm -rf "$exec_root" "$exec_registry"',
+        'sudo -n mkdir -p "$exec_root" "$exec_registry" "$exec_cache"',
         f"sudo -n cp -a '{target}/.' \"$exec_root/\"",
+        f"sudo -n cp -a '{names.registry_directory(target)}/.' \"$exec_registry/\"",
         *sh_build_lines(
             tools=f'"{tool_caches_directory("$exec_cache")}"',
             marker=f'"$exec_root/{names.GENERATION_MARKER_NAME}"',
             run_as="sudo -n ",
         ),
-        f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_cache"',
+        f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_registry" "$exec_cache"',
         "as_exec() {",
         f"  sudo -n -u {EXEC_USER} env -i "
         f'HOME="$exec_home" USER={EXEC_USER} LOGNAME={EXEC_USER} PATH={EXEC_PATH} '
@@ -155,6 +158,7 @@ def isolated_build_lines(
         f"{AGENT_LABEL_VARIABLE}='{agent}' "
         f'{CACHE_VARIABLE}="$exec_cache" '
         f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')} "
+        f'{REGISTRY_VARIABLE}="$exec_registry" '
         'sh -eu -c "$1"',
         "}",
         "status=0",

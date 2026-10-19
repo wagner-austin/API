@@ -14,12 +14,8 @@ from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 
 from fleet.cli import node_agent
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import (
-    NodeConfig,
-    NodePlatform,
-    decode_node_config,
-    encode_node_config,
-)
+from fleet.contracts.machine import decode_machine
+from fleet.contracts.node import NodeConfig, NodePlatform, encode_node_config
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks, dialect, host_report, names
 from tests._node_agent_fixtures import (
@@ -30,6 +26,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document, machines_of
 from tests.conftest import FakeRun, failed, ok, workspace_document
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -58,38 +55,6 @@ WRITER = names.runner_name("lavender-wsl", elevated=False)
 
 #: What the Windows capacity probe prints for lavender at 0.3 GB free.
 LAVENDER_STARVED = "free_ram_gb=0.3\nfree_disk_gb=612.4\nreserved_cores=0\n"
-
-
-def _host() -> NodeConfig:
-    """lavender, the Windows host.
-
-    Returns:
-        The node.
-    """
-    return NodeConfig(
-        host="lavender",
-        platform=NodePlatform.WINDOWS,
-        stage_root="C:/fleet/stage",
-        logical_cores=16,
-        ram_gb=31.7,
-        gpu=None,
-        enabled=True,
-        test_database=False,
-        rust=None,
-        cxx=None,
-        docker=None,
-        stack=None,
-        elevated=False,
-        wsl_host=None,
-        budget=NodeBudget(
-            reserved_cores=4,
-            reserved_ram_gb=6.0,
-            worker_ram_gb=1.1,
-            max_disk_gb=40.0,
-            checks_at_once=None,
-            pinned_checks_only=False,
-        ),
-    )
 
 
 def _wsl_node() -> NodeConfig:
@@ -159,19 +124,33 @@ class TestListing:
         assert host_report.parse_wsl_list(_wsl_bytes("  NAME  STATE  VERSION\r\n\r\n")) == []
 
 
-def _with_nodes(document: JSONObject, extra: JSONObject) -> JSONObject:
-    """A workspace document with nodes added beside its own.
+def _wsl_machine(host: str) -> JSONObject:
+    """lavender-wsl's machine file, naming the machine it runs inside.
+
+    Args:
+        host: The machine its ``guest`` names.
+
+    Returns:
+        The file's object.
+    """
+    return machine_document(
+        platform="linux",
+        guest=host,
+        dispatch={**encode_node_config(_wsl_node()), "held": None},
+    )
+
+
+def _with_machines(document: JSONObject, extra: JSONObject) -> JSONObject:
+    """A workspace document with machines added beside its own.
 
     Args:
         document: The document to extend, modified in place.
-        extra: The added nodes, keyed by name.
+        extra: The added machine files, keyed by name.
 
     Returns:
         The same document.
     """
-    nodes = document["nodes"]
-    assert isinstance(nodes, dict)
-    nodes.update(extra)
+    machines_of(document).update(extra)
     return document
 
 
@@ -236,52 +215,37 @@ class TestDescribe:
 
 
 class TestDeclaration:
-    """wsl_host's decode, on the node and across the workspace."""
+    """A guest's host, read from its machine file and checked across the workspace."""
 
-    def test_the_declaration_round_trips(self) -> None:
-        encoded = encode_node_config(_wsl_node())
-        assert encoded["wsl_host"] == "lavender"
-        assert decode_node_config(encoded) == _wsl_node()
+    def test_the_guest_s_host_is_the_node_s_wsl_host(self) -> None:
+        decoded = decode_machine("lavender-wsl", _wsl_machine("lavender"))
 
-    def test_an_absent_declaration_is_refused(self) -> None:
-        encoded = encode_node_config(_wsl_node())
-        del encoded["wsl_host"]
-        with pytest.raises(JSONTypeError, match="must declare 'wsl_host'"):
-            decode_node_config(encoded)
-
-    @pytest.mark.parametrize("value", ["", 7])
-    def test_a_value_that_is_not_a_name_is_refused(self, value: str | int) -> None:
-        encoded = {**encode_node_config(_wsl_node()), "wsl_host": value}
-        with pytest.raises(JSONTypeError, match="non-empty string or null"):
-            decode_node_config(encoded)
-
-    def test_a_windows_node_may_not_name_a_host(self) -> None:
-        encoded = {**encode_node_config(_host()), "wsl_host": "sedona"}
-        with pytest.raises(JSONTypeError, match="only a linux node runs inside"):
-            decode_node_config(encoded)
+        assert decoded["dispatch"] == _wsl_node()
 
     def test_the_workspace_accepts_a_host_that_is_one_of_its_windows_nodes(self) -> None:
-        document = _with_nodes(
-            workspace_document(), {"lavender-wsl": encode_node_config(_wsl_node())}
-        )
+        document = _with_machines(workspace_document(), {"lavender-wsl": _wsl_machine("lavender")})
+
         assert decode_fleet_workspace(document)["nodes"]["lavender-wsl"]["wsl_host"] == "lavender"
 
     def test_the_workspace_refuses_a_host_it_does_not_declare(self) -> None:
-        document = _with_nodes(
-            workspace_document(),
-            {"lavender-wsl": {**encode_node_config(_wsl_node()), "wsl_host": "pendragon"}},
-        )
-        with pytest.raises(JSONTypeError, match="'pendragon', which is not a node"):
+        document = _with_machines(workspace_document(), {"lavender-wsl": _wsl_machine("pendragon")})
+
+        with pytest.raises(
+            JSONTypeError,
+            match=r"machines\['lavender-wsl'\]\.guest names 'pendragon', which declares no "
+            "dispatch capacity",
+        ):
             decode_fleet_workspace(document)
 
     def test_the_workspace_refuses_a_host_that_is_not_windows(self) -> None:
-        document = _with_nodes(
+        document = _with_machines(
             workspace_document(),
             {
-                "lavender-wsl": encode_node_config(_wsl_node()),
-                "other-wsl": {**encode_node_config(_wsl_node()), "wsl_host": "lavender-wsl"},
+                "lavender-wsl": _wsl_machine("lavender"),
+                "other-wsl": _wsl_machine("lavender-wsl"),
             },
         )
+
         with pytest.raises(JSONTypeError, match="a linux node; only a windows node runs WSL"):
             decode_fleet_workspace(document)
 
@@ -292,8 +256,8 @@ class TestTheTick:
     def test_the_tick_logs_what_the_host_sees(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        document = _with_nodes(
-            sourced_document((NPM_CI,)), {"lavender-wsl": encode_node_config(_wsl_node())}
+        document = _with_machines(
+            sourced_document((NPM_CI,)), {"lavender-wsl": _wsl_machine("lavender")}
         )
         write_registry(sourced_config, document)
         _test_hooks.run = FakeRun(

@@ -18,6 +18,7 @@ from fleet.cli import _config, nodes
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.core import _test_hooks, records
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of, machine_document, machines_of
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok, workspace_document
 
 #: sedona's reading at 10:51Z scaled to the fixture: under the reservation.
@@ -40,34 +41,6 @@ def _config_with(tmp_path: pathlib.Path, document: JSONObject) -> pathlib.Path:
         The written registry directory.
     """
     return write_registry(tmp_path / "registry", document)
-
-
-def _nodes(document: JSONObject) -> JSONObject:
-    """The fixture workspace's node map, to change in place.
-
-    Args:
-        document: A workspace document from the shared fixtures.
-
-    Returns:
-        Its ``nodes`` object.
-    """
-    declared = document["nodes"]
-    assert isinstance(declared, dict)
-    return declared
-
-
-def _lavender(document: JSONObject) -> JSONObject:
-    """The fixture workspace's one node, to change in place.
-
-    Args:
-        document: A workspace document from the shared fixtures.
-
-    Returns:
-        lavender's declaration inside it.
-    """
-    lavender = _nodes(document)["lavender"]
-    assert isinstance(lavender, dict)
-    return lavender
 
 
 def _lines(config: pathlib.Path) -> list[str]:
@@ -95,7 +68,7 @@ def test_a_node_under_its_reservation_names_the_reservation(tmp_path: pathlib.Pa
     """sedona's cause that morning, and with an elevated runner both lanes
     say it, since they share the node."""
     document = workspace_document()
-    _lavender(document)["elevated"] = True
+    dispatch_of(document, "lavender")["elevated"] = True
     _test_hooks.run = FakeRun([ok(""), ok(STARVED)])
 
     reserved = (
@@ -149,21 +122,18 @@ def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Pa
 
 def test_a_retired_node_points_at_its_reason(tmp_path: pathlib.Path) -> None:
     document = workspace_document()
-    _lavender(document)["enabled"] = False
-    document["not_dispatchable"] = {"lavender": "its WSL VM holds the memory this lane measures"}
+    dispatch_of(document, "lavender")["held"] = "its WSL VM holds the memory this lane measures"
     _test_hooks.run = FakeRun([])
 
     assert _lines(_config_with(tmp_path, document)) == [
         "lavender: DISABLED -- declared off in this workspace, not probed; "
-        "not_dispatchable gives the reason"
+        "its machine file gives the reason it is held"
     ]
 
 
 def test_an_unreachable_wsl_node_adds_what_its_host_reports(tmp_path: pathlib.Path) -> None:
     document = workspace_document()
-    guest: JSONObject = {**_lavender(document), "host": "lavender-wsl", "platform": "linux"}
-    guest["wsl_host"] = "lavender"
-    _nodes(document)["lavender-wsl"] = guest
+    machines_of(document)["lavender-wsl"] = machine_document(platform="linux", guest="lavender")
     _test_hooks.run = FakeRun(
         [
             ok(""),

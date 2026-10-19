@@ -26,10 +26,8 @@ Every script here prepends it, so the same ``poetry`` the operator ran by
 hand is the one the build finds.
 
 WHY POETRY'S KEYRING IS OFF. Every build exports ``POETRY_KEYRING_ENABLED``
-false (:data:`fleet.core.names.POETRY_KEYRING_OFF` says why):
-left on, poetry waits on a D-Bus SecretService that a headless node never
-answers, and the build times out inside ``poetry install`` (MCPs board task
-c837fd8d).
+false (:data:`fleet.core.names.POETRY_KEYRING_OFF` says why): left on, poetry
+waits on a D-Bus SecretService a headless node never answers.
 """
 
 from __future__ import annotations
@@ -51,6 +49,7 @@ from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
     POETRY_KEYRING_OFF,
+    REGISTRY_VARIABLE,
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import sh_phase_lines
@@ -329,7 +328,8 @@ class LinuxDialect:
         ]
         if isolated:
             run = posixpath.basename(target.rstrip("/"))
-            lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{exec_root(run)}"']
+            copy = exec_root(run)
+            lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{copy}" "{names.staging_directory(copy)}"']
         return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
     def digest_script(self, target: str) -> str:
@@ -426,11 +426,12 @@ class LinuxDialect:
             f"{AGENT_LABEL_VARIABLE}='{label}'",
             f"{CACHE_VARIABLE}='{cache_root}'",
             f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",
+            f"{REGISTRY_VARIABLE}='{names.registry_directory(target)}'",
             f"export npm_config_cache POETRY_CACHE_DIR {POETRY_IN_PROJECT[0]} "
             f"{POETRY_KEYRING_OFF[0]} "
             "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
             f"{AGENT_LABEL_VARIABLE} "
-            f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE}",
+            f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE} {REGISTRY_VARIABLE}",
             f"cd '{target}'",
         ]
         for step in install:

@@ -57,7 +57,7 @@ def project_file(tags: list[JSONValue], *, note: str = "") -> str:
 
 #: The registry a rolled commit declares in these cases.
 REGISTRY_FILES = {
-    "tools/fleet/registry/nodes.json": "{}\n",
+    "tools/fleet/registry/settings.json": "{}\n",
     "tools/fleet/registry/projects/MCPs.json": project_file([]),
     "tools/fleet/registry/projects/MCPs/packages/wiki-check.json": project_file(
         ["cxx", "pdftotext"], note="caf\u00e9 \u2014 r\u00e9sum\u00e9"
@@ -138,7 +138,7 @@ class TestReadDeclared:
     def test_a_commit_declaring_no_project_sends_nothing(self, tmp_path: pathlib.Path) -> None:
         repo = tmp_path / "api"
         commit = committed_repository(
-            repo, {"tools/fleet/registry/nodes.json": "{}\n"}, rolled.ROLLED_REF
+            repo, {"tools/fleet/registry/settings.json": "{}\n"}, rolled.ROLLED_REF
         )
 
         assert declared.read_declared(repo) == (

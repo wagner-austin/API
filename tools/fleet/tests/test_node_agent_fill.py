@@ -110,9 +110,9 @@ class TestARoomyNode:
         _other_export(two_projects)
         runs = [
             *PROBED,
-            *launch_steps(digest, commit_present=True),
+            *launch_steps(digest, registry=two_projects, commit_present=True),
             *PROBED,
-            *launch_steps(digest, commit_present=True),
+            *launch_steps(digest, registry=two_projects, commit_present=True),
             *PROBED,
         ]
         other = {"id": OTHER_JOB_ID, "project": OTHER_PROJECT}
@@ -213,7 +213,7 @@ class TestAHeldProjectIsNotClaimed:
 
         endpoint, _ = _tick(
             sourced_config,
-            claim_replies(staging.digest(payload), commit_present=True),
+            claim_replies(staging.digest(payload), registry=sourced_config, commit_present=True),
             [
                 dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": queue_job(status="claimed")}),

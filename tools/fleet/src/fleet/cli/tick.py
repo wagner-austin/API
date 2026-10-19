@@ -362,15 +362,8 @@ def plan_tick(
         )
         if lane is Lane.HUB_ANNOUNCE:
             return TickPlan(arguments=(*hub, *announce), stem="fleet-agent", header=lane.value)
-        mcps_root = api_root.parent / "MCPs"
         return TickPlan(
-            arguments=(
-                *hub,
-                "--mcps-root",
-                str(mcps_root),
-                "--registry",
-                str(mcps_root / "fleet-mcp" / "fleet-nodes.json"),
-            ),
+            arguments=(*hub, "--mcps-root", str(api_root.parent / "MCPs")),
             stem="fleet-agent",
             header=lane.value,
         )

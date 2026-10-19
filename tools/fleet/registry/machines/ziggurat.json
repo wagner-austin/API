@@ -1,0 +1,20 @@
+{
+  "role": "session-host",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.86.243.5",
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII408kXbqK2ka+DZwYYvLfIXfmAQ1a6XlMgAuxdMfTiH corvis@ziggurat",
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "The session host: it runs the operator's Claude Code sessions and nothing else, and is where his devices enter them with pc (board task 701151b4; the operator, 2026-10-14: \"ziggurat will be our entry point\"). Never dispatched: its dispatch gives the reason. Its sshd admits the hub and the phone, the one role whose admit row names the clients.",
+  "dispatch": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Move it to `nodes` with that budget when he decides; this line is the hold, not the verdict."
+}

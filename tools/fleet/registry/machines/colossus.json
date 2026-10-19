@@ -1,0 +1,40 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "user": "user",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.111.149.33",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Enrolled by fleet-enroll. A dispatch worker since 2026-10-09 (board task 28c43011), provisioned by scripts/host/fleet-node/provision.sh with the fleet test database and the isolated docker lane; its Arc Pro B60 runs glimmer.service and is not a CUDA device, so gpu stays null.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/user/fleet/stage",
+    "logical_cores": 12,
+    "ram_gb": 31.3,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 4,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": null,
+    "elevated": false
+  }
+}

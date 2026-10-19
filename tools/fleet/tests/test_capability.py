@@ -27,9 +27,10 @@ from fleet.contracts.capability import (
     measured,
     version_drift,
 )
-from fleet.contracts.node import declared_capability, decode_node_config, encode_node_config
+from fleet.contracts.node import declared_capability, encode_node_config
 from fleet.contracts.toolchain import ToolReport
 from fleet.core import toolchain
+from tests._contract_fixtures import decode_like
 from tests._toolchain_fixtures import (
     DIPHTHERIA_2026_09_23,
     DIPHTHERIA_2026_09_27,
@@ -146,30 +147,30 @@ class TestVersionDrift:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
         assert version_drift(RUST, None, reports) == (
             "declares rust none but its probe reports cargo '1.98.1', so it claims with the "
-            "rust tag; set rust to '1.98.1' in registry/nodes.json"
+            "rust tag; set rust to '1.98.1' in its registry/machines file"
         )
 
     def test_a_declared_toolchain_the_probe_does_not_find_is_claimed_without(self) -> None:
         assert version_drift(RUST, "1.98.1", toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
             "declares rust '1.98.1' but its probe reports no cargo, so it claims without the "
-            "rust tag; set rust to null in registry/nodes.json"
+            "rust tag; set rust to null in its registry/machines file"
         )
         assert version_drift(STACK, "29.8.1", _answered("stack", False, "")) == (
             "declares stack '29.8.1' but its probe reports no stack, so it claims without the "
-            "stack tag; set stack to null in registry/nodes.json"
+            "stack tag; set stack to null in its registry/machines file"
         )
 
     def test_another_version_keeps_the_tag_and_names_the_one_that_would_match(self) -> None:
         reports = toolchain.read_reports(DIPHTHERIA_2026_09_27_CXX)
         assert version_drift(CXX, "13.2.0", reports) == (
             "declares cxx '13.2.0' but its probe reports cxx '13.3.0', so it claims with the "
-            "cxx tag; set cxx to '13.3.0' in registry/nodes.json"
+            "cxx tag; set cxx to '13.3.0' in its registry/machines file"
         )
 
     def test_an_unreadable_answer_is_quoted_and_claims_without(self) -> None:
         assert version_drift(RUST, "1.98.1", _answered("cargo", True, SHIM_ERROR)) == (
             f"declares rust '1.98.1' but its probe reports cargo {SHIM_ERROR!r}, so it claims "
-            "without the rust tag; set rust to null in registry/nodes.json"
+            "without the rust tag; set rust to null in its registry/machines file"
         )
 
 
@@ -215,7 +216,7 @@ class TestDecodeCapability:
 class TestTheNodeContractCarriesBoth:
     def test_declared_toolchains_survive_encoding_and_read_back_by_capability(self) -> None:
         declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1", stack="29.8.2")
-        assert decode_node_config(encode_node_config(declared)) == declared
+        assert decode_like(encode_node_config(declared), declared) == declared
         assert declared_capability(declared, RUST) == "1.98.1"
         assert declared_capability(declared, CXX) == "13.3.0"
         assert declared_capability(declared, DOCKER) == "29.8.1"
@@ -232,11 +233,11 @@ class TestTheNodeContractCarriesBoth:
             JSONTypeError,
             match=rf"^node must declare '{key}': the version of that toolchain its probe reports",
         ):
-            decode_node_config(encoded)
+            decode_like(encoded, node())
 
     def test_a_malformed_declaration_is_refused_through_the_node(self) -> None:
         with pytest.raises(JSONTypeError, match=r"^cxx must be null or the version"):
-            decode_node_config({**encode_node_config(node()), "cxx": "stable"})
+            decode_like({**encode_node_config(node()), "cxx": "stable"}, node())
 
 
 class TestTheReadinessGate:

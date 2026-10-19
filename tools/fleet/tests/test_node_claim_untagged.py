@@ -24,6 +24,7 @@ from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import FakeQueue, queue_job
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of
 from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, ok
 from tests.test_node_agent_elevated import ADMINISTRATOR_TOKEN
 
@@ -54,13 +55,9 @@ def _untagged_config(config_path: pathlib.Path) -> pathlib.Path:
         The same path, rewritten.
     """
     document = sourced_document((NPM_CI,))
-    nodes = document["nodes"]
     projects = document["projects"]
-    assert isinstance(nodes, dict)
     assert isinstance(projects, dict)
-    lavender = nodes["lavender"]
-    assert isinstance(lavender, dict)
-    lavender["elevated"] = True
+    dispatch_of(document, "lavender")["elevated"] = True
     projects[ELEVATED_PROJECT] = {
         "worker_ram_gb": 0.5,
         "minimum_workers": 1,

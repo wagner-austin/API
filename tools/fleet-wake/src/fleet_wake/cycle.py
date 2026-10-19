@@ -114,7 +114,7 @@ def load_workspace(config_path: pathlib.Path) -> LoadedWorkspace:
     """
     resolved = config_path.resolve()
     document = read_workspace_document(resolved)
-    return LoadedWorkspace(decode_fleet_workspace(document), resolved.parent)
+    return LoadedWorkspace(decode_fleet_workspace(document), resolved, resolved.parent)
 
 
 __all__ = ["load_workspace", "run_cycle"]

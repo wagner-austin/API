@@ -14,7 +14,7 @@ THE SCRIPT IS SENT AND RUN BY PATH, IN THE NODE'S DIALECT. Like every remote
 command in this package (:mod:`fleet.core.remote` carries the measured
 reason) it is a file the node runs by path, and like every other script it
 is rendered by :func:`fleet.core.dialect.for_platform` from the platform the
-identity registry declares for the node: PowerShell to a Windows node, ``sh``
+roster declares for the node (:mod:`fleet.contracts.machine`): PowerShell to a Windows node, ``sh``
 to a Linux one. Until board task cd5010c4 the PowerShell text went to every
 node, and diphtheria answered ``powershell: command not found`` on every
 tick, logged as a node that did not answer. Both renderings emit ONE JSON
@@ -54,6 +54,7 @@ and recording around it would fill the ledger with rows nobody can trace.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime
 from typing import Final, TypedDict
 
@@ -62,9 +63,9 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
+from fleet.contracts.machine import Machine, MachineRole
 from fleet.contracts.node import NodePlatform
 from fleet.core import dialect, queue, remote
-from fleet.core.registry import RegistryNode
 
 #: What the script is called on the node, before the dialect's extension,
 #: under the provisioned account's ``.fleet`` directory -- the same
@@ -77,7 +78,9 @@ OBSERVE_STEM: Final = "observe-sessions"
 #: provisioned and has no account of ours to ssh in as. A session host is
 #: where the operator's Claude Code sessions run (MCPs board task 701151b4),
 #: so it is the node this pass most has to see.
-OBSERVABLE_ROLES: Final = frozenset({"worker", "vpn-jump", "session-host"})
+OBSERVABLE_ROLES: Final = frozenset(
+    {MachineRole.WORKER, MachineRole.VPN_JUMP, MachineRole.SESSION_HOST}
+)
 
 
 class NodeSessions(TypedDict):
@@ -333,12 +336,12 @@ def machine_of(sessions: NodeSessions) -> str:
     return f"{sessions['platform']}:{sessions['hostname']}"
 
 
-def observe_node(board: McpCredentials, node: RegistryNode, identity: JSONObject) -> NodeOutcome:
+def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> NodeOutcome:
     """Read one node's records and record them on the board.
 
     Args:
         board: The taskboard's endpoint and headers.
-        node: The node, from the identity registry.
+        node: The machine, from the roster.
         identity: This runner's identity arguments.
 
     Returns:
@@ -377,32 +380,41 @@ def observe_node(board: McpCredentials, node: RegistryNode, identity: JSONObject
     return NodeOutcome(node=node["name"], recorded=True, detail=detail)
 
 
+def observable(machines: Mapping[str, Machine]) -> tuple[Machine, ...]:
+    """The machines the roster says are live and whose sessions this pass records.
+
+    Args:
+        machines: The roster's machines, by name.
+
+    Returns:
+        Each enabled machine whose role is in :data:`OBSERVABLE_ROLES`, in
+        name order. Disabled machines, the hub and clients are left out:
+        they are never asked, which is a different fact from not answering.
+    """
+    return tuple(
+        machines[name]
+        for name in sorted(machines)
+        if machines[name]["enabled"] and machines[name]["role"] in OBSERVABLE_ROLES
+    )
+
+
 def observe_pass(
-    board: McpCredentials, registry: dict[str, RegistryNode], identity: JSONObject
+    board: McpCredentials, machines: tuple[Machine, ...], identity: JSONObject
 ) -> tuple[NodeOutcome, ...]:
-    """Observe every node the registry says is live and observable.
+    """Observe each machine :func:`observable` chose.
 
     Args:
         board: The taskboard's endpoint and headers.
-        registry: The identity registry's nodes, from
-            :func:`fleet.core.registry.decode_registry_nodes`.
+        machines: The machines to visit, in order.
         identity: This runner's identity arguments.
 
     Returns:
-        One outcome per node visited, in name order. Disabled nodes, the
-        hub and clients are not visited and produce no outcome -- they were
-        never asked, which is a different fact from not answering.
+        One outcome per machine, in order.
 
     Raises:
         AppError: See :func:`observe_node`.
     """
-    outcomes: list[NodeOutcome] = []
-    for name in sorted(registry):
-        node = registry[name]
-        if not node["enabled"] or node["role"] not in OBSERVABLE_ROLES:
-            continue
-        outcomes.append(observe_node(board, node, identity))
-    return tuple(outcomes)
+    return tuple(observe_node(board, machine, identity) for machine in machines)
 
 
 def render_outcome(outcome: NodeOutcome) -> str:
@@ -429,6 +441,7 @@ __all__ = [
     "decode_node_sessions",
     "iso_from_millis",
     "machine_of",
+    "observable",
     "observation_json",
     "observe_node",
     "observe_pass",

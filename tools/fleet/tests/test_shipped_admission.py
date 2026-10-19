@@ -40,12 +40,15 @@ from fleet.core.workspace_files import read_workspace_document
 #: Each bounded node, a project it checks, and the workers it grants that
 #: project alone: half the cores its owner leaves, rounded up, with memory to
 #: spare at 24 GB free. diphtheria is weighed with a suite pinned to it,
-#: because it checks no other.
+#: because it checks no other. loki and serendipity leave their owner only
+#: the operating system's 2 cores since MCPs board task e447de72 (the
+#: operator, 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all
+#: workers"), so 14 and 6 cores are left to the fleet.
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
     "lavender-wsl": ("MCPs/mcp-shared", 4),
-    "loki": ("MCPs/mcp-shared", 6),
-    "serendipity": ("MCPs/mcp-shared", 2),
+    "loki": ("MCPs/mcp-shared", 7),
+    "serendipity": ("MCPs/mcp-shared", 3),
 }
 
 #: The suites that need diphtheria's production stack or read what only it

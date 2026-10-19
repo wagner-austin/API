@@ -97,11 +97,10 @@ class TestTagDrift:
 
         assert tag_drift(_diphtheria(), toolchain.read_reports(answer)) == (
             "declares gpu 'NVIDIA RTX A2000 12GB, 8.6' but nvidia-smi reports none, so it claims "
-            "without the gpu tag; correct gpu in registry/nodes.json",
+            "without the gpu tag; correct gpu in its registry/machines file",
             "declares test_database true but no corvis-fleet-testdb container exists, so it "
-            "claims without the testdb tag; set test_database to false in registry/nodes.json, "
-            "or "
-            "provision the container",
+            "claims without the testdb tag; set test_database to false in its registry/machines "
+            "file, or provision the container",
         )
 
     def test_an_undeclared_card_test_database_and_compiler(self) -> None:
@@ -113,10 +112,10 @@ class TestTagDrift:
 
         assert tag_drift(node("pendragon"), toolchain.read_reports(answer)) == (
             "declares gpu none but nvidia-smi reports 'NVIDIA GeForce GTX 1630, 7.5', so it "
-            "claims with the gpu tag; correct gpu in registry/nodes.json",
+            "claims with the gpu tag; correct gpu in its registry/machines file",
             "declares test_database false but corvis-fleet-testdb exists "
             "(pgvector/pgvector:pg16-bookworm), so it claims with the testdb tag; set "
-            "test_database to true in registry/nodes.json",
+            "test_database to true in its registry/machines file",
             "declares cxx none but its probe reports cxx '13.3.0', so it claims with the cxx "
-            "tag; set cxx to '13.3.0' in registry/nodes.json",
+            "tag; set cxx to '13.3.0' in its registry/machines file",
         )

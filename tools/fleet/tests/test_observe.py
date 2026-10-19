@@ -15,9 +15,9 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
+from fleet.contracts.machine import Machine, MachineRole
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, observe, remote
-from fleet.core.registry import RegistryNode
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok, timed_out
 
@@ -71,27 +71,28 @@ def node(
     enabled: bool = True,
     user: str | None = "austin",
     platform: NodePlatform = NodePlatform.WINDOWS,
-) -> RegistryNode:
-    """Build one identity-registry node.
+) -> Machine:
+    """Build one roster machine that declares no dispatch capacity.
 
     Args:
-        name: The node name.
+        name: The machine name.
         role: hub, worker, vpn-jump, session-host or client.
-        enabled: Whether the registry says it should answer.
+        enabled: Whether the roster says it should answer.
         user: The provisioned account, or None.
-        platform: What the registry says it runs.
+        platform: What the roster says it runs.
 
     Returns:
-        The node.
+        The machine.
     """
-    return RegistryNode(
+    return Machine(
         name=name,
-        enabled=enabled,
-        role=role,
+        role=MachineRole(role),
         user=user,
         platform=platform,
-        cuda=False,
-        test_database=False,
+        enabled=enabled,
+        guest_host=None,
+        dispatch=None,
+        held="observed, never dispatched to",
     )
 
 
@@ -466,12 +467,9 @@ def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
     _test_hooks.run = run
     board = FakeQueue(["observed 1 session(s) for win32:serendipity (0 new row(s)) at t"])
     _test_hooks.http_post = board
-    registry = {
-        "pendragon": node("pendragon", "worker", user="austi"),
-        "serendipity": node("serendipity", "worker"),
-    }
+    machines = (node("pendragon", "worker", user="austi"), node("serendipity", "worker"))
 
-    outcomes = observe.observe_pass(BOARD, registry, IDENTITY)
+    outcomes = observe.observe_pass(BOARD, machines, IDENTITY)
 
     assert [observe.render_outcome(o) for o in outcomes] == [
         "pendragon: not observed -- ssh to pendragon timed out while sending "
@@ -527,7 +525,7 @@ def test_observe_pass_visits_enabled_workers_and_jump_hosts_in_name_order() -> N
         "loki": node("loki", "worker", user="loki"),
     }
 
-    outcomes = observe.observe_pass(BOARD, registry, IDENTITY)
+    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
 
     assert [o["node"] for o in outcomes] == ["loki", "serendipity", "viper"]
     assert [o["recorded"] for o in outcomes] == [False, True, True]
@@ -545,7 +543,7 @@ def test_observe_pass_visits_a_session_host() -> None:
         "austinpc": node("austinpc", "hub"),
     }
 
-    outcomes = observe.observe_pass(BOARD, registry, IDENTITY)
+    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
 
     assert [(o["node"], o["recorded"]) for o in outcomes] == [("ziggurat", True)]
     assert [a["machine"] for a in board.arguments] == ["win32:ziggurat"]

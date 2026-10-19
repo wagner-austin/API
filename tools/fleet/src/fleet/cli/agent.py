@@ -63,9 +63,10 @@ duty's:
        5a3865bf; :mod:`fleet.core.observe` carries the why). Last, because
        it is the pass that touches every node, and a node asleep costs a
        ten-second ssh timeout that the queue work should not wait behind.
-       Runs only when ``--registry`` names the identity registry: the pass
-       needs to know which machines exist, and that file lives in the MCPs
-       checkout, which a runner may legitimately not have.
+       The machines are the registry's own roster (``registry/machines``,
+       MCPs board task e447de72), so every hub tick observes; until then
+       they were read from MCPs' ``fleet-nodes.json``, named by a
+       ``--registry`` flag, and a tick without it observed nothing.
     4. REAP. Read each WSL runner host's Workers against GitHub's runner
        list, read again two minutes later where one was named, and end each
        Worker both readings name as holding a job GitHub dropped, by pid,
@@ -116,16 +117,15 @@ SESSION_FLAG = "--session"
 ROOT_FLAG = "--repo-root"
 NODE_FLAG = "--node"
 MCPS_ROOT_FLAG = "--mcps-root"
-REGISTRY_FLAG = "--registry"
 LANE_FLAG = "--lane"
 NETBOOT_RELEASE_FLAG = "--netboot-release"
 NODEJS_FLAG = "--nodejs"
 SERVED_ROOT_FLAG = "--served-root"
 ENV_FILE_FLAG = "--env-file"
 
-#: The flags only a hub tick's publish and observe passes read, which a
-#: sessions or netboot tick refuses rather than ignores.
-_HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG, REGISTRY_FLAG)
+#: The flag only a hub tick's base rebuilds read, which a sessions or
+#: netboot tick refuses rather than ignores.
+_HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG,)
 
 #: The flags a netboot tick places its arms with, which every other lane
 #: refuses rather than ignores.
@@ -139,7 +139,6 @@ _FLAGS = (
     ROOT_FLAG,
     NODE_FLAG,
     MCPS_ROOT_FLAG,
-    REGISTRY_FLAG,
     LANE_FLAG,
     *NETBOOT_FLAGS,
 )
@@ -301,7 +300,7 @@ def lane_host(parsed: Mapping[str, str], lane: DispatchLane) -> str:
             or a sessions tick that names no ``--node``.
     """
     if lane is not DispatchLane.HUB:
-        _refuse_flags(parsed, lane, _HUB_ONLY_FLAGS, "only a hub tick publishes and observes")
+        _refuse_flags(parsed, lane, _HUB_ONLY_FLAGS, "only a hub tick rebuilds the bases")
     if lane is not DispatchLane.NETBOOT:
         _refuse_flags(parsed, lane, NETBOOT_FLAGS, "only a netboot tick arms")
     if lane is DispatchLane.SESSIONS:
@@ -318,15 +317,16 @@ def lane_host(parsed: Mapping[str, str], lane: DispatchLane) -> str:
     return _test_hooks.hostname()
 
 
-def netboot_place(parsed: Mapping[str, str]) -> netboot_arm.NetbootPlace:
+def netboot_place(parsed: Mapping[str, str], registry: pathlib.Path) -> netboot_arm.NetbootPlace:
     """Read where a netboot tick's arms run from and write to.
 
     Args:
         parsed: The parsed flags.
+        registry: The registry directory this tick loaded.
 
     Returns:
-        The installed release, the node binary, the served root and the
-        workspace env file.
+        The installed release, the node binary, the served root, the
+        workspace env file and the registry.
 
     Raises:
         ValueError: When any of :data:`NETBOOT_FLAGS` is absent.
@@ -336,6 +336,7 @@ def netboot_place(parsed: Mapping[str, str]) -> netboot_arm.NetbootPlace:
         nodejs=cli_args.require_flag(parsed, NODEJS_FLAG),
         served_root=pathlib.Path(cli_args.require_flag(parsed, SERVED_ROOT_FLAG)),
         env_file=pathlib.Path(cli_args.require_flag(parsed, ENV_FILE_FLAG)),
+        registry=registry,
     )
 
 
@@ -378,11 +379,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = cli_args.parse_single_flags(
         [token for token in tokens if token != queue.ANNOUNCE_FLAG], _FLAGS
     )
-    # The workspace is still read, and refused when malformed, although no
-    # lane here dispatches to a node: a runner whose registry does not
-    # decode has no business claiming anything, and the node runners beside
-    # it read the same file.
-    _config.load_workspace(parsed)
+    # The workspace is read, and refused when malformed, although no lane
+    # here dispatches to a node: a runner whose registry does not decode has
+    # no business claiming anything, the node runners beside it read the same
+    # files, and a hub tick's observe pass walks its machines.
+    loaded = _config.load_workspace(parsed)
     lane = require_runner_lane(cli_args.require_flag(parsed, LANE_FLAG))
     host = lane_host(parsed, lane)
     agent = cli_args.require_flag(parsed, AGENT_FLAG)
@@ -415,21 +416,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         node=parsed.get(NODE_FLAG),
         host=host,
         mcps_root=mcps_root,
-        netboot=netboot_place(parsed) if lane is DispatchLane.NETBOOT else None,
+        netboot=netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None,
     )
     if claimed is None:
         _log.info("%s lane empty", lane.value)
     if lane is not DispatchLane.HUB:
         return 0
     hub_passes.publish_pass(credentials, identity, repo_root=project_root)
-
-    raw_registry = parsed.get(REGISTRY_FLAG)
-    if raw_registry is None:
-        # Said out loud, every tick: a ledger with no fleet rows must be
-        # distinguishable from a runner that was never asked to write any.
-        _log.info("session observation skipped: no %s given", REGISTRY_FLAG)
-    else:
-        hub_passes.observe_pass(pathlib.Path(raw_registry).resolve(), identity)
+    hub_passes.observe_pass(loaded.workspace["machines"], identity)
     hub_passes.reap_pass(project_root)
     return 0
 
@@ -466,7 +460,6 @@ __all__ = [
     "NETBOOT_RELEASE_FLAG",
     "NODEJS_FLAG",
     "NODE_FLAG",
-    "REGISTRY_FLAG",
     "ROOT_FLAG",
     "SERVED_ROOT_FLAG",
     "SESSION_FLAG",

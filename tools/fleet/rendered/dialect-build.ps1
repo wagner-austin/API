@@ -132,6 +132,7 @@ $env:CORVIS_FLEET_ELEVATED = '0'
 $env:BOARD_AGENT_LABEL = 'opus-example-0929'
 $env:CORVIS_FLEET_CACHE = $CacheRoot
 $env:CORVIS_FLEET_WORKSPACE = 'packages/maketools'
+$env:CORVIS_FLEET_REGISTRY = "$Target.stage/registry"
 $env:PATH = "$GitBin;$env:PATH"
 function Invoke-Logged {
     param([string]$Shell, [string]$Command)

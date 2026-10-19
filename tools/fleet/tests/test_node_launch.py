@@ -117,7 +117,7 @@ class TestAClaimWhileItsJobLaunches:
         release = threading.Event()
         _test_hooks.run = ThreadRoutedRun(
             claims=FakeRun([*PROBED, *PROBED]),
-            launches=FakeRun(launch_steps(digest, commit_present=True)),
+            launches=FakeRun(launch_steps(digest, registry=sourced_config, commit_present=True)),
             release=release,
         )
         _test_hooks.http_post = ThreadRoutedQueue(
@@ -217,7 +217,9 @@ class TestALaunchWhoseStartReportTheQueueDidNotAnswer:
         :func:`fleet.cli.node_collect.reconcile_claim` to adopt, and the
         launcher raises nothing (MCPs board task 8993c306)."""
         digest = staging.digest(prebuilt_export(sourced_config))
-        _test_hooks.run = FakeRun(launch_steps(digest, commit_present=True))
+        _test_hooks.run = FakeRun(
+            launch_steps(digest, registry=sourced_config, commit_present=True)
+        )
         endpoint = FakeQueue([Unanswered(), Unanswered()])
         _test_hooks.http_post = answering(endpoint)
         held: list[frozenset[str]] = []

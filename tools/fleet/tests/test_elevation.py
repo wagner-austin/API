@@ -19,12 +19,13 @@ from fleet.contracts.elevation import (
     elevated_session,
     elevation_gap,
 )
-from fleet.contracts.node import decode_node_config, encode_node_config
+from fleet.contracts.node import NodePlatform, encode_node_config
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.toolchain import ToolReport
 from fleet.core import dispatch
 from fleet.core.toolchain import read_reports
+from tests._contract_fixtures import decode_like
 from tests._toolchain_fixtures import LAVENDER_2026_09_23, node
 
 
@@ -77,21 +78,22 @@ class TestTheDeclaration:
         del encoded["elevated"]
 
         with pytest.raises(JSONTypeError, match="must declare 'elevated': true only for a Windows"):
-            decode_node_config(encoded)
+            decode_like(encoded, node())
 
     def test_elevated_is_carried_both_ways_on_a_windows_node(self) -> None:
         encoded = encode_node_config(node())
         assert encoded["elevated"] is False
 
-        assert decode_node_config({**encoded, "elevated": True})["elevated"] is True
+        assert decode_like({**encoded, "elevated": True}, node())["elevated"] is True
 
     def test_an_elevated_linux_node_is_refused(self) -> None:
+        linux = node()
+        linux["platform"] = NodePlatform.LINUX
+
         with pytest.raises(
             JSONTypeError, match=r"^elevated is true on a linux node; an elevated runner launches"
         ):
-            decode_node_config(
-                {**encode_node_config(node()), "platform": "linux", "elevated": True}
-            )
+            decode_like({**encode_node_config(linux), "elevated": True}, linux)
 
 
 class TestTheTokenGate:

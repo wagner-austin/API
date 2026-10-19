@@ -1,4 +1,4 @@
-"""The remaining contracts: node, project, workspace, ledger and feed.
+"""The remaining contracts: project, workspace, ledger and feed (machine and node: test_machine.py).
 
 Every decoder is exercised on its own refusals rather than only its happy
 path, because each refusal encodes a specific way a fleet goes wrong and a
@@ -12,7 +12,6 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 
-from fleet.contracts.budget import NodeBudget
 from fleet.contracts.feed import (
     TERMINAL_KINDS,
     FeedEvent,
@@ -30,15 +29,7 @@ from fleet.contracts.ledger import (
     encode_ledger_entry,
     is_live,
 )
-from fleet.contracts.node import (
-    NodeConfig,
-    NodeGpu,
-    NodePlatform,
-    decode_node_config,
-    decode_node_gpu,
-    encode_node_config,
-    encode_node_gpu,
-)
+from fleet.contracts.machine import encode_machine
 from fleet.contracts.project import (
     ProjectConfig,
     decode_project_config,
@@ -52,51 +43,8 @@ from fleet.contracts.workspace import (
     require_node,
     require_project,
 )
-
-_BUDGET = NodeBudget(
-    reserved_cores=2,
-    reserved_ram_gb=4.0,
-    worker_ram_gb=1.1,
-    max_disk_gb=20.0,
-    checks_at_once=None,
-    pinned_checks_only=False,
-)
-
-_GPU = NodeGpu(
-    model="NVIDIA GeForce GTX 1630",
-    vram_mib=4096,
-    compute_capability="7.5",
-    driver_version="591.86",
-)
-
-
-def _node(*, gpu: NodeGpu | None = _GPU, cores: int = 16) -> NodeConfig:
-    """Build a node declaration.
-
-    Args:
-        gpu: Its CUDA device, or None for a CPU-only machine.
-        cores: Logical processors.
-
-    Returns:
-        The node.
-    """
-    return NodeConfig(
-        host="lavender",
-        platform=NodePlatform.WINDOWS,
-        stage_root="C:/fleet/stage",
-        logical_cores=cores,
-        ram_gb=32.0,
-        gpu=gpu,
-        enabled=True,
-        test_database=False,
-        rust=None,
-        cxx=None,
-        docker=None,
-        stack=None,
-        elevated=False,
-        wsl_host=None,
-        budget=_BUDGET,
-    )
+from tests._contract_fixtures import machine, node
+from tests._roster_fixtures import machines_of
 
 
 def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectConfig:
@@ -127,8 +75,11 @@ def _workspace() -> FleetWorkspace:
     Returns:
         The workspace.
     """
+    lavender = node()
+    loki = node(gpu=None, host="loki")
     return FleetWorkspace(
-        nodes={"lavender": _node(), "loki": _node(gpu=None)},
+        machines={"lavender": machine("lavender", lavender), "loki": machine("loki", loki)},
+        nodes={"lavender": lavender, "loki": loki},
         not_dispatchable={},
         projects={"services/Model-Trainer": _project()},
         data_paths={
@@ -173,132 +124,6 @@ def _entry(*, outcome: str = "running", workers: int = 6, started: int = 100) ->
             "detail": "",
         }
     )
-
-
-class TestNodeGpu:
-    def test_a_device_survives_encoding(self) -> None:
-        assert decode_node_gpu(load_json_str(dump_json_str(encode_node_gpu(_GPU)))) == _GPU
-
-    def test_compute_capability_orders_as_a_version_not_a_float(self) -> None:
-        """THE REASON IT IS A STRING, asserted on real architectures.
-
-        Read as floats, 8.10 would sort BELOW 8.9 and a fleet comparing two
-        cards would call the newer one older. Held as versions, the two are
-        simply distinct values and nothing is tempted to order them
-        arithmetically.
-        """
-        ampere = decode_node_gpu({**encode_node_gpu(_GPU), "compute_capability": "8.9"})
-        hopper = decode_node_gpu({**encode_node_gpu(_GPU), "compute_capability": "8.10"})
-
-        assert ampere["compute_capability"] != hopper["compute_capability"]
-        assert float(hopper["compute_capability"]) < float(ampere["compute_capability"])
-
-    def test_a_non_object_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be a JSON object"):
-            decode_node_gpu("GTX 1630")
-
-    def test_a_card_reporting_no_memory_is_a_failed_probe(self) -> None:
-        with pytest.raises(JSONTypeError, match="vram_mib must be positive"):
-            decode_node_gpu({**encode_node_gpu(_GPU), "vram_mib": 0})
-
-
-class TestNodeConfig:
-    def test_a_node_survives_encoding(self) -> None:
-        original = _node()
-
-        assert decode_node_config(load_json_str(dump_json_str(encode_node_config(original)))) == (
-            original
-        )
-
-    def test_a_cpu_only_node_survives_encoding(self) -> None:
-        original = _node(gpu=None)
-
-        assert decode_node_config(load_json_str(dump_json_str(encode_node_config(original)))) == (
-            original
-        )
-
-    def test_an_absent_gpu_key_is_refused(self) -> None:
-        """Absence is indistinguishable from unfilled.
-
-        The difference matters the moment a measurement is pinned to a card,
-        so a CPU-only node says so with an explicit null.
-        """
-        encoded = encode_node_config(_node())
-        del encoded["gpu"]
-
-        with pytest.raises(JSONTypeError, match="must declare 'gpu'"):
-            decode_node_config(encoded)
-
-    def test_an_absent_enabled_key_is_refused(self) -> None:
-        """Neither default is safe, so the workspace has to say which.
-
-        Defaulting to true is the exact defect this field was added for --
-        loki was marked off in the fleet's identity registry on 2026-09-05 and
-        this workspace kept dispatching to it, ten seconds of ssh timeout at a
-        time. Defaulting to false would fail the other way and silently shrink
-        the fleet, with nothing to notice the missing capacity.
-        """
-        encoded = encode_node_config(_node())
-        del encoded["enabled"]
-
-        with pytest.raises(JSONTypeError, match="must declare 'enabled'"):
-            decode_node_config(encoded)
-
-    def test_an_absent_test_database_key_is_refused(self) -> None:
-        """Neither default is safe here either (MCPs board task 6bbfd171).
-
-        False would hide a provisioned node from every Postgres-backed
-        package; true would hand those packages to a node whose global test
-        setup cannot reach a database.
-        """
-        encoded = encode_node_config(_node())
-        del encoded["test_database"]
-
-        with pytest.raises(JSONTypeError, match="must declare 'test_database'"):
-            decode_node_config(encoded)
-
-    def test_test_database_is_carried_both_ways(self) -> None:
-        encoded = encode_node_config(_node())
-        assert encoded["test_database"] is False
-
-        assert decode_node_config({**encoded, "test_database": True})["test_database"] is True
-
-    def test_a_non_object_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be a JSON object"):
-            decode_node_config(["lavender"])
-
-    def test_a_node_with_no_cores_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="logical_cores must be at least 1"):
-            decode_node_config({**encode_node_config(_node()), "logical_cores": 0})
-
-    def test_an_empty_stage_root_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="stage_root must not be empty"):
-            decode_node_config({**encode_node_config(_node()), "stage_root": ""})
-
-    def test_a_node_with_no_memory_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="ram_gb must be positive"):
-            decode_node_config({**encode_node_config(_node()), "ram_gb": 0.0})
-
-    def test_the_platform_is_carried_and_a_linux_node_decodes(self) -> None:
-        encoded = encode_node_config(_node())
-        assert encoded["platform"] == "windows"
-
-        decoded = decode_node_config({**encoded, "platform": "linux"})
-
-        assert decoded["platform"] == "linux"
-
-    def test_a_platform_outside_the_set_is_refused(self) -> None:
-        """A value with no dialect has nothing to send; refusing here keeps
-        that from surfacing as a script the far side cannot parse."""
-        with pytest.raises(JSONTypeError, match="platform must be one of windows, linux"):
-            decode_node_config({**encode_node_config(_node()), "platform": "solaris"})
-
-    def test_a_node_missing_platform_is_refused(self) -> None:
-        encoded = encode_node_config(_node())
-        del encoded["platform"]
-
-        with pytest.raises(JSONTypeError, match="platform"):
-            decode_node_config(encoded)
 
 
 class TestProject:
@@ -376,53 +201,61 @@ class TestWorkspace:
         with pytest.raises(JSONTypeError, match="workspace must be a JSON object"):
             decode_fleet_workspace([])
 
-    def test_a_workspace_with_no_nodes_is_refused(self) -> None:
+    def test_a_workspace_with_no_machines_is_refused(self) -> None:
         """It could dispatch nothing, and every command would blame the caller."""
-        with pytest.raises(JSONTypeError, match="declares no nodes"):
-            decode_fleet_workspace({**encode_fleet_workspace(_workspace()), "nodes": {}})
+        with pytest.raises(JSONTypeError, match="declares no machines"):
+            decode_fleet_workspace({**encode_fleet_workspace(_workspace()), "machines": {}})
+
+    def test_a_roster_where_no_machine_declares_capacity_is_refused(self) -> None:
+        original = _workspace()
+        original["machines"] = {"austinpc": machine("austinpc", None, held="the hub")}
+
+        with pytest.raises(JSONTypeError, match="no machine declares what dispatch may take"):
+            decode_fleet_workspace(encode_fleet_workspace(original))
 
     def test_a_workspace_with_no_projects_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="declares no projects"):
             decode_fleet_workspace({**encode_fleet_workspace(_workspace()), "projects": {}})
 
     def test_excluding_nothing_is_a_real_answer_unlike_declaring_no_nodes(self) -> None:
-        """An empty exclusion map is a fleet that has decided about every
-        machine and excluded none, which is a legitimate state. That is why
-        it is not run through the same emptiness refusal as nodes."""
+        """A roster in which every machine takes work excludes none, which is
+        a legitimate state, unlike a roster in which none does."""
         assert decode_fleet_workspace(encode_fleet_workspace(_workspace()))["not_dispatchable"] == (
             {}
         )
 
-    def test_an_exclusion_survives_encoding_with_its_reason(self) -> None:
-        reason = "the hub the dispatcher itself runs on; it shares the .venv"
+    def test_each_reason_a_machine_takes_no_work_is_its_exclusion(self) -> None:
+        """A machine that declares no capacity says why in its ``dispatch``,
+        and a declared node held out says why in ``held``; both are what
+        ``not_dispatchable`` names (MCPs board task e447de72), and neither
+        node is dispatched to."""
+        hub = "the hub the dispatcher itself runs on; it shares the .venv"
+        retired = "its WSL VM holds the memory the Windows lane measures"
         original = _workspace()
-        original["not_dispatchable"] = {"austinpc": reason}
+        original["machines"]["austinpc"] = machine("austinpc", None, held=hub)
+        original["machines"]["loki"] = machine("loki", node(gpu=None, host="loki"), held=retired)
 
         decoded = decode_fleet_workspace(
             load_json_str(dump_json_str(encode_fleet_workspace(original)))
         )
 
-        assert decoded["not_dispatchable"] == {"austinpc": reason}
+        assert decoded["not_dispatchable"] == {"austinpc": hub, "loki": retired}
+        assert sorted(decoded["nodes"]) == ["lavender", "loki"]
+        assert decoded["nodes"]["loki"]["enabled"] is False
+        assert decoded["machines"]["loki"]["held"] == retired
 
-    def test_an_exclusion_with_a_blank_reason_is_refused(self) -> None:
+    def test_a_blank_reason_is_refused(self) -> None:
         """It says no more than leaving the machine out entirely, which is
         exactly the ambiguity the field was added to remove."""
-        with pytest.raises(JSONTypeError, match="has an empty reason"):
-            decode_fleet_workspace(
-                {**encode_fleet_workspace(_workspace()), "not_dispatchable": {"austinpc": ""}}
-            )
+        original = _workspace()
+        encoded = encode_fleet_workspace(original)
+        machines_of(encoded)["austinpc"] = {
+            **encode_machine(machine("austinpc", None, held="x")),
+            "dispatch": "",
+        }
 
-    def test_a_machine_both_declared_and_excluded_is_refused(self) -> None:
-        """The document says two opposite things about one machine. Honouring
-        either would be a guess, and the quiet guess -- excluded wins -- would
-        remove a node somebody declared with full capacity numbers."""
-        with pytest.raises(JSONTypeError, match="both as an enabled node"):
-            decode_fleet_workspace(
-                {
-                    **encode_fleet_workspace(_workspace()),
-                    "not_dispatchable": {"loki": "travels"},
-                }
-            )
+        with pytest.raises(JSONTypeError, match="dispatch must be a non-empty string"):
+            decode_fleet_workspace(encoded)
 
     def test_an_unknown_node_names_the_declared_ones(self) -> None:
         with pytest.raises(AppError) as excinfo:

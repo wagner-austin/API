@@ -271,7 +271,7 @@ class TestTheCommands:
         config_path = _shared_workspace(tmp_path)
         _test_hooks.now = FakeClock(DEMO_NOW)
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
 
         run.main(
@@ -360,7 +360,7 @@ class TestTheCommands:
         the new check must be invisible to them."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
 
         assert (
             run.main(

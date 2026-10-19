@@ -49,21 +49,29 @@ class LoadedWorkspace:
 
     Attributes:
         workspace: The validated document.
+        registry: The registry directory it was read from, whose files a
+            command hands on to a reader of its own (the netboot arm reads
+            ``machines`` there).
         directory: The directory its relative paths resolve against: the
-            one it was read from, or the one ``--records-dir`` named.
+            registry's parent, or the one ``--records-dir`` named.
     """
 
     workspace: FleetWorkspace
+    registry: pathlib.Path
     directory: pathlib.Path
 
-    def __init__(self, workspace: FleetWorkspace, directory: pathlib.Path) -> None:
+    def __init__(
+        self, workspace: FleetWorkspace, registry: pathlib.Path, directory: pathlib.Path
+    ) -> None:
         """Hold a decoded workspace and where it came from.
 
         Args:
             workspace: The validated document.
-            directory: The directory it was read from.
+            registry: The registry directory it was read from.
+            directory: The directory its relative paths resolve against.
         """
         self.workspace = workspace
+        self.registry = registry
         self.directory = directory
 
     def _resolve(self, declared: str) -> pathlib.Path:
@@ -199,7 +207,7 @@ def load_workspace(parsed: dict[str, str]) -> LoadedWorkspace:
     value = read_workspace_document(path)
     records = parsed.get(RECORDS_FLAG)
     directory = path.parent if records is None else pathlib.Path(records).resolve()
-    return LoadedWorkspace(decode_fleet_workspace(value), directory)
+    return LoadedWorkspace(decode_fleet_workspace(value), path, directory)
 
 
 __all__ = ["CONFIG_FLAG", "RECORDS_FLAG", "LoadedWorkspace", "load_workspace"]

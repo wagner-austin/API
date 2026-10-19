@@ -382,7 +382,7 @@ class TestRunnerSpec:
         """A rebuild never takes a capability tag away from a fleet node.
 
         lavender's distro is both a CI runner host here and the fleet node
-        lavender-wsl in registry/nodes.json, whose runner claims with the tags its
+        lavender-wsl in registry/machines, whose runner claims with the tags its
         probe finds each tick. A tagged tool installed by hand there would be
         lost on the next ``--rebuild``, and every job needing its tag would
         silently wait for another node: on 2026-10-05 no node had go, and MCPs

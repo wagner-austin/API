@@ -1,0 +1,54 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.65.161.27",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": {
+    "host": "lavender",
+    "sshPort": 2222
+  },
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": [
+      {
+        "kind": "systemd",
+        "unit": "docker.service",
+        "purpose": "the daemon that runs corvis-fleet-testdb, the loopback test database every testdb suite migrates into"
+      }
+    ]
+  },
+  "notes": "lavender's WSL2 Ubuntu 24.04, a fleet node since 2026-09-29 (board task c4fc4f3e): the second linux node and the second node running corvis-fleet-testdb, added because diphtheria alone carried linux and testdb and 17 queued jobs could land nowhere else. Provisioned by MCPs scripts/host/lavender/provision-fleet-node.sh piped through `ssh lavender wsl.exe -d Ubuntu -u root`, with scripts/host/lib/fleet-testdb.sh, the container definition diphtheria's provision.sh sources too. Measured that day: 16 logical cores and 25.4 GiB given to the distro by lavender's .wslconfig, 851 GB free on /, systemd as PID 1, g++ 13.3.0, Node v24.21.0 from NodeSource, Python 3.11.16 from deadsnakes as corvis's python3. It has no tailnet device: the hub's ssh config reaches it as Host lavender-wsl with a ProxyCommand that logs in to lavender's sshd and forwards to 127.0.0.1:2222 there (`ssh -W %h:%p lavender`), which WSL's localhost relay carries into the distro, and its sshd binds 127.0.0.1:2222 alone and admits corvis@127.0.0.1 alone, so nothing off lavender's loopback reaches it and its tailnetIp is lavender's. From 2026-09-29 to 2026-10-15 the hop ran `wsl.exe -d Ubuntu -u corvis -- nc -N 127.0.0.1 2222` per connection instead, because an sshd restart at 2026-09-29T10:33Z had left the relay holding a dead mapping for 2222; a wsl.exe launch then took 24 to 31 s while the node was loaded and failed fleet steps at the banner exchange (board task 5a643339), and four sshd restarts on WSL 2.7.14.0 on 2026-10-15 left the relay carrying 44 of 44 connections. The distro stays up because lavender's wsl-keepalive task keeps it alive, the same task the GitHub runners inside it depend on; those runners share its cores, so its dispatch budget reserves 8 cores and 6 GB of it for them. Its system Docker daemon is Ubuntu's docker.io 29.1.3, the runners' rootful one; since 2026-09-29 it also runs the fleet's isolated docker lane from scripts/host/lib/fleet-exec-docker.sh, the definition diphtheria's provision.sh sources: an execdocker user outside the docker group with its own rootless daemon (measured '29.1.3 [name=seccomp,profile=builtin, name=rootless, name=cgroupns]'), Docker's docker-rootless-extras-29.1.3 archive pinned by sha256 because docker.io ships no rootless tooling, and docker.io held so an unattended upgrade cannot move the version its dispatch declares. It was added because diphtheria's stack outgrew the half of its memory the fleet leaves it and every docker job had nowhere else to run. The GPU is lavender's own GTX 1630, which WSL exposes through the Windows driver: /usr/lib/wsl/lib/nvidia-smi reported 'NVIDIA GeForce GTX 1630, 4096 MiB, 591.86' on 2026-09-29, the card and driver lavender's row names, and the provision script links it into /usr/local/bin because WSL leaves it off a non-login PATH. It is ONE card under two rows, so a gpu job here and one on lavender would share it; every gpu project in fleet.json also requires windows (slime, chat/execution, measured that day), so none lands here.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 16,
+    "ram_gb": 25.4,
+    "gpu": {
+      "model": "NVIDIA GeForce GTX 1630",
+      "vram_mib": 4096,
+      "compute_capability": "7.5",
+      "driver_version": "591.86"
+    },
+    "budget": {
+      "reserved_cores": 8,
+      "reserved_ram_gb": 6.0,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": 1,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.1.3",
+    "stack": null,
+    "elevated": false
+  }
+}

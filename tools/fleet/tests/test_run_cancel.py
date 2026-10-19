@@ -109,7 +109,7 @@ class TestRun:
         # reading its own archive back -- which is what makes exit 0 here an
         # assertion about the path and not merely about the file existing.
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
 
         code = run.main(
@@ -142,7 +142,7 @@ class TestRun:
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
 
         code = run.main(
             [
@@ -193,7 +193,7 @@ class TestRun:
         """
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         argv = [
             _config.CONFIG_FLAG,
             str(config_path),
@@ -248,7 +248,7 @@ class TestRun:
     ) -> None:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
 
         assert (
             run.main(
@@ -297,7 +297,7 @@ class TestCancel:
             repo: The monorepo root.
         """
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         run.main(
             [
                 _config.CONFIG_FLAG,
@@ -457,7 +457,7 @@ class TestFinish:
 class TestInvocationForms:
     def test_run_entrypoint_exits_zero(self, config_path: pathlib.Path, repo: pathlib.Path) -> None:
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         saved = sys.argv
         sys.argv = [
             "fleet-run",
@@ -534,7 +534,7 @@ class TestInvocationForms:
         reads as a successful dispatch that never happened.
         """
         payload = prebuilt_archive(config_path, repo)
-        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload)))
+        _test_hooks.run = FakeRun(dispatch_replies(staging.digest(payload), config_path))
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.run", None)
         sys.argv = [

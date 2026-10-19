@@ -160,6 +160,7 @@ def launch_claimed(
                 path=prepared["source"]["path"],
                 install=prepared["source"]["install"],
             ),
+            registry=loaded.registry,
         )
     except AppError as refusal:
         detail = f"{refusal.code}: {refusal.message}"

@@ -28,8 +28,16 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, PROBE_OK, FakeRun, ok, retire_replies
+from tests.conftest import (
+    DEMO_PROJECT,
+    DEMO_RUN_ID,
+    PROBE_OK,
+    FakeRun,
+    ok,
+    retire_replies,
+)
 
 __all__ = ["_credentials_in_env"]
 
@@ -52,11 +60,7 @@ def _elevated_config(config_path: pathlib.Path) -> pathlib.Path:
         The same path, rewritten.
     """
     document = sourced_document((NPM_CI,))
-    nodes = document["nodes"]
-    assert isinstance(nodes, dict)
-    lavender = nodes["lavender"]
-    assert isinstance(lavender, dict)
-    lavender["elevated"] = True
+    dispatch_of(document, "lavender")["elevated"] = True
     return write_registry(config_path, document)
 
 

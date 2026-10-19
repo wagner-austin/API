@@ -32,6 +32,7 @@ from fleet.cli import _config
 from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document
 
 #: The host-case markers and the execution run (board task 465689f5), and
 #: pytester, which test_host_execution runs that plugin's own sessions with.
@@ -312,7 +313,34 @@ def stage_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
     ]
 
 
-def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
+def registry_replies(registry: pathlib.Path) -> list[_test_hooks.CommandResult]:
+    """Every command staging the registry beside an export runs, in order.
+
+    (:func:`fleet.core.staging.stage_registry`, MCPs board task e447de72.)
+
+    Args:
+        registry: The registry directory the dispatch loaded, whose archive's
+            digest the node reports.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        ok(""),  # registry: send the archive directory's mkdir script
+        ok(""),  # registry: run it
+        ok(""),  # registry: send the registry directory's mkdir script
+        ok(""),  # registry: run it
+        ok(""),  # registry: scp the archive
+        ok(""),  # registry: send the digest script
+        ok(staging.digest(staging.registry_payload(registry))),  # registry: run it
+        ok(""),  # registry: send the extract script
+        ok(""),  # registry: run it
+    ]
+
+
+def dispatch_replies(
+    archive_digest: str, registry: pathlib.Path
+) -> list[_test_hooks.CommandResult]:
     """Every command a successful dispatch runs, in order.
 
     Written out rather than indexed into, because the sequence is the thing
@@ -325,6 +353,7 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
     Args:
         archive_digest: What the node should report having reassembled. The
             real digest for a success; anything else exercises the refusal.
+        registry: The registry directory the dispatch loaded.
 
     Returns:
         One result per call.
@@ -334,6 +363,7 @@ def dispatch_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:
         ok(PROBE_OK),  # probe: run it
         ok(""),  # tar, locally
         *stage_replies(archive_digest),
+        *registry_replies(registry),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
@@ -367,33 +397,7 @@ def workspace_document() -> JSONObject:
         The document, ready to serialise.
     """
     return {
-        "nodes": {
-            "lavender": {
-                "host": "lavender",
-                "platform": "windows",
-                "stage_root": "C:/fleet/stage",
-                "logical_cores": 16,
-                "ram_gb": 32.0,
-                "gpu": None,
-                "enabled": True,
-                "test_database": False,
-                "rust": None,
-                "cxx": None,
-                "docker": None,
-                "stack": None,
-                "elevated": False,
-                "wsl_host": None,
-                "budget": {
-                    "reserved_cores": 2,
-                    "reserved_ram_gb": 4.0,
-                    "worker_ram_gb": 1.1,
-                    "max_disk_gb": 20.0,
-                    "checks_at_once": None,
-                    "pinned_checks_only": False,
-                },
-            }
-        },
-        "not_dispatchable": {},
+        "machines": {"lavender": machine_document()},
         "data_paths": {},
         "node_local_resources": [],
         "projects": {

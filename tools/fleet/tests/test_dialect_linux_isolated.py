@@ -88,13 +88,22 @@ class TestIsolatedText:
         assert _isolated().startswith(PROLOGUE)
         copy = lines.index(f"sudo -n cp -a '{TARGET}/.' \"$exec_root/\"")
         uid = lines.index(f'exec_uid="$(id -u {EXEC_USER})"')
-        assert lines[uid + 1 : uid + 4] == [
+        assert lines[uid + 1 : uid + 5] == [
             EXEC_HOME_LINE,
             'exec_root="$exec_home/fleet/stage/slime-execution-1790600000"',
+            'exec_registry="$exec_home/fleet/stage/slime-execution-1790600000.stage/registry"',
             'exec_cache="$exec_home/fleet/cache"',
         ]
-        owner = lines.index(f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_cache"')
-        assert lines.index('sudo -n rm -rf "$exec_root"') < copy < owner
+        owner = lines.index(
+            f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_registry" "$exec_cache"'
+        )
+        assert lines.index('sudo -n rm -rf "$exec_root" "$exec_registry"') < copy < owner
+        # The roster the runner staged beside the tree goes with it, so a
+        # suite reading CORVIS_FLEET_REGISTRY as execdocker finds it (MCPs
+        # board task e447de72).
+        assert lines[copy + 1] == (
+            f"sudo -n cp -a '{names.registry_directory(TARGET)}/.' \"$exec_registry/\""
+        )
         # The generation is chosen, and its marker written into the copy,
         # as root before the copy and the cache are given to execdocker
         # (MCPs board task 346abc45).
@@ -105,7 +114,7 @@ class TestIsolatedText:
                 run_as="sudo -n ",
             )
         )
-        assert lines[copy + 1 : owner] == generation
+        assert lines[copy + 2 : owner] == generation
 
     def test_every_step_runs_as_execdocker_from_an_empty_environment_on_its_rootless_socket(
         self,
@@ -126,6 +135,7 @@ class TestIsolatedText:
         assert "CORVIS_TEST_MAX_WORKERS='3' " in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT} " in body
         assert "CORVIS_FLEET_WORKSPACE=. " in _isolated(path="")
+        assert 'CORVIS_FLEET_REGISTRY="$exec_registry" ' in body
         # env -i clears the runner's environment, so the keyring switch must
         # cross it too (MCPs board task c837fd8d).
         assert "POETRY_KEYRING_ENABLED='false' " in body

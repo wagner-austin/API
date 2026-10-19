@@ -16,8 +16,10 @@ netboot release, the same one the hub runner's ``netboot-serve`` row serves
 from: the row's ``{release}`` names it, and its own verifier checks its seal
 before anything in it runs (:mod:`fleet.core.sealed_release`). The revision
 the seal names is the arm's ``--commit``, so every arm records the commit it
-was built from, and the roster it reads is that release's
-``fleet-mcp/fleet-nodes.json``, never a checkout's working tree.
+was built from. The roster it reads is the registry this tick loaded, the
+rolled commit's ``tools/fleet/registry`` (MCPs board task e447de72); until
+then it was named as the release's ``fleet-mcp/fleet-nodes.json``, a file
+the netboot release never shipped.
 
 THE KEY STAYS WHERE IT IS. The arm mints with the tailnet API key the
 workspace env file already holds for the netboot execution lane. It is read
@@ -54,9 +56,6 @@ CLI: Final = pathlib.PurePosixPath("fleet-mcp/dist/src/netboot-cli.js")
 
 #: The installer definition inside a release.
 DEFINITION: Final = pathlib.PurePosixPath("fleet-mcp/netboot")
-
-#: The roster inside a release, which names each machine's boot MAC.
-ROSTER: Final = pathlib.PurePosixPath("fleet-mcp/fleet-nodes.json")
 
 #: Where the arm fetches the ISO, inside the served root so a build's
 #: rename stays on one file system.
@@ -114,12 +113,16 @@ class NetbootPlace(TypedDict):
         nodejs: The node binary that runs its CLI.
         served_root: The tree ``netboot-serve`` answers from.
         env_file: The workspace env file holding the tailnet API key.
+        registry: The registry directory this tick loaded, whose
+            ``machines`` roster names each machine's boot MAC (MCPs board
+            task e447de72).
     """
 
     release: pathlib.Path
     nodejs: str
     served_root: pathlib.Path
     env_file: pathlib.Path
+    registry: pathlib.Path
 
 
 class TailnetKey(TypedDict):
@@ -185,7 +188,7 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
     Returns:
         Node importing the release's CLI and running ``arm`` with its
         definition, the served root, a cache inside it, the seal's
-        revision as the commit, the machine and the release's roster.
+        revision as the commit, the machine and the loaded registry.
     """
     root = release["root"]
     importer = (
@@ -208,7 +211,7 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
         "--node",
         machine,
         "--registry",
-        str(root / ROSTER),
+        str(place["registry"]),
     )
 
 
@@ -321,7 +324,6 @@ __all__ = [
     "NO_KEY_CODE",
     "NO_MACHINE_CODE",
     "NO_RELEASE_CODE",
-    "ROSTER",
     "ArmOutcome",
     "NetbootPlace",
     "TailnetKey",

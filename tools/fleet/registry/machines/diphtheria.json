@@ -1,0 +1,87 @@
+{
+  "role": "hub",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [
+    "control",
+    "sessions",
+    "netboot",
+    "devices"
+  ],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.119.95.50",
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHoLsl1JQAe3FE/QsOfx8XpcOrEGI5NOtce5aADvRwnP corvis@diphtheria fleet hub",
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": [
+      {
+        "kind": "systemd",
+        "unit": "containerd.service",
+        "purpose": "the container runtime under docker"
+      },
+      {
+        "kind": "systemd",
+        "unit": "docker.service",
+        "purpose": "the corvis stack: every backend, the edge and postgres run here as containers"
+      },
+      {
+        "kind": "systemd",
+        "unit": "corvis-tailnet-ingress.service",
+        "purpose": "applies the mangle-table rule that confines the stack's published tailnet ports to the hub and colossus's 5432; the kernel keeps no rule across a boot"
+      },
+      {
+        "kind": "listener",
+        "address": "127.0.0.1",
+        "port": 5037,
+        "purpose": "the adb server phone-mcp reaches the Pixel 8 on this host's USB through (board task 49b6588b)",
+        "remedy": "make phone-up on diphtheria (the operator's 2026-09-25 ruling: adb is started by hand, never by a scheduled task)"
+      },
+      {
+        "kind": "listener",
+        "address": "172.18.0.1",
+        "port": 8040,
+        "purpose": "phone-mcp's listener on the compose bridge gateway, which mcp-forward-phone-mcp dials for the proxy",
+        "remedy": "the hub runner's phone-mcp row runs it: read that job's record in the runner's state directory, then make phone-up on diphtheria"
+      },
+      {
+        "kind": "listener",
+        "address": "172.18.0.1",
+        "port": 8042,
+        "purpose": "print-mcp's listener on the compose bridge gateway, which mcp-forward-print-mcp dials for the proxy",
+        "remedy": "the hub runner's print-mcp row runs it: read that job's record in the runner's state directory"
+      }
+    ]
+  },
+  "notes": "Dell OptiPlex 7040 MT, reimaged to Ubuntu 24.04.5 LTS and re-provisioned 2026-09-19 from a CORVIS stick (board task ff233b29; Initialize-Node.sh + Harden-Sshd.sh, verify ALL 16 PASSED). Login user corvis (the only uid>=1000 account). sshd binds 100.119.95.50:22 only, ssh.socket disabled, key-only; ufw ACTIVE: 22 from 100.77.206.124 only, 41641/udp and 5353/udp allowed. Tailscale 1.102.3 from the drive's pinned build. Reach measured from the hub 2026-09-19T11:24Z: ssh BatchMode -> Diphtheria exit 0; password-only -> Permission denied (publickey). The 2026-09-16 Windows row (austi, 100.96.143.14) is superseded and its device record is gone. RTX A2000 12GB installed with the driver up: nvidia-smi reports it, measured over ssh 2026-09-19T12:0xZ. Hardware re-measured on the node 2026-09-22T15:01Z (board task 5f52b0c9): Intel Core i7-6700 @ 3.40GHz, 8 threads; 31.2 GiB RAM (MemTotal 32746176 kB); NVIDIA RTX A2000 12GB, driver 595.91.07, 12282 MiB. The DISPLAY runs on the Intel HD Graphics 530 iGPU (00:02.0, drm card1 boot_vga=1); the A2000 (01:00.0, card2 boot_vga=0) reports display_active Disabled, so it is free of desktop rendering. The card is NOT idle: mcp-embed-api, moved here in the cutover, holds it for production embeddings (1138 MiB, process up since 2026-09-22T03:14Z), so any GPU work dispatched here shares the card with live semantic search. The fleet-node-setup probe drop-in /etc/sudoers.d/corvis-fleet-probe is installed (2026-09-19 14:02, grants exactly /usr/sbin/sshd -T and /usr/sbin/ufw status) and the audit's two root-only readings are MEASURED and pass: sshd.effective-key-only and firewall.ufw-admits-hub-only both ok in the audit captured 2026-09-20T20:34:43Z (read and corrected 2026-09-22, board task 5f52b0c9; this sentence previously said they reported NOT MEASURED). The fleet account ALSO holds a blanket grant, /etc/sudoers.d/corvis-nopasswd reading corvis ALL=(ALL) NOPASSWD: ALL, installed deliberately during the cutover for docker work (board task 3f9a0c00); it supersedes the narrow probe grant and contradicts the no-password-less-sudo premise stated in fleet-mcp/src/linux-facts.ts, and whether it is still needed after the cutover is an open question for the operator, not a defect this note resolves. ledger_observer is fleet-arm since 2026-09-21 (board task cd5010c4): the fleet arm's observe script goes out in the node's dialect, sh here (API tools/fleet, fleet.core.dialect_linux), and the hub's tick at 2026-09-21T00:27:04Z recorded 'observed 0 session(s) for linux:diphtheria, watermark stamped, first pass over this machine'. Before that the arm sent its PowerShell script to every node and this row was none so the audit did not fail every pass on a gap the arm could not close.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 8,
+    "ram_gb": 31.0,
+    "gpu": {
+      "model": "NVIDIA RTX A2000 12GB",
+      "vram_mib": 12282,
+      "compute_capability": "8.6",
+      "driver_version": "595.91.07"
+    },
+    "budget": {
+      "reserved_cores": 4,
+      "reserved_ram_gb": 2.0,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": 1,
+      "pinned_checks_only": true
+    },
+    "test_database": true,
+    "rust": "1.98.1",
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": "29.8.1",
+    "elevated": false
+  }
+}

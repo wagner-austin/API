@@ -132,7 +132,8 @@ def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() 
     )
     assert runner.stdin[0] == sent.encode("utf-8")
     assert sent.endswith(
-        f'{EXEC_HOME_LINE}\nsudo -n rm -rf "$exec_home/fleet/stage/{DEMO_RUN_ID}"\n'
+        f'{EXEC_HOME_LINE}\nsudo -n rm -rf "$exec_home/fleet/stage/{DEMO_RUN_ID}" '
+        f'"$exec_home/fleet/stage/{DEMO_RUN_ID}.stage"\n'
     )
 
 

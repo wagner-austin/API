@@ -24,11 +24,11 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, nodes, run
 from fleet.core import _test_hooks, staging
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document, machine_of, machines_of
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -41,27 +41,6 @@ from tests.conftest import (
     prebuilt_archive,
     workspace_document,
 )
-
-
-def _registry_node(name: str, *, enabled: bool) -> JSONObject:
-    """One identity-registry worker entry, Windows like the fixture workspace.
-
-    Args:
-        name: The node's registry name.
-        enabled: Whether the registry says it answers.
-
-    Returns:
-        The entry, carrying every field the reconciler decodes.
-    """
-    return {
-        "name": name,
-        "role": "worker",
-        "user": "austi",
-        "enabled": enabled,
-        "platform": "windows",
-        "gpu": None,
-        "test_database": False,
-    }
 
 
 @pytest.fixture(name="mixed_config")
@@ -80,17 +59,7 @@ def _mixed_config(tmp_path: pathlib.Path) -> pathlib.Path:
     _test_hooks.now = FakeClock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     document = workspace_document()
-    declared = document["nodes"]
-    if not isinstance(declared, dict):
-        raise AssertionError("the fixture workspace must declare nodes")
-    template = declared["lavender"]
-    if not isinstance(template, dict):
-        raise AssertionError("the fixture workspace must declare lavender")
-    asleep: JSONObject = dict(template)
-    asleep["host"] = "asleep"
-    asleep["enabled"] = False
-    declared["asleep"] = asleep
-    document["nodes"] = declared
+    machines_of(document)["asleep"] = machine_document(enabled=False)
     return write_registry(tmp_path / "registry", document)
 
 
@@ -103,7 +72,7 @@ class TestAutoSelectSkipsWithoutProbing:
         disabled node were probed, this runner would raise "unscripted call"
         on its very first command."""
         payload = prebuilt_archive(mixed_config, repo)
-        runner = FakeRun(dispatch_replies(staging.digest(payload)))
+        runner = FakeRun(dispatch_replies(staging.digest(payload), mixed_config))
         _test_hooks.run = runner
 
         assert (
@@ -136,13 +105,7 @@ class TestAutoSelectSkipsWithoutProbing:
         _test_hooks.now = FakeClock(DEMO_NOW)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         document = workspace_document()
-        declared = document["nodes"]
-        if not isinstance(declared, dict):
-            raise AssertionError("the fixture workspace must declare nodes")
-        lavender = declared["lavender"]
-        if not isinstance(lavender, dict):
-            raise AssertionError("the fixture workspace must declare lavender")
-        lavender["enabled"] = False
+        machine_of(document, "lavender")["enabled"] = False
         path = write_registry(tmp_path / "registry", document)
         _test_hooks.run = FakeRun([])
 
@@ -197,214 +160,25 @@ class TestNamingADisabledNodeIsAnError:
         assert "nothing was asked of it" in excinfo.value.message
 
 
-class TestFleetNodesReportsAndReconciles:
-    def test_a_disabled_node_is_a_line_and_not_a_failure(self, mixed_config: pathlib.Path) -> None:
+class TestFleetNodesReports:
+    def test_a_disabled_node_is_a_line_and_not_a_failure(
+        self, mixed_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """It has not failed to answer, so it must not push the exit status
         non-zero -- otherwise a fleet with one machine deliberately off reads
         as a fleet with a fault, every run, forever."""
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
-        assert nodes.main([_config.CONFIG_FLAG, str(mixed_config)]) == 0
-
-    def test_the_registry_flag_reports_drift_and_exits_non_zero(
-        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        registry_path = tmp_path / "fleet-nodes.json"
-        registry_path.write_text(
-            dump_json_str(
-                {
-                    "nodes": [
-                        _registry_node("lavender", enabled=True),
-                        _registry_node("asleep", enabled=True),
-                    ]
-                }
-            ),
-            encoding="utf-8",
-        )
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
-
-        assert (
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.REGISTRY_FLAG,
-                    str(registry_path),
-                ]
-            )
-            == 1
-        )
-
-    def test_agreement_leaves_the_status_alone_and_says_how_much_it_examined(
-        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        registry_path = tmp_path / "fleet-nodes.json"
-        registry_path.write_text(
-            dump_json_str(
-                {
-                    "nodes": [
-                        _registry_node("lavender", enabled=True),
-                        _registry_node("asleep", enabled=False),
-                    ]
-                }
-            ),
-            encoding="utf-8",
-        )
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
-
         with caplog.at_level("INFO"):
-            assert (
-                nodes.main(
-                    [
-                        _config.CONFIG_FLAG,
-                        str(mixed_config),
-                        nodes.REGISTRY_FLAG,
-                        str(registry_path),
-                    ]
-                )
-                == 0
-            )
+            assert nodes.main([_config.CONFIG_FLAG, str(mixed_config)]) == 0
 
-        messages = [record.getMessage() for record in caplog.records]
-        assert (
-            f"2 node(s) agree with {registry_path} on enabled, platform, gpu and test_database"
-            in messages
-        )
+        assert "asleep: DISABLED -- declared off in this workspace, not probed" in caplog.text
 
-    def test_without_the_flag_no_reconciliation_is_claimed(
-        self, mixed_config: pathlib.Path
-    ) -> None:
-        """Omitting it must not read as "the registries agree". Nobody asked,
-        so nothing was established."""
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
-
-        assert nodes.main([_config.CONFIG_FLAG, str(mixed_config)]) == 0
-
-
-class TestReconcilingWithoutTouchingTheNetwork:
-    """``--probe never``: the two-file comparison, and nothing else.
-
-    THE CALLER IS A SCHEDULE. Reconciliation asks whether two files on one
-    disk agree, so paying an ssh round trip per node every N minutes to
-    answer it is the wrong shape -- and it puts two schedules on the same
-    fleet, producing two answers about one node minutes apart. Asked for by
-    the owner of ``fleet-nodes.json`` on board task df6f1dc8.
-    """
-
-    def _registry(self, tmp_path: pathlib.Path, **enabled: bool) -> pathlib.Path:
-        """Write an identity registry declaring the given nodes.
-
-        Args:
-            tmp_path: pytest's per-test temporary directory.
-            **enabled: Node name to whether the registry says it should
-                answer.
-
-        Returns:
-            Path to the written registry.
-        """
-        path = tmp_path / "fleet-nodes.json"
-        path.write_text(
-            dump_json_str(
-                {"nodes": [_registry_node(name, enabled=v) for name, v in enabled.items()]}
-            ),
-            encoding="utf-8",
-        )
-        return path
-
-    def test_not_one_ssh_call_is_made(
-        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        """THE MEASURED COST, and the only reason the flag exists. The
-        scripted runner holds NOTHING, so any command sent to any node --
-        including the enabled one -- raises "unscripted call" rather than
-        passing quietly."""
-        runner = FakeRun([])
-        _test_hooks.run = runner
-
-        assert (
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.REGISTRY_FLAG,
-                    str(self._registry(tmp_path, lavender=True, asleep=False)),
-                    nodes.PROBE_FLAG,
-                    nodes.PROBE_NEVER,
-                ]
-            )
-            == 0
-        )
-
-        assert runner.calls == []
-
-    def test_drift_still_sets_the_status(
-        self, mixed_config: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        """Skipping the probe must not also skip the finding. A schedule that
-        exits 0 on drift is a schedule nobody would notice."""
+    def test_the_identity_registry_is_no_longer_read_here(self, mixed_config: pathlib.Path) -> None:
+        """The roster is this registry's own ``machines/`` (MCPs board task
+        e447de72), so the flag that compared it with MCPs' old copy is
+        refused as unknown rather than ignored."""
         _test_hooks.run = FakeRun([])
 
-        assert (
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.REGISTRY_FLAG,
-                    str(self._registry(tmp_path, lavender=True, asleep=True)),
-                    nodes.PROBE_FLAG,
-                    nodes.PROBE_NEVER,
-                ]
-            )
-            == 1
-        )
-
-    def test_asking_always_is_the_same_as_not_asking(self, mixed_config: pathlib.Path) -> None:
-        """The default has to stay the default. Every existing caller and the
-        20-minute fleet audit depend on the bare command probing."""
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
-
-        assert (
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.PROBE_FLAG,
-                    nodes.PROBE_ALWAYS,
-                ]
-            )
-            == 0
-        )
-
-    def test_a_mode_that_does_not_exist_is_refused(self, mixed_config: pathlib.Path) -> None:
-        """``--probe no`` must not be read as ``never``. A schedule that
-        quietly probed anyway would reintroduce the exact cost the flag was
-        added to remove, while reporting success."""
-        _test_hooks.run = FakeRun([])
-
-        with pytest.raises(ValueError, match=r"--probe must be one of"):
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.PROBE_FLAG,
-                    "no",
-                ]
-            )
-
-    def test_probing_nothing_and_reconciling_nothing_is_refused(
-        self, mixed_config: pathlib.Path
-    ) -> None:
-        """It would print no lines and exit 0 -- a silence indistinguishable
-        from a fleet in perfect health, which is the one thing an exit status
-        must never be able to mean by accident."""
-        _test_hooks.run = FakeRun([])
-
-        with pytest.raises(ValueError, match=r"needs --registry"):
-            nodes.main(
-                [
-                    _config.CONFIG_FLAG,
-                    str(mixed_config),
-                    nodes.PROBE_FLAG,
-                    nodes.PROBE_NEVER,
-                ]
-            )
+        with pytest.raises(ValueError, match=r"unknown argument '--registry'"):
+            nodes.main([_config.CONFIG_FLAG, str(mixed_config), "--registry", "fleet-nodes.json"])

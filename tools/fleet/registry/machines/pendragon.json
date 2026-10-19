@@ -1,0 +1,40 @@
+{
+  "role": "worker",
+  "platform": "windows",
+  "user": "austi",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.74.0.62",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "ASUS ROG Ally RC71L (Ryzen Z1 Extreme, Zen 4, AVX-512), Windows 11 Home. A HANDHELD, chassis type 30, on AC permanently by the operator's decision 2026-09-15 — that ruling is what discharges the DC-sleep hole below, and it is an operating condition, so if this box ever starts living on battery the hole is live again. First provisioned 2026-08-16, went offline ~2026-08-17, RE-PROVISIONED 2026-09-15 from a CORVIS stick with the fleet-node-setup skill (board task 9d6d5aec): Initialize-Node.ps1 verify pass 11/11 exit 0, sshd key-only, sshd -T passwordauthentication no / kbdinteractiveauthentication no / permitemptypasswords no, hub-only Allow on tcp/22 plus a Block for the rest of CGNAT on 22 and 445. THE IP CHANGED, 100.102.102.2 -> 100.74.0.62: a stale device record held the name, so the node enrolled as pendragon-1 and the operator had to fix the record in the admin console. Neither `tailscale logout` + `up --hostname` nor `tailscale set --hostname` frees a name held that way — it is console-only, and it presents exactly like a tailnet ACL denial (Self.Online=false, ping 4/4 timeout, netcheck clean), which is a fourth outcome fleet-node-setup section 5 does not yet name. Reach measured from the hub 2026-09-15T18:1xZ (task 9d6d5aec): `ssh -o BatchMode=yes austi@100.74.0.62 hostname` -> Pendragon, exit 0; password-only attempt -> Permission denied (publickey). Windows Update is FULLY MANUAL here (Windows 11 Home, so the AU policy is inert; operator chose the UsoSvc route to match the other nodes: UsoSvc Disabled, WaaSMedicSvc Start=4 via the registry, because Set-Service on WaaSMedicSvc is TrustedInstaller-denied on Home). Armoury Crate holds the battery at an 80% charge limit — nothing in powercfg or the verify pass can see that, and it will look like a failing battery to whoever reads 89% draining to 80 and stopping. A dispatch node since 2026-09-30 (MCPs board task ea6856eb): the operator released it on 2026-09-25, its memory was freed by a restart on 2026-09-28 (4.9 GB free at idle, against 1.0 GB paging before), its toolchain was installed on 2026-09-30, and API/tools/fleet/fleet.json carries it in its nodes map with that measured budget. UNMEASURED, and worth knowing before trusting this node's uptime: ten ASUS services run Automatic (Armoury Crate, ASUSOptimization et al.) and manage power and thermal profiles on ROG hardware; nobody has checked whether the powercfg settings survive a reboot or a profile switch. Its NavProbe CPU control sweep is already on the record from the 2026-08-16 provisioning — 10/10 digests, AVX-512 rung.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "C:/fleet/stage",
+    "logical_cores": 16,
+    "ram_gb": 11.7,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": false,
+    "rust": null,
+    "cxx": null,
+    "docker": null,
+    "stack": null,
+    "elevated": false
+  }
+}

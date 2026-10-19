@@ -33,6 +33,7 @@ from fleet.contracts.toolchain import (
 )
 from fleet.core import _test_hooks, dialect_linux, toolchain, windows_toolchain_probe
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document
 from tests._toolchain_fixtures import (
     CHROME_APT,
     CHROME_NO_INSTALL,
@@ -64,34 +65,8 @@ def _workspace_document() -> JSONObject:
     Returns:
         The document, ready to serialise.
     """
-    budget: JSONObject = {
-        "reserved_cores": 2,
-        "reserved_ram_gb": 4.0,
-        "worker_ram_gb": 1.1,
-        "max_disk_gb": 20.0,
-        "checks_at_once": None,
-        "pinned_checks_only": False,
-    }
-    node: JSONObject = {
-        "host": "lavender",
-        "platform": "windows",
-        "stage_root": "C:/fleet/stage",
-        "logical_cores": 16,
-        "ram_gb": 32.0,
-        "gpu": None,
-        "enabled": True,
-        "test_database": False,
-        "rust": None,
-        "cxx": None,
-        "docker": None,
-        "stack": None,
-        "elevated": False,
-        "wsl_host": None,
-        "budget": budget,
-    }
     return {
-        "nodes": {"lavender": node, "loki": {**node, "host": "loki"}},
-        "not_dispatchable": {},
+        "machines": {"lavender": machine_document(), "loki": machine_document()},
         "data_paths": {},
         "node_local_resources": [],
         "projects": {

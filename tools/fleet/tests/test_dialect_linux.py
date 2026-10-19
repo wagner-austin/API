@@ -112,12 +112,13 @@ class TestBuildScript:
         assert "CORVIS_TEST_MAX_WORKERS='6'\n" in body
         assert f"CORVIS_FLEET_WORKSPACE={DEMO_PROJECT}\n" in body
         assert "CORVIS_FLEET_WORKSPACE=.\n" in _build(path="")
+        assert f"CORVIS_FLEET_REGISTRY='{names.registry_directory(TARGET)}'\n" in body
         assert (
             "export npm_config_cache POETRY_CACHE_DIR POETRY_VIRTUALENVS_IN_PROJECT "
             "POETRY_KEYRING_ENABLED PLAYWRIGHT_BROWSERS_PATH "
             "PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
             "BOARD_AGENT_LABEL "
-            "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE\n"
+            "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE CORVIS_FLEET_REGISTRY\n"
         ) in body
         assert f"make check >> '{TARGET}/{names.RESULT_NAME}.log' 2>&1\n" in body
 

@@ -1,0 +1,20 @@
+{
+  "role": "worker",
+  "platform": "windows",
+  "user": "austi",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.96.79.34",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Lenovo Yoga 3 14 (80JH), i5-5200U, 8 GB, the operator's older laptop. WINDOWS 10 HOME 22H2 (build 19045), END OF SUPPORT OCTOBER 2025: a permanently enrolled node with an ssh listener and no security updates, recorded here because the operator was told and chose to proceed (task acdfe6b8), the same reasoning that put desktop-li867ht on the Ubuntu list. Provisioned 2026-09-12 from a CORVIS stick by hand (task 3027abcf): sshd key-only with directives before the Match block, hub-only Allow on tcp/22 plus a Block for the rest of CGNAT on 22 and 445, Broadcom wifi power-save disabled. Reach measured from the hub 2026-09-13T19:41Z (task acdfe6b8): BatchMode ssh -> LenovoOld, exit 0; password-only attempt -> Permission denied (publickey). Not a dispatch target: 8 GB and an EOL OS, the reason its dispatch gives. DC SLEEP CLOSED 2026-09-19: slept 03:11 PDT on its 15-minute battery idle timer after a charger came out (Kernel-Power 42, WLAN security stopped the same second, woke 04:12 on the replug, no reboot, Tailscale service never stopped) and read as ssh-timeout until then; standby-timeout-dc and hibernate-timeout-dc set to 0 over ssh and read back 0/0, matching AC. Lid-close is Do nothing on AC and DC.",
+  "dispatch": "The operator's older Yoga 3 (i5-5200U Broadwell: AVX2, no AVX-512; 8 GB; Windows 10 22H2, end of support October 2025), enrolled 2026-09-12 and reachable from the hub. Not a CI dispatch target: 8 GB is under any project's worker budget once the OS and a runner are resident, and an EOL OS should not run CI. That hold is about THIS dispatcher; it never governed a manual measurement over ssh, and the operator explicitly authorised one on 2026-09-13 ('run the sweep on lenovoold'): the NavProbe CPU control sweep, board task 62fb6c7f, the AVX2-without-AVX-512 rung the fleet had never measured. Revisit dispatch only if it is reimaged to a supported OS and the operator asks."
+}

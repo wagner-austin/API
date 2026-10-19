@@ -9,13 +9,15 @@ why each comes in the order it does.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Mapping
 
 from board_watch import config as board_config
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import _test_hooks, declared, observe, registry, runner_reap_dropped
+from fleet.contracts.machine import Machine
+from fleet.core import declared, observe, runner_reap_dropped
 
 _log = get_logger(__name__)
 
@@ -54,29 +56,34 @@ def publish_pass(
     )
 
 
-def observe_pass(registry_path: pathlib.Path, identity: JSONObject) -> None:
+def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
     """Record every enabled worker's Claude Code sessions in the board's ledger.
 
-    The board's credentials are read HERE, not at the top of the tick: they
-    are the taskboard's (``TASKBOARD_MCP_API_KEY``), a different secret from
-    the queue's, and a runner started without ``--registry`` has no use for
-    them and must not be refused for lacking them.
+    The board's credentials are read HERE, not at the top of the tick, and
+    only when the roster names a machine to observe: they are the
+    taskboard's (``TASKBOARD_MCP_API_KEY``), a different secret from the
+    queue's, which the claim and publish passes need without them.
 
     Args:
-        registry_path: The identity registry, ``fleet-mcp/fleet-nodes.json``.
+        machines: The roster's machines, from the loaded workspace.
         identity: This runner's identity arguments.
 
     Raises:
-        AppError: ``NODE_REGISTRY_UNREADABLE`` for a registry this cannot
-            read, the board-watch credential codes when the taskboard's
+        AppError: The board-watch credential codes when the taskboard's
             variables are unset, and the contract faults
             :func:`fleet.core.observe.observe_node` names. A node that does
             not answer is logged, not raised.
-        OSError: When the registry file cannot be read.
     """
-    nodes = registry.decode_registry_nodes(_test_hooks.read_text(registry_path))
+    observed = observe.observable(machines)
+    if not observed:
+        _log.info(
+            "observed no session: none of the roster's %d machine(s) is an enabled worker, "
+            "vpn-jump or session host",
+            len(machines),
+        )
+        return
     board = board_config.load_credentials()
-    for outcome in observe.observe_pass(board, nodes, identity):
+    for outcome in observe.observe_pass(board, observed, identity):
         _log.info("%s", observe.render_outcome(outcome))
 
 

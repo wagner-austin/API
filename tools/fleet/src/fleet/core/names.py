@@ -147,6 +147,17 @@ CACHE_VARIABLE = "CORVIS_FLEET_CACHE"
 #: Project directory used by preparation to select its dependency closure.
 WORKSPACE_VARIABLE = "CORVIS_FLEET_WORKSPACE"
 
+#: The variable every build exports naming :func:`registry_directory`, the
+#: fleet's registry as the runner that launched the build read it, so a
+#: suite reads the one roster (``machines``, MCPs board task e447de72) with
+#: no API checkout on the node.
+REGISTRY_VARIABLE = "CORVIS_FLEET_REGISTRY"
+
+#: Where a run's staging directory carries the registry, and the archive it
+#: arrived in.
+REGISTRY_DIRECTORY = "registry"
+REGISTRY_ARCHIVE_DIRECTORY = "registry-archive"
+
 #: The variable, and its value, that turn poetry's keyring off in every build,
 #: Linux and Windows, the runner's own and the isolated one alike. Every
 #: project the fleet builds installs from PyPI with no private index, so
@@ -281,6 +292,22 @@ def staging_directory(directory: str) -> str:
         inside it.
     """
     return f"{directory}{STAGE_SUFFIX}"
+
+
+def registry_directory(target: str) -> str:
+    """Where a run's copy of the fleet registry lands on its node.
+
+    In the run's staging directory, beside the export and never inside it,
+    so the export is the project's tree alone and the retire that removes
+    the run removes the copy.
+
+    Args:
+        target: The run's export directory.
+
+    Returns:
+        ``<target>.stage/registry``.
+    """
+    return f"{staging_directory(target)}/{REGISTRY_DIRECTORY}"
 
 
 def reset_directory_stem(directory: str) -> str:
@@ -504,6 +531,7 @@ __all__ = [
     "log_path",
     "make_directory_stem",
     "recipe_directory",
+    "registry_directory",
     "reset_directory_stem",
     "retained_log_path",
     "retire_stem",

@@ -28,11 +28,12 @@ from typing import Final
 
 import pytest
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import NodeConfig, NodePlatform, encode_node_config
+from fleet.contracts.machine import Machine, MachineRole, encode_machine
+from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.project import ProjectConfig, encode_project_config
 from fleet.core.workspace_files import (
-    NODES_FILE,
-    PROJECT_SUFFIX,
+    JSON_SUFFIX,
+    MACHINES_DIRECTORY,
     PROJECTS_DIRECTORY,
     SETTINGS_FILE,
 )
@@ -72,9 +73,9 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
     The suite that proves fleet-wake reads a workspace cannot be the one
     place that invents what a workspace looks like.
 
-    `encode_node_config` and `encode_project_config` are the writers the
-    registry itself round-trips through, and `NodeConfig`/`ProjectConfig`
-    are total TypedDicts, so the NEXT required field fails mypy here rather
+    `encode_machine` and `encode_project_config` are the writers the
+    registry itself round-trips through, and `Machine`, `NodeConfig` and
+    `ProjectConfig` are total TypedDicts, so the NEXT required field fails mypy here rather
     than fourteen tests at runtime. The same reasoning as the ledger rows
     this module's header describes: produced the way production produces
     them, never invented beside them.
@@ -87,37 +88,41 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
     Returns:
         Path to the written registry directory.
     """
-    document: JSONObject = {
-        "nodes": {
-            "lavender": encode_node_config(
-                NodeConfig(
-                    host="lavender",
-                    platform=NodePlatform.WINDOWS,
-                    stage_root="C:/fleet/stage",
-                    logical_cores=16,
-                    ram_gb=32.0,
-                    gpu=None,
-                    enabled=True,
-                    test_database=False,
-                    rust=None,
-                    cxx=None,
-                    docker=None,
-                    stack=None,
-                    elevated=False,
-                    wsl_host=None,
-                    budget=NodeBudget(
-                        reserved_cores=2,
-                        reserved_ram_gb=4.0,
-                        worker_ram_gb=1.1,
-                        max_disk_gb=20.0,
-                        checks_at_once=None,
-                        pinned_checks_only=False,
-                    ),
-                )
-            )
-        },
-        "not_dispatchable": {},
-    }
+    machine = encode_machine(
+        Machine(
+            name="lavender",
+            role=MachineRole.WORKER,
+            user="austi",
+            platform=NodePlatform.WINDOWS,
+            enabled=True,
+            guest_host=None,
+            dispatch=NodeConfig(
+                host="lavender",
+                platform=NodePlatform.WINDOWS,
+                stage_root="C:/fleet/stage",
+                logical_cores=16,
+                ram_gb=32.0,
+                gpu=None,
+                enabled=True,
+                test_database=False,
+                rust=None,
+                cxx=None,
+                docker=None,
+                stack=None,
+                elevated=False,
+                wsl_host=None,
+                budget=NodeBudget(
+                    reserved_cores=2,
+                    reserved_ram_gb=4.0,
+                    worker_ram_gb=1.1,
+                    max_disk_gb=20.0,
+                    checks_at_once=None,
+                    pinned_checks_only=False,
+                ),
+            ),
+            held=None,
+        )
+    )
     settings: JSONObject = {
         # Required by the workspace contract since board task 140e7042. Empty
         # here because nothing this package does reads it: the field scopes a
@@ -157,10 +162,13 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
     # task 4a78c916), so the bridge reads it through fleet's own reader.
     # A project key is a repository path, so its file can sit in a
     # subdirectory of projects/ (tools/fleet is projects/tools/fleet.json).
+    # The roster is one file per machine (MCPs board task e447de72).
     registry = tmp_path / "registry"
-    project_file = registry / PROJECTS_DIRECTORY / f"{project}{PROJECT_SUFFIX}"
+    project_file = registry / PROJECTS_DIRECTORY / f"{project}{JSON_SUFFIX}"
     project_file.parent.mkdir(parents=True)
-    (registry / NODES_FILE).write_text(dump_json_str(document), encoding="utf-8")
+    machine_file = registry / MACHINES_DIRECTORY / f"lavender{JSON_SUFFIX}"
+    machine_file.parent.mkdir()
+    machine_file.write_text(dump_json_str(machine), encoding="utf-8")
     (registry / SETTINGS_FILE).write_text(dump_json_str(settings), encoding="utf-8")
     project_file.write_text(dump_json_str(entry), encoding="utf-8")
     return registry

@@ -36,8 +36,11 @@ lockfile that IS sent.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
+import io
 import pathlib
+import tarfile
 
 from platform_core.errors import AppError, FleetErrorCode
 
@@ -355,11 +358,114 @@ def stage(
     return target
 
 
+def registry_payload(registry: pathlib.Path) -> bytes:
+    """A gzipped tar of every file under the registry, the same bytes for the same files.
+
+    Built here rather than by ``tar``: the registry is a few dozen small
+    JSON files, and an archive that depends only on their paths and bytes
+    (no times, owners or modes from the disk) is one whose digest a reader
+    can name in advance.
+
+    Args:
+        registry: The registry directory.
+
+    Returns:
+        The archive, its members the registry's files by their paths under
+        it, in path order.
+
+    Raises:
+        OSError: When a file cannot be read.
+    """
+    buffer = io.BytesIO()
+    with (
+        gzip.GzipFile(fileobj=buffer, mode="wb", mtime=0) as zipped,
+        tarfile.open(fileobj=zipped, mode="w") as packed,
+    ):
+        for path in sorted(entry for entry in registry.rglob("*") if entry.is_file()):
+            data = _test_hooks.read_bytes(path)
+            member = tarfile.TarInfo(path.relative_to(registry).as_posix())
+            member.size = len(data)
+            member.mode = 0o644
+            packed.addfile(member, io.BytesIO(data))
+    return buffer.getvalue()
+
+
+def stage_registry(
+    host: str,
+    *,
+    platform: NodePlatform,
+    target: str,
+    registry: pathlib.Path,
+    local: pathlib.Path,
+) -> str:
+    """Put the fleet registry the runner read in a staged run's staging directory.
+
+    Every build exports where it lands as
+    :data:`fleet.core.names.REGISTRY_VARIABLE`, so a suite reads the fleet's
+    one roster (MCPs board task e447de72) as the runner that launched it
+    read it, on a node with no API checkout. It is archived, sent and
+    digested as the export is, then extracted into
+    :func:`fleet.core.names.registry_directory`, which the run's retire
+    removes with the rest of its staging directory.
+
+    Args:
+        host: SSH destination.
+        platform: The node's declared platform.
+        target: The run's export directory, already staged.
+        registry: The registry directory this runner loaded.
+        local: Local file to write the archive to, removed once the node
+            has verified it.
+
+    Returns:
+        The absolute remote directory the registry was extracted into.
+
+    Raises:
+        AppError: As :func:`send_verified` describes, and from the transport
+            for any of the scripts around it.
+        OSError: When a registry file cannot be read or the archive written.
+    """
+    spoken = dialect.for_platform(platform)
+    staged = names.staging_directory(target)
+    carried = f"{staged}/{names.REGISTRY_ARCHIVE_DIRECTORY}"
+    landed = names.registry_directory(target)
+    payload = registry_payload(registry)
+    _test_hooks.make_directory(local.parent)
+    local.write_bytes(payload)
+    for name, directory in (
+        (names.REGISTRY_ARCHIVE_DIRECTORY, carried),
+        (names.REGISTRY_DIRECTORY, landed),
+    ):
+        remote.run_script(
+            host,
+            spoken.script_path(staged, names.make_directory_stem(name)),
+            spoken.make_directory_script(directory),
+            platform=platform,
+        )
+    send_verified(
+        host,
+        platform=platform,
+        into=carried,
+        source=local,
+        payload=payload,
+        described_as="the fleet registry",
+    )
+    local.unlink()
+    remote.run_script(
+        host,
+        spoken.script_path(carried, names.EXTRACT_STEM),
+        spoken.checked_script(dialect.extract_commands(f"{carried}/{names.ARCHIVE_NAME}", landed)),
+        platform=platform,
+    )
+    return landed
+
+
 __all__ = [
     "EXCLUDED_DIRECTORIES",
     "archive",
     "digest",
+    "registry_payload",
     "send_verified",
     "stage",
     "stage_companion",
+    "stage_registry",
 ]

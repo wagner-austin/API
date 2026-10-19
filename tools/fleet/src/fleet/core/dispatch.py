@@ -299,6 +299,7 @@ def start(
     build_payload: PayloadBuilder,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
+    registry: pathlib.Path,
 ) -> LedgerEntry:
     """Take the lease, then :func:`launch` under it: ``fleet-run``'s dispatch.
 
@@ -326,6 +327,7 @@ def start(
         build_payload: Builds the archive once the lease is held.
         companions: The repositories staged beside the export.
         recipe: Where in the tree the recipe runs and what readies it.
+        registry: The registry directory this command loaded.
 
     Returns:
         The running ledger row.
@@ -355,6 +357,7 @@ def start(
         build_payload=build_payload,
         companions=companions,
         recipe=recipe,
+        registry=registry,
     )
 
 
@@ -368,6 +371,7 @@ def launch(
     build_payload: PayloadBuilder,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
+    registry: pathlib.Path,
 ) -> LedgerEntry:
     """Stage the tree, launch the suite, and record it, under a held lease.
 
@@ -385,6 +389,7 @@ def launch(
             order, before the build script is sent. Empty for a project
             whose check reads only its own tree.
         recipe: Where in the tree the recipe runs and what readies it.
+        registry: The registry directory staged beside the export.
 
     Returns:
         The running ledger row.
@@ -407,6 +412,10 @@ def launch(
         stage_root=node["stage_root"],
         source=payload["path"],
         payload=payload["data"],
+    )
+    local = payload["path"].with_name(f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz")
+    staging.stage_registry(
+        node["host"], platform=node["platform"], target=target, registry=registry, local=local
     )
     # The node has verified the archive's digest and unpacked it, and the
     # bytes the feed counts are held here, so the local file has no reader

@@ -51,7 +51,7 @@ import shutil
 from typing import Final, TypedDict
 
 from fleet.core import _test_hooks, commit_tree
-from fleet.core.workspace_files import NODES_FILE, SETTINGS_FILE
+from fleet.core.workspace_files import SETTINGS_FILE
 
 #: The ref ``make fleet-roll`` sets and every tick reads.
 ROLLED_REF: Final = "refs/fleet/rolled"
@@ -77,15 +77,15 @@ SOURCE_TREES: Final[tuple[str, ...]] = (
 ARCHIVED_PATHS: Final[tuple[str, ...]] = (*SOURCE_TREES, REGISTRY_DIRECTORY)
 
 #: Files whose absence means the extraction cannot run a tick: both agents'
-#: entry points, one module of each imported package, and the registry's two
-#: fixed files (its projects directory is checked by the agent's own reader).
+#: entry points, one module of each imported package, and the registry's
+#: fixed file (its machines and projects directories are checked by the
+#: agent's own reader).
 REQUIRED_FILES: Final[tuple[str, ...]] = (
     f"{FLEET_SRC}/fleet/cli/agent.py",
     f"{FLEET_SRC}/fleet/cli/node_agent.py",
     f"{PLATFORM_CORE_SRC}/platform_core/__init__.py",
     f"{MONOREPO_GUARDS_SRC}/monorepo_guards/__init__.py",
     f"{BOARD_WATCH_SRC}/board_watch/__init__.py",
-    f"{REGISTRY_DIRECTORY}/{NODES_FILE}",
     f"{REGISTRY_DIRECTORY}/{SETTINGS_FILE}",
 )
 

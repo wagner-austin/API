@@ -253,6 +253,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # dispatched from the queue, where the export lives.
         companions=(),
         recipe=dispatch.working_tree_recipe(project, plan),
+        registry=loaded.registry,
     )
 
     _log.info(

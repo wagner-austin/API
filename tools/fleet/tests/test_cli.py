@@ -29,6 +29,7 @@ from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.core import _test_hooks, records
 from tests._registry import write_registry
+from tests._roster_fixtures import machine_document
 from tests.conftest import FakeClock, FakeRun, failed, ok
 
 _NOW = 1_757_000_000
@@ -55,9 +56,8 @@ def _workspace_document() -> JSONObject:
         "checks_at_once": None,
         "pinned_checks_only": False,
     }
-    node: JSONObject = {
-        "host": "lavender",
-        "platform": "windows",
+    dispatch: JSONObject = {
+        "held": None,
         "stage_root": "C:/fleet/stage",
         "logical_cores": 16,
         "ram_gb": 32.0,
@@ -67,22 +67,19 @@ def _workspace_document() -> JSONObject:
             "compute_capability": "7.5",
             "driver_version": "591.86",
         },
-        "enabled": True,
         "test_database": False,
         "rust": None,
         "cxx": None,
         "docker": None,
         "stack": None,
         "elevated": False,
-        "wsl_host": None,
         "budget": budget,
     }
     return {
-        "nodes": {
-            "lavender": node,
-            "loki": {**node, "host": "loki", "gpu": None},
+        "machines": {
+            "lavender": machine_document(dispatch=dispatch),
+            "loki": machine_document(dispatch={**dispatch, "gpu": None}),
         },
-        "not_dispatchable": {},
         "data_paths": {},
         "node_local_resources": [],
         "projects": {

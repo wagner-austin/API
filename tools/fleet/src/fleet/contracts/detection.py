@@ -27,8 +27,8 @@ that runner re-reads its token every tick (:mod:`fleet.contracts.elevation`).
 
 The declaration is still compared every tick (:func:`tag_drift`), because the
 hub's own planning reads it without asking the node
-(:func:`fleet.contracts.tags.node_tags`), and a difference means
-registry/nodes.json should change.
+(:func:`fleet.contracts.tags.node_tags`), and a difference means the node's
+file under registry/machines should change.
 """
 
 from __future__ import annotations
@@ -112,22 +112,21 @@ def tag_drift(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[str, .
         claims = "without" if found_gpu is None else "with"
         lines.append(
             f"declares gpu {said} but nvidia-smi reports {reported}, so it claims {claims} the "
-            "gpu tag; correct gpu in registry/nodes.json"
+            "gpu tag; correct gpu in its registry/machines file"
         )
     found_testdb = _answer(TESTDB_PROBE, reports)
     if node["test_database"] != (found_testdb is not None):
         if found_testdb is None:
             lines.append(
                 f"declares test_database true but no {TESTDB_CONTAINER} container exists, so it "
-                "claims without the testdb tag; set test_database to false in "
-                "registry/nodes.json, or "
-                "provision the container"
+                "claims without the testdb tag; set test_database to false in its "
+                "registry/machines file, or provision the container"
             )
         else:
             lines.append(
                 f"declares test_database false but {TESTDB_CONTAINER} exists ({found_testdb}), "
-                "so it claims with the testdb tag; set test_database to true in "
-                "registry/nodes.json"
+                "so it claims with the testdb tag; set test_database to true in its "
+                "registry/machines file"
             )
     lines.extend(
         drift

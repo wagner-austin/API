@@ -42,7 +42,7 @@ from platform_core.mcp_client import McpCredentials, call_mcp_tool
 from fleet.contracts.project import decode_project_config
 from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks, commit_tree, rolled
-from fleet.core.workspace_files import PROJECT_SUFFIX, PROJECTS_DIRECTORY, project_key
+from fleet.core.workspace_files import JSON_SUFFIX, PROJECTS_DIRECTORY, project_key
 
 #: The registry's per-project files, as paths in the API repository.
 PROJECTS_PATH: Final = f"{rolled.REGISTRY_DIRECTORY}/{PROJECTS_DIRECTORY}"
@@ -121,7 +121,7 @@ def declared_files(listing: str) -> tuple[tuple[str, str], ...]:
         sorted(
             (project_key(projects, pathlib.Path(line)), line)
             for line in listing.splitlines()
-            if line.endswith(PROJECT_SUFFIX)
+            if line.endswith(JSON_SUFFIX)
         )
     )
 

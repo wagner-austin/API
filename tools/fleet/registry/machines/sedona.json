@@ -1,0 +1,60 @@
+{
+  "role": "vpn-jump",
+  "platform": "windows",
+  "user": "austi",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.95.76.122",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": {
+    "name": "sedona-ssh",
+    "id": "5435a8b8-9a88-45da-bd00-d64446df950e",
+    "hostname": "sedona-ssh.austinwagner.org"
+  },
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": [
+      {
+        "kind": "windows-service",
+        "name": "cloudflared",
+        "purpose": "the Cloudflare tunnel, this vpn-jump's only way in while it holds the UCI VPN"
+      },
+      {
+        "kind": "windows-service",
+        "name": "csc_vpnagent",
+        "purpose": "the UCI VPN agent, the route to hpc3"
+      }
+    ]
+  },
+  "notes": "Provisioned as a vpn-jump 2026-09-04 so hpc3 stays reachable while loki travels. Stays home, so it is the better default jump host. DC SLEEP CLOSED 2026-09-19: slept 02:57 PDT on its 60-minute battery idle timer after a charger came out (Kernel-Power 42, woke 04:13 on the replug, no reboot, Tailscale service never stopped) and read as probe-failed until then; standby-timeout-dc and hibernate-timeout-dc set to 0 over ssh and read back 0/0, matching AC. Lid-close is Do nothing on AC and DC (the DC side was Sleep until 2026-09-19, set to 0 over ssh on the operator's instruction and read back 0/0 from the registry), matching the other two laptops. Note its scheme is 'Gigabyte Balanced' and a process ran powercfg against it at 04:14 that morning, so if the timeouts drift back, an OEM tool is the suspect.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "C:/fleet/stage",
+    "logical_cores": 20,
+    "ram_gb": 16.0,
+    "gpu": {
+      "model": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+      "vram_mib": 8192,
+      "compute_capability": "8.6",
+      "driver_version": "551.23"
+    },
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "17.14.37710.0",
+    "docker": null,
+    "stack": null,
+    "elevated": false
+  }
+}

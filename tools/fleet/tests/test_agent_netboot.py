@@ -144,11 +144,12 @@ def refused_queue(**claimed: JSONValue) -> FakeQueue:
     )
 
 
-def expected_arm(paths: dict[str, pathlib.Path]) -> tuple[str, ...]:
+def expected_arm(paths: dict[str, pathlib.Path], registry: pathlib.Path) -> tuple[str, ...]:
     """The arm the agent runs for lavender from the planted release.
 
     Args:
         paths: What :func:`place` laid out.
+        registry: The registry directory the tick loaded.
 
     Returns:
         The argv :func:`fleet.core.netboot_arm.arm_argv` composes.
@@ -159,6 +160,7 @@ def expected_arm(paths: dict[str, pathlib.Path]) -> tuple[str, ...]:
             nodejs="node",
             served_root=paths[agent.SERVED_ROOT_FLAG],
             env_file=paths[agent.ENV_FILE_FLAG],
+            registry=registry,
         ),
         sealed_release.SealedRelease(
             release=RELEASE_ID, revision=REVISION, root=paths[agent.NETBOOT_RELEASE_FLAG]
@@ -186,7 +188,10 @@ class TestTheNetbootLane:
         assert "node" not in endpoint.arguments[0]
         # The release's own verifier, then the release's own arm, and no
         # hub pass after it.
-        assert runner.calls == [sealed_release.verify_argv(release, "netboot"), expected_arm(paths)]
+        assert runner.calls == [
+            sealed_release.verify_argv(release, "netboot"),
+            expected_arm(paths, config_path),
+        ]
         assert runner.timeouts == [300, netboot_arm.ARM_TIMEOUT_SECONDS]
         # The key reaches the arm's environment and nothing else.
         assert runner.set_env == [(), (("TAILSCALE_API_KEY", API_KEY),)]
@@ -345,9 +350,9 @@ class TestTheNetbootCommandLine:
                 "it claims every arm, and the machine an arm names is its target",
             ),
             (
-                ["--registry", "fleet-nodes.json"],
-                "--registry",
-                "only a hub tick publishes and observes",
+                ["--mcps-root", "/home/corvis/PROJECTS/MCPs"],
+                "--mcps-root",
+                "only a hub tick rebuilds the bases",
             ),
         ],
     )

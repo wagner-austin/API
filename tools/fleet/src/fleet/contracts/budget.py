@@ -213,7 +213,7 @@ def _decode_checks_at_once(value: JSONObject) -> int | None:
     if checks_at_once is not None and checks_at_once < 1:
         raise JSONTypeError(
             f"checks_at_once must be at least 1 or null, got {checks_at_once}; a node that "
-            "carries no check is disabled in registry/nodes.json instead"
+            "carries no check is held in its registry/machines file instead"
         )
     return checks_at_once
 

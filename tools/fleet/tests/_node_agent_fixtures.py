@@ -45,6 +45,7 @@ from tests.conftest import (
     FakeRun,
     failed,
     ok,
+    registry_replies,
     stage_replies,
     workspace_document,
 )
@@ -218,6 +219,7 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
 def claim_replies(
     digest: str,
     *,
+    registry: pathlib.Path,
     commit_present: bool,
     after_launch: tuple[_test_hooks.CommandResult, ...] = (),
 ) -> list[_test_hooks.CommandResult]:
@@ -225,6 +227,7 @@ def claim_replies(
 
     Args:
         digest: What the node reports having reassembled.
+        registry: The registry directory the tick loaded.
         commit_present: Whether the mirror already holds the sha, which
             decides whether a fetch runs.
         after_launch: What the start report runs once the job is launched,
@@ -236,7 +239,7 @@ def claim_replies(
     """
     return [
         *PROBED,  # the probe, before any claim
-        *launch_steps(digest, commit_present=commit_present),
+        *launch_steps(digest, registry=registry, commit_present=commit_present),
         *after_launch,
         # The tick claims again after a launch (MCPs board task 48842bfd):
         # the re-probe finds the one registered project held by the run just
@@ -245,11 +248,14 @@ def claim_replies(
     ]
 
 
-def launch_steps(digest: str, *, commit_present: bool) -> list[_test_hooks.CommandResult]:
+def launch_steps(
+    digest: str, *, registry: pathlib.Path, commit_present: bool
+) -> list[_test_hooks.CommandResult]:
     """Every command between a claim and its launch, for a project whose mirror is new.
 
     Args:
         digest: What the node reports having reassembled.
+        registry: The registry directory the tick loaded.
         commit_present: Whether the mirror already holds the sha, which
             decides whether a fetch runs.
 
@@ -262,6 +268,7 @@ def launch_steps(digest: str, *, commit_present: bool) -> list[_test_hooks.Comma
         *fetched,  # git cat-file -e: present; or absent, then git fetch
         ok(""),  # git archive -o
         *stage_replies(digest),
+        *registry_replies(registry),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
@@ -279,7 +286,9 @@ def launch(config_path: pathlib.Path) -> None:
         config_path: The workspace document.
     """
     payload = prebuilt_export(config_path)
-    _test_hooks.run = FakeRun(claim_replies(staging.digest(payload), commit_present=True))
+    _test_hooks.run = FakeRun(
+        claim_replies(staging.digest(payload), registry=config_path, commit_present=True)
+    )
     _test_hooks.http_post = FakeQueue(
         [
             dump_json_str({"jobs": []}),

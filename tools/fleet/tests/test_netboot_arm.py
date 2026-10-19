@@ -107,6 +107,7 @@ class TestTheCommandLine:
             nodejs="/usr/bin/node",
             served_root=served,
             env_file=tmp_path / "MCPs" / ".env",
+            registry=tmp_path / "API" / "tools" / "fleet" / "registry",
         )
 
         release = SealedRelease(release=RELEASE["release"], revision=RELEASE["revision"], root=root)
@@ -131,7 +132,7 @@ class TestTheCommandLine:
             "--node",
             "lavender",
             "--registry",
-            str(root / "fleet-mcp" / "fleet-nodes.json"),
+            str(tmp_path / "API" / "tools" / "fleet" / "registry"),
         )
         # The env file's path is the agent's to read; the arm is never told it.
         assert not any(".env" in token for token in argv)

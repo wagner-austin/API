@@ -1,0 +1,95 @@
+{
+  "role": "hub",
+  "platform": "windows",
+  "user": "Test",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "pcsession",
+  "tailnetIp": "100.77.206.124",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": {
+    "name": "austinpc-ssh",
+    "id": "d7ac1983-b844-4bf8-9877-d634f0e13de9",
+    "hostname": null
+  },
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": [
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "WSL-Ubuntu-KeepAlive",
+        "expect": "running",
+        "okResults": [],
+        "purpose": "keeps the Ubuntu distro, and every service inside it, alive without a login"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "MCPsDockerAutoStart",
+        "expect": "periodic",
+        "okResults": [
+          0
+        ],
+        "purpose": "brings Docker Desktop up without a login, so the hub's containers return"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "corvis-hub-runner",
+        "expect": "running",
+        "okResults": [],
+        "purpose": "the hub runner at RunLevel Limited, the one loop that runs every row of scripts/fleet/hub-jobs.json not declaring elevated: the fleet arm's hub tick, which dispatches work and records remote sessions on the ledger, one tick per enabled node of the API node registry, the session and skills mirrors to diphtheria, the drift sweep, which files an owning task for each item that stands unowned and states no operator ask, and the supervisor's jobs: each supervised room's pass, review and health check, switched on and off with the room by the trigger listener's gates, the listener itself, the ends run and the overdue sweep (board task b27bd34a)"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "corvis-hub-runner-elevated",
+        "expect": "running",
+        "okResults": [],
+        "purpose": "the hub runner at RunLevel Highest, which runs the rows of scripts/fleet/hub-jobs.json declaring elevated, this audit and the session host watch among them; without it fleet_status serves a snapshot that stops aging honestly (board task b27bd34a)"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "MCPsSessionHost",
+        "expect": "running",
+        "okResults": [],
+        "purpose": "the tmux server austinpc's own Claude Code sessions run in, until the reimage moves the last of them to ziggurat (scripts/ops/install-session-host-task.ps1)"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "API-MarketPaper-20261014-20261212",
+        "expect": "periodic",
+        "okResults": [
+          0
+        ],
+        "purpose": "the markets paper campaign's tick every three minutes until 2026-12-12, writing files/market-edge-20261012/campaign-20261014-20261212 (API libs/covenant_ml/docs/MARKET_RESEARCH.md)"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "API-KalshiDemo-Batch-20261015",
+        "expect": "periodic",
+        "okResults": [
+          0
+        ],
+        "purpose": "the bounded Kalshi demo-exchange batch every fifteen minutes for seven days from 2026-10-15 (API libs/covenant_ml/docs/DEMO_BATCH_VALIDATION_20261015.md)"
+      },
+      {
+        "kind": "scheduled-task",
+        "path": "\\",
+        "name": "API-EquityPaper-Outcome-20261113",
+        "expect": "registered",
+        "okResults": [],
+        "purpose": "the stock-panel pilot's one outcome capture, dated 2026-11-12 16:05 local (API libs/covenant_ml/docs/EQUITY_SCHEDULE.md)"
+      }
+    ]
+  },
+  "notes": "The hub. Holds cert.pem, so tunnels and DNS routes are created from here. Its own key is deliberately ABSENT from its own administrators_authorized_keys.",
+  "dispatch": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it."
+}

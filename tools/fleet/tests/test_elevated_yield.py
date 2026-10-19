@@ -22,6 +22,7 @@ from fleet.core import _test_hooks, elevated_yield, leases
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, node_argv, sourced_document
 from tests._queue_fakes import QUEUE_CREDENTIALS, FakeQueue, queue_job, tick_body
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import (
     DEMO_NOW,
@@ -53,12 +54,8 @@ def _with_elevated(document: JSONObject, *, node_elevated: bool) -> JSONObject:
         The same document, changed in place.
     """
     projects = document["projects"]
-    nodes = document["nodes"]
     assert isinstance(projects, dict)
-    assert isinstance(nodes, dict)
-    lavender = nodes["lavender"]
-    assert isinstance(lavender, dict)
-    lavender["elevated"] = node_elevated
+    dispatch_of(document, "lavender")["elevated"] = node_elevated
     projects[ELEVATED_PROJECT] = {
         "worker_ram_gb": 0.5,
         "minimum_workers": 1,

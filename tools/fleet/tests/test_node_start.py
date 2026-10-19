@@ -56,7 +56,11 @@ def _tick(
     """
     payload = prebuilt_export(config_path)
     stop = (ok(""), ok("stopped"), *retire_replies())
-    runner = FakeRun(claim_replies(staging.digest(payload), commit_present=True, after_launch=stop))
+    runner = FakeRun(
+        claim_replies(
+            staging.digest(payload), registry=config_path, commit_present=True, after_launch=stop
+        )
+    )
     _test_hooks.run = runner
     endpoint = FakeQueue(
         [
@@ -91,9 +95,9 @@ def test_a_job_cancelled_while_it_launched_is_stopped_and_the_tick_succeeds(
     # Every scripted reply was consumed: the launch, then the stop and the
     # retire of the run it launched, then the re-probe of a tick that
     # launched (MCPs board task 48842bfd).
-    assert len(runner.calls) == len(claim_replies("x", commit_present=True)) + 2 + len(
-        retire_replies()
-    )
+    assert len(runner.calls) == len(
+        claim_replies("x", registry=sourced_config, commit_present=True)
+    ) + 2 + len(retire_replies())
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
     last = records.read_ledger(loaded.ledger)[-1]
     assert (last["run_id"], last["outcome"]) == (DEMO_RUN_ID, "cancelled")
@@ -118,6 +122,8 @@ def test_a_refused_start_for_a_job_not_cancelled_propagates_and_stops_nothing(
     assert excinfo.value.message == f"MCP tool reported a failure: {BAD_TRANSITION}"
     assert endpoint.tools[-1] == "dispatch_get"
     # Up to the launch: the refusal ends the tick before it probes again.
-    assert len(runner.calls) == len(claim_replies("x", commit_present=True)) - len(PROBED)
+    assert len(runner.calls) == len(
+        claim_replies("x", registry=sourced_config, commit_present=True)
+    ) - len(PROBED)
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
     assert records.read_ledger(loaded.ledger)[-1]["outcome"] == "running"

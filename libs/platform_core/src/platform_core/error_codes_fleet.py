@@ -63,13 +63,6 @@ class FleetErrorCode(ErrorCodeBase):
     # because the node is the right kind and still never the answer: only
     # the named node is.
     NODE_NOT_PINNED = "NODE_NOT_PINNED"
-    # The identity registry named by `fleet-nodes --registry` could not be
-    # read. Drift itself has NO code, deliberately: it is reported as one
-    # printed line per disagreement plus a non-zero exit, the same shape as an
-    # unreachable node, because raising on the first disagreement would hide
-    # the rest. An unreadable registry is the opposite case -- nothing was
-    # compared at all, and reporting that as "no drift" would be a lie.
-    NODE_REGISTRY_UNREADABLE = "NODE_REGISTRY_UNREADABLE"
     # The session ledger's fleet arm (MCPs board task 5a3865bf). The agent
     # reads a node's ~/.claude/sessions/<pid>.json records over ssh and hands
     # them to `task_session_observe`. A record that is not the shape the

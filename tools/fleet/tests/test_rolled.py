@@ -187,7 +187,7 @@ class TestScriptedExtraction:
             "lacks tools/fleet/src/fleet/cli/agent.py, tools/fleet/src/fleet/cli/node_agent.py, "
             "libs/platform_core/src/platform_core/__init__.py, "
             "libs/monorepo_guards/src/monorepo_guards/__init__.py, "
-            "tools/board-watch/src/board_watch/__init__.py, tools/fleet/registry/nodes.json, "
+            "tools/board-watch/src/board_watch/__init__.py, "
             "tools/fleet/registry/settings.json; nothing ran"
         )
         assert not destination_of(scratch).exists()
@@ -201,8 +201,7 @@ ROLLED_FILES: dict[str, str] = {
     "libs/platform_core/src/platform_core/__init__.py": "",
     "libs/monorepo_guards/src/monorepo_guards/__init__.py": "",
     "tools/board-watch/src/board_watch/__init__.py": "",
-    "tools/fleet/registry/nodes.json": '{"rolled": true}\n',
-    "tools/fleet/registry/settings.json": "{}\n",
+    "tools/fleet/registry/settings.json": '{"rolled": true}\n',
 }
 
 
@@ -214,7 +213,7 @@ class TestRealExtraction:
         commit = committed_repository(api, ROLLED_FILES, rolled.ROLLED_REF)
         agent_source = api / "tools/fleet/src/fleet/cli/agent.py"
         agent_source.write_text("ROLLED = False\n", encoding="utf-8")
-        (api / "tools/fleet/registry/nodes.json").write_text(
+        (api / "tools/fleet/registry/settings.json").write_text(
             '{"rolled": false}\n', encoding="utf-8"
         )
         git(api, "commit", "--quiet", "--all", "-m", "committed after the roll")
@@ -230,8 +229,8 @@ class TestRealExtraction:
         assert tree["directory"] == str(destination)
         agent = destination / "tools/fleet/src/fleet/cli/agent.py"
         assert agent.read_text(encoding="utf-8") == "ROLLED = True\n"
-        nodes = pathlib.Path(tree["config"]) / "nodes.json"
-        assert nodes.read_text(encoding="utf-8") == '{"rolled": true}\n'
+        settings = pathlib.Path(tree["config"]) / "settings.json"
+        assert settings.read_text(encoding="utf-8") == '{"rolled": true}\n'
         assert not (destination / "tools/fleet/pyproject.toml").exists()
 
     def test_the_state_a_serve_compares_is_read_from_its_records_directory_for_real(
@@ -246,7 +245,7 @@ class TestRealExtraction:
 
         assert rolled.rolled_state(records) == first
 
-        (api / "tools/fleet/registry/nodes.json").write_text(
+        (api / "tools/fleet/registry/settings.json").write_text(
             '{"rolled": "again"}\n', encoding="utf-8"
         )
         git(api, "commit", "--quiet", "--all", "-m", "the next roll")

@@ -3,14 +3,14 @@
 lavender's Windows lane was retired on 2026-09-29: its WSL VM, which runs the
 lavender-wsl node and the GitHub runners, holds the memory the Windows lane
 measures, so the Windows runner found no room while jobs waited. lavender
-stays under ``nodes`` because lavender-wsl names it as its ``wsl_host`` and
-the host report reads that declaration, and it stays enabled in the MCPs
-identity registry because the audit and the session observer still visit
-it. So three things must hold together, and each case here drives one
-through the real code: the decoder accepts a disabled node that
-``not_dispatchable`` explains, the registry reconciliation reads that as a
-decision rather than unused capacity, and a runner whose scheduled task
-outlived the retirement claims nothing and asks the node nothing.
+keeps its declared capacity because lavender-wsl's ``guest`` names it and the
+host report reads that declaration, and it stays enabled because the audit
+and the session observer still visit it; its machine file holds it out of
+dispatch with ``dispatch.held`` (MCPs board task e447de72). So two things
+must hold together here, and each case drives one through the real code:
+the decoder keeps the held node declared but not dispatching, with its
+reason, and a runner whose scheduled task outlived the retirement claims
+nothing and asks the node nothing.
 """
 
 from __future__ import annotations
@@ -21,17 +21,18 @@ from typing import Final
 import pytest
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from fleet.cli import _config, node_agent, nodes
+from fleet.cli import node_agent
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import _credentials_in_env, node_argv
 from tests._queue_fakes import FakeQueue, tick_body
 from tests._registry import write_registry
+from tests._roster_fixtures import dispatch_of
 from tests.conftest import FakeRun, workspace_document
 
 __all__ = ["_credentials_in_env"]
 
-#: The reason registry/nodes.json gives, shortened.
+#: The reason registry/machines/lavender.json gives, shortened.
 REASON: Final[str] = "its WSL VM holds the memory the Windows lane measures"
 
 
@@ -42,12 +43,7 @@ def _retired() -> JSONObject:
         The document.
     """
     document = workspace_document()
-    declared = document["nodes"]
-    assert isinstance(declared, dict)
-    lavender = declared["lavender"]
-    assert isinstance(lavender, dict)
-    lavender["enabled"] = False
-    document["not_dispatchable"] = {"lavender": REASON}
+    dispatch_of(document, "lavender")["held"] = REASON
     return document
 
 
@@ -58,35 +54,6 @@ def test_the_decoder_keeps_both_the_declaration_and_the_reason() -> None:
         False,
         {"lavender": REASON},
     )
-
-
-def test_the_reconciliation_reads_the_retirement_as_agreement(
-    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    """The registry keeps lavender enabled; fleet-nodes still exits 0 and
-    says how much it compared, without an ssh call to anything."""
-    config = write_registry(tmp_path / "registry", _retired())
-    registry_path = tmp_path / "fleet-nodes.json"
-    entry: JSONObject = {
-        "name": "lavender",
-        "role": "worker",
-        "user": "Test",
-        "enabled": True,
-        "platform": "windows",
-        "gpu": None,
-        "test_database": False,
-    }
-    registry_path.write_text(dump_json_str({"nodes": [entry]}), encoding="utf-8")
-    runner = FakeRun([])
-    _test_hooks.run = runner
-    argv = [_config.CONFIG_FLAG, str(config), nodes.REGISTRY_FLAG, str(registry_path)]
-
-    with caplog.at_level("INFO"):
-        status = nodes.main([*argv, nodes.PROBE_FLAG, nodes.PROBE_NEVER])
-
-    assert (status, runner.calls) == (0, [])
-    assert "1 node(s) agree with" in caplog.text
-    assert "REGISTRY DRIFT" not in caplog.text
 
 
 def test_a_stale_runner_for_the_retired_node_claims_nothing(
@@ -106,7 +73,8 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
         assert node_agent.main(node_argv(config_path)) == 0
 
     assert (runner.calls, endpoint.tools) == ([], ["dispatch_list"])
-    assert "lavender is disabled in registry/nodes.json; claiming nothing" in caplog.text
+    verdict = "is disabled in registry/machines/lavender.json; claiming nothing"
+    assert f"lavender {verdict}" in caplog.text
     assert [tick_body(tick) for tick in endpoint.ticks] == [
         {
             "node": "lavender",
@@ -114,6 +82,6 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
             "tags": [],
             "fits": [],
             "claiming": False,
-            "verdict": "is disabled in registry/nodes.json; claiming nothing",
+            "verdict": verdict,
         }
     ]

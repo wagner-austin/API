@@ -1,0 +1,40 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.104.15.118",
+  "reachKey": null,
+  "bootMac": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Ubuntu 24.04.4 on a Dell OptiPlex Micro 7010 (i5-13500T), provisioned from the stick 2026-10-18 (Initialize-Node.sh --role worker, VERIFY ALL PASSED). A dispatch worker since 2026-10-19 (board task f3a19e1d), provisioned by scripts/host/fleet-node/provision.sh with the fleet test database and the isolated docker lane; nobody uses it at its console, so its budget keeps only the OS's margin.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 20,
+    "ram_gb": 31.0,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": null,
+    "elevated": false
+  }
+}
