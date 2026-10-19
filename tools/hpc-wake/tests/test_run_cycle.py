@@ -2,9 +2,9 @@
 
 Real parsing, real log rotation, real file writes; the one fake is the
 process runner rebound through ``scripts._test_hooks``, which is how the
-suite covers the entry point without posting to the board. The tree, the
-runner and the clock are :mod:`tests.run_cycle_tree`'s, shared with the
-health record's suite, ``test_run_cycle_health.py``.
+suite covers the entry point without posting to the board. The tree and the
+runner are :mod:`tests.run_cycle_tree`'s, shared with the recorder row's
+suite, ``test_run_cycle_recorder.py``.
 """
 
 from __future__ import annotations

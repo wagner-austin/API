@@ -1,22 +1,18 @@
-"""The scheduled entry point's test world: a staged package tree, a recording
-process runner, a movable clock and readers for the health record a tick
-writes.
+"""The scheduled entry point's test world: a staged package tree and a
+recording process runner.
 
-Shared by ``test_run_cycle.py`` and ``test_run_cycle_health.py``; the
-``runner`` and ``clock`` fixtures are registered in ``conftest.py`` from the
-generators here. The one fake is the process runner rebound through
-``scripts._test_hooks``, which is how the suites cover the entry point
-without posting to the board.
+Shared by ``test_run_cycle.py`` and ``test_run_cycle_recorder.py``; the
+``runner`` fixture is registered in ``conftest.py`` from the generator here.
+The one fake is the process runner rebound through ``scripts._test_hooks``,
+which is how the suites cover the entry point without posting to the board.
 """
 
 from __future__ import annotations
 
-import datetime
 import pathlib
 from collections.abc import Generator, Mapping, Sequence
 
 from scripts import _test_hooks, run_cycle
-from scripts.pump_health import HEALTH_FILENAME, PublisherHealth, read_health
 
 
 class Completed:
@@ -71,74 +67,6 @@ def make_runner() -> Generator[RecordingRunner, None, None]:
     _test_hooks.run_process = fake
     yield fake
     _test_hooks.run_process = _test_hooks._default_run_process
-
-
-class FrozenClock:
-    """A clock a test can move, standing in for ``_test_hooks.now``."""
-
-    def __init__(self, instant: datetime.datetime) -> None:
-        self.instant = instant
-
-    def __call__(self) -> datetime.datetime:
-        """Return the instant this clock is currently set to.
-
-        Returns:
-            The instant.
-        """
-        return self.instant
-
-
-def make_clock() -> Generator[FrozenClock, None, None]:
-    """Freeze the tick's clock, and put the real one back afterwards.
-
-    The header stamp and the health record both read it, so a test that
-    asserted either against the wall clock would assert nothing.
-    """
-    frozen = FrozenClock(datetime.datetime(2026, 9, 21, 20, 43, 15, tzinfo=datetime.UTC))
-    _test_hooks.now = frozen
-    yield frozen
-    _test_hooks.now = _test_hooks._utc_now
-
-
-def health_path(root: pathlib.Path) -> pathlib.Path:
-    """Where the tick writes its health record.
-
-    Args:
-        root: The staged package root.
-
-    Returns:
-        The record's path.
-    """
-    return root / "runs" / HEALTH_FILENAME
-
-
-def publisher(root: pathlib.Path, name: str) -> PublisherHealth:
-    """One publisher's row out of the record the tick just wrote.
-
-    Read through the module's own reader rather than by splitting the file
-    here, so a rendering this reader cannot read back fails the test.
-
-    Args:
-        root: The staged package root.
-        name: The publisher's marker.
-
-    Returns:
-        Its entry.
-    """
-    return read_health(health_path(root))[name]
-
-
-def written_line(root: pathlib.Path) -> str:
-    """The record's ``written`` field, as the file spells it.
-
-    Args:
-        root: The staged package root.
-
-    Returns:
-        The instant.
-    """
-    lines = health_path(root).read_text(encoding="utf-8").splitlines()
-    return next(line.split("\t")[1] for line in lines if line.startswith("written\t"))
 
 
 def staged_root(tmp_path: pathlib.Path, env_body: str) -> pathlib.Path:

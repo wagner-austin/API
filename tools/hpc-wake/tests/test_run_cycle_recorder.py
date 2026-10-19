@@ -19,10 +19,8 @@ from tests.run_cycle_tree import (
     PYTHON,
     WORKSPACE,
     Completed,
-    FrozenClock,
     RecordingRunner,
     cycle_argv,
-    publisher,
     staged_root,
 )
 
@@ -57,15 +55,17 @@ class TestTheRecorderRow:
         assert env == runner.calls[0][2]
 
     def test_a_record_that_failed_is_its_own_red_row(
-        self, tmp_path: pathlib.Path, runner: RecordingRunner, clock: FrozenClock
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
+        """The tick's exit is the run's, which the hub runner ships to MCPs
+        hub_runner_runs: a record that could not be made is a nonzero run
+        whose host ticked no publisher, which task_wake_bridges says in
+        those words (MCPs board task e6f2c511)."""
         runner.results[-1] = Completed("", "QUEUE_UNANSWERED\n", 1)
         root = staged_root(tmp_path, GOOD_ENV)
 
         assert run_cycle.main(cycle_argv(root)) == 1
 
-        failing = publisher(root, "publisher-ticks")
-        assert (failing["exit_code"], failing["consecutive_failures"]) == (1, 1)
-        assert publisher(root, "hpc-wake")["last_ok"] == "2026-09-21T20:43:15Z"
+        assert len(runner.calls) == len(run_cycle.publishers(WORKSPACE, PYTHON)) + 1
         log = (root / "runs" / "cycle.log").read_text(encoding="utf-8")
         assert log.endswith("-- publisher-ticks\nQUEUE_UNANSWERED\n")

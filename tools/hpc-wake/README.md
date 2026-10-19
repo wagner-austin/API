@@ -118,7 +118,20 @@ one row per state a publisher ran in, so an audit's query reads which
 commit the hub ran, e.g. `SELECT count(*) FROM hub_publisher_ticks WHERE
 publisher = 'hpc-wake' AND head_sha = '<sha>' AND NOT dirty AND exit_code
 = 0`. It posts nothing. A record that could not be made is that row's red
-line in the health record; no publisher waits on it.
+line in `cycle.log` and the tick's nonzero exit; no publisher waits on it.
+
+The pump's health is read from the database, not from a file here (MCPs
+board task e6f2c511). The hub runner ships every run of this job, with its
+exit, to MCPs `hub_runner_runs`, and MCPs `task_wake_bridges` reads the
+newest ended run on any host with the publishers that host ticked inside
+it in `hub_publisher_ticks`, which is the line every session's start
+banner prints: all published, which ones are not, a pump whose newest run
+ended 15 or more minutes ago, or no run on record. A record that could not
+be made is a nonzero run whose host ticked no publisher, said in those
+words. The `runs/pump-health.tsv` this package wrote every tick until
+2026-10-19 was read only by that banner, from austinpc's disk, so it
+stopped meaning anything when the control duty moved to diphtheria and is
+no longer written.
 
 Every publisher batches per tick (a 103-job Slurm batch or a 126-line
 lock-journal backlog is ONE post) and mentions only whoever acted — the

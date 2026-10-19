@@ -38,7 +38,10 @@ parsed strictly by :mod:`platform_core.env_assignments`, the one parser the
 fleet ticks share, refusing any uncommented line that is not a plain
 ``$env:NAME = 'value'`` assignment), truncate ``runs/cycle.log`` past ~1 MB,
 stamp a UTC header, append the cycle's output, exit with the cycle's own
-status so the scheduler's task history stays the health record.
+status so the hub runner's record of each run stays the health record: it
+ships every run's exit to MCPs ``hub_runner_runs``, which ``task_wake_bridges``
+reads with the publishers' ticks for every session's start banner (MCPs board
+task e6f2c511).
 """
 
 from __future__ import annotations
@@ -52,7 +55,7 @@ from typing import Final, TextIO
 from platform_core.env_assignments import parse_env_assignments
 from typing_extensions import TypedDict
 
-from scripts import _test_hooks, pump_health
+from scripts import _test_hooks
 
 PACKAGE_ROOT_FLAG: Final[str] = "--package-root"
 WORKSPACE_FLAG: Final[str] = "--workspace"
@@ -111,8 +114,8 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
     9406cfd9: publishers are added HERE, never as sibling scheduled tasks).
     Order is publication order only; each runs regardless of the previous
     one's exit status, and the tick's own status is the first nonzero exit
-    so the scheduler's history stays the health record while the log names
-    the failing half.
+    so the hub runner's record of the run stays the health record while the
+    log names the failing half.
 
     Two rows the table held while austinpc ran it left it with the control
     duty (MCPs board task c39ee056): hub-tunnel-wake read the journal of
@@ -273,8 +276,10 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
 #: database's copy. Its args gain one ``<publisher>=<exit code>=<directory>``
 #: token per publisher this tick, which is why it is not a row of the table
 #: above. It is a row like them in every other way: marked in the log and
-#: given its own line in the health record, so a record that could not be
-#: made reads as one red row and stops no publisher.
+#: counted in the tick's status, so a record that could not be made reads as
+#: one red row and a nonzero exit, which the hub runner records as the run's
+#: and MCPs ``task_wake_bridges`` reports beside a run that ticked no
+#: publisher, and it stops no publisher.
 RECORDER: Final[Publisher] = {
     "name": "publisher-ticks",
     "args": ("poetry", "run", "--", "python", "-m", "fleet.cli.publisher_ticks"),
@@ -394,8 +399,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             records the crash.
         subprocess.TimeoutExpired: When a publisher outlasts
             :data:`PUBLISHER_WALL_SECONDS`; it is killed and the tick ends
-            there, as a crash the scheduler records, with the health record
-            left unwritten so its age says the pump stopped.
+            there, as a crash the hub runner records as the run's exit.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     arguments = arguments_from(tokens)
@@ -429,18 +433,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             env,
         )
         outcomes.append((RECORDER["name"], recorded))
-    worst = next((code for _, code in outcomes if code != 0), 0)
-    # THE HEALTH RECORD IS WRITTEN EVERY TICK, GREEN OR RED, and it is the
-    # only part of this function anything outside the machine's scheduler
-    # can read. The log above is where a five-day outage hid: it is
-    # truncated past 1 MB, so by the time anyone looked for the 2026-09-16
-    # start of it there were 80 minutes of ticks left. See scripts/pump_health.
-    health_path = package_root / "runs" / pump_health.HEALTH_FILENAME
-    pump_health.write_health(
-        health_path,
-        pump_health.next_health(pump_health.read_health(health_path), outcomes, now),
-    )
-    return worst
+    return next((code for _, code in outcomes if code != 0), 0)
 
 
 if __name__ == "__main__":
