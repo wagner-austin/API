@@ -378,25 +378,26 @@ class TestRunnerSpec:
         assert lavender["base"]["execution_policy"] == "RemoteSigned"
         assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]
 
-    def test_a_distro_that_is_a_fleet_node_installs_every_tagged_tool_apt_supplies(self) -> None:
+    def test_a_runner_host_installs_every_tagged_tool_apt_supplies(self) -> None:
         """A rebuild never takes a capability tag away from a fleet node.
 
-        lavender's distro is both a CI runner host here and the fleet node
-        lavender-wsl in registry/machines, whose runner claims with the tags its
-        probe finds each tick. A tagged tool installed by hand there would be
-        lost on the next ``--rebuild``, and every job needing its tag would
-        silently wait for another node: on 2026-10-05 no node had go, and MCPs
-        rcs-bridge's check had nowhere to run (MCPs board task 1da15750). So
-        the roster's base installs each tagged tool's apt-get package, and
-        carries as an asset the one tagged tool no apt repository supplies:
-        Chrome, the .deb Google ships, whose asset path is the file the
-        probe's chrome line asks for (MCPs board task 2f596185). poppler-utils
-        joined the base when pdftotext became a tag (MCPs board task
-        6dd73ada): lavender-wsl had it on 2026-10-11, but from no line here.
+        A CI runner host here is a fleet machine of registry/machines too,
+        whose runner claims with the tags its probe finds each tick: lavender
+        was through its WSL guest lavender-wsl, and is itself since its
+        reimage to Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). A tagged
+        tool installed by hand there would be lost on the next ``--rebuild``,
+        and every job needing its tag would silently wait for another node:
+        on 2026-10-05 no node had go, and MCPs rcs-bridge's check had nowhere
+        to run (MCPs board task 1da15750). So the roster's base installs each
+        tagged tool's apt-get package, and carries as an asset the one tagged
+        tool no apt repository supplies: Chrome, the .deb Google ships, whose
+        asset path is the file the probe's chrome line asks for (MCPs board
+        task 2f596185). poppler-utils joined the base when pdftotext became a
+        tag (MCPs board task 6dd73ada): lavender-wsl had it on 2026-10-11,
+        but from no line here.
         """
         spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
-        workspace = decode_fleet_workspace(shipped_document())
-        wsl_hosts = {node["wsl_host"] for node in workspace["nodes"].values()}
+        machines = set(decode_fleet_workspace(shipped_document())["machines"])
         apt_installs = {
             tool["name"]: tool["install"]["apt-get"]
             for tool in TAGGED_TOOLS
@@ -410,8 +411,7 @@ class TestRunnerSpec:
         assert apt_supplied == {"ffmpeg", "golang-go", "poppler-utils"}
         assert set(apt_installs) - {"ffmpeg", "go", "pdftotext"} == {"chrome"}
         assert apt_installs["chrome"].startswith("curl -fsSL -o ")
-        node_hosts = [host for host in spec["hosts"] if host["name"] in wsl_hosts]
-        assert [host["name"] for host in node_hosts] == ["lavender"]
-        for host in node_hosts:
+        assert [host["name"] for host in spec["hosts"] if host["name"] in machines] == ["lavender"]
+        for host in spec["hosts"]:
             assert apt_supplied <= set(host["base"]["apt_packages"]), host["name"]
             assert CHROME_LINUX_PATH in {asset["path"] for asset in host["assets"]}, host["name"]

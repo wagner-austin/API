@@ -1,122 +1,20 @@
 {
   "role": "worker",
-  "platform": "windows",
-  "user": "Test",
+  "platform": "linux",
+  "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
   "ledger_observer": "fleet-arm",
-  "tailnetIp": "100.65.161.27",
+  "tailnetIp": "100.85.53.111",
   "reachKey": null,
   "bootMac": "1c:69:7a:fe:78:9a",
   "tunnel": null,
   "guest": null,
-  "ciWorkersPerRunner": 2,
+  "ciWorkersPerRunner": null,
   "boot": {
-    "units": [
-      {
-        "kind": "windows-service",
-        "name": "actions.runner.wagner-austin-chat.lavender",
-        "purpose": "the chat repository's Windows CI runner"
-      },
-      {
-        "kind": "windows-service",
-        "name": "actions.runner.wagner-austin-MCPs.lavender",
-        "purpose": "the MCPs repository's Windows CI runner"
-      },
-      {
-        "kind": "windows-service",
-        "name": "actions.runner.wagner-austin-corvis-stick.lavender",
-        "purpose": "the corvis-stick repository's Windows CI runner"
-      },
-      {
-        "kind": "windows-service",
-        "name": "actions.runner.wagner-austin-tree-bot.lavender",
-        "purpose": "the tree-bot repository's Windows CI runner"
-      },
-      {
-        "kind": "scheduled-task",
-        "path": "\\",
-        "name": "wsl-keepalive",
-        "expect": "running",
-        "okResults": [],
-        "purpose": "keeps the Ubuntu distro alive without a login; every Linux CI runner lives inside it"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-API.lavender-wsl.service",
-        "purpose": "the API repository's Linux CI runner 1 of 2"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-API.lavender-wsl-2.service",
-        "purpose": "the API repository's Linux CI runner 2 of 2"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-        "purpose": "the MCPs repository's Linux CI runner 1 of 4"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service",
-        "purpose": "the MCPs repository's Linux CI runner 2 of 4"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service",
-        "purpose": "the MCPs repository's Linux CI runner 3 of 4"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service",
-        "purpose": "the MCPs repository's Linux CI runner 4 of 4"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-corvis-stick.lavender-wsl.service",
-        "purpose": "the corvis-stick repository's Linux CI runner"
-      },
-      {
-        "kind": "wsl-systemd",
-        "distro": "Ubuntu",
-        "unit": "actions.runner.wagner-austin-tree-bot.lavender-wsl.service",
-        "purpose": "the tree-bot repository's Linux CI runner"
-      }
-    ]
+    "units": []
   },
-  "notes": "Measurement node. Also answers to the alias 'jahboej'. THE CI HOST: every self-hosted GitHub Actions runner on this fleet lives in this node's Ubuntu distro, and five repositories provision into it. ciWorkersPerRunner is 2 because the probe finds EIGHT runner services against 16 logical processors (wagner-austin-MCPs x4, -API x2, -portable-claude x1, -tree-bot x1, measured 2026-09-11). It was effectively 4 until then, which is where the oversubscription came from: check.yml sets 4 and mcp-shared's ci-matrices guard multiplies it by [int]$RunnerCount = 4 from this repo's provisioner, so the product read 16 and passed while the box carried 32. REINSTALLED 2026-09-26 (board tasks 9e5c7a17, 1aa6a021, d690ebd0): a clean Windows 11 Home after the disk corruption, the login account is now Test, the tailnet address 100.65.161.27, and the WSL distro was rebuilt from the pinned Ubuntu 24.04 rootfs; portable-claude is now corvis-stick. The PYTHON paragraph below describes the previous install, whose files are gone. PYTHON, measured 2026-09-23 over ssh as austi: until 05:39Z no python on the PATH was a real interpreter (where.exe python found only the WindowsApps Store alias; the one 3.11.9 was a Windows Actions runner's setup-python tool cache at C:\\actions-runner\\_work\\_tool\\Python\\3.11.9\\x64, off the PATH), so every slime fleet check died at Makefile:60 (fleet board task e62c8120). python.org 3.11.9 was then installed per-user by winget at C:\\Users\\austi\\AppData\\Local\\Programs\\Python\\Python311, and python --version answers Python 3.11.9 there; the other gpu+windows nodes answered the same that day (sedona per-user 3.11.9, the hub 3.11.9). That install took over the tool cache's machine-wide 3.11.9 registration and moved its files out, breaking the runner's Python jobs until the missing files were copied back without an installer at 11:31Z. Never reinstall or repair either 3.11.9 here: both trees now answer to one registration, and API tools/fleet's python install refuses this machine for that reason.",
-  "dispatch": {
-    "held": "Its WINDOWS lane, retired 2026-09-29 by MCPs board task 7e467416; its capacity stays declared because lavender-wsl runs inside it, and the machine stays enabled because the audit and the session observer still visit it. The WSL VM on the same 31.7 GB machine is capped at 26 GB by .wslconfig and holds lavender-wsl (a fleet lane, corvis-fleet-testdb) and five GitHub Actions runners. Measured that day: vmmemWSL 24.63 GB with Windows free 1.7 GB against this lane's 6 GB reserve; 13 GB of page cache dropped inside the VM did not return to Windows (vmmemWSL 23.5 GB right after, 25.1 GB at 11:04Z); and inside the guest lavender-wsl's own probe logged room for nothing on 90 of 129 ticks, MemAvailable 1.7 to 12.8 GB against its 12 GB reserve, so the VM's in-guest use, not only its cache, fills it. The two lanes cannot both fit, and lavender-wsl is the one kept: it is the fleet's second testdb and docker lane beside diphtheria, whose production reservation keeps it idle while production is warm, while serendipity and sedona carry the Windows lanes. Revisit if lavender gains memory or the GitHub runners leave the VM.",
-    "stage_root": "C:/fleet/stage",
-    "logical_cores": 16,
-    "ram_gb": 32.0,
-    "gpu": {
-      "model": "NVIDIA GeForce GTX 1630",
-      "vram_mib": 4096,
-      "compute_capability": "7.5",
-      "driver_version": "591.86"
-    },
-    "budget": {
-      "reserved_cores": 4,
-      "reserved_ram_gb": 6.0,
-      "worker_ram_gb": 1.1,
-      "max_disk_gb": 40.0,
-      "checks_at_once": null,
-      "pinned_checks_only": false
-    },
-    "test_database": false,
-    "rust": null,
-    "cxx": "17.14.37710.0",
-    "docker": null,
-    "stack": null,
-    "elevated": false
-  }
+  "notes": "Reimaged from Windows to Ubuntu 24.04.4 LTS (kernel 7.0.0-38) on 2026-10-19 from a CORVIS stick (fleet-node-setup's Initialize-Node.sh), replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist (MCPs board task 1e9ab738). Measured over ssh 2026-10-19T22:3xZ: 16 logical cores, 31 GiB RAM, a 915 GB root disk, wired Realtek GbE enp2s0 at 1c:69:7a:fe:78:9a (the boot MAC a netboot arm uses), and a GeForce GTX 1630 on 01:00.0; Ubuntu's nvidia-driver-595 (595.99.02) was installed after, and nvidia-smi -L named the card at 23:22Z. Docker is docker-ce 29.8.1, held, from the fleet node provision, the daemon active. Enrolled from ziggurat with fleet-enroll at 22:34Z: austinpc, diphtheria and ziggurat each print Lavender for ssh lavender hostname, and a password-only login is refused from each.",
+  "dispatch": "Held until it is provisioned as a Linux worker: on 2026-10-19 it has no docker, no fleet test database, no node or poetry toolchain and no fleet runner, so a check sent here could not run (MCPs board task 1e9ab738). Move this to a dispatch block with its measured capacity once those are installed and a check has passed here."
 }

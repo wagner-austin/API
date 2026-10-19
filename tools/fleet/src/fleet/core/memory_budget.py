@@ -11,11 +11,13 @@ load.
 
 The two numbers live in two files (``runners.json`` and ``registry/machines``) and
 were each reasonable alone. This is the check that reads both: for every
-node, the CI slice its host may run inside the node (none unless the node's
-``wsl_host`` is a runners.json host with a slice), plus the node's
+node, the CI slice its runners may take on the same machine (none unless a
+runners.json host carries the node's name), plus the node's
 ``reserved_ram_gb``, plus the smallest job the node can serve (a project's
 ``minimum_workers`` times its ``worker_ram_gb``, over the projects whose
 tags the node carries), must be at most the node's declared ``ram_gb``.
+Since 2026-10-19 a runner host is the machine itself, never a VM a node
+shares (MCPs board task 1e9ab738), so the join is by name.
 """
 
 from __future__ import annotations
@@ -27,20 +29,19 @@ from fleet.contracts.tags import missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace
 
 
-def slice_cap_gb(node: NodeConfig, runners: RunnerSpec) -> int:
-    """The CI slice's ``MemoryMax`` inside a node, or 0 where there is none.
+def slice_cap_gb(name: str, runners: RunnerSpec) -> int:
+    """The CI slice's ``MemoryMax`` on a node, or 0 where there is none.
 
     Args:
-        node: The node's declaration.
+        name: The node's machine name.
         runners: The runner roster.
 
     Returns:
-        ``memory_max_gb`` of the runners.json host the node's ``wsl_host``
-        names; 0 for a node with no ``wsl_host`` or one whose host runs no
-        runners here.
+        ``memory_max_gb`` of the runners.json host of that name; 0 for a
+        machine that runs no runners here.
     """
     for host in runners["hosts"]:
-        if node["wsl_host"] == host["host"]:
+        if host["name"] == name:
             return host["ci_slice"]["memory_max_gb"]
     return 0
 
@@ -80,7 +81,7 @@ def budget_gaps(workspace: FleetWorkspace, runners: RunnerSpec) -> tuple[str, ..
     projects = tuple(workspace["projects"].values())
     gaps: list[str] = []
     for name, node in workspace["nodes"].items():
-        cap = slice_cap_gb(node, runners)
+        cap = slice_cap_gb(name, runners)
         reserved = node["budget"]["reserved_ram_gb"]
         job = smallest_job_gb(node, projects)
         if cap + reserved + job > node["ram_gb"]:

@@ -104,29 +104,25 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
     )
 
 
-def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
-    """tools/fleet-execution-runners reads lavender's live runner units.
+def test_no_project_reads_the_runner_host_while_it_dispatches_nothing() -> None:
+    """The runner host's live cases have no fleet project until lavender dispatches.
 
-    It is pinned to the node whose WSL host is the one its recipe names to
-    the cases, which ``runners.json`` declares, and it requires no ``docker``
-    tag: that would isolate it as execdocker, while its full-slice case runs
-    under the fleet user's own systemd manager (MCPs board task 715b9ec5).
+    tools/fleet-execution-runners ran them pinned to lavender-wsl, the WSL
+    guest that held the runners, which went with lavender's reimage to
+    Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). The cases must run on
+    the runner host itself, and lavender's dispatch is held until it is
+    provisioned, so no node can carry the project yet. The recipe still
+    names the host ``runners.json`` declares, so the project returns pinned
+    to it.
     """
     workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, "tools/fleet-execution-runners")
-    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX,), "lavender-wsl")
-    assert project["source"] == ProjectSource(
-        remote="https://github.com/wagner-austin/API.git",
-        path="tools/fleet-execution-runners",
-        install=(),
-        companions=(),
-    )
+    assert "tools/fleet-execution-runners" not in workspace["projects"]
+    assert "lavender" not in workspace["nodes"]
     recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
     given = f"{RUNNER_HOST_OPTION}="
     named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]
-    host = require_node(workspace, "lavender-wsl")["wsl_host"]
     declared = [each["name"] for each in load_runner_spec(str(PACKAGE / "runners.json"))["hosts"]]
-    assert (named, host in declared) == ([host], True)
+    assert (named, declared) == (["lavender"], ["lavender"])
 
 
 def test_the_hub_s_cases_run_on_the_hub_as_the_fleet_user() -> None:
@@ -259,7 +255,7 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     )
 
 
-def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender_wsl() -> None:
+def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender() -> None:
     """MCPs/execution-netboot-diphtheria installs a clean VM by network boot.
 
     Its last install step copies the host's Tailscale API key out of the
@@ -268,8 +264,10 @@ def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender_wsl() -> No
     (MCPs board task d387271d). The case mints a tailnet key and reaches the
     VM over the tailnet, which diphtheria's grant allows and a
     ``tag:corvis-node`` machine's does not, so the project names that host;
-    the VM itself boots on lavender-wsl's KVM, since diphtheria's stack leaves
-    no room for its 7.5 GB. Its server listens on the definition's fixed port,
+    the VM itself boots on lavender's KVM, since diphtheria's stack leaves
+    no room for its 7.5 GB; it booted on lavender-wsl's until lavender was
+    reimaged to Ubuntu on 2026-10-19 (MCPs board task 1e9ab738), and the
+    machine's own KVM replaces the guest's. Its server listens on the definition's fixed port,
     so two runs at once would refuse each other: the port is its exclusive
     resource.
     """
@@ -291,7 +289,7 @@ def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender_wsl() -> No
                     *prepare,
                     "netboot-lane",
                     "ENV_FILE=/home/corvis/PROJECTS/MCPs/.env",
-                    "VM_HOST=lavender-wsl",
+                    "VM_HOST=lavender",
                 ),
             ),
         ),

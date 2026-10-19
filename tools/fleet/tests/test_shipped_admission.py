@@ -10,9 +10,10 @@ these nodes a second check fits the core pool and still pushes both past the
   corvis-stick both crossed the budget, run side by side on 2026-10-09.
 - diphtheria, MCPs board task 18816b8f: the shared-library suite took 188 s
   alone and 410 s beside another check.
-- lavender-wsl, MCPs board task 30dba6d7: MCPs/mcp-shared took 130 s alone
-  (fleet job f55b38a0) and 305 s beside MCPs/execution-deploy and
-  MCPs/packages/maketools (fleet job aad491ff) on 2026-10-16.
+lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
+took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
+went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
+1e9ab738); lavender itself dispatches nothing until it is provisioned.
 
 diphtheria also checks only the projects pinned to it (MCPs board task
 d577036f): one check at a time, it still ran 10 of its 341 checks in the 7
@@ -46,7 +47,6 @@ from fleet.core.workspace_files import read_workspace_document
 #: workers"), so 14 and 6 cores are left to the fleet.
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
-    "lavender-wsl": ("MCPs/mcp-shared", 4),
     "loki": ("MCPs/mcp-shared", 7),
     "serendipity": ("MCPs/mcp-shared", 3),
 }
@@ -106,7 +106,7 @@ def test_the_measured_nodes_are_the_bounded_ones() -> None:
         if node["budget"]["checks_at_once"] is not None
     }
 
-    assert bounds == {"diphtheria": 1, "lavender-wsl": 1, "loki": 1, "serendipity": 1}
+    assert bounds == {"diphtheria": 1, "loki": 1, "serendipity": 1}
 
 
 @pytest.mark.parametrize(("name", "measured"), sorted(BOUNDED_GRANTS.items()))
