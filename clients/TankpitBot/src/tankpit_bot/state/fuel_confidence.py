@@ -11,7 +11,7 @@ from tankpit_bot.state.types import (
     WorldStateDict,
     coord_key,
 )
-from tankpit_bot.types.constants import TankLiveness
+from tankpit_bot.types.constants import DIRECTION_DEAD_THRESHOLD, TankLiveness
 
 _POSITION_SOURCES = {
     FactSource.WIRE_0X3D_MOVEMENT,
@@ -50,6 +50,7 @@ def containers_after_enemy_refuel(
     if (
         previous["liveness"] is not TankLiveness.ALIVE
         or current["liveness"] is not TankLiveness.ALIVE
+        or previous["direction"] >= DIRECTION_DEAD_THRESHOLD
     ):
         return state["containers"]
     if current["rank"] != previous["rank"]:

@@ -51,8 +51,8 @@ source_paths:
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
   "src/tankpit_bot/sniffer/world_state_dispatch.py": "f3fcce75692cb5857b787b32e707376e4f6aabf8"
-  "tests/sniffer/test_enemy_refuel_dispatch.py": "c213cc0a1b1e5cfac1e84826a1824f891dc793d7"
-  "src/tankpit_bot/state/fuel_confidence.py": "2e3b1301bd85c720fe70d94260b312fdf87e7f8a"
+  "tests/sniffer/test_enemy_refuel_dispatch.py": "6bf1eb35ba32e53c2686d2636a0968c85836b4a5"
+  "src/tankpit_bot/state/fuel_confidence.py": "8910d25ac398039e4c2fd00ed70a082ef0768444"
   "src/tankpit_bot/state/tank_mutations.py": "d3ab81a2cc867b75322a379a785c9cc00da810b9"
   "src/tankpit_bot/sniffer/world_state_tiles.py": "d636e4d712145a24e56fff37ce70b2c066487558"
   "src/tankpit_bot/bot/ai/equipment.py": "3a0aa9d05f106db46f77d9332e305c721a4f460f"

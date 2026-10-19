@@ -11,9 +11,10 @@ from tankpit_bot.sniffer.world_state_dispatch import dispatch_world_state_update
 from tests.bot.ai._support import make_container, make_world
 
 
-@pytest.mark.parametrize("rank,confidence", [(6, 0.5), (7, 1.0)])
+@pytest.mark.parametrize("rank,direction,confidence", [(6, 0, 0.5), (7, 0, 1.0), (6, 32, 1.0)])
 def test_wire_refuel_pair_distinguishes_unchanged_rank_from_promotion(
     rank: int,
+    direction: int,
     confidence: float,
 ) -> None:
     """The real dispatcher carries both fuel tier and rank into the inference."""
@@ -32,7 +33,7 @@ def test_wire_refuel_pair_distinguishes_unchanged_rank_from_promotion(
             tank_id=814,
             x=148,
             y=249,
-            direction=0,
+            direction=direction,
             damage_state=2,
             rank=6,
             lb_score=0,
