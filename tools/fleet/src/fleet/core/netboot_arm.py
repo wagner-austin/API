@@ -44,6 +44,9 @@ from __future__ import annotations
 import pathlib
 from typing import Final, TypedDict
 
+from platform_core.env_file import parse_env_file
+from platform_core.errors import AppError
+
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks
 from fleet.core.sealed_release import SealedRelease
@@ -153,28 +156,28 @@ def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
     """Read the tailnet API key from the workspace env file.
 
     Args:
-        env_file: The file, ``KEY=value`` lines; the key's is
-            ``TAILSCALE_API_KEY=`` and the value unquoted.
+        env_file: The stack's ``.env``, read by
+            :func:`platform_core.env_file.parse_env_file`, the one reader of
+            it, in the grammar its owner holds.
 
     Returns:
         The key, or a ``CODE: message`` refusal naming the file and never a
-        line of it, when it is absent, carries no key line, carries two, or
-        the one it carries is empty.
+        line of it, when it is absent, holds a line that is not
+        ``KEY=VALUE``, or sets no key or an empty one.
     """
     if not _test_hooks.file_exists(env_file):
         return f"{NO_KEY_CODE}: {env_file} does not exist, so no key can be minted; nothing ran"
-    lead = f"{KEY_NAME}="
-    values = [
-        line.removeprefix(lead).strip()
-        for line in _test_hooks.read_text(env_file).splitlines()
-        if line.startswith(lead)
-    ]
-    if len(values) != 1 or values[0] == "":
+    try:
+        values = parse_env_file(_test_hooks.read_text(env_file), source=str(env_file))
+    except AppError as unreadable:
+        return f"{NO_KEY_CODE}: {unreadable.message}; nothing ran"
+    value = values.get(KEY_NAME, "")
+    if value == "":
         return (
-            f"{NO_KEY_CODE}: {env_file} carries {len(values)} {KEY_NAME} line(s), and the arm "
-            "mints with exactly one that is not empty; nothing ran"
+            f"{NO_KEY_CODE}: {env_file} sets no {KEY_NAME}, or sets it empty, and the arm mints "
+            "with it; nothing ran"
         )
-    return TailnetKey(value=values[0])
+    return TailnetKey(value=value)
 
 
 def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple[str, ...]:

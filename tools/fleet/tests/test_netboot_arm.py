@@ -62,26 +62,46 @@ class TestTheKey:
 
         assert netboot_arm.read_tailnet_key(path) == netboot_arm.TailnetKey(value="tskey-api-abc")
 
+    def test_the_last_assignment_wins_as_in_the_files_one_reader(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = env_file(tmp_path, "TAILSCALE_API_KEY=tskey-api-a\nTAILSCALE_API_KEY=tskey-api-b\n")
+
+        assert netboot_arm.read_tailnet_key(path) == netboot_arm.TailnetKey(value="tskey-api-b")
+
     @pytest.mark.parametrize(
-        ("text", "count"),
+        "text",
         [
-            ("VM_HOST=lavender-wsl\n", 0),
-            ("TAILSCALE_API_KEY=\n", 1),
-            ("TAILSCALE_API_KEY=tskey-api-a\nTAILSCALE_API_KEY=tskey-api-b\n", 2),
-            # A commented or exported line is not the line the lane reads.
-            ("# TAILSCALE_API_KEY=tskey-api-a\nexport TAILSCALE_API_KEY=tskey-api-b\n", 0),
+            "VM_HOST=lavender-wsl\n",
+            "TAILSCALE_API_KEY=\n",
+            # A commented or exported line does not set the key.
+            "# TAILSCALE_API_KEY=tskey-api-a\nexport TAILSCALE_API_KEY=tskey-api-b\n",
         ],
     )
-    def test_anything_but_one_key_that_is_not_empty_is_refused_without_echoing_a_line(
-        self, tmp_path: pathlib.Path, text: str, count: int
+    def test_a_file_that_sets_no_key_is_refused_without_echoing_a_line(
+        self, tmp_path: pathlib.Path, text: str
     ) -> None:
         path = env_file(tmp_path, text)
 
         detail = netboot_arm.read_tailnet_key(path)
 
         assert detail == (
-            f"{netboot_arm.NO_KEY_CODE}: {path} carries {count} TAILSCALE_API_KEY line(s), and "
-            "the arm mints with exactly one that is not empty; nothing ran"
+            f"{netboot_arm.NO_KEY_CODE}: {path} sets no TAILSCALE_API_KEY, or sets it empty, "
+            "and the arm mints with it; nothing ran"
+        )
+        assert "tskey" not in detail
+
+    def test_a_line_the_reader_cannot_split_is_refused_by_number_without_echoing_it(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = env_file(tmp_path, "A=1\ntskey-api-pasted-alone\n")
+
+        detail = netboot_arm.read_tailnet_key(path)
+
+        assert detail == (
+            f"{netboot_arm.NO_KEY_CODE}: line 2 of {path} is not a KEY=VALUE line; only those, "
+            "blank lines and # comments are read, and skipping one would drop whichever key it "
+            "sets; nothing ran"
         )
         assert "tskey" not in detail
 

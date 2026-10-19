@@ -14,7 +14,7 @@ from platform_core.error_codes_tooling import (
     SessionLabelErrorCode,
     StackEndpointErrorCode,
 )
-from platform_core.errors import AppError
+from platform_core.errors import AppError, ErrorCode
 from platform_core.json_utils import dump_json_str
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
 from platform_core.mcp_testing import (
@@ -47,9 +47,9 @@ BOUND = "opus-rebuild-deadlock-0910"
 WRONG = "opus-dashboard-0911"
 ENV_TEXT = (
     "# the stack\n"
-    "POSTGRES_PASSWORD='pg'\n"
-    f'{API_KEY_NAME}="internal-key"\n'
-    "not a pair\n"
+    "POSTGRES_PASSWORD=pg\n"
+    f"{API_KEY_NAME}=internal-key\n"
+    "\n"
     f"{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-000000000000\n"
 )
 ENDPOINTS_TEXT = stack_endpoints_text()
@@ -124,11 +124,18 @@ def test_a_session_id_the_harness_could_not_have_written_is_refused(value: str) 
 # ---------------------------------------------------------------------------
 
 
-def test_the_credentials_are_the_two_keys_unquoted_bound_to_the_given_url() -> None:
+def test_the_credentials_are_the_two_keys_bound_to_the_given_url() -> None:
     credentials = stack_credentials(ENV_TEXT, DECLARED_TASKBOARD_URL)
     assert credentials["url"] == DECLARED_TASKBOARD_URL
     assert credentials["api_key"] == "internal-key"
     assert credentials["tenant_id"] == "2e137b5f-0000-4000-8000-000000000000"
+
+
+def test_the_file_is_read_by_the_one_env_file_reader_which_refuses_a_line_it_cannot_split() -> None:
+    with pytest.raises(AppError) as caught:
+        stack_credentials(f"{API_KEY_NAME}=k\nnot a pair\n", DECLARED_TASKBOARD_URL)
+    assert caught.value.code is ErrorCode.CONFIG_ERROR
+    assert caught.value.message.startswith(f"line 2 of {STACK_ENV_PATH} is not a KEY=VALUE line")
 
 
 @pytest.mark.parametrize(
@@ -136,7 +143,6 @@ def test_the_credentials_are_the_two_keys_unquoted_bound_to_the_given_url() -> N
     [
         (f"{TENANT_ID_NAME}=t\n", API_KEY_NAME),
         (f"{API_KEY_NAME}=k\n{TENANT_ID_NAME}=\n", TENANT_ID_NAME),
-        (f"{API_KEY_NAME}=''\n{TENANT_ID_NAME}=t\n", API_KEY_NAME),
         ("", API_KEY_NAME),
     ],
 )

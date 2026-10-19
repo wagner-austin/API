@@ -32,7 +32,8 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob, encode_job_line
+from fleet.cli import job_close
+from fleet.contracts.dispatch import ClosingStatus, DispatchJob
 from fleet.core import netboot_arm, queue, rebuild, restart, sealed_release, session_release
 
 _log = get_logger(__name__)
@@ -44,39 +45,6 @@ _log = get_logger(__name__)
 #: 1800 s, or a bake, bounded at 1800 s by its own deadline) and the tick's
 #: own ExecutionTimeLimit ends anything past that.
 CLAIM_LEASE_SECONDS = 3600
-
-
-def refuse_job(
-    credentials: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-    *,
-    detail: str,
-) -> DispatchJob:
-    """Close a claimed job as refused, with its named reason.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        job: The claimed job being refused.
-        identity: This runner's identity arguments.
-        detail: The ``CODE: message`` refusal for the queue.
-
-    Returns:
-        The job, for the caller to hand back.
-
-    Raises:
-        AppError: Only from the queue call itself.
-    """
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.REFUSED,
-        exit_code=None,
-        detail=detail,
-        identity=identity,
-    )
-    _log.info("refused %s: %s", job["job_id"], detail)
-    return job
 
 
 def _start(
@@ -135,20 +103,17 @@ def rebuild_job(
     """
     refusal = rebuild.refusal_for(mcps_root, job["submitted_by"])
     if refusal is not None:
-        return refuse_job(credentials, job, identity, detail=refusal)
+        return job_close.refuse(credentials, job, identity, detail=refusal)
     _start(credentials, job, identity, node=node, run_id=f"bases-{job['job_id']}")
     result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
-    detail = rebuild.describe_result(result)
-    queue.report_close(
+    return job_close.close(
         credentials,
-        job_id=job["job_id"],
+        job,
+        identity,
         status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
-        detail=detail,
-        identity=identity,
+        detail=rebuild.describe_result(result),
     )
-    _log.info("%s: %s", encode_job_line(job), detail)
-    return job
 
 
 def session_job(
@@ -191,7 +156,7 @@ def session_job(
     """
     refusal = restart.refusal_for(job["session_target"])
     if refusal is not None:
-        return refuse_job(credentials, job, identity, detail=refusal)
+        return job_close.refuse(credentials, job, identity, detail=refusal)
     # Narrowed by the refusal above: a None target was refused there.
     target = job["session_target"] if job["session_target"] is not None else ""
     # The verb runs the active sealed session-verbs release, verified for
@@ -200,7 +165,7 @@ def session_job(
     # is this machine's platform's (board task 315111e4).
     release = session_release.active_session_release(sys.platform)
     if isinstance(release, str):
-        return refuse_job(credentials, job, identity, detail=release)
+        return job_close.refuse(credentials, job, identity, detail=release)
     invocation = restart.session_invocation(
         release, job["command"], target, job["submitted_by"], node
     )
@@ -210,20 +175,17 @@ def session_job(
     if invocation["types_requester"]:
         requester_refusal = restart.requester_refusal(job["submitted_by"])
         if requester_refusal is not None:
-            return refuse_job(credentials, job, identity, detail=requester_refusal)
+            return job_close.refuse(credentials, job, identity, detail=requester_refusal)
     _start(credentials, job, identity, node=node, run_id=f"{invocation['verb']}-{job['job_id']}")
     result = restart.run_session_job(invocation)
-    detail = restart.describe_result(result, invocation)
-    queue.report_close(
+    return job_close.close(
         credentials,
-        job_id=job["job_id"],
+        job,
+        identity,
         status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
         exit_code=result["returncode"],
-        detail=detail,
-        identity=identity,
+        detail=restart.describe_result(result, invocation),
     )
-    _log.info("%s: %s", encode_job_line(job), detail)
-    return job
 
 
 def netboot_job(
@@ -259,7 +221,7 @@ def netboot_job(
     """
     machine = job["requested_node"]
     if machine is None:
-        return refuse_job(
+        return job_close.refuse(
             credentials,
             job,
             identity,
@@ -270,29 +232,26 @@ def netboot_job(
         )
     release = sealed_release.verify_release(place["release"], netboot_arm.KIND)
     if isinstance(release, str):
-        return refuse_job(credentials, job, identity, detail=release)
+        return job_close.refuse(credentials, job, identity, detail=release)
     key = netboot_arm.read_tailnet_key(place["env_file"])
     if isinstance(key, str):
-        return refuse_job(credentials, job, identity, detail=key)
+        return job_close.refuse(credentials, job, identity, detail=key)
     _start(credentials, job, identity, node=node, run_id=f"netboot-arm-{job['job_id']}")
     result = netboot_arm.run_arm(netboot_arm.arm_argv(place, release, machine), key)
     outcome = netboot_arm.arm_outcome(result, release, machine)
-    queue.report_close(
+    return job_close.close(
         credentials,
-        job_id=job["job_id"],
+        job,
+        identity,
         status=outcome["status"],
         exit_code=outcome["exit_code"],
         detail=outcome["detail"],
-        identity=identity,
     )
-    _log.info("%s: %s", encode_job_line(job), outcome["detail"])
-    return job
 
 
 __all__ = [
     "CLAIM_LEASE_SECONDS",
     "netboot_job",
     "rebuild_job",
-    "refuse_job",
     "session_job",
 ]

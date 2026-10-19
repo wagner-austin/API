@@ -44,7 +44,7 @@ from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config
-from fleet.cli.node_claim import refuse
+from fleet.cli.job_close import refuse
 from fleet.cli.node_prepare import Admitted, Prepared, prepare
 from fleet.cli.node_start import report_started
 from fleet.contracts.dispatch import DispatchJob

@@ -96,7 +96,8 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import _config, node_serve, node_serve_claim, node_watch
-from fleet.cli.node_claim import ask_queue, refuse
+from fleet.cli.job_close import refuse
+from fleet.cli.node_claim import ask_queue
 from fleet.cli.node_collect import collect_pass
 from fleet.cli.node_launch import Launcher
 from fleet.cli.node_prepare import admit

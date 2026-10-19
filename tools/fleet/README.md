@@ -291,7 +291,8 @@ nothing back, because that lease belongs to another run.
 
 **The hub runner is the machine holding the control duty, by name.** Its
 label is `fleet-hub-<alias>` and its session the version-5 UUID of
-`fleet-agent/hub/<alias>` (`fleet.cli.tick.hub_identity`), and a base rebuild
+`fleet-agent/hub/<alias>` (`fleet.cli.tick.runner_identity`, which names the
+sessions and netboot runners the same way by their lanes), and a base rebuild
 or other hub job is reported started on that alias, so moving the duty gives
 the new holder its own label (MCPs board task c39ee056). austinpc's former
 pair, `fleet-runner-austinpc` and session a850f688, stays bound to the runner
@@ -302,13 +303,14 @@ that used it and is never reused.
 `dispatch_netboot_arm`) names one roster machine as its requested node. The
 `fleet-netboot` hub-runner row runs `fleet.cli.tick --lane netboot` on the
 machine holding the netboot duty, as `fleet-netboot-<alias>`
-(`fleet.cli.tick.netboot_identity`), with the installed netboot release, the
+(`fleet.cli.tick.runner_identity`), with the installed netboot release, the
 node binary, the served root and the workspace env file. The agent claims the
 lane with no node filter, since the machine an arm names is its target and
 never where it runs. Before the job is reported started it checks the
 release's seal with that release's own verifier (`fleet.core.sealed_release`,
 the check the session verbs make too) and reads `TAILSCALE_API_KEY` from the
-env file; then it runs the release's own `fleet-netboot arm --node <machine>
+env file through `platform_core.env_file`, the one reader of the stack's
+`.env`; then it runs the release's own `fleet-netboot arm --node <machine>
 --registry <the registry directory the tick loaded>`, whose `machines/` names
 each machine's boot MAC, with the seal's revision as
 `--commit` and the key in the arm's environment alone

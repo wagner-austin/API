@@ -23,7 +23,7 @@ with the credentials the pump hands every bridge (``FLEET_MCP_API_KEY`` and
 ``CORVIS_TENANT_ID`` from its ``runs/env.ps1``), so a record that could not be
 made is a red row in the pump's health record like any bridge's, never a
 tick that crashed. It acts under the dispatch identity of the hub runner on
-the machine it runs on (:func:`fleet.cli.tick.hub_identity`): it is the
+the machine it runs on (:func:`fleet.cli.tick.runner_identity`): it is the
 fleet package acting for the hub, and the queue already knows that writer.
 """
 
@@ -36,7 +36,8 @@ from typing import Final, TypedDict
 
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
-from fleet.cli.tick import hub_identity
+from fleet.cli.tick import runner_identity
+from fleet.contracts.dispatch import DispatchLane
 from fleet.contracts.publisher_tick import PublisherTick
 from fleet.core import _test_hooks, queue, tick_report
 from fleet.core.checkout import read_checkout
@@ -118,7 +119,7 @@ def main(argv: Sequence[str]) -> int:
     ran = [parse_ran(token) for token in argv]
     credentials = queue.load_credentials()
     host = _test_hooks.hostname()
-    label, session = hub_identity(host)
+    label, session = runner_identity(DispatchLane.HUB, host)
     identity = queue.identity_arguments(label, session, str(pathlib.Path.cwd()))
     for bridge in ran:
         checkout = read_checkout(bridge["directory"])

@@ -288,8 +288,9 @@ class TestNetbootRefusals:
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
         assert len(runner.calls) == 1
-        assert narrow_json_to_str(endpoint.arguments[1]["detail"]).startswith(
-            f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} carries 0 "
+        assert narrow_json_to_str(endpoint.arguments[1]["detail"]) == (
+            f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no TAILSCALE_API_KEY, "
+            "or sets it empty, and the arm mints with it; nothing ran"
         )
 
     def test_an_arm_naming_no_machine_is_refused_and_nothing_runs(

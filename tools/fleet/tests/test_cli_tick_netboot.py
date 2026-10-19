@@ -19,6 +19,7 @@ from typing import Final
 import pytest
 
 from fleet.cli import tick
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks
 from tests.conftest import FakeRun, ok
 
@@ -105,11 +106,11 @@ class TestTheNetbootLanes:
         )
 
     def test_each_machine_has_its_own_netboot_runner_identity(self) -> None:
-        assert tick.netboot_identity("diphtheria") == (
+        assert tick.runner_identity(DispatchLane.NETBOOT, "diphtheria") == (
             "fleet-netboot-diphtheria",
             DIPHTHERIA_SESSION,
         )
-        assert tick.netboot_identity("lacrymal") == (
+        assert tick.runner_identity(DispatchLane.NETBOOT, "lacrymal") == (
             "fleet-netboot-lacrymal",
             "fabb438a-f8ae-56da-8155-b9dd5ac979f8",
         )

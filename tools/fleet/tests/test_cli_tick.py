@@ -18,6 +18,7 @@ from platform_core.errors import AppError, ErrorCode
 
 from fleet.cli import rolled as rolled_cli
 from fleet.cli import tick
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks
 from tests.conftest import FakeRun, failed, ok, timed_out
 
@@ -163,8 +164,10 @@ class TestTheLanes:
             header=header,
         )
 
+    # The sessions already bound on the board, pinned so that naming every
+    # duty by one function moved none of them (MCPs board task af8b5662).
     def test_each_machine_has_its_own_sessions_runner_identity(self) -> None:
-        assert tick.sessions_identity("austinpc") == (
+        assert tick.runner_identity(DispatchLane.SESSIONS, "austinpc") == (
             "fleet-sessions-austinpc",
             "bf75d02e-27a3-5752-8d96-07819e29af54",
         )
@@ -172,11 +175,11 @@ class TestTheLanes:
     # Neither is austinpc's retired pair, fleet-runner-austinpc and session
     # a850f688, which stays bound to the runner that used it.
     def test_each_machine_has_its_own_hub_runner_identity(self) -> None:
-        assert tick.hub_identity("diphtheria") == (
+        assert tick.runner_identity(DispatchLane.HUB, "diphtheria") == (
             "fleet-hub-diphtheria",
             "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
         )
-        assert tick.hub_identity("austinpc") == (
+        assert tick.runner_identity(DispatchLane.HUB, "austinpc") == (
             "fleet-hub-austinpc",
             "6f531d60-5c82-5b23-b2a3-c523f13c9490",
         )

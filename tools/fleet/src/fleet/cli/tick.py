@@ -94,6 +94,7 @@ from platform_core.members import find_member
 
 from fleet.cli import agent as agent_cli
 from fleet.cli import rolled as rolled_cli
+from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, names
 
 API_ROOT_FLAG: Final = "--api-root"
@@ -124,16 +125,18 @@ class Lane(StrEnum):
     ELEVATED_ANNOUNCE = "elevated-announce"
 
 
-#: The lanes the hub runner serves: its tick and its one-time check-in.
-_HUB_LANES: Final[frozenset[Lane]] = frozenset({Lane.HUB, Lane.HUB_ANNOUNCE})
-
-#: The lanes the sessions runner serves, on the machine holding the
-#: sessions duty: its tick and its one-time check-in.
-_SESSIONS_LANES: Final[frozenset[Lane]] = frozenset({Lane.SESSIONS, Lane.SESSIONS_ANNOUNCE})
-
-#: The lanes the netboot runner serves, on the machine holding the netboot
-#: duty: its tick and its one-time check-in.
-_NETBOOT_LANES: Final[frozenset[Lane]] = frozenset({Lane.NETBOOT, Lane.NETBOOT_ANNOUNCE})
+#: The ticks ``fleet-agent`` runs, each a duty's tick or its one-time
+#: check-in, by the queue lane that duty claims: the control duty's hub, the
+#: sessions duty's and the netboot duty's. One table, so the three runners
+#: are planned by one function and named by one (MCPs board task af8b5662).
+_AGENT_LANES: Final[Mapping[Lane, DispatchLane]] = {
+    Lane.HUB: DispatchLane.HUB,
+    Lane.HUB_ANNOUNCE: DispatchLane.HUB,
+    Lane.SESSIONS: DispatchLane.SESSIONS,
+    Lane.SESSIONS_ANNOUNCE: DispatchLane.SESSIONS,
+    Lane.NETBOOT: DispatchLane.NETBOOT,
+    Lane.NETBOOT_ANNOUNCE: DispatchLane.NETBOOT,
+}
 
 #: The node lanes that run a node's ELEVATED runner (MCPs board task
 #: a98d7083): its own identity and log, claiming only the jobs requiring the
@@ -155,66 +158,31 @@ _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
 SESSIONS_NAMESPACE: Final = uuid.NAMESPACE_URL
 
 
-def hub_identity(alias: str) -> tuple[str, str]:
-    """The label and session id a machine's hub runner acts as.
+def runner_identity(lane: DispatchLane, alias: str) -> tuple[str, str]:
+    """The label and session id a machine's ``fleet-agent`` runner acts as.
 
-    Derived from the alias as a sessions runner's are: one stable session
-    per machine, so the control duty moving to another machine gives that
-    machine its own label for good, ``fleet-hub-<alias>``. Until MCPs board
-    task c39ee056 the one hub was austinpc, whose fixed pair,
-    ``fleet-runner-austinpc`` and session a850f688, is bound for good and so
-    is not reused.
-
-    Args:
-        alias: The machine's registry name.
-
-    Returns:
-        ``fleet-hub-<alias>`` and the version-5 UUID of
-        ``fleet-agent/hub/<alias>`` in :data:`SESSIONS_NAMESPACE`.
-    """
-    return (
-        f"fleet-hub-{alias}",
-        str(uuid.uuid5(SESSIONS_NAMESPACE, f"fleet-agent/hub/{alias}")),
-    )
-
-
-def sessions_identity(alias: str) -> tuple[str, str]:
-    """The label and session id a machine's sessions runner acts as.
-
-    Derived from the alias as a node runner's are
+    Derived from the queue lane its duty claims and the machine's alias, as
+    a node runner's are from the alias
     (:func:`fleet.cli.node_agent.node_identity`): one stable session per
-    machine, so its check-in binds one label to one session for good, and
-    the duty moving to another machine gives that machine its own.
+    duty and machine, so a check-in binds one label to one session for
+    good, and a duty moving to another machine gives that machine its own.
+    Until MCPs board task c39ee056 the one hub was austinpc, whose fixed
+    pair, ``fleet-runner-austinpc`` and session a850f688, is bound for good
+    and so is not reused.
 
     Args:
+        lane: The queue lane the duty claims, one of :data:`_AGENT_LANES`'
+            values: hub, sessions or netboot. The node lane's runner is
+            ``fleet-node-agent``, named by ``node_identity``.
         alias: The machine's registry name.
 
     Returns:
-        ``fleet-sessions-<alias>`` and the version-5 UUID of
-        ``fleet-agent/sessions/<alias>`` in :data:`SESSIONS_NAMESPACE`.
+        ``fleet-<lane>-<alias>`` and the version-5 UUID of
+        ``fleet-agent/<lane>/<alias>`` in :data:`SESSIONS_NAMESPACE`.
     """
     return (
-        f"fleet-sessions-{alias}",
-        str(uuid.uuid5(SESSIONS_NAMESPACE, f"fleet-agent/sessions/{alias}")),
-    )
-
-
-def netboot_identity(alias: str) -> tuple[str, str]:
-    """The label and session id a machine's netboot runner acts as.
-
-    Derived from the alias as a hub runner's are, so the netboot duty moving
-    to another machine gives that machine its own label for good.
-
-    Args:
-        alias: The machine's registry name.
-
-    Returns:
-        ``fleet-netboot-<alias>`` and the version-5 UUID of
-        ``fleet-agent/netboot/<alias>`` in :data:`SESSIONS_NAMESPACE`.
-    """
-    return (
-        f"fleet-netboot-{alias}",
-        str(uuid.uuid5(SESSIONS_NAMESPACE, f"fleet-agent/netboot/{alias}")),
+        f"fleet-{lane.value}-{alias}",
+        str(uuid.uuid5(SESSIONS_NAMESPACE, f"fleet-agent/{lane.value}/{alias}")),
     )
 
 
@@ -292,6 +260,71 @@ def _netboot_arguments(lane: Lane, netboot: Mapping[str, str]) -> tuple[str, ...
     return ()
 
 
+def _agent_plan(
+    api_root: pathlib.Path,
+    lane: Lane,
+    agent_lane: DispatchLane,
+    node: str | None,
+    trailing: tuple[str, ...],
+) -> TickPlan:
+    """Plan a ``fleet-agent`` tick: the hub, sessions or netboot runner's.
+
+    The sessions duty is placed by the tick's ``--node``; the control and
+    netboot duties run on the machine the tick runs on, which is named by
+    its hostname. The hub's tick alone hands the agent the MCPs checkout it
+    rebuilds in, and keeps its historic log stem, ``fleet-agent``.
+
+    Args:
+        api_root: The API checkout.
+        lane: Which tick this is.
+        agent_lane: The queue lane its duty claims (:data:`_AGENT_LANES`).
+        node: The machine's alias for the sessions lane; None otherwise.
+        trailing: The netboot flags and the announce flag, as the lane has
+            them.
+
+    Returns:
+        The launcher's command line, the log stem and the record's header.
+
+    Raises:
+        ValueError: ``FLEET_TICK_USAGE`` when the sessions lane names no
+            node, or the hub or netboot lane names one.
+    """
+    placement: tuple[str, ...]
+    if agent_lane is DispatchLane.SESSIONS:
+        if node is None:
+            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {NODE_FLAG}")
+        alias, placement, header = node, ("--node", node), f"{lane.value} {node}"
+    else:
+        if node is not None:
+            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane takes no {NODE_FLAG}")
+        alias, placement, header = _test_hooks.hostname(), (), lane.value
+    label, session = runner_identity(agent_lane, alias)
+    rebuild = ("--mcps-root", str(api_root.parent / "MCPs")) if lane is Lane.HUB else ()
+    repo = str(api_root)
+    return TickPlan(
+        arguments=(
+            rolled_cli.REPO_ROOT_FLAG,
+            repo,
+            rolled_cli.AGENT_FLAG,
+            "fleet-agent",
+            rolled_cli.SEPARATOR,
+            "--agent",
+            label,
+            "--session",
+            session,
+            "--repo-root",
+            repo,
+            "--lane",
+            agent_lane.value,
+            *placement,
+            *rebuild,
+            *trailing,
+        ),
+        stem="fleet-agent" if agent_lane is DispatchLane.HUB else label,
+        header=header,
+    )
+
+
 def plan_tick(
     api_root: pathlib.Path, lane: Lane, node: str | None, netboot: Mapping[str, str]
 ) -> TickPlan:
@@ -316,83 +349,11 @@ def plan_tick(
     repo = str(api_root)
     announce = ("--announce",) if lane in _ANNOUNCE_LANES else ()
     arms = _netboot_arguments(lane, netboot)
-    if lane in _NETBOOT_LANES:
-        if node is not None:
-            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane takes no {NODE_FLAG}")
-        label, session = netboot_identity(_test_hooks.hostname())
-        return TickPlan(
-            arguments=(
-                rolled_cli.REPO_ROOT_FLAG,
-                repo,
-                rolled_cli.AGENT_FLAG,
-                "fleet-agent",
-                rolled_cli.SEPARATOR,
-                "--agent",
-                label,
-                "--session",
-                session,
-                "--repo-root",
-                repo,
-                "--lane",
-                "netboot",
-                *arms,
-                *announce,
-            ),
-            stem=label,
-            header=lane.value,
-        )
-    if lane in _HUB_LANES:
-        if node is not None:
-            raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane takes no {NODE_FLAG}")
-        label, session = hub_identity(_test_hooks.hostname())
-        hub = (
-            rolled_cli.REPO_ROOT_FLAG,
-            repo,
-            rolled_cli.AGENT_FLAG,
-            "fleet-agent",
-            rolled_cli.SEPARATOR,
-            "--agent",
-            label,
-            "--session",
-            session,
-            "--repo-root",
-            repo,
-            "--lane",
-            "hub",
-        )
-        if lane is Lane.HUB_ANNOUNCE:
-            return TickPlan(arguments=(*hub, *announce), stem="fleet-agent", header=lane.value)
-        return TickPlan(
-            arguments=(*hub, "--mcps-root", str(api_root.parent / "MCPs")),
-            stem="fleet-agent",
-            header=lane.value,
-        )
+    agent_lane = _AGENT_LANES.get(lane)
+    if agent_lane is not None:
+        return _agent_plan(api_root, lane, agent_lane, node, (*arms, *announce))
     if node is None:
         raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {NODE_FLAG}")
-    if lane in _SESSIONS_LANES:
-        label, session = sessions_identity(node)
-        return TickPlan(
-            arguments=(
-                rolled_cli.REPO_ROOT_FLAG,
-                repo,
-                rolled_cli.AGENT_FLAG,
-                "fleet-agent",
-                rolled_cli.SEPARATOR,
-                "--agent",
-                label,
-                "--session",
-                session,
-                "--repo-root",
-                repo,
-                "--lane",
-                "sessions",
-                "--node",
-                node,
-                *announce,
-            ),
-            stem=label,
-            header=f"{lane.value} {node}",
-        )
     elevated = lane in _ELEVATED_LANES
     runner = names.runner_name(node, elevated=elevated)
     return TickPlan(
@@ -493,13 +454,11 @@ __all__ = [
     "Lane",
     "TickPlan",
     "entrypoint",
-    "hub_identity",
     "main",
-    "netboot_identity",
     "plan_tick",
     "remove_stale_logs",
     "require_lane",
-    "sessions_identity",
+    "runner_identity",
 ]
 
 

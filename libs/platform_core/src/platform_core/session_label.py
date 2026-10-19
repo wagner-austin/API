@@ -48,6 +48,7 @@ import re
 from collections.abc import Callable
 from typing import Final, TypedDict
 
+from platform_core.env_file import parse_env_file
 from platform_core.error_codes_tooling import SessionLabelErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpPostProtocol, call_mcp_tool
@@ -126,8 +127,9 @@ def stack_credentials(env_text: str, url: str) -> McpCredentials:
     """Read the taskboard's credentials out of the stack's ``.env`` text.
 
     Args:
-        env_text: The whole file. ``NAME=value`` lines, values optionally
-            quoted; everything else is ignored.
+        env_text: The whole file, read by
+            :func:`platform_core.env_file.parse_env_file`, the one reader
+            of it.
         url: The taskboard's declared url
             (:func:`platform_core.stack_endpoints.declared_url`).
 
@@ -136,14 +138,10 @@ def stack_credentials(env_text: str, url: str) -> McpCredentials:
 
     Raises:
         AppError: ``CREDENTIALS_MISSING`` when either key is absent or
-            empty, naming the key and the file.
+            empty, naming the key and the file; ``CONFIG_ERROR`` from the
+            reader for a line that is not ``KEY=VALUE``.
     """
-    values: dict[str, str] = {}
-    for line in env_text.splitlines():
-        name, separator, value = line.partition("=")
-        if separator == "":
-            continue
-        values[name.strip()] = value.strip().strip('"').strip("'")
+    values = parse_env_file(env_text, source=str(STACK_ENV_PATH))
     api_key = values.get(API_KEY_NAME, "")
     tenant_id = values.get(TENANT_ID_NAME, "")
     for name, value in ((API_KEY_NAME, api_key), (TENANT_ID_NAME, tenant_id)):

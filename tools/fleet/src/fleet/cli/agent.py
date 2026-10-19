@@ -101,7 +101,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, hub_jobs, hub_passes
+from fleet.cli import _config, hub_jobs, hub_passes, job_close
 from fleet.contracts.dispatch import (
     DispatchCommand,
     DispatchJob,
@@ -202,7 +202,7 @@ def claim_pass(
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
         if mcps_root is None:
-            return hub_jobs.refuse_job(
+            return job_close.refuse(
                 credentials,
                 job,
                 identity,
@@ -216,7 +216,7 @@ def claim_pass(
         return hub_jobs.rebuild_job(credentials, job, identity, mcps_root=mcps_root, node=host)
     if job["command"] is DispatchCommand.NETBOOT_ARM:
         if netboot is None:
-            return hub_jobs.refuse_job(
+            return job_close.refuse(
                 credentials,
                 job,
                 identity,
