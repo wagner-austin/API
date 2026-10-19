@@ -318,27 +318,26 @@ def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
     )
 
 
-@pytest.mark.parametrize(
-    ("host", "tag"), [("sedona", NodeTag.WINDOWS), ("colossus", NodeTag.LINUX)]
-)
-def test_tankpits_move_is_measured_on_the_host_that_holds_each_end(host: str, tag: NodeTag) -> None:
-    """Each end of TankPit's move is checked by a project pinned to its host.
+def test_tankpits_move_is_measured_on_colossus_alone() -> None:
+    """TankPit's move is checked by a project pinned to colossus.
 
-    sedona holds the directory the move copied and colossus the copy, the
-    release and its image (board task c481c259), so each project lands on
-    that node alone, which carries the platform tag it names.
+    colossus holds the copy, the release and its image (board task
+    c481c259), so the project lands on that node alone, a Linux one. Its
+    sedona twin went with sedona's 2026-10-19 reimage (MCPs board task
+    1e9ab738), and the workspace declares no project for it.
     """
     workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, f"clients/TankpitBot-{host}-execution")
-    assert project["node"] == host
-    assert project["required_tags"] == (tag,)
+    project = require_project(workspace, "clients/TankpitBot-colossus-execution")
+    assert project["node"] == "colossus"
+    assert project["required_tags"] == (NodeTag.LINUX,)
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
-        path=f"clients/TankpitBot-{host}-execution",
+        path="clients/TankpitBot-colossus-execution",
         install=(),
         companions=(),
     )
-    assert require_node(workspace, host)["platform"] == tag.value
+    assert require_node(workspace, "colossus")["platform"] == NodeTag.LINUX.value
+    assert "clients/TankpitBot-sedona-execution" not in workspace["projects"]
 
 
 def test_tankpitbot_runs_its_ordinary_check_on_each_platform() -> None:
