@@ -62,21 +62,28 @@ def test_every_deploy_runs_the_gate_for_both_platforms() -> None:
 def test_a_fleet_roll_moves_the_ref_only_after_both_suites_passed_at_head() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "\nfleet-roll: commit-tasks executed\n" in makefile
-    assert _recipe("Makefile", "fleet-roll") == ["git update-ref refs/fleet/rolled HEAD"]
+    # The ref is pushed once moved, forced since a roll may move it back, so a
+    # machine holding a hub-runner duty other than the hub's aligns to it
+    # from origin (7875aaab1, MCPs board task c39ee056).
+    assert _recipe("Makefile", "fleet-roll") == [
+        "git update-ref refs/fleet/rolled HEAD",
+        "git push origin +refs/fleet/rolled:refs/fleet/rolled",
+    ]
 
 
 def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     # Every fleet tick is poetry running fleet.cli.tick (MCPs board task
     # 94ac1c4f; the MCPs hub runner's fleet rows run that, held by its table
     # suite since MCPs board task b27bd34a), and the tick runs its agent only
-    # through the rolled launcher: fleet-agent from the hub lanes' plan and the
-    # sessions lanes' (MCPs board task c39ee056), fleet-node-agent from a
-    # node's. Each plan names its agent once, beside the launcher's flag.
+    # through the rolled launcher: fleet-agent from the one plan every
+    # fleet-agent lane shares, hub, sessions and netboot (MCPs board tasks
+    # c39ee056, 83102d9d and af8b5662), fleet-node-agent from a node's. Each
+    # plan names its agent once, beside the launcher's flag.
     tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
         encoding="utf-8"
     )
     assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
-    plans = {"fleet-agent": 2, "fleet-node-agent": 1}
+    plans = {"fleet-agent": 1, "fleet-node-agent": 1}
     for agent, count in plans.items():
         assert len(list(re.finditer(rf'rolled_cli\.AGENT_FLAG,\s+"{agent}",', tick))) == count
     assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == sum(plans.values())

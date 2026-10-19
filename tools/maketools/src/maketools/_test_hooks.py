@@ -46,6 +46,7 @@ from maketools.concurrent_children import run_children_concurrently
 from maketools.processes import (
     LINUX_PROC_ROOT,
     ProcessRow,
+    linux_process_row,
     linux_process_table,
     windows_process_table,
 )
@@ -392,7 +393,7 @@ def _linux_table() -> Sequence[ProcessRow]:
     Returns:
         The rows.
     """
-    return linux_process_table(LINUX_PROC_ROOT)
+    return linux_process_table(LINUX_PROC_ROOT, linux_process_row)
 
 
 def _default_kill(pid: int) -> None:

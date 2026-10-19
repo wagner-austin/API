@@ -15,6 +15,7 @@ from maketools.commands import CommandResult
 from maketools.processes import (
     LINUX_CLOCK_TICKS,
     WINDOWS_SNAPSHOT_SCRIPT,
+    ProcessRow,
     decode_process_row,
     linux_boot_unix,
     linux_commit_mb,
@@ -167,5 +168,39 @@ def test_linux_process_table_lists_numeric_directories_and_skips_a_vanished_one(
     write_process(proc, 3, name="a", ppid=1, cmdline=["a"])
     write_process(proc, 12, name="b", ppid=3, cmdline=["b"])
     (proc / "99").mkdir()  # exited between the listing and the read: no stat
-    rows = linux_process_table(proc)
+    rows = linux_process_table(proc, linux_process_row)
     assert [(r["pid"], r["parent_pid"], r["name"]) for r in rows] == [(3, 1, "a"), (12, 3, "b")]
+
+
+def test_linux_process_table_skips_a_process_whose_read_the_kernel_answers_esrch(
+    proc: Path,
+) -> None:
+    # Fleet job d2454143 (MCPs board task cf2e4802): a process being torn
+    # down keeps its listed directory, and reading its stat raises
+    # ProcessLookupError rather than FileNotFoundError.
+    write_process(proc, 3, name="a", ppid=1, cmdline=["a"])
+    write_process(proc, 50, name="exiting", ppid=3, cmdline=["exiting"])
+    write_process(proc, 12, name="b", ppid=3, cmdline=["b"])
+    (proc / "99").mkdir()
+    asked: list[int] = []
+
+    def read_row(pid: int, proc_root: Path, boot_unix: float) -> ProcessRow:
+        asked.append(pid)
+        if pid == 50:
+            raise ProcessLookupError(3, "No such process")
+        return linux_process_row(pid, proc_root, boot_unix)
+
+    rows = linux_process_table(proc, read_row)
+
+    assert [r["pid"] for r in rows] == [3, 12]
+    assert asked == [3, 12, 50, 99]
+
+
+def test_linux_process_table_lets_any_other_read_failure_propagate(proc: Path) -> None:
+    write_process(proc, 3, name="a", ppid=1, cmdline=["a"])
+
+    def read_row(pid: int, proc_root: Path, boot_unix: float) -> ProcessRow:
+        raise PermissionError(13, "Permission denied", str(proc_root / str(pid) / "stat"))
+
+    with pytest.raises(PermissionError):
+        linux_process_table(proc, read_row)

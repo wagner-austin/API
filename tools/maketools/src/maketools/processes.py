@@ -19,7 +19,7 @@ from __future__ import annotations
 import base64
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import Final, Protocol, TypedDict
 
 from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
@@ -196,8 +196,12 @@ def linux_process_row(pid: int, proc_root: Path, boot_unix: float) -> ProcessRow
         The row.
 
     Raises:
-        FileNotFoundError: When the process exited between the listing and
-            this read; the caller skips it.
+        FileNotFoundError: When the process exited and was reaped between
+            the listing and this read; the caller skips it.
+        ProcessLookupError: When the process is being torn down as this
+            reads it: its directory is still listed, but the kernel answers
+            the read with ESRCH (measured on colossus 2026-10-19, fleet job
+            d2454143, MCPs board task cf2e4802). The caller skips it too.
     """
     directory = proc_root / str(pid)
     stat = (directory / "stat").read_text(encoding="utf-8")
@@ -223,26 +227,48 @@ def linux_process_row(pid: int, proc_root: Path, boot_unix: float) -> ProcessRow
     )
 
 
-def linux_process_table(proc_root: Path) -> Sequence[ProcessRow]:
+class ReadRowProtocol(Protocol):
+    """Reads one process's row: :func:`linux_process_row`'s shape."""
+
+    def __call__(self, pid: int, proc_root: Path, boot_unix: float) -> ProcessRow:
+        """Read it.
+
+        Args:
+            pid: The process.
+            proc_root: The ``/proc`` root.
+            boot_unix: From :func:`linux_boot_unix`.
+
+        Returns:
+            The row.
+        """
+        ...
+
+
+def linux_process_table(proc_root: Path, read_row: ReadRowProtocol) -> Sequence[ProcessRow]:
     """Snapshot the Linux process table.
 
     A process that exits between the directory listing and its own read is
     skipped: it is not in the table any more, which is the answer a snapshot
-    taken a moment later would have given.
+    taken a moment later would have given. It shows as either of the two
+    exceptions :func:`linux_process_row` names, and both are skipped; any
+    other failure propagates.
 
     Args:
         proc_root: The ``/proc`` root.
+        read_row: Reads one process; :func:`linux_process_row`, bound in
+            ``maketools._test_hooks``, so the two ways a process vanishes
+            mid-read are exercised with the kernel's own exception types.
 
     Returns:
-        Every process with a numeric directory.
+        Every process with a numeric directory that was still there to read.
     """
     boot_unix = linux_boot_unix(proc_root)
     rows: list[ProcessRow] = []
     pids = sorted(int(entry.name) for entry in proc_root.iterdir() if entry.name.isdigit())
     for pid in pids:
         try:
-            rows.append(linux_process_row(pid, proc_root, boot_unix))
-        except FileNotFoundError:
+            rows.append(read_row(pid, proc_root, boot_unix))
+        except (FileNotFoundError, ProcessLookupError):
             continue
     return rows
 
@@ -252,6 +278,7 @@ __all__ = [
     "LINUX_PROC_ROOT",
     "WINDOWS_SNAPSHOT_SCRIPT",
     "ProcessRow",
+    "ReadRowProtocol",
     "decode_process_row",
     "linux_boot_unix",
     "linux_commit_mb",
