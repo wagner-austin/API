@@ -15,7 +15,7 @@ import sys
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue
 
-from fleet.core import _test_hooks, session_release
+from fleet.core import _test_hooks, sealed_release, session_release
 from tests._queue_fakes import FakeEnv, queue_env
 from tests._session_release_fixtures import (
     RELEASE_ID,
@@ -24,6 +24,7 @@ from tests._session_release_fixtures import (
     point_environment,
     pointer_file,
     pointer_record,
+    release_root,
     verified_line,
     verifier,
     verify_call,
@@ -66,7 +67,7 @@ class TestActiveRelease:
             expected["root"] / "mcp-shared" / "src" / "source-registry"
         )
         assert runner.calls == [verify_call(tmp_path)]
-        assert runner.timeouts == [session_release.VERIFY_TIMEOUT_SECONDS] == [300]
+        assert runner.timeouts == [sealed_release.VERIFY_TIMEOUT_SECONDS] == [300]
         assert runner.unset_env == [()]
         assert runner.set_env == [()]
 
@@ -232,7 +233,7 @@ class TestVerification:
         detail = refusal(session_release.active_session_release(sys.platform))
 
         assert detail == (
-            f"{session_release.UNSEALED_CODE}: {verifier(tmp_path)} exited 1: "
+            f"{sealed_release.UNSEALED_CODE}: {verifier(tmp_path)} exited 1: "
             "RELEASE_DIGEST_MISMATCH: payload changed"
         )
 
@@ -252,6 +253,41 @@ class TestVerification:
 
         detail = refusal(session_release.active_session_release(sys.platform))
 
-        assert detail.startswith(f"{session_release.ANSWER_MISMATCH_CODE}: ")
+        assert detail.startswith(f"{sealed_release.ANSWER_MISMATCH_CODE}: ")
         assert f"answered {answer!r}" in detail
-        assert f"requires {verified_line(tmp_path)!r}; nothing was run" in detail
+        assert detail.endswith(
+            f"where a session-verbs release {RELEASE_ID} at {release_root(tmp_path)} is "
+            "required; nothing was run"
+        )
+
+    def test_a_seal_at_another_revision_than_the_pointers_is_refused(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The pointer and the seal disagree: the release in its directory was
+        re-cut, or the pointer was written for another cut of it."""
+        plant_release(tmp_path)
+        other = "0" * 40
+        sealed = verified_line(tmp_path).replace(REVISION, other)
+        _test_hooks.run = FakeRun([ok(f"{sealed}\n")])
+
+        detail = refusal(session_release.active_session_release(sys.platform))
+
+        assert detail == (
+            f"{session_release.POINTER_MISMATCH_CODE}: the pointer {pointer_file(tmp_path)} "
+            f"names release {RELEASE_ID} at revision {REVISION}, and its root's own verifier "
+            f"verified release {RELEASE_ID} at revision {other}; nothing was run"
+        )
+
+    def test_a_pointer_naming_another_release_than_its_roots_directory_is_refused(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        record: dict[str, JSONValue] = dict(pointer_record(tmp_path))
+        record["release"] = "a" * 32
+        write_pointer(tmp_path, record)
+        _test_hooks.run = FakeRun([verify_reply(tmp_path)])
+
+        detail = refusal(session_release.active_session_release(sys.platform))
+
+        assert detail.startswith(f"{session_release.POINTER_MISMATCH_CODE}: ")
+        assert f"names release {'a' * 32} at revision {REVISION}" in detail
+        assert f"verified release {RELEASE_ID} at revision {REVISION}" in detail

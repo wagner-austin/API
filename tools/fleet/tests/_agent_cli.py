@@ -1,7 +1,8 @@
 """The ``fleet-agent`` command lines the agent suites run a tick with.
 
 Shared by the agent suites (``test_agent.py``, ``test_agent_rebuild.py``,
-``test_agent_restart.py`` and ``test_declared.py``, split by role at the
+``test_agent_restart.py``, ``test_agent_netboot.py`` and
+``test_declared.py``, split by role at the
 file-size ceiling) so each runner's identity stays one set of literals. Out
 of ``conftest.py`` since the sessions lane (MCPs board task c39ee056) gave
 the agent a second runner, which took that file past the ceiling.
@@ -79,4 +80,35 @@ def sessions_argv(config_path: pathlib.Path, repo: pathlib.Path, node: str) -> l
     ]
 
 
-__all__ = ["HUB_HOST", "agent_argv", "hub_host", "sessions_argv"]
+def netboot_argv(
+    config_path: pathlib.Path, repo: pathlib.Path, place: dict[str, pathlib.Path]
+) -> list[str]:
+    """Build the agent CLI's argument list for one netboot tick.
+
+    Args:
+        config_path: The workspace document.
+        repo: The monorepo root on this machine.
+        place: The release, served root and env file, keyed by flag; the
+            node binary is always ``node``.
+
+    Returns:
+        The argument list, with the netboot runner's identity.
+    """
+    return [
+        "--config",
+        str(config_path),
+        agent_cli.AGENT_FLAG,
+        f"fleet-netboot-{HUB_HOST}",
+        agent_cli.SESSION_FLAG,
+        "55555555-eeee-4eee-8eee-555555555555",
+        agent_cli.ROOT_FLAG,
+        str(repo),
+        agent_cli.LANE_FLAG,
+        "netboot",
+        agent_cli.NODEJS_FLAG,
+        "node",
+        *(token for flag, path in place.items() for token in (flag, str(path))),
+    ]
+
+
+__all__ = ["HUB_HOST", "agent_argv", "hub_host", "netboot_argv", "sessions_argv"]

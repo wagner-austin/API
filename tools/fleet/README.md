@@ -292,6 +292,27 @@ the new holder its own label (MCPs board task c39ee056). austinpc's former
 pair, `fleet-runner-austinpc` and session a850f688, stays bound to the runner
 that used it and is never reused.
 
+**The netboot runner arms machines, and nothing is typed** (MCPs board task
+83102d9d). A `netboot-arm` row (MCPs migs 807 and 809, queued only by
+`dispatch_netboot_arm`) names one roster machine as its requested node. The
+`fleet-netboot` hub-runner row runs `fleet.cli.tick --lane netboot` on the
+machine holding the netboot duty, as `fleet-netboot-<alias>`
+(`fleet.cli.tick.netboot_identity`), with the installed netboot release, the
+node binary, the served root and the workspace env file. The agent claims the
+lane with no node filter, since the machine an arm names is its target and
+never where it runs. Before the job is reported started it checks the
+release's seal with that release's own verifier (`fleet.core.sealed_release`,
+the check the session verbs make too) and reads `TAILSCALE_API_KEY` from the
+env file; then it runs the release's own `fleet-netboot arm --node <machine>
+--registry <release>/fleet-mcp/fleet-nodes.json`, with the seal's revision as
+`--commit` and the key in the arm's environment alone
+(`fleet.core.netboot_arm`). Exit 0 with one `NETBOOT ARMED` line closes it
+`passed` with that line, which names the key's id and never the key. A refusal
+raised before anything is minted (`NETBOOT_ARM_MACHINE_UNKNOWN`,
+`NETBOOT_ARM_MACHINE_NOT_ARMABLE`, `NETBOOT_ARM_LIVE`) closes it `refused` with
+the arm's own text, and any other exit `failed` with its output's tail. Output
+carrying a `tskey-` is never copied into a detail.
+
 **The ledger row names the submitter, not the runner.** A row stamped with
 the hub runner's label would record only that the runner ran something; the
 queue job carries the enqueueing session's label and UUID, and those are what
@@ -312,7 +333,9 @@ had one head. Two changes end both.
 
 **The queue is partitioned into lanes** (MCPs migration 532, `packages/db`).
 A row's `command` decides its lane: `build-bases` and the session verbs are
-the `hub` lane, `check`/`lint`/`test` are the `node` lane, and
+the `hub` lane (the session verbs have their own `sessions` lane since mig 795,
+and `netboot-arm` the `netboot` lane since mig 807), `check`/`lint`/`test` are
+the `node` lane, and
 `dispatch_claim` takes `lane` and claims only from that one. A revive never
 queues behind a check because no runner ever asks for both at once
 (`test_agent.py` pins the hub claim; `test_node_agent.py` the node claim).

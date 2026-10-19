@@ -77,7 +77,7 @@ class TestTheLanes:
         _test_hooks.hostname = _diphtheria
         root = pathlib.Path("/home/corvis/PROJECTS/API")
         mcps = pathlib.Path("/home/corvis/PROJECTS/MCPs")
-        assert tick.plan_tick(root, tick.Lane.HUB, None) == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.HUB, None, {}) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -107,7 +107,7 @@ class TestTheLanes:
     def test_the_hub_announce_lane_checks_the_hub_runner_in_and_claims_nothing(self) -> None:
         _test_hooks.hostname = _diphtheria
         root = pathlib.Path("/home/corvis/PROJECTS/API")
-        assert tick.plan_tick(root, tick.Lane.HUB_ANNOUNCE, None) == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.HUB_ANNOUNCE, None, {}) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -142,7 +142,7 @@ class TestTheLanes:
         self, lane: tick.Lane, tail: tuple[str, ...], header: str
     ) -> None:
         root = pathlib.Path("/home/corvis/PROJECTS/API")
-        assert tick.plan_tick(root, lane, "ziggurat") == tick.TickPlan(
+        assert tick.plan_tick(root, lane, "ziggurat", {}) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -185,7 +185,7 @@ class TestTheLanes:
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:
         root = pathlib.Path("C:/api")
-        assert tick.plan_tick(root, tick.Lane.NODE, "sedona") == tick.TickPlan(
+        assert tick.plan_tick(root, tick.Lane.NODE, "sedona", {}) == tick.TickPlan(
             arguments=(
                 "--repo-root",
                 str(root),
@@ -200,7 +200,7 @@ class TestTheLanes:
         )
 
     def test_the_announce_lane_checks_in_and_shares_its_nodes_log(self) -> None:
-        plan = tick.plan_tick(pathlib.Path("C:/api"), tick.Lane.ANNOUNCE, "sedona")
+        plan = tick.plan_tick(pathlib.Path("C:/api"), tick.Lane.ANNOUNCE, "sedona", {})
         assert plan["arguments"][-3:] == ("--node", "sedona", "--announce")
         assert plan["stem"] == "fleet-node-sedona"
         assert plan["header"] == "announce sedona"
@@ -225,17 +225,22 @@ class TestTheLanes:
     def test_the_elevated_lanes_run_the_nodes_elevated_runner_into_its_own_log(
         self, lane: tick.Lane, tail: tuple[str, ...], header: str
     ) -> None:
-        plan = tick.plan_tick(pathlib.Path("C:/api"), lane, "serendipity")
+        plan = tick.plan_tick(pathlib.Path("C:/api"), lane, "serendipity", {})
         assert plan["arguments"][3:] == ("fleet-node-agent", "--", *tail)
         assert plan["stem"] == "fleet-node-serendipity-elevated"
         assert plan["header"] == header
 
     @pytest.mark.parametrize(
-        ("lane", "word"), [(tick.Lane.HUB, "hub"), (tick.Lane.HUB_ANNOUNCE, "hub-announce")]
+        ("lane", "word"),
+        [
+            (tick.Lane.HUB, "hub"),
+            (tick.Lane.HUB_ANNOUNCE, "hub-announce"),
+            (tick.Lane.NETBOOT_ANNOUNCE, "netboot-announce"),
+        ],
     )
-    def test_a_hub_lane_naming_a_node_is_refused(self, lane: tick.Lane, word: str) -> None:
+    def test_a_duty_lane_naming_a_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
-            tick.plan_tick(pathlib.Path("C:/api"), lane, "sedona")
+            tick.plan_tick(pathlib.Path("C:/api"), lane, "sedona", {})
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane takes no --node"
 
     @pytest.mark.parametrize(
@@ -251,7 +256,7 @@ class TestTheLanes:
     )
     def test_a_machine_lane_naming_no_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
-            tick.plan_tick(pathlib.Path("C:/api"), lane, None)
+            tick.plan_tick(pathlib.Path("C:/api"), lane, None, {})
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane needs --node"
 
     def test_each_lane_word_narrows_to_its_member_and_nothing_else_does(self) -> None:
@@ -260,6 +265,8 @@ class TestTheLanes:
             "hub-announce",
             "sessions",
             "sessions-announce",
+            "netboot",
+            "netboot-announce",
             "node",
             "announce",
             "elevated",
@@ -270,6 +277,8 @@ class TestTheLanes:
             tick.Lane.HUB_ANNOUNCE,
             tick.Lane.SESSIONS,
             tick.Lane.SESSIONS_ANNOUNCE,
+            tick.Lane.NETBOOT,
+            tick.Lane.NETBOOT_ANNOUNCE,
             tick.Lane.NODE,
             tick.Lane.ANNOUNCE,
             tick.Lane.ELEVATED,
@@ -280,8 +289,8 @@ class TestTheLanes:
             tick.require_lane("agent")
         assert str(refused.value) == (
             "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
-            "'sessions-announce', 'node', 'announce', 'elevated', 'elevated-announce'], "
-            "not 'agent'"
+            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce', "
+            "'elevated', 'elevated-announce'], not 'agent'"
         )
 
     def test_the_ticks_deadline_is_half_a_minute_past_the_agents(self) -> None:

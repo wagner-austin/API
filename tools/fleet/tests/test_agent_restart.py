@@ -17,7 +17,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, restart, session_release
+from fleet.core import _test_hooks, restart, sealed_release, session_release
 from tests._agent_cli import HUB_HOST, agent_argv, hub_host, sessions_argv
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
@@ -180,7 +180,7 @@ class TestRestartLane:
         # answering closes the job instead of holding the tick.
         assert (
             runner.timeouts[:2]
-            == [session_release.VERIFY_TIMEOUT_SECONDS, restart.SESSION_JOB_TIMEOUT_SECONDS]
+            == [sealed_release.VERIFY_TIMEOUT_SECONDS, restart.SESSION_JOB_TIMEOUT_SECONDS]
             == [300, 600]
         )
         started = endpoint.arguments[1]
@@ -478,7 +478,7 @@ class TestReleaseRefusals:
         closed = endpoint.arguments[1]
         assert closed["status"] == "refused"
         detail = narrow_json_to_str(closed["detail"])
-        assert detail.startswith(f"{session_release.UNSEALED_CODE}: ")
+        assert detail.startswith(f"{sealed_release.UNSEALED_CODE}: ")
         assert "RELEASE_DIGEST_MISMATCH: the payload changed" in detail
 
     def test_a_lawless_target_is_refused_before_the_release_is_even_read(

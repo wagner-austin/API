@@ -1,5 +1,5 @@
 """CLI: one tick of the runner that serves the corvis dispatch queue's hub
-lane or its sessions lane.
+lane, its sessions lane or its netboot lane.
 
 Usage:
     fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
@@ -7,6 +7,10 @@ Usage:
     fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
         --agent fleet-sessions-austinpc --session <uuid> --lane sessions \\
         --node austinpc [--announce]
+    fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
+        --agent fleet-netboot-diphtheria --session <uuid> --lane netboot \\
+        --netboot-release <release>/MCPs --nodejs /usr/bin/node \\
+        --served-root /srv/corvis-netboot --env-file <workspace>/.env [--announce]
 
 THIS IS THE OTHER HALF OF QUEUE INVERSION. ``fleet-mcp``'s ``dispatch_*``
 tools hold a queue that any session can enqueue onto -- from a phone, from
@@ -20,15 +24,18 @@ ONE TICK, NO LOOP. The interval belongs to whatever schedules this -- a shell
 loop, Task Scheduler, a Monitor -- where it is visible and changeable without
 editing code. Same decision ``tools/board-watch`` made next door.
 
-THE HUB AND SESSIONS LANES ONLY (MCPs board tasks fd5cabfa, A5, and
-c39ee056). With ``--lane hub`` this runner claims the ``build-bases``
-rebuild, the control duty's verb; with ``--lane sessions`` it claims the
-session verbs (restart, revive, the two kills, the compact and the exit),
-the sessions duty's, on the machine whose sessions they are. Every one runs
-where it was claimed and closes in the tick that claimed it. The MCPs hub
-runner places each lane's row by the duty the node registry gives its
-machine, so the queue names no node for a session verb: holding the duty is
-the placement. The make targets, which run on a fleet node against a
+THE HUB, SESSIONS AND NETBOOT LANES ONLY (MCPs board tasks fd5cabfa, A5,
+c39ee056 and 83102d9d). With ``--lane hub`` this runner claims the
+``build-bases`` rebuild, the control duty's verb; with ``--lane sessions``
+it claims the session verbs (restart, revive, the two kills, the compact
+and the exit), the sessions duty's, on the machine whose sessions they are;
+with ``--lane netboot`` it claims the arms, the netboot duty's, whatever
+machine each names, since the machine an arm names is its target and never
+where it runs. Every one runs where it was claimed and closes in the tick
+that claimed it (:mod:`fleet.cli.hub_jobs`). The MCPs hub runner places
+each lane's row by the duty the node registry gives its machine, so the
+queue names no node for a session verb: holding the duty is the placement.
+The make targets, which run on a fleet node against a
 checked-out commit, are the ``node`` lane, drained by one
 :mod:`fleet.cli.node_agent` per enabled node. Until 2026-09-21 one runner
 took every kind of job oldest-first, so a revive queued behind 129 stale
@@ -36,8 +43,9 @@ kills (board task 4199d1fb) and nine nodes behaved as one slow node; lanes
 and per-node runners are the fix, and nothing here collects a suite any more
 because nothing here starts one.
 
-A HUB TICK IS FOUR PASSES, IN THIS ORDER; a sessions tick is the first
-alone, since publishing, observing and reaping are the control duty's:
+A HUB TICK IS FOUR PASSES, IN THIS ORDER; a sessions or netboot tick is
+the first alone, since publishing, observing and reaping are the control
+duty's:
 
     1. CLAIM. Take at most one job of the lane and run it to its close.
     2. PUBLISH. Read every project the registry declares at the commit
@@ -65,8 +73,9 @@ alone, since publishing, observing and reaping are the control duty's:
        :mod:`fleet.core.runner_reap_dropped`). Last, because its second
        reading waits, and nothing above should wait behind it.
 
-At most ONE job per tick, deliberately: a bake or a session verb holds its
-machine, and a second claimed before the first closed would run beside it.
+At most ONE job per tick, deliberately: a bake, a session verb or an arm
+holds its machine, and a second claimed before the first closed would run
+beside it.
 
 WHY THIS COMMAND EXITS 0 FOR A REFUSED JOB, and it is the same argument
 ``fleet-collect`` makes for a failing suite: the status of this command is
@@ -83,7 +92,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
@@ -91,21 +100,14 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, hub_passes
+from fleet.cli import _config, hub_jobs, hub_passes
 from fleet.contracts.dispatch import (
-    ClosingStatus,
     DispatchCommand,
     DispatchJob,
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import (
-    _test_hooks,
-    queue,
-    rebuild,
-    restart,
-    session_release,
-)
+from fleet.core import _test_hooks, netboot_arm, queue, rebuild
 
 _log = get_logger(__name__)
 
@@ -116,6 +118,18 @@ NODE_FLAG = "--node"
 MCPS_ROOT_FLAG = "--mcps-root"
 REGISTRY_FLAG = "--registry"
 LANE_FLAG = "--lane"
+NETBOOT_RELEASE_FLAG = "--netboot-release"
+NODEJS_FLAG = "--nodejs"
+SERVED_ROOT_FLAG = "--served-root"
+ENV_FILE_FLAG = "--env-file"
+
+#: The flags only a hub tick's publish and observe passes read, which a
+#: sessions or netboot tick refuses rather than ignores.
+_HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG, REGISTRY_FLAG)
+
+#: The flags a netboot tick places its arms with, which every other lane
+#: refuses rather than ignores.
+NETBOOT_FLAGS = (NETBOOT_RELEASE_FLAG, NODEJS_FLAG, SERVED_ROOT_FLAG, ENV_FILE_FLAG)
 
 _FLAGS = (
     _config.CONFIG_FLAG,
@@ -127,209 +141,8 @@ _FLAGS = (
     MCPS_ROOT_FLAG,
     REGISTRY_FLAG,
     LANE_FLAG,
+    *NETBOOT_FLAGS,
 )
-
-#: The flags only a hub tick's publish and observe passes read, which a
-#: sessions tick refuses rather than ignores.
-_HUB_ONLY_FLAGS = (MCPS_ROOT_FLAG, REGISTRY_FLAG)
-
-#: How long a claim survives without a report.
-#:
-#: An hour: a hub verb closes in the tick that claimed it, so the lease only
-#: has to outlive the longest of them (a bake, bounded at 1800 s by its own
-#: deadline) and the tick's own ExecutionTimeLimit ends anything past that.
-CLAIM_LEASE_SECONDS = 3600
-
-
-def _refuse_hub_job(
-    credentials: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-    *,
-    detail: str,
-) -> DispatchJob:
-    """Close a hub-local job as refused, with its named reason.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        job: The claimed job being refused.
-        identity: This runner's identity arguments.
-        detail: The ``CODE: message`` refusal for the queue.
-
-    Returns:
-        The job, for the caller to hand back.
-
-    Raises:
-        AppError: Only from the queue call itself.
-    """
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.REFUSED,
-        exit_code=None,
-        detail=detail,
-        identity=identity,
-    )
-    _log.info("refused %s: %s", job["job_id"], detail)
-    return job
-
-
-def rebuild_job(
-    credentials: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-    *,
-    mcps_root: pathlib.Path | None,
-    node: str,
-) -> DispatchJob:
-    """Execute a claimed ``build-bases`` job on the hub, start to close.
-
-    Synchronous, unlike a suite dispatch: the bake is a local make, minutes
-    long, and closing it in the same tick leaves no cross-tick state to
-    collect (module docstring of :mod:`fleet.core.rebuild`). A runner that
-    dies mid-bake leaves the job ``running`` until its lease lapses, after
-    which a later tick reclaims it and re-runs the idempotent make.
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        job: The claimed ``build-bases`` job.
-        identity: This runner's identity arguments.
-        mcps_root: The MCPs checkout, or None when the runner was started
-            without ``--mcps-root``.
-        node: This machine's alias, which the job is reported started on:
-            the job names none, since holding the control duty is the
-            placement (MCPs board task c39ee056).
-
-    Returns:
-        The job, whatever became of it.
-
-    Raises:
-        AppError: Only from the queue calls themselves, as
-            :func:`claim_pass` describes.
-    """
-    if mcps_root is None:
-        return _refuse_hub_job(
-            credentials,
-            job,
-            identity,
-            detail=(
-                f"{rebuild.ROOT_MISSING_CODE}: this runner was started "
-                f"without {MCPS_ROOT_FLAG}, so it has no MCPs checkout to "
-                "rebuild in; resubmit once a rebuild-capable runner is "
-                "scheduled"
-            ),
-        )
-    refusal = rebuild.refusal_for(mcps_root, job["submitted_by"])
-    if refusal is not None:
-        return _refuse_hub_job(credentials, job, identity, detail=refusal)
-    run_id = f"bases-{job['job_id']}"
-    queue.report_start(
-        credentials,
-        job_id=job["job_id"],
-        node=node,
-        run_id=run_id,
-        lease_seconds=CLAIM_LEASE_SECONDS,
-        identity=identity,
-    )
-    _log.info("started %s on %s as %s (local bake)", job["job_id"], node, run_id)
-    result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
-    detail = rebuild.describe_result(result)
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
-        exit_code=result["returncode"],
-        detail=detail,
-        identity=identity,
-    )
-    _log.info("%s: %s", encode_job_line(job), detail)
-    return job
-
-
-def session_job(
-    credentials: McpCredentials,
-    job: DispatchJob,
-    identity: JSONObject,
-    *,
-    node: str,
-) -> DispatchJob:
-    """Execute a claimed session job (restart, revive, kill, compact or exit)
-    on this machine, start to close.
-
-    The same shape as :func:`rebuild_job` and for the same reasons: the
-    work is local, well under a minute, and closing it in one tick leaves
-    nothing to collect. The keystroke sequence and every rail around it
-    belong to ``session_audit`` (``rollover``, ``revive``, ``kill`` and
-    ``compact``); this runner composes one invocation per verb through
-    :func:`fleet.core.restart.session_invocation` and reports what it said
-    (module docstring of :mod:`fleet.core.restart`).
-
-    Named for the job kind rather than one of its five verbs. It was
-    ``restart_job``, which named one verb and claimed a state change this
-    runner does not make: the change, and the check of each step before
-    the next (the old process gone before a resume is typed, a new record
-    on the installed build before a restart is reported), are the sealed
-    ``session_audit`` release's, whose exit status this closes the job
-    with (``state-change-verified``, board task cc7222ca).
-
-    Args:
-        credentials: The queue's endpoint and headers.
-        job: The claimed session job.
-        identity: This runner's identity arguments.
-        node: This machine's alias, which the job is reported started on.
-
-    Returns:
-        The job, whatever became of it.
-
-    Raises:
-        AppError: Only from the queue calls themselves, as
-            :func:`claim_pass` describes.
-    """
-    refusal = restart.refusal_for(job["session_target"])
-    if refusal is not None:
-        return _refuse_hub_job(credentials, job, identity, detail=refusal)
-    # Narrowed by the refusal above: a None target was refused there.
-    target = job["session_target"] if job["session_target"] is not None else ""
-    # The verb runs the active sealed session-verbs release, verified for
-    # this job, and nothing else (MCPs board task c7c2527d); no release, or
-    # one that fails its seal, refuses the job with nothing run. Its store
-    # is this machine's platform's (board task 315111e4).
-    release = session_release.active_session_release(sys.platform)
-    if isinstance(release, str):
-        return _refuse_hub_job(credentials, job, identity, detail=release)
-    invocation = restart.session_invocation(
-        release, job["command"], target, job["submitted_by"], node
-    )
-    # A revive types the submitter's label into its brief and a kill passes
-    # it as an argument (MCPs migs 525 and 526), so the label is judged
-    # before it can become an argv element, the same way the target is.
-    if invocation["types_requester"]:
-        requester_refusal = restart.requester_refusal(job["submitted_by"])
-        if requester_refusal is not None:
-            return _refuse_hub_job(credentials, job, identity, detail=requester_refusal)
-    verb = invocation["verb"]
-    run_id = f"{verb}-{job['job_id']}"
-    queue.report_start(
-        credentials,
-        job_id=job["job_id"],
-        node=node,
-        run_id=run_id,
-        lease_seconds=CLAIM_LEASE_SECONDS,
-        identity=identity,
-    )
-    _log.info("started %s on %s as %s (local %s)", job["job_id"], node, run_id, verb)
-    result = restart.run_session_job(invocation)
-    detail = restart.describe_result(result, invocation)
-    queue.report_close(
-        credentials,
-        job_id=job["job_id"],
-        status=ClosingStatus.PASSED if result["returncode"] == 0 else ClosingStatus.FAILED,
-        exit_code=result["returncode"],
-        detail=detail,
-        identity=identity,
-    )
-    _log.info("%s: %s", encode_job_line(job), detail)
-    return job
 
 
 def claim_pass(
@@ -340,24 +153,27 @@ def claim_pass(
     node: str | None,
     host: str,
     mcps_root: pathlib.Path | None,
+    netboot: netboot_arm.NetbootPlace | None,
 ) -> DispatchJob | None:
     """Take one job of this runner's lane and run it to its close.
 
     A job is run by its command, whichever lane gave it: until the MCPs
     queue split the session verbs into their own lane (mig 795), the hub
-    lane gave both kinds.
+    lane gave both kinds. So a job whose kind needs what this runner was not
+    started with is refused naming the flag, rather than run without it.
 
     Args:
         credentials: The queue's endpoint and headers.
         identity: This runner's identity arguments.
-        lane: The hub lane or the sessions lane.
+        lane: The hub, sessions or netboot lane.
         node: Restrict claims to this node, plus jobs that name none, or
             None to take any job of the lane.
         host: The node a job is reported started on: this machine.
         mcps_root: The MCPs checkout a base rebuild runs in, or None when
             the runner was started without ``--mcps-root``. Session verbs
-            never use it: they run a sealed release
-            (:mod:`fleet.core.session_release`).
+            and arms never use it: they run a sealed release.
+        netboot: Where an arm runs from and writes to, or None when the
+            runner is not a netboot tick.
 
     Returns:
         The job that was claimed, whatever became of it, or None when the
@@ -365,10 +181,10 @@ def claim_pass(
 
     Raises:
         AppError: Only from the queue calls themselves. A LOCAL refusal (no
-            MCPs checkout, a target that cannot be resolved, a session
-            release that is missing or fails its seal) is reported to
-            the queue as ``refused`` with its code and message verbatim and
-            does not propagate; see the module docstring for why that is
+            MCPs checkout, a target that cannot be resolved, a release that
+            is missing or fails its seal, no key to mint with) is reported
+            to the queue as ``refused`` with its code and message verbatim
+            and does not propagate; see the module docstring for why that is
             transport rather than recovery.
     """
     job = queue.claim_next(
@@ -377,7 +193,7 @@ def claim_pass(
         tags=(),
         node=node,
         projects=None,
-        lease_seconds=CLAIM_LEASE_SECONDS,
+        lease_seconds=hub_jobs.CLAIM_LEASE_SECONDS,
         identity=identity,
     )
     if job is None:
@@ -386,14 +202,40 @@ def claim_pass(
     if job["command"] is DispatchCommand.BUILD_BASES:
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
-        return rebuild_job(credentials, job, identity, mcps_root=mcps_root, node=host)
-    return session_job(credentials, job, identity, node=host)
+        if mcps_root is None:
+            return hub_jobs.refuse_job(
+                credentials,
+                job,
+                identity,
+                detail=(
+                    f"{rebuild.ROOT_MISSING_CODE}: this runner was started "
+                    f"without {MCPS_ROOT_FLAG}, so it has no MCPs checkout to "
+                    "rebuild in; resubmit once a rebuild-capable runner is "
+                    "scheduled"
+                ),
+            )
+        return hub_jobs.rebuild_job(credentials, job, identity, mcps_root=mcps_root, node=host)
+    if job["command"] is DispatchCommand.NETBOOT_ARM:
+        if netboot is None:
+            return hub_jobs.refuse_job(
+                credentials,
+                job,
+                identity,
+                detail=(
+                    f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
+                    f"{', '.join(NETBOOT_FLAGS)}, so it has no netboot release to arm "
+                    "from; the netboot duty's fleet-netboot runner claims arms"
+                ),
+            )
+        return hub_jobs.netboot_job(credentials, job, identity, place=netboot, node=host)
+    return hub_jobs.session_job(credentials, job, identity, node=host)
 
 
 #: What each lane's check-in says the runner claims.
 _LANE_CLAIMS = {
     DispatchLane.HUB: "the queue's hub lane (build-bases)",
     DispatchLane.SESSIONS: "the queue's sessions lane (the session verbs)",
+    DispatchLane.NETBOOT: "the queue's netboot lane (netboot-arm)",
 }
 
 
@@ -404,7 +246,7 @@ def require_runner_lane(value: str) -> DispatchLane:
         value: The ``--lane`` value.
 
     Returns:
-        The hub lane or the sessions lane.
+        The hub, sessions or netboot lane.
 
     Raises:
         ValueError: ``FLEET_AGENT_USAGE`` for any other value, the node lane
@@ -415,6 +257,86 @@ def require_runner_lane(value: str) -> DispatchLane:
             return lane
     words = [lane.value for lane in _LANE_CLAIMS]
     raise ValueError(f"FLEET_AGENT_USAGE: {LANE_FLAG} is one of {words}, not {value!r}")
+
+
+def _refuse_flags(
+    parsed: Mapping[str, str], lane: DispatchLane, flags: Sequence[str], why: str
+) -> None:
+    """Refuse a tick given flags its lane does not read.
+
+    Args:
+        parsed: The parsed flags.
+        lane: The lane this tick claims from.
+        flags: The flags the lane takes none of.
+        why: Why it takes none of them.
+
+    Raises:
+        ValueError: ``FLEET_AGENT_USAGE`` naming each given flag.
+    """
+    given = [flag for flag in flags if flag in parsed]
+    if given:
+        raise ValueError(
+            f"FLEET_AGENT_USAGE: the {lane.value} lane takes no {' or '.join(given)}; {why}"
+        )
+
+
+def lane_host(parsed: Mapping[str, str], lane: DispatchLane) -> str:
+    """Name the machine this tick's jobs are reported started on.
+
+    A sessions tick names it with ``--node``, since the sessions duty's
+    machine can reach in to a session host and act as it (MCPs board task
+    78a1eca7). The hub and netboot lanes run on whichever machine holds
+    their duty, so they report on that machine by its own name (MCPs board
+    task c39ee056).
+
+    Args:
+        parsed: The parsed flags.
+        lane: The lane this tick claims from.
+
+    Returns:
+        The machine's alias.
+
+    Raises:
+        ValueError: ``FLEET_AGENT_USAGE`` for a flag the lane does not read,
+            or a sessions tick that names no ``--node``.
+    """
+    if lane is not DispatchLane.HUB:
+        _refuse_flags(parsed, lane, _HUB_ONLY_FLAGS, "only a hub tick publishes and observes")
+    if lane is not DispatchLane.NETBOOT:
+        _refuse_flags(parsed, lane, NETBOOT_FLAGS, "only a netboot tick arms")
+    if lane is DispatchLane.SESSIONS:
+        return cli_args.require_flag(parsed, NODE_FLAG)
+    if lane is DispatchLane.NETBOOT:
+        # The machine an arm names is its target, never where it runs, so
+        # the lane claims every arm, whatever machine it names.
+        _refuse_flags(
+            parsed,
+            lane,
+            (NODE_FLAG,),
+            "it claims every arm, and the machine an arm names is its target",
+        )
+    return _test_hooks.hostname()
+
+
+def netboot_place(parsed: Mapping[str, str]) -> netboot_arm.NetbootPlace:
+    """Read where a netboot tick's arms run from and write to.
+
+    Args:
+        parsed: The parsed flags.
+
+    Returns:
+        The installed release, the node binary, the served root and the
+        workspace env file.
+
+    Raises:
+        ValueError: When any of :data:`NETBOOT_FLAGS` is absent.
+    """
+    return netboot_arm.NetbootPlace(
+        release=pathlib.Path(cli_args.require_flag(parsed, NETBOOT_RELEASE_FLAG)),
+        nodejs=cli_args.require_flag(parsed, NODEJS_FLAG),
+        served_root=pathlib.Path(cli_args.require_flag(parsed, SERVED_ROOT_FLAG)),
+        env_file=pathlib.Path(cli_args.require_flag(parsed, ENV_FILE_FLAG)),
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -431,8 +353,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     A sessions tick names its machine with ``--node``: the claim takes jobs
     for it and jobs naming none, and its session jobs are reported started
-    there. It refuses ``--mcps-root`` and ``--registry``, which only the hub
-    tick's passes read.
+    there. A netboot tick names where its arms run from and write to with
+    :data:`NETBOOT_FLAGS` and claims with no node. Each refuses the flags
+    only another lane reads (:func:`lane_host`).
 
     Args:
         argv: Command-line arguments excluding the program name.
@@ -444,7 +367,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or a
             required one is absent; ``FLEET_AGENT_USAGE`` for a lane this
-            runner does not claim, or a sessions tick given a hub-only flag.
+            runner does not claim, or a tick given a flag only another lane
+            reads.
         AppError: When the queue or the board cannot be reached or answered
             a shape this runner cannot read, or when the workspace does not
             decode.
@@ -454,24 +378,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     parsed = cli_args.parse_single_flags(
         [token for token in tokens if token != queue.ANNOUNCE_FLAG], _FLAGS
     )
-    # The workspace is still read, and refused when malformed, although
-    # neither lane dispatches to a node: a runner whose registry does not
+    # The workspace is still read, and refused when malformed, although no
+    # lane here dispatches to a node: a runner whose registry does not
     # decode has no business claiming anything, and the node runners beside
     # it read the same file.
     _config.load_workspace(parsed)
     lane = require_runner_lane(cli_args.require_flag(parsed, LANE_FLAG))
-    if lane is DispatchLane.SESSIONS:
-        given = [flag for flag in _HUB_ONLY_FLAGS if flag in parsed]
-        if given:
-            raise ValueError(
-                f"FLEET_AGENT_USAGE: the sessions lane takes no {' or '.join(given)}; "
-                "only a hub tick publishes and observes"
-            )
-        host = cli_args.require_flag(parsed, NODE_FLAG)
-    else:
-        # The hub lane runs on whichever machine holds the control duty, so
-        # it reports on that machine by its own name (MCPs board task c39ee056).
-        host = _test_hooks.hostname()
+    host = lane_host(parsed, lane)
     agent = cli_args.require_flag(parsed, AGENT_FLAG)
     session_id = cli_args.require_flag(parsed, SESSION_FLAG)
     project_root = pathlib.Path(cli_args.require_flag(parsed, ROOT_FLAG)).resolve()
@@ -502,10 +415,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         node=parsed.get(NODE_FLAG),
         host=host,
         mcps_root=mcps_root,
+        netboot=netboot_place(parsed) if lane is DispatchLane.NETBOOT else None,
     )
     if claimed is None:
         _log.info("%s lane empty", lane.value)
-    if lane is DispatchLane.SESSIONS:
+    if lane is not DispatchLane.HUB:
         return 0
     hub_passes.publish_pass(credentials, identity, repo_root=project_root)
 
@@ -545,17 +459,21 @@ if __name__ == "__main__":
 
 __all__ = [
     "AGENT_FLAG",
-    "CLAIM_LEASE_SECONDS",
+    "ENV_FILE_FLAG",
     "LANE_FLAG",
     "MCPS_ROOT_FLAG",
+    "NETBOOT_FLAGS",
+    "NETBOOT_RELEASE_FLAG",
+    "NODEJS_FLAG",
     "NODE_FLAG",
     "REGISTRY_FLAG",
     "ROOT_FLAG",
+    "SERVED_ROOT_FLAG",
     "SESSION_FLAG",
     "claim_pass",
     "entrypoint",
+    "lane_host",
     "main",
-    "rebuild_job",
+    "netboot_place",
     "require_runner_lane",
-    "session_job",
 ]

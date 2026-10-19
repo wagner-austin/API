@@ -30,7 +30,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
-from fleet.cli import agent
+from fleet.cli import agent, hub_jobs
 from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, queue
 from tests._agent_cli import agent_argv, sessions_argv
@@ -80,7 +80,7 @@ class TestAnEmptyHubLane:
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0]["lane"] == "hub"
         assert endpoint.arguments[0]["tags"] == []
-        assert endpoint.arguments[0]["leaseSeconds"] == agent.CLAIM_LEASE_SECONDS
+        assert endpoint.arguments[0]["leaseSeconds"] == hub_jobs.CLAIM_LEASE_SECONDS
         assert "node" not in endpoint.arguments[0]
 
 
@@ -153,12 +153,13 @@ class TestTheSessionsLane:
             agent.require_runner_lane(word)
 
         assert str(refused.value) == (
-            f"FLEET_AGENT_USAGE: --lane is one of ['hub', 'sessions'], not {word!r}"
+            f"FLEET_AGENT_USAGE: --lane is one of ['hub', 'sessions', 'netboot'], not {word!r}"
         )
 
     def test_each_lane_word_names_its_lane(self) -> None:
         assert agent.require_runner_lane("hub") is DispatchLane.HUB
         assert agent.require_runner_lane("sessions") is DispatchLane.SESSIONS
+        assert agent.require_runner_lane("netboot") is DispatchLane.NETBOOT
 
     def test_a_tick_without_a_lane_is_refused_before_any_call(
         self, config_path: pathlib.Path, repo: pathlib.Path
