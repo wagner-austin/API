@@ -3,11 +3,15 @@
 ONE CLOSE PER OUTCOME (MCPs board task af8b5662). The node lanes and the
 hub jobs each carried their own refusal, the same queue report and the same
 log line in :mod:`fleet.cli.node_claim` and :mod:`fleet.cli.hub_jobs`, and
-the hub jobs repeated their finished close once per kind. Both now close
-here: :func:`refuse` for a job that ran nothing, :func:`close` for one that
-ran and ended with a status of its own. A node lane's suite closes through
-its collect instead (:mod:`fleet.cli.node_collect`), because there the close
-reads a run another tick launched.
+the hub jobs repeated their finished close once per kind. Every close is
+now made here: :func:`refuse` for a job that ran nothing, :func:`close` for
+one that ran and ended with a status of its own. That holds for a node
+lane's collect too, which refuses a claim an earlier tick launched nothing
+for (:func:`fleet.cli.node_collect.reconcile_claim`) and closes an ended
+run with its verdict (:func:`fleet.cli.node_settle.settle`); check review
+678e4470 found both still building the queue's close by hand, and
+``tests/test_one_job_close.py`` now fails on a ``report_close`` call in any
+module but this one.
 """
 
 from __future__ import annotations

@@ -273,7 +273,9 @@ class TestCollectEnded:
         )
 
         assert collected["outcome"] is CollectOutcome.SETTLED
-        assert collected["line"].endswith(f"run={DEMO_RUN_ID}")
+        assert collected["line"].endswith(
+            f"run={DEMO_RUN_ID}: its row is finished and its directory retired"
+        )
         assert endpoint.tools == ["dispatch_list", "dispatch_report"]
         assert narrow_json_to_str(endpoint.arguments[1]["action"]) == "close"
 

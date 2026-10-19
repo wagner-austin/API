@@ -32,7 +32,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue, Unanswered, queue_job
-from tests.conftest import DEMO_RUN_ID, FakeRun, ok, retire_replies
+from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -112,6 +112,55 @@ class TestACloseTheQueueDidNotAnswer:
             True,
         ]
         assert "passed" in _ledger(sourced_config)
+
+
+#: A node that does not answer the retire's send: the retire is owed.
+UNANSWERED_RETIRE = failed(255, "Connection timed out during banner exchange")
+
+
+class TestASettleLogsEachFactOnce:
+    """The close logs the verdict (fleet.cli.job_close, MCPs board task
+    af8b5662) and the collect pass logs what followed it, so a settle that
+    closed through job_close says each once rather than the verdict twice."""
+
+    @pytest.mark.parametrize(
+        ("after_close", "followed"),
+        [
+            ([*retire_replies(), *PROBED], "its row is finished and its directory retired"),
+            (
+                [UNANSWERED_RETIRE, *PROBED],
+                "its row is finished and the retire is owed until lavender answers",
+            ),
+        ],
+    )
+    def test_the_verdict_once_then_what_followed(
+        self,
+        sourced_config: pathlib.Path,
+        caplog: pytest.LogCaptureFixture,
+        after_close: list[_test_hooks.CommandResult],
+        followed: str,
+    ) -> None:
+        launch(sourced_config)
+        _test_hooks.run = FakeRun([*READ_AND_TAIL, *after_close])
+        answering_queue = FakeQueue(
+            [
+                held_answer(taskId=VERDICT_TASK),
+                dump_json_str({"job": queue_job(status="passed")}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = answering(answering_queue)
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        verdict = narrow_json_to_str(answering_queue.arguments[1]["detail"])
+        messages = [record.getMessage() for record in caplog.records]
+        verdict_lines = [message for message in messages if verdict in message]
+        followed_lines = [m for m in messages if m.endswith(f"run={DEMO_RUN_ID}: {followed}")]
+        assert len(verdict_lines) == 1
+        assert verdict_lines[0].endswith(f"run={DEMO_RUN_ID}: {verdict}")
+        assert len(followed_lines) == 1
 
 
 #: The tail of a build the unit-end script closed (MCPs board task

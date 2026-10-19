@@ -59,12 +59,12 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, node_lost
+from fleet.cli import _config, job_close, node_lost
 from fleet.cli import collect as collect_cli
 from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
 from fleet.cli.run_locks import SETTLING
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob, DispatchStatus, encode_job_line
+from fleet.contracts.dispatch import DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
@@ -310,19 +310,15 @@ def reconcile_claim(
             f"{alias}, its start report never reached the queue, and nothing was launched; "
             "refused so the submitter can resubmit it"
         )
-        queue.report_close(
-            credentials,
-            job_id=job["job_id"],
-            status=ClosingStatus.REFUSED,
-            exit_code=None,
-            detail=detail,
-            identity=identity,
-        )
+        job_close.refuse(credentials, job, identity, detail=detail)
         # The launch that would have removed its host claim never ended: its
         # tick was killed (MCPs board task 3f7d40fe), so the claim is removed
         # here, or it charges the host until its lease lapses an hour later.
+        # The refusal logged itself; this line says what followed it.
         host_claims.discharge(loaded.host_claims, alias=alias, job_id=job["job_id"])
-        return Reconciled(line=f"{encode_job_line(job)}: refused, {detail}", adopted=None)
+        return Reconciled(
+            line=f"{encode_job_line(job)}: its host claim on {alias} is discharged", adopted=None
+        )
     queue.report_start(
         credentials,
         job_id=job["job_id"],

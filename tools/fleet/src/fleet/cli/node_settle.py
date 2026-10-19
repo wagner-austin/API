@@ -50,7 +50,7 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config
+from fleet.cli import _config, job_close
 from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob, encode_job_line
 from fleet.contracts.ledger import LedgerEntry
@@ -104,8 +104,10 @@ def settle(
 
     Returns:
         :attr:`~fleet.cli.node_collected.CollectOutcome.SETTLED` with the
-        job's line and the verdict, as posted and as the queue job's detail;
-        or :attr:`~fleet.cli.node_collected.CollectOutcome.UNREACHABLE`, with
+        job's line and what followed its close, the verdict having been
+        logged by the close (:func:`fleet.cli.job_close.close`) as the queue
+        job's detail; or
+        :attr:`~fleet.cli.node_collected.CollectOutcome.UNREACHABLE`, with
         nothing anywhere changed, when the node did not answer the tail's read.
 
     Raises:
@@ -157,13 +159,13 @@ def settle(
             line=line,
             identity=identity,
         )
-    queue.report_close(
+    job_close.close(
         credentials,
-        job_id=job["job_id"],
+        job,
+        identity,
         status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
         exit_code=exit_code,
         detail=line,
-        identity=identity,
     )
     dispatch.finish(
         loaded.leases,
@@ -178,9 +180,13 @@ def settle(
     # waiting on housekeeping (fleet.core.retire, MCPs board task 8993c306).
     # A node that did not answer owes the retire to a later collect pass,
     # which removes the unread generations after it (MCPs board task 8776b828).
+    # The close logged the verdict; this line says what followed it.
     if retire_owed.retire_or_owe(loaded.retires, node, alias=row["node"], run_id=row["run_id"]):
         cache_generations.remove_unused_on_node(node)
-    return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {line}")
+        after = "its row is finished and its directory retired"
+    else:
+        after = f"its row is finished and the retire is owed until {row['node']} answers"
+    return Collected(outcome=CollectOutcome.SETTLED, line=f"{encode_job_line(job)}: {after}")
 
 
 def read_tail(node: NodeConfig, *, run_id: str) -> remote.Answered:
