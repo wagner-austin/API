@@ -360,8 +360,14 @@ class TestObservingSessions:
         # The queue pass ran, the hub was skipped, the one worker was asked
         # and its silence was logged as an outcome rather than raised.
         assert endpoint.tools == ["dispatch_claim"]
+        # By the node's own prefix, not by the word anywhere in the line: on
+        # serendipity the run's stage path carries it too, so the publish and
+        # reap passes' lines naming the test repo matched (fleet job
+        # cda230e4, MCPs board task cf2e4802).
         lines = [
-            record.getMessage() for record in caplog.records if "serendipity" in record.getMessage()
+            record.getMessage()
+            for record in caplog.records
+            if record.getMessage().startswith("serendipity: ")
         ]
         assert lines == [
             "serendipity: not observed -- ssh to serendipity failed while sending "
