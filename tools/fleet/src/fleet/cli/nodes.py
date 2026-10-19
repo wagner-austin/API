@@ -29,13 +29,11 @@ unreachable node inside another machine's WSL adds what that host reports.
 A DISABLED NODE IS NOT PROBED, and says so. Nobody expects it to answer, and
 asking costs a ten-second ssh timeout per node per run.
 
-Whether this workspace and the fleet's identity registry
-(``fleet-mcp/fleet-nodes.json``, in the MCPs repo) agree on which machines are
-expected to answer is not asked here: the fleet audit reads both files on
-every pass and fails a node's ``roster.agrees`` row when they disagree (MCPs
-board task e447de72; :mod:`fleet.core.registry`). This command's
-``--registry`` and ``--probe never`` did that comparison until then, only when
-a session ran them by hand.
+Whether a machine is expected to answer is said once, by the ``enabled`` of
+its own ``registry/machines/<name>.json``, the fleet's one roster (MCPs board
+task e447de72). Until then MCPs' ``fleet-mcp/fleet-nodes.json`` said it a
+second time, and this command's ``--registry`` and ``--probe never`` compared
+the two only when a session ran them by hand; both went with that copy.
 """
 
 from __future__ import annotations

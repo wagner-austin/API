@@ -103,8 +103,9 @@ def choose(
             raise AppError(
                 FleetErrorCode.NODE_DISABLED,
                 f"{named} is declared disabled in this workspace, so nothing was asked of "
-                "it. Re-enable it in registry/nodes.json once it is expected to answer, or "
-                "dispatch without --node to let the fleet choose among the machines that are.",
+                f"it. Set enabled in registry/machines/{named}.json once it is expected to "
+                "answer, or dispatch without --node to let the fleet choose among the machines "
+                "that are.",
             )
         state = _probe(loaded, name=named, node=node)
         return named, node, capacity.plan_dispatch(node, state, plan, node_tags(node))

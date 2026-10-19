@@ -84,8 +84,11 @@ def test_every_shipped_registry_file_is_at_most_six_hundred_lines() -> None:
 
     named = [*(SHIPPED_REGISTRY / "machines").glob("*.json")]
     named += (SHIPPED_REGISTRY / "projects").rglob("*.json")
-    assert {"nodes.json", "settings.json", "machines/sedona.json"} < set(lines)
-    assert len(lines) == 2 + len(named)
+    # settings.json is the one file beside the machines and the projects: the
+    # roster's former nodes.json is gone (MCPs board task 33831692).
+    assert {"settings.json", "machines/sedona.json"} < set(lines)
+    assert "nodes.json" not in lines
+    assert len(lines) == 1 + len(named)
     assert {name: count for name, count in lines.items() if count > MAX_FILE_LINES} == {}
 
 

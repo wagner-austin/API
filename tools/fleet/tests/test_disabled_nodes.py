@@ -158,6 +158,8 @@ class TestNamingADisabledNodeIsAnError:
 
         assert excinfo.value.code is FleetErrorCode.NODE_DISABLED
         assert "nothing was asked of it" in excinfo.value.message
+        # The roster is one file per machine (MCPs board task 33831692).
+        assert "Set enabled in registry/machines/asleep.json" in excinfo.value.message
 
 
 class TestFleetNodesReports:
