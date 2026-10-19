@@ -1,60 +1,20 @@
 {
-  "role": "vpn-jump",
-  "platform": "windows",
-  "user": "austi",
+  "role": "worker",
+  "platform": "linux",
+  "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
   "ledger_observer": "fleet-arm",
-  "tailnetIp": "100.95.76.122",
+  "tailnetIp": "100.116.255.0",
   "reachKey": null,
   "bootMac": null,
-  "tunnel": {
-    "name": "sedona-ssh",
-    "id": "5435a8b8-9a88-45da-bd00-d64446df950e",
-    "hostname": "sedona-ssh.austinwagner.org"
-  },
+  "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
   "boot": {
-    "units": [
-      {
-        "kind": "windows-service",
-        "name": "cloudflared",
-        "purpose": "the Cloudflare tunnel, this vpn-jump's only way in while it holds the UCI VPN"
-      },
-      {
-        "kind": "windows-service",
-        "name": "csc_vpnagent",
-        "purpose": "the UCI VPN agent, the route to hpc3"
-      }
-    ]
+    "units": []
   },
-  "notes": "Provisioned as a vpn-jump 2026-09-04 so hpc3 stays reachable while loki travels. Stays home, so it is the better default jump host. DC SLEEP CLOSED 2026-09-19: slept 02:57 PDT on its 60-minute battery idle timer after a charger came out (Kernel-Power 42, woke 04:13 on the replug, no reboot, Tailscale service never stopped) and read as probe-failed until then; standby-timeout-dc and hibernate-timeout-dc set to 0 over ssh and read back 0/0, matching AC. Lid-close is Do nothing on AC and DC (the DC side was Sleep until 2026-09-19, set to 0 over ssh on the operator's instruction and read back 0/0 from the registry), matching the other two laptops. Note its scheme is 'Gigabyte Balanced' and a process ran powercfg against it at 04:14 that morning, so if the timeouts drift back, an OEM tool is the suspect.",
-  "dispatch": {
-    "held": null,
-    "stage_root": "C:/fleet/stage",
-    "logical_cores": 20,
-    "ram_gb": 16.0,
-    "gpu": {
-      "model": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
-      "vram_mib": 8192,
-      "compute_capability": "8.6",
-      "driver_version": "551.23"
-    },
-    "budget": {
-      "reserved_cores": 2,
-      "reserved_ram_gb": 1.5,
-      "worker_ram_gb": 1.1,
-      "max_disk_gb": 40.0,
-      "checks_at_once": null,
-      "pinned_checks_only": false
-    },
-    "test_database": true,
-    "rust": null,
-    "cxx": "17.14.37710.0",
-    "docker": null,
-    "stack": null,
-    "elevated": false
-  }
+  "notes": "Gigabyte AERO 16 XE5 (i7-12700H, serial SN22160J001487). Reimaged from Windows to Ubuntu 24.04.4 LTS (kernel 7.0.0-38) on 2026-10-19 from a CORVIS stick (fleet-node-setup's Initialize-Node.sh), replacing the Windows vpn-jump, its sedona-ssh Cloudflare tunnel and its UCI VPN agent, none of which exist on this install (MCPs board task 1e9ab738). Measured over ssh 2026-10-19T23:0xZ: 20 logical cores, 15 GiB RAM, a 937 GB NVMe root, Wi-Fi only (wlp87s0; no wired port, so no boot MAC), and the GeForce RTX 3070 Ti Laptop GPU answering nvidia-smi. Enrolled from ziggurat with fleet-enroll at 22:58Z at 100.116.255.0, login user corvis; austinpc, diphtheria and ziggurat each print Sedona for ssh sedona hostname, and a password-only login is refused from each (diphtheria's admit rule and restricted key were copied from lacrymal's, since the stick wrote only austinpc's and ziggurat's). Docker, the fleet test database and the toolchain are not installed yet.",
+  "dispatch": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Replace this reason with that capacity when he decides; this line is the hold, not the verdict."
 }
