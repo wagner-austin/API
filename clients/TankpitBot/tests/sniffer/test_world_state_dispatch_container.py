@@ -103,7 +103,7 @@ class TestDispatchTilePatchUpdates:
         assert container["is_fuel"] is True
         assert container["volume"] == 600
         assert container["source"] == "viewport"
-        assert container["refresh_kind"] == "viewport_patch"
+        assert container["refresh_kind"] == "radar_cache_refresh"
 
         dispatch_world_state_update(ws, CacheUpdateDict(msg_type=0x43, updates=[(33, 44, 0)]))
 

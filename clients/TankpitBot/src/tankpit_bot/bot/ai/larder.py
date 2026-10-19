@@ -282,7 +282,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
     best_landing_x = 0
     best_landing_y = 0
     best_cost = 0
-    best_score = 0.0
+    best_score = (-1.0, 0.0)
     # Hop pricing horizon: stale sightings never enter teleport
     # scoring; the beliefs survive for walk service and in-window
     # pickups (the ``stale`` tally reports the exclusions).
@@ -356,7 +356,7 @@ def select_fuel_larder_hop(ctx: DecideCtx) -> FuelLarderSelectionDict:
             viewport["width"],
             viewport["height"],
         )
-        score = gain * walkable / max(cost, 1)
+        score = (container["confidence"], gain * walkable / max(cost, 1))
         if best is None or score > best_score:
             best = container
             best_landing_x = landing_x

@@ -478,7 +478,10 @@ def desperation_fuel_hop(
         cost = teleport_cost(sx, sy, landing_x, landing_y)
         if cost <= 0 or cost > ctx.fuel or not escape_hop_permitted(ctx, *landing):
             continue
-        if best_container is None or cost < best_cost:
+        if best_container is None or (container["confidence"], -cost) > (
+            best_container["confidence"],
+            -best_cost,
+        ):
             best_cost = cost
             best_landing_x = landing_x
             best_landing_y = landing_y

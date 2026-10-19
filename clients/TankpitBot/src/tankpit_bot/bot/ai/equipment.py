@@ -100,7 +100,8 @@ def is_fuel_lock_release_warranted(
 ) -> bool:
     """Return True when a fuel candidate justifies dropping the locked target.
 
-    Two independent release paths:
+    Prefer a candidate with higher confidence, retaining the lock against
+    lower-confidence candidates. At equal confidence, two release paths apply:
 
     1. The distance rule shared with equipment locks
        (:func:`is_lock_release_warranted` — markedly closer).
@@ -119,6 +120,8 @@ def is_fuel_lock_release_warranted(
     Returns:
         True when either release path fires.
     """
+    if candidate["confidence"] != locked_target["confidence"]:
+        return candidate["confidence"] > locked_target["confidence"]
     if is_lock_release_warranted(
         self_state,
         locked_target["x"],

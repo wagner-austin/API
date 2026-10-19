@@ -74,6 +74,11 @@ def update_container_from_radar(
         refresh_kind=refresh_kind,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
+        confidence=(
+            existing["confidence"]
+            if existing is not None and refresh_kind is ContainerRefreshKind.RADAR_KNOWN_RESOURCES
+            else 1.0
+        ),
     )
 
     new_containers = dict(state["containers"])
@@ -134,6 +139,7 @@ def merge_container_sighting(
         refresh_kind=ContainerRefreshKind.FLEET_REPORT,
         timestamp_ms=observed_ms,
         failed_pickups=failed_pickups,
+        confidence=existing["confidence"] if existing is not None else 1.0,
     )
     new_containers = dict(state["containers"])
     new_containers[key] = new_container
@@ -293,6 +299,8 @@ def increment_container_failed_pickups(
         refresh_kind=container["refresh_kind"],
         timestamp_ms=container["timestamp_ms"],
         failed_pickups=container["failed_pickups"] + 1,
+        confidence=container["confidence"],
+        provenance=container["provenance"],
     )
     new_containers = dict(state["containers"])
     new_containers[key] = new_container
@@ -314,6 +322,8 @@ def apply_tile_cache_update(
     y: int,
     cache_value: int,
     timestamp_ms: int,
+    *,
+    refresh_kind: ContainerRefreshKind = ContainerRefreshKind.VIEWPORT_PATCH,
 ) -> WorldStateDict:
     """Reconcile ``world.containers`` from one tile's wire-decoded cache byte.
 
@@ -335,6 +345,7 @@ def apply_tile_cache_update(
         y: Tile Y coordinate.
         cache_value: Decoded cache byte (``-1`` / ``0`` / fuel volume).
         timestamp_ms: Message timestamp.
+        refresh_kind: Viewport advertisement or explicit cache correction.
 
     Returns:
         New ``WorldStateDict`` with ``world.containers`` reconciled for
@@ -354,8 +365,14 @@ def apply_tile_cache_update(
         is_fuel=is_fuel,
         volume=volume,
         source=EntitySource.VIEWPORT,
+        refresh_kind=refresh_kind,
         timestamp_ms=timestamp_ms,
         failed_pickups=failed_pickups,
+        confidence=(
+            existing["confidence"]
+            if existing is not None and refresh_kind is ContainerRefreshKind.VIEWPORT_PATCH
+            else 1.0
+        ),
     )
     new_containers = dict(state["containers"])
     new_containers[key] = new_container

@@ -36,7 +36,7 @@ from tankpit_bot.state.viewport_geometry import (
     viewport_patch_world_coords,
     viewport_radar_bounds,
 )
-from tankpit_bot.types.constants import EntitySource
+from tankpit_bot.types.constants import ContainerRefreshKind, EntitySource
 
 _TileEntityT = TypeVar("_TileEntityT", ContainerStateDict, MineStateDict)
 
@@ -257,6 +257,7 @@ def update_cache_tiles(ws: WorldService, updates: list[tuple[int, int, int]]) ->
             y,
             cache_value,
             timestamp_ms,
+            refresh_kind=ContainerRefreshKind.RADAR_CACHE_REFRESH,
         )
 
 

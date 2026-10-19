@@ -10,6 +10,7 @@ through, plus liveness, aim, and removal. Sibling of
 from __future__ import annotations
 
 from tankpit_bot.facts.provenance import make_provenance
+from tankpit_bot.state.fuel_confidence import containers_after_enemy_refuel
 from tankpit_bot.state.types import (
     TankObservation,
     WorldStateDict,
@@ -232,7 +233,7 @@ def apply_tank_observation(state: WorldStateDict, obs: TankObservation) -> World
     return WorldStateDict(
         self_state=state["self_state"],
         tanks=new_tanks,
-        containers=state["containers"],
+        containers=containers_after_enemy_refuel(state, existing, new_tank, obs),
         mines=state["mines"],
         terrain=state["terrain"],
         viewport=state["viewport"],

@@ -149,10 +149,10 @@ def update_world_state_from_container_pickup(
     rank = ws.world_state["self_state"]["rank"] if ws.world_state["self_state"] is not None else 8
     record_fuel_entry(book=ws.fuel_book, kind=FuelEntryKind.PICKUP, lo=0, hi=fuel_capacity(rank))
     if remaining_volume <= 0:
-        emit_world("Picked up container at (%d, %d)", x, y)
+        emit_world("Container cleared at (%d, %d)", x, y)
     else:
         emit_world(
-            "Partial pickup at (%d, %d) -- %d fuel remains",
+            "Container updated at (%d, %d) -- %d fuel remains",
             x,
             y,
             remaining_volume,

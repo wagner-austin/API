@@ -6864,3 +6864,11 @@ The recorded-move test and its two colossus captures are removed. Its
 docstring had called the sedona listing unedited, but the listing was
 printed by a PowerShell script that lowercased the hashes and wrote
 relative paths, then had its CRs stripped and was sorted on ziggurat.
+
+## [2026-10-19] update | Enemy-refuel evidence now affects fuel selection
+
+Updated [[retreat-incident-20261017]] for task `afdc4b26-3c88-421f-801c-bc7ba4d1e61d`:
+the observed movement/status refuel pattern now lowers local container confidence,
+and fuel selectors prefer eligible higher-confidence alternatives. Documented the
+bounded inference, partial-consumption uncertainty, refresh authority, neutral
+container logs and executable regressions. No live bot restart was performed.

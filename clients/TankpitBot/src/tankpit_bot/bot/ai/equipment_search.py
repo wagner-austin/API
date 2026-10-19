@@ -224,7 +224,7 @@ def find_best_fuel(
 ) -> ContainerStateDict | None:
     """Find the best walk-reachable fuel container, prioritizing volume over distance.
 
-    Score = volume - distance, so high-volume nearby containers win.
+    Confidence ranks first; volume minus distance breaks confidence ties.
 
     Args:
         world: Current world state with container positions.
@@ -236,7 +236,7 @@ def find_best_fuel(
         Best walk-reachable fuel ContainerStateDict, or None if none visible.
     """
     best: ContainerStateDict | None = None
-    best_score = -_MAX_DIST
+    best_score = (-1.0, -_MAX_DIST)
     sx, sy = self_state["x"], self_state["y"]
 
     for container in world["containers"].values():
@@ -259,7 +259,7 @@ def find_best_fuel(
             cy,
         ):
             continue
-        score = container["volume"] - dist
+        score = (container["confidence"], container["volume"] - dist)
         if score > best_score:
             best_score = score
             best = container
@@ -277,7 +277,7 @@ def find_fuel_candidates(
     """Return walk-reachable fuel candidates ordered best-first.
 
     The same eligibility gates as :func:`find_best_fuel`, returning
-    the FULL ranked list (``volume - distance`` descending) instead of
+    the FULL ranked list (confidence, then ``volume - distance``) instead of
     only the winner -- flag s9-2/3 (2026-07-30): the walk step's
     single-best pick was vetoed as not worth its 13-tile walk while a
     762-volume container sat 3 tiles away, and with no second look
@@ -310,16 +310,16 @@ def find_fuel_candidates(
     return [container for _, container in scored]
 
 
-def _fuel_candidate_score(entry: tuple[int, ContainerStateDict]) -> int:
-    """Sort key: the candidate's volume-minus-distance score.
+def _fuel_candidate_score(entry: tuple[int, ContainerStateDict]) -> tuple[float, int]:
+    """Sort key: confidence before the volume-minus-distance score.
 
     Args:
         entry: ``(score, container)`` pair.
 
     Returns:
-        The score component.
+        Confidence and the score component.
     """
-    return entry[0]
+    return entry[1]["confidence"], entry[0]
 
 
 def find_adjacent_container(

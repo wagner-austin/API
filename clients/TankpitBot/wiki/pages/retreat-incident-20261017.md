@@ -2,7 +2,7 @@
 title: Retreat failures in the 2026-10-17 World run
 tags: [incident, combat, retreat, scheduling, fuel]
 related: ["[[committed-intent]]", "[[bot-behavior-contract]]", "[[fuel-system]]", "[[fleet-coordination]]", "[[teleport-mechanics]]"]
-fact_checked: "2026-10-18"
+fact_checked: "2026-10-19"
 confidence: medium
 hubs: [architecture]
 verified: Preserved captures and release source inspected; corrective regression tests executed offline without a live restart.
@@ -11,6 +11,13 @@ provenance:
   - "/home/corvis/tankpit-evidence-20261017/manifest.json: 20 files, 104395465 bytes; every size and SHA-256 reverified."
   - "Runtime API release 3888f06b22f5eea63d8e8cb5fe9934143ee7f392; tv-1 run bot-20261017-093852, tank 740 / Yuppler."
 source_paths:
+  - "src/tankpit_bot/state/fuel_confidence.py"
+  - "src/tankpit_bot/state/tank_mutations.py"
+  - "src/tankpit_bot/sniffer/world_state_tiles.py"
+  - "src/tankpit_bot/bot/ai/equipment.py"
+  - "src/tankpit_bot/bot/ai/equipment_search.py"
+  - "tests/world_state/test_fuel_confidence.py"
+  - "tests/bot/ai/test_suspect_fuel.py"
   - "src/tankpit_bot/sniffer/world_state_tanks.py"
   - "src/tankpit_bot/sniffer/world_state_containers.py"
   - "src/tankpit_bot/analysis/scan.py"
@@ -41,8 +48,15 @@ source_paths:
   - "src/tankpit_bot/fleetshare/report.py"
   - "src/tankpit_bot/replay/engine.py"
 source_git_blobs:
+  "src/tankpit_bot/state/fuel_confidence.py": "2e3b1301bd85c720fe70d94260b312fdf87e7f8a"
+  "src/tankpit_bot/state/tank_mutations.py": "d3ab81a2cc867b75322a379a785c9cc00da810b9"
+  "src/tankpit_bot/sniffer/world_state_tiles.py": "d636e4d712145a24e56fff37ce70b2c066487558"
+  "src/tankpit_bot/bot/ai/equipment.py": "3a0aa9d05f106db46f77d9332e305c721a4f460f"
+  "src/tankpit_bot/bot/ai/equipment_search.py": "b23f9cd58a5fb80f878e1f9a897dc348f760a647"
+  "tests/world_state/test_fuel_confidence.py": "d6f8d98f1f3b92769f3edb1107aaa668d1ea7c80"
+  "tests/bot/ai/test_suspect_fuel.py": "e50b3d842171809bc6525f35df63dc79dc51759f"
   "src/tankpit_bot/sniffer/world_state_tanks.py": "52d730f73c82657055e931d2bf29d1e0648edbdf"
-  "src/tankpit_bot/sniffer/world_state_containers.py": "49678f03463720638851baf687e667b183f784fc"
+  "src/tankpit_bot/sniffer/world_state_containers.py": "5db49ebf63ccd417658d6c29a39c01f6ee662a58"
   "src/tankpit_bot/analysis/scan.py": "808b553d59c0a4e80e0907c8fef7c28bf8843cbc"
   "src/tankpit_bot/container/decoders/events.py": "c2a81cd5ffe3b478915f5a5f2b85550bcf210577"
   "src/tankpit_bot/browser/cdp_utils.py": "810b4d1eb9fbba0f598b3bf6c0ac2da4b55463a3"
@@ -64,10 +78,10 @@ source_git_blobs:
   "src/tankpit_bot/bot/ai/collect_mode_outcomes.py": "85152d9a6f3a0e32ca1f471a7d28b7d79f71bc43"
   "src/tankpit_bot/bot/ai/collect_pickups.py": "652a96bec44ae109046be8e59d361b842a1d6a31"
   "src/tankpit_bot/bot/ai/movement.py": "c4df95be78254ee18e2a1d670f4b509a0551ddac"
-  "src/tankpit_bot/bot/ai/larder.py": "fb1f4d3bfedbd65b6c08367cd6593619094ec1ea"
-  "src/tankpit_bot/bot/ai/collect_hops.py": "2c0e113d42594c6f015f7115ee8a33a71393b897"
+  "src/tankpit_bot/bot/ai/larder.py": "da1a5f3dcecff2513da65afb4c0516a93be0bd4e"
+  "src/tankpit_bot/bot/ai/collect_hops.py": "3d4b8ff983ff8cbe802cc7e7110e8160f0d9fe59"
   "src/tankpit_bot/bot/executor.py": "d2430383d3e214d08ce64a5c88d54f649962a620"
-  "src/tankpit_bot/state/container_mutations.py": "a6e0c51208b0c438bbe56ef1139d1ac0917bfaba"
+  "src/tankpit_bot/state/container_mutations.py": "e6be8dedfa1b403716d50312f691c35be64a96b5"
   "src/tankpit_bot/fleetshare/report.py": "cfc0608da47dc6e2b559ecd46d6248a054ccdce9"
   "src/tankpit_bot/replay/engine.py": "7a1333337901d19972a617c3d59e8e20d4efcc03"
 ---
@@ -139,9 +153,11 @@ Within-session send/receive deltas use CDP timestamps mapped through one anchore
 
 The existing accounting rule remains correct: `pickup_container` changes container beliefs, never our fuel. Absolute fuel messages remain authoritative. A zero remaining-volume receipt removes the target and records a tombstone so older fleet sightings cannot reintroduce it. The corrected retreat policy also prices transit and incoming-fire exposure without adding anticipated pickup fuel. Enemy consumption therefore does not invalidate the retreat, clearance or response-wake fixes, and it supplies no reason to change teleport cost arithmetic.[^17]
 
-Earlier resource-risk detection is a remaining opportunity, not an implemented behavior: `update_world_state_from_tank_damage` currently updates the enemy observation and emits `tank_damage_changed`; it does not revise container confidence. A future rule could correlate a fresh enemy position on a known fuel tile with an improving fuel tier and mark that target as suspect before spending fuel to reach it. Such a signal must not invent an exact remaining volume or unconditionally delete a container: the enemy may have taken only part, and a tier change alone does not identify its source. A fresh trustworthy resource observation or an explicit clear should resolve that suspicion. The capture supports evaluating this rule; it does not establish a general depletion law.[^17]
+The October 19 correction implements a conservative local inference in `containers_after_enemy_refuel`: a live enemy's movement observation followed within 2000 ms by a wire status showing a higher fuel quartile at unchanged rank marks known positive fuel at that position with confidence at most 0.5. This is a ranking signal, not a calibrated depletion probability. It retains the advertised volume and resource observation time, cites the movement/status evidence, and leaves our fuel unchanged. Unknown tanks, our tank, teammates, rank changes, deactivation/respawn transitions, stale positions, and map/DOM-only position evidence do not establish this inference. The rule intentionally covers the observed movement/status pattern; it is not a general enemy-consumption detector.[^17]
 
-Diagnostics also need to distinguish a world update from an own pickup: `update_world_state_from_container_pickup` currently logs “Picked up container” on any zero-volume receipt, despite not identifying a collector. That wording can mislead an investigation even though the fuel accounting is correct. The present follow-up changes documentation only; no enemy-refuel inference or logging change is claimed implemented.[^17]
+Walk candidate ranking, fuel-lock replacement, larder scoring and desperation-hop scoring prefer higher-confidence eligible fuel before their existing value/distance criteria. A sole suspect target remains eligible under the existing safety gates: partial enemy consumption is possible. Repeated viewport advertisements, fleet reports and synthetic known-resource radar refreshes retain suspicion. An explicit radar quantity or 0x43 remaining-volume correction restores confidence; an explicit zero removes the target. This does not change retreat exposure budgeting or assign an exact enemy transfer.[^17]
+
+Container receipt diagnostics now say “Container cleared” or “Container updated … fuel remains”, because the receipt identifies no collector. Regression tests cover the observed 580-fuel pattern, exclusions, repeated status, refresh authority, partial consumption, target ranking, held-lock preference and sole-target recovery. The correction is verified offline; it does not prove a particular alternate move would have survived, and no live restart is part of it.[^17]
 
 ## Confirmed control-flow gaps in release 3888f06b2
 
@@ -213,6 +229,6 @@ Executable regressions are `tests/bot/ai/test_retreat_regressions.py` and `tests
 [^12]: Private tv-1 messages 1662, 1669, 1671–1673; all five captures' gameplay commands and own fuel readings from 09:49:12 through 09:49:18. `src/tankpit_bot/container/decoders/events.py` decodes cache coordinates and remaining volume without a consumer id. Archived `tpclient.js`, `$g.prototype.h` and the `V.C=$g` registration, apply the remaining cache value to a tile.
 [^13]: Manifest-pinned demo-1, tv-1 and tv-2 captures at the outbound timestamps in the controls table, subsequent own position, absolute fuel and landing messages. `src/tankpit_bot/physics/costs.py`, `teleport_cost`, computes integer Euclidean cost; the controls compare its result with the observed charge before pickup.
 [^14]: `src/tankpit_bot/browser/cdp_service.py`, `_record_frame`, calls `CDPClock.to_unix_ms`; `src/tankpit_bot/browser/cdp_utils.py`, `CDPClock`, anchors the first CDP timestamp to local wall time and reuses that offset within the session.
-[^17]: `src/tankpit_bot/state/container_mutations.py`, `pickup_container`; `src/tankpit_bot/sniffer/world_state_containers.py`, `update_world_state_from_container_pickup` and `update_world_state_from_fuel_total`; `src/tankpit_bot/sniffer/world_state_tanks.py`, `update_world_state_from_tank_damage`; `src/tankpit_bot/bot/ai/escape_policy.py`, `escape_hop_permitted`. These are inspected current implementations; the confidence rule described here is a proposal, not code behavior.
+[^17]: `src/tankpit_bot/state/fuel_confidence.py`, `containers_after_enemy_refuel`, called by `state/tank_mutations.py`, `apply_tank_observation`; `state/container_mutations.py`, resource refresh and pickup functions; `sniffer/world_state_tiles.py`, `update_cache_tiles`; `sniffer/world_state_containers.py`, `update_world_state_from_container_pickup` and `update_world_state_from_fuel_total`; `bot/ai/equipment_search.py`, fuel selectors; `bot/ai/equipment.py`, `is_fuel_lock_release_warranted`; `bot/ai/larder.py`, `select_fuel_larder_hop`; `bot/ai/collect_hops.py`, `desperation_fuel_hop`; `bot/ai/escape_policy.py`, `escape_hop_permitted`. Executable cases: `tests/world_state/test_fuel_confidence.py` and `tests/bot/ai/test_suspect_fuel.py`.
 [^16]: Private tv-1 capture messages 1612/1613/1627/1664 and tv-2 messages 1439/1440; all referenced observations are decoded gameplay records. The enemy's short status has `fuel=None`, `rank=6`, and `damage_state=3` immediately after its position record has `damage_state=2`. `src/tankpit_bot/bot/ai/combat_break.py`, `assess_engagement_break`, documents and uses the fuel-quartile interpretation; [[deactivation-format]] § SOLVED (2026-07-23): there is no healing — the damage tier IS the fuel quartile records the historical 19,658-pair fit. The consumption attribution is an inference from position and improving fuel tier, not an actor-bearing pickup receipt.
 [^15]: Manifest-pinned captures: tv-1 commands 1587/1676 and radar messages 1592/1681; tv-2 command 1387, all outbound messages through 1482, and radar messages 1422/1480; demo-1 command 553 and response 556; tv-3 landing 1289 and zero updates 1291/1292. All five streams were checked over 09:48:40–09:49:20 for the fatal target and over the stated per-case windows. Archived `tpclient.js`, radar handler `ch` and cache handler `$g.prototype.h`, apply tile values without awarding fuel. The existing wiki contracts are [[radar-mechanics]] § The radar response is a delta sync (reveals + corrections, unchanged omitted) and [[fleet-coordination]] § The exchange, whose shared-scan paragraph records the August 25 team-reveal ruling; capture locators here provide the new primary evidence.
