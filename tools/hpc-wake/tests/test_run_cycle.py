@@ -111,6 +111,22 @@ class TestMain:
             ("-- publisher-ticks", "ticks-out", "ticks-err"),
         ]
 
+    def test_a_tick_leaves_only_its_log_and_credentials_in_runs(
+        self, tmp_path: pathlib.Path, runner: RecordingRunner
+    ) -> None:
+        """MCPs board task 6a2eb905: the tick writes no health record of its
+        own. runs/pump-health.tsv was read only by the MCPs start banner, off
+        austinpc's disk; the pump's health is the hub runner's record of each
+        run and the publishers' ticks, which task_wake_bridges reads."""
+        root = staged_root(tmp_path, GOOD_ENV)
+
+        run_cycle.main(cycle_argv(root))
+
+        assert sorted(entry.name for entry in (root / "runs").iterdir()) == [
+            "cycle.log",
+            "env.ps1",
+        ]
+
     def test_hands_each_publisher_its_command_its_cwd_and_a_merged_env(
         self, tmp_path: pathlib.Path, runner: RecordingRunner
     ) -> None:
