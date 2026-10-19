@@ -1,35 +1,33 @@
-"""Measure TankPit's move from sedona to colossus on each host, by the fleet.
+"""Measure TankPit's move from sedona to colossus on colossus, by the fleet.
 
 Board task c481c259 moved the game host from sedona to colossus on
 2026-10-18. Its closure first rested on listings this session captured and
 committed, and audit 85ae66f7 held that a committed capture proves only
 what was written into it. So the claims are measured here, by code a fleet
-runner executes on the host itself:
-
-* ``sedona``: every file under sedona's ``runs`` and ``data`` still hashes
-  to the committed listing, so the copy Codex asked to keep is as it was
-  when the move read it;
-* ``colossus``: every file of the copy on colossus hashes to the same
-  listing; the release the move made is on the host's ladder; its image,
-  ``tankpit-fleet:<release>``, is on the host's daemon and was built after
-  the release was unpacked; and no container is named ``tankpit`` or was
-  started from that image, because the operator asked that no bot run
-  until he resumes.
+runner executes on colossus itself: every file of the copy on colossus
+hashes to the committed listing; the release the move made is on the
+host's ladder; its image, ``tankpit-fleet:<release>``, is on the host's
+daemon and was built after the release was unpacked; and no container is
+named ``tankpit`` or was started from that image, because the operator
+asked that no bot run until he resumes.
 
 THE LISTING. :data:`LISTING` is ``<sha256>  <path>`` per file, sorted by
 path, as :func:`hash_tree` prints it; sedona's runs and data hashed to it at
 the move and again at 15:28Z, and so did colossus's copy.
 
-THESE ARE A MOVE'S MEASUREMENTS, NOT STANDING CHECKS. Once the operator
+THE SEDONA END IS GONE. A ``sedona`` run hashed sedona's own tree against
+the listing until 2026-10-19, when sedona was reimaged from Windows to
+Ubuntu (MCPs board task 1e9ab738) and ``C:/fleet/tankpit`` went with it, so
+the copy on colossus is the one this module measures.
+
+THIS IS A MOVE'S MEASUREMENT, NOT A STANDING CHECK. Once the operator
 resumes and ``make up`` starts the fleet, a container from that image
-exists and the ``colossus`` run refuses by design; the projects that run it,
-``clients/TankpitBot-sedona-execution`` and
-``clients/TankpitBot-colossus-execution``, are pinned to their hosts and
-measure a commit, so their rows stay what they measured.
+exists and the run refuses by design; the project that runs it,
+``clients/TankpitBot-colossus-execution``, is pinned to colossus and
+measures a commit, so its rows stay what they measured.
 
 Usage::
 
-    python -m scripts.colossus_move sedona
     python -m scripts.colossus_move colossus
 """
 
@@ -66,26 +64,23 @@ CREATED: Final[re.Pattern[str]] = re.compile(
 #: How many differing paths a refusal names.
 NAMED_PATHS: Final[int] = 5
 
-_USAGE: Final[str] = "usage: python -m scripts.colossus_move {sedona|colossus}\n"
+_USAGE: Final[str] = "usage: python -m scripts.colossus_move colossus\n"
 
 
 class MovePlaces(TypedDict):
-    """Where each host keeps what the move is measured against.
+    """Where colossus keeps what the move is measured against.
 
     Attributes:
-        sedona_tree: sedona's TankPit directory, holding ``runs`` and ``data``.
-        archive_tree: The copy on colossus, holding the same two.
+        archive_tree: The copy on colossus, holding ``runs`` and ``data``.
         releases: colossus's release ladder.
     """
 
-    sedona_tree: Path
     archive_tree: Path
     releases: Path
 
 
-#: The real places, on each host.
+#: The real places, on colossus.
 HOST_PLACES: Final[MovePlaces] = MovePlaces(
-    sedona_tree=Path("C:/fleet/tankpit"),
     archive_tree=Path(f"{GAME_HOST_HOME}/tankpit-archive/sedona-2026-10-18"),
     releases=Path(RELEASES_DIR),
 )
@@ -263,27 +258,23 @@ def colossus_host(releases: Path, project_root: Path) -> list[str]:
 
 
 def run(arguments: list[str], project_root: Path, places: MovePlaces) -> list[str]:
-    """Measure the host the command line names.
+    """Measure colossus, the host the command line must name.
 
     Args:
         arguments: The arguments after the program name.
         project_root: This package's directory.
-        places: Where each host keeps what is measured.
+        places: Where colossus keeps what is measured.
 
     Returns:
         The lines saying what was measured.
 
     Raises:
-        SystemExit: 2 with the usage for anything but ``sedona`` or
-            ``colossus``.
+        SystemExit: 2 with the usage for anything but ``colossus``.
         FleetHostError: As :func:`compare_tree` and :func:`colossus_host`.
     """
-    listing = project_root / LISTING
-    if arguments == ["sedona"]:
-        return [compare_tree(places["sedona_tree"], listing)]
     if arguments == ["colossus"]:
         return [
-            compare_tree(places["archive_tree"], listing),
+            compare_tree(places["archive_tree"], project_root / LISTING),
             *colossus_host(places["releases"], project_root),
         ]
     sys.stdout.write(_USAGE)

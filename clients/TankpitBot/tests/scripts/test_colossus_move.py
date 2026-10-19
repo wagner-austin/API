@@ -121,7 +121,7 @@ def _ladder(root: Path) -> Path:
 
 
 def test_the_committed_listing_names_every_file_the_move_copied() -> None:
-    """The listing both hosts hash to holds sedona's 614 files, two of them data."""
+    """The listing colossus's copy hashes to holds sedona's 614 files, two of them data."""
     hashes = read_listing(Path(__file__).resolve().parents[2] / LISTING)
     assert len(hashes) == 614
     assert sorted(path for path in hashes if path.startswith("data/")) == [
@@ -298,7 +298,7 @@ def test_a_container_listing_docker_refuses_is_named(tmp_path: Path) -> None:
 
 
 def _places(tmp_path: Path) -> MovePlaces:
-    """Both hosts' places under ``tmp_path``, the listing beside them.
+    """colossus's places under ``tmp_path``, the listing beside them.
 
     Args:
         tmp_path: The test's directory, standing in for the package.
@@ -309,21 +309,9 @@ def _places(tmp_path: Path) -> MovePlaces:
     (tmp_path / LISTING).parent.mkdir(parents=True)
     _matching(tmp_path / LISTING)
     return MovePlaces(
-        sedona_tree=_tree(tmp_path / "sedona"),
         archive_tree=_tree(tmp_path / "archive"),
         releases=_ladder(tmp_path),
     )
-
-
-def test_sedona_is_measured_against_the_packages_listing_only(tmp_path: Path) -> None:
-    """``sedona`` hashes its tree and asks docker nothing."""
-    recorder = Recorder({})
-    script_hooks.run_command = recorder
-    places = _places(tmp_path)
-    assert run(["sedona"], tmp_path, places) == [
-        f"2 of 2 files under {places['sedona_tree']} (runs, data) hash to {LISTING.name}"
-    ]
-    assert recorder.calls == []
 
 
 def test_colossus_is_measured_on_its_copy_and_its_daemon(tmp_path: Path) -> None:
@@ -340,11 +328,11 @@ def test_colossus_is_measured_on_its_copy_and_its_daemon(tmp_path: Path) -> None
 def test_any_other_command_line_prints_the_usage(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """A host the module does not measure exits 2."""
+    """A host the module does not measure exits 2, sedona's retired end among them."""
     with pytest.raises(SystemExit) as exited:
-        run(["sedona", "colossus"], tmp_path, _places(tmp_path))
+        run(["sedona"], tmp_path, _places(tmp_path))
     assert exited.value.code == 2
-    assert capsys.readouterr().out == "usage: python -m scripts.colossus_move {sedona|colossus}\n"
+    assert capsys.readouterr().out == "usage: python -m scripts.colossus_move colossus\n"
 
 
 def test_the_lines_are_printed_one_per_line(capsys: pytest.CaptureFixture[str]) -> None:
