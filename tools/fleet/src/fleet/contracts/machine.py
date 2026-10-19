@@ -71,6 +71,10 @@ class MachineRole(StrEnum):
     WORKER = "worker"
     SESSION_HOST = "session-host"
     CLIENT = "client"
+    #: A machine the operator can reach but does not own (a relative's PC,
+    #: helped remotely with consent); MCPs fleet-mcp's FleetRole names the same
+    #: six, and fleet-enroll takes it as --role (MCPs board task e447de72).
+    UNTRUSTED_MANAGED = "untrusted-managed"
 
 
 class Machine(TypedDict):

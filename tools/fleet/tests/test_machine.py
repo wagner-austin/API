@@ -222,6 +222,17 @@ class TestMachine:
             None,
         )
 
+    def test_a_machine_the_operator_reaches_but_does_not_own_is_read(self) -> None:
+        decoded = decode_machine(
+            "relative",
+            _file(role="untrusted-managed", guest=None, dispatch="not the operator's machine"),
+        )
+
+        assert (decoded["role"], decoded["held"]) == (
+            MachineRole.UNTRUSTED_MANAGED,
+            "not the operator's machine",
+        )
+
     def test_a_held_node_dispatches_nothing_and_says_why(self) -> None:
         dispatch = {**encode_node_config(node()), "held": "its WSL VM holds the memory"}
 
