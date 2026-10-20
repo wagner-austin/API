@@ -6,8 +6,9 @@ reclaimed 0 B a day while its daemon's build cache grew to 103.7 GB
 (2026-10-18T07:32Z), because no pass in it reached that cache, and the
 provision that installs it is rendered for an operator to run, so a host can
 keep an old copy. This case reads, on the runner host, that the installed
-script is the render byte for byte, that its timer is enabled and fired within
-a day, and that its last run succeeded, which under the script's ``set -euo
+script is the render byte for byte, that its timer is enabled and due within a
+day, that its service started within a day, by the timer or the provision's
+first pass, and that its last run succeeded, which under the script's ``set -euo
 pipefail`` means every docker prune in it did. The run's own report then says
 that the render is what ran, after it was installed, that every pass printed
 its closing line, and that the private build cache the size pass left is
@@ -57,9 +58,16 @@ CI_CLEAN_PATH: Final[pathlib.Path] = pathlib.Path("/usr/local/bin/ci-clean")
 CI_CLEAN_TIMER: Final[str] = "ci-clean.timer"
 CI_CLEAN_SERVICE: Final[str] = "ci-clean.service"
 
-#: The longest since the timer last fired: its daily start, plus the hours a
-#: run may be late by (``Persistent=true`` catches a missed start at boot).
+#: The longest since the service last started: the timer's daily start, plus
+#: the hours a run may be late by (``Persistent=true`` catches a missed start
+#: at boot). The run is the service's, not the timer's: the provision starts
+#: the first pass itself, which the timer's LastTriggerUSec never records, and
+#: lavender's first check, the day it joined, failed on "ci-clean.timer has
+#: never fired" with that pass's report beside it.
 TRIGGER_WITHIN_SECONDS: Final[int] = 26 * 3600
+
+#: The timer is daily, so its next start is never further off than a day.
+DAY_SECONDS: Final[int] = 24 * 3600
 
 #: The host daemon's socket, named so the case never reads another daemon a
 #: ``DOCKER_HOST`` in the run's environment points at.
@@ -103,17 +111,20 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
     assert CI_CLEAN_TIMER in runner_host["systemd_timers"]
     assert CI_CLEAN_PATH.read_text(encoding="utf-8") == CI_CLEAN_SCRIPT
 
-    timer = unit_properties(CI_CLEAN_TIMER, ("UnitFileState", "LastTriggerUSec"))
-    assert timer["UnitFileState"] == "enabled"
-    fired = timer["LastTriggerUSec"]
-    assert fired not in {"", "n/a"}, f"{CI_CLEAN_TIMER} has never fired: {fired!r}"
-    # systemd 255 prints the instant in the host's zone, which the host's own
-    # date reads back; its --timestamp=unix does not reach systemctl show.
-    epoch = int(command_output(["date", "-d", fired, "+%s"]).strip())
-    since = int(time.time()) - epoch
-    assert since <= TRIGGER_WITHIN_SECONDS, f"{CI_CLEAN_TIMER} last fired {since} s ago"
+    timer = unit_properties(
+        CI_CLEAN_TIMER, ("UnitFileState", "ActiveState", "NextElapseUSecRealtime")
+    )
+    assert (timer["UnitFileState"], timer["ActiveState"]) == ("enabled", "active")
+    due = _epoch(timer["NextElapseUSecRealtime"], f"{CI_CLEAN_TIMER} has no next start")
+    assert due - int(time.time()) <= DAY_SECONDS, f"{CI_CLEAN_TIMER} next starts at {due}"
 
-    service = unit_properties(CI_CLEAN_SERVICE, ("Result", "ExecMainStatus"))
+    service = unit_properties(
+        CI_CLEAN_SERVICE, ("Result", "ExecMainStatus", "ExecMainStartTimestamp")
+    )
+    since = int(time.time()) - _epoch(
+        service.pop("ExecMainStartTimestamp"), f"{CI_CLEAN_SERVICE} has never run"
+    )
+    assert since <= TRIGGER_WITHIN_SECONDS, f"{CI_CLEAN_SERVICE} last started {since} s ago"
     assert service == {"Result": "success", "ExecMainStatus": "0"}
 
     report = _last_run()
@@ -123,7 +134,8 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
     record_property(
         READING_PROPERTY,
         f"{runner_host['name']}: {CI_CLEAN_PATH} is the render of CI_CLEAN_SCRIPT, "
-        f"{CI_CLEAN_TIMER} enabled and fired {since} s ago, its last run {service['Result']} "
+        f"{CI_CLEAN_TIMER} enabled and due within a day, {CI_CLEAN_SERVICE} started {since} s "
+        f"ago, its last run {service['Result']} "
         f"with status {service['ExecMainStatus']}; {CI_CLEAN_REPORT} says the render ran "
         f"{report.after_install} s after it was installed and took the private build cache "
         f"from {report.before} bytes to {report.private}, {report.records} records, against "
@@ -132,6 +144,22 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
         + "; the host daemon's build cache now reads "
         + ", ".join(" ".join(total) for total in totals),
     )
+
+
+def _epoch(instant: str, unset: str) -> int:
+    """An instant systemctl show printed, in seconds since the epoch.
+
+    Args:
+        instant: The property's value.
+        unset: What the assertion says when systemd recorded none.
+
+    Returns:
+        The instant.
+    """
+    assert instant not in {"", "n/a"}, f"{unset}: {instant!r}"
+    # systemd 255 prints the instant in the host's zone, which the host's own
+    # date reads back; its --timestamp=unix does not reach systemctl show.
+    return int(command_output(["date", "-d", instant, "+%s"]).strip())
 
 
 class LastRun(NamedTuple):
