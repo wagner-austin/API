@@ -87,7 +87,7 @@ class TestTheKey:
 
         assert detail == (
             f"{netboot_arm.NO_KEY_CODE}: {path} sets no TAILSCALE_API_KEY, or sets it empty, "
-            "and the arm mints with it; nothing ran"
+            "and the netboot duty's commands run with it; nothing ran"
         )
         assert "tskey" not in detail
 

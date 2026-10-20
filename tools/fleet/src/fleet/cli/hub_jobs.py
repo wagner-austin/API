@@ -34,7 +34,7 @@ from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import job_close
 from fleet.contracts.dispatch import ClosingStatus, DispatchJob
-from fleet.core import netboot_arm, queue, rebuild, restart, sealed_release, session_release
+from fleet.core import netboot_arm, queue, rebuild, restart, session_release
 
 _log = get_logger(__name__)
 
@@ -230,15 +230,16 @@ def netboot_job(
                 "dispatch_netboot_arm queues one naming a roster machine; nothing ran"
             ),
         )
-    release = sealed_release.verify_release(place["release"], netboot_arm.KIND)
-    if isinstance(release, str):
-        return job_close.refuse(credentials, job, identity, detail=release)
-    key = netboot_arm.read_tailnet_key(place["env_file"])
-    if isinstance(key, str):
-        return job_close.refuse(credentials, job, identity, detail=key)
+    ready = netboot_arm.ready(place)
+    if isinstance(ready, str):
+        return job_close.refuse(credentials, job, identity, detail=ready)
     _start(credentials, job, identity, node=node, run_id=f"netboot-arm-{job['job_id']}")
-    result = netboot_arm.run_arm(netboot_arm.arm_argv(place, release, machine), key)
-    outcome = netboot_arm.arm_outcome(result, release, machine)
+    result = netboot_arm.run_cli(
+        netboot_arm.arm_argv(place, ready["release"], machine),
+        ready["key"],
+        timeout_seconds=netboot_arm.ARM_TIMEOUT_SECONDS,
+    )
+    outcome = netboot_arm.arm_outcome(result, ready["release"], machine)
     return job_close.close(
         credentials,
         job,

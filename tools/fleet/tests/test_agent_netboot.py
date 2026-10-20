@@ -1,7 +1,8 @@
 """The netboot lane at the tick level (MCPs board task 83102d9d): a claimed
 ``netboot-arm`` job verifies the installed netboot release, runs its
 ``fleet-netboot arm`` for the machine the job names, and closes with what
-the arm said.
+the arm said; every netboot tick then runs the adopt pass (MCPs board task
+49d366ac, ``test_agent_netboot_adopt.py``).
 
 Split by role like ``test_agent_restart.py``: the queue speaks the real
 wire shape, and the verifier and the arm go through the same command hook
@@ -22,18 +23,22 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, netboot_arm, queue, sealed_release
+from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, sealed_release
 from tests._agent_cli import HUB_HOST, agent_argv, hub_host, netboot_argv, sessions_argv
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
+from tests._netboot_tick import (
+    API_KEY,
+    RELEASE_ID,
+    REVISION,
+    adopt_calls,
+    adopt_replies,
+    netboot_place,
+    place,
+    sealed,
+    verify_reply,
+)
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_env, queue_job
 from tests.conftest import FakeRun, failed, ok
-
-#: The installed release's candidate directory and the commit it was cut at.
-RELEASE_ID: Final = "7fcc96d6ca7f9057183df144ad8ea2bd"
-REVISION: Final = "bade610b3a91eba2a7bab589770754d61e63a0e5"
-
-#: The tailnet API key the workspace env file holds for the netboot lane.
-API_KEY: Final = "tskey-api-kTEST1234CNTRL-secret"
 
 #: What the arm prints once lavender is armed: the key's id, never a key.
 ARMED: Final = (
@@ -49,42 +54,6 @@ def _credentials_in_env() -> None:
     """The queue's variables, and the machine the tick runs on."""
     _test_hooks.env = queue_env()
     _test_hooks.hostname = hub_host
-
-
-def place(tmp_path: pathlib.Path) -> dict[str, pathlib.Path]:
-    """Lay out the installed release and the env file, keyed by the flag naming each.
-
-    Args:
-        tmp_path: The test's temporary directory.
-
-    Returns:
-        The release checkout, the served root and the env file.
-    """
-    release = tmp_path / "netboot-releases" / RELEASE_ID / "MCPs"
-    release.mkdir(parents=True)
-    env_file = tmp_path / "MCPs" / ".env"
-    env_file.parent.mkdir()
-    env_file.write_text(
-        f"POSTGRES_PASSWORD=unrelated\nTAILSCALE_API_KEY={API_KEY}\nVM_HOST=lavender-wsl\n",
-        encoding="utf-8",
-    )
-    return {
-        agent.NETBOOT_RELEASE_FLAG: release,
-        agent.SERVED_ROOT_FLAG: tmp_path / "srv" / "corvis-netboot",
-        agent.ENV_FILE_FLAG: env_file,
-    }
-
-
-def verify_reply(release: pathlib.Path) -> _test_hooks.CommandResult:
-    """The release's verifier, answering that its seal holds.
-
-    Args:
-        release: The release's checkout.
-
-    Returns:
-        Exit 0 with the line MCPs maketools prints.
-    """
-    return ok(f"{sealed_release.verified_line('netboot', RELEASE_ID, REVISION, release)}\n")
 
 
 def arm_row(**overrides: JSONValue) -> JSONObject:
@@ -148,25 +117,13 @@ def expected_arm(paths: dict[str, pathlib.Path], registry: pathlib.Path) -> tupl
     """The arm the agent runs for lavender from the planted release.
 
     Args:
-        paths: What :func:`place` laid out.
+        paths: What :func:`tests._netboot_tick.place` laid out.
         registry: The registry directory the tick loaded.
 
     Returns:
         The argv :func:`fleet.core.netboot_arm.arm_argv` composes.
     """
-    return netboot_arm.arm_argv(
-        netboot_arm.NetbootPlace(
-            release=paths[agent.NETBOOT_RELEASE_FLAG],
-            nodejs="node",
-            served_root=paths[agent.SERVED_ROOT_FLAG],
-            env_file=paths[agent.ENV_FILE_FLAG],
-            registry=registry,
-        ),
-        sealed_release.SealedRelease(
-            release=RELEASE_ID, revision=REVISION, root=paths[agent.NETBOOT_RELEASE_FLAG]
-        ),
-        "lavender",
-    )
+    return netboot_arm.arm_argv(netboot_place(paths, registry), sealed(paths), "lavender")
 
 
 class TestTheNetbootLane:
@@ -175,7 +132,13 @@ class TestTheNetbootLane:
     ) -> None:
         paths = place(tmp_path)
         release = paths[agent.NETBOOT_RELEASE_FLAG]
-        runner = FakeRun([verify_reply(release), ok(f"NETBOOT BUILT digest=4be1\n{ARMED}\n")])
+        runner = FakeRun(
+            [
+                verify_reply(release),
+                ok(f"NETBOOT BUILT digest=4be1\n{ARMED}\n"),
+                *adopt_replies(paths),
+            ]
+        )
         _test_hooks.run = runner
         endpoint = ran_queue("passed")
         _test_hooks.http_post = endpoint
@@ -186,15 +149,22 @@ class TestTheNetbootLane:
         # Every arm, whatever machine it names: the machine is the target.
         assert endpoint.arguments[0]["lane"] == "netboot"
         assert "node" not in endpoint.arguments[0]
-        # The release's own verifier, then the release's own arm, and no
-        # hub pass after it.
+        # The release's own verifier, then the release's own arm, then the
+        # adopt pass, and no hub pass after it.
         assert runner.calls == [
             sealed_release.verify_argv(release, "netboot"),
             expected_arm(paths, config_path),
+            *adopt_calls(paths, config_path),
         ]
-        assert runner.timeouts == [300, netboot_arm.ARM_TIMEOUT_SECONDS]
-        # The key reaches the arm's environment and nothing else.
-        assert runner.set_env == [(), (("TAILSCALE_API_KEY", API_KEY),)]
+        assert runner.timeouts == [
+            300,
+            netboot_arm.ARM_TIMEOUT_SECONDS,
+            300,
+            netboot_adopt.ADOPT_TIMEOUT_SECONDS,
+        ]
+        # The key reaches the arm's and adopt's environments and nothing else.
+        key = (("TAILSCALE_API_KEY", API_KEY),)
+        assert runner.set_env == [(), key, (), key]
         assert not any(API_KEY in token for call in runner.calls for token in call)
         started = endpoint.arguments[1]
         assert started["node"] == HUB_HOST
@@ -217,6 +187,7 @@ class TestTheNetbootLane:
             [
                 verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
                 failed(1, f"fleet-netboot: {refusal}\n"),
+                *adopt_replies(paths),
             ]
         )
         endpoint = ran_queue("refused")
@@ -237,6 +208,7 @@ class TestTheNetbootLane:
             [
                 verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
                 failed(1, "fleet-netboot: TAILNET_KEY_MINT_FAILED: Tailscale answered 403\n"),
+                *adopt_replies(paths),
             ]
         )
         endpoint = ran_queue("failed")
@@ -254,22 +226,23 @@ class TestTheNetbootLane:
 
 class TestNetbootRefusals:
     """Nothing is minted when there is nothing verified to arm from, no key
-    to mint with, or no machine to arm."""
+    to mint with, or no machine to arm; the adopt pass that follows refuses
+    alike when the release or the key is what is missing."""
 
     def test_a_release_that_fails_its_seal_refuses_the_arm_and_nothing_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
         paths = place(tmp_path)
-        runner = FakeRun([failed(1, "RELEASE_DIGEST_MISMATCH: the payload changed")])
+        unsealed = failed(1, "RELEASE_DIGEST_MISMATCH: the payload changed")
+        runner = FakeRun([unsealed, unsealed])
         _test_hooks.run = runner
         endpoint = refused_queue()
         _test_hooks.http_post = endpoint
 
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        assert runner.calls == [
-            sealed_release.verify_argv(paths[agent.NETBOOT_RELEASE_FLAG], "netboot")
-        ]
+        verify = sealed_release.verify_argv(paths[agent.NETBOOT_RELEASE_FLAG], "netboot")
+        assert runner.calls == [verify, verify]
         assert endpoint.tools == ["dispatch_claim", "dispatch_report"]
         detail = narrow_json_to_str(endpoint.arguments[1]["detail"])
         assert detail.startswith(f"{sealed_release.UNSEALED_CODE}: ")
@@ -280,30 +253,34 @@ class TestNetbootRefusals:
     ) -> None:
         paths = place(tmp_path)
         paths[agent.ENV_FILE_FLAG].write_text("VM_HOST=lavender-wsl\n", encoding="utf-8")
-        runner = FakeRun([verify_reply(paths[agent.NETBOOT_RELEASE_FLAG])])
+        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        runner = FakeRun([verify_reply(release), verify_reply(release)])
         _test_hooks.run = runner
         endpoint = refused_queue()
         _test_hooks.http_post = endpoint
 
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        assert len(runner.calls) == 1
+        # The arm's verify and the adopt pass's, and neither command ran.
+        assert len(runner.calls) == 2
         assert narrow_json_to_str(endpoint.arguments[1]["detail"]) == (
             f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no TAILSCALE_API_KEY, "
-            "or sets it empty, and the arm mints with it; nothing ran"
+            "or sets it empty, and the netboot duty's commands run with it; nothing ran"
         )
 
     def test_an_arm_naming_no_machine_is_refused_and_nothing_runs(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:
-        runner = FakeRun([])
+        paths = place(tmp_path)
+        runner = FakeRun(adopt_replies(paths))
         _test_hooks.run = runner
         endpoint = refused_queue(requestedNode=None)
         _test_hooks.http_post = endpoint
 
-        assert agent.main(netboot_argv(config_path, repo, place(tmp_path))) == 0
+        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        assert runner.calls == []
+        # Only the adopt pass ran.
+        assert runner.calls == adopt_calls(paths, config_path)
         assert narrow_json_to_str(endpoint.arguments[1]["detail"]).startswith(
             f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine to arm"
         )
@@ -312,7 +289,8 @@ class TestNetbootRefusals:
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         """A job is run by its command, whichever lane gave it, so a runner
-        started without a release refuses an arm rather than guess one."""
+        started without a release refuses an arm rather than guess one, and
+        runs no adopt pass, which is the netboot duty's."""
         runner = FakeRun([*UNROLLED_TICK])
         _test_hooks.run = runner
         endpoint = refused_queue()
@@ -329,19 +307,6 @@ class TestNetbootRefusals:
 
 
 class TestTheNetbootCommandLine:
-    def test_an_empty_netboot_lane_claims_once_and_runs_no_hub_pass(
-        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
-    ) -> None:
-        runner = FakeRun([])
-        _test_hooks.run = runner
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
-        _test_hooks.http_post = endpoint
-
-        assert agent.main(netboot_argv(config_path, repo, place(tmp_path))) == 0
-
-        assert endpoint.tools == ["dispatch_claim"]
-        assert runner.calls == []
-
     @pytest.mark.parametrize(
         ("extra", "named", "why"),
         [

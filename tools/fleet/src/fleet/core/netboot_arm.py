@@ -28,6 +28,11 @@ log, no detail. The arm prints the minted key's id and never the key; a
 line of output carrying a tailnet key (``tskey-``) means that contract
 broke, and then none of the output is copied into the job's detail.
 
+SHARED WITH THE ADOPT PASS. :func:`ready`, :func:`cli_argv`,
+:func:`run_cli`, :func:`carries_key` and :func:`output_tail` are how every
+``fleet-netboot`` command the duty runs is verified, composed, run and read;
+:mod:`fleet.core.netboot_adopt` runs ``adopt`` through them each tick.
+
 HOW THE JOB CLOSES. Exit 0 with exactly one ``NETBOOT ARMED`` line is
 ``passed``, the detail that line. A refusal the arm raises before minting
 anything (the machine is not in the roster, it declares no boot MAC, or it
@@ -49,7 +54,7 @@ from platform_core.errors import AppError
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks
-from fleet.core.sealed_release import SealedRelease
+from fleet.core.sealed_release import SealedRelease, verify_release
 
 #: The release kind an arm runs, as MCPs ``release-kinds.json`` names it.
 KIND: Final = "netboot"
@@ -64,7 +69,8 @@ DEFINITION: Final = pathlib.PurePosixPath("fleet-mcp/netboot")
 #: rename stays on one file system.
 CACHE: Final = "cache"
 
-#: The variable the arm mints with, and the env file line that carries it.
+#: The variable the duty's commands read the key from, and the env file
+#: line that carries it.
 KEY_NAME: Final = "TAILSCALE_API_KEY"
 
 #: What every tailnet key begins with: an API key and a minted auth key alike.
@@ -152,6 +158,38 @@ class ArmOutcome(TypedDict):
     detail: str
 
 
+class Ready(TypedDict):
+    """What every ``fleet-netboot`` command the duty runs needs before it runs.
+
+    Attributes:
+        release: The installed release, its seal verified.
+        key: The tailnet API key.
+    """
+
+    release: SealedRelease
+    key: TailnetKey
+
+
+def ready(place: NetbootPlace) -> Ready | str:
+    """Verify the installed release's seal, then read the key.
+
+    Args:
+        place: Where the netboot duty's commands run from.
+
+    Returns:
+        The verified release and the key, or the first refusal: the
+        verifier's when the seal does not hold, :func:`read_tailnet_key`'s
+        when the env file gives no key. Nothing in the release has run.
+    """
+    release = verify_release(place["release"], KIND)
+    if isinstance(release, str):
+        return release
+    key = read_tailnet_key(place["env_file"])
+    if isinstance(key, str):
+        return key
+    return Ready(release=release, key=key)
+
+
 def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
     """Read the tailnet API key from the workspace env file.
 
@@ -174,10 +212,29 @@ def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
     value = values.get(KEY_NAME, "")
     if value == "":
         return (
-            f"{NO_KEY_CODE}: {env_file} sets no {KEY_NAME}, or sets it empty, and the arm mints "
-            "with it; nothing ran"
+            f"{NO_KEY_CODE}: {env_file} sets no {KEY_NAME}, or sets it empty, and the netboot "
+            "duty's commands run with it; nothing ran"
         )
     return TailnetKey(value=value)
+
+
+def cli_argv(place: NetbootPlace, release: SealedRelease, *arguments: str) -> tuple[str, ...]:
+    """The release's own ``fleet-netboot``, run with ``arguments``.
+
+    Args:
+        place: Where the netboot duty's commands run from.
+        release: The verified release.
+        *arguments: The command and its flags.
+
+    Returns:
+        Node importing the release's CLI and running it with ``arguments``;
+        the CLI reads them from ``process.argv[1]`` on under ``-e``.
+    """
+    importer = (
+        f"const m = await import({(release['root'] / CLI).as_uri()!r}); "
+        "await m.runFromProcess(process);"
+    )
+    return (place["nodejs"], "--input-type=module", "-e", importer, *arguments)
 
 
 def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple[str, ...]:
@@ -194,14 +251,9 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
         revision as the commit, the machine and the loaded registry.
     """
     root = release["root"]
-    importer = (
-        f"const m = await import({(root / CLI).as_uri()!r}); await m.runFromProcess(process);"
-    )
-    return (
-        place["nodejs"],
-        "--input-type=module",
-        "-e",
-        importer,
+    return cli_argv(
+        place,
+        release,
         "arm",
         "--definition",
         str(root / DEFINITION),
@@ -218,27 +270,30 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
     )
 
 
-def run_arm(argv: tuple[str, ...], key: TailnetKey) -> _test_hooks.CommandResult:
-    """Run one arm with the key in its environment alone.
+def run_cli(
+    argv: tuple[str, ...], key: TailnetKey, *, timeout_seconds: int
+) -> _test_hooks.CommandResult:
+    """Run one ``fleet-netboot`` command with the key in its environment alone.
 
     Args:
-        argv: What :func:`arm_argv` composed.
+        argv: What :func:`cli_argv` composed.
         key: The tailnet API key.
+        timeout_seconds: The command's deadline.
 
     Returns:
         Its exit status and captured streams, or the timed-out result after
-        :data:`ARM_TIMEOUT_SECONDS`.
+        ``timeout_seconds``.
     """
     return _test_hooks.run(
-        argv, timeout_seconds=ARM_TIMEOUT_SECONDS, set_env=((KEY_NAME, key["value"]),)
+        argv, timeout_seconds=timeout_seconds, set_env=((KEY_NAME, key["value"]),)
     )
 
 
-def _cli_error(stderr: str) -> str:
-    """The error the arm's CLI exited with, without its prefix.
+def cli_error(stderr: str) -> str:
+    """The error a ``fleet-netboot`` command exited with, without its prefix.
 
     Args:
-        stderr: The arm's standard error.
+        stderr: The command's standard error.
 
     Returns:
         The text after the last ``fleet-netboot: `` line's prefix, or ``""``
@@ -250,6 +305,32 @@ def _cli_error(stderr: str) -> str:
         if line.startswith(CLI_ERROR_PREFIX)
     ]
     return errors[-1] if errors else ""
+
+
+def carries_key(result: _test_hooks.CommandResult) -> bool:
+    """Whether a command's output carries a tailnet key, which it never prints.
+
+    Args:
+        result: The command's exit status and streams.
+
+    Returns:
+        True when either stream holds :data:`KEY_MARK`; then none of the
+        output may be copied anywhere.
+    """
+    return KEY_MARK in result["stdout"] or KEY_MARK in result["stderr"]
+
+
+def output_tail(result: _test_hooks.CommandResult) -> str:
+    """The end of a failed command's output, for the line that reports it.
+
+    Args:
+        result: The command's exit status and streams.
+
+    Returns:
+        The last :data:`DETAIL_TAIL_CHARS` characters of its stdout then
+        stderr, stripped.
+    """
+    return (result["stdout"] + result["stderr"]).strip()[-DETAIL_TAIL_CHARS:]
 
 
 def arm_outcome(
@@ -274,7 +355,7 @@ def arm_outcome(
         f"(revision {release['revision']})"
     )
     returncode = result["returncode"]
-    if KEY_MARK in result["stdout"] or KEY_MARK in result["stderr"]:
+    if carries_key(result):
         return ArmOutcome(
             status=ClosingStatus.REFUSED if returncode == 0 else ClosingStatus.FAILED,
             exit_code=None if returncode == 0 else returncode,
@@ -299,14 +380,13 @@ def arm_outcome(
                 "does not report it armed"
             ),
         )
-    error = _cli_error(result["stderr"])
+    error = cli_error(result["stderr"])
     if any(error.startswith(f"{code}:") for code in ARM_REFUSALS):
         return ArmOutcome(status=ClosingStatus.REFUSED, exit_code=None, detail=error)
-    tail = (result["stdout"] + result["stderr"]).strip()[-DETAIL_TAIL_CHARS:]
     return ArmOutcome(
         status=ClosingStatus.FAILED,
         exit_code=returncode,
-        detail=f"{opening} exited {returncode}: {tail}",
+        detail=f"{opening} exited {returncode}: {output_tail(result)}",
     )
 
 
@@ -329,9 +409,15 @@ __all__ = [
     "NO_RELEASE_CODE",
     "ArmOutcome",
     "NetbootPlace",
+    "Ready",
     "TailnetKey",
     "arm_argv",
     "arm_outcome",
+    "carries_key",
+    "cli_argv",
+    "cli_error",
+    "output_tail",
     "read_tailnet_key",
-    "run_arm",
+    "ready",
+    "run_cli",
 ]

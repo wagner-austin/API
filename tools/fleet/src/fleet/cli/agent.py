@@ -43,9 +43,11 @@ kills (board task 4199d1fb) and nine nodes behaved as one slow node; lanes
 and per-node runners are the fix, and nothing here collects a suite any more
 because nothing here starts one.
 
-A HUB TICK IS FOUR PASSES, IN THIS ORDER; a sessions or netboot tick is
-the first alone, since publishing, observing and reaping are the control
-duty's:
+A HUB TICK IS FOUR PASSES, IN THIS ORDER; a sessions tick is the first
+alone, since publishing, observing and reaping are the control duty's, and
+a netboot tick is the first and then the netboot duty's own adopt pass,
+which gives each machine that checked in after a reinstall its roster name
+and address (MCPs board task 49d366ac, :mod:`fleet.core.netboot_adopt`):
 
     1. CLAIM. Take at most one job of the lane and run it to its close.
     2. PUBLISH. Read every project the registry declares at the commit
@@ -110,7 +112,7 @@ from fleet.contracts.dispatch import (
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, netboot_arm, queue, rebuild
+from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, rebuild
 
 _log = get_logger(__name__)
 
@@ -344,6 +346,7 @@ def netboot_place(parsed: Mapping[str, str], registry: pathlib.Path) -> netboot_
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Run one tick: claim and run at most one job of the lane, then, on the
+    netboot lane, adopt each reinstalled machine that checked in, and on the
     hub lane, publish the registry and observe.
 
     With ``--announce`` the tick instead posts the check-in that registers
@@ -411,6 +414,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     raw_mcps_root = parsed.get(MCPS_ROOT_FLAG)
     mcps_root = pathlib.Path(raw_mcps_root).resolve() if raw_mcps_root is not None else None
 
+    netboot = netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None
     claimed = claim_pass(
         credentials,
         identity,
@@ -418,10 +422,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         node=parsed.get(NODE_FLAG),
         host=host,
         mcps_root=mcps_root,
-        netboot=netboot_place(parsed, loaded.registry) if lane is DispatchLane.NETBOOT else None,
+        netboot=netboot,
     )
     if claimed is None:
         _log.info("%s lane empty", lane.value)
+    if netboot is not None:
+        for line in netboot_adopt.adopt_pass(netboot):
+            _log.info("%s", line)
     if lane is not DispatchLane.HUB:
         return 0
     hub_passes.publish_pass(credentials, identity, repo_root=project_root)
