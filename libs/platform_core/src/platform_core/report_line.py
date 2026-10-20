@@ -17,8 +17,10 @@ from typing import Protocol
 class EmitProtocol(Protocol):
     """Write one line to a report stream."""
 
-    def __call__(self, line: str) -> None:
+    def __call__(self, line: str, /) -> None:
         """Write it.
+
+        Positional-only, so a test's ``list.append`` is a writer too.
 
         Args:
             line: The line, without a trailing newline.
@@ -40,4 +42,18 @@ def emit_line(line: str) -> None:
     sys.stdout.flush()
 
 
-__all__ = ["EmitProtocol", "emit_line"]
+def emit_error_line(line: str) -> None:
+    """Write one line to standard error and flush it.
+
+    The refusal stream :func:`platform_core.cli_boundary.run_cli` writes to,
+    apart from :func:`emit_line`'s so a command's report can be piped or
+    redirected while its refusals still reach the operator.
+
+    Args:
+        line: The line, without a trailing newline.
+    """
+    sys.stderr.write(line + "\n")
+    sys.stderr.flush()
+
+
+__all__ = ["EmitProtocol", "emit_error_line", "emit_line"]
