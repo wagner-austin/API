@@ -46,8 +46,40 @@ import pathlib
 import re
 import sys
 
-#: Directories whose immediate children are candidate packages.
-PACKAGE_ROOTS = ("clients", "services", "libs", "tools")
+#: Where this repository declares the directories whose immediate children
+#: are its packages. MCPs' maketools reads the same file when pre-push runs a
+#: push's tests (MCPs board task a7416f6f), so the roots are stated once.
+PROJECT_ROOTS = pathlib.Path("scripts", "make", "project-roots.json")
+
+
+def package_roots(repo: pathlib.Path) -> list[str]:
+    """Read the directories whose immediate children are candidate packages.
+
+    Args:
+        repo: Repository root.
+
+    Returns:
+        The declared roots, in the declared order.
+
+    Raises:
+        ValueError: When the declaration is not exactly
+            ``{"nestedRoots": [<directory name>, ...]}``.
+        OSError: When it cannot be read.
+    """
+    declaration = repo / PROJECT_ROOTS
+    document: object = json.loads(declaration.read_text(encoding="utf-8"))
+    declared: object = document.get("nestedRoots") if isinstance(document, dict) else None
+    entries: list[object] = declared if isinstance(declared, list) else []
+    roots = [
+        root
+        for root in entries
+        if isinstance(root, str) and root not in ("", ".", "..") and "/" not in root
+    ]
+    shaped = isinstance(document, dict) and set(document) == {"nestedRoots"}
+    if not shaped or len(roots) != len(entries) or not isinstance(declared, list):
+        raise ValueError(f'{declaration} is not {{"nestedRoots": [<directory name>, ...]}}')
+    return roots
+
 
 #: A package is one this repository gates, which is what a `check` target means.
 CHECK_TARGET = re.compile(r"^check:", re.MULTILINE)
@@ -103,7 +135,7 @@ def gated_packages(repo: pathlib.Path) -> list[str]:
         by its name, rather than either by being added here.
     """
     found: list[str] = []
-    for root in PACKAGE_ROOTS:
+    for root in package_roots(repo):
         for makefile in sorted((repo / root).glob("*/Makefile")):
             if FLEET_SUITE.search(makefile.parent.name):
                 continue

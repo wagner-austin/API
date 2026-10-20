@@ -103,6 +103,32 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remot
     fi
 done
 
+# EVERY PUSH RUNS THE TESTS IT TOUCHES (MCPs board task a7416f6f), as MCPs'
+# own pre-push has since board task c04519f9: on 2026-09-28 a push of four
+# test files nobody had run left MCPs' main red for twelve hours, and until
+# this step a push here ran no test at all. For each pushed range, MCPs'
+# maketools pushed-venvs first builds the venv of every project the commits
+# touch that this tree lacks, from its own lock, since pushed-tests borrows
+# it; then pushed-tests runs, in a clean checkout of the tip, every test file
+# the commits add or change and the test beside every source file they
+# change, each with its project's own runner, and refuses the push naming
+# every failing case and every selected file that did not run. Which
+# directories hold this repository's projects is its own
+# scripts/make/project-roots.json, read from the tip. Both run as MCPs'
+# origin/main carries them (published_maketools.py), over the ranges
+# commit-tasks gets, with nothing that skips them.
+printf '%s\n' "$PUSH_INPUT" | while read -r _pt_local_ref pt_local_sha _pt_remote_ref pt_remote_sha; do
+    [ -z "$pt_local_sha" ] && continue
+    [ "$pt_local_sha" = "$ZERO" ] && continue
+    if [ "$pt_remote_sha" = "$ZERO" ]; then
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-venvs "$REPO" "$pt_local_sha" "^origin/main" < /dev/null
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-tests "$REPO" "$pt_local_sha" "$pt_local_sha" "^origin/main" < /dev/null
+    else
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-venvs "$REPO" "$pt_remote_sha..$pt_local_sha" < /dev/null
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-tests "$REPO" "$pt_local_sha" "$pt_remote_sha..$pt_local_sha" < /dev/null
+    fi
+done
+
 # The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
 # ran against, so a green `make check` in that package is evidence about
 # this invocation. The two branches are PLATFORM DETECTION, not a fallback:
