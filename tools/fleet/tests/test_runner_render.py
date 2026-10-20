@@ -264,6 +264,7 @@ class TestTheProvision:
             runner_cache_adopt.render_adopt_lines(spec),
             *(runner_render.render_install_lines(install) for install in spec["installs"]),
         )
+        assert lines[-1] == runner_render.FIRST_HYGIENE_PASS
 
     def test_a_manual_asset_appears_in_no_script(self, tmp_path: pathlib.Path) -> None:
         rendered = runner_render.render_provision(_two_repos(tmp_path))

@@ -88,6 +88,14 @@ SCRIPT_HEADER: Final = ("#!/usr/bin/env bash", "set -euo pipefail")
 CI_CLEAN_SERVICE_PATH: Final = "/etc/systemd/system/ci-clean.service"
 CI_CLEAN_TIMER_PATH: Final = "/etc/systemd/system/ci-clean.timer"
 
+#: The provision's last line: one hygiene pass, after every runner install,
+#: so the cache generations it reports exist. The timer alone left a host
+#: provisioned after 04:00 with no run for up to a day, and the runner host's
+#: suite holds each host to a successful run within 26 hours: lavender joined
+#: on 2026-10-19 and its first check failed on "ci-clean.timer has never
+#: fired". ``start`` waits for the oneshot, so a failed pass fails the provision.
+FIRST_HYGIENE_PASS: Final = "systemctl start ci-clean.service"
+
 
 class RenderedProvision(TypedDict):
     """Everything ``fleet-runners --render`` produces for one host.
@@ -305,6 +313,10 @@ def render_provision_script(spec: HostRunnerSpec, tokens: dict[str, str]) -> str
     for install in spec["installs"]:
         lines += render_install_lines(install)
         lines.append("")
+    lines += [
+        "# --- the first hygiene pass, run now rather than at the timer's next 04:00 ---",
+        FIRST_HYGIENE_PASS,
+    ]
     return "\n".join(lines) + "\n"
 
 
