@@ -16,6 +16,7 @@ from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_orphan_check
 from fleet.core.runner_reaper_render import REAPER_PATH
 from tests._audit_rows import run_rows
+from tests._host_bash import bash_path
 from tests._runner_fixtures import a_host, an_install
 
 #: The install every case audits.
@@ -53,7 +54,7 @@ def _row(tmp_path: pathlib.Path, minutes: int, reaper: str) -> str:
     [row] = run_rows(
         tmp_path,
         runner_orphan_check.render_orphan_check_lines(_host(minutes), INSTALL),
-        {REAPER_PATH: f'echo "$*" > "{tmp_path}/asked"\n{reaper}'},
+        {REAPER_PATH: f'echo "$*" > "{bash_path(tmp_path)}/asked"\n{reaper}'},
     )
     return row
 

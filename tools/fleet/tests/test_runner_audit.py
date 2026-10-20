@@ -23,6 +23,7 @@ from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
 from fleet.core.runner_reaper_render import REAPER_PATH
 from tests._audit_rows import run_rows
+from tests._host_bash import bash_path
 from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
@@ -42,6 +43,20 @@ _CLEAN: Mapping[str, str] = {
 }
 
 
+@pytest.fixture(name="base")
+def _base(tmp_path: pathlib.Path) -> str:
+    """The case's directory as the host's bash spells it.
+
+    Args:
+        tmp_path: The case's directory.
+
+    Returns:
+        :func:`tests._host_bash.bash_path` of it, the form every path in
+        the host and its rows takes.
+    """
+    return bash_path(tmp_path)
+
+
 def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
     """A host declaring every kind of row, its files laid out in ``tmp_path``.
 
@@ -53,22 +68,23 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
 
     Returns:
         One install with a GPU, one timer, a pinned jar and a writable
-        directory.
+        directory, every path spelled as the host's bash spells it.
     """
+    base = bash_path(tmp_path)
     root = tmp_path / "actions-runner-api-1"
     (root / "_work").mkdir(parents=True)
-    (root / ".path").write_text(f"{tmp_path / 'stand-ins'}:/usr/bin:/bin")
+    (root / ".path").write_text(f"{base}/stand-ins:/usr/bin:/bin")
     (tmp_path / "game-lib.jar").write_bytes(_JAR_BYTES)
     (tmp_path / "data").mkdir()
     install = an_install()
-    install["workdir"] = f"{root}/_work"
+    install["workdir"] = f"{base}/actions-runner-api-1/_work"
     return a_host(
         [install],
         gpu_required=True,
         systemd_timers=["ci-clean.timer"],
         assets=[
             FileAsset(
-                path=f"{tmp_path}/game-lib.jar",
+                path=f"{base}/game-lib.jar",
                 sha256=hashlib.sha256(_JAR_BYTES).hexdigest(),
                 writable=False,
                 reason="the provenance jar",
@@ -76,7 +92,7 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
                 provision_command=None,
             ),
             FileAsset(
-                path=f"{tmp_path}/data",
+                path=f"{base}/data",
                 sha256=None,
                 writable=True,
                 reason="checkpoint writes",
@@ -108,24 +124,24 @@ class TestExpectedChecks:
     """What the roster promises the script will report."""
 
     def test_every_declared_concept_yields_its_checks_in_order(
-        self, tmp_path: pathlib.Path
+        self, tmp_path: pathlib.Path, base: str
     ) -> None:
         ids = [check["check_id"] for check in runner_audit.expected_checks(_host(tmp_path))]
         assert ids == [
             "memory:31gb",
             "disk:/:ceiling-150gb:baseline-18gb@2026-10-20",
             "cache:/home/gharunner/.cache:ceiling-60gb",
-            f"cache:{tmp_path}/actions-runner-api-1/_work:ceiling-15gb",
+            f"cache:{base}/actions-runner-api-1/_work:ceiling-15gb",
             "gpu:wagner-austin/API:lavender",
             "timer:ci-clean.timer",
             "service:actions.runner.wagner-austin-API.lavender.service",
             "workdir:wagner-austin/API:lavender",
             "placement:wagner-austin/API:lavender",
             "orphans:wagner-austin/API:lavender",
-            f"asset:{tmp_path}/game-lib.jar",
-            f"sha256:{tmp_path}/game-lib.jar",
-            f"asset:{tmp_path}/data",
-            f"writable:{tmp_path}/data",
+            f"asset:{base}/game-lib.jar",
+            f"sha256:{base}/game-lib.jar",
+            f"asset:{base}/data",
+            f"writable:{base}/data",
         ]
 
     def test_undeclared_concepts_yield_no_checks(self) -> None:
@@ -212,12 +228,12 @@ class TestTheScriptRunsForReal:
             "DRIFT systemctl is-active said: inactive (exit 3)"
         )
 
-    def test_a_missing_work_tree_drifts(self, tmp_path: pathlib.Path) -> None:
+    def test_a_missing_work_tree_drifts(self, tmp_path: pathlib.Path, base: str) -> None:
         spec = _host(tmp_path)
         (tmp_path / "actions-runner-api-1" / "_work").rmdir()
         rows = _audit(spec, tmp_path)
         assert rows["workdir:wagner-austin/API:lavender"] == (
-            f"DRIFT test -d {tmp_path}/actions-runner-api-1/_work:  (exit 1)"
+            f"DRIFT test -d {base}/actions-runner-api-1/_work:  (exit 1)"
         )
 
     def test_an_unplaced_unit_and_a_leftover_drift(self, tmp_path: pathlib.Path) -> None:
@@ -232,34 +248,38 @@ class TestTheScriptRunsForReal:
         assert rows["orphans:wagner-austin/API:lavender"].endswith("the reaper counted: 2 (exit 0)")
 
     def test_a_missing_asset_drifts_on_presence_and_on_its_pin(
-        self, tmp_path: pathlib.Path
+        self, tmp_path: pathlib.Path, base: str
     ) -> None:
         spec = _host(tmp_path)
         (tmp_path / "game-lib.jar").unlink()
         rows = _audit(spec, tmp_path)
-        assert rows[f"asset:{tmp_path}/game-lib.jar"] == (
-            f"DRIFT test -e {tmp_path}/game-lib.jar:  (exit 1)"
+        assert rows[f"asset:{base}/game-lib.jar"] == (
+            f"DRIFT test -e {base}/game-lib.jar:  (exit 1)"
         )
-        assert rows[f"sha256:{tmp_path}/game-lib.jar"].startswith("DRIFT sha256sum said: ")
+        assert rows[f"sha256:{base}/game-lib.jar"].startswith("DRIFT sha256sum said: ")
 
-    def test_an_asset_of_other_bytes_drifts_on_its_pin(self, tmp_path: pathlib.Path) -> None:
+    def test_an_asset_of_other_bytes_drifts_on_its_pin(
+        self, tmp_path: pathlib.Path, base: str
+    ) -> None:
         spec = _host(tmp_path)
         (tmp_path / "game-lib.jar").write_bytes(b"another jar")
         rows = _audit(spec, tmp_path)
-        assert rows[f"asset:{tmp_path}/game-lib.jar"] == "OK"
-        assert rows[f"sha256:{tmp_path}/game-lib.jar"] == (
+        assert rows[f"asset:{base}/game-lib.jar"] == "OK"
+        assert rows[f"sha256:{base}/game-lib.jar"] == (
             f"DRIFT sha256sum said: {hashlib.sha256(b'another jar').hexdigest()}  "
-            f"{tmp_path}/game-lib.jar (exit 0)"
+            f"{base}/game-lib.jar (exit 0)"
         )
 
-    def test_an_asset_the_runner_account_cannot_write_drifts(self, tmp_path: pathlib.Path) -> None:
+    def test_an_asset_the_runner_account_cannot_write_drifts(
+        self, tmp_path: pathlib.Path, base: str
+    ) -> None:
         spec = _host(tmp_path)
         rows = _audit(spec, tmp_path, runuser='echo "$*" > "$(dirname "$0")/asked"; exit 1')
-        assert rows[f"writable:{tmp_path}/data"] == (
-            f"DRIFT test -w {tmp_path}/data as gharunner:  (exit 1)"
+        assert rows[f"writable:{base}/data"] == (
+            f"DRIFT test -w {base}/data as gharunner:  (exit 1)"
         )
         assert (tmp_path / "stand-ins" / "asked").read_text() == (
-            f"-u gharunner -- test -w {tmp_path}/data\n"
+            f"-u gharunner -- test -w {base}/data\n"
         )
 
     @pytest.mark.parametrize("bad", ["it's", 'say "hi"', "a\nb", "tick`", "dollar$"])

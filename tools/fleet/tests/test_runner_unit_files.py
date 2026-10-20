@@ -17,7 +17,7 @@ from fleet.core.runner_unit_files import (
     render_drop_in_lines,
     render_unit_file_lines,
 )
-from tests._host_bash import host_bash
+from tests._host_bash import bash_path, host_bash
 from tests._runner_fixtures import an_install
 
 #: A unit body with the shapes a real one carries: a section, directives and
@@ -63,7 +63,8 @@ def test_an_absent_unit_is_written_byte_for_byte_and_systemd_reloaded(
     tmp_path: pathlib.Path,
 ) -> None:
     path = tmp_path / "etc" / "unit.d" / "fleet.conf"
-    out, calls = _run(tmp_path, render_unit_file_lines(str(path), BODY, announcement="set"))
+    spelled = f"{bash_path(tmp_path)}/etc/unit.d/fleet.conf"
+    out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
     assert path.read_text(encoding="utf-8") == BODY
     assert (out, calls) == ("set\n", ["daemon-reload"])
 
@@ -71,14 +72,16 @@ def test_an_absent_unit_is_written_byte_for_byte_and_systemd_reloaded(
 def test_a_unit_holding_the_body_already_is_left_alone(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "unit.conf"
     path.write_text(BODY, encoding="utf-8")
-    out, calls = _run(tmp_path, render_unit_file_lines(str(path), BODY, announcement="set"))
+    spelled = f"{bash_path(tmp_path)}/unit.conf"
+    out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
     assert (out, calls) == ("", [])
 
 
 def test_a_unit_holding_other_text_is_rewritten(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "unit.conf"
     path.write_text("[Service]\nKillMode=control-group\n", encoding="utf-8")
-    out, calls = _run(tmp_path, render_unit_file_lines(str(path), BODY, announcement="set"))
+    spelled = f"{bash_path(tmp_path)}/unit.conf"
+    out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
     assert path.read_text(encoding="utf-8") == BODY
     assert (out, calls) == ("set\n", ["daemon-reload"])
 

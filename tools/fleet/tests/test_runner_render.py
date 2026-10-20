@@ -27,6 +27,7 @@ from fleet.core import (
     runner_slice_render,
 )
 from fleet.core.runner_unit_files import render_unit_file_lines
+from tests._host_bash import bash_path
 from tests._runner_fixtures import a_host, an_install
 from tests._stand_ins import run_with_stand_ins
 
@@ -45,7 +46,7 @@ def _recording(tmp_path: pathlib.Path, name: str, then: str = "exit 0") -> str:
     Returns:
         The body.
     """
-    return f'echo "{name} $*" >> "{tmp_path}/asked"\n{then}'
+    return f'echo "{name} $*" >> "{bash_path(tmp_path)}/asked"\n{then}'
 
 
 def _asked(tmp_path: pathlib.Path) -> list[str]:
@@ -66,12 +67,13 @@ def _assets(tmp_path: pathlib.Path) -> list[FileAsset]:
 
     Args:
         tmp_path: The case's directory, which the fetchable and writable
-            assets live under.
+            assets live under, spelled as the host's bash spells it.
 
     Returns:
         A manual jar, a fetchable converter and a writable directory.
     """
-    converter = tmp_path / "convert.py"
+    base = bash_path(tmp_path)
+    converter = f"{base}/convert.py"
     return [
         FileAsset(
             path="/opt/corvis/rw-game/game-lib.jar",
@@ -82,15 +84,15 @@ def _assets(tmp_path: pathlib.Path) -> list[FileAsset]:
             provision_command=None,
         ),
         FileAsset(
-            path=str(converter),
+            path=converter,
             sha256=None,
             writable=False,
             reason="the GGUF converter",
             manual=False,
-            provision_command=f"echo fetched >> '{tmp_path}/asked'; touch '{converter}'",
+            provision_command=f"echo fetched >> '{base}/asked'; touch '{converter}'",
         ),
         FileAsset(
-            path=str(tmp_path / "data"),
+            path=f"{base}/data",
             sha256=None,
             writable=True,
             reason="checkpoint writes",
@@ -142,7 +144,9 @@ class TestTheBase:
         commands["id"] = "exit 1"
         ran = run_with_stand_ins(
             tmp_path,
-            script.replace(runner_render.REBOOT_REQUIRED_PATH, str(flag)).splitlines(),
+            script.replace(
+                runner_render.REBOOT_REQUIRED_PATH, f"{bash_path(tmp_path)}/reboot-required"
+            ).splitlines(),
             {**commands, **answers},
             options=(),
         )
@@ -282,7 +286,7 @@ class TestTheAssetLines:
         )
         assert ran.returncode == 0, ran.stderr
         assert (tmp_path / "data").is_dir()
-        assert _asked(tmp_path) == [f"chown gharunner:gharunner {tmp_path}/data"]
+        assert _asked(tmp_path) == [f"chown gharunner:gharunner {bash_path(tmp_path)}/data"]
 
     def test_a_fetchable_asset_is_fetched_once_over_two_runs(self, tmp_path: pathlib.Path) -> None:
         lines = runner_render.render_asset_lines(_assets(tmp_path)[1])
@@ -311,7 +315,7 @@ class TestTheInstallLines:
             The install.
         """
         install = an_install()
-        install["workdir"] = f"{tmp_path}/runner/_work"
+        install["workdir"] = f"{bash_path(tmp_path)}/runner/_work"
         (tmp_path / "runner").mkdir()
         return install
 
@@ -341,8 +345,8 @@ class TestTheInstallLines:
         )
         assert ran.returncode == 0, ran.stderr
         assert _asked(tmp_path) == [
-            f"runuser -u gharunner -- bash -c cd '{tmp_path}/runner' && ./config.sh --unattended "
-            '--url https://github.com/wagner-austin/API --token "TOK" --name lavender '
+            f"runuser -u gharunner -- bash -c cd '{bash_path(tmp_path)}/runner' && ./config.sh "
+            '--unattended --url https://github.com/wagner-austin/API --token "TOK" --name lavender '
             "--labels lavender --replace"
         ]
 
