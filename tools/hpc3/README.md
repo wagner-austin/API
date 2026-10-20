@@ -342,7 +342,8 @@ indexed from the [images-and-staging hub](wiki/hubs/images-and-staging.md).
 | `2` | it **refused**; nothing was submitted, staged or run |
 
 A refusal prints one line to stderr carrying its error code. Exactly one
-place translates — `cli/_fatal.py`, at the process boundary — and it is
+place translates — `platform_core.cli_boundary.run_cli`, at the process
+boundary, which every console script in the monorepo shares — and it is
 **typed**, not an `except Exception`. Anything else propagates with its
 traceback intact, because anything else is a defect in this package rather
 than a refusal by it, and a defect that prints one tidy line is a defect

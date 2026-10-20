@@ -46,7 +46,7 @@ from hpc3.cli import _test_hooks
 
 CLI_DIR = pathlib.Path(__file__).resolve().parents[1] / "src" / "hpc3" / "cli"
 
-#: What a command exits with when it refuses -- ``_fatal.EXIT_REFUSED``. Run
+#: What a command exits with when it refuses -- ``cli_boundary.EXIT_REFUSED``. Run
 #: with no arguments, every command here is missing a required flag, raises
 #: ValueError, and that is translated to this status.
 EXIT_REFUSED = 2
@@ -106,7 +106,7 @@ def test_running_a_command_as_a_module_reaches_its_entry_point(
     """Run each command through ``runpy`` exactly as ``python -m`` does.
 
     Given no arguments every command here lacks a required flag, so it raises
-    ValueError, ``_fatal.run`` translates that to :data:`EXIT_REFUSED`, and
+    ValueError, ``run_cli`` translates that to :data:`EXIT_REFUSED`, and
     ``entrypoint`` raises SystemExit carrying it. Reaching that status proves
     the whole chain ran: guard, entry point, main, and the typed translator.
 

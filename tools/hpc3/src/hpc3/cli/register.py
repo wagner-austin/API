@@ -45,9 +45,10 @@ from collections.abc import Sequence
 from typing import Final
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import require_project
 
-from hpc3.cli import _fatal, _register_flags, _test_hooks
+from hpc3.cli import _register_flags, _test_hooks
 from hpc3.cli._paths import index_path, runs_directory
 from hpc3.clusters import require_cluster
 from hpc3.contracts.cluster import require_partition
@@ -184,7 +185,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(_fatal.run(main))
+    raise SystemExit(run_cli(main, emit=_test_hooks.emit, emit_error=_test_hooks.emit_error))
 
 
 __all__ = ["FLAGS", "entrypoint", "main"]

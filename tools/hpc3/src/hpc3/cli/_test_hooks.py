@@ -15,33 +15,11 @@ from __future__ import annotations
 
 import datetime
 import pathlib
-import sys
 import time
 from collections.abc import Callable
 
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
-
-
-def _default_emit(line: str) -> None:
-    """Write one report line to stdout.
-
-    Args:
-        line: Line to write, without a trailing newline.
-    """
-    sys.stdout.write(line + "\n")
-
-
-def _default_emit_error(line: str) -> None:
-    """Write one refusal line to stderr.
-
-    Separate stream from :func:`_default_emit` so a command's report can be
-    piped or redirected while its refusals still reach the operator, and so
-    a refusal never lands in a file something else will parse as output.
-
-    Args:
-        line: Line to write, without a trailing newline.
-    """
-    sys.stderr.write(line + "\n")
+from platform_core.report_line import EmitProtocol, emit_error_line, emit_line
 
 
 def _default_now_iso() -> str:
@@ -75,8 +53,10 @@ def _default_monorepo_root() -> pathlib.Path:
     return pathlib.Path(__file__).resolve().parents[5]
 
 
-emit: Callable[[str], None] = _default_emit
-emit_error: Callable[[str], None] = _default_emit_error
+#: The report stream and the refusal stream, kept apart so a command's report
+#: can be piped or redirected while its refusals still reach the operator.
+emit: EmitProtocol = emit_line
+emit_error: EmitProtocol = emit_error_line
 now_iso: Callable[[], str] = _default_now_iso
 sleep: Callable[[float], None] = _default_sleep
 #: The MCP poster the submitter lookup asks the taskboard through: the same
@@ -93,8 +73,8 @@ monorepo_root: Callable[[], pathlib.Path] = _default_monorepo_root
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
     global emit, emit_error, now_iso, sleep, http_post, monorepo_root
-    emit = _default_emit
-    emit_error = _default_emit_error
+    emit = emit_line
+    emit_error = emit_error_line
     now_iso = _default_now_iso
     sleep = _default_sleep
     http_post = urllib_mcp_post

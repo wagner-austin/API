@@ -37,8 +37,9 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 
-from hpc3.cli import _config, _fatal, _test_hooks
+from hpc3.cli import _config, _test_hooks
 from hpc3.core import audit
 from hpc3.core.bootstrap import CONDA_MODULE, bootstrap_environment
 
@@ -104,7 +105,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(_fatal.run(main))
+    raise SystemExit(run_cli(main, emit=_test_hooks.emit, emit_error=_test_hooks.emit_error))
 
 
 __all__ = ["entrypoint", "main"]

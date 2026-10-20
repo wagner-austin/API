@@ -20,7 +20,9 @@ import sys
 from collections.abc import Sequence
 from typing import Final
 
-from hpc3.cli import _fatal
+from platform_core.cli_boundary import run_cli
+
+from hpc3.cli import _test_hooks
 from hpc3.cli._paths import index_path, runs_directory
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.registry import declared_projects, read_document
@@ -152,14 +154,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 def entrypoint() -> None:
     """Console-script entry point.
 
-    Refusals travel through ``_fatal.run`` like every other command here, so
-    a ValueError becomes EXIT_REFUSED with its message on stderr rather than
-    a traceback.
+    Refusals travel through :func:`platform_core.cli_boundary.run_cli` like
+    every other command here, so a ValueError becomes EXIT_REFUSED with its
+    message on stderr rather than a traceback.
 
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(_fatal.run(main))
+    raise SystemExit(run_cli(main, emit=_test_hooks.emit, emit_error=_test_hooks.emit_error))
 
 
 __all__ = [

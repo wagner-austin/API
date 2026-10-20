@@ -37,10 +37,11 @@ import sys
 from collections.abc import Sequence
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import qualified_name
 from platform_core.json_utils import load_json_str
 
-from hpc3.cli import _fatal, _test_hooks
+from hpc3.cli import _test_hooks
 from hpc3.contracts.image_spec import decode_image_spec
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.image_build import render_build_script
@@ -183,7 +184,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(_fatal.run(main))
+    raise SystemExit(run_cli(main, emit=_test_hooks.emit, emit_error=_test_hooks.emit_error))
 
 
 __all__ = ["BUILD_SCRIPT_NAME", "entrypoint", "main", "require_build_name"]
