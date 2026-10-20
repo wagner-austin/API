@@ -32,10 +32,11 @@ and this runner re-checks before the value lands in an argv element,
 because the runner is the layer nearest the machine and the one that
 cannot assume the other two were consulted.
 
-FIVE SESSION VERBS, ONE TABLE (MCPs migs 507, 525, 526 and 564). Restart,
-revive, the two kills (``kill-session`` and ``kill-session-hard``, board
-task 660964d9) and the compact (``compact-session``, board task 01f31e4a)
-each map to exactly one session-audit invocation through
+THE SESSION VERBS, ONE TABLE (MCPs migs 507, 525, 526, 564 and 826).
+Restart, revive, the two kills (``kill-session`` and ``kill-session-hard``,
+board task 660964d9), the compact (``compact-session``, board task
+01f31e4a), the approved exit and the move (``move-session``, board task
+4c26ab11) each map to exactly one session-audit invocation through
 :func:`session_invocation`, so the runner has one job path for all of them
 and no verb can reach an invocation another verb owns. The hard kill is its
 own verb on the queue and its own ``--hard`` flag here: nothing in this
@@ -94,8 +95,11 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: ``compact-session`` (board task 01f31e4a) shrinks a working session that
 #: got too big, the operator's "/compact if they get too big", never an
 #: exit. ``exit-session`` (MCPs board task 5aa8ed06) is a session's own exit,
-#: approved by its room's supervisor. The words are the queue's own
-#: :class:`DispatchCommand` members, so one vocabulary names them.
+#: approved by its room's supervisor. ``move-session`` (MCPs mig 826, board
+#: task 4c26ab11) restarts a session stopped at its subscription's usage
+#: limit through the account launcher, which leases another account. The
+#: words are the queue's own :class:`DispatchCommand` members, so one
+#: vocabulary names them.
 SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.RESTART_SESSION,
     DispatchCommand.REVIVE_SESSION,
@@ -103,6 +107,7 @@ SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.KILL_SESSION_HARD,
     DispatchCommand.COMPACT_SESSION,
     DispatchCommand.EXIT_SESSION,
+    DispatchCommand.MOVE_SESSION,
 )
 
 #: Detail prefix for a command this module has no invocation for.
@@ -300,6 +305,40 @@ def compact_argv(
     )
 
 
+def move_argv(
+    release_root: pathlib.Path,
+    registry_dir: str,
+    host: str,
+    session_target: str,
+    requested_by: str,
+) -> tuple[str, ...]:
+    """Compose the session-audit invocation for one move job.
+
+    Args:
+        release_root: The verified release's checkout.
+        registry_dir: The release's register.
+        host: The node the session runs on.
+        session_target: The session UUID (already grammar-checked).
+        requested_by: The label that enqueued the move (already
+            grammar-checked), named in the line session-audit types into the
+            moved session.
+
+    Returns:
+        The argv: ``session-audit move --session <uuid> --requested-by
+        <label>`` through :func:`session_audit_argv`.
+    """
+    return session_audit_argv(
+        release_root,
+        registry_dir,
+        host,
+        "move",
+        "--session",
+        session_target,
+        "--requested-by",
+        requested_by,
+    )
+
+
 class SessionInvocation(TypedDict):
     """What one session verb runs.
 
@@ -409,6 +448,15 @@ def session_invocation(
             release=release_id,
             revision=revision,
         )
+    if command is DispatchCommand.MOVE_SESSION:
+        return SessionInvocation(
+            verb="move",
+            mode="move",
+            argv=move_argv(root, registry_dir, host, session_target, requested_by),
+            types_requester=True,
+            release=release_id,
+            revision=revision,
+        )
     raise ValueError(f"{COMMAND_UNKNOWN_CODE}: {command.value!r} is not a session verb")
 
 
@@ -469,7 +517,7 @@ def run_session_job(invocation: SessionInvocation) -> CommandResult:
 
     Returns:
         The invocation's exit status and captured streams. Exit 0 means the
-        verb did what it names (RESTARTED, REVIVED, ENDED, COMPACTED); anything else
+        verb did what it names (RESTARTED, REVIVED, ENDED, COMPACTED, MOVED); anything else
         means it did not, and the stdout tail carries session-audit's own
         outcome line saying why. After :const:`SESSION_JOB_TIMEOUT_SECONDS`
         it is the timed-out result.
@@ -488,7 +536,7 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
     Args:
         result: The invocation's outcome.
         invocation: What ran: its session-audit mode (``rollover``,
-            ``revive``, ``kill`` or ``compact``), named so the reader knows which outcome
+            ``revive``, ``kill``, ``compact`` or ``move``), named so the reader knows which outcome
             block the tail carries, and the sealed release and revision it
             ran from, so a closure can show its fix was the code that acted.
 
@@ -496,7 +544,8 @@ def describe_result(result: CommandResult, invocation: SessionInvocation) -> str
         The mode, the release, its revision, the exit code and the tail of the combined
         output -- the tail, because session-audit prints its outcome block
         (``ROLLOVER APPLIED`` with one line per session, ``REVIVE -
-        <OUTCOME>``, ``KILL - <OUTCOME>`` or ``COMPACT - <OUTCOME>``) last.
+        <OUTCOME>``, ``KILL - <OUTCOME>``, ``COMPACT - <OUTCOME>`` or ``MOVE -
+        <OUTCOME>``) last.
     """
     combined = (result["stdout"] + result["stderr"]).strip()
     tail = combined[-DETAIL_TAIL_CHARS:]
@@ -521,6 +570,7 @@ __all__ = [
     "compact_argv",
     "describe_result",
     "kill_argv",
+    "move_argv",
     "refusal_for",
     "requester_refusal",
     "restart_argv",

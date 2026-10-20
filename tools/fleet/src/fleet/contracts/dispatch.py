@@ -81,6 +81,10 @@ class DispatchCommand(StrEnum):
     # performs it exactly as a graceful kill; the verb is what tells the
     # ledger the session ended itself rather than being ended.
     EXIT_SESSION = "exit-session"
+    # MCPs mig 826, board task 4c26ab11: a session stopped at its
+    # subscription's usage limit, restarted in its pane through the account
+    # launcher, which leases the account with the most headroom.
+    MOVE_SESSION = "move-session"
     # MCPs board task bea0264b: arm one machine of the roster to network-boot
     # the installer, run by the machine holding the netboot duty. Decoded
     # here before the queue admits one, since a command this reader does not

@@ -366,6 +366,34 @@ class TestRestartLane:
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"{opening('compact', 0)} {line.strip()}"
 
+    def test_a_claimed_move_runs_session_audits_move_mode_and_closes_with_its_line(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs mig 826, board task 4c26ab11: the move rides the one session
+        job path, runs ``session-audit move`` with the submitter, and the
+        closing detail carries the executor's outcome line."""
+        release = plant_release(tmp_path)
+        line = f"MOVE - MOVED session {TARGET}: restarted through the account launcher\n"
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), *UNROLLED_TICK])
+        _test_hooks.run = runner
+        endpoint = ran_queue("move-session", "passed")
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(agent_argv(config_path, repo)) == 0
+
+        assert runner.calls == [
+            verify_call(tmp_path),
+            restart.move_argv(
+                release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
+            ),
+            *unrolled_calls(repo),
+        ]
+        assert endpoint.arguments[1]["runId"] == f"move-{DEFAULT_JOB_ID}"
+        closed = endpoint.arguments[2]
+        assert closed["status"] == "passed"
+        detail = narrow_json_to_str(closed["detail"])
+        assert detail == f"{opening('move', 0)} {line.strip()}"
+
     def test_an_approved_exit_runs_the_graceful_kill_under_its_own_run_verb(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:

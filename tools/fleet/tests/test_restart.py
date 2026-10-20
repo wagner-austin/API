@@ -80,6 +80,20 @@ class TestRestartArgv:
             DispatchCommand.KILL_SESSION_HARD,
             DispatchCommand.COMPACT_SESSION,
             DispatchCommand.EXIT_SESSION,
+            DispatchCommand.MOVE_SESSION,
+        )
+
+    def test_composes_the_exact_move_invocation(self) -> None:
+        """MCPs mig 826, board task 4c26ab11: the move carries the submitter,
+        which session-audit names in the line it types into the moved session."""
+        assert restart.move_argv(ROOT, REGISTRY, HOST, TARGET, "pcsession-observer") == (
+            *PREFIX,
+            "move",
+            "--session",
+            TARGET,
+            "--requested-by",
+            "pcsession-observer",
+            *SUFFIX,
         )
 
     def test_composes_the_exact_compact_invocation(self) -> None:
@@ -163,6 +177,15 @@ class TestRestartArgv:
             "verb": "exit",
             "mode": "kill",
             "argv": restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
+            "types_requester": True,
+            **sealed,
+        }
+        assert restart.session_invocation(
+            RELEASE, DispatchCommand.MOVE_SESSION, TARGET, label, HOST
+        ) == {
+            "verb": "move",
+            "mode": "move",
+            "argv": restart.move_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
