@@ -13,28 +13,24 @@ owner/repo --host lavender`` does, in order:
   2. MINTS the registration token itself (``gh api``, through the command
      hook) -- tokens expire hourly, so any flow that asks a human to paste
      one has already lost the idiot-proofing race.
-  3. DERIVES the install entries from the fleet's own measured convention
-     (one WSL install named/labelled ``lavender-wsl`` in
-     ``/home/gharunner/actions-runner-<repo>-1``, one Windows install
-     named/labelled ``lavender`` in ``C:/actions-runner-<repo>`` -- the
-     layout every existing repo on the box already follows).
-  4. PROVISIONS both sides by render-send-run: the same install renderers
-     ``--render`` uses, sent as files and executed by path, because every
-     inline-quoting shortcut tried on this fleet has been defeated by the
-     ssh->cmd->powershell->wsl->bash gauntlet -- twice on the night this
-     module was written.
-  5. REWRITES the roster in the same act, so the audit and the load
-     sampler cover the new installs from birth rather than after somebody
-     remembers.
+  3. DERIVES the install entry from the fleet's convention: one runner
+     named and labelled after the host, in
+     ``/home/<runner account>/actions-runner-<repo>-1``, so a workflow
+     targets the host's label and the directory says whose runner it is.
+  4. PROVISIONS by re-running the host's whole provision
+     (:func:`fleet.core.runner_render.render_provision_script`) over the
+     roster with the new install in it, sent as a file and run as root.
+     Every step is idempotent, and the host-wide units that list every
+     install pick the new one up in the same run.
+  5. REWRITES the roster in the same act (the caller, from the mutated
+     host entry), so the audit and the load sampler cover the new install
+     from birth rather than after somebody remembers.
   6. AUDITS the host as verification and returns the findings -- onboarding
-     is not done when the scripts exit; it is done when the audit says the
-     services are running.
+     is not done when the script exits; it is done when the audit says the
+     service is running.
 
 Nothing here is optional and nothing falls back: a failure at any step
-raises with a typed code and the steps already taken stand (a registered
-runner with no roster entry is exactly what step 5 exists to prevent, so
-step 5 failing after step 4 is a loud error naming the repair, not a
-shrug).
+raises with a typed code and the steps already taken stand.
 """
 
 from __future__ import annotations
@@ -42,18 +38,11 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import (
-    remote,
-    runner_audit,
-    runner_distro,
-    runner_render,
-    runner_windows_provision,
-)
+from fleet.core import remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
 from fleet.core.runner_github import mint_registration_token
-from fleet.core.runner_install import token_variable
+from fleet.core.runner_install import RUNNER_ACCOUNT, payload_path
 
 
 class OnboardPlan(TypedDict):
@@ -61,12 +50,12 @@ class OnboardPlan(TypedDict):
 
     Attributes:
         repo: The repository, ``owner/name``.
-        installs: The install entries that will be provisioned and added to
-            the roster, derived from the fleet's naming convention.
+        install: The install that will be provisioned and added to the
+            roster, derived from the fleet's naming convention.
     """
 
     repo: str
-    installs: list[RunnerInstall]
+    install: RunnerInstall
 
 
 def _repo_slug(repo: str) -> str:
@@ -76,30 +65,18 @@ def _repo_slug(repo: str) -> str:
         repo: The repository, ``owner/name``.
 
     Returns:
-        The name half, lowercased -- matching the measured convention
-        (``actions-runner-treebot-1`` came from a hand-rolled variation;
-        the convention this module enforces keeps the name verbatim, so
-        the directory always answers "whose runner is this" by itself.
+        The name half, lowercased, so the directory answers "whose runner is
+        this" by itself.
     """
     return repo.split("/")[1].lower()
 
 
-def plan_onboard(
-    spec: HostRunnerSpec,
-    repo: str,
-    *,
-    sides: tuple[str, ...],
-    python_versions: tuple[str, ...],
-) -> OnboardPlan:
-    """The installs onboarding will create, per the fleet convention.
+def plan_onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
+    """The install onboarding will create, per the fleet convention.
 
     Args:
         spec: The target host's roster entry.
         repo: The repository, ``owner/name``.
-        sides: Which environments to provision, from {"wsl", "windows"}.
-        python_versions: Exact Python versions the Windows install's tool
-            cache is seeded with, recorded on that install so a rebuild
-            seeds the same ones; empty for none.
 
     Returns:
         The plan.
@@ -109,17 +86,11 @@ def plan_onboard(
             carries any install for this repo on this host. The roster is
             the memory; a second registration would be a duplicate runner,
             not a refresh.
-        ValueError: On an empty or unknown ``sides`` entry, or a repo that
-            is not ``owner/name`` -- refused here rather than downstream so
-            the message names the flag to fix.
+        ValueError: On a repo that is not ``owner/name`` -- refused here
+            rather than downstream so the message names the flag to fix.
     """
     if repo.count("/") != 1 or not all(repo.split("/")):
         raise ValueError(f"--onboard takes owner/repo, got {repo!r}")
-    if not sides:
-        raise ValueError("sides must name at least one of wsl, windows")
-    for side in sides:
-        if side not in ("wsl", "windows"):
-            raise ValueError(f"unknown side {side!r}; sides are wsl and windows")
     existing = [i for i in spec["installs"] if i["repo"] == repo]
     if existing:
         names = ", ".join(i["runner_name"] for i in existing)
@@ -130,143 +101,57 @@ def plan_onboard(
             "run the audit; if the goal is removal, that is a deliberate act this "
             "command does not perform.",
         )
-    slug = _repo_slug(repo)
-    owner_dashed = repo.replace("/", "-")
-    installs: list[RunnerInstall] = []
-    if "wsl" in sides:
-        installs.append(
-            RunnerInstall(
-                repo=repo,
-                runner_name="lavender-wsl",
-                side="wsl",
-                service=f"actions.runner.{owner_dashed}.lavender-wsl.service",
-                workdir=f"/home/gharunner/actions-runner-{slug}-1/_work",
-                labels=["lavender-wsl"],
-                python_toolcache=[],
-            )
-        )
-    if "windows" in sides:
-        installs.append(
-            RunnerInstall(
-                repo=repo,
-                runner_name="lavender",
-                side="windows",
-                service=f"actions.runner.{owner_dashed}.lavender",
-                workdir=f"C:/actions-runner-{slug}/_work",
-                labels=["lavender"],
-                python_toolcache=list(python_versions),
-            )
-        )
-    return OnboardPlan(repo=repo, installs=installs)
-
-
-def _provision_wsl(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> None:
-    """Provision one WSL-side install on the host.
-
-    The bash payload is sent as a file and executed by path
-    (:func:`fleet.core.runner_distro.run_distro_script`); the token is
-    injected as the payload's own environment variable line rather than a
-    command-line argument, so it never crosses a shell boundary unquoted.
-
-    Args:
-        spec: The host.
-        install: The install, ``side`` ``"wsl"``.
-        token: The registration token.
-
-    Raises:
-        AppError: ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            remote layer -- config.sh refusing (already configured, expired
-            token) surfaces as the latter with the script's own stderr.
-    """
-    token_var = token_variable(install["repo"])
-    payload = "\n".join(
-        [
-            "#!/usr/bin/env bash",
-            "set -euo pipefail",
-            f"export {token_var}='{token}'",
-            *runner_render.render_wsl_install_lines(install),
-        ]
+    name = spec["name"]
+    install = RunnerInstall(
+        repo=repo,
+        runner_name=name,
+        service=f"actions.runner.{repo.replace('/', '-')}.{name}.service",
+        workdir=f"/home/{RUNNER_ACCOUNT}/actions-runner-{_repo_slug(repo)}-1/_work",
+        labels=[name],
     )
-    runner_distro.run_distro_script(
-        spec,
-        f"fleet-onboard-{_repo_slug(install['repo'])}",
-        payload,
-        timeout_seconds=remote.SSH_TIMEOUT_SECONDS,
-    )
+    return OnboardPlan(repo=repo, install=install)
 
 
-def _provision_windows(spec: HostRunnerSpec, install: RunnerInstall, token: str) -> None:
-    """Provision one Windows-side install on the host.
-
-    Args:
-        spec: The host.
-        install: The install, ``side`` ``"windows"``; its
-            ``python_toolcache`` versions are seeded so setup-python finds
-            instead of installing.
-        token: The registration token.
-
-    Raises:
-        AppError: ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            remote layer.
-    """
-    remote.run_script(
-        spec["host"],
-        f"{spec['scratch_dir']}/fleet-onboard-{_repo_slug(install['repo'])}-win.ps1",
-        runner_windows_provision.render_windows_onboard_script(
-            install, {token_variable(install["repo"]): token}
-        ),
-        platform=NodePlatform.WINDOWS,
-    )
-
-
-def onboard(
-    spec: HostRunnerSpec,
-    repo: str,
-    *,
-    sides: tuple[str, ...],
-    python_versions: tuple[str, ...] = (),
-) -> tuple[OnboardPlan, list[AuditFinding]]:
+def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFinding]]:
     """Onboard one repository onto one host, end to end.
 
     Args:
-        spec: The target host's roster entry. MUTATED: the plan's installs
-            are appended, so the caller's subsequent roster write and audit
-            see the new state -- the whole point of onboarding being one
-            act.
+        spec: The target host's roster entry. MUTATED: the plan's install is
+            appended before the provision runs, because the provision is
+            rendered from the roster, and the caller's roster write and the
+            audit then see the new state -- the whole point of onboarding
+            being one act.
         repo: The repository, ``owner/name``.
-        sides: Which environments to provision.
-        python_versions: Exact Python versions to seed into the Windows
-            install's tool cache. Required knowledge for any repo whose
-            Windows jobs run setup-python -- the install path it falls back
-            to needs registry rights the runner service does not have.
 
     Returns:
         The executed plan and the post-onboarding audit findings for the
-        host, new installs included.
+        host, the new install included.
 
     Raises:
         AppError: ``RUNNER_ALREADY_ONBOARDED``,
             ``RUNNER_TOKEN_UNAVAILABLE``, ``NODE_UNREACHABLE``,
             ``DISPATCH_FAILED`` or ``RUNNER_AUDIT_UNPARSABLE`` as the
-            steps describe.
+            steps describe; config.sh refusing (an expired token) surfaces
+            as ``DISPATCH_FAILED`` with the script's own stderr.
         ValueError: From the planner's flag validation.
     """
-    plan = plan_onboard(spec, repo, sides=sides, python_versions=python_versions)
+    plan = plan_onboard(spec, repo)
     token = mint_registration_token(repo)
-    for install in plan["installs"]:
-        if install["side"] == "wsl":
-            _provision_wsl(spec, install, token)
-        else:
-            _provision_windows(spec, install, token)
-    spec["installs"].extend(plan["installs"])
+    spec["installs"].append(plan["install"])
+    remote.run_root_script(
+        spec["host"],
+        payload_path(spec, f"fleet-onboard-{_repo_slug(repo)}"),
+        runner_render.render_provision_script(spec, {repo: token}),
+        timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
+    )
     outcome = runner_audit.attempt_audit_host(spec)
     findings = outcome["findings"]
     if findings is None:
         raise AppError(
             FleetErrorCode.NODE_UNREACHABLE,
             f"post-onboard audit could not reach {spec['name']}: {outcome['reason']}. "
-            "The runners were provisioned and the roster entries are staged; re-run "
-            "the audit before trusting either.",
+            "The runner was provisioned and its roster entry is staged; re-run the "
+            "audit before trusting either.",
         )
     return plan, findings
 

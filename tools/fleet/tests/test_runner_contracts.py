@@ -44,12 +44,10 @@ def _install(**overrides: JSONValue) -> dict[str, JSONValue]:
     """
     raw: dict[str, JSONValue] = {
         "repo": "wagner-austin/API",
-        "runner_name": "lavender-wsl",
-        "side": "wsl",
-        "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
+        "runner_name": "lavender",
+        "service": "actions.runner.wagner-austin-API.lavender.service",
         "workdir": "/home/gharunner/actions-runner-api-1/_work",
-        "labels": ["lavender-wsl"],
-        "python_toolcache": [],
+        "labels": ["lavender"],
     }
     raw.update(overrides)
     return raw
@@ -88,10 +86,8 @@ def _host(**overrides: JSONValue) -> dict[str, JSONValue]:
     raw: dict[str, JSONValue] = {
         "name": "lavender",
         "host": "lavender",
-        "wsl_distro": "Ubuntu",
-        "keepalive_task": "wsl-keepalive",
-        "wslconfig_min_memory_gb": 26,
-        "scratch_dir": "C:/fleet/stage",
+        "memory_gb": 31,
+        "payload_dir": "/home/corvis/fleet/runner-payloads",
         "gpu_required": True,
         "systemd_timers": ["ci-clean.timer"],
         "job_timeout_minutes": 360,
@@ -109,8 +105,13 @@ class TestRunnerInstall:
 
     def test_a_valid_install_round_trips(self) -> None:
         decoded: RunnerInstall = decode_runner_install(_install())
-        assert decoded["repo"] == "wagner-austin/API"
-        assert decoded["labels"] == ["lavender-wsl"]
+        assert decoded == RunnerInstall(
+            repo="wagner-austin/API",
+            runner_name="lavender",
+            service="actions.runner.wagner-austin-API.lavender.service",
+            workdir="/home/gharunner/actions-runner-api-1/_work",
+            labels=["lavender"],
+        )
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):
@@ -125,55 +126,20 @@ class TestRunnerInstall:
         with pytest.raises(JSONTypeError, match="unreachable"):
             decode_runner_install(_install(labels=[]))
 
-    def test_a_windows_install_round_trips(self) -> None:
-        decoded = decode_runner_install(
-            _install(
-                side="windows",
-                runner_name="lavender",
-                service="actions.runner.wagner-austin-API.lavender",
-                workdir="C:/actions-runner-api/_work",
-                labels=["lavender"],
-            )
+    @pytest.mark.parametrize("workdir", ["C:/actions-runner/_work", "actions-runner/_work", ""])
+    def test_a_workdir_that_is_not_an_absolute_posix_path_is_refused(self, workdir: str) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_runner_install(_install(workdir=workdir))
+        assert str(refused.value) == (
+            f"an install's workdir must be an absolute POSIX path, got {workdir!r}"
         )
-        assert decoded["side"] == "windows"
 
-    @pytest.mark.parametrize("side", ["linux", "host", ""])
-    def test_an_unknown_side_is_refused(self, side: str) -> None:
-        with pytest.raises(JSONTypeError, match="must be 'wsl' or 'windows'"):
-            decode_runner_install(_install(side=side))
-
-    def test_a_wsl_install_with_a_windows_workdir_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="absolute POSIX path"):
-            decode_runner_install(_install(workdir="C:/actions-runner/_work"))
-
-    def test_a_windows_install_with_a_posix_workdir_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="drive-letter path"):
-            decode_runner_install(_install(side="windows"))
-
-    def test_a_windows_install_keeps_its_exact_toolcache_seeds(self) -> None:
-        decoded = decode_runner_install(
-            _install(
-                side="windows",
-                workdir="C:/actions-runner-tree-bot/_work",
-                python_toolcache=["3.11.9", "3.12.10"],
-            )
-        )
-        assert decoded["python_toolcache"] == ["3.11.9", "3.12.10"]
-
-    def test_a_wsl_install_seeding_a_toolcache_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be empty on a wsl install"):
-            decode_runner_install(_install(python_toolcache=["3.11.9"]))
-
-    @pytest.mark.parametrize("version", ["3.11", "3.11.x", "3.11.9.1", ""])
-    def test_a_toolcache_version_that_is_not_exact_is_refused(self, version: str) -> None:
-        with pytest.raises(JSONTypeError, match=r"exact X\.Y\.Z"):
-            decode_runner_install(
-                _install(
-                    side="windows",
-                    workdir="C:/actions-runner/_work",
-                    python_toolcache=[version],
-                )
-            )
+    @pytest.mark.parametrize("field", ["runner_name", "service"])
+    def test_a_missing_name_or_service_is_refused(self, field: str) -> None:
+        raw = _install()
+        del raw[field]
+        with pytest.raises(JSONTypeError, match=field):
+            decode_runner_install(raw)
 
 
 class TestFileAsset:
@@ -244,46 +210,41 @@ class TestHostRunnerSpec:
 
     def test_a_valid_host_round_trips(self) -> None:
         decoded: HostRunnerSpec = decode_host_runner_spec(_host())
-        assert decoded["name"] == "lavender"
-        assert decoded["wslconfig_min_memory_gb"] == 26
+        assert (decoded["name"], decoded["memory_gb"], decoded["payload_dir"]) == (
+            "lavender",
+            31,
+            "/home/corvis/fleet/runner-payloads",
+        )
+        assert decode_host_runner_spec(dict(encode_host_runner_spec(decoded))) == decoded
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a JSON object"):
             decode_host_runner_spec([])
 
-    def test_a_null_keepalive_task_is_a_state_not_an_omission(self) -> None:
-        decoded = decode_host_runner_spec(_host(keepalive_task=None))
-        assert decoded["keepalive_task"] is None
+    @pytest.mark.parametrize("memory", [0, -4])
+    def test_a_memory_that_is_not_positive_is_refused(self, memory: int) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_host_runner_spec(_host(memory_gb=memory))
+        assert str(refused.value) == f"memory_gb must be positive, got {memory}"
 
-    def test_an_absent_keepalive_key_is_refused(self) -> None:
+    def test_a_ci_slice_reaching_the_host_s_memory_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="leaves nothing of the host's 18 GB"):
+            decode_host_runner_spec(_host(memory_gb=18))
+
+    @pytest.mark.parametrize("payload_dir", ["C:/fleet/stage", "fleet/payloads", ""])
+    def test_a_payload_dir_that_is_not_absolute_is_refused(self, payload_dir: str) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_host_runner_spec(_host(payload_dir=payload_dir))
+        assert str(refused.value) == (
+            f"payload_dir must be an absolute POSIX path, got {payload_dir!r}"
+        )
+
+    @pytest.mark.parametrize("field", ["memory_gb", "payload_dir"])
+    def test_a_missing_memory_or_payload_dir_is_refused(self, field: str) -> None:
         raw = _host()
-        del raw["keepalive_task"]
-        with pytest.raises(JSONTypeError, match="must declare 'keepalive_task'"):
+        del raw[field]
+        with pytest.raises(JSONTypeError, match=field):
             decode_host_runner_spec(raw)
-
-    def test_a_mistyped_keepalive_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="string or null"):
-            decode_host_runner_spec(_host(keepalive_task=7))
-
-    def test_an_absent_memory_floor_key_is_refused(self) -> None:
-        raw = _host()
-        del raw["wslconfig_min_memory_gb"]
-        with pytest.raises(JSONTypeError, match="must declare 'wslconfig_min_memory_gb'"):
-            decode_host_runner_spec(raw)
-
-    def test_a_null_memory_floor_is_the_host_default(self) -> None:
-        decoded = decode_host_runner_spec(_host(wslconfig_min_memory_gb=None))
-        assert decoded["wslconfig_min_memory_gb"] is None
-
-    @pytest.mark.parametrize("floor", [0, -4])
-    def test_a_non_positive_memory_floor_is_refused(self, floor: int) -> None:
-        with pytest.raises(JSONTypeError, match="must be positive"):
-            decode_host_runner_spec(_host(wslconfig_min_memory_gb=floor))
-
-    @pytest.mark.parametrize("floor", [True, "26", 2.5])
-    def test_a_mistyped_memory_floor_is_refused(self, floor: JSONValue) -> None:
-        with pytest.raises(JSONTypeError, match="integer or null"):
-            decode_host_runner_spec(_host(wslconfig_min_memory_gb=floor))
 
     def test_a_host_with_no_installs_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="not a CI host"):
@@ -313,7 +274,7 @@ class TestHostRunnerSpec:
 
     def test_the_base_decodes_with_the_host(self) -> None:
         decoded = decode_host_runner_spec(_host())
-        assert decoded["base"]["execution_policy"] == "RemoteSigned"
+        assert decoded["base"]["apt_packages"] == ["ffmpeg", "golang-go"]
         assert decoded["base"]["disk"]["ceiling_gb"] == 150
 
 
@@ -329,7 +290,7 @@ class TestRunnerSpec:
             decode_runner_spec({"hosts": []})
 
     def test_duplicate_host_names_are_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be unique"):
+        with pytest.raises(JSONTypeError, match="must be unique, got duplicates: lavender"):
             decode_runner_spec({"hosts": [_host(), _host()]})
 
     def test_encode_then_decode_is_the_identity(self) -> None:
@@ -347,35 +308,26 @@ class TestRunnerSpec:
         assert decode_runner_spec(dict(encode_runner_spec(spec))) == spec
         lavender = spec["hosts"][0]
         assert lavender["name"] == "lavender"
-        # The full box, both execution environments: eight wsl-side installs
-        # (2 API + 4 MCPs + corvis-stick + tree-bot) and four windows-side
-        # ones (MCPs, corvis-stick, tree-bot, chat). The 2026-09-09 count
-        # from the live services missed chat, whose only runner is
-        # [self-hosted, lavender]; the 2026-09-26 rebuild found it still
-        # registered and absent here (board task 1aa6a021). corvis-stick was
+        # The Linux runners lavender's WSL guest carried until its reimage to
+        # Ubuntu on 2026-10-19 (MCPs board task 1e9ab738), now on the host
+        # itself: 2 API, 4 MCPs, corvis-stick and tree-bot, every one
+        # answering the host's own label. The four Windows runners went with
+        # Windows; Windows CI moves to a runner on loki. corvis-stick was
         # portable-claude until its rename, and registering against the old
         # URL 404s.
-        sides = [install["side"] for install in lavender["installs"]]
-        assert sides.count("wsl") == 8
-        assert sides.count("windows") == 4
+        per_repo = [install["repo"] for install in lavender["installs"]]
+        assert {repo: per_repo.count(repo) for repo in per_repo} == {
+            "wagner-austin/API": 2,
+            "wagner-austin/MCPs": 4,
+            "wagner-austin/corvis-stick": 1,
+            "wagner-austin/tree-bot": 1,
+        }
+        assert {label for install in lavender["installs"] for label in install["labels"]} == {
+            "lavender"
+        }
         pinned = [asset for asset in lavender["assets"] if asset["sha256"] is not None]
         assert len(pinned) == 1
         assert pinned[0]["manual"] is True
-        # The tool-cache seeds measured on the rebuilt lavender, 2026-09-26:
-        # MCPs, chat and tree-bot seed 3.11.9 and tree-bot also 3.12.10;
-        # corvis-stick's Windows jobs bring no Python.
-        seeds = {
-            install["repo"]: install["python_toolcache"]
-            for install in lavender["installs"]
-            if install["side"] == "windows"
-        }
-        assert seeds == {
-            "wagner-austin/MCPs": ["3.11.9"],
-            "wagner-austin/corvis-stick": [],
-            "wagner-austin/chat": ["3.11.9"],
-            "wagner-austin/tree-bot": ["3.11.9", "3.12.10"],
-        }
-        assert lavender["base"]["execution_policy"] == "RemoteSigned"
         assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]
 
     def test_a_runner_host_installs_every_tagged_tool_apt_supplies(self) -> None:

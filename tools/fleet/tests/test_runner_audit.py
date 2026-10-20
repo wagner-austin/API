@@ -1,102 +1,271 @@
-"""The audit: script rendering, transcript scoring, and the ssh seam.
+"""The audit: which rows a host owes, the verdict each reaches, scoring, and the ssh seam.
 
-The fakes here answer through ``_test_hooks.run`` exactly as
-:mod:`tests.test_core_io` describes: they satisfy the real protocol, and the
-transcript each test scores is one the rendered script's own Write-Check lines would
-produce -- ids taken from :func:`expected_checks`, never retyped.
+The rendered script runs here whole, under a real bash with every command it
+asks a stand-in that answers as each case says (tests/_audit_rows.py), against
+a host whose work tree, runner ``.path`` and assets are real files in the
+case's directory. The scoring and seam cases answer through
+``_test_hooks.run`` exactly as :mod:`tests.test_core_io` describes, their
+transcripts built from :func:`expected_checks`, never retyped.
 """
 
 from __future__ import annotations
 
+import hashlib
+import pathlib
+from collections.abc import Mapping
+
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.runners import (
-    FileAsset,
-    HostRunnerSpec,
-    RunnerInstall,
-)
+from fleet.contracts.runners import FileAsset, HostRunnerSpec
 from fleet.core import _test_hooks, runner_audit, runner_audit_disk, runner_dropped_check
 from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
-from tests._runner_fixtures import a_base, a_ci_slice, no_dropped_jobs
+from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
+from fleet.core.runner_reaper_render import REAPER_PATH
+from tests._audit_rows import run_rows
+from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
+#: The pinned asset's bytes.
+_JAR_BYTES = b"the provenance jar"
 
-def _host(
-    *,
-    keepalive_task: str | None = "wsl-keepalive",
-    wslconfig_min_memory_gb: int | None = 26,
-    gpu_required: bool = True,
-    systemd_timers: list[str] | None = None,
-    assets: list[FileAsset] | None = None,
-) -> HostRunnerSpec:
-    """A host spec with one install, shaped per test.
+#: Every command the audit asks, answering as a clean host does.
+_CLEAN: Mapping[str, str] = {
+    "free": 'echo "       total   used"; echo "Mem:      31      4"',
+    "df": 'echo "Used"; echo " 20G"',
+    "du": 'echo "1G	$3"',
+    "nvidia-smi": 'echo "NVIDIA GeForce RTX 3090"',
+    "systemctl": 'case "$1" in is-enabled) echo enabled ;; is-active) echo active ;; esac',
+    "runuser": 'shift 3; "$@"',
+    JOB_SCOPE_PATH: "echo placed",
+    REAPER_PATH: "echo 0",
+}
+
+
+def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
+    """A host declaring every kind of row, its files laid out in ``tmp_path``.
 
     Args:
-        keepalive_task: The keepalive declaration.
-        wslconfig_min_memory_gb: The memory floor declaration.
-        gpu_required: Whether the GPU check is declared.
-        systemd_timers: The timer declarations, default one.
-        assets: The asset declarations, default one pinned writable pair.
+        tmp_path: The case's directory, which holds the install's work tree,
+            the ``.path`` its runner gives its jobs (the stand-ins, then the
+            system directories their ``env bash`` shebang is found in), and
+            both assets.
 
     Returns:
-        The spec.
+        One install with a GPU, one timer, a pinned jar and a writable
+        directory.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task=keepalive_task,
-        wslconfig_min_memory_gb=wslconfig_min_memory_gb,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=gpu_required,
-        systemd_timers=["ci-clean.timer"] if systemd_timers is None else systemd_timers,
-        job_timeout_minutes=360,
-        installs=[
-            RunnerInstall(
-                repo="wagner-austin/API",
-                runner_name="lavender-wsl",
-                side="wsl",
-                service="actions.runner.wagner-austin-API.lavender-wsl.service",
-                workdir="/home/gharunner/actions-runner-api-1/_work",
-                labels=["lavender-wsl"],
-                python_toolcache=[],
-            )
-        ],
+    root = tmp_path / "actions-runner-api-1"
+    (root / "_work").mkdir(parents=True)
+    (root / ".path").write_text(f"{tmp_path / 'stand-ins'}:/usr/bin:/bin")
+    (tmp_path / "game-lib.jar").write_bytes(_JAR_BYTES)
+    (tmp_path / "data").mkdir()
+    install = an_install()
+    install["workdir"] = f"{root}/_work"
+    return a_host(
+        [install],
+        gpu_required=True,
+        systemd_timers=["ci-clean.timer"],
         assets=[
             FileAsset(
-                path="/opt/corvis/rw-game/game-lib.jar",
-                sha256="8a" * 32,
+                path=f"{tmp_path}/game-lib.jar",
+                sha256=hashlib.sha256(_JAR_BYTES).hexdigest(),
                 writable=False,
                 reason="the provenance jar",
                 manual=True,
                 provision_command=None,
             ),
             FileAsset(
-                path="/data",
+                path=f"{tmp_path}/data",
                 sha256=None,
                 writable=True,
                 reason="checkpoint writes",
                 manual=False,
-                provision_command=None,
+                provision_command="mkdir -p /data",
             ),
-        ]
-        if assets is None
-        else assets,
-        base=a_base(),
-        ci_slice=a_ci_slice(),
+        ],
     )
 
 
-#: The rows every host reports whatever else it declares.
-_DISK_ID = "disk:/:ceiling-150gb:baseline-46gb@2026-09-26"
-_CACHE_ID = "cache:/home/gharunner/.cache:ceiling-60gb"
-_WORK_ID = "cache:/home/gharunner/actions-runner-api-1/_work:ceiling-15gb"
-_POLICY_ID = "execution-policy:LocalMachine:RemoteSigned"
-_LONG_ID = runner_audit.LONG_PATHS_CHECK_ID
-_ENV_ID = "machine-env:POETRY_CACHE_DIR"
-_ORPHAN_ID = "orphans:wagner-austin/API:wsl:lavender-wsl"
-_PLACEMENT_ID = "placement:wagner-austin/API:wsl:lavender-wsl"
+def _audit(spec: HostRunnerSpec, tmp_path: pathlib.Path, **answers: str) -> dict[str, str]:
+    """Run the host's whole audit, each command answering as a clean host's but those named.
+
+    Args:
+        spec: The host.
+        tmp_path: The case's directory.
+        **answers: Stand-in bodies replacing the clean ones, by command name.
+
+    Returns:
+        Each ``CHECK`` line's id to the rest of the line, in the order printed.
+    """
+    rows = run_rows(
+        tmp_path, runner_audit.render_audit_script(spec).splitlines(), {**_CLEAN, **answers}
+    )
+    return {row.split(" ")[1]: row.split(" ", 2)[2] for row in rows}
+
+
+class TestExpectedChecks:
+    """What the roster promises the script will report."""
+
+    def test_every_declared_concept_yields_its_checks_in_order(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        ids = [check["check_id"] for check in runner_audit.expected_checks(_host(tmp_path))]
+        assert ids == [
+            "memory:31gb",
+            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20",
+            "cache:/home/gharunner/.cache:ceiling-60gb",
+            f"cache:{tmp_path}/actions-runner-api-1/_work:ceiling-15gb",
+            "gpu:wagner-austin/API:lavender",
+            "timer:ci-clean.timer",
+            "service:actions.runner.wagner-austin-API.lavender.service",
+            "workdir:wagner-austin/API:lavender",
+            "placement:wagner-austin/API:lavender",
+            "orphans:wagner-austin/API:lavender",
+            f"asset:{tmp_path}/game-lib.jar",
+            f"sha256:{tmp_path}/game-lib.jar",
+            f"asset:{tmp_path}/data",
+            f"writable:{tmp_path}/data",
+        ]
+
+    def test_undeclared_concepts_yield_no_checks(self) -> None:
+        ids = [check["check_id"] for check in runner_audit.expected_checks(a_host())]
+        assert ids == [
+            "memory:31gb",
+            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20",
+            "cache:/home/gharunner/.cache:ceiling-60gb",
+            "cache:/home/gharunner/actions-runner-api-1/_work:ceiling-15gb",
+            "service:actions.runner.wagner-austin-API.lavender.service",
+            "workdir:wagner-austin/API:lavender",
+            "placement:wagner-austin/API:lavender",
+            "orphans:wagner-austin/API:lavender",
+        ]
+
+    def test_the_disk_row_carries_the_ceiling_and_the_idle_baseline(self) -> None:
+        assert runner_audit_disk.disk_check_id(a_host()) == (
+            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20"
+        )
+
+    def test_the_memory_row_carries_the_declared_size(self) -> None:
+        assert runner_audit.memory_check_id(a_host()) == "memory:31gb"
+
+
+class TestTheScriptRunsForReal:
+    """The whole audit, under bash, each command a stand-in."""
+
+    def test_a_clean_host_passes_every_row_in_the_declared_order(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path)
+        assert list(rows) == [check["check_id"] for check in runner_audit.expected_checks(spec)]
+        assert set(rows.values()) == {"OK"}
+
+    def test_a_host_short_of_its_memory_drifts_with_what_free_said(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path, free='echo "Mem:      15      4"')
+        assert rows["memory:31gb"] == (
+            "DRIFT the host reports 15 GB, below the 30 GB a 31 GB host reports; "
+            "free said: Mem:      15      4 (exit 0)"
+        )
+
+    def test_a_memory_answer_that_is_not_a_size_never_passes(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path, free='echo "free: /proc/meminfo: denied"; exit 1')
+        assert rows["memory:31gb"].startswith(
+            "DRIFT the host reports an unreadable figure GB, below the 30 GB"
+        )
+
+    def test_a_root_past_its_ceiling_drifts(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path, df='echo "Used"; echo " 151G"')
+        assert rows[runner_audit_disk.disk_check_id(spec)] == (
+            "DRIFT the root uses 151 GB against a ceiling of 150 GB; an idle rebuilt host used "
+            "18 GB on 2026-10-20; df said: Used  151G (exit 0)"
+        )
+
+    @pytest.mark.parametrize(
+        "smi",
+        ["exit 0", 'echo "NVIDIA-SMI has failed: no devices were found"; exit 9'],
+        ids=["silent", "failed"],
+    )
+    def test_a_runner_path_with_no_card_drifts(self, tmp_path: pathlib.Path, smi: str) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path, **{"nvidia-smi": smi})
+        assert rows["gpu:wagner-austin/API:lavender"].startswith(
+            "DRIFT nvidia-smi on the runner PATH said: "
+        )
+
+    def test_a_disabled_timer_and_an_inactive_runner_drift(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(
+            spec,
+            tmp_path,
+            systemctl='case "$1" in is-enabled) echo disabled ;; *) echo inactive; exit 3 ;; esac',
+        )
+        assert rows["timer:ci-clean.timer"] == (
+            "DRIFT systemctl is-enabled said: disabled (exit 0)"
+        )
+        assert rows["service:actions.runner.wagner-austin-API.lavender.service"] == (
+            "DRIFT systemctl is-active said: inactive (exit 3)"
+        )
+
+    def test_a_missing_work_tree_drifts(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        (tmp_path / "actions-runner-api-1" / "_work").rmdir()
+        rows = _audit(spec, tmp_path)
+        assert rows["workdir:wagner-austin/API:lavender"] == (
+            f"DRIFT test -d {tmp_path}/actions-runner-api-1/_work:  (exit 1)"
+        )
+
+    def test_an_unplaced_unit_and_a_leftover_drift(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(
+            spec, tmp_path, **{JOB_SCOPE_PATH: "echo unplaced; exit 1", REAPER_PATH: "echo 2"}
+        )
+        assert rows["placement:wagner-austin/API:lavender"].startswith("DRIFT ")
+        assert rows["placement:wagner-austin/API:lavender"].endswith(
+            "the helper read: unplaced (exit 1)"
+        )
+        assert rows["orphans:wagner-austin/API:lavender"].endswith("the reaper counted: 2 (exit 0)")
+
+    def test_a_missing_asset_drifts_on_presence_and_on_its_pin(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec = _host(tmp_path)
+        (tmp_path / "game-lib.jar").unlink()
+        rows = _audit(spec, tmp_path)
+        assert rows[f"asset:{tmp_path}/game-lib.jar"] == (
+            f"DRIFT test -e {tmp_path}/game-lib.jar:  (exit 1)"
+        )
+        assert rows[f"sha256:{tmp_path}/game-lib.jar"].startswith("DRIFT sha256sum said: ")
+
+    def test_an_asset_of_other_bytes_drifts_on_its_pin(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        (tmp_path / "game-lib.jar").write_bytes(b"another jar")
+        rows = _audit(spec, tmp_path)
+        assert rows[f"asset:{tmp_path}/game-lib.jar"] == "OK"
+        assert rows[f"sha256:{tmp_path}/game-lib.jar"] == (
+            f"DRIFT sha256sum said: {hashlib.sha256(b'another jar').hexdigest()}  "
+            f"{tmp_path}/game-lib.jar (exit 0)"
+        )
+
+    def test_an_asset_the_runner_account_cannot_write_drifts(self, tmp_path: pathlib.Path) -> None:
+        spec = _host(tmp_path)
+        rows = _audit(spec, tmp_path, runuser='echo "$*" > "$(dirname "$0")/asked"; exit 1')
+        assert rows[f"writable:{tmp_path}/data"] == (
+            f"DRIFT test -w {tmp_path}/data as gharunner:  (exit 1)"
+        )
+        assert (tmp_path / "stand-ins" / "asked").read_text() == (
+            f"-u gharunner -- test -w {tmp_path}/data\n"
+        )
+
+    @pytest.mark.parametrize("bad", ["it's", 'say "hi"', "a\nb", "tick`", "dollar$"])
+    def test_an_unscriptable_roster_value_is_refused(self, bad: str) -> None:
+        with pytest.raises(ValueError, match="cannot be embedded"):
+            runner_audit.render_audit_script(a_host(systemd_timers=[bad]))
 
 
 def _clean_transcript(spec: HostRunnerSpec) -> str:
@@ -114,135 +283,53 @@ def _clean_transcript(spec: HostRunnerSpec) -> str:
     )
 
 
-class TestExpectedChecks:
-    """What the roster promises the script will report."""
-
-    def test_every_declared_concept_yields_its_checks_in_order(self) -> None:
-        ids = [check["check_id"] for check in runner_audit.expected_checks(_host())]
-        assert ids == [
-            "keepalive:wsl-keepalive",
-            "memory-floor:26gb",
-            _DISK_ID,
-            _CACHE_ID,
-            _WORK_ID,
-            _POLICY_ID,
-            _LONG_ID,
-            _ENV_ID,
-            "gpu:wagner-austin/API:wsl:lavender-wsl",
-            "timer:ci-clean.timer",
-            "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
-            "workdir:wagner-austin/API:wsl:lavender-wsl",
-            _PLACEMENT_ID,
-            _ORPHAN_ID,
-            "asset:/opt/corvis/rw-game/game-lib.jar",
-            "sha256:/opt/corvis/rw-game/game-lib.jar",
-            "asset:/data",
-            "writable:/data",
-        ]
-
-    def test_undeclared_concepts_yield_no_checks(self) -> None:
-        spec = _host(
-            keepalive_task=None,
-            wslconfig_min_memory_gb=None,
-            gpu_required=False,
-            systemd_timers=[],
-            assets=[],
-        )
-        ids = [check["check_id"] for check in runner_audit.expected_checks(spec)]
-        assert ids == [
-            _DISK_ID,
-            _CACHE_ID,
-            _WORK_ID,
-            _POLICY_ID,
-            _LONG_ID,
-            _ENV_ID,
-            "service:wsl:actions.runner.wagner-austin-API.lavender-wsl.service",
-            "workdir:wagner-austin/API:wsl:lavender-wsl",
-            _PLACEMENT_ID,
-            _ORPHAN_ID,
-        ]
-
-    def test_the_disk_row_carries_the_ceiling_and_the_idle_baseline(self) -> None:
-        assert runner_audit_disk.disk_check_id(_host()) == _DISK_ID
-
-
-class TestRenderAuditScript:
-    """The rendered driver."""
-
-    def test_the_script_emits_every_expected_check_in_order(self) -> None:
-        spec = _host()
-        script = runner_audit.render_audit_script(spec)
-        positions = [
-            script.index(f"'{check['check_id']}'") for check in runner_audit.expected_checks(spec)
-        ]
-        assert positions == sorted(positions)
-
-    def test_the_script_forces_wsl_output_to_utf8(self) -> None:
-        assert "$env:WSL_UTF8 = '1'" in runner_audit.render_audit_script(_host())
-
-    def test_the_script_measures_the_vm_not_the_config_file(self) -> None:
-        script = runner_audit.render_audit_script(_host(wslconfig_min_memory_gb=26))
-        assert "free -m" in script
-        assert "-ge 26000" in script
-        assert ".wslconfig" not in script
-
-    def test_the_pin_appears_verbatim(self) -> None:
-        assert "8a" * 32 in runner_audit.render_audit_script(_host())
-
-    def test_the_script_ends_by_exiting_zero_because_drift_is_data(self) -> None:
-        assert runner_audit.render_audit_script(_host()).rstrip().endswith("exit 0")
-
-    @pytest.mark.parametrize("bad", ["it's", 'say "hi"', "a\nb", "tick`", "dollar$"])
-    def test_an_unscriptable_roster_value_is_refused(self, bad: str) -> None:
-        spec = _host(systemd_timers=[bad])
-        with pytest.raises(ValueError, match="cannot be embedded"):
-            runner_audit.render_audit_script(spec)
-
-
 class TestParseAuditTranscript:
     """Scoring, and every way a transcript can fail to be scorable."""
 
-    def test_a_clean_transcript_scores_every_check_ok(self) -> None:
-        spec = _host()
+    def test_a_clean_transcript_scores_every_check_ok_with_its_reason(self) -> None:
+        spec = a_host(gpu_required=True)
         findings = runner_audit.parse_audit_transcript(spec, _clean_transcript(spec))
-        assert [finding["ok"] for finding in findings] == [True] * 18
-        assert findings[0]["reason"].startswith("the scheduled task")
+        assert [finding["ok"] for finding in findings] == [True] * 9
+        assert findings[0]["reason"] == runner_audit.MEMORY_REASON
 
     def test_a_drift_line_carries_its_detail_and_reason(self) -> None:
-        spec = _host()
+        spec = a_host(gpu_required=True)
         lines = _clean_transcript(spec).splitlines()
-        lines[8] = (
-            "CHECK gpu:wagner-austin/API:wsl:lavender-wsl DRIFT "
-            "nvidia-smi on the runner PATH said: "
+        lines[4] = "CHECK gpu:wagner-austin/API:lavender DRIFT nvidia-smi on the runner PATH said: "
+        drifted = runner_audit.parse_audit_transcript(spec, "\n".join(lines))[4]
+        assert drifted == AuditFinding(
+            check_id="gpu:wagner-austin/API:lavender",
+            ok=False,
+            detail="nvidia-smi on the runner PATH said: ",
+            reason="runner jobs on this host digest a real GPU",
         )
-        findings = runner_audit.parse_audit_transcript(spec, "\n".join(lines))
-        drifted = findings[8]
-        assert drifted["ok"] is False
-        assert drifted["detail"] == "nvidia-smi on the runner PATH said: "
-        assert drifted["reason"] == "runner jobs on this host digest a real GPU"
 
     def test_blank_lines_are_not_checks(self) -> None:
-        spec = _host()
+        spec = a_host()
         transcript = "\n\n" + _clean_transcript(spec) + "\n"
-        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 18
+        assert len(runner_audit.parse_audit_transcript(spec, transcript)) == 8
 
-    def test_a_non_check_line_is_unparsable(self) -> None:
-        spec = _host()
+    @pytest.mark.parametrize("line", ["some stray output", "CHECK x", "CHECK x MAYBE detail"])
+    def test_a_non_check_line_is_unparsable(self, line: str) -> None:
         with pytest.raises(AppError) as fault:
-            runner_audit.parse_audit_transcript(spec, "some stray output\n")
+            runner_audit.parse_audit_transcript(a_host(), f"{line}\n")
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
+        assert fault.value.message == (
+            f"the audit transcript from lavender cannot be scored: line is not a CHECK line: "
+            f"{line!r}"
+        )
 
     def test_a_drift_line_with_no_detail_is_unparsable(self) -> None:
-        spec = _host()
+        spec = a_host()
         lines = _clean_transcript(spec).splitlines()
-        lines[0] = "CHECK keepalive:wsl-keepalive DRIFT"
+        lines[0] = "CHECK memory:31gb DRIFT"
         with pytest.raises(AppError) as fault:
             runner_audit.parse_audit_transcript(spec, "\n".join(lines))
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
-        assert "carries no detail" in fault.value.message
+        assert "DRIFT line for memory:31gb carries no detail" in fault.value.message
 
     def test_a_truncated_transcript_is_a_script_that_died_midway(self) -> None:
-        spec = _host()
+        spec = a_host()
         truncated = "\n".join(_clean_transcript(spec).splitlines()[:4])
         with pytest.raises(AppError) as fault:
             runner_audit.parse_audit_transcript(spec, truncated)
@@ -250,7 +337,7 @@ class TestParseAuditTranscript:
         assert "died midway" in fault.value.message
 
     def test_a_reordered_transcript_is_unparsable(self) -> None:
-        spec = _host()
+        spec = a_host()
         lines = _clean_transcript(spec).splitlines()
         lines[0], lines[1] = lines[1], lines[0]
         with pytest.raises(AppError) as fault:
@@ -259,19 +346,17 @@ class TestParseAuditTranscript:
 
 
 class TestAttemptAuditHost:
-    """The ssh seam: send, run, score."""
+    """The ssh seam: send, run as root, score, then the hub's dropped-job row."""
 
     def test_a_reachable_clean_host_yields_findings(self) -> None:
-        spec = _host()
+        spec = a_host()
         runner = FakeRun([ok(""), ok(_clean_transcript(spec)), *no_dropped_jobs(spec)])
         _test_hooks.run = runner
         outcome = runner_audit.attempt_audit_host(spec)
-        # The hub's own row closes the host's: GitHub's runner list beside the
-        # host's Worker ages (MCPs board task 715b9ec5).
         dropped = AuditFinding(
             check_id="dropped-jobs:lavender",
             ok=True,
-            detail="examined 1 WSL runner(s) against GitHub; none holds a Runner.Worker over "
+            detail="examined 1 runner(s) against GitHub; none holds a Runner.Worker over "
             "300 s that GitHub reads not busy or unlisted, or that a newer Worker "
             "superseded",
             reason=runner_dropped_check.DROPPED_REASON,
@@ -288,14 +373,14 @@ class TestAttemptAuditHost:
             ],
             reason="",
         )
-        sent_argv = runner.calls[0]
-        assert sent_argv[0] == "ssh"
-        assert "C:/fleet/stage/" + runner_audit.AUDIT_SCRIPT_NAME in " ".join(sent_argv)
+        path = f"/home/corvis/fleet/runner-payloads/{runner_audit.AUDIT_SCRIPT_STEM}.sh"
         assert runner.stdin[0] == runner_audit.render_audit_script(spec).encode("utf-8")
+        assert path in " ".join(runner.calls[0])
+        assert tuple(runner.calls[1][-4:]) == ("sudo", "-n", "/bin/bash", path)
 
     def test_an_unreachable_host_is_a_value_not_a_crash(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "No route to host")])
-        outcome = runner_audit.attempt_audit_host(_host())
+        outcome = runner_audit.attempt_audit_host(a_host())
         assert outcome["findings"] is None
         assert "No route to host" in outcome["reason"]
 
@@ -303,7 +388,7 @@ class TestAttemptAuditHost:
         """The script answered, then ssh could not reach the host for the
         dropped-job row's read: reporting the script's rows alone would read
         as a host whose every row was examined."""
-        spec = _host()
+        spec = a_host()
         _test_hooks.run = FakeRun(
             [ok(""), ok(_clean_transcript(spec)), ok(""), failed(255, "Connection reset")]
         )
@@ -314,5 +399,5 @@ class TestAttemptAuditHost:
     def test_a_script_that_ran_and_lied_raises_rather_than_scores(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok("nonsense\n")])
         with pytest.raises(AppError) as fault:
-            runner_audit.attempt_audit_host(_host())
+            runner_audit.attempt_audit_host(a_host())
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE

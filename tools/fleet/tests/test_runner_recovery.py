@@ -1,10 +1,7 @@
-"""Restart-on-failure for the runner services: both halves run for real.
+"""Restart-on-failure for the runner services, run for real.
 
-The Windows lines run inside the Windows provision's install loop and are
-executed by tests/pester/rendered-provision-windows.Tests.ps1 with a stand-in
-sc.exe, so no service on this machine changes. The systemd lines run under
-a real bash from a script file (as provision.sh delivers them) with
-``systemctl`` defined as a recording function and the one absolute
+The lines run under a real bash from a script file (as provision.sh delivers
+them) with ``systemctl`` defined as a recording function and the one absolute
 directory, ``/etc/systemd/system``, rewritten to the test's own directory:
 the comparison, the write, the reload and the idempotence all run as
 rendered.
@@ -17,31 +14,12 @@ import subprocess
 
 import pytest
 
-from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_recovery
 from tests._host_bash import host_bash
+from tests._runner_fixtures import an_install
 
-_UNIT = "actions.runner.wagner-austin-MCPs.lavender-wsl.service"
-
-
-def _install(service: str) -> RunnerInstall:
-    """A wsl-side install.
-
-    Args:
-        service: The unit name.
-
-    Returns:
-        The install.
-    """
-    return RunnerInstall(
-        repo="wagner-austin/MCPs",
-        runner_name="lavender",
-        side="wsl",
-        service=service,
-        workdir="/home/gharunner/r/_work",
-        labels=["lavender"],
-        python_toolcache=[],
-    )
+#: The unit every case gives the policy.
+_INSTALL = an_install("wagner-austin/MCPs")
 
 
 class TestRendered:
@@ -49,21 +27,11 @@ class TestRendered:
 
     def test_an_unscriptable_unit_is_refused(self) -> None:
         with pytest.raises(ValueError) as refused:
-            runner_recovery.render_wsl_recovery_lines(_install("bad'unit"))
+            runner_recovery.render_recovery_lines({**_INSTALL, "service": "bad'unit"})
         assert str(refused.value) == (
             'service "bad\'unit" contains "\'", which cannot be embedded in a rendered '
             "script verbatim; rename the item rather than escaping it"
         )
-
-    def test_the_windows_policy_is_written_through_the_sc_parameter(self) -> None:
-        """Executed by tests/pester/rendered-provision-windows.Tests.ps1 inside
-        the Windows provision's install loop, a refused write included."""
-        lines = runner_recovery.render_windows_recovery_lines()
-        assert lines[0] == (
-            "& $Sc failure $ServiceName reset= 86400 "
-            "actions= restart/5000/restart/5000/restart/5000 | Out-Null"
-        )
-        assert lines[4] == "& $Sc failureflag $ServiceName 1 | Out-Null"
 
 
 class TestTheSystemdLinesRunForReal:
@@ -71,7 +39,8 @@ class TestTheSystemdLinesRunForReal:
 
     def test_the_drop_in_is_written_once_and_reloaded_once(self, tmp_path: pathlib.Path) -> None:
         bash = host_bash()
-        lines = runner_recovery.render_wsl_recovery_lines(_install(_UNIT))
+        unit = _INSTALL["service"]
+        lines = runner_recovery.render_recovery_lines(_INSTALL)
         body = "\n".join(lines).replace("/etc/systemd/system", "units")
         script = 'systemctl() { echo "$*" >> reloads.log; }\n' + body + "\n"
         (tmp_path / "recovery.sh").write_bytes(script.encode())
@@ -82,7 +51,7 @@ class TestTheSystemdLinesRunForReal:
             )
             assert ran.returncode == 0, ran.stderr
             outputs.append(ran.stdout)
-        assert outputs == [f"restart policy set for {_UNIT}\n", ""]
-        drop_in = tmp_path / "units" / f"{_UNIT}.d" / runner_recovery.SYSTEMD_DROP_IN_NAME
+        assert outputs == [f"restart policy set for {unit}\n", ""]
+        drop_in = tmp_path / "units" / f"{unit}.d" / runner_recovery.SYSTEMD_DROP_IN_NAME
         assert drop_in.read_bytes() == runner_recovery.SYSTEMD_DROP_IN.encode()
         assert (tmp_path / "reloads.log").read_text(encoding="utf-8") == "daemon-reload\n"

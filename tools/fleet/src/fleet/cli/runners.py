@@ -3,27 +3,23 @@
 Usage:
     fleet-runners --spec runners.json
     fleet-runners --spec runners.json --host lavender
-    fleet-runners --spec runners.json --host lavender --render C:/provision
+    fleet-runners --spec runners.json --host lavender --render /tmp/provision
     fleet-runners --spec runners.json --host lavender --sample load.jsonl
     fleet-runners --spec runners.json --report load.jsonl --cores 16
     fleet-runners --spec runners.json --host lavender --onboard owner/repo
     fleet-runners --spec runners.json --host lavender --rebuild yes
 
-``--rebuild yes`` takes a machine node setup has made reachable, from a
-stock Windows install, to an audited runner host: the Windows base and the
-reboot it asks for, the pinned distro, the Linux base, fresh tokens, the
-roster's provision scripts, then the audit (:mod:`fleet.core.runner_rebuild`).
-Every stage is idempotent, so a cut-short rebuild is finished by running it
-again. The value is a confirmation, because the act lays a whole machine.
+``--rebuild yes`` takes a fleet node a CORVIS stick or a netboot installed
+and enrolled to an audited runner host: the base and the reboot it asks
+for, fresh tokens, the roster's provision, then the audit
+(:mod:`fleet.core.runner_rebuild`). Every stage is idempotent, so a
+cut-short rebuild is finished by running it again. The value is a
+confirmation, because the act lays a whole machine.
 
 ``--onboard`` is the operator's 2026-09-09 mandate made runnable: ONE
 command registers a repository's CI onto the self-hosted fleet -- token
-minted via gh, both sides provisioned by render-send-run, the roster
-rewritten in the same act, and the host audited as proof. ``--sides
-wsl,windows`` narrows which environments (default both); ``--python
-3.11.9,3.12.10`` seeds those exact versions into the Windows tool cache
-so setup-python finds instead of installing (the install path needs
-registry rights the runner service does not have). See
+minted via gh, the host's provision re-run with the new install in it,
+the roster rewritten in the same act, and the host audited as proof. See
 :mod:`fleet.core.runner_onboard` for every refusal it can make.
 
 The ``fleet-nodes`` of GitHub Actions serving: one line per declared check,
@@ -94,10 +90,6 @@ CORES_FLAG = "--cores"
 
 ONBOARD_FLAG = "--onboard"
 
-SIDES_FLAG = "--sides"
-
-PYTHON_FLAG = "--python"
-
 REBUILD_FLAG = "--rebuild"
 
 _FLAGS = (
@@ -108,8 +100,6 @@ _FLAGS = (
     REPORT_FLAG,
     CORES_FLAG,
     ONBOARD_FLAG,
-    SIDES_FLAG,
-    PYTHON_FLAG,
     REBUILD_FLAG,
 )
 
@@ -194,25 +184,27 @@ def _render(host: HostRunnerSpec, out_dir: str) -> int:
 
     Args:
         host: The host to render for.
-        out_dir: Directory receiving ``provision.ps1`` and ``provision.sh``.
+        out_dir: Directory receiving ``base.sh`` and ``provision.sh``.
 
     Returns:
         0 always: rendering is a local act that either completes or raises.
     """
     rendered = runner_render.render_provision(host)
-    windows_path = pathlib.Path(out_dir) / "provision.ps1"
-    linux_path = pathlib.Path(out_dir) / "provision.sh"
-    _test_hooks.write_text(windows_path, rendered["windows_script"])
-    _test_hooks.write_text(linux_path, rendered["linux_script"])
-    _log.info("wrote %s", windows_path)
-    _log.info("wrote %s", linux_path)
+    base_path = pathlib.Path(out_dir) / "base.sh"
+    provision_path = pathlib.Path(out_dir) / "provision.sh"
+    _test_hooks.write_text(base_path, rendered["base_script"])
+    _test_hooks.write_text(provision_path, rendered["provision_script"])
+    _log.info("wrote %s", base_path)
+    _log.info("wrote %s", provision_path)
     _log.info("RUN ORDER for %s:", host["name"])
-    _log.info("  1. provision.ps1 on the Windows host (as the interactive user)")
-    _log.info("  2. wsl --shutdown, then re-run the keepalive task, if a memory floor changed")
-    _log.info("  3. provision.sh inside the distro as root, with each RUNNER_TOKEN_* exported")
+    _log.info(
+        "  1. base.sh on the host as root, then reboot if it printed %s",
+        runner_render.REBOOT_MARKER,
+    )
+    _log.info("  2. provision.sh on the host as root, with each RUNNER_TOKEN_* exported")
     for step in rendered["manual_steps"]:
         _log.info("  %s", step)
-    _log.info("  4. fleet-runners audit --spec <roster> --host %s", host["name"])
+    _log.info("  3. fleet-runners --spec <roster> --host %s", host["name"])
     return 0
 
 
@@ -277,14 +269,7 @@ def _report(record_path: str, *, cores: int, host_name: str | None) -> int:
     return 0
 
 
-def _onboard(
-    spec: RunnerSpec,
-    spec_path: str,
-    host: HostRunnerSpec,
-    repo: str,
-    sides: tuple[str, ...],
-    python_versions: tuple[str, ...],
-) -> int:
+def _onboard(spec: RunnerSpec, spec_path: str, host: HostRunnerSpec, repo: str) -> int:
     """Onboard a repo onto a host, rewrite the roster, print the audit.
 
     Args:
@@ -293,32 +278,26 @@ def _onboard(
         spec_path: Where the roster lives, for the rewrite.
         host: The target host's entry within ``spec``.
         repo: The repository, ``owner/name``.
-        sides: Which environments to provision.
-        python_versions: Exact Python versions to seed into the Windows
-            tool cache, empty for none.
 
     Returns:
         0 when the post-onboard audit is clean; 1 when it reports drift --
-        the runners exist and the roster records them either way, and the
+        the runner exists and the roster records it either way, and the
         drift lines say exactly what to repair.
 
     Raises:
         AppError: As :func:`fleet.core.runner_onboard.onboard` describes.
     """
-    plan, findings = runner_onboard.onboard(
-        host, repo, sides=sides, python_versions=python_versions
-    )
+    plan, findings = runner_onboard.onboard(host, repo)
     _test_hooks.write_text(
         pathlib.Path(spec_path), dump_json_str(encode_runner_spec(spec), indent=2) + "\n"
     )
-    for install in plan["installs"]:
-        _log.info(
-            "onboarded %s %s runner %s (labels: %s)",
-            repo,
-            install["side"],
-            install["runner_name"],
-            ",".join(install["labels"]),
-        )
+    install = plan["install"]
+    _log.info(
+        "onboarded %s runner %s (labels: %s)",
+        repo,
+        install["runner_name"],
+        ",".join(install["labels"]),
+    )
     _log.info("roster rewritten: %s", spec_path)
     faults = _log_findings(host, findings)
     if faults:
@@ -425,13 +404,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     hosts = select_hosts(spec, parsed.get(HOST_FLAG))
     onboard_repo = parsed.get(ONBOARD_FLAG)
     if onboard_repo is not None:
-        _require_host(parsed, ONBOARD_FLAG, "onboarding registers runners on one machine")
-        sides = _split_flag(parsed.get(SIDES_FLAG), default=("wsl", "windows"))
-        python_versions = _split_flag(parsed.get(PYTHON_FLAG), default=())
-        return _onboard(spec, spec_path, hosts[0], onboard_repo, sides, python_versions)
-    for orphan in (SIDES_FLAG, PYTHON_FLAG):
-        if orphan in parsed:
-            raise ValueError(f"{orphan} only means something with {ONBOARD_FLAG}")
+        _require_host(parsed, ONBOARD_FLAG, "onboarding registers a runner on one machine")
+        return _onboard(spec, spec_path, hosts[0], onboard_repo)
     if REBUILD_FLAG in parsed:
         _require_rebuild_confirmation(parsed)
         _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
@@ -481,21 +455,6 @@ def _require_rebuild_confirmation(parsed: dict[str, str]) -> None:
         )
 
 
-def _split_flag(raw: str | None, *, default: tuple[str, ...]) -> tuple[str, ...]:
-    """A comma-separated flag value as a tuple.
-
-    Args:
-        raw: The flag's value, or None when absent.
-        default: What absence means.
-
-    Returns:
-        The non-empty entries, or the default.
-    """
-    if raw is None:
-        return default
-    return tuple(entry for entry in raw.split(",") if entry)
-
-
 def _parse_cores(parsed: dict[str, str]) -> int:
     """The validated ``--cores`` value for a report.
 
@@ -542,12 +501,10 @@ __all__ = [
     "CORES_FLAG",
     "HOST_FLAG",
     "ONBOARD_FLAG",
-    "PYTHON_FLAG",
     "REBUILD_FLAG",
     "RENDER_FLAG",
     "REPORT_FLAG",
     "SAMPLE_FLAG",
-    "SIDES_FLAG",
     "SPEC_FLAG",
     "entrypoint",
     "load_runner_spec",

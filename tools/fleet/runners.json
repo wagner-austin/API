@@ -3,121 +3,67 @@
     {
       "name": "lavender",
       "host": "lavender",
-      "wsl_distro": "Ubuntu",
-      "keepalive_task": "wsl-keepalive",
-      "wslconfig_min_memory_gb": 26,
-      "scratch_dir": "C:/fleet/stage",
+      "memory_gb": 31,
+      "payload_dir": "/home/corvis/fleet/runner-payloads",
       "gpu_required": true,
       "systemd_timers": ["ci-clean.timer", "fleet-runner-reaper.timer"],
       "job_timeout_minutes": 360,
       "installs": [
         {
           "repo": "wagner-austin/API",
-          "runner_name": "lavender-wsl",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-API.lavender-wsl.service",
+          "runner_name": "lavender",
+          "service": "actions.runner.wagner-austin-API.lavender.service",
           "workdir": "/home/gharunner/actions-runner-api-1/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
+          "labels": ["lavender"]
         },
         {
           "repo": "wagner-austin/API",
-          "runner_name": "lavender-wsl-2",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-API.lavender-wsl-2.service",
+          "runner_name": "lavender-2",
+          "service": "actions.runner.wagner-austin-API.lavender-2.service",
           "workdir": "/home/gharunner/actions-runner-api-2/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-wsl",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-          "workdir": "/home/gharunner/actions-runner/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-wsl-2",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service",
-          "workdir": "/home/gharunner/actions-runner-2/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-wsl-3",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service",
-          "workdir": "/home/gharunner/actions-runner-3/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-wsl-4",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-wsl-4.service",
-          "workdir": "/home/gharunner/actions-runner-4/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
+          "labels": ["lavender"]
         },
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender",
-          "side": "windows",
-          "service": "actions.runner.wagner-austin-MCPs.lavender",
-          "workdir": "C:/actions-runner/_work",
-          "labels": ["lavender"],
-          "python_toolcache": ["3.11.9"]
+          "service": "actions.runner.wagner-austin-MCPs.lavender.service",
+          "workdir": "/home/gharunner/actions-runner-mcps-1/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-2",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-2.service",
+          "workdir": "/home/gharunner/actions-runner-mcps-2/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-3",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-3.service",
+          "workdir": "/home/gharunner/actions-runner-mcps-3/_work",
+          "labels": ["lavender"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "lavender-4",
+          "service": "actions.runner.wagner-austin-MCPs.lavender-4.service",
+          "workdir": "/home/gharunner/actions-runner-mcps-4/_work",
+          "labels": ["lavender"]
         },
         {
           "repo": "wagner-austin/corvis-stick",
-          "runner_name": "lavender-wsl",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-corvis-stick.lavender-wsl.service",
+          "runner_name": "lavender",
+          "service": "actions.runner.wagner-austin-corvis-stick.lavender.service",
           "workdir": "/home/gharunner/actions-runner-corvis-stick-1/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/corvis-stick",
-          "runner_name": "lavender",
-          "side": "windows",
-          "service": "actions.runner.wagner-austin-corvis-stick.lavender",
-          "workdir": "C:/actions-runner-corvis-stick/_work",
-          "labels": ["lavender"],
-          "python_toolcache": []
-        },
-        {
-          "repo": "wagner-austin/chat",
-          "runner_name": "lavender",
-          "side": "windows",
-          "service": "actions.runner.wagner-austin-chat.lavender",
-          "workdir": "C:/actions-runner-chat/_work",
-          "labels": ["lavender"],
-          "python_toolcache": ["3.11.9"]
-        },
-        {
-          "repo": "wagner-austin/tree-bot",
-          "runner_name": "lavender-wsl",
-          "side": "wsl",
-          "service": "actions.runner.wagner-austin-tree-bot.lavender-wsl.service",
-          "workdir": "/home/gharunner/actions-runner-treebot-1/_work",
-          "labels": ["lavender-wsl"],
-          "python_toolcache": []
+          "labels": ["lavender"]
         },
         {
           "repo": "wagner-austin/tree-bot",
           "runner_name": "lavender",
-          "side": "windows",
-          "service": "actions.runner.wagner-austin-tree-bot.lavender",
-          "workdir": "C:/actions-runner-tree-bot/_work",
-          "labels": ["lavender"],
-          "python_toolcache": ["3.11.9", "3.12.10"]
+          "service": "actions.runner.wagner-austin-tree-bot.lavender.service",
+          "workdir": "/home/gharunner/actions-runner-tree-bot-1/_work",
+          "labels": ["lavender"]
         }
       ],
       "assets": [
@@ -163,46 +109,18 @@
         }
       ],
       "base": {
-        "windows_features": ["VirtualMachinePlatform", "Microsoft-Windows-Subsystem-Linux"],
-        "wsl_msi": {
-          "version": "2.7.14",
-          "url": "https://github.com/microsoft/WSL/releases/download/2.7.14/wsl.2.7.14.0.x64.msi",
-          "sha256": "db084e536279a59e90a26ec598d8aa8a4dff8309f41d078fd06242953ac1ebcd"
-        },
-        "rootfs": {
-          "version": "24.04-20240423",
-          "url": "https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423/ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz",
-          "sha256": "8251e27ffff381a4af5f41dcb94d867de3e0d9774a9241908ab34555d99315ea"
-        },
-        "distro_dir": "C:/wsl/Ubuntu",
         "apt_packages": [
-          "build-essential",
           "python3",
           "pkg-config",
-          "postgresql-client",
           "ffmpeg",
           "golang-go",
           "poppler-utils",
-          "curl",
-          "pipx",
-          "git",
-          "unzip",
-          "ca-certificates",
-          "docker.io"
+          "unzip"
         ],
-        "machine_path_entries": ["C:\\Program Files (x86)\\GnuWin32\\bin"],
-        "machine_environment": [
-          {
-            "name": "POETRY_CACHE_DIR",
-            "value": "C:\\fleet\\poetry",
-            "reason": "the runners run as SYSTEM, whose profile is under System32, where 32-bit make is redirected to SysWOW64 and cannot launch a venv's python (MCPs run 36264009927)"
-          }
-        ],
-        "execution_policy": "RemoteSigned",
         "disk": {
           "ceiling_gb": 150,
-          "baseline_gb": 46,
-          "baseline_measured": "2026-09-26",
+          "baseline_gb": 18,
+          "baseline_measured": "2026-10-20",
           "cache_path": "/home/gharunner/.cache",
           "cache_ceiling_gb": 60,
           "work_ceiling_gb": 15

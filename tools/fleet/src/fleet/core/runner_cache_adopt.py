@@ -1,4 +1,4 @@
-"""How a WSL runner unit comes to read the action archive cache (MCPs board task ce2b92e0).
+"""How a runner unit comes to read the action archive cache (MCPs board task ce2b92e0).
 
 A unit takes an environment only when it starts, and a restart ends a
 running job (the unit's ``KillMode`` is ``control-group``), so the drop-in
@@ -44,12 +44,13 @@ from __future__ import annotations
 from fleet.contracts.action_cache import STATUS_PATH
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core.runner_action_cache import (
+    CACHE_DIR,
     CACHE_DROP_IN,
     CACHE_DROP_IN_NAME,
     CACHE_VARIABLE,
-    WSL_CACHE_DIR,
 )
 from fleet.core.runner_proc_bash import UNIT_PROCS_FUNCTION
+from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from fleet.core.script_values import scriptable
 
 #: Where the adopt script is installed.
@@ -81,7 +82,7 @@ settle=$1
 shift
 cgroup_root=/sys/fs/cgroup
 """
-    + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n\n"
+    + f"setting={CACHE_VARIABLE}={CACHE_DIR}\n\n"
     + UNIT_PROCS_FUNCTION
     + r"""
 # Whether runner unit UNIT, its cgroup at CGROUP, held no Runner.Worker at
@@ -167,7 +168,7 @@ if [ $# -lt 1 ]; then
     exit 2
 fi
 """
-    + f"setting={CACHE_VARIABLE}={WSL_CACHE_DIR}\n"
+    + f"setting={CACHE_VARIABLE}={CACHE_DIR}\n"
     + f"status={STATUS_PATH}\n"
     + r"""
 runners=0
@@ -230,23 +231,49 @@ WantedBy=timers.target
 """
 
 
-def wsl_units(spec: HostRunnerSpec) -> list[str]:
-    """The host's WSL runner units, as the timer passes them.
+def runner_units(spec: HostRunnerSpec) -> list[str]:
+    """The host's runner units, as the timer passes them.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
-        Each wsl-side install's unit, in roster order.
+        Each install's unit, in roster order.
 
     Raises:
         ValueError: When a unit name cannot be embedded verbatim.
     """
-    return [
-        scriptable(install["service"], label="service")
-        for install in spec["installs"]
-        if install["side"] == "wsl"
-    ]
+    return [scriptable(install["service"], label="service") for install in spec["installs"]]
+
+
+def render_adopt_service(spec: HostRunnerSpec) -> str:
+    """The adopt service: the adopt script, then the report, over every runner unit.
+
+    Args:
+        spec: The host's roster entry.
+
+    Returns:
+        The unit file's text. The report runs after the adopt script so the
+        counts it publishes follow any restart the adopt made.
+
+    Raises:
+        ValueError: When a unit name cannot be embedded verbatim.
+    """
+    named = " ".join(runner_units(spec))
+    return (
+        "\n".join(
+            [
+                "[Unit]",
+                "Description=Restart each idle runner unit running without the action cache",
+                "",
+                "[Service]",
+                "Type=oneshot",
+                f"ExecStart={ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {named}",
+                f"ExecStart={REPORT_PATH} {named}",
+            ]
+        )
+        + "\n"
+    )
 
 
 def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
@@ -258,29 +285,12 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
         spec: The host's roster entry.
 
     Returns:
-        The lines, written whole on every run as the fill's are; none when
-        the host has no WSL installs, since there is nothing to adopt. The
-        service runs the adopt script, then the report over the same units,
-        so the counts it publishes follow any restart it made.
+        The lines: both scripts written whole on every run, as the fill's
+        are, and both units written when they differ.
 
     Raises:
         ValueError: When a unit name cannot be embedded verbatim.
     """
-    units = wsl_units(spec)
-    if not units:
-        return []
-    named = " ".join(units)
-    service = "\n".join(
-        [
-            "[Unit]",
-            "Description=Restart each idle runner unit running without the action cache",
-            "",
-            "[Service]",
-            "Type=oneshot",
-            f"ExecStart={ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {named}",
-            f"ExecStart={REPORT_PATH} {named}",
-        ]
-    )
     return [
         f"cat > {ADOPT_PATH} <<'ADOPT_EOF'",
         ADOPT_SCRIPT.rstrip("\n"),
@@ -290,13 +300,16 @@ def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
         REPORT_SCRIPT.rstrip("\n"),
         "REPORT_EOF",
         f"chmod +x {REPORT_PATH}",
-        f"cat > /etc/systemd/system/{ADOPT_SERVICE_NAME} <<'UNIT_EOF'",
-        service,
-        "UNIT_EOF",
-        f"cat > /etc/systemd/system/{ADOPT_TIMER_NAME} <<'TIMER_EOF'",
-        ADOPT_TIMER.rstrip("\n"),
-        "TIMER_EOF",
-        "systemctl daemon-reload",
+        *render_unit_file_lines(
+            f"/etc/systemd/system/{ADOPT_SERVICE_NAME}",
+            render_adopt_service(spec),
+            announcement=f"{ADOPT_SERVICE_NAME} written",
+        ),
+        *render_unit_file_lines(
+            f"/etc/systemd/system/{ADOPT_TIMER_NAME}",
+            ADOPT_TIMER,
+            announcement=f"{ADOPT_TIMER_NAME} written",
+        ),
         f"systemctl enable --now {ADOPT_TIMER_NAME}",
     ]
 
@@ -310,7 +323,7 @@ def render_cache_environment_lines(install: RunnerInstall) -> list[str]:
     in the same run, restarts the unit if it is idle and says so either way.
 
     Args:
-        install: A wsl-side install; its ``service`` is the unit's name.
+        install: The install; its ``service`` is the unit's name.
 
     Returns:
         The lines.
@@ -319,14 +332,12 @@ def render_cache_environment_lines(install: RunnerInstall) -> list[str]:
         ValueError: When the unit name cannot be embedded verbatim.
     """
     unit = scriptable(install["service"], label="service")
-    directory = f"/etc/systemd/system/{unit}.d"
-    path = f"{directory}/{CACHE_DROP_IN_NAME}"
-    body = CACHE_DROP_IN.replace("\n", "\\n")
     return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then',
-        f"    mkdir -p {directory}",
-        f"    printf '{body}' > {path}",
-        "    systemctl daemon-reload",
-        "fi",
+        *render_drop_in_lines(
+            install,
+            name=CACHE_DROP_IN_NAME,
+            body=CACHE_DROP_IN,
+            announcement=f"action cache named for {unit}",
+        ),
         f"{ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {unit}",
     ]

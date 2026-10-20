@@ -1,4 +1,4 @@
-"""Which WSL runners still hold a job GitHub has dropped, and the audit row that names them.
+"""Which runners still hold a job GitHub has dropped, and the audit row that names them.
 
 MCPs board task 715b9ec5. On 2026-10-02 and 2026-10-16 every lavender-wsl
 listener lost GitHub, GitHub dropped the jobs and read all the runners
@@ -10,7 +10,7 @@ because the host alone cannot tell a long job from a dropped one. GitHub can.
 So the reading takes both halves. The hub asks GitHub for each repository's
 runners (``gh api repos/<repo>/actions/runners``, the same local auth that
 mints registration tokens, :mod:`fleet.core.runner_github`), and asks the
-host for every Runner.Worker of each WSL unit, in its cgroup or its job
+host for every Runner.Worker of each runner unit, in its cgroup or its job
 scopes, by pid, start and age, through the job scope helper's ``--workers``
 mode (:mod:`fleet.core.runner_job_scope_render`). A Worker older than
 :data:`DROPPED_GRACE_SECONDS` holds a dropped job when it is its unit's
@@ -86,7 +86,7 @@ class DroppedReading(TypedDict):
     """One host's reading.
 
     Attributes:
-        examined: How many WSL runners it read.
+        examined: How many runners it read.
         dropped: Each Worker holding a dropped job, in roster order.
         failure: None when the host answered; otherwise why the helper's
             read gave nothing.
@@ -114,17 +114,16 @@ def _workers_argv(spec: HostRunnerSpec, installs: list[RunnerInstall]) -> tuple[
 
     Args:
         spec: The host.
-        installs: Its WSL installs.
+        installs: Its installs.
 
     Returns:
-        ``wsl`` running the helper's ``--workers`` mode as root in the distro.
+        The helper's ``--workers`` mode, run as root.
 
     Raises:
         ValueError: When a value cannot be embedded verbatim.
     """
-    distro = scriptable(spec["wsl_distro"], label="wsl_distro")
     units = tuple(scriptable(install["service"], label="service") for install in installs)
-    return ("wsl", "-d", distro, "-u", "root", "--", JOB_SCOPE_PATH, "--workers", *units)
+    return (*remote.ROOT_PREFIX, JOB_SCOPE_PATH, "--workers", *units)
 
 
 def _unparsable(spec: HostRunnerSpec, detail: str) -> AppError[FleetErrorCode]:
@@ -149,7 +148,7 @@ def _parse_workers(
 
     Args:
         spec: The host, named in a refusal.
-        installs: The WSL installs whose units were asked about.
+        installs: The installs whose units were asked about.
         output: The lines, ``<unit> <pid> <start> <age>`` or ``<unit> -``.
 
     Returns:
@@ -241,23 +240,21 @@ def _dropped_of(
 
 
 def read_dropped(spec: HostRunnerSpec) -> DroppedReading:
-    """Read which of the host's WSL runners hold a job GitHub dropped.
+    """Read which of the host's runners hold a job GitHub dropped.
 
     Args:
         spec: The host.
 
     Returns:
-        The reading: nothing examined for a host with no WSL install, the
-        helper's failure when it did not answer, else each dropped Worker.
+        The reading: the helper's failure when it did not answer, else each
+        dropped Worker.
 
     Raises:
         AppError: ``RUNNER_GITHUB_UNREADABLE`` as :func:`read_github_runners`
             says; ``RUNNER_AUDIT_UNPARSABLE`` when the host's answer cannot
             be read.
     """
-    installs = [install for install in spec["installs"] if install["side"] == "wsl"]
-    if not installs:
-        return DroppedReading(examined=0, dropped=[], failure=None)
+    installs = spec["installs"]
     github = {repo: read_github_runners(repo) for repo in sorted({i["repo"] for i in installs})}
     outcome = remote.attempt_ssh(spec["host"], _workers_argv(spec, installs))
     if outcome["failure"] is not None:
@@ -282,7 +279,7 @@ def describe_dropped(held: DroppedWorker) -> str:
         held: The Worker.
 
     Returns:
-        E.g. ``wagner-austin/API lavender-wsl Runner.Worker 4312 (offline
+        E.g. ``wagner-austin/API lavender Runner.Worker 4312 (offline
         busy=false, 6300 s)``.
     """
     install, worker = held["install"], held["worker"]
@@ -300,16 +297,14 @@ def attempt_dropped_check(spec: HostRunnerSpec) -> AuditOutcome:
 
     Returns:
         One finding, ok when no examined runner holds a dropped job, and
-        drifted with the helper's words when it ran and failed; none for a
-        host with no WSL install; or no findings and the reason, when ssh
-        could not reach the host for the read.
+        drifted with the helper's words when it ran and failed; or no
+        findings and the reason, when ssh could not reach the host for the
+        read.
 
     Raises:
         AppError: As :func:`read_dropped` says.
     """
     reading = read_dropped(spec)
-    if reading["examined"] == 0:
-        return AuditOutcome(findings=[], reason="")
     failure = reading["failure"]
     if failure is not None and failure["code"] is FleetErrorCode.NODE_UNREACHABLE:
         return AuditOutcome(findings=None, reason=failure["message"])
@@ -319,13 +314,13 @@ def attempt_dropped_check(spec: HostRunnerSpec) -> AuditOutcome:
         detail = f"the job scope helper did not read the Workers: {failure['message']}"
     elif reading["dropped"]:
         detail = (
-            f"examined {reading['examined']} WSL runner(s) against GitHub; "
+            f"examined {reading['examined']} runner(s) against GitHub; "
             f"{len(reading['dropped'])} Runner.Worker(s) hold a job GitHub dropped: "
             + "; ".join(describe_dropped(held) for held in reading["dropped"])
         )
     else:
         detail = (
-            f"examined {reading['examined']} WSL runner(s) against GitHub; none holds a "
+            f"examined {reading['examined']} runner(s) against GitHub; none holds a "
             f"Runner.Worker over {DROPPED_GRACE_SECONDS} s that GitHub reads not busy or "
             "unlisted, or that a newer Worker superseded"
         )

@@ -1,7 +1,7 @@
 """Holding a runner host's caches to their ceilings.
 
 The disk row (:func:`fleet.core.runner_audit_disk.disk_check_id`) holds the
-distro's root to one number, which says a host has grown but not where. On
+host's root to one number, which says a host has grown but not where. On
 lavender the root went from 10 GB to 97 GB in the day after its 2026-09-26
 rebuild (MCPs board task bfca20e6): 50 GB was the runner account's cache,
 which pip, npm, poetry and playwright fill across jobs and nothing empties,
@@ -9,11 +9,9 @@ and about 23 GB was the eight installs' ``_work`` trees. Each of those is a
 row of its own here, so the audit that reports the growth names the
 directory it is in.
 
-MEASURED WITH ``du -s -BG`` INSIDE THE DISTRO, PARSED TO WHOLE GB. An
-unreadable answer (a missing directory, a du that failed) parses to -1 and
-drifts with du's own words and exit, never passes. Only WSL installs have a
-row: a Windows install's ``_work`` is on the host's own disk, which the
-distro ceiling does not govern.
+MEASURED WITH ``du -s -BG``, READ AS WHOLE GB. An answer that is not a size
+(a missing directory, a du that failed) leaves the figure empty and drifts
+with du's own words and exit, never passes.
 """
 
 from __future__ import annotations
@@ -42,7 +40,7 @@ class CacheRow(TypedDict):
     Attributes:
         check_id: ``cache:<path>:ceiling-<N>gb``; the ceiling is in the id
             so every line for the row states what is allowed.
-        path: The directory inside the distro, absolute.
+        path: The directory, absolute.
         ceiling_gb: The most it may hold, in GB.
         reason: Why the row exists.
     """
@@ -57,7 +55,7 @@ def _row(path: str, ceiling_gb: int, reason: str) -> CacheRow:
     """One row for a directory.
 
     Args:
-        path: The directory inside the distro.
+        path: The directory.
         ceiling_gb: Its ceiling in GB.
         reason: Why the row exists.
 
@@ -79,7 +77,7 @@ def cache_rows(spec: HostRunnerSpec) -> list[CacheRow]:
         spec: The host's roster entry.
 
     Returns:
-        The runner account's cache first, then one row per WSL install's
+        The runner account's cache first, then one row per install's
         ``_work`` tree in roster order.
     """
     disk = spec["base"]["disk"]
@@ -87,20 +85,19 @@ def cache_rows(spec: HostRunnerSpec) -> list[CacheRow]:
     rows.extend(
         _row(install["workdir"], disk["work_ceiling_gb"], WORK_REASON)
         for install in spec["installs"]
-        if install["side"] == "wsl"
     )
     return rows
 
 
 def render_cache_check_lines(spec: HostRunnerSpec) -> list[str]:
-    """Script lines that measure each cache row inside the distro.
+    """Audit lines that measure each cache row.
 
     Args:
         spec: The host's roster entry.
 
     Returns:
-        Six lines per row: ``du -s -BG`` of the directory, its first line
-        parsed to whole GB (-1 when unreadable), and the Write-Check.
+        Three bash lines per row: ``du -s -BG`` of the directory, its first
+        line read as whole GB by the audit's ``gb_at``, and the ``check``.
 
     Raises:
         ValueError: When a path cannot be embedded verbatim; see
@@ -111,14 +108,11 @@ def render_cache_check_lines(spec: HostRunnerSpec) -> list[str]:
         path = scriptable(row["path"], label="cache path")
         ceiling = row["ceiling_gb"]
         lines += [
-            f"$Probe = Invoke-InDistro $Cmd $Wsl $Distro \"du -s -BG '{path}'\"",
-            "$CacheGb = -1",
-            "if ((@($Probe.Lines | Select-Object -First 1) -join '') -match '^(\\d+)G') {",
-            "    $CacheGb = [int]$Matches[1]",
-            "}",
-            f"Write-Check '{row['check_id']}' ($Probe.Exit -eq 0 -and $CacheGb -ge 0 -and "
-            f"$CacheGb -le {ceiling}) ('{path} holds ' + $CacheGb + ' GB against a ceiling of "
-            f"{ceiling} GB; du said: ' + $Probe.Text)",
+            f"probe du -s -BG '{path}'",
+            "held=$(gb_at 1)",
+            f'check \'{row["check_id"]}\' "$(verdict_of within "$held" {ceiling})" '
+            f'"{path} holds ${{held:-an unreadable figure}} GB against a ceiling of '
+            f'{ceiling} GB; du said: $PROBE_TEXT"',
         ]
     return lines
 

@@ -134,13 +134,13 @@ having none.
 ## `fleet-runners`: a CI runner host is disposable
 
 The self-hosted GitHub Actions runners live on one roster, `runners.json`:
-which runners each host carries, which assets their jobs need, and, in each
-host's `base`, what a stock Windows install needs before any runner can
-register. `fleet-runners` holds the hosts to it:
+which runners each host carries, which assets their jobs need, the CI slice
+their jobs share, and, in each host's `base`, the apt packages a fleet node
+lacks for them. `fleet-runners` holds the hosts to it:
 
 ```bash
 fleet-runners --spec runners.json                                   # audit every host
-fleet-runners --spec runners.json --host lavender --render <dir>    # write provision.ps1/.sh
+fleet-runners --spec runners.json --host lavender --render <dir>    # write base.sh and provision.sh
 fleet-runners --spec runners.json --host lavender --onboard owner/repo
 fleet-runners --spec runners.json --host lavender --rebuild yes     # rebuild the host
 ```
@@ -149,24 +149,22 @@ The operator, on 2026-09-26, while lavender was being recovered by hand from a
 full disk: "it justcis a github runner". A machine whose only job is running
 CI holds nothing that needs saving, so the answer to any fault on it is to
 wipe it and run the recipe again (board task 1aa6a021). `--rebuild yes` is
-that recipe. It starts from a machine that node setup has made reachable (the
-corvis-stick `fleet-node-setup` skill: OpenSSH, Tailscale, git, the fleet
-key), because nothing can reach a stock install before that, and it lays, in
-order:
+that recipe. Every runner host is an Ubuntu fleet node since lavender was
+reimaged on 2026-10-19 (MCPs board task 1e9ab738), so the recipe starts from
+a node a CORVIS stick or a netboot installed and MCPs' `make fleet-provision`
+provisioned (Tailscale, the fleet user's key and passwordless sudo, docker,
+the GPU driver, the toolchain), because nothing can reach a machine before
+that. Each stage is a bash payload sent to the host's `payload_dir` and run
+there as root (`remote.run_root_script`), in order:
 
-1. the **Windows base**: the optional features WSL needs, the pinned WSL
-   release (MSI, SHA-256 checked), the LocalMachine execution policy, Win32
-   and git long paths, the machine PATH, the declared machine variables and
-   `.wslconfig`; then the
-   **reboot** Windows asks for,
-   waited out by comparing boot instants, never by a sleep;
-2. the **distro**, imported from the pinned image when it is not registered;
-3. **`/etc/wsl.conf`** (systemd as PID 1), restarting the distro when it
-   changed;
-4. the **Linux base**: the roster's apt packages, docker, the runner account;
-5. **registration tokens**, minted with `gh`, one per repository;
-6. the roster's own **`provision.ps1` and `provision.sh`**, carrying them;
-7. the **audit**, whose findings are the verdict and the exit code.
+1. the **base**: refuses a host whose docker is not active, installs the
+   roster's apt packages, creates the runner account `gharunner` in the
+   docker group and proves it can reach docker; then the **reboot** a
+   package asked for (`/var/run/reboot-required`), waited out by comparing
+   the kernel's boot id, never by a sleep, and the base again;
+2. **registration tokens**, minted with `gh`, one per repository;
+3. the roster's own **`provision.sh`**, carrying them;
+4. the **audit**, whose findings are the verdict and the exit code.
 
 Every stage is idempotent, so a rebuild cut short by anything is finished by
 running the same command again, and a rebuild over a healthy host changes
@@ -185,22 +183,19 @@ nothing: an install whose `.runner` exists is not configured twice.
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Written in `ci_clean`, embedded by `runner_render` and installed by provision.sh |
 | ci-clean's report | `/var/lib/ci-clean/last-run`, in the state directory systemd makes for the service (`StateDirectory=ci-clean`), world-readable: each run writes the sha256 of the script that ran, when it started, every pass's closing line, the daemon's build cache records before the prunes and after them, which generation each runner install's last job read and what the current one holds. `test_runner_hygiene_host` reads it, because the runner account's home is closed to the fleet's user (MCPs board tasks 46c7b11b and 4b405239) |
-| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<side>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5). Once every unit's leftovers are reaped, a pass restarts each unit whose `Slice=` drop-in names `listeners.slice` while its cgroup is still in `runners.slice`, the moment its Listener runs with no Worker: a unit running a job is read again five times a second for up to `PLACE_WAIT_SECONDS`, 20 s, because a single read missed the seconds between two jobs on every pass for 82 minutes |
-| The distro itself | Imported from the pinned image |
-| Windows PATH, execution policy, long paths, `.wslconfig`, keepalive task | Laid by the Windows base and provision.ps1; the keepalive is registered through S4U at startup, so it holds the distro open after a reboot with nobody logged on |
-| Each Windows runner service's account | SYSTEM, a deliberate privilege decision (`runner_account` says why and what it costs). provision.ps1 rebinds a service found under another account and removes the work tree that account owned, and the audit's `account:windows:<service>:LocalSystem` row drifts on any other |
-| Machine variables (`base.machine_environment`) | Written by the Windows base, which asks for a reboot when one changed, because a service only sees the environment built at boot; each has a `machine-env:<name>` audit row. `POETRY_CACHE_DIR` is `C:\fleet\poetry` because SYSTEM's profile is under System32, where 32-bit `make` is redirected to SysWOW64 and cannot launch a venv's python |
-| Each Windows runner's Python tool cache | Seeded by provision.ps1 from the NuGet CPython package, with pip's `Scripts` entry points written from its bundled wheel |
+| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5). Once every unit's leftovers are reaped, a pass restarts each unit whose `Slice=` drop-in names `listeners.slice` while its cgroup is still in `runners.slice`, the moment its Listener runs with no Worker: a unit running a job is read again five times a second for up to `PLACE_WAIT_SECONDS`, 20 s, because a single read missed the seconds between two jobs on every pass for 82 minutes |
+| Each unit file the provision writes | Written through `runner_unit_files`, the one writer: a unit or drop-in is rewritten, and systemd reloaded, only when its text differs, so a re-run over a built host reloads nothing |
 | The licensed game tree (`manual` asset) | The one exception: no script may fetch it. The rebuild prints it as `PLACE BY HAND`, and the audit fails until it is placed |
 
-**The disk ceiling.** The audit fails a host whose distro root uses more than
+**The disk ceiling.** The audit fails a host whose root uses more than
 `base.disk.ceiling_gb`, and the row's id carries both numbers, so every line,
 passing or failing, says what is allowed and what normal was:
-`disk:/:ceiling-150gb:baseline-46gb@2026-09-26`. The baseline is lavender's
-idle rebuilt root, 46 GB on 2026-09-26, which still read 46 GB after about
-thirty real MCPs jobs. The ceiling leaves about 100 GB for the working set
-(the image pull cache, one set of venvs per runner, the checkouts) and trips
-long before the 536 GB of leaked volumes that filled lavender's disk on
+`disk:/:ceiling-150gb:baseline-18gb@2026-10-20`. The baseline is lavender's
+root after its reimage and the fleet node provision and before any runner,
+18 GB used of 915 GB at 2026-10-20T00:33Z. The 150 GB ceiling, kept from the
+WSL guest, leaves the working set (the image pull cache, one set of venvs per
+runner, the checkouts) far more room than the guest had and trips long
+before the 536 GB of leaked volumes that filled lavender's disk on
 2026-09-25.
 
 ## `fleet-agent`: serving the corvis dispatch queue
@@ -249,7 +244,7 @@ therefore four passes, in this order:
    This pass writes to the **taskboard**, so it needs `TASKBOARD_MCP_API_KEY`
    (mcp-taskboard's `MCP_INTERNAL_KEY`) beside the queue's key.
 4. **reap** — read the roster (`runners.json` at the rolled commit) and, for
-   each host with WSL runners, ask `gh` for each repository's runners and the
+   each runner host, ask `gh` for each repository's runners and the
    host's job scope helper for each unit's `Runner.Worker`s by pid, start and
    age. A Worker over five minutes old is holding a job GitHub dropped when
    GitHub reads its runner not busy, online or offline, or does not list it,
@@ -1264,10 +1259,12 @@ its tags or capacity are weighed, so a runner is never offered it
 (`fitting_projects`) and nobody who submits the check has to name the node.
 
 `tools/fleet-execution-runners` is this package's own (MCPs board task
-715b9ec5, A3), pinned to `lavender-wsl`. Its `make check` is this package's
+715b9ec5, A3). It was pinned to `lavender-wsl` and left the registry with
+that guest on 2026-10-19, and it is declared again, pinned to `lavender`,
+once runners run there. Its `make check` is this package's
 `execution-runners`, which passes `--runner-host=lavender` to the suite and so
 runs only the `host_runner_units` cases (`tests/_host.py`): they read, on the
-host and as the fleet user, that every WSL runner unit `runners.json` declares
+host and as the fleet user, that every runner unit `runners.json` declares
 for lavender is active in `listeners.slice`, that slice unbounded and
 `runners.slice` at the roster's `memory_high_gb`, and every live
 `Runner.Worker` in its own job scope; and they fill a slice of the fleet

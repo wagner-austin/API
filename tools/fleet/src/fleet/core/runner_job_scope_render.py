@@ -1,6 +1,6 @@
 """The bash that runs each GitHub Actions job outside its runner's listener.
 
-MCPs board task 715b9ec5. Until it, every WSL runner unit, its
+MCPs board task 715b9ec5. Until it, every runner unit, its
 ``Runner.Listener`` included, sat in the CI slice its jobs fill, and the
 listener is what holds a job's lease with GitHub. On 2026-10-02 and again on
 2026-10-16 the slice sat at its ``MemoryHigh`` and every listener's calls to
@@ -44,8 +44,10 @@ from __future__ import annotations
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
+from fleet.core.runner_install import RUNNER_ACCOUNT
 from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
 from fleet.core.runner_tool_caches import HOOK_LINES
+from fleet.core.runner_unit_files import render_drop_in_lines
 from fleet.core.script_values import scriptable
 
 #: Where the helper is installed.
@@ -68,7 +70,7 @@ HOOK_DROP_IN = f"[Service]\nEnvironment={HOOK_VARIABLE}={JOB_HOOK_PATH}\n"
 SUDOERS_PATH = "/etc/sudoers.d/fleet-runner-job-scope"
 
 #: The rule. ``""`` permits the command with no argument and nothing else.
-SUDOERS_RULE = f'gharunner ALL=(root) NOPASSWD: {JOB_SCOPE_PATH} ""\n'
+SUDOERS_RULE = f'{RUNNER_ACCOUNT} ALL=(root) NOPASSWD: {JOB_SCOPE_PATH} ""\n'
 
 #: Seconds a ``Runner.Worker`` may run in its unit's own cgroup before the
 #: placement row counts it. The hook runs once the job is set up, which the
@@ -275,14 +277,14 @@ def render_job_scope_lines() -> list[str]:
 
 
 def render_job_hook_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that give one WSL runner unit the job-started hook.
+    """Bash lines that give one runner unit the job-started hook.
 
     Run before the unit starts or is restarted into the listener slice
     (:func:`fleet.core.runner_slice_render.render_runner_slice_lines`), which
     is when its runner reads its environment.
 
     Args:
-        install: A wsl-side install; its ``service`` is the unit's name.
+        install: The install; its ``service`` is the unit's name.
 
     Returns:
         The lines. The drop-in is written, and systemd reloaded, only when the
@@ -291,18 +293,14 @@ def render_job_hook_lines(install: RunnerInstall) -> list[str]:
     Raises:
         ValueError: When the unit name cannot be embedded verbatim.
     """
-    unit = scriptable(install["service"], label="service")
-    directory = f"/etc/systemd/system/{unit}.d"
-    path = f"{directory}/{HOOK_DROP_IN_NAME}"
-    body = HOOK_DROP_IN.replace("\n", "\\n")
-    return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then',
-        f"    mkdir -p {directory}",
-        f"    printf '{body}' > {path}",
-        "    systemctl daemon-reload",
-        f"    echo 'job hook set for {unit}: each job runs in a scope of {CI_SLICE_NAME}'",
-        "fi",
-    ]
+    return render_drop_in_lines(
+        install,
+        name=HOOK_DROP_IN_NAME,
+        body=HOOK_DROP_IN,
+        announcement=(
+            f"job hook set for {install['service']}: each job runs in a scope of {CI_SLICE_NAME}"
+        ),
+    )
 
 
 #: Why the placement row matters, printed beside a drift line.
@@ -314,27 +312,27 @@ PLACEMENT_REASON = (
 
 
 def placement_check_id(install: RunnerInstall) -> str:
-    """The placement row's id for one WSL install.
+    """The placement row's id for one install.
 
     Args:
-        install: A wsl-side install.
+        install: The install.
 
     Returns:
-        E.g. ``placement:wagner-austin/MCPs:wsl:lavender-wsl``.
+        E.g. ``placement:wagner-austin/MCPs:lavender``.
     """
-    return f"placement:{install['repo']}:{install['side']}:{install['runner_name']}"
+    return f"placement:{install['repo']}:{install['runner_name']}"
 
 
 def render_placement_check_lines(install: RunnerInstall) -> list[str]:
-    """Audit lines for one WSL install's placement row.
+    """Audit lines for one install's placement row.
 
     Args:
-        install: A wsl-side install.
+        install: The install; its ``service`` is the unit's name.
 
     Returns:
-        The lines. The row passes only when the helper's ``--audit`` exits 0
-        and its first line reads ``placed``: the unit runs in the listener
-        slice, and no ``Runner.Worker`` older than
+        The bash lines. The row passes only when the helper's ``--audit``
+        exits 0 and its first line reads ``placed``: the unit runs in the
+        listener slice, and no ``Runner.Worker`` older than
         :data:`ADOPTION_GRACE_SECONDS` runs in the unit's own cgroup. The
         helper's whole answer is the row's detail either way.
 
@@ -342,13 +340,11 @@ def render_placement_check_lines(install: RunnerInstall) -> list[str]:
         ValueError: When the unit name cannot be embedded verbatim.
     """
     service = scriptable(install["service"], label="service")
-    check_id = placement_check_id(install)
     return [
-        f"$Probe = Invoke-InDistro $Cmd $Wsl $Distro \"{JOB_SCOPE_PATH} --audit '{service}'\"",
-        "$Placed = (@($Probe.Lines | Select-Object -First 1) -join '')",
-        f"Write-Check '{check_id}' ($Probe.Exit -eq 0 -and $Placed -eq 'placed') "
-        f"('{service} in {LISTENER_SLICE_NAME} and its jobs in {CI_SLICE_NAME}; the helper read: ' "
-        "+ $Probe.Text)",
+        f"probe {JOB_SCOPE_PATH} --audit '{service}'",
+        f"check '{placement_check_id(install)}' \"$(verdict_of answered placed)\" "
+        f'"{service} in {LISTENER_SLICE_NAME} and its jobs in {CI_SLICE_NAME}; the helper '
+        'read: $PROBE_TEXT"',
     ]
 
 

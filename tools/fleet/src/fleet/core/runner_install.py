@@ -1,15 +1,16 @@
-"""What a runner install is called on its host, for both sides' provisions.
+"""What a runner install, its account and its payloads are called on the host.
 
-The runner release, the environment variable a repository's registration
-token arrives in, and the directory an install lives in are one fact each,
-read by the Windows provision (:mod:`fleet.core.runner_windows_provision`)
-and the Linux one (:mod:`fleet.core.runner_render`) alike, so neither side
-can name them differently from the other.
+The runner release, the account every runner runs as, the environment
+variable a repository's registration token arrives in, the directory an
+install lives in, and where a payload lands are one fact each, read by the
+provision (:mod:`fleet.core.runner_render`), the audit
+(:mod:`fleet.core.runner_audit`) and the rebuild alike, so none of them can
+name them differently from the others.
 """
 
 from __future__ import annotations
 
-from fleet.contracts.runners import RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 
 #: The GitHub Actions runner release the rendered provisions install.
 #:
@@ -17,6 +18,9 @@ from fleet.contracts.runners import RunnerInstall
 #: as the version the live lavender installs run (2026-09-08). Bumping it is
 #: a one-line change reviewed like any other.
 RUNNER_VERSION = "2.337.0"
+
+#: The account every runner on a host runs as, and owns its install as.
+RUNNER_ACCOUNT = "gharunner"
 
 
 def token_variable(repo: str) -> str:
@@ -40,14 +44,28 @@ def install_root_for(install: RunnerInstall) -> str:
         install: The install.
 
     Returns:
-        The parent of the ``_work`` tree, backslashed for a windows-side
-        install (command lines and cmdlets both take that form) and POSIX
-        for a wsl one.
+        The parent of the ``_work`` tree.
     """
-    root = install["workdir"].rsplit("/", 1)[0]
-    if install["side"] == "windows":
-        return root.replace("/", "\\")
-    return root
+    return install["workdir"].rsplit("/", 1)[0]
 
 
-__all__ = ["RUNNER_VERSION", "install_root_for", "token_variable"]
+def payload_path(spec: HostRunnerSpec, stem: str) -> str:
+    """Where a root payload lands on the runner host.
+
+    Args:
+        spec: The host.
+        stem: The payload's file-name stem.
+
+    Returns:
+        ``<payload_dir>/<stem>.sh``.
+    """
+    return f"{spec['payload_dir']}/{stem}.sh"
+
+
+__all__ = [
+    "RUNNER_ACCOUNT",
+    "RUNNER_VERSION",
+    "install_root_for",
+    "payload_path",
+    "token_variable",
+]

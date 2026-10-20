@@ -2,13 +2,11 @@
 
 MCPs board task 715b9ec5, A1. Each fake answers through ``_test_hooks.run``
 exactly as :mod:`tests.test_core_io` describes: first one ``gh`` runner list
-per repository of the host's WSL installs, in name order, then the job scope
+per repository of the host's installs, in name order, then the job scope
 helper's ``--workers`` lines over ssh.
 """
 
 from __future__ import annotations
-
-from typing import Literal
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
@@ -18,73 +16,35 @@ from fleet.core import _test_hooks, runner_dropped_check
 from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_dropped_check import DroppedReading, DroppedWorker, HostWorker
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
-from tests._runner_fixtures import a_base, a_ci_slice
+from tests._runner_fixtures import a_host, an_install
 from tests.conftest import FakeRun, failed, ok
 
-
-def _install(repo: str, runner_name: str, side: Literal["wsl", "windows"]) -> RunnerInstall:
-    """One install of the test host.
-
-    Args:
-        repo: Its repository.
-        runner_name: Its runner's name.
-        side: ``wsl`` or ``windows``.
-
-    Returns:
-        The install, its unit named after both.
-    """
-    stem = repo.replace("/", "-")
-    return RunnerInstall(
-        repo=repo,
-        runner_name=runner_name,
-        side=side,
-        service=f"actions.runner.{stem}.{runner_name}" + (".service" if side == "wsl" else ""),
-        workdir=(
-            f"/home/gharunner/{runner_name}/_work"
-            if side == "wsl"
-            else f"C:/actions-runner-{runner_name}/_work"
-        ),
-        labels=[runner_name],
-        python_toolcache=[],
-    )
-
-
-#: The WSL installs: three runners of API and one of x, x sorting after API.
-WSL: tuple[RunnerInstall, ...] = (
-    _install("wagner-austin/API", "lavender-wsl", "wsl"),
-    _install("wagner-austin/API", "lavender-wsl-2", "wsl"),
-    _install("wagner-austin/API", "lavender-wsl-3", "wsl"),
-    _install("wagner-austin/x", "lavender-wsl", "wsl"),
+#: The installs: three runners of API and one of x, x sorting after API.
+INSTALLS: tuple[RunnerInstall, ...] = (
+    an_install("wagner-austin/API"),
+    an_install("wagner-austin/API", "lavender-2", slot=2),
+    an_install("wagner-austin/API", "lavender-3", slot=3),
+    an_install("wagner-austin/x"),
 )
 
-#: A Windows install, which the reading does not read.
-WINDOWS = _install("wagner-austin/chat", "lavender", "windows")
 
-
-def _host(*installs: RunnerInstall) -> HostRunnerSpec:
-    """A lavender-shaped host with the given installs.
-
-    Args:
-        *installs: Its installs.
+def _host() -> HostRunnerSpec:
+    """A lavender-shaped host holding :data:`INSTALLS`.
 
     Returns:
         The spec.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task=None,
-        wslconfig_min_memory_gb=None,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=False,
-        systemd_timers=[],
-        job_timeout_minutes=360,
-        installs=list(installs),
-        assets=[],
-        base=a_base(),
-        ci_slice=a_ci_slice(),
-    )
+    return a_host(INSTALLS)
+
+
+#: The command the helper's read runs on the host.
+WORKERS_READ = (
+    "sudo",
+    "-n",
+    JOB_SCOPE_PATH,
+    "--workers",
+    *(install["service"] for install in INSTALLS),
+)
 
 
 def _worker(pid: int, age: int) -> HostWorker:
@@ -101,7 +61,7 @@ def _worker(pid: int, age: int) -> HostWorker:
 
 
 def _answer(*units: tuple[HostWorker, ...]) -> str:
-    """The helper's ``--workers`` answer, one tuple of Workers per WSL install in order.
+    """The helper's ``--workers`` answer, one tuple of Workers per install in order.
 
     Args:
         *units: Each unit's Workers, none for ``<unit> -``.
@@ -110,7 +70,7 @@ def _answer(*units: tuple[HostWorker, ...]) -> str:
         The lines.
     """
     lines: list[str] = []
-    for install, workers in zip(WSL, units, strict=True):
+    for install, workers in zip(INSTALLS, units, strict=True):
         if not workers:
             lines.append(f"{install['service']} -\n")
         for worker in workers:
@@ -121,10 +81,10 @@ def _answer(*units: tuple[HostWorker, ...]) -> str:
 
 
 #: GitHub reading every API runner online and busy.
-API_BUSY = "lavender-wsl online true\nlavender-wsl-2 online true\nlavender-wsl-3 online true\n"
+API_BUSY = "lavender online true\nlavender-2 online true\nlavender-3 online true\n"
 
 #: GitHub reading x's runner online and busy.
-X_BUSY = "lavender-wsl online true\n"
+X_BUSY = "lavender online true\n"
 
 
 def _one(*, passed: bool, detail: str) -> AuditOutcome:
@@ -146,28 +106,18 @@ def _one(*, passed: bool, detail: str) -> AuditOutcome:
     return AuditOutcome(findings=[finding], reason="")
 
 
-#: The clean detail over the four WSL installs.
+#: The clean detail over the four installs.
 CLEAN = (
-    "examined 4 WSL runner(s) against GitHub; none holds a Runner.Worker over 300 s that "
+    "examined 4 runner(s) against GitHub; none holds a Runner.Worker over 300 s that "
     "GitHub reads not busy or unlisted, or that a newer Worker superseded"
 )
 
 
 class TestTheReading:
-    def test_a_host_with_no_wsl_install_is_not_read(self) -> None:
-        runner = FakeRun([])
-        _test_hooks.run = runner
-        assert runner_dropped_check.read_dropped(_host(WINDOWS)) == DroppedReading(
-            examined=0, dropped=[], failure=None
-        )
-        assert runner.calls == []
-
     def test_each_dropped_worker_is_named_by_its_runner_pid_and_start(self) -> None:
         """The 2026-10-16 shape: GitHub reads the runners offline or idle, or
         lists them no more, while their Workers run on."""
-        github = (
-            "lavender-wsl offline false\nlavender-wsl-2 online false\nlavender-wsl-3 online true\n"
-        )
+        github = "lavender offline false\nlavender-2 online false\nlavender-3 online true\n"
         runner = FakeRun(
             [
                 ok(github),
@@ -183,30 +133,23 @@ class TestTheReading:
             ]
         )
         _test_hooks.run = runner
-        reading = runner_dropped_check.read_dropped(_host(*WSL, WINDOWS))
+        reading = runner_dropped_check.read_dropped(_host())
         assert reading == DroppedReading(
             examined=4,
             dropped=[
-                DroppedWorker(install=WSL[0], worker=_worker(41, 6300), said="offline busy=false"),
-                DroppedWorker(install=WSL[1], worker=_worker(42, 400), said="online busy=false"),
-                DroppedWorker(install=WSL[3], worker=_worker(44, 301), said="unlisted"),
+                DroppedWorker(
+                    install=INSTALLS[0], worker=_worker(41, 6300), said="offline busy=false"
+                ),
+                DroppedWorker(
+                    install=INSTALLS[1], worker=_worker(42, 400), said="online busy=false"
+                ),
+                DroppedWorker(install=INSTALLS[3], worker=_worker(44, 301), said="unlisted"),
             ],
             failure=None,
         )
         assert runner.calls[0][3] == "repos/wagner-austin/API/actions/runners"
         assert runner.calls[1][3] == "repos/wagner-austin/x/actions/runners"
-        assert tuple(runner.calls[2][-13:]) == (
-            "lavender",
-            "wsl",
-            "-d",
-            "Ubuntu",
-            "-u",
-            "root",
-            "--",
-            JOB_SCOPE_PATH,
-            "--workers",
-            *(install["service"] for install in WSL),
-        )
+        assert tuple(runner.calls[2][-(len(WORKERS_READ) + 1) :]) == ("lavender", *WORKERS_READ)
 
     def test_an_older_worker_a_newer_one_superseded_is_dropped_whatever_github_says(
         self,
@@ -220,31 +163,30 @@ class TestTheReading:
         _test_hooks.run = FakeRun(
             [ok(API_BUSY), ok(X_BUSY), ok(_answer((newer, older), (handing, taking), (), ()))]
         )
-        reading = runner_dropped_check.read_dropped(_host(*WSL))
+        reading = runner_dropped_check.read_dropped(_host())
         assert reading["dropped"] == [
-            DroppedWorker(install=WSL[0], worker=older, said="superseded by Runner.Worker 52")
+            DroppedWorker(install=INSTALLS[0], worker=older, said="superseded by Runner.Worker 52")
         ]
 
     def test_a_worker_inside_the_grace_or_none_is_not_named(self) -> None:
         """GitHub's list lags a job's start, so a Worker of exactly the grace
         under a runner GitHub reads idle is a job starting, not a dropped one."""
-        idle = "lavender-wsl offline false\nlavender-wsl-2 online false\n"
+        idle = "lavender offline false\nlavender-2 online false\n"
         _test_hooks.run = FakeRun(
             [ok(idle), ok(""), ok(_answer((_worker(61, 300),), (), (_worker(62, 12),), ()))]
         )
-        assert runner_dropped_check.read_dropped(_host(*WSL))["dropped"] == []
+        assert runner_dropped_check.read_dropped(_host())["dropped"] == []
 
     def test_a_host_that_did_not_answer_is_its_failure(self) -> None:
         _test_hooks.run = FakeRun([ok(API_BUSY), ok(X_BUSY), failed(255, "No route to host")])
-        reading = runner_dropped_check.read_dropped(_host(*WSL))
+        reading = runner_dropped_check.read_dropped(_host())
         failure = reading["failure"]
         assert reading["examined"] == 4
         assert reading["dropped"] == []
         assert failure == {
             "code": FleetErrorCode.NODE_UNREACHABLE,
-            "message": "ssh to lavender failed while running `wsl -d Ubuntu -u root -- "
-            f"{JOB_SCOPE_PATH} --workers {' '.join(i['service'] for i in WSL)}`: "
-            "No route to host",
+            "message": "ssh to lavender failed while running "
+            f"`{' '.join(WORKERS_READ)}`: No route to host",
         }
 
     @pytest.mark.parametrize(
@@ -254,28 +196,23 @@ class TestTheReading:
     def test_a_line_of_any_other_shape_is_unparsable(self, line: str) -> None:
         _test_hooks.run = FakeRun([ok(API_BUSY), ok(X_BUSY), ok(_answer((), (), (), ()) + line)])
         with pytest.raises(AppError) as fault:
-            runner_dropped_check.read_dropped(_host(*WSL))
+            runner_dropped_check.read_dropped(_host())
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
         assert repr(line) in fault.value.message
 
     def test_an_answer_that_stops_early_is_unparsable_not_workerless(self) -> None:
-        stopped = "".join(f"{install['service']} -\n" for install in WSL[:2])
+        stopped = "".join(f"{install['service']} -\n" for install in INSTALLS[:2])
         _test_hooks.run = FakeRun([ok(API_BUSY), ok(X_BUSY), ok(stopped)])
         with pytest.raises(AppError) as fault:
-            runner_dropped_check.read_dropped(_host(*WSL))
+            runner_dropped_check.read_dropped(_host())
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
         assert fault.value.message == (
             "lavender's job scope helper named no Worker for "
-            f"{WSL[2]['service']}, {WSL[3]['service']}"
+            f"{INSTALLS[2]['service']}, {INSTALLS[3]['service']}"
         )
 
 
 class TestTheAuditRow:
-    def test_a_host_with_no_wsl_install_has_no_row(self) -> None:
-        _test_hooks.run = FakeRun([])
-        outcome = runner_dropped_check.attempt_dropped_check(_host(WINDOWS))
-        assert outcome == AuditOutcome(findings=[], reason="")
-
     def test_busy_runners_with_old_workers_are_ok_and_the_count_is_named(self) -> None:
         _test_hooks.run = FakeRun(
             [
@@ -284,22 +221,22 @@ class TestTheAuditRow:
                 ok(_answer((_worker(71, 9000),), (_worker(72, 9000),), (), (_worker(74, 9000),))),
             ]
         )
-        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL, WINDOWS))
+        outcome = runner_dropped_check.attempt_dropped_check(_host())
         assert outcome == _one(passed=True, detail=CLEAN)
 
     def test_each_dropped_worker_drifts_the_row_by_name(self) -> None:
         _test_hooks.run = FakeRun(
             [
-                ok("lavender-wsl online false\n"),
+                ok("lavender online false\n"),
                 ok(X_BUSY),
                 ok(_answer((_worker(81, 700),), (), (), ())),
             ]
         )
-        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL))
+        outcome = runner_dropped_check.attempt_dropped_check(_host())
         assert outcome == _one(
             passed=False,
-            detail="examined 4 WSL runner(s) against GitHub; 1 Runner.Worker(s) hold a job "
-            "GitHub dropped: wagner-austin/API lavender-wsl Runner.Worker 81 "
+            detail="examined 4 runner(s) against GitHub; 1 Runner.Worker(s) hold a job "
+            "GitHub dropped: wagner-austin/API lavender Runner.Worker 81 "
             "(online busy=false, 700 s)",
         )
 
@@ -309,17 +246,17 @@ class TestTheAuditRow:
         GitHub still held on 2026-10-17."""
         _test_hooks.run = FakeRun(
             [
-                ok("lavender-wsl offline true\nlavender-wsl-2 offline true\n"),
+                ok("lavender offline true\nlavender-2 offline true\n"),
                 ok(X_BUSY),
                 ok(_answer((_worker(91, 9000),), (_worker(92, 9000),), (), ())),
             ]
         )
-        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL))
+        outcome = runner_dropped_check.attempt_dropped_check(_host())
         assert outcome == _one(passed=True, detail=CLEAN)
 
     def test_a_host_ssh_cannot_reach_is_a_value_with_its_reason(self) -> None:
         _test_hooks.run = FakeRun([ok(API_BUSY), ok(X_BUSY), failed(255, "No route to host")])
-        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL))
+        outcome = runner_dropped_check.attempt_dropped_check(_host())
         assert outcome["findings"] is None
         assert "No route to host" in outcome["reason"]
 
@@ -328,17 +265,10 @@ class TestTheAuditRow:
         _test_hooks.run = FakeRun(
             [ok(API_BUSY), ok(X_BUSY), failed(127, "fleet-runner-job-scope: not found")]
         )
-        outcome = runner_dropped_check.attempt_dropped_check(_host(*WSL))
-        command = " ".join(
-            (
-                "wsl -d Ubuntu -u root --",
-                JOB_SCOPE_PATH,
-                "--workers",
-                *(install["service"] for install in WSL),
-            )
-        )
+        outcome = runner_dropped_check.attempt_dropped_check(_host())
         assert outcome == _one(
             passed=False,
             detail="the job scope helper did not read the Workers: running "
-            f"`{command}` on lavender exited 127: fleet-runner-job-scope: not found",
+            f"`{' '.join(WORKERS_READ)}` on lavender exited 127: "
+            "fleet-runner-job-scope: not found",
         )

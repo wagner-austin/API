@@ -1,4 +1,4 @@
-"""The hub's pass that ends every WSL runner Worker whose job GitHub dropped.
+"""The hub's pass that ends every runner Worker whose job GitHub dropped.
 
 MCPs board task 715b9ec5, A2. The host's reaper ends a Worker only past the
 host's job timeout (:mod:`fleet.core.runner_reaper_render`, rule 3), because
@@ -9,7 +9,7 @@ NODE_OWNER_RESERVED while they did. The hub can tell, from GitHub's runner
 list (:mod:`fleet.core.runner_dropped_check`), so each hub tick runs this pass
 (:mod:`fleet.cli.hub_passes`):
 
-1. Read every roster host's WSL runners against GitHub.
+1. Read every roster host's runners against GitHub.
 2. When a host names a dropped Worker, read it again
    :data:`CONFIRM_SECONDS` later, once for every host that named one: a
    runner GitHub reads offline for one reading may be a listener
@@ -118,18 +118,13 @@ def _reap_argv(spec: HostRunnerSpec, held: DroppedWorker) -> tuple[str, ...]:
         held: The Worker.
 
     Returns:
-        ``wsl`` running the reaper's ``--dropped`` mode as root in the distro.
+        The reaper's ``--dropped`` mode, run as root.
 
     Raises:
         ValueError: When a value cannot be embedded verbatim.
     """
     return (
-        "wsl",
-        "-d",
-        scriptable(spec["wsl_distro"], label="wsl_distro"),
-        "-u",
-        "root",
-        "--",
+        *remote.ROOT_PREFIX,
         REAPER_PATH,
         "--dropped",
         scriptable(held["install"]["service"], label="service"),
@@ -183,7 +178,7 @@ def reap_pass(runners: RunnerSpec) -> list[str]:
         runners: The roster.
 
     Returns:
-        The pass's lines, one or more per host with a WSL runner.
+        The pass's lines, one or more per host.
 
     Raises:
         AppError: ``RUNNER_GITHUB_UNREADABLE`` and ``RUNNER_AUDIT_UNPARSABLE``
@@ -195,8 +190,6 @@ def reap_pass(runners: RunnerSpec) -> list[str]:
     named: list[tuple[HostRunnerSpec, DroppedReading]] = []
     for spec in runners["hosts"]:
         reading = read_dropped(spec)
-        if reading["examined"] == 0:
-            continue
         unread = _unread(spec, reading)
         if unread is not None:
             lines.append(unread)
@@ -209,7 +202,7 @@ def reap_pass(runners: RunnerSpec) -> list[str]:
             named.append((spec, reading))
         else:
             lines.append(
-                f"{spec['name']}: examined {reading['examined']} WSL runner(s); none holds a "
+                f"{spec['name']}: examined {reading['examined']} runner(s); none holds a "
                 "job GitHub dropped"
             )
     if not named:

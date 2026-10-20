@@ -55,3 +55,18 @@ def test_a_system32_binary_is_named_by_its_absolute_path() -> None:
     named = system32_parameter("Cmd", "cmd.exe")
 
     assert named == '[string]$Cmd = "$env:SystemRoot\\System32\\cmd.exe"'
+
+
+@pytest.mark.parametrize(
+    ("name", "binary", "message"),
+    [
+        ("cmd", "cmd.exe", "PascalCase"),
+        ("Cmd", "C:/cmd.exe", "lowercase name ending .exe"),
+        ("Cmd", "cmd", "lowercase name ending .exe"),
+    ],
+)
+def test_a_system32_value_that_is_not_plain_is_refused(
+    name: str, binary: str, message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        system32_parameter(name, binary)

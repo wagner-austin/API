@@ -1,4 +1,4 @@
-"""The bash that holds a host's WSL runners to their CI budget.
+"""The bash that holds a host's runners to their CI budget.
 
 MCPs board task 45a4f22b; the budget and the incident behind it are
 :mod:`fleet.contracts.runner_slice`. Three pieces, all idempotent:
@@ -33,6 +33,7 @@ from fleet.contracts.runner_slice import (
     CiSlice,
 )
 from fleet.contracts.runners import RunnerInstall
+from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from fleet.core.script_values import scriptable
 
 #: The runner drop-in's file name inside ``<unit>.d``.
@@ -99,36 +100,11 @@ def render_slice_unit(budget: CiSlice) -> str:
     directives = [*SLICE_ACCOUNTING, *render_slice_bounds(budget)]
     return (
         "[Unit]\n"
-        "Description=GitHub Actions runners' share of this VM, rendered by fleet-runners "
+        "Description=GitHub Actions runners' share of this host, rendered by fleet-runners "
         "(MCPs board tasks 45a4f22b, cb264851)\n"
         "\n"
         "[Slice]\n" + "".join(f"{directive}\n" for directive in directives)
     )
-
-
-def _render_unit_file_lines(path: str, body: str, said: str) -> list[str]:
-    """Bash lines that write one unit file only when its text differs.
-
-    Args:
-        path: Where the unit is written.
-        body: Its text.
-        said: What the lines print when they write it.
-
-    Returns:
-        The lines.
-    """
-    return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
-        body.rstrip("\n"),
-        "SLICE_EOF",
-        ')" ]; then',
-        f"    cat > {path} <<'SLICE_EOF'",
-        body.rstrip("\n"),
-        "SLICE_EOF",
-        "    systemctl daemon-reload",
-        f"    echo '{said}'",
-        "fi",
-    ]
 
 
 def render_slice_unit_lines(budget: CiSlice) -> list[str]:
@@ -141,29 +117,29 @@ def render_slice_unit_lines(budget: CiSlice) -> list[str]:
         The lines; they print what changed.
     """
     return [
-        *_render_unit_file_lines(
+        *render_unit_file_lines(
             SLICE_UNIT_PATH,
             render_slice_unit(budget),
-            f"ci budget set: {CI_SLICE_NAME} {' '.join(render_slice_bounds(budget))}",
+            announcement=f"ci budget set: {CI_SLICE_NAME} {' '.join(render_slice_bounds(budget))}",
         ),
         f"systemctl start {CI_SLICE_NAME}",
-        *_render_unit_file_lines(
+        *render_unit_file_lines(
             LISTENER_SLICE_UNIT_PATH,
             LISTENER_SLICE_UNIT,
-            f"listener slice set: {LISTENER_SLICE_NAME}, bounded by nothing",
+            announcement=f"listener slice set: {LISTENER_SLICE_NAME}, bounded by nothing",
         ),
         f"systemctl start {LISTENER_SLICE_NAME}",
     ]
 
 
 def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that put one WSL runner unit in the listener slice.
+    """Bash lines that put one runner unit in the listener slice.
 
     Run after the unit exists and after ``svc.sh start``, so the move sees
     the unit's live cgroup.
 
     Args:
-        install: A wsl-side install; its ``service`` is the unit's name.
+        install: The install; its ``service`` is the unit's name.
 
     Returns:
         The lines. The drop-in is written, and systemd reloaded, only when
@@ -174,15 +150,13 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
         ValueError: When the unit name cannot be embedded verbatim.
     """
     unit = scriptable(install["service"], label="service")
-    directory = f"/etc/systemd/system/{unit}.d"
-    path = f"{directory}/{SLICE_DROP_IN_NAME}"
-    body = SLICE_DROP_IN.replace("\n", "\\n")
     return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then',
-        f"    mkdir -p {directory}",
-        f"    printf '{body}' > {path}",
-        "    systemctl daemon-reload",
-        "fi",
+        *render_drop_in_lines(
+            install,
+            name=SLICE_DROP_IN_NAME,
+            body=SLICE_DROP_IN,
+            announcement=f"listener slice named for {unit}",
+        ),
         f"cgroup=$(systemctl show -p ControlGroup --value {unit})",
         'case "$cgroup" in',
         f"    /{LISTENER_SLICE_NAME}/*) ;;",

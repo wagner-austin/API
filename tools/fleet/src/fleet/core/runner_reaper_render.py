@@ -88,7 +88,7 @@ from __future__ import annotations
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
-from fleet.core.script_values import scriptable
+from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 
 #: The runner drop-in's file name inside ``<unit>.d``.
 KILL_DROP_IN_NAME = "fleet-kill.conf"
@@ -377,7 +377,7 @@ def render_kill_mode_lines(install: RunnerInstall) -> list[str]:
     the new ``KillMode`` at the reload, so its next stop or restart honours it.
 
     Args:
-        install: A wsl-side install; its ``service`` is the unit's name.
+        install: The install; its ``service`` is the unit's name.
 
     Returns:
         The lines. The drop-in is written, and systemd reloaded, only when
@@ -386,18 +386,12 @@ def render_kill_mode_lines(install: RunnerInstall) -> list[str]:
     Raises:
         ValueError: When the unit name cannot be embedded verbatim.
     """
-    unit = scriptable(install["service"], label="service")
-    directory = f"/etc/systemd/system/{unit}.d"
-    path = f"{directory}/{KILL_DROP_IN_NAME}"
-    body = KILL_DROP_IN.replace("\n", "\\n")
-    return [
-        f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then',
-        f"    mkdir -p {directory}",
-        f"    printf '{body}' > {path}",
-        "    systemctl daemon-reload",
-        f"    echo 'kill mode set for {unit}: a stop ends its whole cgroup'",
-        "fi",
-    ]
+    return render_drop_in_lines(
+        install,
+        name=KILL_DROP_IN_NAME,
+        body=KILL_DROP_IN,
+        announcement=f"kill mode set for {install['service']}: a stop ends its whole cgroup",
+    )
 
 
 def render_reaper_service(spec: HostRunnerSpec) -> str:
@@ -428,21 +422,24 @@ def render_reaper_lines(spec: HostRunnerSpec) -> list[str]:
         spec: The host, whose job timeout the service passes the reaper.
 
     Returns:
-        The lines: the script and both units written whole on every run, as
-        ``ci-clean``'s are, then a reload and the timer enabled and started.
+        The lines: the script written whole on every run, both units
+        written when they differ, then the timer enabled and started.
     """
     return [
         f"cat > {REAPER_PATH} <<'REAPER_EOF'",
         REAPER_SCRIPT.rstrip("\n"),
         "REAPER_EOF",
         f"chmod +x {REAPER_PATH}",
-        f"cat > /etc/systemd/system/{REAPER_SERVICE_NAME} <<'UNIT_EOF'",
-        render_reaper_service(spec).rstrip("\n"),
-        "UNIT_EOF",
-        f"cat > /etc/systemd/system/{REAPER_TIMER_NAME} <<'TIMER_EOF'",
-        REAPER_TIMER.rstrip("\n"),
-        "TIMER_EOF",
-        "systemctl daemon-reload",
+        *render_unit_file_lines(
+            f"/etc/systemd/system/{REAPER_SERVICE_NAME}",
+            render_reaper_service(spec),
+            announcement=f"{REAPER_SERVICE_NAME} written",
+        ),
+        *render_unit_file_lines(
+            f"/etc/systemd/system/{REAPER_TIMER_NAME}",
+            REAPER_TIMER,
+            announcement=f"{REAPER_TIMER_NAME} written",
+        ),
         f"systemctl enable --now {REAPER_TIMER_NAME}",
     ]
 

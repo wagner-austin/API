@@ -1,7 +1,7 @@
 """CLI: write every rendered PowerShell script to its committed copy.
 
 Usage:
-    python -m fleet.cli.render_powershell --spec runners.json --out rendered
+    python -m fleet.cli.render_powershell --out rendered
 
 ``make render-powershell`` runs exactly that. The registry and the reason the
 copies are committed are :mod:`fleet.core.rendered_powershell`'s; this only
@@ -19,14 +19,13 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 
-from fleet.cli.runners import SPEC_FLAG, load_runner_spec
 from fleet.core import _test_hooks, rendered_powershell
 
 _log = get_logger(__name__)
 
 OUT_FLAG = "--out"
 
-_FLAGS = (SPEC_FLAG, OUT_FLAG)
+_FLAGS = (OUT_FLAG,)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -39,15 +38,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         0 once every file is written.
 
     Raises:
-        ValueError: When a flag is unknown, repeated or missing its value,
-            or a render cannot be produced from the roster.
-        AppError: ``RUNNER_SPEC_UNREADABLE`` when the roster does not decode.
+        ValueError: When a flag is unknown, repeated or missing its value.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
-    roster = load_runner_spec(cli_args.require_flag(parsed, SPEC_FLAG))
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
-    scripts = rendered_powershell.render_all(roster)
+    scripts = rendered_powershell.render_all()
     for script in scripts:
         _test_hooks.write_text(out / f"{script['name']}.ps1", script["text"])
     _log.info("wrote %d rendered PowerShell script(s) to %s", len(scripts), out)

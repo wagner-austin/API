@@ -23,14 +23,16 @@ from typing_extensions import TypedDict
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_job_scope_render, runner_render, runner_tool_caches
+from fleet.core.runner_unit_files import render_drop_in_lines
+from tests._audit_rows import run_rows
 from tests._host_bash import host_bash
-from tests.test_runner_slice import _roster_host
+from tests._runner_fixtures import a_host, an_install
 
 #: The unit every case runs.
-UNIT = "actions.runner.wagner-austin-API.lavender-wsl.service"
+UNIT = "actions.runner.wagner-austin-API.lavender.service"
 
 #: The scope its Worker, pid 13, is adopted into.
-SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-wsl-13.scope"
+SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-13.scope"
 
 #: The stand-ins.
 STAND_INS = """
@@ -389,7 +391,7 @@ class TestTheAuditMode:
 
 
 #: Another unit of the host, asked about beside :data:`UNIT`.
-OTHER_UNIT = "actions.runner.wagner-austin-API.lavender-wsl-2.service"
+OTHER_UNIT = "actions.runner.wagner-austin-API.lavender-2.service"
 
 
 class TestTheWorkersMode:
@@ -440,17 +442,29 @@ def _install() -> RunnerInstall:
     """The unit's install.
 
     Returns:
-        It.
+        API's first install, whose unit is :data:`UNIT`.
     """
-    return RunnerInstall(
-        repo="wagner-austin/API",
-        runner_name="lavender-wsl",
-        side="wsl",
-        service=UNIT,
-        workdir="/home/gharunner/actions-runner-api-1/_work",
-        labels=["lavender-wsl"],
-        python_toolcache=[],
+    install = an_install("wagner-austin/API")
+    assert install["service"] == UNIT
+    return install
+
+
+def _placement_row(tmp_path: pathlib.Path, helper: str) -> str:
+    """Run the placement row under the audit's own functions, the helper a stand-in.
+
+    Args:
+        tmp_path: The case's directory.
+        helper: The stand-in helper's body.
+
+    Returns:
+        The row's ``CHECK`` line.
+    """
+    [row] = run_rows(
+        tmp_path,
+        runner_job_scope_render.render_placement_check_lines(_install()),
+        {runner_job_scope_render.JOB_SCOPE_PATH: helper},
     )
+    return row
 
 
 class TestTheRenderedPieces:
@@ -480,29 +494,46 @@ class TestTheRenderedPieces:
             "SUDOERS_EOF",
         ]
 
-    def test_each_unit_s_drop_in_names_the_hook_and_is_written_only_when_it_differs(
-        self,
-    ) -> None:
-        lines = runner_job_scope_render.render_job_hook_lines(_install())
-        path = f"/etc/systemd/system/{UNIT}.d/fleet-job-scope.conf"
-        body = (
-            "[Service]\\nEnvironment=ACTIONS_RUNNER_HOOK_JOB_STARTED="
-            "/usr/local/bin/fleet-runner-job-started.sh\\n"
+    def test_each_unit_s_drop_in_names_the_hook_through_the_one_unit_writer(self) -> None:
+        assert runner_job_scope_render.HOOK_DROP_IN == (
+            "[Service]\nEnvironment=ACTIONS_RUNNER_HOOK_JOB_STARTED="
+            "/usr/local/bin/fleet-runner-job-started.sh\n"
         )
-        assert lines[0] == f'if [ "$(cat {path} 2>/dev/null)" != "$(printf \'{body}\')" ]; then'
-        assert lines[2] == f"    printf '{body}' > {path}"
+        assert runner_job_scope_render.render_job_hook_lines(_install()) == render_drop_in_lines(
+            _install(),
+            name="fleet-job-scope.conf",
+            body=runner_job_scope_render.HOOK_DROP_IN,
+            announcement=f"job hook set for {UNIT}: each job runs in a scope of {CI_SLICE_NAME}",
+        )
 
     def test_the_provision_installs_the_helper_before_any_runner(self) -> None:
-        script = runner_render.render_provision(_roster_host())["linux_script"]
+        script = runner_render.render_provision(a_host([_install()]))["provision_script"]
         assert script.index("visudo -cf") < script.index("./svc.sh start")
 
-    def test_the_placement_row_asks_the_helper_s_audit_mode(self) -> None:
+    def test_the_placement_row_is_named_for_the_install(self) -> None:
         assert runner_job_scope_render.placement_check_id(_install()) == (
-            "placement:wagner-austin/API:wsl:lavender-wsl"
+            "placement:wagner-austin/API:lavender"
         )
-        lines = runner_job_scope_render.render_placement_check_lines(_install())
-        assert lines[0] == (
-            "$Probe = Invoke-InDistro $Cmd $Wsl $Distro "
-            f"\"/usr/local/sbin/fleet-runner-job-scope --audit '{UNIT}'\""
+
+    def test_the_placement_row_passes_when_the_helper_reads_placed(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        assert _placement_row(tmp_path, 'echo placed; echo "$2 in listeners.slice"') == (
+            "CHECK placement:wagner-austin/API:lavender OK"
         )
-        assert "$Placed -eq 'placed'" in lines[2]
+
+    @pytest.mark.parametrize(
+        ("helper", "read"),
+        [
+            ('echo misplaced; echo "$2 runs in runners.slice"; exit 0', "misplaced"),
+            ("echo placed; exit 1", "placed"),
+        ],
+    )
+    def test_the_placement_row_drifts_with_the_helper_s_words_otherwise(
+        self, tmp_path: pathlib.Path, helper: str, read: str
+    ) -> None:
+        row = _placement_row(tmp_path, helper)
+        assert row.startswith(
+            f"CHECK placement:wagner-austin/API:lavender DRIFT {UNIT} in {LISTENER_SLICE_NAME} "
+            f"and its jobs in {CI_SLICE_NAME}; the helper read: {read}"
+        )

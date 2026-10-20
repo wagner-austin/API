@@ -13,13 +13,11 @@ test_runner_action_cache_units.
 
 from __future__ import annotations
 
-import io
 import os
 import pathlib
 import subprocess
 import tarfile
 import time
-import zipfile
 
 import pytest
 
@@ -231,19 +229,6 @@ def _tar_members(archive: pathlib.Path) -> dict[str, bytes]:
     return members
 
 
-def _zip_members(archive: pathlib.Path) -> dict[str, bytes]:
-    """A zip archive's files and their bytes.
-
-    Args:
-        archive: The archive.
-
-    Returns:
-        Each file's path to its bytes.
-    """
-    with zipfile.ZipFile(io.BytesIO(archive.read_bytes())) as opened:
-        return {name: opened.read(name) for name in opened.namelist() if not name.endswith("/")}
-
-
 def _summary(
     examined: int,
     workdirs: int,
@@ -251,9 +236,8 @@ def _summary(
     held: int,
     failed: int,
     pruned: int,
-    archive_format: str = "tar.gz",
 ) -> str:
-    """One pass's last line, into the cases' ``cache``.
+    """The fill's last line, into the cases' ``cache``.
 
     Args:
         examined: References read.
@@ -262,13 +246,12 @@ def _summary(
         held: Archives already there.
         failed: References that resolved to nothing or were not built.
         pruned: Archives removed.
-        archive_format: The pass's format.
 
     Returns:
         The line, with its newline.
     """
     return (
-        f"fleet-action-cache-fill: {archive_format} into cache: {examined} action reference(s) "
+        f"fleet-action-cache-fill: into cache: {examined} action reference(s) "
         f"in the checkouts of {workdirs} workdir(s): {cached} cached now, {held} already held, "
         f"{failed} failed; {pruned} unnamed for {runner_action_cache.PRUNE_DAYS} days removed\n"
     )
@@ -284,7 +267,7 @@ class TestTheFillRunsForReal:
         composite = "runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v7\n"
         host.checkout("one", "MCPs", host.workflow(), composite)
         host.checkout("two", "API", "steps:\n  - uses: actions/checkout@v7\n", None)
-        first = host.run("tar.gz", "cache", "one", "two")
+        first = host.run("cache", "one", "two")
         assert first.returncode == 0, first.stderr
         sha = host.sha
         # setup-node's v7 is an annotated tag: the archive is of the commit it
@@ -308,23 +291,10 @@ class TestTheFillRunsForReal:
             f"fleet-action-cache-fill: cached actions/checkout@v7 at {checkout}"
         )
         assert first.stdout.endswith(_summary(4, 2, 4, 0, 0, 0))
-        second = host.run("tar.gz", "cache", "one", "two")
+        second = host.run("cache", "one", "two")
         assert second.returncode == 0, second.stderr
         assert len(host.fetched()) == 4
         assert second.stdout == _summary(4, 2, 0, 4, 0, 0)
-
-    def test_the_windows_side_gets_zip_archives_of_one_top_directory(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        host = Fill(tmp_path)
-        host.checkout("win", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
-        ran = host.run("zip", "cache", "win")
-        assert ran.returncode == 0, ran.stderr
-        checkout = host.sha["actions/checkout"]
-        assert host.archives() == [f"actions_checkout/{checkout}.zip"]
-        assert _zip_members(host.cache / "actions_checkout" / f"{checkout}.zip") == {
-            f"actions-checkout-{checkout[:12]}/action.yml": b"name: actions/checkout\n"
-        }
 
     def test_a_ref_naming_nothing_fails_the_pass_after_the_others_are_cached(
         self, tmp_path: pathlib.Path
@@ -337,7 +307,7 @@ class TestTheFillRunsForReal:
             "  - uses: nobody/gone@v1\n"
         )
         host.checkout("one", "MCPs", workflow, None)
-        ran = host.run("tar.gz", "cache", "one")
+        ran = host.run("cache", "one")
         assert ran.returncode == 1
         assert ran.stdout.splitlines()[1:] == [
             "fleet-action-cache-fill: actions/setup-node@v99 names no tag, branch or commit "
@@ -354,7 +324,7 @@ class TestTheFillRunsForReal:
         host = Fill(tmp_path)
         host.checkout("one", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
         (host.table / "refuse").write_text("", encoding="utf-8")
-        ran = host.run("tar.gz", "cache", "one")
+        ran = host.run("cache", "one")
         assert ran.returncode == 1
         assert ran.stdout == (
             "fleet-action-cache-fill: could not fetch actions/checkout@v7 at "
@@ -374,24 +344,25 @@ class TestTheFillRunsForReal:
         named = host.cache / "actions_checkout" / f"{checkout}.tar.gz"
         stale = host.cache / "actions_checkout" / f"{'e' * 40}.tar.gz"
         recent = host.cache / "actions_setup-node" / f"{'f' * 40}.tar.gz"
-        other_format = host.cache / "actions_setup-node" / f"{'f' * 40}.zip"
+        not_an_archive = host.cache / "actions_setup-node" / "notes.txt"
         for archive, when in (
             (named, old),
             (stale, old),
             (recent, time.time() - 5 * days),
-            (other_format, old),
+            (not_an_archive, old),
         ):
             archive.parent.mkdir(parents=True, exist_ok=True)
             archive.write_text("held", encoding="utf-8")
             os.utime(archive, (when, when))
-        ran = host.run("tar.gz", "cache", "one")
+        ran = host.run("cache", "one")
         assert ran.returncode == 0, ran.stderr
         assert host.fetched() == []
         assert ran.stdout == _summary(1, 1, 0, 1, 0, 1)
+        # Only an archive is the fill's to prune.
         assert host.archives() == [
             f"actions_checkout/{checkout}.tar.gz",
             f"actions_setup-node/{'f' * 40}.tar.gz",
-            f"actions_setup-node/{'f' * 40}.zip",
+            "actions_setup-node/notes.txt",
         ]
         # Named this pass, so its age starts again.
         assert named.stat().st_mtime > time.time() - days
@@ -404,34 +375,13 @@ class TestTheFillRunsForReal:
         held = host.cache / "actions_checkout" / f"{host.sha['actions/checkout']}.tar.gz"
         held.parent.mkdir(parents=True)
         held.write_text("held", encoding="utf-8")
-        ran = host.run("tar.gz", "cache", "empty")
+        ran = host.run("cache", "empty")
         assert ran.returncode == 0, ran.stderr
         assert ran.stdout == _summary(0, 1, 0, 0, 0, 0)
         assert host.archives() == [f"actions_checkout/{host.sha['actions/checkout']}.tar.gz"]
 
-    def test_a_failed_pass_does_not_stop_the_next_and_fails_the_fill(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        # lavender's first run, 2026-10-15T12:41Z: one archive was refused,
-        # and the Windows pass, a second ExecStart, never ran.
-        host = Fill(tmp_path)
-        host.checkout("one", "MCPs", "steps:\n  - uses: nobody/gone@v1\n", None)
-        host.checkout("win", "MCPs", "steps:\n  - uses: actions/checkout@v7\n", None)
-        ran = host.run("tar.gz", "cache", "one", "--", "zip", "cache", "win")
-        assert ran.returncode == 1
-        assert ran.stdout.splitlines()[1] == _summary(1, 1, 0, 0, 1, 0).rstrip("\n")
-        assert ran.stdout.endswith(_summary(1, 1, 1, 0, 0, 0, "zip"))
-        assert host.archives() == [f"actions_checkout/{host.sha['actions/checkout']}.zip"]
-
-    @pytest.mark.parametrize(
-        "arguments",
-        [
-            ("tar.gz", "cache"),
-            ("tar", "cache", "one"),
-            ("tar.gz", "cache", "one", "--", "zip", "cache"),
-        ],
-    )
-    def test_a_short_or_unknown_pass_is_refused_with_its_usage_before_any_runs(
+    @pytest.mark.parametrize("arguments", [(), ("cache",)])
+    def test_a_fill_without_a_cache_and_a_workdir_is_refused_with_its_usage(
         self, tmp_path: pathlib.Path, arguments: tuple[str, ...]
     ) -> None:
         host = Fill(tmp_path)
@@ -439,7 +389,6 @@ class TestTheFillRunsForReal:
         ran = host.run(*arguments)
         assert ran.returncode == 2
         assert ran.stderr == (
-            "fleet-action-cache-fill: usage: fleet-action-cache-fill tar.gz|zip CACHE WORKDIR... "
-            "[-- tar.gz|zip CACHE WORKDIR...]...\n"
+            "fleet-action-cache-fill: usage: fleet-action-cache-fill CACHE WORKDIR...\n"
         )
         assert host.fetched() == []

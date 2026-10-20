@@ -1,17 +1,23 @@
-"""The rendered provision: both scripts, the manual steps, and the payloads.
+"""The rendered converge scripts: the base, the provision, and the manual steps.
 
-The hygiene payloads themselves are tests/test_ci_clean.py's; here they are
-asserted only as embedded in the provision, byte for byte.
+The base and the lines that act on a host's files run here under a real bash,
+each command they ask a stand-in that records what it was asked
+(tests/_stand_ins.py). The hygiene payloads are tests/test_ci_clean.py's and
+each section's lines their own module's; here they are asserted as composed
+into the provision, in order.
 """
 
 from __future__ import annotations
 
 import pathlib
-import subprocess
+from collections.abc import Sequence
+
+import pytest
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import (
     ci_clean,
+    runner_action_cache,
     runner_cache_adopt,
     runner_install,
     runner_job_scope_render,
@@ -19,263 +25,417 @@ from fleet.core import (
     runner_recovery,
     runner_render,
     runner_slice_render,
-    runner_windows_provision,
 )
-from tests._host_bash import host_bash
-from tests._runner_fixtures import a_base, a_ci_slice
+from fleet.core.runner_unit_files import render_unit_file_lines
+from tests._runner_fixtures import a_host, an_install
+from tests._stand_ins import run_with_stand_ins
+
+#: The base's line once it has done everything.
+_READY = "base ready: packages installed, docker reachable as gharunner"
 
 
-def _host(
-    *,
-    keepalive_task: str | None = "wsl-keepalive",
-    wslconfig_min_memory_gb: int | None = 26,
-    assets: list[FileAsset] | None = None,
-) -> HostRunnerSpec:
-    """A host spec shaped per test, two installs across two repos.
+def _recording(tmp_path: pathlib.Path, name: str, then: str = "exit 0") -> str:
+    """A stand-in body that appends its command line to ``asked``, then answers.
 
     Args:
-        keepalive_task: The keepalive declaration.
-        wslconfig_min_memory_gb: The memory floor declaration.
-        assets: The asset declarations, default one of each kind.
+        tmp_path: The case's directory, holding ``asked``.
+        name: The command's name, written before its arguments.
+        then: What the stand-in does after recording.
+
+    Returns:
+        The body.
+    """
+    return f'echo "{name} $*" >> "{tmp_path}/asked"\n{then}'
+
+
+def _asked(tmp_path: pathlib.Path) -> list[str]:
+    """Every command line the recording stand-ins were asked, in order.
+
+    Args:
+        tmp_path: The case's directory.
+
+    Returns:
+        The lines, none when nothing was asked.
+    """
+    asked = tmp_path / "asked"
+    return asked.read_text().splitlines() if asked.exists() else []
+
+
+def _assets(tmp_path: pathlib.Path) -> list[FileAsset]:
+    """One asset of each kind, the fetchable one's command recording its run.
+
+    Args:
+        tmp_path: The case's directory, which the fetchable and writable
+            assets live under.
+
+    Returns:
+        A manual jar, a fetchable converter and a writable directory.
+    """
+    converter = tmp_path / "convert.py"
+    return [
+        FileAsset(
+            path="/opt/corvis/rw-game/game-lib.jar",
+            sha256="8a" * 32,
+            writable=False,
+            reason="the provenance jar",
+            manual=True,
+            provision_command=None,
+        ),
+        FileAsset(
+            path=str(converter),
+            sha256=None,
+            writable=False,
+            reason="the GGUF converter",
+            manual=False,
+            provision_command=f"echo fetched >> '{tmp_path}/asked'; touch '{converter}'",
+        ),
+        FileAsset(
+            path=str(tmp_path / "data"),
+            sha256=None,
+            writable=True,
+            reason="checkpoint writes",
+            manual=False,
+            provision_command=None,
+        ),
+    ]
+
+
+def _two_repos(tmp_path: pathlib.Path) -> HostRunnerSpec:
+    """A host with an install of each of two repositories and every kind of asset.
+
+    Args:
+        tmp_path: The case's directory, for the assets.
 
     Returns:
         The spec.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task=keepalive_task,
-        wslconfig_min_memory_gb=wslconfig_min_memory_gb,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=True,
-        systemd_timers=["ci-clean.timer"],
-        job_timeout_minutes=360,
-        installs=[
-            RunnerInstall(
-                repo="wagner-austin/API",
-                runner_name="lavender-wsl",
-                side="wsl",
-                service="actions.runner.wagner-austin-API.lavender-wsl.service",
-                workdir="/home/gharunner/actions-runner-1/_work",
-                labels=["lavender-wsl"],
-                python_toolcache=[],
-            ),
-            RunnerInstall(
-                repo="wagner-austin/MCPs",
-                runner_name="lavender-wsl",
-                side="wsl",
-                service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-                workdir="/home/gharunner/actions-runner-2/_work",
-                labels=["lavender-wsl", "linux-ci"],
-                python_toolcache=[],
-            ),
-        ],
-        assets=[
-            FileAsset(
-                path="/opt/corvis/rw-game/game-lib.jar",
-                sha256="8a" * 32,
-                writable=False,
-                reason="the provenance jar",
-                manual=True,
-                provision_command=None,
-            ),
-            FileAsset(
-                path="/opt/llama.cpp/convert_lora_to_gguf.py",
-                sha256=None,
-                writable=False,
-                reason="the GGUF converter",
-                manual=False,
-                provision_command="git clone --depth 1 https://example.invalid/l /opt/llama.cpp",
-            ),
-            FileAsset(
-                path="/data",
-                sha256=None,
-                writable=True,
-                reason="checkpoint writes",
-                manual=False,
-                provision_command=None,
-            ),
-        ]
-        if assets is None
-        else assets,
-        base=a_base(),
-        ci_slice=a_ci_slice(),
+    return a_host(
+        [an_install("wagner-austin/API"), an_install("wagner-austin/MCPs")],
+        assets=_assets(tmp_path),
     )
 
 
-class TestWindowsScript:
-    """provision.ps1 is :mod:`fleet.core.runner_windows_provision`'s, tested there."""
+class TestTheBase:
+    """base.sh, run for real."""
 
-    def test_the_windows_script_is_the_windows_provision_with_no_tokens(self) -> None:
-        spec = _host()
-        rendered = runner_render.render_provision(spec)
-        assert rendered["windows_script"] == (
-            runner_windows_provision.render_windows_provision_script(spec, {})
+    def _run(
+        self, tmp_path: pathlib.Path, *, reboot: bool = False, **answers: str
+    ) -> tuple[int, str, str]:
+        """Run the base with every command it asks a recording stand-in.
+
+        Args:
+            tmp_path: The case's directory.
+            reboot: Whether a package asked for a reboot.
+            **answers: Stand-in bodies replacing the recording ones.
+
+        Returns:
+            The exit status, standard output and standard error.
+        """
+        flag = tmp_path / "reboot-required"
+        if reboot:
+            flag.touch()
+        script = runner_render.render_base_script(a_host())
+        commands = {
+            name: _recording(tmp_path, name)
+            for name in ("systemctl", "apt-get", "useradd", "usermod", "runuser")
+        }
+        commands["id"] = "exit 1"
+        ran = run_with_stand_ins(
+            tmp_path,
+            script.replace(runner_render.REBOOT_REQUIRED_PATH, str(flag)).splitlines(),
+            {**commands, **answers},
+            options=(),
         )
-        # A Windows install never leaks into the Linux script, whose
-        # environment cannot run it.
-        assert "config.cmd" not in rendered["linux_script"]
+        return ran.returncode, ran.stdout, ran.stderr
 
-
-class TestLinuxScript:
-    """provision.sh."""
-
-    def test_the_hygiene_payloads_are_embedded_byte_identically(self) -> None:
-        script = runner_render.render_provision(_host())["linux_script"]
-        assert ci_clean.CI_CLEAN_SCRIPT.rstrip("\n") in script
-        assert ci_clean.CI_CLEAN_SERVICE.rstrip("\n") in script
-        assert ci_clean.CI_CLEAN_TIMER.rstrip("\n") in script
-        assert "systemctl enable --now ci-clean.timer" in script
-
-    def test_a_writable_asset_becomes_mkdir_and_chown(self) -> None:
-        script = runner_render.render_provision(_host())["linux_script"]
-        assert "mkdir -p '/data'" in script
-        assert "chown gharunner:gharunner '/data'" in script
-
-    def test_a_fetchable_asset_runs_its_own_command_idempotently(self) -> None:
-        script = runner_render.render_provision(_host())["linux_script"]
-        assert "if [ ! -e '/opt/llama.cpp/convert_lora_to_gguf.py' ]; then" in script
-        assert "git clone --depth 1 https://example.invalid/l /opt/llama.cpp" in script
-
-    def test_a_manual_asset_appears_in_no_script(self) -> None:
-        rendered = runner_render.render_provision(_host())
-        assert "rw-game" not in rendered["linux_script"]
-        assert "rw-game" not in rendered["windows_script"]
-
-    def test_each_install_demands_its_repos_token_and_configures_it(self) -> None:
-        script = runner_render.render_provision(_host())["linux_script"]
-        assert "RUNNER_TOKEN_API" in script
-        assert "RUNNER_TOKEN_MCPS" in script
-        assert "--url https://github.com/wagner-austin/API" in script
-        assert "--labels lavender-wsl,linux-ci" in script
-        assert runner_install.RUNNER_VERSION in script
-
-    def test_a_same_named_registration_is_taken_back(self) -> None:
-        """A rebuilt host's old runners are still registered, offline, under
-        the roster's names (board task 1aa6a021), so config.sh replaces
-        rather than refuses; rendered-provision-windows.Tests.ps1 holds
-        config.cmd to the same."""
-        wsl = RunnerInstall(
-            repo="wagner-austin/MCPs",
-            runner_name="lavender-wsl",
-            side="wsl",
-            service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-            workdir="/home/gharunner/actions-runner/_work",
-            labels=["lavender-wsl"],
-            python_toolcache=[],
-        )
-        [configure] = [
-            line for line in runner_render.render_wsl_install_lines(wsl) if "./config.sh" in line
-        ]
-        assert configure.endswith('--name lavender-wsl --labels lavender-wsl --replace"')
-
-    def test_the_local_bin_line_appends_once_when_run_for_real(
+    def test_a_fresh_node_gets_the_packages_and_the_account_in_docker(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """The .path lines are executed, twice, by a real bash against a real
-        file shaped as config.sh writes it: one colon-joined line. Both
-        entries land once and in order, and the second run leaves the file
-        unchanged, because the provision is re-run after any roster change.
-
-        The lines run from a script file, as runner_onboard delivers them
-        (``bash <file>``), never through ``bash -c``: on a host whose PATH
-        resolves bash to System32's WSL launcher, that launcher re-expands
-        its argument and turns ``s#$#`` into ``s#0#``, which the 2026-09-26
-        review re-run hit and production never can."""
-        bash = host_bash()
-        install = RunnerInstall(
-            repo="wagner-austin/MCPs",
-            runner_name="lavender-wsl",
-            side="wsl",
-            service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-            workdir="rt/_work",
-            labels=["lavender-wsl"],
-            python_toolcache=[],
-        )
-        appends = [
-            line for line in runner_render.render_wsl_install_lines(install) if ".path" in line
+        assert self._run(tmp_path) == (0, f"{_READY}\n", "")
+        assert _asked(tmp_path) == [
+            "systemctl is-active --quiet docker",
+            "apt-get update -qq",
+            "apt-get install -y -qq ffmpeg golang-go",
+            "useradd -m -s /bin/bash gharunner",
+            "usermod -aG docker gharunner",
+            "runuser -u gharunner -- docker ps",
         ]
-        assert len(appends) == len(runner_render.RUNNER_PATH_ENTRIES)
-        runner_dir = tmp_path / "rt"
-        runner_dir.mkdir()
-        (runner_dir / ".path").write_bytes(b"/usr/local/bin:/usr/bin:/bin\n")
-        (tmp_path / "append-path.sh").write_bytes(("\n".join(appends) + "\n").encode())
-        for _ in range(2):
-            ran = subprocess.run(
-                [bash, "append-path.sh"],
-                cwd=tmp_path,
-                capture_output=True,
-                text=True,
-                check=False,
+
+    def test_an_existing_account_is_not_created_again(self, tmp_path: pathlib.Path) -> None:
+        assert self._run(tmp_path, id="exit 0")[0] == 0
+        assert not any(line.startswith("useradd") for line in _asked(tmp_path))
+
+    def test_a_package_that_asks_for_a_reboot_is_said(self, tmp_path: pathlib.Path) -> None:
+        status, out, _ = self._run(tmp_path, reboot=True)
+        assert (status, out) == (0, f"{runner_render.REBOOT_MARKER}\n{_READY}\n")
+
+    def test_a_node_with_no_docker_is_refused_before_anything_is_installed(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        status, out, err = self._run(tmp_path, systemctl="exit 3")
+        assert (status, out) == (1, "")
+        assert err == (
+            "docker is not active; run the fleet node provision "
+            "(MCPs scripts/host/fleet-node/provision.sh) first\n"
+        )
+        assert _asked(tmp_path) == []
+
+    def test_an_account_that_cannot_reach_docker_fails_the_base(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        status, out, _ = self._run(tmp_path, runuser="exit 1")
+        assert (status, out) == (1, "")
+
+    @pytest.mark.parametrize("package", ["ffmpeg;rm", "FFmpeg", "-y", "go lang", "pkg$"])
+    def test_a_package_name_that_is_not_plain_is_refused(self, package: str) -> None:
+        host = a_host()
+        host["base"]["apt_packages"] = [package]
+        with pytest.raises(ValueError, match="not a plain package name"):
+            runner_render.render_base_script(host)
+
+
+def _in_order(lines: Sequence[str], *blocks: Sequence[str]) -> bool:
+    """Whether each block appears whole in ``lines``, each after the one before.
+
+    Compared as text, since a renderer's line may carry a whole heredoc.
+
+    Args:
+        lines: The script's lines.
+        *blocks: The blocks, in the order they must appear.
+
+    Returns:
+        True when every block was found in turn, each starting a line.
+    """
+    text = "\n" + "\n".join(lines) + "\n"
+    at = 0
+    for block in blocks:
+        found = text.find("\n" + "\n".join(block) + "\n", at)
+        if found < 0:
+            return False
+        at = found + len("\n".join(block)) + 1
+    return True
+
+
+class TestTheProvision:
+    """provision.sh, composed from each section's renderer."""
+
+    def test_the_tokens_are_exported_first_in_repository_order(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        tokens = {"wagner-austin/MCPs": "TWO", "wagner-austin/API": "ONE"}
+        lines = runner_render.render_provision_script(_two_repos(tmp_path), tokens).splitlines()
+        assert lines[:2] == list(runner_render.SCRIPT_HEADER)
+        assert lines[4:6] == ["export RUNNER_TOKEN_API='ONE'", "export RUNNER_TOKEN_MCPS='TWO'"]
+
+    def test_a_token_that_cannot_be_embedded_is_refused(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match="registration token"):
+            runner_render.render_provision_script(
+                _two_repos(tmp_path), {"wagner-austin/API": "a'b"}
             )
-            assert ran.returncode == 0, ran.stderr
-        assert (runner_dir / ".path").read_bytes() == (
-            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}:{runner_render.WSL_LIB}\n"
+
+    def test_every_section_is_its_renderer_s_lines_in_order(self, tmp_path: pathlib.Path) -> None:
+        spec = _two_repos(tmp_path)
+        lines = runner_render.render_provision_script(spec, {}).splitlines()
+        assets = spec["assets"]
+        assert _in_order(
+            lines,
+            ci_clean.CI_CLEAN_SCRIPT.rstrip("\n").splitlines(),
+            render_unit_file_lines(
+                runner_render.CI_CLEAN_SERVICE_PATH,
+                ci_clean.CI_CLEAN_SERVICE,
+                announcement="hygiene unit set: ci-clean.service",
+            ),
+            render_unit_file_lines(
+                runner_render.CI_CLEAN_TIMER_PATH,
+                ci_clean.CI_CLEAN_TIMER,
+                announcement="hygiene unit set: ci-clean.timer",
+            ),
+            ["systemctl enable --now ci-clean.timer"],
+            runner_render.render_asset_lines(assets[1]),
+            runner_render.render_asset_lines(assets[2]),
+            runner_slice_render.render_slice_unit_lines(spec["ci_slice"]),
+            runner_reaper_render.render_reaper_lines(spec),
+            runner_job_scope_render.render_job_scope_lines(),
+            runner_action_cache.render_fill_lines(spec),
+            runner_cache_adopt.render_adopt_lines(spec),
+            *(runner_render.render_install_lines(install) for install in spec["installs"]),
+        )
+
+    def test_a_manual_asset_appears_in_no_script(self, tmp_path: pathlib.Path) -> None:
+        rendered = runner_render.render_provision(_two_repos(tmp_path))
+        assert "rw-game" not in rendered["provision_script"]
+        assert "rw-game" not in rendered["base_script"]
+
+
+class TestTheAssetLines:
+    """Each fetchable asset's lines, run for real."""
+
+    def test_a_writable_directory_is_made_and_given_to_the_runners(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        data = _assets(tmp_path)[2]
+        ran = run_with_stand_ins(
+            tmp_path,
+            runner_render.render_asset_lines(data),
+            {"chown": _recording(tmp_path, "chown")},
+            options=("-eu",),
+        )
+        assert ran.returncode == 0, ran.stderr
+        assert (tmp_path / "data").is_dir()
+        assert _asked(tmp_path) == [f"chown gharunner:gharunner {tmp_path}/data"]
+
+    def test_a_fetchable_asset_is_fetched_once_over_two_runs(self, tmp_path: pathlib.Path) -> None:
+        lines = runner_render.render_asset_lines(_assets(tmp_path)[1])
+        ran = run_with_stand_ins(tmp_path, [*lines, *lines], {}, options=("-eu",))
+        assert ran.returncode == 0, ran.stderr
+        assert _asked(tmp_path) == ["fetched"]
+        assert (tmp_path / "convert.py").is_file()
+
+    def test_a_path_that_cannot_be_embedded_is_refused(self, tmp_path: pathlib.Path) -> None:
+        asset = _assets(tmp_path)[2]
+        asset["path"] = "/da'ta"
+        with pytest.raises(ValueError, match="asset path"):
+            runner_render.render_asset_lines(asset)
+
+
+class TestTheInstallLines:
+    """One runner's lines: configured once, its PATH extended once, then started."""
+
+    def _install_in(self, tmp_path: pathlib.Path) -> RunnerInstall:
+        """An install whose directory is the case's ``runner``.
+
+        Args:
+            tmp_path: The case's directory.
+
+        Returns:
+            The install.
+        """
+        install = an_install()
+        install["workdir"] = f"{tmp_path}/runner/_work"
+        (tmp_path / "runner").mkdir()
+        return install
+
+    def _registration(self, install: RunnerInstall) -> list[str]:
+        """The block that registers an unconfigured runner.
+
+        Args:
+            install: The install.
+
+        Returns:
+            Its four lines.
+        """
+        lines = runner_render.render_install_lines(install)
+        root = runner_install.install_root_for(install)
+        guard = lines.index(f"if [ ! -f '{root}/.runner' ]; then")
+        return lines[guard : guard + 4]
+
+    def test_an_unconfigured_runner_is_registered_with_its_token_replacing_its_name(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        install = self._install_in(tmp_path)
+        ran = run_with_stand_ins(
+            tmp_path,
+            ["export RUNNER_TOKEN_API='TOK'", *self._registration(install)],
+            {"runuser": _recording(tmp_path, "runuser")},
+            options=("-eu",),
+        )
+        assert ran.returncode == 0, ran.stderr
+        assert _asked(tmp_path) == [
+            f"runuser -u gharunner -- bash -c cd '{tmp_path}/runner' && ./config.sh --unattended "
+            '--url https://github.com/wagner-austin/API --token "TOK" --name lavender '
+            "--labels lavender --replace"
+        ]
+
+    def test_an_unconfigured_runner_without_its_token_stops_naming_it(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        install = self._install_in(tmp_path)
+        ran = run_with_stand_ins(
+            tmp_path,
+            self._registration(install),
+            {"runuser": _recording(tmp_path, "runuser")},
+            options=("-eu",),
+        )
+        assert ran.returncode != 0
+        assert ran.stderr.rstrip("\n").endswith(
+            "RUNNER_TOKEN_API: set RUNNER_TOKEN_API to a fresh registration token for "
+            "wagner-austin/API; fleet-runners --rebuild and --onboard mint it with gh"
+        )
+        assert _asked(tmp_path) == []
+
+    def test_a_configured_runner_needs_no_token(self, tmp_path: pathlib.Path) -> None:
+        install = self._install_in(tmp_path)
+        (tmp_path / "runner" / ".runner").touch()
+        ran = run_with_stand_ins(
+            tmp_path,
+            self._registration(install),
+            {"runuser": _recording(tmp_path, "runuser")},
+            options=("-eu",),
+        )
+        assert ran.returncode == 0, ran.stderr
+        assert _asked(tmp_path) == []
+
+    def test_the_local_bin_lands_on_the_runner_path_once_over_two_runs(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        install = self._install_in(tmp_path)
+        [append] = [
+            line for line in runner_render.render_install_lines(install) if line.startswith("grep")
+        ]
+        (tmp_path / "runner" / ".path").write_bytes(b"/usr/local/bin:/usr/bin:/bin\n")
+        ran = run_with_stand_ins(tmp_path, [append, append], {}, options=("-eu",))
+        assert ran.returncode == 0, ran.stderr
+        assert (tmp_path / "runner" / ".path").read_bytes() == (
+            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}\n"
         ).encode()
 
-
-class TestRerunsOverAHalfBuiltHost:
-    """--rebuild re-runs every stage, so a configured install is left alone."""
-
-    def test_a_configured_wsl_runner_skips_config_and_svc_install(self) -> None:
-        install = RunnerInstall(
-            repo="wagner-austin/MCPs",
-            runner_name="lavender-wsl",
-            side="wsl",
-            service="actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-            workdir="/home/gharunner/actions-runner/_work",
-            labels=["lavender-wsl"],
-            python_toolcache=[],
+    def test_the_unit_is_set_before_it_starts_and_placed_after(self) -> None:
+        """The unit exists after svc.sh install and gets its restart policy,
+        its kill mode and its job hook before it starts; once it runs, it
+        gets the action cache's environment and is moved into the listener
+        slice."""
+        install = an_install()
+        root = runner_install.install_root_for(install)
+        started = [f"(cd '{root}' && ./svc.sh start)"]
+        assert not _in_order(
+            runner_render.render_install_lines(install),
+            started,
+            runner_recovery.render_recovery_lines(install),
         )
-        lines = runner_render.render_wsl_install_lines(install)
-        guard = lines.index("if [ ! -f /home/gharunner/actions-runner/.runner ]; then")
-        assert "./config.sh" in lines[guard + 1]
-        assert lines[guard + 2] == "fi"
-        # The unit exists after svc.sh install and gets its restart policy,
-        # its kill mode and its job hook (MCPs board task 715b9ec5) before it
-        # starts; after it starts, when its live process and cgroup can be
-        # read, it gets the action cache (MCPs board task ce2b92e0) and is
-        # moved into the listener slice.
-        recovery = runner_recovery.render_wsl_recovery_lines(install)
-        kill_mode = runner_reaper_render.render_kill_mode_lines(install)
-        hook = runner_job_scope_render.render_job_hook_lines(install)
-        cached = runner_cache_adopt.render_cache_environment_lines(install)
-        placed = runner_slice_render.render_runner_slice_lines(install)
-        start = len(lines) - len(placed) - len(cached) - 1
-        before = start - len(hook) - len(kill_mode) - len(recovery)
-        assert lines[before - 1] == (
-            "[ -f /home/gharunner/actions-runner/.service ] || "
-            "(cd /home/gharunner/actions-runner && ./svc.sh install gharunner)"
+        assert _in_order(
+            runner_render.render_install_lines(install),
+            [f"[ -f '{root}/.service' ] || (cd '{root}' && ./svc.sh install gharunner)"],
+            runner_recovery.render_recovery_lines(install),
+            runner_reaper_render.render_kill_mode_lines(install),
+            runner_job_scope_render.render_job_hook_lines(install),
+            started,
+            runner_cache_adopt.render_cache_environment_lines(install),
+            runner_slice_render.render_runner_slice_lines(install),
         )
-        assert lines[before : before + len(recovery)] == recovery
-        assert lines[before + len(recovery) : start - len(hook)] == kill_mode
-        assert lines[start - len(hook) : start] == hook
-        assert lines[start] == "(cd /home/gharunner/actions-runner && ./svc.sh start)"
-        assert lines[start + 1 : start + 1 + len(cached)] == cached
-        assert lines[start + 1 + len(cached) :] == placed
+
+    def test_a_directory_that_cannot_be_embedded_is_refused(self) -> None:
+        install = an_install()
+        install["workdir"] = "/home/it's/_work"
+        with pytest.raises(ValueError, match="workdir"):
+            runner_render.render_install_lines(install)
 
 
-class TestManualSteps:
-    """What no script may do."""
+class TestTheRender:
+    """What ``fleet-runners --render`` writes and prints."""
 
-    def test_every_manual_asset_becomes_a_loud_step(self) -> None:
-        rendered = runner_render.render_provision(_host())
-        assert len(rendered["manual_steps"]) == 1
-        step = rendered["manual_steps"][0]
-        assert step.startswith("PLACE BY HAND: /opt/corvis/rw-game/game-lib.jar")
-        assert "re-run fleet-runners audit" in step
+    def test_the_render_is_both_scripts_with_no_tokens_and_the_manual_steps(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec = _two_repos(tmp_path)
+        assert runner_render.render_provision(spec) == runner_render.RenderedProvision(
+            base_script=runner_render.render_base_script(spec),
+            provision_script=runner_render.render_provision_script(spec, {}),
+            manual_steps=[
+                "PLACE BY HAND: /opt/corvis/rw-game/game-lib.jar -- the provenance jar. This "
+                "asset can never be fetched by a script; place it, then re-run fleet-runners "
+                "audit."
+            ],
+        )
 
-    def test_a_host_with_no_manual_assets_has_no_steps(self) -> None:
-        assets = [
-            FileAsset(
-                path="/data",
-                sha256=None,
-                writable=True,
-                reason="checkpoint writes",
-                manual=False,
-                provision_command=None,
-            )
-        ]
-        rendered = runner_render.render_provision(_host(assets=assets))
-        assert rendered["manual_steps"] == []
+    def test_a_host_with_no_manual_assets_has_no_steps(self, tmp_path: pathlib.Path) -> None:
+        assert runner_render.manual_steps(a_host(assets=_assets(tmp_path)[1:])) == []

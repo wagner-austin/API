@@ -10,10 +10,12 @@ and sshd stopped answering, so every fleet tick for lavender-wsl read
 runners and sshd shared ``system.slice``, which carried no ceiling at all.
 
 This block is the ceiling, declared once per host. The provision renders it
-as one systemd slice holding every WSL runner's jobs on the host, so CI jobs
+as one systemd slice holding every runner's jobs on the host, so CI jobs
 throttle, and at worst are killed, inside their own share, while sshd, the
 test database, the fleet's own checks and the runners' listeners keep the
-rest of the VM.
+rest of the machine. The incidents above were measured inside lavender's WSL
+VM, which held the runners until lavender was reimaged to Linux on
+2026-10-19 (MCPs board task 1e9ab738); the machine is now the host itself.
 
 A memory ceiling alone did not hold them (MCPs board task cb264851). On
 2026-10-08 at 00:12Z a CI burst held the slice at its ``MemoryHigh``, the
@@ -35,7 +37,7 @@ from __future__ import annotations
 from platform_core.json_utils import JSONObject, JSONTypeError, require_int
 from typing_extensions import TypedDict
 
-#: The slice every WSL runner's jobs run in. One name for every host: the
+#: The slice every runner's jobs run in. One name for every host: the
 #: budget differs per host, the unit it is enforced by does not. No dash:
 #: systemd reads ``a-b.slice`` as a child of ``a.slice``.
 CI_SLICE_NAME = "runners.slice"
@@ -61,10 +63,9 @@ CPU_WEIGHT_MIN = 1
 CPU_WEIGHT_MAX = 10000
 
 #: The file whose filesystem's disk the read bounds apply to. systemd
-#: resolves it to the backing block device when the unit loads (``8:48``,
-#: ``/dev/sdd``, on lavender), so the unit names no device letter, which a
-#: WSL boot may reorder. The runners' work trees, their caches, docker and
-#: the fleet's stages all live on it.
+#: resolves it to the backing block device when the unit loads, so the unit
+#: names no device letter, which a boot may reorder. The runners' work
+#: trees, their caches, docker and the fleet's stages all live on it.
 IO_BOUND_PATH = "/"
 
 
@@ -76,7 +77,7 @@ class CiSlice(TypedDict):
             throttling them (``MemoryHigh``), in GB.
         memory_max_gb: The hard ceiling (``MemoryMax``), in GB; a job that
             passes it is killed by the kernel inside the slice.
-        swap_max_gb: The most of the VM's swap the slice may hold
+        swap_max_gb: The most of the host's swap the slice may hold
             (``MemorySwapMax``), in GB; 0 lets it hold none.
         cpu_weight: The slice's ``CPUWeight`` against every other unit's
             default of 100.
@@ -113,13 +114,13 @@ def encode_ci_slice(budget: CiSlice) -> JSONObject:
     }
 
 
-def decode_ci_slice(value: JSONObject, *, vm_memory_gb: int | None) -> CiSlice:
+def decode_ci_slice(value: JSONObject, *, host_memory_gb: int) -> CiSlice:
     """Decode and validate one host's CI budget.
 
     Args:
         value: The ``ci_slice`` object from the host's roster entry.
-        vm_memory_gb: The host's ``wslconfig_min_memory_gb``, or None when
-            the host keeps the Windows default and no size is declared.
+        host_memory_gb: The host's ``memory_gb``, the memory its kernel
+            reports.
 
     Returns:
         The validated budget.
@@ -128,8 +129,8 @@ def decode_ci_slice(value: JSONObject, *, vm_memory_gb: int | None) -> CiSlice:
         JSONTypeError: If a field is missing or mistyped, a memory figure is
             not positive, the swap bound is negative, a read bound is not
             positive, the throttle point sits above the ceiling, the weight
-            is outside systemd's range, or the ceiling leaves the VM nothing
-            beside the runners.
+            is outside systemd's range, or the ceiling leaves the host
+            nothing beside the runners.
     """
     memory_high = require_int(value, "memory_high_gb")
     memory_max = require_int(value, "memory_max_gb")
@@ -157,10 +158,10 @@ def decode_ci_slice(value: JSONObject, *, vm_memory_gb: int | None) -> CiSlice:
             f"ci_slice.cpu_weight must be between {CPU_WEIGHT_MIN} and {CPU_WEIGHT_MAX}, "
             f"got {cpu_weight}"
         )
-    if vm_memory_gb is not None and memory_max >= vm_memory_gb:
+    if memory_max >= host_memory_gb:
         raise JSONTypeError(
-            f"ci_slice.memory_max_gb {memory_max} leaves nothing of the VM's "
-            f"{vm_memory_gb} GB for sshd and the fleet's own checks, which is the "
+            f"ci_slice.memory_max_gb {memory_max} leaves nothing of the host's "
+            f"{host_memory_gb} GB for sshd and the fleet's own checks, which is the "
             "starvation this ceiling exists to prevent"
         )
     return CiSlice(

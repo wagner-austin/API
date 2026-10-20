@@ -310,27 +310,6 @@ def _attempt_stream(host: str, command: str, body: str, *, what: str) -> RemoteF
     return _failure_for(host, what, result)
 
 
-def stream_to_command(host: str, command: str, body: str, *, what: str) -> None:
-    """Stream a body into one remote command's stdin.
-
-    For a write whose bytes the platform's own :meth:`write_command` would
-    change: on Windows that command re-encodes with a BOM and CRLF line
-    ends, which a PowerShell script needs and a bash payload for a WSL
-    distro cannot survive (:mod:`fleet.core.runner_distro`).
-
-    Args:
-        host: SSH destination.
-        command: The remote command that reads standard input.
-        body: The text streamed, UTF-8 encoded.
-        what: What the stream does, for the error.
-
-    Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
-            :func:`run_ssh` describes.
-    """
-    _raise_on(_attempt_stream(host, command, body, what=what))
-
-
 def send_file(host: str, source: pathlib.Path, remote_path: str, *, size_bytes: int) -> None:
     """Copy a local file's bytes to a path on a node, over scp.
 
@@ -472,62 +451,89 @@ def run_script(host: str, remote_path: str, body: str, *, platform: NodePlatform
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``.
     """
-    return run_script_within(
-        host, remote_path, body, platform=platform, timeout_seconds=SSH_TIMEOUT_SECONDS
-    )
+    outcome = attempt_script(host, remote_path, body, platform=platform)
+    _raise_on(outcome["failure"])
+    return outcome["output"]
 
 
-def run_script_within(
-    host: str, remote_path: str, body: str, *, platform: NodePlatform, timeout_seconds: int
-) -> str:
-    """Send a script to a node and run it by path under a stated deadline.
+#: How a Linux node runs a command as root: its account's passwordless sudo,
+#: ``-n`` so a node without it refuses at once instead of waiting on a
+#: password prompt nobody will answer.
+ROOT_PREFIX: tuple[str, ...] = ("sudo", "-n")
 
-    For the one kind of remote work that is long by construction: a runner
-    host's rebuild stages download a distro image and install packages,
-    which :data:`SSH_TIMEOUT_SECONDS` was never sized for (board task
-    1aa6a021). Sending the file keeps the short deadline; only the run
-    takes the caller's.
+#: How a Linux node runs a root payload: bash by path, since the payloads
+#: rely on ``pipefail`` and arrays, which the dialect's ``/bin/sh`` lacks.
+ROOT_BASH: tuple[str, ...] = (*ROOT_PREFIX, "/bin/bash")
+
+
+def attempt_root_script(
+    host: str, remote_path: str, body: str, *, timeout_seconds: int
+) -> RemoteOutcome:
+    """Send a bash payload to a Linux node and run it as root, reporting failure as a value.
+
+    For a CI runner host's payloads (:mod:`fleet.core.runner_audit`,
+    :mod:`fleet.core.runner_rebuild`): they read and write units, slices and
+    the runner account's files, which only root may. The send keeps the
+    short deadline; only the run takes the caller's, because a provision
+    that installs packages was never sized for :data:`SSH_TIMEOUT_SECONDS`.
 
     Args:
         host: SSH destination.
-        remote_path: Absolute path on the node to write and then execute.
-        body: The script's complete text.
-        platform: The node's declared platform.
-        timeout_seconds: The deadline for running the script.
+        remote_path: Absolute path on the node to write and then run.
+        body: The payload's complete text.
+        timeout_seconds: The deadline for running it.
 
     Returns:
-        The script's standard output.
+        The payload's standard output, or the reason there is none. A send
+        that fails short-circuits, as :func:`attempt_script` explains.
+    """
+    failure = attempt_send(host, remote_path, body, platform=NodePlatform.LINUX)
+    if failure is not None:
+        return RemoteOutcome(output="", failure=failure)
+    return _attempt_ssh_within(host, (*ROOT_BASH, remote_path), timeout_seconds=timeout_seconds)
+
+
+def run_root_script(host: str, remote_path: str, body: str, *, timeout_seconds: int) -> str:
+    """Send a bash payload to a Linux node and run it as root.
+
+    The raising boundary over :func:`attempt_root_script`.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write and then run.
+        body: The payload's complete text.
+        timeout_seconds: The deadline for running it.
+
+    Returns:
+        The payload's standard output.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``; a script
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``; a payload
             still running at the deadline is ended and reported as the
-            latter.
+            latter, and one exiting non-zero as the latter with its stderr.
     """
-    _raise_on(attempt_send(host, remote_path, body, platform=platform))
-    outcome = _attempt_ssh_within(
-        host,
-        (*dialect.for_platform(platform).invocation(), remote_path),
-        timeout_seconds=timeout_seconds,
-    )
+    outcome = attempt_root_script(host, remote_path, body, timeout_seconds=timeout_seconds)
     _raise_on(outcome["failure"])
     return outcome["output"]
 
 
 __all__ = [
+    "ROOT_BASH",
+    "ROOT_PREFIX",
     "SSH_FAILURE",
     "SSH_OPTIONS",
     "SSH_TIMEOUT_SECONDS",
     "Answered",
     "RemoteFailure",
     "RemoteOutcome",
+    "attempt_root_script",
     "attempt_script",
     "attempt_send",
     "attempt_ssh",
     "read_script",
+    "run_root_script",
     "run_script",
-    "run_script_within",
     "run_ssh",
     "send_file",
     "send_script",
-    "stream_to_command",
 ]

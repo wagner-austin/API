@@ -67,7 +67,7 @@ duty's:
        MCPs board task e447de72), so every hub tick observes; until then
        they were read from MCPs' ``fleet-nodes.json``, named by a
        ``--registry`` flag, and a tick without it observed nothing.
-    4. REAP. Read each WSL runner host's Workers against GitHub's runner
+    4. REAP. Read each runner host's Workers against GitHub's runner
        list, read again two minutes later where one was named, and end each
        Worker both readings name as holding a job GitHub dropped, by pid,
        through the host's reaper (MCPs board task 715b9ec5,

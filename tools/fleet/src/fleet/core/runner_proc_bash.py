@@ -18,7 +18,7 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME
 #: in :data:`~fleet.contracts.runner_slice.CI_SLICE_NAME` (MCPs board task
 #: 715b9ec5). The pid is last and has no dash, so the unit is everything
 #: before the last dash, read exactly: a glob alone would give the scopes of
-#: ``...lavender-wsl-2`` to ``...lavender-wsl`` too.
+#: ``...lavender-2`` to ``...lavender`` too.
 JOB_SCOPE_PREFIX = "fleet-job-"
 
 #: A process's parent, its start in clock ticks since boot, its age in

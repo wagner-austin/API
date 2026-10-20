@@ -12,7 +12,7 @@ retire takes it otherwise, once it has been superseded for
 runs name, a node holds at most the one generation the next retire removes.
 A second unnamed one means the removal is not running.
 
-``tools/fleet-execution-runners`` reads lavender-wsl's own cache, and
+``tools/fleet-execution-runners`` reads the runner host's own cache, and
 ``tools/fleet-execution-linux`` the cache of execdocker, the account the
 isolated build runs as there. Both are runs the fleet starts, the only ones
 the variable is set for.

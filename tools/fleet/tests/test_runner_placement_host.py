@@ -10,7 +10,7 @@ project ``tools/fleet-execution-runners``, pinned to the runner host's node,
 runs them as the fleet's own user, and each passed case records what it read
 as a ``host_reading`` the run's summary prints.
 
-1. Every WSL unit ``runners.json`` declares for the host is the host's whole
+1. Every unit ``runners.json`` declares for the host is the host's whole
    set of runner units, each active with its cgroup in the listener slice;
    the listener slice carries no memory bound and the CI slice the one the
    roster declares; and every live ``Runner.Worker`` is in its own job scope
@@ -135,8 +135,8 @@ def _workers() -> dict[int, str]:
 def test_every_runner_unit_runs_in_the_listener_slice_and_every_job_in_its_scope(
     runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
 ) -> None:
-    declared = sorted(each["service"] for each in runner_host["installs"] if each["side"] == "wsl")
-    assert declared, f"runners.json declares no WSL runner on {runner_host['name']}"
+    declared = sorted(each["service"] for each in runner_host["installs"])
+    assert declared, f"runners.json declares no runner on {runner_host['name']}"
     assert _runner_units() == declared
 
     placed = {
@@ -166,7 +166,7 @@ def test_every_runner_unit_runs_in_the_listener_slice_and_every_job_in_its_scope
     assert misplaced == {}
     record_property(
         READING_PROPERTY,
-        f"{runner_host['name']}: {len(declared)} of {len(declared)} declared WSL runner unit(s) "
+        f"{runner_host['name']}: {len(declared)} of {len(declared)} declared runner unit(s) "
         f"active in /{LISTENER_SLICE_NAME} (memory.high {listener_high}); {len(workers)} "
         f"Runner.Worker(s), each in its own job scope of /{CI_SLICE_NAME} (memory.high {ci_high})",
     )

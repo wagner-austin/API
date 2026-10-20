@@ -1,7 +1,7 @@
 """The hub's reap pass and its read of the rolled roster (MCPs board task 715b9ec5, A2).
 
 The fakes answer through ``_test_hooks.run``, ``now`` and ``sleep`` exactly
-as :mod:`tests.test_core_io` describes. A WSL host's reading is one ``gh``
+as :mod:`tests.test_core_io` describes. A host's reading is one ``gh``
 runner list per repository, then the job scope helper's ``--workers`` lines;
 a reap is one ssh running the reaper's ``--dropped`` mode.
 """
@@ -15,46 +15,33 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import hub_passes
-from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, encode_runner_spec
+from fleet.contracts.runners import RunnerSpec, encode_runner_spec
 from fleet.core import _test_hooks, declared, rolled, runner_reap_dropped
 from fleet.core.runner_dropped_check import HostWorker
 from fleet.core.runner_reaper_render import REAPER_PATH
 from tests.conftest import FakeClock, FakeRun, FakeSleep, failed, ok
-from tests.test_runner_dropped_check import WINDOWS, WSL, _answer, _host, _worker
+from tests.test_runner_dropped_check import API_BUSY, INSTALLS, X_BUSY, _answer, _host, _worker
 
 #: GitHub reading API's first runner offline, every other runner online and busy.
-API_ONE_OFFLINE = (
-    "lavender-wsl offline false\nlavender-wsl-2 online true\nlavender-wsl-3 online true\n"
-)
-API_BUSY = "lavender-wsl online true\nlavender-wsl-2 online true\nlavender-wsl-3 online true\n"
-X_BUSY = "lavender-wsl online true\n"
+API_ONE_OFFLINE = "lavender offline false\nlavender-2 online true\nlavender-3 online true\n"
 
 #: The Worker the offline runner holds, past the grace.
 HELD = _worker(41, 6300)
 
 #: The Worker's description in the pass's lines.
-NAMED = "wagner-austin/API lavender-wsl Runner.Worker 41 (offline busy=false, 6300 s)"
+NAMED = "wagner-austin/API lavender Runner.Worker 41 (offline busy=false, 6300 s)"
 
-
-def _windows_host() -> HostRunnerSpec:
-    """A host with no WSL runner, which the pass reads nothing of.
-
-    Returns:
-        The spec.
-    """
-    spec = _host(WINDOWS)
-    spec["name"] = "serendipity"
-    spec["host"] = "serendipity"
-    return spec
+#: The unit holding it.
+HELD_UNIT = INSTALLS[0]["service"]
 
 
 def _roster() -> RunnerSpec:
-    """lavender with its four WSL runners, and a Windows-only host.
+    """lavender with its four runners.
 
     Returns:
         The roster.
     """
-    return RunnerSpec(hosts=[_windows_host(), _host(*WSL)])
+    return RunnerSpec(hosts=[_host()])
 
 
 def _reading(answer: str, github: str = API_ONE_OFFLINE) -> list[_test_hooks.CommandResult]:
@@ -93,7 +80,7 @@ class TestThePass:
         runner = FakeRun(_reading(_answer((), (), (), ()), API_BUSY))
         _test_hooks.run = runner
         assert runner_reap_dropped.reap_pass(_roster()) == [
-            "lavender: examined 4 WSL runner(s); none holds a job GitHub dropped"
+            "lavender: examined 4 runner(s); none holds a job GitHub dropped"
         ]
         assert sleeper.slept == []
         assert len(runner.calls) == 3
@@ -101,8 +88,8 @@ class TestThePass:
     def test_a_worker_both_readings_name_is_ended_through_the_reaper(self) -> None:
         sleeper = _sleeper()
         reaped = (
-            f"fleet-runner-reaper: {WSL[0]['service']}: ending pid 41: Runner.Worker\n"
-            f"fleet-runner-reaper: {WSL[0]['service']}: ended Runner.Worker 41 and its tree\n"
+            f"fleet-runner-reaper: {HELD_UNIT}: ending pid 41: Runner.Worker\n"
+            f"fleet-runner-reaper: {HELD_UNIT}: ended Runner.Worker 41 and its tree\n"
         )
         runner = FakeRun([*_reading(WITH_HELD), *_reading(WITH_HELD), ok(reaped)])
         _test_hooks.run = runner
@@ -110,22 +97,17 @@ class TestThePass:
             "lavender: 1 Runner.Worker(s) read as holding a job GitHub dropped, read again in "
             f"120 s: {NAMED}",
             f"lavender: ending {NAMED}",
-            f"lavender: fleet-runner-reaper: {WSL[0]['service']}: ending pid 41: Runner.Worker",
-            f"lavender: fleet-runner-reaper: {WSL[0]['service']}: ended Runner.Worker 41 and its "
-            "tree",
+            f"lavender: fleet-runner-reaper: {HELD_UNIT}: ending pid 41: Runner.Worker",
+            f"lavender: fleet-runner-reaper: {HELD_UNIT}: ended Runner.Worker 41 and its tree",
         ]
         assert sleeper.slept == [runner_reap_dropped.CONFIRM_SECONDS]
-        assert tuple(runner.calls[-1][-12:]) == (
+        assert tuple(runner.calls[-1][-8:]) == (
             "lavender",
-            "wsl",
-            "-d",
-            "Ubuntu",
-            "-u",
-            "root",
-            "--",
+            "sudo",
+            "-n",
             REAPER_PATH,
             "--dropped",
-            WSL[0]["service"],
+            HELD_UNIT,
             "41",
             str(HELD["start"]),
         )
@@ -180,7 +162,9 @@ class TestThePass:
         )
         lines = runner_reap_dropped.reap_pass(_roster())
         assert lines[1] == f"lavender: ending {NAMED}"
-        assert lines[2].startswith("lavender: the reaper did not end it: running `wsl -d Ubuntu")
+        assert lines[2].startswith(
+            f"lavender: the reaper did not end it: running `sudo -n {REAPER_PATH} --dropped "
+        )
         assert lines[2].endswith("FLEET_RUNNER_REAPER_REFUSED: pid 41 is no Runner.Worker")
 
 
@@ -202,7 +186,7 @@ def _blob(text: str) -> str:
 
 class TestTheRolledRoster:
     def test_the_roster_is_read_at_the_rolled_commit(self, tmp_path: pathlib.Path) -> None:
-        roster = RunnerSpec(hosts=[_host(*WSL)])
+        roster = RunnerSpec(hosts=[_host()])
         runner = FakeRun([ok(f"{COMMIT}\n"), ok(_blob(dump_json_str(encode_runner_spec(roster))))])
         _test_hooks.run = runner
         assert runner_reap_dropped.read_rolled_roster(tmp_path) == roster
@@ -242,7 +226,7 @@ class TestTheRolledRoster:
         with caplog.at_level("INFO"):
             hub_passes.reap_pass(tmp_path)
         assert [record.getMessage() for record in caplog.records] == [
-            "lavender: examined 4 WSL runner(s); none holds a job GitHub dropped"
+            "lavender: examined 4 runner(s); none holds a job GitHub dropped"
         ]
 
     def test_a_roster_that_does_not_decode_is_raised(self, tmp_path: pathlib.Path) -> None:

@@ -184,7 +184,7 @@ def test_the_ordinary_run_skips_a_runner_host_case_naming_its_project(
     assert result.ret == pytest.ExitCode.OK
     result.assert_outcomes(passed=1, skipped=1)
     project = PROJECTS[RUNNER_HOST]
-    reason = f"needs a host that runs the fleet's WSL runner units; {project} runs it there"
+    reason = f"needs a host that runs the fleet's runner units; {project} runs it there"
     assert [line for line in result.outlines if line.startswith("SKIPPED")] == [
         f"SKIPPED [1] test_cases.py:2: {reason}"
     ]

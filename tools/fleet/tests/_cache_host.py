@@ -20,15 +20,25 @@ import subprocess
 import time
 
 from fleet.contracts.action_cache import STATUS_PATH
+from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_action_cache, runner_cache_adopt
-from tests._action_cache_fixtures import an_install
 from tests._host_bash import host_bash
+from tests._runner_fixtures import an_install
 
 #: The setting a unit reads the cache by.
-SETTING = f"{runner_action_cache.CACHE_VARIABLE}={runner_action_cache.WSL_CACHE_DIR}"
+SETTING = f"{runner_action_cache.CACHE_VARIABLE}={runner_action_cache.CACHE_DIR}"
 
-#: A second unit, for the cases that run a script over more than one.
-OTHER = "actions.runner.wagner-austin-API.lavender-wsl.service"
+#: The install the drop-in cases run, the fourth of lavender's MCPs runners.
+FOURTH: RunnerInstall = an_install("wagner-austin/MCPs", "lavender-4", slot=4)
+
+#: Its unit.
+UNIT = FOURTH["service"]
+
+#: A second install, for the cases that run a script over more than one.
+SECOND: RunnerInstall = an_install("wagner-austin/API")
+
+#: Its unit.
+OTHER = SECOND["service"]
 
 #: The settle window every rendered adopt call passes.
 SETTLE = runner_cache_adopt.ADOPT_SETTLE_SECONDS
@@ -270,16 +280,16 @@ class Host:
             check=False,
         )
 
-    def provision(self, name: str) -> subprocess.CompletedProcess[str]:
+    def provision(self, install: RunnerInstall) -> subprocess.CompletedProcess[str]:
         """Run one install's drop-in lines, as provision does after it starts the unit.
 
         Args:
-            name: The unit.
+            install: The install, laid out with :meth:`unit` under its unit's name.
 
         Returns:
             The finished process.
         """
-        lines = runner_cache_adopt.render_cache_environment_lines(an_install(name))
+        lines = runner_cache_adopt.render_cache_environment_lines(install)
         body = "set -euo pipefail\n" + laid_out("\n".join(lines)) + "\n"
         (self.root / "provision.sh").write_bytes((STAND_INS + body).encode())
         return self.run("provision.sh")

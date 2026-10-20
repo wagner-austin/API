@@ -12,13 +12,13 @@ entry here, and ``tests/pester`` executes each copy to every command and
 branch. Nothing is added to the harness to see them: a committed render is a
 tracked script like any other, and one no suite runs is PS-NO-SUITE.
 
-Scripts that depend on a host are rendered from the real roster,
-``runners.json``, once per host, so the committed copy is the text that host
-receives. Scripts that depend on a dispatch are rendered for one example
-dispatch (:data:`EXAMPLE_STAGE_ROOT`, :data:`EXAMPLE_RUN_ID`): every location
-they read is a parameter defaulting to the rendered path, so the suite runs
-the committed text against a directory it laid out, and a real dispatch's
-copy differs from the example only in those defaults.
+Every one is the Windows dispatch dialect's; the CI runner host's scripts
+are bash since lavender was reimaged to Linux (MCPs board task 1e9ab738).
+They depend on a dispatch, so they are rendered for one example dispatch
+(:data:`EXAMPLE_STAGE_ROOT`, :data:`EXAMPLE_RUN_ID`): every location they read
+is a parameter defaulting to the rendered path, so the suite runs the
+committed text against a directory it laid out, and a real dispatch's copy
+differs from the example only in those defaults.
 """
 
 from __future__ import annotations
@@ -26,19 +26,12 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodePlatform
-from fleet.contracts.runners import RunnerSpec
 from fleet.contracts.source import InstallStep
 from fleet.core import (
     cache_generations,
     dialect,
     names,
     retire,
-    runner_audit,
-    runner_base_render,
-    runner_distro,
-    runner_load,
-    runner_rebuild,
-    runner_windows_provision,
     stage_repository,
     verdict,
 )
@@ -71,9 +64,6 @@ EXAMPLE_INSTALL: tuple[InstallStep, ...] = (InstallStep(phase="install", argv=("
 #: The submitting label an example build exports as ``BOARD_AGENT_LABEL``.
 EXAMPLE_AGENT = "opus-example-0929"
 
-#: The payload stem the example distro driver runs: the rebuild's Linux base.
-EXAMPLE_DISTRO_STEM = "fleet-rebuild-linux-base"
-
 
 class RenderedScript(TypedDict):
     """One rendered script and the name its committed copy carries.
@@ -87,11 +77,11 @@ class RenderedScript(TypedDict):
     text: str
 
 
-def _dialect_scripts() -> list[RenderedScript]:
-    """The Windows dialect's scripts, for the example dispatch.
+def render_all() -> list[RenderedScript]:
+    """Render the Windows dialect's scripts for the example dispatch, in a stable order.
 
     Returns:
-        One entry per script, named ``dialect-<act>``.
+        One entry per committed file, named ``dialect-<act>``.
     """
     spoken = WindowsDialect()
     target = names.dispatch_directory(EXAMPLE_STAGE_ROOT, EXAMPLE_RUN_ID)
@@ -179,75 +169,10 @@ def _dialect_scripts() -> list[RenderedScript]:
     ]
 
 
-def render_all(roster: RunnerSpec) -> list[RenderedScript]:
-    """Render every script, in a stable order.
-
-    Args:
-        roster: The runner roster the host-specific scripts are rendered for.
-
-    Returns:
-        One entry per committed file.
-
-    Raises:
-        ValueError: When two entries would share a file name, or a roster
-            value cannot be embedded verbatim.
-    """
-    scripts = [
-        RenderedScript(
-            name="rebuild-boot-instant", text=runner_rebuild.render_boot_instant_script()
-        ),
-        RenderedScript(name="rebuild-restart", text=runner_rebuild.render_restart_script()),
-        RenderedScript(name="load-forest", text=runner_load.WINDOWS_FOREST_SCRIPT),
-        *_dialect_scripts(),
-    ]
-    for host in roster["hosts"]:
-        scripts += [
-            RenderedScript(
-                name=f"rebuild-terminate-{host['name']}",
-                text=runner_rebuild.render_terminate_script(host["wsl_distro"]),
-            ),
-            RenderedScript(
-                name=f"base-windows-{host['name']}",
-                text=runner_base_render.render_windows_base_script(host),
-            ),
-            RenderedScript(
-                name=f"base-import-{host['name']}",
-                text=runner_base_render.render_import_script(host),
-            ),
-            RenderedScript(
-                name=f"audit-{host['name']}", text=runner_audit.render_audit_script(host)
-            ),
-            RenderedScript(
-                name=f"distro-driver-{host['name']}",
-                text=runner_distro.render_distro_driver(host, EXAMPLE_DISTRO_STEM),
-            ),
-            RenderedScript(
-                name=f"provision-windows-{host['name']}",
-                text=runner_windows_provision.render_windows_provision_script(host, {}),
-            ),
-        ]
-        windows_installs = [i for i in host["installs"] if i["side"] == "windows"]
-        if windows_installs:
-            scripts.append(
-                RenderedScript(
-                    name=f"onboard-windows-{host['name']}",
-                    text=runner_windows_provision.render_windows_onboard_script(
-                        windows_installs[0], {}
-                    ),
-                )
-            )
-    names = [script["name"] for script in scripts]
-    repeated = sorted({name for name in names if names.count(name) > 1})
-    if repeated:
-        raise ValueError(f"two rendered scripts would share a file name: {', '.join(repeated)}")
-    return scripts
-
-
 __all__ = [
     "EXAMPLE_AGENT",
     "EXAMPLE_COMPANION_REF",
     "EXAMPLE_COMPANION_SHA",
-    "EXAMPLE_DISTRO_STEM",
     "EXAMPLE_INSTALL",
     "EXAMPLE_PROJECT",
     "EXAMPLE_RUN_ID",

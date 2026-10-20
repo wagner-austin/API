@@ -2,21 +2,19 @@
 
 MCPs board task 53528106, A2 and A4. A cancelled GitHub Actions job kills
 its worker, and what the job daemonized lives on: on 2026-10-02 lavender's
-WSL runners held 158 such processes and 17 GB with no job running, and
-nothing in the audit could see it. This row asks each runner, on both
-sides, how many of its processes lie outside its service's own tree, are
-older than the host's ``job_timeout_minutes``, and live while no
-``Runner.Worker`` runs: any such process outlived every job that could own
-it. A Worker older than that timeout runs no job GitHub still holds, so it
-counts itself rather than shielding the rest (on 2026-10-02 at 10:09Z one
-such Worker kept 12.7 GB in an API runner for 3 h 22 min).
+runners held 158 such processes and 17 GB with no job running, and nothing
+in the audit could see it. This row asks each runner how many of its
+processes lie outside its service's own tree, are older than the host's
+``job_timeout_minutes``, and live while no ``Runner.Worker`` runs: any such
+process outlived every job that could own it. A Worker older than that
+timeout runs no job GitHub still holds, so it counts itself rather than
+shielding the rest (on 2026-10-02 at 10:09Z one such Worker kept 12.7 GB in
+an API runner for 3 h 22 min).
 
-A WSL runner is asked through the reaper's own ``--audit`` mode
+The row asks through the reaper's own ``--audit`` mode
 (:mod:`fleet.core.runner_reaper_render`), so the audit measures exactly what
-the reaper acts on, and a host without the reaper drifts on that row as
-well as on its timer's. A Windows runner is read natively: its service's
-process, every descendant of it, and every process whose command line or
-executable sits under the runner's directory but outside that tree.
+the reaper acts on, and a host without the reaper drifts on that row as well
+as on its timer's.
 """
 
 from __future__ import annotations
@@ -28,66 +26,8 @@ from fleet.core.script_values import scriptable
 #: Why the row matters, printed beside a drift line.
 ORPHAN_REASON = (
     "a finished job's processes hold the runner's memory until something kills them; on "
-    "2026-10-02 they held 17 GB of lavender's CI budget and GitHub read every WSL runner offline"
+    "2026-10-02 they held 17 GB of lavender's CI budget and GitHub read every runner offline"
 )
-
-#: The audit's parameter that reads every process, a script block so the
-#: Pester suite can hand it a process table.
-PROCESS_PARAMETER = "[scriptblock]$GetProcesses = { @(Get-CimInstance Win32_Process) }"
-
-#: The PowerShell function the Windows rows call: the processes naming a
-#: runner directory outside its service's tree, older than the bound, when
-#: no live Runner.Worker runs in the tree, and any Worker in the tree, under
-#: that directory, that is itself older than the bound. A Worker past the job timeout runs no job
-#: GitHub still holds, so it shields nothing (the reaper's third rule,
-#: :mod:`fleet.core.runner_reaper_render`); one whose start cannot be read
-#: is taken as live. A stopped service has no tree, so every such process
-#: counts.
-LEFTOVER_FUNCTION = [
-    "function Get-RunnerLeftover {",
-    "    param([object[]]$Processes, [int]$ServicePid, [string]$Root, [int]$OlderThanSeconds)",
-    "    $children = @{}",
-    "    foreach ($Process in $Processes) {",
-    "        $Parent = [int]$Process.ParentProcessId",
-    "        if (-not $children.ContainsKey($Parent)) {",
-    "            $children[$Parent] = [System.Collections.Generic.List[object]]::new()",
-    "        }",
-    "        $children[$Parent].Add($Process)",
-    "    }",
-    "    $tree = @{}",
-    "    $pending = [System.Collections.Generic.Queue[int]]::new()",
-    "    if ($ServicePid -ne 0) {",
-    "        $pending.Enqueue($ServicePid)",
-    "    }",
-    "    while ($pending.Count -gt 0) {",
-    "        $Id = $pending.Dequeue()",
-    "        $tree[$Id] = $true",
-    "        if ($children.ContainsKey($Id)) {",
-    "            foreach ($Child in $children[$Id]) {",
-    "                if (-not $tree.ContainsKey([int]$Child.ProcessId)) {",
-    "                    $pending.Enqueue([int]$Child.ProcessId)",
-    "                }",
-    "            }",
-    "        }",
-    "    }",
-    "    $cutoff = (Get-Date).AddSeconds(-$OlderThanSeconds)",
-    "    $working = @($Processes | Where-Object { $tree.ContainsKey([int]$_.ProcessId) "
-    "-and [string]$_.Name -eq 'Runner.Worker.exe' "
-    "-and ($null -eq $_.CreationDate -or $_.CreationDate -ge $cutoff) })",
-    "    if ($working.Count -gt 0) {",
-    "        return @()",
-    "    }",
-    "    return @($Processes | Where-Object {",
-    "        $null -ne $_.CreationDate -and $_.CreationDate -lt $cutoff -and (",
-    "            ([string]$_.CommandLine).Replace('/', '\\').IndexOf($Root, "
-    "[StringComparison]::OrdinalIgnoreCase) -ge 0 -or",
-    "            ([string]$_.ExecutablePath).StartsWith($Root, "
-    "[StringComparison]::OrdinalIgnoreCase)) -and (",
-    "            -not $tree.ContainsKey([int]$_.ProcessId) -or "
-    "[string]$_.Name -eq 'Runner.Worker.exe')",
-    "    })",
-    "}",
-]
 
 
 def orphan_check_id(install: RunnerInstall) -> str:
@@ -97,76 +37,34 @@ def orphan_check_id(install: RunnerInstall) -> str:
         install: The install.
 
     Returns:
-        E.g. ``orphans:wagner-austin/MCPs:wsl:lavender-wsl``.
+        E.g. ``orphans:wagner-austin/MCPs:lavender``.
     """
-    return f"orphans:{install['repo']}:{install['side']}:{install['runner_name']}"
-
-
-def runner_root(install: RunnerInstall) -> str:
-    """The runner's own directory, the ``_work`` parent, in Windows form.
-
-    Args:
-        install: A windows-side install.
-
-    Returns:
-        The directory with backslashes and a trailing one, so that
-        ``C:\\actions-runner\\`` never matches ``C:\\actions-runner-chat``.
-    """
-    return install["workdir"].rsplit("/", 1)[0].replace("/", "\\") + "\\"
+    return f"orphans:{install['repo']}:{install['runner_name']}"
 
 
 def render_orphan_check_lines(spec: HostRunnerSpec, install: RunnerInstall) -> list[str]:
-    """Script lines for one install's row.
+    """Audit lines for one install's row.
 
     Args:
         spec: The host, for its job timeout.
         install: The install.
 
     Returns:
-        The lines. A WSL row passes only when the reaper exits 0 and counts
-        nothing; a Windows row only when no leftover is found, and names the
-        first five by process name and id when one is. A Windows row reads
-        the ``$Service`` rows its service row read, so it follows that row.
+        The bash lines. The row passes only when the reaper exits 0 and
+        counts nothing.
 
     Raises:
-        ValueError: When the unit name or the directory cannot be embedded
-            verbatim.
+        ValueError: When the unit name cannot be embedded verbatim.
     """
     seconds = spec["job_timeout_minutes"] * 60
     minutes = spec["job_timeout_minutes"]
-    check_id = orphan_check_id(install)
     service = scriptable(install["service"], label="service")
-    if install["side"] == "wsl":
-        return [
-            f'$Probe = Invoke-InDistro $Cmd $Wsl $Distro "{REAPER_PATH} --audit {seconds} '
-            f"'{service}'\"",
-            "$Leftover = (@($Probe.Lines | Select-Object -First 1) -join '')",
-            f"Write-Check '{check_id}' ($Probe.Exit -eq 0 -and $Leftover -eq '0') "
-            f"('processes older than {minutes} minutes that a finished job left in {service}, "
-            "or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)",
-        ]
-    root = scriptable(runner_root(install), label="workdir")
-    # The $Service rows the driver's service row read just before, as the
-    # account row reads them: one Win32_Service read per runner.
     return [
-        "$ServicePid = 0",
-        "foreach ($Row in $Service) {",
-        "    $ServicePid = [int]$Row.ProcessId",
-        "}",
-        f"$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid '{root}' {seconds})",
-        f"Write-Check '{check_id}' ($Leftover.Count -eq 0) "
-        f"([string]$Leftover.Count + ' process(es) under {root} older than {minutes} minutes "
-        f"that a finished job left outside {service}, or a Worker past that job timeout: ' + "
-        "((@($Leftover | Select-Object -First 5 | ForEach-Object { [string]$_.Name + ' pid ' + "
-        "[string]$_.ProcessId })) -join ', '))",
+        f"probe {REAPER_PATH} --audit {seconds} '{service}'",
+        f"check '{orphan_check_id(install)}' \"$(verdict_of answered 0)\" "
+        f'"processes older than {minutes} minutes that a finished job left in {service}, '
+        'or under a Worker past that job timeout; the reaper counted: $PROBE_TEXT"',
     ]
 
 
-__all__ = [
-    "LEFTOVER_FUNCTION",
-    "ORPHAN_REASON",
-    "PROCESS_PARAMETER",
-    "orphan_check_id",
-    "render_orphan_check_lines",
-    "runner_root",
-]
+__all__ = ["ORPHAN_REASON", "orphan_check_id", "render_orphan_check_lines"]

@@ -45,8 +45,8 @@ execution:
 	poetry sync --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov
 
-# The runner host's cases (MCPs board task 715b9ec5): where lavender's WSL
-# runner units and their jobs run, read on lavender-wsl, and a full slice
+# The runner host's cases (MCPs board task 715b9ec5): where lavender's
+# runner units and their jobs run, read on lavender, and a full slice
 # measured beside an unbounded sibling there. The fleet runs it as
 # tools/fleet-execution-runners, pinned to that node; --runner-host names the
 # runners.json host the cases read, and no other run has their capability.
@@ -67,10 +67,10 @@ execution-hub:
 # (fleet.core.rendered_powershell, MCPs board task d69786fa). They are
 # committed so MCPs' PowerShell harness, which finds scripts through git,
 # guards and covers them, and tests/pester executes them. Run this after
-# changing a renderer or runners.json; tests/test_rendered_powershell.py
-# fails until the copies match.
+# changing a renderer; tests/test_rendered_powershell.py fails until the
+# copies match.
 render-powershell:
-	poetry run python -m fleet.cli.render_powershell --spec runners.json --out rendered
+	poetry run python -m fleet.cli.render_powershell --out rendered
 
 # The committed JSON copies of the pins readers outside this package need:
 # the hooks check pins (fleet.core.hooks_check_document, MCPs board task

@@ -2,8 +2,8 @@
 
 Every provisioning byte the onboarder would ship is captured through the
 same ``_test_hooks.run`` seam production uses, so these tests assert the
-actual scripts -- the token line, the config.cmd invocation, the tool-cache
-seeding -- not a summary of them.
+actual payload -- the whole host's provision with the new install in it and
+the new repository's token at its head -- not a summary of it.
 """
 
 from __future__ import annotations
@@ -12,48 +12,27 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import (
-    _test_hooks,
-    runner_audit,
-    runner_onboard,
-    runner_render,
-    runner_windows_provision,
-)
-from tests._runner_fixtures import a_base, a_ci_slice, no_dropped_jobs
+from fleet.core import _test_hooks, remote, runner_audit, runner_onboard, runner_render
+from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
+
+#: The install onboarding tree-bot onto lavender creates.
+_TREE_BOT = RunnerInstall(
+    repo="wagner-austin/tree-bot",
+    runner_name="lavender",
+    service="actions.runner.wagner-austin-tree-bot.lavender.service",
+    workdir="/home/gharunner/actions-runner-tree-bot-1/_work",
+    labels=["lavender"],
+)
 
 
 def _host() -> HostRunnerSpec:
-    """A lavender-shaped host with one pre-existing install.
+    """A lavender-shaped host with one pre-existing install, API's.
 
     Returns:
         The spec.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task=None,
-        wslconfig_min_memory_gb=None,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=False,
-        systemd_timers=[],
-        job_timeout_minutes=360,
-        installs=[
-            RunnerInstall(
-                repo="wagner-austin/API",
-                runner_name="lavender-wsl",
-                side="wsl",
-                service="actions.runner.wagner-austin-API.lavender-wsl.service",
-                workdir="/home/gharunner/actions-runner-api-1/_work",
-                labels=["lavender-wsl"],
-                python_toolcache=[],
-            )
-        ],
-        assets=[],
-        base=a_base(),
-        ci_slice=a_ci_slice(),
-    )
+    return a_host([an_install("wagner-austin/API")])
 
 
 def _clean_transcript(spec: HostRunnerSpec) -> str:
@@ -75,143 +54,85 @@ class TestPlan:
     """plan_onboard's refusals and its derived convention."""
 
     def test_the_plan_follows_the_fleet_convention(self) -> None:
-        plan = runner_onboard.plan_onboard(
-            _host(), "wagner-austin/tree-bot", sides=("wsl", "windows"), python_versions=("3.11.9",)
+        plan = runner_onboard.plan_onboard(_host(), "wagner-austin/Tree-Bot")
+        assert plan == runner_onboard.OnboardPlan(
+            repo="wagner-austin/Tree-Bot",
+            install=RunnerInstall(
+                repo="wagner-austin/Tree-Bot",
+                runner_name="lavender",
+                service="actions.runner.wagner-austin-Tree-Bot.lavender.service",
+                workdir="/home/gharunner/actions-runner-tree-bot-1/_work",
+                labels=["lavender"],
+            ),
         )
-        wsl, windows = plan["installs"]
-        assert wsl["side"] == "wsl"
-        assert wsl["runner_name"] == "lavender-wsl"
-        assert wsl["workdir"] == "/home/gharunner/actions-runner-tree-bot-1/_work"
-        assert wsl["service"] == "actions.runner.wagner-austin-tree-bot.lavender-wsl.service"
-        assert wsl["python_toolcache"] == []
-        assert windows["side"] == "windows"
-        assert windows["runner_name"] == "lavender"
-        assert windows["workdir"] == "C:/actions-runner-tree-bot/_work"
-        assert windows["service"] == "actions.runner.wagner-austin-tree-bot.lavender"
-        assert windows["python_toolcache"] == ["3.11.9"]
 
-    def test_one_side_yields_one_install(self) -> None:
-        plan = runner_onboard.plan_onboard(
-            _host(), "wagner-austin/x", sides=("wsl",), python_versions=()
+    def test_a_repo_already_on_the_host_is_refused_naming_its_runners(self) -> None:
+        spec = a_host(
+            [an_install("wagner-austin/API"), an_install("wagner-austin/API", "lavender-2", slot=2)]
         )
-        assert [i["side"] for i in plan["installs"]] == ["wsl"]
-
-    def test_a_repo_already_on_the_host_is_refused(self) -> None:
         with pytest.raises(AppError) as fault:
-            runner_onboard.plan_onboard(
-                _host(), "wagner-austin/API", sides=("wsl",), python_versions=()
-            )
+            runner_onboard.plan_onboard(spec, "wagner-austin/API")
         assert fault.value.code is FleetErrorCode.RUNNER_ALREADY_ONBOARDED
+        assert fault.value.message.startswith(
+            "wagner-austin/API already has 2 install(s) on lavender (lavender, lavender-2); "
+        )
 
-    @pytest.mark.parametrize("repo", ["no-slash", "a/b/c", "owner/"])
+    @pytest.mark.parametrize("repo", ["no-slash", "a/b/c", "owner/", "/name"])
     def test_a_malformed_repo_is_refused(self, repo: str) -> None:
         with pytest.raises(ValueError, match="owner/repo"):
-            runner_onboard.plan_onboard(_host(), repo, sides=("wsl",), python_versions=())
-
-    def test_empty_sides_are_refused(self) -> None:
-        with pytest.raises(ValueError, match="at least one"):
-            runner_onboard.plan_onboard(_host(), "wagner-austin/x", sides=(), python_versions=())
-
-    def test_an_unknown_side_is_refused(self) -> None:
-        with pytest.raises(ValueError, match="unknown side"):
-            runner_onboard.plan_onboard(
-                _host(), "wagner-austin/x", sides=("linux",), python_versions=()
-            )
+            runner_onboard.plan_onboard(_host(), repo)
 
 
 class TestOnboard:
-    """The whole act, scripts captured byte for byte."""
+    """The whole act, the payload captured byte for byte."""
 
-    def test_both_sides_provision_roster_grows_and_audit_runs(self) -> None:
+    def test_the_host_s_provision_runs_with_the_new_install_and_the_audit_covers_it(
+        self,
+    ) -> None:
         spec = _host()
-        grown = _host()
-        grown["installs"].extend(
-            runner_onboard.plan_onboard(
-                _host(),
-                "wagner-austin/tree-bot",
-                sides=("wsl", "windows"),
-                python_versions=("3.11.9",),
-            )["installs"]
-        )
-        transcript = _clean_transcript(grown)
+        grown = a_host([an_install("wagner-austin/API"), _TREE_BOT])
         runner = FakeRun(
             [
                 ok("TOKENABC123\n"),  # gh mint
-                ok(""),  # send wsl payload
-                ok(""),  # send wsl driver
-                ok("done"),  # run wsl driver
-                ok(""),  # send windows payload
-                ok("done"),  # run windows payload
-                ok(""),  # audit: send driver
-                ok(transcript),  # audit: run driver
+                ok(""),  # send the provision
+                ok("done\n"),  # run it
+                ok(""),  # audit: send
+                ok(_clean_transcript(grown)),  # audit: run
                 *no_dropped_jobs(grown),  # audit: the dropped-job row's reads
             ]
         )
         _test_hooks.run = runner
-        plan, findings = runner_onboard.onboard(
-            spec,
-            "wagner-austin/tree-bot",
-            sides=("wsl", "windows"),
-            python_versions=("3.11.9",),
+        plan, findings = runner_onboard.onboard(spec, "wagner-austin/tree-bot")
+        assert plan["install"] == _TREE_BOT
+        assert spec == grown
+        assert [finding["ok"] for finding in findings] == [True] * (
+            len(runner_audit.expected_checks(grown)) + 1
         )
-        assert [i["repo"] for i in spec["installs"]].count("wagner-austin/tree-bot") == 2
-        assert all(finding["ok"] for finding in findings)
-        wsl_install, windows_install = plan["installs"]
-        # The shipped payloads are asserted byte for byte against the same
-        # renderers production composes from -- the claim under test is the
-        # composition (shebang, strict mode, token line, then the install),
-        # while the renderers' own content has its own tests.
-        expected_wsl = "\n".join(
-            [
-                "#!/usr/bin/env bash",
-                "set -euo pipefail",
-                "export RUNNER_TOKEN_TREE_BOT='TOKENABC123'",
-                *runner_render.render_wsl_install_lines(wsl_install),
-            ]
+        assert runner.calls[0][4] == (
+            "repos/wagner-austin/tree-bot/actions/runners/registration-token"
+        )
+        path = "/home/corvis/fleet/runner-payloads/fleet-onboard-tree-bot.sh"
+        assert runner.stdin[1] == runner_render.render_provision_script(
+            grown, {"wagner-austin/tree-bot": "TOKENABC123"}
         ).encode("utf-8")
-        assert runner.stdin[1] == expected_wsl
-        expected_windows = runner_windows_provision.render_windows_onboard_script(
-            windows_install, {"RUNNER_TOKEN_TREE_BOT": "TOKENABC123"}
-        ).encode("utf-8")
-        assert runner.stdin[4] == expected_windows
+        assert tuple(runner.calls[2][-4:]) == (*remote.ROOT_BASH, path)
+        assert runner.timeouts[2] == runner_render.STAGE_TIMEOUT_SECONDS
 
-    def test_no_python_versions_means_no_toolcache_lines(self) -> None:
-        spec = _host()
-        grown = _host()
-        grown["installs"].extend(
-            runner_onboard.plan_onboard(
-                _host(), "wagner-austin/x", sides=("windows",), python_versions=()
-            )["installs"]
-        )
-        runner = FakeRun(
-            [
-                ok("TOK1\n"),
-                ok(""),
-                ok("done"),
-                ok(""),
-                ok(_clean_transcript(grown)),
-                *no_dropped_jobs(grown),
-            ]
-        )
-        _test_hooks.run = runner
-        plan, _ = runner_onboard.onboard(spec, "wagner-austin/x", sides=("windows",))
-        expected = runner_windows_provision.render_windows_onboard_script(
-            plan["installs"][0], {"RUNNER_TOKEN_X": "TOK1"}
-        ).encode("utf-8")
-        assert runner.stdin[1] == expected
-        assert "Python = @() }" in expected.decode("utf-8")
-
-    def test_an_unreachable_audit_names_the_staged_state(self) -> None:
-        spec = _host()
+    def test_a_provision_that_fails_raises_with_its_words(self) -> None:
         _test_hooks.run = FakeRun(
-            [
-                ok("TOK1\n"),
-                ok(""),
-                ok("done"),
-                failed(255, "No route to host"),
-            ]
+            [ok("TOK1\n"), ok(""), failed(1, "Http response code: NotFound from 'POST'")]
         )
         with pytest.raises(AppError) as fault:
-            runner_onboard.onboard(spec, "wagner-austin/x", sides=("windows",))
+            runner_onboard.onboard(_host(), "wagner-austin/x")
+        assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert "Http response code: NotFound" in fault.value.message
+
+    def test_an_unreachable_audit_names_the_staged_state(self) -> None:
+        _test_hooks.run = FakeRun(
+            [ok("TOK1\n"), ok(""), ok("done\n"), failed(255, "No route to host")]
+        )
+        with pytest.raises(AppError) as fault:
+            runner_onboard.onboard(_host(), "wagner-austin/x")
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
-        assert "staged" in fault.value.message
+        assert fault.value.message.startswith("post-onboard audit could not reach lavender: ")
+        assert "its roster entry is staged" in fault.value.message

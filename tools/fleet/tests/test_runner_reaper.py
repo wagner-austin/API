@@ -23,10 +23,12 @@ from typing_extensions import TypedDict
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_reaper_render, runner_render
+from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from tests._host_bash import host_bash
+from tests._runner_fixtures import an_install
 
 #: The unit every case runs.
-UNIT = "actions.runner.wagner-austin-API.lavender-wsl.service"
+UNIT = "actions.runner.wagner-austin-API.lavender.service"
 
 #: The stand-ins, defined before the script runs. A command substitution
 #: inherits functions, so ``$(getconf CLK_TCK)`` reaches the stand-in too.
@@ -354,11 +356,11 @@ class TestAReapPass:
 
 
 #: The scope the hook adopted the Worker into (MCPs board task 715b9ec5).
-SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-wsl-13.scope"
+SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-13.scope"
 
 #: A sibling unit's scope, whose name begins with this unit's: it is not
 #: this unit's, and nothing in it is read as this unit's.
-SIBLING_SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-wsl-2-30.scope"
+SIBLING_SCOPE = "fleet-job-actions.runner.wagner-austin-API.lavender-2-30.scope"
 
 
 def _scope(table: pathlib.Path, name: str, processes: tuple[Process, ...]) -> None:
@@ -431,20 +433,14 @@ class TestJobScopes:
 
 
 def _install() -> RunnerInstall:
-    """The WSL install the render cases place.
+    """The install the render cases place.
 
     Returns:
-        The install.
+        API's first install, whose unit is :data:`UNIT`.
     """
-    return RunnerInstall(
-        repo="wagner-austin/API",
-        runner_name="lavender-wsl",
-        side="wsl",
-        service=UNIT,
-        workdir="/home/gharunner/actions-runner-api-1/_work",
-        labels=["lavender-wsl"],
-        python_toolcache=[],
-    )
+    install = an_install("wagner-austin/API")
+    assert install["service"] == UNIT
+    return install
 
 
 def _lavender() -> HostRunnerSpec:
@@ -458,21 +454,14 @@ def _lavender() -> HostRunnerSpec:
 
 
 class TestTheRender:
-    def test_the_drop_in_ends_the_whole_group_and_is_written_only_when_it_differs(
-        self,
-    ) -> None:
-        lines = runner_reaper_render.render_kill_mode_lines(_install())
-        path = f"/etc/systemd/system/{UNIT}.d/fleet-kill.conf"
+    def test_the_drop_in_ends_the_whole_group_through_the_one_unit_writer(self) -> None:
         assert runner_reaper_render.KILL_DROP_IN == "[Service]\nKillMode=control-group\n"
-        assert lines == [
-            f'if [ "$(cat {path} 2>/dev/null)" != '
-            "\"$(printf '[Service]\\nKillMode=control-group\\n')\" ]; then",
-            f"    mkdir -p /etc/systemd/system/{UNIT}.d",
-            f"    printf '[Service]\\nKillMode=control-group\\n' > {path}",
-            "    systemctl daemon-reload",
-            f"    echo 'kill mode set for {UNIT}: a stop ends its whole cgroup'",
-            "fi",
-        ]
+        assert runner_reaper_render.render_kill_mode_lines(_install()) == render_drop_in_lines(
+            _install(),
+            name="fleet-kill.conf",
+            body=runner_reaper_render.KILL_DROP_IN,
+            announcement=f"kill mode set for {UNIT}: a stop ends its whole cgroup",
+        )
 
     def test_an_unscriptable_unit_name_is_refused(self) -> None:
         install = _install()
@@ -480,16 +469,25 @@ class TestTheRender:
         with pytest.raises(ValueError, match="service"):
             runner_reaper_render.render_kill_mode_lines(install)
 
-    def test_the_reaper_and_its_units_are_written_whole_and_the_timer_started(self) -> None:
+    def test_the_reaper_is_written_whole_its_units_when_they_differ_and_the_timer_started(
+        self,
+    ) -> None:
         spec = _lavender()
-        lines = runner_reaper_render.render_reaper_lines(spec)
-        assert lines[0] == "cat > /usr/local/sbin/fleet-runner-reaper <<'REAPER_EOF'"
-        assert lines[1] == runner_reaper_render.REAPER_SCRIPT.rstrip("\n")
-        assert lines[2:4] == ["REAPER_EOF", "chmod +x /usr/local/sbin/fleet-runner-reaper"]
-        assert runner_reaper_render.render_reaper_service(spec).rstrip("\n") in lines
-        assert runner_reaper_render.REAPER_TIMER.rstrip("\n") in lines
-        assert lines[-2:] == [
-            "systemctl daemon-reload",
+        assert runner_reaper_render.render_reaper_lines(spec) == [
+            "cat > /usr/local/sbin/fleet-runner-reaper <<'REAPER_EOF'",
+            runner_reaper_render.REAPER_SCRIPT.rstrip("\n"),
+            "REAPER_EOF",
+            "chmod +x /usr/local/sbin/fleet-runner-reaper",
+            *render_unit_file_lines(
+                "/etc/systemd/system/fleet-runner-reaper.service",
+                runner_reaper_render.render_reaper_service(spec),
+                announcement="fleet-runner-reaper.service written",
+            ),
+            *render_unit_file_lines(
+                "/etc/systemd/system/fleet-runner-reaper.timer",
+                runner_reaper_render.REAPER_TIMER,
+                announcement="fleet-runner-reaper.timer written",
+            ),
             "systemctl enable --now fleet-runner-reaper.timer",
         ]
 
@@ -511,16 +509,14 @@ class TestTheRender:
 
     def test_the_provision_installs_the_reaper_before_any_runner(self) -> None:
         spec = _lavender()
-        script = runner_render.render_provision(spec)["linux_script"]
+        script = runner_render.render_provision(spec)["provision_script"]
         assert script.index("enable --now fleet-runner-reaper.timer") < script.index(
             "# --- runner installs ---"
         )
         # lavender's roster bound, 360 minutes.
         assert "ExecStart=/usr/local/sbin/fleet-runner-reaper 21600\n" in script
-        # Twice per WSL runner: the comparison and the write.
-        assert script.count("fleet-kill.conf") == 2 * len(
-            [i for i in spec["installs"] if i["side"] == "wsl"]
-        )
+        # Twice per runner: the comparison and the write.
+        assert script.count("fleet-kill.conf") == 2 * len(spec["installs"])
 
 
 class TestTheAuditMode:

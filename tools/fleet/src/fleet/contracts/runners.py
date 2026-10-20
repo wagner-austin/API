@@ -1,13 +1,16 @@
 """The CI runner roster: which runner installs each machine carries, and why.
 
-This document exists because on 2026-09-08 every fact in it was folklore. A
-Windows scheduled task (``wsl-keepalive``) was the only thing holding six
-runners' WSL VM open, and nothing recorded it -- a restart that missed it took
-both repos' CI pools offline silently. The licensed game tree, the llama.cpp
-checkout and ``/data`` had each been placed on lavender by hand, findable only
-by reading a workflow's assert step or a board post. ``fleet-runners audit``
-scores a host against this roster; ``fleet-runners render`` emits the converge
-script for a new one.
+This document exists because on 2026-09-08 every fact in it was folklore:
+the licensed game tree, the llama.cpp checkout and ``/data`` had each been
+placed on lavender by hand, findable only by reading a workflow's assert step
+or a board post. ``fleet-runners audit`` scores a host against this roster;
+``fleet-runners render`` emits the converge script for a new one.
+
+A RUNNER HOST IS A LINUX MACHINE. Until 2026-10-19 lavender was a Windows
+machine whose WSL distro held the Linux runners beside four Windows ones;
+it was reimaged to Ubuntu that day and every Windows install was deleted
+(MCPs board task 1e9ab738), so each runner is a systemd service on the host
+itself, reached over ssh like every other fleet node.
 
 THIS IS A SECOND MACHINE DOCUMENT, NOT A COPY OF THE FIRST. The fleet's
 roster, ``registry/machines`` (:mod:`fleet.contracts.machine`), owns which
@@ -17,14 +20,12 @@ their labels, and the host assets their job classes require, none of which
 the fleet's roster declares.
 
 ABSENCE IS NOT A STATE, same rule as :mod:`fleet.contracts.node`: optional
-concepts are spelled as explicit ``null`` rather than omitted keys, so a host
-nobody finished describing cannot be told apart from one that genuinely has
-no keepalive task.
+concepts are spelled as explicit ``null`` rather than omitted keys, so an
+asset nobody finished describing cannot be told apart from one that
+genuinely has no pin.
 """
 
 from __future__ import annotations
-
-from typing import Literal
 
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import (
@@ -52,52 +53,34 @@ class RunnerInstall(TypedDict):
         repo: The repository it is registered to, ``owner/name`` form --
             registrations are per-repo, which is why one box carries many.
         runner_name: The name shown by the repo's runner registration, e.g.
-            ``lavender-wsl-2``. Names are per-repo: two installs on one box
-            may share a name across repos without being the same install.
-        side: Which execution environment the install lives in: ``"wsl"``
-            (inside the host's WSL distro, run by systemd) or ``"windows"``
-            (on the host OS, run by a Windows service). Added 2026-09-09,
-            when three Windows-side installs (MCPs, portable-claude,
-            tree-bot) were live on lavender and invisible to the audit and
-            the load sampler because the roster could not describe them.
-        service: The service that runs it. For ``wsl``, the systemd unit
-            (``actions.runner.<owner>-<repo>.<name>.service``); for
-            ``windows``, the Windows service name (same, minus
-            ``.service``). Recorded exactly rather than derived, because
-            "is the service running" is the audit question.
-        workdir: Absolute path of the install's ``_work`` tree inside its
-            execution environment -- a ``/home/...`` path for ``wsl``, a
-            drive-letter path for ``windows``; the decoder enforces the
-            match. This is the path a poetry in-project venv bakes into its
-            shebangs -- the fact behind the 2026-09-08 cache poisoning --
-            and the audit asserts it exists.
+            ``lavender-2``. Names are per-repo: two installs on one box may
+            share a name across repos without being the same install.
+        service: The systemd unit that runs it
+            (``actions.runner.<owner>-<repo>.<name>.service``). Recorded
+            exactly rather than derived, because "is the service running"
+            is the audit question.
+        workdir: Absolute POSIX path of the install's ``_work`` tree. This
+            is the path a poetry in-project venv bakes into its shebangs --
+            the fact behind the 2026-09-08 cache poisoning -- and the audit
+            asserts it exists.
         labels: The custom labels the install answers to, e.g.
-            ``["lavender-wsl"]``. Labels are the pool: a workflow targets a
+            ``["lavender"]``. Labels are the pool: a workflow targets a
             label, never a machine, which is what makes a new box a five
             minute join instead of a workflow edit.
-        python_toolcache: Exact CPython versions seeded into a Windows
-            install's tool cache, so ``actions/setup-python`` finds instead
-            of installing (the install path needs registry rights the runner
-            service lacks). Empty for a WSL install, and for a Windows one
-            whose jobs bring no Python. Recorded here since 2026-09-26: the
-            seeds were an ``--onboard`` flag the roster never kept, so the
-            lavender rebuild had to recover them from the old disk.
     """
 
     repo: str
     runner_name: str
-    side: Literal["wsl", "windows"]
     service: str
     workdir: str
     labels: list[str]
-    python_toolcache: list[str]
 
 
 class FileAsset(TypedDict):
     """One path a host must hold for its runner jobs to be honest.
 
     Attributes:
-        path: Absolute path inside the execution environment.
+        path: Absolute path on the host.
         sha256: Content pin for a file whose exact bytes are load-bearing
             (the RustedWarfareBot provenance jar), or ``None`` for a path
             whose presence is the whole requirement. Explicitly null rather
@@ -138,56 +121,40 @@ class HostRunnerSpec(TypedDict):
         name: The host's fleet name, a machine of ``registry/machines``, so
             the two documents can be joined.
         host: SSH destination -- an alias from ``~/.ssh/config``, the same
-            rule as :class:`fleet.contracts.node.NodeConfig`.
-        wsl_distro: The WSL distribution the runners live inside. Required
-            rather than nullable: the fleet's remote layer drives Windows
-            hosts (see :mod:`fleet.core.remote`), so a bare-Linux CI host is
-            a machine this tooling cannot audit yet -- and a roster must not
-            describe what the audit cannot score, or the entry sits
-            permanently unverified while reading as covered. When a bare
-            Linux box joins the fleet, this field and the audit widen
-            together.
-        keepalive_task: The Windows scheduled task that holds the WSL VM
-            open, or ``None`` on a host that needs none. THIS FIELD IS THE
-            INCIDENT THIS MODULE EXISTS FOR: systemd services do not keep a
-            WSL VM alive, and the task's name lived nowhere until it cost
-            six runners.
-        wslconfig_min_memory_gb: The least memory ``.wslconfig`` must grant
-            the VM, or ``None`` when the host default is acceptable.
-            Lavender's pool needs 26: two CI jobs peak near 10GB each and
-            the Windows default grants half the machine.
-        scratch_dir: Absolute Windows directory on the host for transient
-            audit scripts, the same role ``stage_root`` plays for dispatch.
-            Declared here rather than joined from the registry at runtime:
-            an audit that needed a second document to locate a writable
-            directory would fail on exactly the machine the second document
-            forgot.
+            rule as :class:`fleet.contracts.node.NodeConfig`. Its account
+            runs root payloads through ``sudo -n``.
+        memory_gb: The memory the host's kernel reports, in whole GB. The
+            CI slice's ceiling is held below it, so the runners can never be
+            granted the memory sshd and the fleet's own checks need.
+        payload_dir: Absolute POSIX directory on the host the root payloads
+            and the audit script are sent to, the same role ``stage_root``
+            plays for dispatch. Declared here rather than joined from the
+            registry at runtime: an audit that needed a second document to
+            locate a writable directory would fail on exactly the machine
+            the second document forgot.
         gpu_required: Whether runner jobs on this host digest a real GPU
             (Model-Trainer's default hooks do). Audited via ``nvidia-smi``
-            inside the execution environment.
-        systemd_timers: Timers that must be enabled inside the execution
-            environment, e.g. ``ci-clean.timer`` -- hygiene is part of the
-            provision, not an afterthought on one box's disk.
+            on each runner's own PATH.
+        systemd_timers: Timers that must be enabled on the host, e.g.
+            ``ci-clean.timer`` -- hygiene is part of the provision, not an
+            afterthought on one box's disk.
         job_timeout_minutes: The longest ``timeout-minutes`` any job these
             runners take may declare. A runner holding a process older than
             this with no ``Runner.Worker`` alive is holding what a finished
             job left (MCPs board task 53528106), which the audit fails.
         installs: Every runner install this host carries.
         assets: Every path its job classes require.
-        base: What a stock Windows install needs before any runner can
-            register, and the distro's disk ceiling
-            (:mod:`fleet.contracts.runner_base`).
-        ci_slice: The memory and CPU the host's WSL runners may take
-            together, beside the fleet's own lane on the same VM
+        base: What the host must hold before any runner can register, and
+            its root's disk ceiling (:mod:`fleet.contracts.runner_base`).
+        ci_slice: The memory and CPU the host's runners may take together,
+            beside the fleet's own lane on the same machine
             (:mod:`fleet.contracts.runner_slice`).
     """
 
     name: str
     host: str
-    wsl_distro: str
-    keepalive_task: str | None
-    wslconfig_min_memory_gb: int | None
-    scratch_dir: str
+    memory_gb: int
+    payload_dir: str
     gpu_required: bool
     systemd_timers: list[str]
     job_timeout_minutes: int
@@ -219,11 +186,9 @@ def encode_runner_install(install: RunnerInstall) -> JSONObject:
     return {
         "repo": install["repo"],
         "runner_name": install["runner_name"],
-        "side": install["side"],
         "service": install["service"],
         "workdir": install["workdir"],
         "labels": list(install["labels"]),
-        "python_toolcache": list(install["python_toolcache"]),
     }
 
 
@@ -239,13 +204,10 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, ``repo`` is not ``owner/name``, ``labels`` is empty,
-            ``side`` is not ``wsl`` or ``windows``, or ``workdir``'s shape
-            does not match the side -- a Windows path on a wsl install (or
-            the reverse) describes an install that cannot exist, and the
-            audit pointed at it would report drift no command can fix. A
-            runner with no custom label is unreachable by every workflow in
-            these repositories, so declaring one would record an install
-            nothing can use.
+            or ``workdir`` is not an absolute POSIX path. A runner with no
+            custom label is unreachable by every workflow in these
+            repositories, so declaring one would record an install nothing
+            can use.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"runner install must be a JSON object, got {type(value).__name__}")
@@ -258,42 +220,15 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
             "labels must be non-empty; a runner with no custom label cannot be targeted "
             "by any workflow here and would sit registered but unreachable"
         )
-    raw_side = require_str(value, "side")
-    if raw_side not in ("wsl", "windows"):
-        raise JSONTypeError(f"side must be 'wsl' or 'windows', got {raw_side!r}")
-    side: Literal["wsl", "windows"] = "wsl" if raw_side == "wsl" else "windows"
     workdir = require_str(value, "workdir")
-    if side == "wsl" and not workdir.startswith("/"):
-        raise JSONTypeError(
-            f"a wsl install's workdir must be an absolute POSIX path, got {workdir!r}"
-        )
-    if side == "windows" and not (
-        len(workdir) > 2 and workdir[0].isalpha() and workdir[1] == ":" and workdir[2] in "/\\"
-    ):
-        raise JSONTypeError(
-            f"a windows install's workdir must be a drive-letter path, got {workdir!r}"
-        )
-    toolcache = require_str_list(value, "python_toolcache")
-    if side == "wsl" and toolcache:
-        raise JSONTypeError(
-            "python_toolcache must be empty on a wsl install: the seed is the Windows "
-            "tool cache's, and a WSL job's setup-python installs without registry rights"
-        )
-    for version in toolcache:
-        parts = version.split(".")
-        if len(parts) != 3 or not all(part.isdigit() for part in parts):
-            raise JSONTypeError(
-                f"python_toolcache versions must be exact X.Y.Z, got {version!r}; a floating "
-                "spec re-creates the drift the seed exists to prevent"
-            )
+    if not workdir.startswith("/"):
+        raise JSONTypeError(f"an install's workdir must be an absolute POSIX path, got {workdir!r}")
     return RunnerInstall(
         repo=repo,
         runner_name=require_str(value, "runner_name"),
-        side=side,
         service=require_str(value, "service"),
         workdir=workdir,
         labels=labels,
-        python_toolcache=toolcache,
     )
 
 
@@ -392,10 +327,8 @@ def encode_host_runner_spec(spec: HostRunnerSpec) -> JSONObject:
     return {
         "name": spec["name"],
         "host": spec["host"],
-        "wsl_distro": spec["wsl_distro"],
-        "keepalive_task": spec["keepalive_task"],
-        "wslconfig_min_memory_gb": spec["wslconfig_min_memory_gb"],
-        "scratch_dir": spec["scratch_dir"],
+        "memory_gb": spec["memory_gb"],
+        "payload_dir": spec["payload_dir"],
         "gpu_required": spec["gpu_required"],
         "systemd_timers": list(spec["systemd_timers"]),
         "job_timeout_minutes": spec["job_timeout_minutes"],
@@ -444,32 +377,17 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, an optional concept is absent rather than null, or the
-            memory floor or the job timeout is not positive.
+            mistyped, the memory or the job timeout is not positive, or the
+            payload directory is not an absolute POSIX path.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"host must be a JSON object, got {type(value).__name__}")
-    keepalive_task = _optional_null_str(value, "keepalive_task")
-    if "wslconfig_min_memory_gb" not in value:
-        raise JSONTypeError(
-            "host must declare 'wslconfig_min_memory_gb', using null when the host "
-            "default is acceptable"
-        )
-    raw_memory = value["wslconfig_min_memory_gb"]
-    memory: int | None
-    if raw_memory is None:
-        memory = None
-    elif isinstance(raw_memory, bool) or not isinstance(raw_memory, int):
-        raise JSONTypeError(
-            f"wslconfig_min_memory_gb must be an integer or null, got {type(raw_memory).__name__}"
-        )
-    else:
-        if raw_memory <= 0:
-            raise JSONTypeError(
-                f"wslconfig_min_memory_gb must be positive, got {raw_memory}; a floor of "
-                "nothing is the host default spelled confusingly"
-            )
-        memory = raw_memory
+    memory = require_int(value, "memory_gb")
+    if memory <= 0:
+        raise JSONTypeError(f"memory_gb must be positive, got {memory}")
+    payload_dir = require_str(value, "payload_dir")
+    if not payload_dir.startswith("/"):
+        raise JSONTypeError(f"payload_dir must be an absolute POSIX path, got {payload_dir!r}")
     job_timeout = require_int(value, "job_timeout_minutes")
     if job_timeout <= 0:
         raise JSONTypeError(
@@ -485,17 +403,15 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
     return HostRunnerSpec(
         name=require_str(value, "name"),
         host=require_str(value, "host"),
-        wsl_distro=require_str(value, "wsl_distro"),
-        keepalive_task=keepalive_task,
-        wslconfig_min_memory_gb=memory,
-        scratch_dir=require_str(value, "scratch_dir"),
+        memory_gb=memory,
+        payload_dir=payload_dir,
         gpu_required=require_bool(value, "gpu_required"),
         systemd_timers=require_str_list(value, "systemd_timers"),
         job_timeout_minutes=job_timeout,
         installs=installs,
         assets=[decode_file_asset(entry) for entry in require_list(value, "assets")],
         base=decode_host_base(require_dict(value, "base")),
-        ci_slice=decode_ci_slice(require_dict(value, "ci_slice"), vm_memory_gb=memory),
+        ci_slice=decode_ci_slice(require_dict(value, "ci_slice"), host_memory_gb=memory),
     )
 
 

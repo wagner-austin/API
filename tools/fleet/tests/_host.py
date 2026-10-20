@@ -32,7 +32,7 @@ ordinary run skips it on every platform, naming the project that runs it,
 and the Linux execution run requires it like any host case.
 
 A FOURTH, ``host_runner_units``, binds a case to a host that runs the fleet's
-WSL runner units, and reads where those units and their jobs run on it (MCPs
+runner units, and reads where those units and their jobs run on it (MCPs
 board task 715b9ec5, A3). No platform has that capability: the Linux
 execution run deselects such a case, the ordinary run skips it, and only a
 run given ``--runner-host=<the runners.json host>`` has it, which is what
@@ -68,7 +68,7 @@ MARKERS: Final[dict[str, str]] = {"windows": "host_windows", "linux": "host_linu
 #: run only by the execution run.
 EXECUTION_ONLY_MARKER: Final[str] = "host_linux_docker"
 
-#: The capability of a host that runs the fleet's WSL runner units, whose cases
+#: The capability of a host that runs the fleet's runner units, whose cases
 #: read where those units and their jobs run (MCPs board task 715b9ec5).
 RUNNER_HOST: Final[str] = "runner-host"
 
@@ -228,7 +228,7 @@ def plan_for(here: str) -> host_execution.HostExecutionPlan:
         },
         needs={
             EXECUTION_ONLY_MARKER: "needs a node's execdocker user and its rootless daemon",
-            RUNNER_HOST_MARKER: "needs a host that runs the fleet's WSL runner units",
+            RUNNER_HOST_MARKER: "needs a host that runs the fleet's runner units",
             FLEET_HUB_MARKER: "needs the hub's records and its ssh to every node",
         },
         projects=PROJECTS,

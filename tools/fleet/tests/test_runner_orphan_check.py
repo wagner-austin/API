@@ -1,53 +1,32 @@
 """The audit row for what a finished job left behind (MCPs board task 53528106, A2 and A4).
 
-The row's PowerShell is executed by the Pester suite over the committed
-render (tests/pester/rendered-audit.Tests.ps1); these pin what each side
-asks and how it names its row, so the two halves of a host agree.
+The row asks the reaper's own ``--audit`` mode, so it runs here under the
+audit's functions with the reaper a stand-in that answers as each case says
+(tests/_audit_rows.py); the reaper's counting itself runs in
+test_runner_reaper.
 """
 
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_orphan_check
-from tests._runner_fixtures import a_base, a_ci_slice
+from fleet.core.runner_reaper_render import REAPER_PATH
+from tests._audit_rows import run_rows
+from tests._runner_fixtures import a_host, an_install
 
+#: The install every case audits.
+INSTALL = an_install("wagner-austin/MCPs")
 
-def _install(side: str, workdir: str, service: str) -> RunnerInstall:
-    """One install on either side.
-
-    Args:
-        side: ``wsl`` or ``windows``.
-        workdir: Its ``_work`` tree.
-        service: Its service name.
-
-    Returns:
-        The install.
-    """
-    return RunnerInstall(
-        repo="wagner-austin/MCPs",
-        runner_name="lavender-wsl" if side == "wsl" else "lavender",
-        side="wsl" if side == "wsl" else "windows",
-        service=service,
-        workdir=workdir,
-        labels=["lavender"],
-        python_toolcache=[],
-    )
-
-
-WSL = _install(
-    "wsl",
-    "/home/gharunner/actions-runner/_work",
-    "actions.runner.wagner-austin-MCPs.lavender-wsl.service",
-)
-WINDOWS = _install(
-    "windows", "C:/actions-runner/_work", "actions.runner.wagner-austin-MCPs.lavender"
-)
+#: Its unit.
+UNIT = INSTALL["service"]
 
 
 def _host(minutes: int) -> HostRunnerSpec:
-    """A host holding both installs, bounded at ``minutes``.
+    """A host bounded at ``minutes``.
 
     Args:
         minutes: Its job timeout.
@@ -55,70 +34,56 @@ def _host(minutes: int) -> HostRunnerSpec:
     Returns:
         The host.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task=None,
-        wslconfig_min_memory_gb=None,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=False,
-        systemd_timers=[],
-        job_timeout_minutes=minutes,
-        installs=[WSL, WINDOWS],
-        assets=[],
-        base=a_base(),
-        ci_slice=a_ci_slice(),
+    host = a_host([INSTALL])
+    host["job_timeout_minutes"] = minutes
+    return host
+
+
+def _row(tmp_path: pathlib.Path, minutes: int, reaper: str) -> str:
+    """The row's ``CHECK`` line, the reaper a stand-in.
+
+    Args:
+        tmp_path: The case's directory.
+        minutes: The host's job timeout.
+        reaper: The stand-in reaper's body; it records its arguments.
+
+    Returns:
+        The line.
+    """
+    [row] = run_rows(
+        tmp_path,
+        runner_orphan_check.render_orphan_check_lines(_host(minutes), INSTALL),
+        {REAPER_PATH: f'echo "$*" > "{tmp_path}/asked"\n{reaper}'},
+    )
+    return row
+
+
+def test_the_row_is_named_for_the_repository_and_runner() -> None:
+    assert runner_orphan_check.orphan_check_id(INSTALL) == "orphans:wagner-austin/MCPs:lavender"
+
+
+def test_a_reaper_counting_nothing_passes_and_was_asked_at_the_host_s_bound(
+    tmp_path: pathlib.Path,
+) -> None:
+    assert _row(tmp_path, 60, "echo 0") == "CHECK orphans:wagner-austin/MCPs:lavender OK"
+    assert (tmp_path / "asked").read_text(encoding="utf-8") == f"--audit 3600 {UNIT}\n"
+
+
+@pytest.mark.parametrize(
+    ("reaper", "counted"), [("echo 3", "3 (exit 0)"), ("echo 0; exit 1", "0 (exit 1)")]
+)
+def test_a_count_or_a_failed_reaper_drifts_with_what_it_said(
+    tmp_path: pathlib.Path, reaper: str, counted: str
+) -> None:
+    assert _row(tmp_path, 360, reaper) == (
+        "CHECK orphans:wagner-austin/MCPs:lavender DRIFT processes older than 360 minutes that "
+        f"a finished job left in {UNIT}, or under a Worker past that job timeout; the reaper "
+        f"counted: {counted}"
     )
 
 
-class TestTheRowIds:
-    def test_each_side_names_its_repository_side_and_runner(self) -> None:
-        assert (
-            runner_orphan_check.orphan_check_id(WSL)
-            == "orphans:wagner-austin/MCPs:wsl:lavender-wsl"
+def test_an_unscriptable_unit_is_refused() -> None:
+    with pytest.raises(ValueError, match="service"):
+        runner_orphan_check.render_orphan_check_lines(
+            _host(60), {**INSTALL, "service": "bad'unit.service"}
         )
-        assert (
-            runner_orphan_check.orphan_check_id(WINDOWS)
-            == "orphans:wagner-austin/MCPs:windows:lavender"
-        )
-
-    def test_a_windows_root_ends_in_a_separator_so_a_sibling_runner_never_matches(self) -> None:
-        assert runner_orphan_check.runner_root(WINDOWS) == "C:\\actions-runner\\"
-
-
-class TestTheWslRow:
-    def test_it_asks_the_reaper_s_audit_mode_for_the_unit_at_the_host_s_bound(self) -> None:
-        lines = runner_orphan_check.render_orphan_check_lines(_host(60), WSL)
-        assert lines[0] == (
-            '$Probe = Invoke-InDistro $Cmd $Wsl $Distro "/usr/local/sbin/fleet-runner-reaper '
-            "--audit 3600 'actions.runner.wagner-austin-MCPs.lavender-wsl.service'\""
-        )
-        assert lines[2] == (
-            "Write-Check 'orphans:wagner-austin/MCPs:wsl:lavender-wsl' "
-            "($Probe.Exit -eq 0 -and $Leftover -eq '0') "
-            "('processes older than 60 minutes that a finished job left in "
-            "actions.runner.wagner-austin-MCPs.lavender-wsl.service, "
-            "or under a Worker past that job timeout; the reaper counted: ' + $Probe.Text)"
-        )
-
-
-class TestTheWindowsRow:
-    def test_it_walks_the_service_s_tree_under_its_own_root_at_the_host_s_bound(self) -> None:
-        lines = runner_orphan_check.render_orphan_check_lines(_host(360), WINDOWS)
-        assert lines[:5] == [
-            "$ServicePid = 0",
-            "foreach ($Row in $Service) {",
-            "    $ServicePid = [int]$Row.ProcessId",
-            "}",
-            "$Leftover = @(Get-RunnerLeftover @(& $GetProcesses) $ServicePid "
-            "'C:\\actions-runner\\' 21600)",
-        ]
-        assert lines[5].startswith(
-            "Write-Check 'orphans:wagner-austin/MCPs:windows:lavender' ($Leftover.Count -eq 0) "
-        )
-
-    def test_an_unscriptable_directory_is_refused(self) -> None:
-        install = _install("windows", "C:/it's/_work", "actions.runner.x.lavender")
-        with pytest.raises(ValueError, match="workdir"):
-            runner_orphan_check.render_orphan_check_lines(_host(60), install)

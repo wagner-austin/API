@@ -88,7 +88,7 @@ def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
 
 
 def reap_pass(repo_root: pathlib.Path) -> None:
-    """End every WSL runner Worker whose job GitHub dropped (MCPs board task 715b9ec5).
+    """End every runner Worker whose job GitHub dropped (MCPs board task 715b9ec5).
 
     Args:
         repo_root: The API checkout whose object store holds

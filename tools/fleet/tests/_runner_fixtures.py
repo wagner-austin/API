@@ -8,50 +8,90 @@ test file's own copy.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from platform_core.json_utils import JSONValue
 
-from fleet.contracts.runner_base import DiskCeiling, HostBase, MachineVariable, PinnedDownload
+from fleet.contracts.runner_base import DiskCeiling, HostBase
 from fleet.contracts.runner_slice import CiSlice
-from fleet.contracts.runners import HostRunnerSpec
+from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks
 from tests.conftest import ok
+
+
+def an_install(
+    repo: str = "wagner-austin/API", runner_name: str = "lavender", *, slot: int = 1
+) -> RunnerInstall:
+    """One install named as the roster names lavender's.
+
+    Args:
+        repo: Its repository, ``owner/name``.
+        runner_name: Its runner's name.
+        slot: Which of the repository's installs on the host it is, the
+            number in its install directory.
+
+    Returns:
+        The install: unit ``actions.runner.<owner>-<name>.<runner>.service``,
+        work tree ``/home/gharunner/actions-runner-<name>-<slot>/_work``, and
+        the host's label.
+    """
+    owner, name = repo.split("/")
+    return RunnerInstall(
+        repo=repo,
+        runner_name=runner_name,
+        service=f"actions.runner.{owner}-{name}.{runner_name}.service",
+        workdir=f"/home/gharunner/actions-runner-{name.lower()}-{slot}/_work",
+        labels=["lavender"],
+    )
+
+
+def a_host(
+    installs: Sequence[RunnerInstall] = (),
+    *,
+    gpu_required: bool = False,
+    systemd_timers: Sequence[str] = (),
+    assets: Sequence[FileAsset] = (),
+) -> HostRunnerSpec:
+    """A lavender-shaped host.
+
+    Args:
+        installs: Its installs; none given is one :func:`an_install`.
+        gpu_required: Whether its jobs digest a GPU.
+        systemd_timers: The timers it must keep enabled.
+        assets: The paths its jobs need.
+
+    Returns:
+        The spec: 31 GB, payloads under ``/home/corvis/fleet/runner-payloads``,
+        a six-hour job timeout, :func:`a_base` and :func:`a_ci_slice`.
+    """
+    return HostRunnerSpec(
+        name="lavender",
+        host="lavender",
+        memory_gb=31,
+        payload_dir="/home/corvis/fleet/runner-payloads",
+        gpu_required=gpu_required,
+        systemd_timers=list(systemd_timers),
+        job_timeout_minutes=360,
+        installs=list(installs) if installs else [an_install()],
+        assets=list(assets),
+        base=a_base(),
+        ci_slice=a_ci_slice(),
+    )
 
 
 def a_base() -> HostBase:
     """A lavender-shaped host base.
 
     Returns:
-        The base: two features, the pinned WSL release and image, docker in
-        the packages, one machine PATH entry, POETRY_CACHE_DIR as its one
-        machine variable, RemoteSigned, and a 150 GB
-        ceiling over a 46 GB baseline.
+        The base: ffmpeg and golang-go as the packages a fleet worker lacks,
+        and a 150 GB ceiling over an 18 GB baseline.
     """
     return HostBase(
-        windows_features=["VirtualMachinePlatform", "Microsoft-Windows-Subsystem-Linux"],
-        wsl_msi=PinnedDownload(
-            version="2.7.14",
-            url="https://github.com/microsoft/WSL/releases/download/2.7.14/wsl.2.7.14.0.x64.msi",
-            sha256="db" * 32,
-        ),
-        rootfs=PinnedDownload(
-            version="24.04-20240423",
-            url="https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423/"
-            "ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz",
-            sha256="82" * 32,
-        ),
-        distro_dir="C:/wsl/Ubuntu",
-        apt_packages=["build-essential", "docker.io"],
-        machine_path_entries=["C:\\Program Files (x86)\\GnuWin32\\bin"],
-        machine_environment=[
-            MachineVariable(
-                name="POETRY_CACHE_DIR", value="C:\\fleet\\poetry", reason="out of System32"
-            )
-        ],
-        execution_policy="RemoteSigned",
+        apt_packages=["ffmpeg", "golang-go"],
         disk=DiskCeiling(
             ceiling_gb=150,
-            baseline_gb=46,
-            baseline_measured="2026-09-26",
+            baseline_gb=18,
+            baseline_measured="2026-10-20",
             cache_path="/home/gharunner/.cache",
             cache_ceiling_gb=60,
             work_ceiling_gb=15,
@@ -67,29 +107,11 @@ def base_json() -> dict[str, JSONValue]:
         decoder test is not a round trip through the code it is testing.
     """
     return {
-        "windows_features": ["VirtualMachinePlatform", "Microsoft-Windows-Subsystem-Linux"],
-        "wsl_msi": {
-            "version": "2.7.14",
-            "url": "https://github.com/microsoft/WSL/releases/download/2.7.14/wsl.2.7.14.0.x64.msi",
-            "sha256": "db" * 32,
-        },
-        "rootfs": {
-            "version": "24.04-20240423",
-            "url": "https://cloud-images.ubuntu.com/wsl/releases/24.04/20240423/"
-            "ubuntu-noble-wsl-amd64-wsl.rootfs.tar.gz",
-            "sha256": "82" * 32,
-        },
-        "distro_dir": "C:/wsl/Ubuntu",
-        "apt_packages": ["build-essential", "docker.io"],
-        "machine_path_entries": ["C:\\Program Files (x86)\\GnuWin32\\bin"],
-        "machine_environment": [
-            {"name": "POETRY_CACHE_DIR", "value": "C:\\fleet\\poetry", "reason": "out of System32"}
-        ],
-        "execution_policy": "RemoteSigned",
+        "apt_packages": ["ffmpeg", "golang-go"],
         "disk": {
             "ceiling_gb": 150,
-            "baseline_gb": 46,
-            "baseline_measured": "2026-09-26",
+            "baseline_gb": 18,
+            "baseline_measured": "2026-10-20",
             "cache_path": "/home/gharunner/.cache",
             "cache_ceiling_gb": 60,
             "work_ceiling_gb": 15,
@@ -104,58 +126,40 @@ def no_dropped_jobs(spec: HostRunnerSpec) -> list[_test_hooks.CommandResult]:
         spec: The audited host.
 
     Returns:
-        One ``gh`` runner list per repository of its WSL installs, listing
-        none, then the job scope helper's ``--workers`` answer naming each
-        WSL unit with no Worker. Empty for a host with no WSL install, which
-        the row does not read.
+        One ``gh`` runner list per repository of its installs, listing none,
+        then the job scope helper's ``--workers`` answer naming each unit
+        with no Worker.
     """
-    wsl = [install for install in spec["installs"] if install["side"] == "wsl"]
-    if not wsl:
-        return []
+    installs = spec["installs"]
     return [
-        *(ok("") for _ in sorted({install["repo"] for install in wsl})),
-        ok("".join(f"{install['service']} -\n" for install in wsl)),
+        *(ok("") for _ in sorted({install["repo"] for install in installs})),
+        ok("".join(f"{install['service']} -\n" for install in installs)),
     ]
 
 
 def quiet_rebuild_answers(
-    transcript: str, spec: HostRunnerSpec, *, repos: int, linux_base: str = "linux base ready\n"
+    transcript: str, spec: HostRunnerSpec, *, repos: int
 ) -> list[_test_hooks.CommandResult]:
     """Every command a rebuild of an already-built host runs, in order.
 
     Written out rather than generated from the code, because the sequence is
-    the claim: each stage sends its script and runs it, and a distro stage
-    sends a payload and a driver before running the driver.
+    the claim: each stage sends its payload and runs it.
 
     Args:
         transcript: What the closing audit prints.
-        spec: The rebuilt host, whose WSL installs the audit's dropped-job
-            row reads.
+        spec: The rebuilt host, whose installs the audit's dropped-job row
+            reads.
         repos: How many repositories the roster names, one token each.
-        linux_base: What the Linux base stage prints.
 
     Returns:
-        The replies: windows base (send, run), import (send, run), wsl.conf
-        (send, send, run), linux base (send, send, run), one ``gh`` mint per
-        repository, provision.ps1 (send, run), provision.sh (send, send,
-        run), the audit (send, run) and its dropped-job reads
-        (:func:`no_dropped_jobs`).
+        The replies: the base (send, run), one ``gh`` mint per repository,
+        the provision (send, run), the audit (send, run) and its dropped-job
+        reads (:func:`no_dropped_jobs`).
     """
     return [
         ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(""),
-        ok(linux_base),
+        ok("base ready: packages installed, docker reachable as gharunner\n"),
         *(ok(f"TOKEN{index}\n") for index in range(repos)),
-        ok(""),
-        ok(""),
-        ok(""),
         ok(""),
         ok(""),
         ok(""),
@@ -169,7 +173,7 @@ def a_ci_slice() -> CiSlice:
 
     Returns:
         16 GB throttle, 18 GB ceiling, 2 GB of swap, weight 20, and root-disk
-        reads of 200 MB/s and 5000 per second, under a 26 GB VM.
+        reads of 200 MB/s and 5000 per second, under a 31 GB host.
     """
     return CiSlice(
         memory_high_gb=16,
@@ -200,6 +204,8 @@ def ci_slice_json() -> dict[str, JSONValue]:
 __all__ = [
     "a_base",
     "a_ci_slice",
+    "a_host",
+    "an_install",
     "base_json",
     "ci_slice_json",
     "no_dropped_jobs",

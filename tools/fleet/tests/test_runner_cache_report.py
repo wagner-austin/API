@@ -12,12 +12,12 @@ from __future__ import annotations
 import pathlib
 
 from fleet.contracts.action_cache import PROBE_FIELDS
-from tests._action_cache_fixtures import UNIT
-from tests._cache_host import OTHER, Host
+from tests._cache_host import OTHER, UNIT, Host
+from tests._runner_fixtures import an_install
 
 #: The other two MCPs units lavender runs, for the cases that need four.
-SECOND = "actions.runner.wagner-austin-MCPs.lavender-wsl-2.service"
-THIRD = "actions.runner.wagner-austin-MCPs.lavender-wsl-3.service"
+SECOND = an_install("wagner-austin/MCPs", "lavender-2", slot=2)["service"]
+THIRD = an_install("wagner-austin/MCPs", "lavender-3", slot=3)["service"]
 
 
 def _status(runners: int, reading: int, served: int, missed: int) -> str:

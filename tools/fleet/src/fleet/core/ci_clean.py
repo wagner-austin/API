@@ -62,6 +62,7 @@ from __future__ import annotations
 from typing import Final
 
 from fleet.core import names
+from fleet.core.runner_install import RUNNER_ACCOUNT
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
 from fleet.core.tool_caches import SH_REMOVE_UNUSED
 
@@ -225,7 +226,7 @@ Description=CI runner host hygiene (docker leftovers, poetry orphans, unread cac
 
 [Service]
 Type=oneshot
-User=gharunner
+User={RUNNER_ACCOUNT}
 StateDirectory={STATE_DIRECTORY_NAME}
 ExecStart=/usr/local/bin/ci-clean
 """

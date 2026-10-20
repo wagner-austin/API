@@ -23,11 +23,12 @@ from fleet.contracts.runner_slice import (
 )
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_render, runner_slice_render
+from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from tests._host_bash import host_bash
-from tests._runner_fixtures import a_base, a_ci_slice, ci_slice_json
+from tests._runner_fixtures import a_ci_slice, a_host, an_install, ci_slice_json
 
 #: The unit every case places.
-UNIT = "actions.runner.wagner-austin-MCPs.lavender-wsl.service"
+UNIT = "actions.runner.wagner-austin-MCPs.lavender.service"
 
 
 def _systemctl_stand_in(cgroup: str) -> str:
@@ -48,20 +49,14 @@ def _systemctl_stand_in(cgroup: str) -> str:
 
 
 def _install() -> RunnerInstall:
-    """The WSL install every render case places.
+    """The install every render case places.
 
     Returns:
-        The install.
+        MCPs' first install, whose unit is :data:`UNIT`.
     """
-    return RunnerInstall(
-        repo="wagner-austin/MCPs",
-        runner_name="lavender-wsl",
-        side="wsl",
-        service=UNIT,
-        workdir="/home/gharunner/actions-runner/_work",
-        labels=["lavender-wsl"],
-        python_toolcache=[],
-    )
+    install = an_install("wagner-austin/MCPs")
+    assert install["service"] == UNIT
+    return install
 
 
 def _budget(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -115,12 +110,9 @@ class TestContract:
     """decode_ci_slice's refusals and the round trip."""
 
     def test_lavender_s_budget_decodes_and_round_trips(self) -> None:
-        decoded: CiSlice = decode_ci_slice(ci_slice_json(), vm_memory_gb=26)
+        decoded: CiSlice = decode_ci_slice(ci_slice_json(), host_memory_gb=31)
         assert decoded == a_ci_slice()
         assert encode_ci_slice(decoded) == ci_slice_json()
-
-    def test_a_host_with_the_default_vm_size_is_checked_only_against_itself(self) -> None:
-        assert decode_ci_slice(_budget(memory_max_gb=64), vm_memory_gb=None)["memory_max_gb"] == 64
 
     @pytest.mark.parametrize(
         "field",
@@ -137,18 +129,18 @@ class TestContract:
         raw = _budget()
         del raw[field]
         with pytest.raises(JSONTypeError, match=field):
-            decode_ci_slice(raw, vm_memory_gb=26)
+            decode_ci_slice(raw, host_memory_gb=31)
 
     def test_a_throttle_point_of_nothing_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="memory_high_gb must be positive, got 0"):
-            decode_ci_slice(_budget(memory_high_gb=0), vm_memory_gb=26)
+            decode_ci_slice(_budget(memory_high_gb=0), host_memory_gb=31)
 
     def test_a_slice_may_be_allowed_no_swap_at_all(self) -> None:
-        assert decode_ci_slice(_budget(swap_max_gb=0), vm_memory_gb=26)["swap_max_gb"] == 0
+        assert decode_ci_slice(_budget(swap_max_gb=0), host_memory_gb=31)["swap_max_gb"] == 0
 
     def test_a_negative_swap_bound_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="swap_max_gb must be 0 or more, got -1"):
-            decode_ci_slice(_budget(swap_max_gb=-1), vm_memory_gb=26)
+            decode_ci_slice(_budget(swap_max_gb=-1), host_memory_gb=31)
 
     @pytest.mark.parametrize("field", ["io_read_mb_per_s", "io_read_iops"])
     @pytest.mark.parametrize("bound", [0, -5])
@@ -156,21 +148,26 @@ class TestContract:
         with pytest.raises(
             JSONTypeError, match=f"ci_slice.{field} must be positive, got {bound}; a read bound"
         ):
-            decode_ci_slice(_budget(**{field: bound}), vm_memory_gb=26)
+            decode_ci_slice(_budget(**{field: bound}), host_memory_gb=31)
 
     def test_a_ceiling_below_the_throttle_point_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="kill jobs before systemd ever throttled"):
-            decode_ci_slice(_budget(memory_max_gb=15), vm_memory_gb=26)
+            decode_ci_slice(_budget(memory_max_gb=15), host_memory_gb=31)
 
     @pytest.mark.parametrize("weight", [0, 10001])
     def test_a_weight_outside_systemd_s_range_is_refused(self, weight: int) -> None:
         with pytest.raises(JSONTypeError, match=f"between 1 and 10000, got {weight}"):
-            decode_ci_slice(_budget(cpu_weight=weight), vm_memory_gb=26)
+            decode_ci_slice(_budget(cpu_weight=weight), host_memory_gb=31)
 
-    @pytest.mark.parametrize("vm_memory_gb", [18, 12])
-    def test_a_ceiling_that_leaves_the_vm_nothing_is_refused(self, vm_memory_gb: int) -> None:
-        with pytest.raises(JSONTypeError, match="starvation this ceiling exists to prevent"):
-            decode_ci_slice(ci_slice_json(), vm_memory_gb=vm_memory_gb)
+    @pytest.mark.parametrize("host_memory_gb", [18, 12])
+    def test_a_ceiling_that_leaves_the_host_nothing_is_refused(self, host_memory_gb: int) -> None:
+        with pytest.raises(JSONTypeError) as refused:
+            decode_ci_slice(ci_slice_json(), host_memory_gb=host_memory_gb)
+        assert str(refused.value) == (
+            f"ci_slice.memory_max_gb 18 leaves nothing of the host's {host_memory_gb} GB for "
+            "sshd and the fleet's own checks, which is the starvation this ceiling exists to "
+            "prevent"
+        )
 
 
 class TestSliceUnit:
@@ -179,7 +176,7 @@ class TestSliceUnit:
     def test_the_unit_carries_the_budget(self) -> None:
         assert runner_slice_render.render_slice_unit(a_ci_slice()) == (
             "[Unit]\n"
-            "Description=GitHub Actions runners' share of this VM, rendered by fleet-runners "
+            "Description=GitHub Actions runners' share of this host, rendered by fleet-runners "
             "(MCPs board tasks 45a4f22b, cb264851)\n"
             "\n"
             "[Slice]\n"
@@ -208,34 +205,22 @@ class TestSliceUnit:
         budget["swap_max_gb"] = 0
         assert "\nMemorySwapMax=0G\n" in runner_slice_render.render_slice_unit(budget)
 
-    def test_both_units_are_rewritten_only_when_they_differ_and_always_started(self) -> None:
-        path = runner_slice_render.SLICE_UNIT_PATH
-        body = runner_slice_render.render_slice_unit(a_ci_slice()).rstrip("\n")
-        listeners = runner_slice_render.LISTENER_SLICE_UNIT_PATH
-        unbounded = runner_slice_render.LISTENER_SLICE_UNIT.rstrip("\n")
+    def test_both_units_are_written_through_the_one_unit_writer_and_always_started(self) -> None:
+        """Written only when they differ, which the writer's own suite runs
+        under bash (tests/test_runner_unit_files.py)."""
         assert runner_slice_render.render_slice_unit_lines(a_ci_slice()) == [
-            f'if [ "$(cat {path} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
-            body,
-            "SLICE_EOF",
-            ')" ]; then',
-            f"    cat > {path} <<'SLICE_EOF'",
-            body,
-            "SLICE_EOF",
-            "    systemctl daemon-reload",
-            "    echo 'ci budget set: runners.slice MemoryHigh=16G MemoryMax=18G "
-            "MemorySwapMax=2G CPUWeight=20 IOReadBandwidthMax=/ 200M IOReadIOPSMax=/ 5000'",
-            "fi",
+            *render_unit_file_lines(
+                runner_slice_render.SLICE_UNIT_PATH,
+                runner_slice_render.render_slice_unit(a_ci_slice()),
+                announcement="ci budget set: runners.slice MemoryHigh=16G MemoryMax=18G "
+                "MemorySwapMax=2G CPUWeight=20 IOReadBandwidthMax=/ 200M IOReadIOPSMax=/ 5000",
+            ),
             "systemctl start runners.slice",
-            f'if [ "$(cat {listeners} 2>/dev/null)" != "$(cat <<\'SLICE_EOF\'',
-            unbounded,
-            "SLICE_EOF",
-            ')" ]; then',
-            f"    cat > {listeners} <<'SLICE_EOF'",
-            unbounded,
-            "SLICE_EOF",
-            "    systemctl daemon-reload",
-            "    echo 'listener slice set: listeners.slice, bounded by nothing'",
-            "fi",
+            *render_unit_file_lines(
+                runner_slice_render.LISTENER_SLICE_UNIT_PATH,
+                runner_slice_render.LISTENER_SLICE_UNIT,
+                announcement="listener slice set: listeners.slice, bounded by nothing",
+            ),
             "systemctl start listeners.slice",
         ]
 
@@ -249,13 +234,13 @@ class TestSliceUnit:
         assert "-" not in LISTENER_SLICE_NAME
 
     def test_the_slice_is_laid_before_any_runner_is_placed_in_it(self) -> None:
-        script = runner_render.render_provision(_roster_host())["linux_script"]
+        script = runner_render.render_provision(_roster_host())["provision_script"]
         assert script.index(f"systemctl start {CI_SLICE_NAME}") < script.index(
             runner_slice_render.SLICE_DROP_IN_NAME
         )
 
-    def test_the_whole_linux_provision_parses_as_bash(self, tmp_path: pathlib.Path) -> None:
-        script = runner_render.render_provision(_roster_host())["linux_script"]
+    def test_the_whole_provision_parses_as_bash(self, tmp_path: pathlib.Path) -> None:
+        script = runner_render.render_provision(_roster_host())["provision_script"]
         (tmp_path / "provision.sh").write_bytes(script.encode())
         parsed = subprocess.run(
             [host_bash(), "-n", "provision.sh"],
@@ -270,17 +255,16 @@ class TestSliceUnit:
 class TestRunnerPlacement:
     """Each runner's drop-in and the move into the slice."""
 
-    def test_the_drop_in_names_the_listener_slice_and_is_written_only_when_it_differs(
-        self,
-    ) -> None:
+    def test_the_drop_in_names_the_listener_slice_through_the_one_unit_writer(self) -> None:
         lines = runner_slice_render.render_runner_slice_lines(_install())
-        path = f"/etc/systemd/system/{UNIT}.d/fleet-slice.conf"
-        assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=listeners.slice\n"
-        assert lines[0] == (
-            f'if [ "$(cat {path} 2>/dev/null)" != '
-            "\"$(printf '[Service]\\nSlice=listeners.slice\\n')\" ]; then"
+        drop_in = render_drop_in_lines(
+            _install(),
+            name="fleet-slice.conf",
+            body="[Service]\nSlice=listeners.slice\n",
+            announcement=f"listener slice named for {UNIT}",
         )
-        assert lines[2] == f"    printf '[Service]\\nSlice=listeners.slice\\n' > {path}"
+        assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=listeners.slice\n"
+        assert lines[: len(drop_in)] == drop_in
 
     def test_a_runner_already_in_the_listener_slice_is_left_running(
         self, tmp_path: pathlib.Path
@@ -324,18 +308,4 @@ def _roster_host() -> HostRunnerSpec:
     Returns:
         The spec.
     """
-    return HostRunnerSpec(
-        name="lavender",
-        host="lavender",
-        wsl_distro="Ubuntu",
-        keepalive_task="wsl-keepalive",
-        wslconfig_min_memory_gb=26,
-        scratch_dir="C:/fleet/stage",
-        gpu_required=False,
-        systemd_timers=["ci-clean.timer"],
-        job_timeout_minutes=360,
-        installs=[_install()],
-        assets=[],
-        base=a_base(),
-        ci_slice=a_ci_slice(),
-    )
+    return a_host([_install()], systemd_timers=["ci-clean.timer"])
