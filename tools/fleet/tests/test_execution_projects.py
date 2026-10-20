@@ -104,20 +104,20 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
     )
 
 
-def test_no_project_reads_the_runner_host_while_it_dispatches_nothing() -> None:
-    """The runner host's live cases have no fleet project until lavender dispatches.
+def test_no_project_reads_the_runner_host_before_its_runners_run() -> None:
+    """The runner host's live cases have no fleet project until lavender carries runners.
 
     tools/fleet-execution-runners ran them pinned to lavender-wsl, the WSL
     guest that held the runners, which went with lavender's reimage to
-    Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). The cases must run on
-    the runner host itself, and lavender's dispatch is held until it is
-    provisioned, so no node can carry the project yet. The recipe still
-    names the host ``runners.json`` declares, so the project returns pinned
-    to it.
+    Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). lavender is a Linux
+    worker again, but the cases read live runner units and no runner is
+    installed on it yet, so a project there could only fail. The recipe
+    still names the host ``runners.json`` declares, so the project returns
+    pinned to lavender with its runners.
     """
     workspace = decode_fleet_workspace(shipped_document())
     assert "tools/fleet-execution-runners" not in workspace["projects"]
-    assert "lavender" not in workspace["nodes"]
+    assert require_node(workspace, "lavender")["platform"] == NodeTag.LINUX.value
     recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
     given = f"{RUNNER_HOST_OPTION}="
     named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]

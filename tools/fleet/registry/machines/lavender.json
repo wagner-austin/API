@@ -15,6 +15,31 @@
   "boot": {
     "units": []
   },
-  "notes": "Reimaged from Windows to Ubuntu 24.04.4 LTS (kernel 7.0.0-38) on 2026-10-19 from a CORVIS stick (fleet-node-setup's Initialize-Node.sh), replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist (MCPs board task 1e9ab738). Measured over ssh 2026-10-19T22:3xZ: 16 logical cores, 31 GiB RAM, a 915 GB root disk, wired Realtek GbE enp2s0 at 1c:69:7a:fe:78:9a (the boot MAC a netboot arm uses), and a GeForce GTX 1630 on 01:00.0; Ubuntu's nvidia-driver-595 (595.99.02) was installed after, and nvidia-smi -L named the card at 23:22Z. Docker is docker-ce 29.8.1, held, from the fleet node provision, the daemon active. Enrolled from ziggurat with fleet-enroll at 22:34Z: austinpc, diphtheria and ziggurat each print Lavender for ssh lavender hostname, and a password-only login is refused from each.",
-  "dispatch": "Held until it is provisioned as a Linux worker: on 2026-10-19 it has no docker, no fleet test database, no node or poetry toolchain and no fleet runner, so a check sent here could not run (MCPs board task 1e9ab738). Move this to a dispatch block with its measured capacity once those are installed and a check has passed here."
+  "notes": "Reimaged from Windows to Ubuntu 24.04.4 LTS (kernel 7.0.0-38) on 2026-10-19 from a CORVIS stick (fleet-node-setup's Initialize-Node.sh), replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist (MCPs board task 1e9ab738). Measured over ssh 2026-10-19T22:3xZ: 16 logical cores, 31 GiB RAM, a 915 GB root disk, wired Realtek GbE enp2s0 at 1c:69:7a:fe:78:9a (the boot MAC a netboot arm uses), and a GeForce GTX 1630 on 01:00.0; its driver was first Ubuntu's nvidia-driver-595, installed by hand at 23:1xZ, whose DKMS module is signed with a machine-owner key no one enrolled, so after the 00:14Z reboot the kernel refused it under Secure Boot ('Loading of module with unavailable key is rejected'). Enrolled from ziggurat with fleet-enroll at 22:34Z: austinpc, diphtheria and ziggurat each print Lavender for ssh lavender hostname, and a password-only login is refused from each. Provisioned as a fleet worker on 2026-10-20 by MCPs scripts/host/fleet-node/provision.sh at 0a00d054d, whose step_fleet_gpu_driver replaced that driver with Canonical's signed nvidia-driver-595-open module, and measured by its steps at 00:2xZ: docker-ce 29.8.1 held, corvis-fleet-testdb up, Node v24.21.0, Python 3.11.17, poetry 2.4.2, the hooks check pins, g++ 13.3.0, the card at 595.99.02 (compute capability 7.5), /dev/kvm read and written by corvis for the netboot lane's VM, and enp2s0 at MTU 1500. Its budget reserves 8 cores and 6 GB beside the dispatch lane for the GitHub runners runners.json gives it, whose CI slice is capped at 18 GB, the reservation lavender-wsl carried for the same runners.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 16,
+    "ram_gb": 31.1,
+    "gpu": {
+      "model": "NVIDIA GeForce GTX 1630",
+      "vram_mib": 4096,
+      "compute_capability": "7.5",
+      "driver_version": "595.99.02"
+    },
+    "budget": {
+      "reserved_cores": 8,
+      "reserved_ram_gb": 6.0,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": null,
+    "elevated": false
+  }
 }
