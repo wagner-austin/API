@@ -45,6 +45,10 @@ from fleet.contracts.runner_windows_base import (
 #: every rendered script here spells a path in.
 _WINDOWS_PATH = re.compile(r"^[A-Za-z]:/[^\\]*$")
 
+#: An exact CPython version, the only form the NuGet package is published
+#: under, and the only one that cannot drift between two seeds.
+_PYTHON_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
+
 
 class WindowsRunnerInstall(TypedDict):
     """One GitHub Actions runner installed as a Windows service.
@@ -58,6 +62,10 @@ class WindowsRunnerInstall(TypedDict):
         root: The install's directory, holding ``config.cmd`` and the
             runner's ``.runner`` file, e.g. ``C:/actions-runner/chat``.
         labels: The custom labels it answers to, e.g. ``["loki"]``.
+        python_toolcache: The exact CPython versions seeded into its tool
+            cache, so ``actions/setup-python`` finds each rather than
+            installing it (:mod:`fleet.core.runner_windows_python_render`);
+            empty for a runner whose jobs set up no Python.
     """
 
     repo: str
@@ -65,6 +73,7 @@ class WindowsRunnerInstall(TypedDict):
     service: str
     root: str
     labels: list[str]
+    python_toolcache: list[str]
 
 
 class WindowsRunnerHost(TypedDict):
@@ -144,6 +153,7 @@ def encode_windows_runner_install(install: WindowsRunnerInstall) -> JSONObject:
         "service": install["service"],
         "root": install["root"],
         "labels": list(install["labels"]),
+        "python_toolcache": list(install["python_toolcache"]),
     }
 
 
@@ -159,9 +169,10 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             empty, ``repo`` is not ``owner/name``, ``labels`` is empty or a
-            label holds the comma ``config.cmd`` splits labels on, or
+            label holds the comma ``config.cmd`` splits labels on,
             ``service`` is not the name ``config.cmd`` gives this repository
-            and runner.
+            and runner, or a tool cache version is not exact or is named
+            twice.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(
@@ -187,12 +198,22 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
     for label in labels:
         if not label or "," in label:
             raise JSONTypeError(f"a label must be non-empty and hold no comma, got {label!r}")
+    toolcache = require_str_list(value, "python_toolcache")
+    for version in toolcache:
+        if not _PYTHON_VERSION.match(version):
+            raise JSONTypeError(
+                f"python_toolcache versions must be exact X.Y.Z, got {version!r}; a floating "
+                "version would seed whichever release was newest the day it ran"
+            )
+    if len(set(toolcache)) != len(toolcache):
+        raise JSONTypeError(f"python_toolcache names a version twice: {toolcache}")
     return WindowsRunnerInstall(
         repo=repo,
         runner_name=runner_name,
         service=service,
         root=_windows_path(value, "root"),
         labels=labels,
+        python_toolcache=toolcache,
     )
 
 

@@ -11,7 +11,10 @@ $ErrorActionPreference = 'Stop'
 # scratch keys under HKCU, the machine variables are written in the Process
 # scope, and the runner release is a zip this suite builds and serves as a
 # file:// URL, holding a config.cmd stand-in that records its arguments,
-# writes .runner beside itself and exits with the case's code. Nothing on
+# writes .runner beside itself and exits with the case's code. The NuGet
+# CPython package (fleet.core.runner_windows_python_render) is a zip served
+# the same way, whose python.cmd stand-in, passed as -PythonName, records its
+# arguments and writes Scripts\pip.exe as a pip reinstall does. Nothing on
 # this machine's services, registry or machine environment changes.
 
 BeforeAll {
@@ -189,6 +192,48 @@ BeforeAll {
         return ([Uri]$zip).AbsoluteUri
     }
 
+    function Initialize-Package {
+        <#
+        .SYNOPSIS
+            A NuGet CPython package zip for 3.11.9, as a file:// URL whose
+            {0} the install fills with the version.
+        .PARAMETER NoWheel
+            Carry no bundled pip wheel.
+        .PARAMETER PipExit
+            What its python.cmd exits with.
+        .PARAMETER NoScripts
+            Make its python.cmd write no Scripts\pip.exe.
+        .OUTPUTS
+            String: the URL.
+        #>
+        param([switch]$NoWheel, [int]$PipExit = 0, [switch]$NoScripts)
+        $directory = Join-Path $TestDrive ('package-' + [guid]::NewGuid().ToString('N'))
+        $content = Join-Path $directory 'content'
+        $bundled = Join-Path $content 'tools\Lib\ensurepip\_bundled'
+        [void][System.IO.Directory]::CreateDirectory($bundled)
+        if (-not $NoWheel) { [System.IO.File]::WriteAllText((Join-Path $bundled 'pip-24.0-py3-none-any.whl'), 'wheel') }
+        $lines = @('@echo off', '>>"%~dp0python-calls.txt" echo %*')
+        if (-not $NoScripts) { $lines += @('mkdir "%~dp0Scripts"', 'type nul > "%~dp0Scripts\pip.exe"') }
+        $lines += "exit /b $PipExit"
+        [System.IO.File]::WriteAllText((Join-Path $content 'tools\python.cmd'), ($lines -join "`r`n") + "`r`n", [System.Text.Encoding]::ASCII)
+        Compress-Archive -Path (Join-Path $content '*') -DestinationPath (Join-Path $directory 'python-3.11.9.zip')
+        return ([Uri]$directory).AbsoluteUri + '/python-{0}.zip'
+    }
+
+    function Initialize-Seeded {
+        <#
+        .SYNOPSIS
+            Lay 3.11.9 in a runner's tool cache, as an earlier run's seed did.
+        .PARAMETER Root
+            The runner's directory.
+        #>
+        param([string]$Root)
+        $python = Join-Path $Root '_work\_tool\Python'
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $python '3.11.9\x64\Scripts'))
+        [System.IO.File]::WriteAllText((Join-Path $python '3.11.9\x64\Scripts\pip.exe'), '')
+        [System.IO.File]::WriteAllText((Join-Path $python '3.11.9\x64.complete'), '')
+    }
+
     function Initialize-Root {
         <#
         .SYNOPSIS
@@ -222,14 +267,18 @@ BeforeAll {
             The registration tokens.
         .PARAMETER Base
             The base parameters; a laid host's when omitted.
+        .PARAMETER Python
+            The tool cache versions the install declares.
+        .PARAMETER PackageUrl
+            The NuGet CPython package's URL.
         .OUTPUTS
             String[]: what it printed.
         #>
-        param([string]$Root, [object]$Sc, [string]$Url, [hashtable]$Tokens, [hashtable]$Base)
+        param([string]$Root, [object]$Sc, [string]$Url, [hashtable]$Tokens, [hashtable]$Base, [string[]]$Python = @(), [string]$PackageUrl = 'file:///absent-{0}.zip')
         if (-not $Base) { $Base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) }
-        $install = @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = $Root; Service = $script:service }
+        $install = @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = $Root; Service = $script:service; Python = @($Python) }
         $installs = ConvertTo-Json -InputObject @($install) -Compress
-        $parameters = @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs; StopWaitSeconds = 2 } + $Base
+        $parameters = @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs; StopWaitSeconds = 2; PythonPackageUrl = $PackageUrl; PythonName = 'python.cmd' } + $Base
         return [string[]]@(Invoke-Rendered 'runner-windows-install' $parameters)
     }
 
@@ -241,12 +290,18 @@ BeforeAll {
             The sc.exe stand-in.
         .PARAMETER Base
             The base parameters; a laid host's when omitted.
+        .PARAMETER Root
+            The install's directory; one under TestDrive when omitted.
+        .PARAMETER Python
+            The tool cache versions the install declares.
         .OUTPUTS
             String[]: its rows.
         #>
-        param([object]$Sc, [hashtable]$Base)
+        param([object]$Sc, [hashtable]$Base, [string]$Root, [string[]]$Python = @())
         if (-not $Base) { $Base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) }
-        return [string[]]@(Invoke-Rendered 'runner-windows-audit' (@{ Sc = $Sc.Path } + $Base))
+        if (-not $Root) { $Root = Initialize-Root }
+        $installs = ConvertTo-Json -InputObject @(@{ Service = $script:service; Root = $Root; Python = @($Python) }) -Compress
+        return [string[]]@(Invoke-Rendered 'runner-windows-audit' (@{ Sc = $Sc.Path; Installs = $installs } + $Base))
     }
 }
 
@@ -357,36 +412,76 @@ Describe 'The install' {
         $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) (Get-CaseVariableName)
         { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc -StopTo '4  RUNNING') 'file:///absent.zip' @{} $base } | Should -Throw "RUNNER_SERVICE_FAILED: $($script:service) did not stop within 2 s"
     }
+    It 'seeds each declared Python into the runner tool cache with pip entry points, and marks it complete' {
+        $root = Initialize-Root -Unpacked -Registered
+        $printed = Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} -Python '3.11.9' -PackageUrl (Initialize-Package)
+        $tools = Join-Path $root '_work\_tool'
+        $printed | Should -Be @(
+            "python: seeded 3.11.9 into $tools for wagner-austin/chat",
+            "runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure"
+        )
+        $target = Join-Path $tools 'Python\3.11.9\x64'
+        Test-Path -LiteralPath (Join-Path $target 'Scripts\pip.exe') | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $tools 'Python\3.11.9\x64.complete') | Should -BeTrue
+        $wheel = Join-Path $target 'Lib\ensurepip\_bundled\pip-24.0-py3-none-any.whl'
+        Read-CallRecord ([pscustomobject]@{ Record = (Join-Path $target 'python-calls.txt') }) | Should -Be @(
+            "-m pip install --force-reinstall --no-deps --no-index --no-warn-script-location --disable-pip-version-check $wheel"
+        )
+    }
+    It 'leaves a version already seeded alone' {
+        $root = Initialize-Root -Unpacked -Registered
+        Initialize-Seeded $root
+        $printed = Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} -Python '3.11.9'
+        $printed | Should -Be @("runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure")
+    }
+    It 'stops when the package holds no bundled pip wheel' {
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} -Python '3.11.9' -PackageUrl (Initialize-Package -NoWheel) } | Should -Throw 'RUNNER_PYTHON_SEED_FAILED: 3.11.9 holds 0 bundled pip wheels, not one'
+    }
+    It 'stops when the pip reinstall fails, with its status' {
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} -Python '3.11.9' -PackageUrl (Initialize-Package -PipExit 2) } | Should -Throw 'RUNNER_PYTHON_SEED_FAILED: the pip reinstall in 3.11.9 exited 2'
+    }
+    It 'stops when the pip reinstall writes no pip.exe' {
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} -Python '3.11.9' -PackageUrl (Initialize-Package -NoScripts) } | Should -Throw 'RUNNER_PYTHON_SEED_FAILED: the pip reinstall in 3.11.9 wrote no Scripts\pip.exe'
+    }
 }
 
 Describe 'The audit' {
-    It 'reads a laid host and a running, automatic SYSTEM service that restarts on failure as OK rows' {
+    It 'reads a laid host and a running, automatic SYSTEM service that restarts on failure, its Python seeded, as OK rows' {
         $sc = Initialize-Sc
         $variable = Get-CaseVariableName
         [Environment]::SetEnvironmentVariable($variable, 'C:\fleet\poetry', 'Process')
-        Invoke-Audit $sc (Get-Base (Initialize-RegistryScratch) (Initialize-Git) $variable) | Should -Be @(
+        $root = Initialize-Root
+        Initialize-Seeded $root
+        Invoke-Audit $sc (Get-Base (Initialize-RegistryScratch) (Initialize-Git) $variable) $root '3.11.9' | Should -Be @(
             'CHECK execution-policy:LocalMachine:RemoteSigned OK',
             'CHECK long-paths OK',
             'CHECK git-longpaths OK',
             "CHECK machine-env:$variable OK",
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) OK",
-            "CHECK recovery:$($script:service) OK"
+            "CHECK recovery:$($script:service) OK",
+            "CHECK python:$($script:service):3.11.9 OK"
         )
         Read-CallRecord $sc | Should -Be @("query $($script:service)", "qc $($script:service)", "qfailure $($script:service)")
     }
-    It 'reads a stock host and a stopped, manual service with no restarts as DRIFT rows naming what each said' {
+    It 'reads a stock host and a stopped, manual service with no restarts and no Python as DRIFT rows naming what each said' {
         $sc = Initialize-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
         $variable = Get-CaseVariableName
         $base = Get-Base (Initialize-RegistryScratch -Policy '' -LongPaths 0) (Initialize-Git -Held '' -GetExit 1) $variable
-        Invoke-Audit $sc $base | Should -Be @(
+        $root = Initialize-Root
+        $python = Join-Path $root '_work\_tool\Python\3.11.9'
+        Invoke-Audit $sc $base $root '3.11.9' | Should -Be @(
             'CHECK execution-policy:LocalMachine:RemoteSigned DRIFT the LocalMachine ExecutionPolicy value is: ',
             'CHECK long-paths DRIFT LongPathsEnabled is: 0',
             'CHECK git-longpaths DRIFT git config --system --get core.longpaths exited 1: ',
             "CHECK machine-env:$variable DRIFT the machine variable holds: ",
             "CHECK service:$($script:service) DRIFT sc.exe query exited 0: SERVICE_NAME: $($script:service) STATE : 1 STOPPED",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : NT AUTHORITY\SYSTEM",
-            "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 0: FAILURE_ACTIONS : NONE"
+            "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 0: FAILURE_ACTIONS : NONE",
+            "CHECK python:$($script:service):3.11.9 DRIFT the tool cache lacks $python\x64\Scripts\pip.exe or $python\x64.complete"
         )
     }
     It 'reads an automatic service under the runner default account as account drift alone' {

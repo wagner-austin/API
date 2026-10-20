@@ -27,7 +27,8 @@ def _clean() -> str:
     """loki's audit output when every row holds.
 
     Returns:
-        One OK line per expected check: the base's four, then the runner's three.
+        One OK line per expected check: the base's four, then the runner's
+        three and its tool cache row.
     """
     checks = runner_windows_render.expected_checks(decode_windows_runner_host(raw_windows_host()))
     return "".join(f"CHECK {check['check_id']} OK\n" for check in checks)
@@ -61,6 +62,7 @@ class TestTheAudit:
             f"loki OK service:{_SERVICE}",
             f"loki OK account:{_SERVICE}",
             f"loki OK recovery:{_SERVICE}",
+            f"loki OK python:{_SERVICE}:3.11.9",
             "roster OK registrations:wagner-austin/chat",
         ]
         assert runner.calls[2][3] == "repos/wagner-austin/chat/actions/runners"

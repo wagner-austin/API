@@ -157,28 +157,32 @@
           "runner_name": "loki",
           "service": "actions.runner.wagner-austin-chat.loki",
           "root": "C:/actions-runner/chat",
-          "labels": ["loki"]
+          "labels": ["loki"],
+          "python_toolcache": ["3.11.9"]
         },
         {
           "repo": "wagner-austin/corvis-stick",
           "runner_name": "loki",
           "service": "actions.runner.wagner-austin-corvis-stick.loki",
           "root": "C:/actions-runner/corvis-stick",
-          "labels": ["loki"]
+          "labels": ["loki"],
+          "python_toolcache": ["3.11.9"]
         },
         {
           "repo": "wagner-austin/tree-bot",
           "runner_name": "loki",
           "service": "actions.runner.wagner-austin-tree-bot.loki",
           "root": "C:/actions-runner/tree-bot",
-          "labels": ["loki"]
+          "labels": ["loki"],
+          "python_toolcache": ["3.11.9", "3.12.10"]
         },
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "loki",
           "service": "actions.runner.wagner-austin-MCPs.loki",
           "root": "C:/actions-runner/MCPs",
-          "labels": ["loki"]
+          "labels": ["loki"],
+          "python_toolcache": ["3.11.9"]
         }
       ]
     }

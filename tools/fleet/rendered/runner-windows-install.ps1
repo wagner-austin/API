@@ -8,8 +8,10 @@ param(
     [string]$Git = 'git',
     [string]$VariableScope = 'Machine',
     [string]$MachineEnvironment = '[{"Name":"POETRY_CACHE_DIR","Value":"C:\\fleet\\poetry"}]',
+    [string]$PythonPackageUrl = 'https://www.nuget.org/api/v2/package/python/{0}',
+    [string]$PythonName = 'python.exe',
     [int]$StopWaitSeconds = 60,
-    [string]$Installs = '[{"Repo":"wagner-austin/chat","Name":"loki","Labels":"loki","Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki"}]'
+    [string]$Installs = '[{"Repo":"wagner-austin/chat","Name":"loki","Labels":"loki","Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki","Python":["3.11.9"]}]'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -58,6 +60,33 @@ foreach ($install in ($Installs | ConvertFrom-Json)) {
             throw "RUNNER_CONFIG_FAILED: config.cmd for $($install.Repo) exited $LASTEXITCODE"
         }
         "runner: registered $($install.Repo) runner $($install.Name)"
+    }
+    $tools = Join-Path $root '_work\_tool'
+    foreach ($version in @($install.Python)) {
+        $target = Join-Path $tools "Python\$version\x64"
+        if (-not (Test-Path -LiteralPath (Join-Path $target 'Scripts\pip.exe'))) {
+            $work = Join-Path $env:TEMP ([guid]::NewGuid().ToString('N'))
+            [void][IO.Directory]::CreateDirectory($work)
+            $package = Join-Path $work 'python.nupkg.zip'
+            Invoke-WebRequest -Uri ($PythonPackageUrl -f $version) -OutFile $package -UseBasicParsing
+            Expand-Archive -LiteralPath $package -DestinationPath $work -Force
+            [void][IO.Directory]::CreateDirectory($target)
+            Copy-Item -Path (Join-Path $work 'tools\*') -Destination $target -Recurse -Force
+            $wheel = @(Get-ChildItem -LiteralPath (Join-Path $target 'Lib\ensurepip\_bundled') -Filter 'pip-*.whl')
+            if ($wheel.Count -ne 1) {
+                throw "RUNNER_PYTHON_SEED_FAILED: $version holds $($wheel.Count) bundled pip wheels, not one"
+            }
+            & (Join-Path $target $PythonName) -m pip install --force-reinstall --no-deps --no-index --no-warn-script-location --disable-pip-version-check $wheel[0].FullName
+            if ($LASTEXITCODE -ne 0) {
+                throw "RUNNER_PYTHON_SEED_FAILED: the pip reinstall in $version exited $LASTEXITCODE"
+            }
+            if (-not (Test-Path -LiteralPath (Join-Path $target 'Scripts\pip.exe'))) {
+                throw "RUNNER_PYTHON_SEED_FAILED: the pip reinstall in $version wrote no Scripts\pip.exe"
+            }
+            [void](New-Item -ItemType File -Force -Path (Join-Path $tools "Python\$version\x64.complete"))
+            Remove-Item -LiteralPath $work -Recurse -Force
+            "python: seeded $version into $tools for $($install.Repo)"
+        }
     }
     $null = & $Sc failure $install.Service reset= 86400 actions= restart/60000/restart/60000/restart/60000
     if ($LASTEXITCODE -ne 0) {

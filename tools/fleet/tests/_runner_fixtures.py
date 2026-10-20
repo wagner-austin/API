@@ -148,12 +148,14 @@ def raw_windows_install(repo: str = "wagner-austin/chat") -> dict[str, JSONValue
         The raw install.
     """
     labels: list[JSONValue] = ["loki"]
+    toolcache: list[JSONValue] = ["3.11.9"]
     return {
         "repo": repo,
         "runner_name": "loki",
         "service": f"actions.runner.{repo.replace('/', '-')}.loki",
         "root": f"C:/actions-runner/{repo.split('/')[1]}",
         "labels": labels,
+        "python_toolcache": toolcache,
     }
 
 

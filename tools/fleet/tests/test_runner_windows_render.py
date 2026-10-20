@@ -9,7 +9,11 @@ from __future__ import annotations
 import pytest
 
 from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
-from fleet.core import runner_windows_base_render, runner_windows_render
+from fleet.core import (
+    runner_windows_base_render,
+    runner_windows_python_render,
+    runner_windows_render,
+)
 from fleet.core.runner_audit_types import ExpectedCheck
 from tests._runner_fixtures import a_windows_host
 
@@ -30,6 +34,7 @@ def _install(repo: str) -> WindowsRunnerInstall:
         service=f"actions.runner.{repo.replace('/', '-')}.loki",
         root=f"C:/actions-runner/{name}",
         labels=["loki", "windows-ci"],
+        python_toolcache=["3.11.9"],
     )
 
 
@@ -62,15 +67,19 @@ def _parameter_lines(script: str) -> list[str]:
 
 class TestTheInstallScript:
     def test_the_installs_are_one_json_string_the_script_decodes_in_its_body(self) -> None:
+        mcps = _install("wagner-austin/MCPs")
+        mcps["python_toolcache"] = []
         script = runner_windows_render.render_install_script(
-            _host(_install("wagner-austin/chat"), _install("wagner-austin/MCPs")), {}
+            _host(_install("wagner-austin/chat"), mcps), {}
         )
         assert _parameter_lines(script)[-2:] == [
             "    [string]$Installs = '["
             '{"Repo":"wagner-austin/chat","Name":"loki","Labels":"loki,windows-ci",'
-            '"Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki"},'
+            '"Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki",'
+            '"Python":["3.11.9"]},'
             '{"Repo":"wagner-austin/MCPs","Name":"loki","Labels":"loki,windows-ci",'
-            '"Root":"C:/actions-runner/MCPs","Service":"actions.runner.wagner-austin-MCPs.loki"}'
+            '"Root":"C:/actions-runner/MCPs","Service":"actions.runner.wagner-austin-MCPs.loki",'
+            '"Python":[]}'
             "]'",
             ")",
         ]
@@ -79,8 +88,9 @@ class TestTheInstallScript:
     def test_the_base_parameters_and_lines_come_before_the_first_runner(self) -> None:
         script = runner_windows_render.committed_install_script()
         lines = script.splitlines()
-        assert _parameter_lines(script)[4:11] == [
+        assert _parameter_lines(script)[4:13] == [
             *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
+            *runner_windows_python_render.PARAMETER_LINES,
             f"    [int]$StopWaitSeconds = {runner_windows_render.STOP_WAIT_SECONDS},",
         ]
         first = lines.index(runner_windows_base_render.INSTALL_LINES[0])
@@ -88,6 +98,20 @@ class TestTheInstallScript:
             runner_windows_base_render.INSTALL_LINES
         )
         assert first < lines.index("foreach ($install in ($Installs | ConvertFrom-Json)) {")
+
+    def test_each_runner_s_tool_cache_is_seeded_after_its_registration_before_its_service(
+        self,
+    ) -> None:
+        lines = runner_windows_render.committed_install_script().splitlines()
+        seed = lines.index(runner_windows_python_render.INSTALL_LINES[0])
+        assert lines[seed : seed + len(runner_windows_python_render.INSTALL_LINES)] == list(
+            runner_windows_python_render.INSTALL_LINES
+        )
+        registered = '        "runner: registered $($install.Repo) runner $($install.Name)"'
+        assert lines[seed - 2 : seed] == [registered, "    }"]
+        assert lines[seed + len(runner_windows_python_render.INSTALL_LINES)].startswith(
+            "    $null = & $Sc failure $install.Service"
+        )
 
     def test_the_tokens_are_one_pair_per_repository_in_order(self) -> None:
         script = runner_windows_render.render_install_script(
@@ -142,11 +166,18 @@ class TestTheAudit:
             '    [string]$Sc = "$env:SystemRoot\\System32\\sc.exe",',
             *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
             "    [string]$Installs = '["
-            '{"Service":"actions.runner.wagner-austin-chat.loki"},'
-            '{"Service":"actions.runner.wagner-austin-MCPs.loki"}'
+            '{"Service":"actions.runner.wagner-austin-chat.loki",'
+            '"Root":"C:/actions-runner/chat","Python":["3.11.9"]},'
+            '{"Service":"actions.runner.wagner-austin-MCPs.loki",'
+            '"Root":"C:/actions-runner/MCPs","Python":["3.11.9"]}'
             "]'",
             ")",
         ]
+        lines = script.splitlines()
+        rows = lines.index(runner_windows_python_render.AUDIT_LINES[0])
+        assert lines[rows : rows + len(runner_windows_python_render.AUDIT_LINES)] == list(
+            runner_windows_python_render.AUDIT_LINES
+        )
 
     def test_a_service_name_a_script_could_not_carry_is_refused(self) -> None:
         install = _install("wagner-austin/chat")
@@ -179,7 +210,25 @@ class TestTheAudit:
             ExpectedCheck(
                 check_id=f"recovery:{service}", reason=runner_windows_render.RECOVERY_REASON
             ),
+            ExpectedCheck(
+                check_id=f"python:{service}:3.11.9",
+                reason=runner_windows_python_render.SEED_REASON,
+            ),
         ]
+
+    def test_a_runner_with_no_tool_cache_version_has_no_tool_cache_row(self) -> None:
+        install = _install("wagner-austin/chat")
+        install["python_toolcache"] = []
+        checks = runner_windows_render.expected_checks(_host(install))
+        assert [check["check_id"] for check in checks][-1] == (
+            "recovery:actions.runner.wagner-austin-chat.loki"
+        )
+
+    def test_a_tool_cache_version_a_script_could_not_carry_is_refused(self) -> None:
+        install = _install("wagner-austin/chat")
+        install["python_toolcache"] = ["3.11.9'"]
+        with pytest.raises(ValueError, match=r"^python_toolcache \"3\.11\.9'\" contains"):
+            runner_windows_render.render_audit_script(_host(install))
 
     def test_the_committed_copy_is_the_example_host_s(self) -> None:
         assert runner_windows_render.committed_audit_script() == (

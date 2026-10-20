@@ -6,7 +6,7 @@ param(
     [string]$Git = 'git',
     [string]$VariableScope = 'Machine',
     [string]$MachineEnvironment = '[{"Name":"POETRY_CACHE_DIR","Value":"C:\\fleet\\poetry"}]',
-    [string]$Installs = '[{"Service":"actions.runner.wagner-austin-chat.loki"}]'
+    [string]$Installs = '[{"Service":"actions.runner.wagner-austin-chat.loki","Root":"C:/actions-runner/chat","Python":["3.11.9"]}]'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -60,6 +60,16 @@ foreach ($install in ($Installs | ConvertFrom-Json)) {
         "CHECK recovery:$service OK"
     } else {
         "CHECK recovery:$service DRIFT sc.exe qfailure exited $($failure.Code): $($failure.Text)"
+    }
+    $tools = Join-Path $install.Root '_work\_tool'
+    foreach ($version in @($install.Python)) {
+        $pip = Join-Path $tools "Python\$version\x64\Scripts\pip.exe"
+        $complete = Join-Path $tools "Python\$version\x64.complete"
+        if ((Test-Path -LiteralPath $pip) -and (Test-Path -LiteralPath $complete)) {
+            "CHECK python:${service}:$version OK"
+        } else {
+            "CHECK python:${service}:$version DRIFT the tool cache lacks $pip or $complete"
+        }
     }
 }
 exit 0

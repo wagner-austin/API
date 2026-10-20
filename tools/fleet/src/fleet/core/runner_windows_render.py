@@ -20,7 +20,9 @@ effects are parameters too.
 
 AN INSTALL IS IDEMPOTENT, step by step. The base writes only what differs;
 the release is unpacked only where ``config.cmd`` is absent and registered
-only where ``.runner`` is absent, as ``config.cmd`` refuses a second run; the
+only where ``.runner`` is absent, as ``config.cmd`` refuses a second run; each
+tool cache version is seeded only where its ``pip.exe`` is absent
+(:mod:`fleet.core.runner_windows_python_render`); the
 recovery actions are set every run; and the service is started when
 ``sc.exe`` does not read it RUNNING, or stopped and started again when the
 base wrote a machine variable, which a running listener never reads.
@@ -33,11 +35,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONValue, dump_json_str
 
 from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
 from fleet.contracts.runner_windows_base import MachineVariable, WindowsHostBase
 from fleet.core import runner_windows_base_render as base_render
+from fleet.core import runner_windows_python_render as python_render
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.runner_audit_types import ExpectedCheck
 from fleet.core.runner_install import RUNNER_VERSION
@@ -121,12 +124,13 @@ def _example() -> WindowsRunnerHost:
                 service="actions.runner.wagner-austin-chat.loki",
                 root="C:/actions-runner/chat",
                 labels=["loki"],
+                python_toolcache=["3.11.9"],
             )
         ],
     )
 
 
-def _installs_parameter(rows: Sequence[Mapping[str, str]]) -> str:
+def _installs_parameter(rows: Sequence[Mapping[str, JSONValue]]) -> str:
     """The ``$Installs`` parameter: the host's installs as one JSON string.
 
     A string, not hashtable literals, because a constant default is no
@@ -148,7 +152,23 @@ def _installs_parameter(rows: Sequence[Mapping[str, str]]) -> str:
     return f"    [string]$Installs = '{dump_json_str(list(rows))}'"
 
 
-def _install_row(install: WindowsRunnerInstall) -> dict[str, str]:
+def _python_row(install: WindowsRunnerInstall) -> list[JSONValue]:
+    """The install's tool cache versions as both scripts read them.
+
+    Args:
+        install: The install.
+
+    Returns:
+        The versions, in the roster's order.
+
+    Raises:
+        ValueError: When a version could not be embedded verbatim.
+    """
+    versions = install["python_toolcache"]
+    return [scriptable(version, label="python_toolcache") for version in versions]
+
+
+def _install_row(install: WindowsRunnerInstall) -> dict[str, JSONValue]:
     """One install as the install script reads it.
 
     Args:
@@ -156,7 +176,7 @@ def _install_row(install: WindowsRunnerInstall) -> dict[str, str]:
 
     Returns:
         Its repository, runner name, comma-joined labels (``config.cmd``'s
-        ``--labels`` form), directory and service.
+        ``--labels`` form), directory, service and tool cache versions.
 
     Raises:
         ValueError: When a value could not be embedded verbatim.
@@ -167,6 +187,7 @@ def _install_row(install: WindowsRunnerInstall) -> dict[str, str]:
         "Labels": scriptable(",".join(install["labels"]), label="labels"),
         "Root": scriptable(install["root"], label="root"),
         "Service": scriptable(install["service"], label="service"),
+        "Python": _python_row(install),
     }
 
 
@@ -264,6 +285,7 @@ def render_install_script(host: WindowsRunnerHost, tokens: Mapping[str, str]) ->
         f"    {system32_parameter('Sc', 'sc.exe')},",
         f"    [hashtable]$Tokens = {_tokens_literal(tokens)},",
         *base_render.parameter_lines(host["base"]),
+        *python_render.PARAMETER_LINES,
         f"    [int]$StopWaitSeconds = {STOP_WAIT_SECONDS},",
         _installs_parameter([_install_row(install) for install in host["installs"]]),
         ")",
@@ -292,6 +314,7 @@ def render_install_script(host: WindowsRunnerHost, tokens: Mapping[str, str]) ->
         "        }",
         '        "runner: registered $($install.Repo) runner $($install.Name)"',
         "    }",
+        *python_render.INSTALL_LINES,
         *_SERVICE_LINES,
         "}",
     ]
@@ -312,8 +335,13 @@ def render_audit_script(host: WindowsRunnerHost) -> str:
         ValueError: When a service name or a machine variable could not be
             embedded verbatim.
     """
-    services = [
-        {"Service": scriptable(install["service"], label="service")} for install in host["installs"]
+    services: list[Mapping[str, JSONValue]] = [
+        {
+            "Service": scriptable(install["service"], label="service"),
+            "Root": scriptable(install["root"], label="root"),
+            "Python": _python_row(install),
+        }
+        for install in host["installs"]
     ]
     lines = [
         "param(",
@@ -350,6 +378,7 @@ def render_audit_script(host: WindowsRunnerHost) -> str:
         '        "CHECK recovery:$service DRIFT sc.exe qfailure exited $($failure.Code): '
         '$($failure.Text)"',
         "    }",
+        *python_render.AUDIT_LINES,
         "}",
         # Drift is data: the last native read may have exited non-zero, and
         # that status is not the audit's.
@@ -369,8 +398,9 @@ def expected_checks(host: WindowsRunnerHost) -> list[ExpectedCheck]:
 
     Returns:
         The base's rows (:func:`fleet.core.runner_windows_base_render.expected_checks`),
-        then three per install: its state, its configuration and its
-        recovery actions.
+        then per install its state, its configuration, its recovery
+        actions and one row per tool cache version
+        (:func:`fleet.core.runner_windows_python_render.expected_checks`).
     """
     checks = base_render.expected_checks(host["base"])
     for install in host["installs"]:
@@ -382,6 +412,7 @@ def expected_checks(host: WindowsRunnerHost) -> list[ExpectedCheck]:
             ),
             ExpectedCheck(check_id=f"account:{service}", reason=ACCOUNT_REASON),
             ExpectedCheck(check_id=f"recovery:{service}", reason=RECOVERY_REASON),
+            *python_render.expected_checks(install),
         ]
     return checks
 

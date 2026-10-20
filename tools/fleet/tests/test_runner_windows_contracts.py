@@ -22,6 +22,7 @@ class TestTheInstall:
             service="actions.runner.wagner-austin-chat.loki",
             root="C:/actions-runner/chat",
             labels=["loki"],
+            python_toolcache=["3.11.9"],
         )
 
     def test_a_non_object_is_refused(self) -> None:
@@ -78,6 +79,28 @@ class TestTheInstall:
         with pytest.raises(JSONTypeError) as refused:
             decode_windows_runner_install(raw)
         assert str(refused.value) == f"a label must be non-empty and hold no comma, got {label!r}"
+
+    @pytest.mark.parametrize("version", ["3.11", "3.11.x", "v3.11.9"])
+    def test_a_tool_cache_version_that_is_not_exact_is_refused(self, version: str) -> None:
+        raw = raw_windows_install()
+        toolcache: list[JSONValue] = [version]
+        raw["python_toolcache"] = toolcache
+        with pytest.raises(JSONTypeError) as refused:
+            decode_windows_runner_install(raw)
+        assert str(refused.value) == (
+            f"python_toolcache versions must be exact X.Y.Z, got {version!r}; a floating "
+            "version would seed whichever release was newest the day it ran"
+        )
+
+    def test_a_tool_cache_version_named_twice_is_refused(self) -> None:
+        raw = raw_windows_install()
+        toolcache: list[JSONValue] = ["3.11.9", "3.12.10", "3.11.9"]
+        raw["python_toolcache"] = toolcache
+        with pytest.raises(JSONTypeError) as refused:
+            decode_windows_runner_install(raw)
+        assert str(refused.value) == (
+            "python_toolcache names a version twice: ['3.11.9', '3.12.10', '3.11.9']"
+        )
 
 
 class TestTheHost:

@@ -78,8 +78,8 @@ class TestTheRebuild:
             "runner: unpacked the release",
             "runner: registered wagner-austin/chat",
         ]
-        # The base's four rows and the one runner's three.
-        assert [finding["ok"] for finding in report["findings"]] == [True] * 7
+        # The base's four rows, the one runner's three and its one tool cache row.
+        assert [finding["ok"] for finding in report["findings"]] == [True] * 8
         assert runner.calls[0][4] == "repos/wagner-austin/chat/actions/runners/registration-token"
         assert runner.stdin[1] == runner_windows_render.render_install_script(
             host, {"wagner-austin/chat": "TOKEN1"}
