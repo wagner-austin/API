@@ -5,7 +5,7 @@
 # lavender's runners.slice with no job running: the runner kills its Worker
 # and the step's process group, and whatever the job had put in a session
 # of its own (a test's forkserver, a daemonized server) stayed in the
-# unit's cgroup. tools/fleet now gives every WSL runner unit
+# unit's cgroup. tools/fleet now gives every runner unit
 # KillMode=control-group and installs fleet-runner-reaper, which empties a
 # unit of such processes within 30 seconds of its job ending
 # (tools/fleet/src/fleet/core/runner_reaper_render.py).
@@ -19,9 +19,9 @@
 # only the reaper catches. Its second step holds the job. Cancel the run
 # during the second step and read the unit:
 #
-#   gh workflow run runner-reaper-proof.yml -f runner=lavender-wsl
+#   gh workflow run runner-reaper-proof.yml -f runner=lavender
 #   gh run cancel <run id>
-#   (as root in the distro) pgrep -af fleet-reaper-proof-<run id>
+#   (as root on lavender) pgrep -af fleet-reaper-proof-<run id>
 #
 # With the reaper installed the daemon is gone within one minute of the
 # cancel; without it, it sleeps out its 900 seconds in the unit. The
@@ -32,7 +32,7 @@ on:
   workflow_dispatch:
     inputs:
       runner:
-        description: "Runner label to run on (e.g. lavender-wsl)"
+        description: "Runner label to run on (e.g. lavender)"
         required: true
         type: string
 

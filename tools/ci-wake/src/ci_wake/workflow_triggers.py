@@ -446,7 +446,7 @@ def describe(workflow: Workflow) -> str:
 
     Returns:
         ``check.yml: push on branches main``, ``packages.yml: push on every
-        branch and tag``, or ``runner-diag.yml: no push trigger``.
+        branch and tag``, or ``runner-reaper-proof.yml: no push trigger``.
     """
     if workflow.push is None:
         return f"{workflow.name}: no push trigger"

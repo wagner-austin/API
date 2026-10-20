@@ -216,7 +216,7 @@ jobs:
     #
     # services/Model-Trainer joined it 2026-09-08 because its suite honestly
     # requires the host -- real CUDA (the default hooks digest the actual
-    # card; lavender's GTX 1630 is visible inside WSL), nvidia-smi (the
+    # card, lavender's GTX 1630), nvidia-smi (the
     # driver-version fingerprint reads the real driver), a writable /data
     # (the settings default APP__DATA_ROOT, the container convention), and a
     # llama.cpp checkout at /opt/llama.cpp for the GGUF export tests. On a
@@ -240,11 +240,13 @@ jobs:
     # orphan python processes reaped after -- the OOM killer taking the
     # runner agent, reported as infrastructure rather than as a failed
     # assertion. Sixteen xdist workers each holding torch plus real
-    # training does not fit in 16GB; the lavender pool has 26GB.
+    # training does not fit in 16GB. On lavender every runner's job runs in
+    # the one CI slice tools/fleet runners.json declares: throttled at 16 GB
+    # and bounded at 18 GB with 2 GB of swap, out of the host's 31 GB.
     # Every pool member is named twice -- here and in the make check step's
     # worker cap, handwriting-ai at 2 and Model-Trainer at 8 -- so a package
     # joins the pool and takes its share of the box in one edit.
-    runs-on: ${{ contains(fromJSON('["services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender-wsl"]') || 'ubuntu-latest' }}
+    runs-on: ${{ contains(fromJSON('["services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -319,7 +321,7 @@ jobs:
       #
       # `github.workspace` is in the key because A VENV IS BOUND TO THE
       # ABSOLUTE PATH IT WAS BUILT AT, and the runner that saves a cache is
-      # not always the runner that restores it. The self-hosted `lavender-wsl`
+      # not always the runner that restores it. The self-hosted `lavender`
       # label is a POOL of two installs on one host (actions-runner-api-1 and
       # -api-2, different `_work` paths), and a poetry in-project `.venv`
       # bakes its install path into every `bin/*` shebang. Restored across

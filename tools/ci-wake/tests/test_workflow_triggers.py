@@ -80,7 +80,7 @@ class TestTheWorkflowsThatExist:
         # is why "never enrol a tag" would have been wrong here.
         assert workflows["packages.yml"].push == EVERY_REF
         assert admits(EVERY_REF, DX_MOD)
-        assert workflows["runner-diag.yml"].push is None
+        assert workflows["runner-reaper-proof.yml"].push is None
         assert workflows["powershell.yml"].push == PushTrigger(
             branches=("main",), branches_ignore=None, tags=None, tags_ignore=None
         )
