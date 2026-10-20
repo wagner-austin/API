@@ -62,7 +62,6 @@ session-audit acts on that host, locally when it is the machine it runs on.
 
 from __future__ import annotations
 
-import pathlib
 import re
 from typing import Final, TypedDict
 
@@ -70,15 +69,20 @@ from fleet.contracts.dispatch import DispatchCommand
 from fleet.core import _test_hooks
 from fleet.core._test_hooks import CommandResult
 from fleet.core.rebuild import DETAIL_TAIL_CHARS
+from fleet.core.session_argv import (
+    compact_argv,
+    handoff_argv,
+    kill_argv,
+    move_argv,
+    restart_argv,
+    revive_argv,
+)
 from fleet.core.session_release import SessionRelease
 
 #: The UUID grammar the harness writes session ids in, and mig 507 pins.
 SESSION_TARGET_PATTERN: Final = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
 )
-
-#: Where session-audit lives inside a release's checkout.
-SESSION_AUDIT_DIR: Final = pathlib.PurePosixPath("packages/session-audit")
 
 #: Detail prefix for a target outside the UUID grammar.
 TARGET_INVALID_CODE: Final = "RESTART_TARGET_INVALID"
@@ -97,9 +101,11 @@ TARGET_MISSING_CODE: Final = "RESTART_TARGET_MISSING"
 #: exit. ``exit-session`` (MCPs board task 5aa8ed06) is a session's own exit,
 #: approved by its room's supervisor. ``move-session`` (MCPs mig 826, board
 #: task 4c26ab11) restarts a session stopped at its subscription's usage
-#: limit through the account launcher, which leases another account. The
-#: words are the queue's own :class:`DispatchCommand` members, so one
-#: vocabulary names them.
+#: limit through the account launcher, which leases another account.
+#: ``handoff-session`` (MCPs mig 831, board task 553cc92f) starts a fresh
+#: worker on a board task in the tree of the session that handed it over,
+#: touching that session not at all. The words are the queue's own
+#: :class:`DispatchCommand` members, so one vocabulary names them.
 SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.RESTART_SESSION,
     DispatchCommand.REVIVE_SESSION,
@@ -108,7 +114,15 @@ SESSION_COMMANDS: Final[tuple[DispatchCommand, ...]] = (
     DispatchCommand.COMPACT_SESSION,
     DispatchCommand.EXIT_SESSION,
     DispatchCommand.MOVE_SESSION,
+    DispatchCommand.HANDOFF_SESSION,
 )
+
+#: Detail prefix for a handoff-session row that names no task -- a queue
+#: that has stopped enforcing mig 831's CHECK.
+TASK_MISSING_CODE: Final = "HANDOFF_TASK_MISSING"
+
+#: Detail prefix for a handoff whose task is outside the UUID grammar.
+TASK_INVALID_CODE: Final = "HANDOFF_TASK_INVALID"
 
 #: Detail prefix for a command this module has no invocation for.
 COMMAND_UNKNOWN_CODE: Final = "SESSION_COMMAND_UNKNOWN"
@@ -151,192 +165,35 @@ def refusal_for(session_target: str | None) -> str | None:
     return None
 
 
-def session_audit_argv(
-    release_root: pathlib.Path, registry_dir: str, host: str, *arguments: str
-) -> tuple[str, ...]:
-    """Compose one session-audit invocation against a release's register.
+def task_refusal(command: DispatchCommand, task_id: str | None) -> str | None:
+    """Decide whether a handoff's task can honestly reach an argv element.
+
+    A handoff names the board task its fresh worker starts on (MCPs mig
+    831's ``fleet_dispatch_jobs_handoff_task_pin``); every other session verb
+    passes. Judged here, beside the target, because this runner is the layer
+    nearest the machine and cannot assume the queue's CHECK was consulted.
 
     Args:
-        release_root: The verified release's checkout
-            (:class:`~fleet.core.session_release.SessionRelease`), whose
-            sealed session-audit environment the invocation runs in.
-        registry_dir: The release's register, so the window a kill
-            re-checks is the sealed one.
-        host: The node the target session runs on, the claiming tick's
-            ``--node``, which session-audit acts on.
-        arguments: The mode and its arguments.
+        command: The queue row's command.
+        task_id: The queue row's task, or None when it carries none.
 
     Returns:
-        ``poetry -C <release>/packages/session-audit run session-audit
-        <arguments> --host <node> --registry-dir <dir>``. Through poetry,
-        the same way the supervisor's runner invokes the package, so the
-        invocation resolves the release's own in-project venv, whose
-        editable install is the release's source, rather than this runner's.
+        A ``CODE: message`` refusal detail for the queue, or None when the
+        job can run.
     """
-    return (
-        "poetry",
-        "-C",
-        str(release_root / pathlib.Path(SESSION_AUDIT_DIR)),
-        "run",
-        "session-audit",
-        *arguments,
-        "--host",
-        host,
-        "--registry-dir",
-        registry_dir,
-    )
-
-
-def restart_argv(
-    release_root: pathlib.Path, registry_dir: str, host: str, session_target: str
-) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one restart job.
-
-    Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register.
-        host: The node the session runs on.
-        session_target: The session UUID (already grammar-checked).
-
-    Returns:
-        The argv: ``session-audit rollover --apply --session <uuid>``
-        through :func:`session_audit_argv`.
-    """
-    return session_audit_argv(
-        release_root, registry_dir, host, "rollover", "--apply", "--session", session_target
-    )
-
-
-def revive_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
-) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one revive job.
-
-    Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register.
-        host: The node the session runs on.
-        session_target: The session UUID (already grammar-checked).
-        requested_by: The label that enqueued the revive (already
-            grammar-checked), named in the brief session-audit types.
-
-    Returns:
-        The argv: ``session-audit revive --session <uuid> --requested-by
-        <label>`` through :func:`session_audit_argv`.
-    """
-    return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "revive",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
-    )
-
-
-def kill_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
-    *,
-    hard: bool,
-) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one kill job.
-
-    Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register, which carries the idle window
-            the graceful kill re-checks its premise against.
-        host: The node the session runs on.
-        session_target: The session UUID (already grammar-checked).
-        requested_by: The label that enqueued the kill (already
-            grammar-checked), printed with session-audit's outcome.
-        hard: Whether the queue row is ``kill-session-hard``.
-
-    Returns:
-        The argv: ``session-audit kill --session <uuid> --requested-by
-        <label>`` through :func:`session_audit_argv`, with ``--hard`` after
-        the label for the hard verb and never otherwise.
-    """
-    base = ("kill", "--session", session_target, "--requested-by", requested_by)
-    return session_audit_argv(
-        release_root, registry_dir, host, *base, *(("--hard",) if hard else ())
-    )
-
-
-def compact_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
-) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one compact job.
-
-    Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register.
-        host: The node the session runs on.
-        session_target: The session UUID (already grammar-checked).
-        requested_by: The label that enqueued the compact (already
-            grammar-checked), printed with session-audit's outcome.
-
-    Returns:
-        The argv: ``session-audit compact --session <uuid> --requested-by
-        <label>`` through :func:`session_audit_argv`.
-    """
-    return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "compact",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
-    )
-
-
-def move_argv(
-    release_root: pathlib.Path,
-    registry_dir: str,
-    host: str,
-    session_target: str,
-    requested_by: str,
-) -> tuple[str, ...]:
-    """Compose the session-audit invocation for one move job.
-
-    Args:
-        release_root: The verified release's checkout.
-        registry_dir: The release's register.
-        host: The node the session runs on.
-        session_target: The session UUID (already grammar-checked).
-        requested_by: The label that enqueued the move (already
-            grammar-checked), named in the line session-audit types into the
-            moved session.
-
-    Returns:
-        The argv: ``session-audit move --session <uuid> --requested-by
-        <label>`` through :func:`session_audit_argv`.
-    """
-    return session_audit_argv(
-        release_root,
-        registry_dir,
-        host,
-        "move",
-        "--session",
-        session_target,
-        "--requested-by",
-        requested_by,
-    )
+    if command is not DispatchCommand.HANDOFF_SESSION:
+        return None
+    if task_id is None:
+        return (
+            f"{TASK_MISSING_CODE}: a handoff-session row names the board task its fresh "
+            "worker starts on and this one does not; the queue's CHECK should have refused it"
+        )
+    if SESSION_TARGET_PATTERN.fullmatch(task_id) is None:
+        return (
+            f"{TASK_INVALID_CODE}: task {task_id!r} is not a lowercase hex UUID as the "
+            "board mints them; refused before it could reach an argv element"
+        )
+    return None
 
 
 class SessionInvocation(TypedDict):
@@ -369,6 +226,7 @@ def session_invocation(
     session_target: str,
     requested_by: str,
     host: str,
+    task_id: str | None,
 ) -> SessionInvocation:
     """Map one session verb to its one invocation.
 
@@ -380,14 +238,19 @@ def session_invocation(
         requested_by: The queue row's ``submitted_by``.
         host: The node the session runs on: the claiming tick's ``--node``,
             which the queue pinned the verb to (MCPs mig 796).
+        task_id: The queue row's task (already judged by
+            :func:`task_refusal`), which only a handoff carries into its
+            invocation.
 
     Returns:
         The :class:`SessionInvocation`.
 
     Raises:
         ValueError: ``SESSION_COMMAND_UNKNOWN`` for a command that is not a
-            session verb. The caller routes only :data:`SESSION_COMMANDS`
-            here, so this names a routing defect rather than guessing.
+            session verb, and ``HANDOFF_TASK_MISSING`` for a handoff with no
+            task. The caller routes only :data:`SESSION_COMMANDS` here, after
+            :func:`task_refusal`, so each names a routing defect rather than
+            guessing.
     """
     root = release["root"]
     registry_dir = release["registry_dir"]
@@ -453,6 +316,20 @@ def session_invocation(
             verb="move",
             mode="move",
             argv=move_argv(root, registry_dir, host, session_target, requested_by),
+            types_requester=True,
+            release=release_id,
+            revision=revision,
+        )
+    if command is DispatchCommand.HANDOFF_SESSION:
+        if task_id is None:
+            raise ValueError(
+                f"{TASK_MISSING_CODE}: a handoff reached its invocation with no task, "
+                "past task_refusal"
+            )
+        return SessionInvocation(
+            verb="handoff",
+            mode="handoff",
+            argv=handoff_argv(root, registry_dir, host, session_target, task_id, requested_by),
             types_requester=True,
             release=release_id,
             revision=revision,
@@ -559,23 +436,19 @@ __all__ = [
     "COMMAND_UNKNOWN_CODE",
     "LABEL_PATTERN",
     "REQUESTER_INVALID_CODE",
-    "SESSION_AUDIT_DIR",
     "SESSION_COMMANDS",
     "SESSION_ENVIRONMENT_EXCLUDED",
     "SESSION_ENVIRONMENT_SET",
     "SESSION_TARGET_PATTERN",
     "TARGET_INVALID_CODE",
     "TARGET_MISSING_CODE",
+    "TASK_INVALID_CODE",
+    "TASK_MISSING_CODE",
     "SessionInvocation",
-    "compact_argv",
     "describe_result",
-    "kill_argv",
-    "move_argv",
     "refusal_for",
     "requester_refusal",
-    "restart_argv",
-    "revive_argv",
     "run_session_job",
-    "session_audit_argv",
     "session_invocation",
+    "task_refusal",
 ]

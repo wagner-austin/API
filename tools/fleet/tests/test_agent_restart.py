@@ -17,7 +17,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent
-from fleet.core import _test_hooks, restart, sealed_release, session_release
+from fleet.core import _test_hooks, restart, sealed_release, session_argv, session_release
 from tests._agent_cli import HUB_HOST, agent_argv, hub_host, sessions_argv
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
@@ -33,6 +33,8 @@ from tests.conftest import FakeRun, failed
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
 SUBMITTER = "fable-dm-versionsplit-0912"
+#: The board task a handoff's fresh worker starts on (MCPs mig 831).
+HANDOFF_TASK = "553cc92f-39d0-49f3-a631-0d6108a2c5ec"
 
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
@@ -169,7 +171,7 @@ class TestRestartLane:
         # release's session-audit against its register (MCPs c7c2527d).
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.restart_argv(release["root"], release["registry_dir"], HUB_HOST, TARGET),
+            session_argv.restart_argv(release["root"], release["registry_dir"], HUB_HOST, TARGET),
             *unrolled_calls(repo),
         ]
         # The child inherits neither this agent's poetry venv nor any
@@ -229,7 +231,7 @@ class TestRestartLane:
         # board task 78a1eca7).
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.restart_argv(release["root"], release["registry_dir"], "ziggurat", TARGET),
+            session_argv.restart_argv(release["root"], release["registry_dir"], "ziggurat", TARGET),
         ]
 
     def test_a_claimed_revive_runs_session_audits_revive_mode_with_the_submitter(
@@ -258,7 +260,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.revive_argv(
+            session_argv.revive_argv(
                 release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
             ),
             *unrolled_calls(repo),
@@ -320,7 +322,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.kill_argv(
+            session_argv.kill_argv(
                 release["root"],
                 release["registry_dir"],
                 HUB_HOST,
@@ -355,7 +357,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.compact_argv(
+            session_argv.compact_argv(
                 release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
             ),
             *unrolled_calls(repo),
@@ -383,7 +385,7 @@ class TestRestartLane:
 
         assert runner.calls == [
             verify_call(tmp_path),
-            restart.move_argv(
+            session_argv.move_argv(
                 release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER
             ),
             *unrolled_calls(repo),
@@ -393,6 +395,38 @@ class TestRestartLane:
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"{opening('move', 0)} {line.strip()}"
+
+    def test_a_claimed_handoff_runs_session_audits_handoff_mode_with_its_task(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs mig 831, board task 553cc92f: the handoff rides the one session
+        job path and runs ``session-audit handoff`` with the row's task."""
+        release = plant_release(tmp_path)
+        line = f"HANDOFF - STARTED opus-coordination-w1-1020 for task {HANDOFF_TASK}\n"
+        runner = FakeRun([verify_reply(tmp_path), verb_reply(0, line), *UNROLLED_TICK])
+        _test_hooks.run = runner
+        row = {"command": "handoff-session", "taskId": HANDOFF_TASK}
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"claimed": restart_row(**row)}),
+                dump_json_str({"job": restart_row(**row, status="running", node="austinpc")}),
+                dump_json_str({"job": restart_row(**row, status="passed", node="austinpc")}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(agent_argv(config_path, repo)) == 0
+
+        assert runner.calls == [
+            verify_call(tmp_path),
+            session_argv.handoff_argv(
+                release["root"], release["registry_dir"], HUB_HOST, TARGET, HANDOFF_TASK, SUBMITTER
+            ),
+            *unrolled_calls(repo),
+        ]
+        assert endpoint.arguments[1]["runId"] == f"handoff-{DEFAULT_JOB_ID}"
+        detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
+        assert detail == f"{opening('handoff', 0)} {line.strip()}"
 
     def test_an_approved_exit_runs_the_graceful_kill_under_its_own_run_verb(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
@@ -409,7 +443,7 @@ class TestRestartLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert runner.calls[1] == restart.kill_argv(
+        assert runner.calls[1] == session_argv.kill_argv(
             release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER, hard=False
         )
         assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
@@ -537,3 +571,18 @@ class TestReleaseRefusals:
 
         assert runner.calls == [*unrolled_calls(repo)]
         assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])
+
+    def test_a_handoff_naming_no_task_is_refused_before_the_release_is_read(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs mig 831: a handoff whose row names no task starts no worker."""
+        plant_release(tmp_path)
+        runner = FakeRun([*UNROLLED_TICK])
+        _test_hooks.run = runner
+        endpoint = refused_queue(command="handoff-session", taskId=None)
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(agent_argv(config_path, repo)) == 0
+
+        assert runner.calls == [*unrolled_calls(repo)]
+        assert "HANDOFF_TASK_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])

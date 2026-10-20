@@ -85,6 +85,10 @@ class DispatchCommand(StrEnum):
     # subscription's usage limit, restarted in its pane through the account
     # launcher, which leases the account with the most headroom.
     MOVE_SESSION = "move-session"
+    # MCPs mig 831, board task 553cc92f: a fresh worker started on a board
+    # task in the tree of the session that handed it over, which the row
+    # names as its target, with the task in taskId.
+    HANDOFF_SESSION = "handoff-session"
     # MCPs board task bea0264b: arm one machine of the roster to network-boot
     # the installer, run by the machine holding the netboot duty. Decoded
     # here before the queue admits one, since a command this reader does not

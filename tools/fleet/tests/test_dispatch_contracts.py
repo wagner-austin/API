@@ -210,7 +210,7 @@ class TestMalformedAnswers:
         assert (
             "command 'deploy' is not one of check, lint, test, build-bases, restart-session, "
             "revive-session, kill-session, kill-session-hard, compact-session, exit-session, "
-            "move-session, netboot-arm" in raised.value.message
+            "move-session, handoff-session, netboot-arm" in raised.value.message
         )
 
     def test_an_arm_decodes_naming_the_machine_and_logs_as_an_arm_not_a_make(self) -> None:

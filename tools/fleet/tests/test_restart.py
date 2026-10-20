@@ -15,11 +15,13 @@ from typing import Final
 import pytest
 
 from fleet.contracts.dispatch import DispatchCommand
-from fleet.core import _test_hooks, rebuild, restart
+from fleet.core import _test_hooks, rebuild, restart, session_argv
 from fleet.core.session_release import SessionRelease
 from tests.conftest import FakeRun, ok
 
 TARGET = "934d9975-0d65-4e68-83de-b74f8c4df0c4"
+#: The board task a handoff's fresh worker starts on (MCPs mig 831).
+TASK = "553cc92f-39d0-49f3-a631-0d6108a2c5ec"
 ROOT: Final = pathlib.Path(
     "C:/Users/Test/AppData/Local/Corvis/session-verbs-releases/3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6/MCPs"
 )
@@ -51,7 +53,7 @@ class TestRestartArgv:
     def test_composes_the_exact_session_audit_invocation(self) -> None:
         """The register the verb reads is the release's, last on the line,
         after the host the session runs on."""
-        assert restart.restart_argv(ROOT, REGISTRY, HOST, TARGET) == (
+        assert session_argv.restart_argv(ROOT, REGISTRY, HOST, TARGET) == (
             *PREFIX,
             "rollover",
             "--apply",
@@ -64,7 +66,8 @@ class TestRestartArgv:
         """The second session verb (MCPs mig 525, board task 1fe89973): one
         table maps it to session-audit's revive mode, carrying the submitter
         into the brief the revived session is typed."""
-        assert restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, "fable-system-audit-0915") == (
+        label = "fable-system-audit-0915"
+        assert session_argv.revive_argv(ROOT, REGISTRY, HOST, TARGET, label) == (
             *PREFIX,
             "revive",
             "--session",
@@ -81,12 +84,13 @@ class TestRestartArgv:
             DispatchCommand.COMPACT_SESSION,
             DispatchCommand.EXIT_SESSION,
             DispatchCommand.MOVE_SESSION,
+            DispatchCommand.HANDOFF_SESSION,
         )
 
     def test_composes_the_exact_move_invocation(self) -> None:
         """MCPs mig 826, board task 4c26ab11: the move carries the submitter,
         which session-audit names in the line it types into the moved session."""
-        assert restart.move_argv(ROOT, REGISTRY, HOST, TARGET, "pcsession-observer") == (
+        assert session_argv.move_argv(ROOT, REGISTRY, HOST, TARGET, "pcsession-observer") == (
             *PREFIX,
             "move",
             "--session",
@@ -96,10 +100,28 @@ class TestRestartArgv:
             *SUFFIX,
         )
 
+    def test_composes_the_exact_handoff_invocation(self) -> None:
+        """MCPs mig 831, board task 553cc92f: the handoff names its
+        predecessor, the task its fresh worker starts on, and the label that
+        handed it over, which session-audit names in the worker's brief."""
+        assert session_argv.handoff_argv(
+            ROOT, REGISTRY, HOST, TARGET, TASK, "opus-mcps-1020-645e"
+        ) == (
+            *PREFIX,
+            "handoff",
+            "--session",
+            TARGET,
+            "--task",
+            TASK,
+            "--requested-by",
+            "opus-mcps-1020-645e",
+            *SUFFIX,
+        )
+
     def test_composes_the_exact_compact_invocation(self) -> None:
         """MCPs mig 564, board task 01f31e4a: the compact carries the
         submitter so session-audit prints who asked, and no kill flag."""
-        assert restart.compact_argv(ROOT, REGISTRY, HOST, TARGET, "opus-super-fleet-0926") == (
+        assert session_argv.compact_argv(ROOT, REGISTRY, HOST, TARGET, "opus-super-fleet-0926") == (
             *PREFIX,
             "compact",
             "--session",
@@ -115,11 +137,11 @@ class TestRestartArgv:
         graceful = (*PREFIX, "kill", "--session", TARGET, "--requested-by", "opus-mcps-0917-e7b5")
         label = "opus-mcps-0917-e7b5"
 
-        assert restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False) == (
+        assert session_argv.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False) == (
             *graceful,
             *SUFFIX,
         )
-        assert restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=True) == (
+        assert session_argv.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=True) == (
             *graceful,
             "--hard",
             *SUFFIX,
@@ -130,71 +152,92 @@ class TestRestartArgv:
         sealed = {"release": RELEASE["release"], "revision": RELEASE["revision"]}
 
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.RESTART_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "restart",
             "mode": "rollover",
-            "argv": restart.restart_argv(ROOT, REGISTRY, HOST, TARGET),
+            "argv": session_argv.restart_argv(ROOT, REGISTRY, HOST, TARGET),
             "types_requester": False,
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "revive",
             "mode": "revive",
-            "argv": restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, label),
+            "argv": session_argv.revive_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.KILL_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.KILL_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "kill",
             "mode": "kill",
-            "argv": restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
+            "argv": session_argv.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
             "types_requester": True,
             **sealed,
         }
         hard = restart.session_invocation(
-            RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label, HOST
+            RELEASE, DispatchCommand.KILL_SESSION_HARD, TARGET, label, HOST, None
         )
-        assert hard["argv"] == restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=True)
+        assert hard["argv"] == session_argv.kill_argv(
+            ROOT, REGISTRY, HOST, TARGET, label, hard=True
+        )
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.COMPACT_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "compact",
             "mode": "compact",
-            "argv": restart.compact_argv(ROOT, REGISTRY, HOST, TARGET, label),
+            "argv": session_argv.compact_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
         # MCPs board task 5aa8ed06: an approved self-exit is the graceful
         # kill's one invocation, never the hard one, under its own run verb.
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "exit",
             "mode": "kill",
-            "argv": restart.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
+            "argv": session_argv.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
             "types_requester": True,
             **sealed,
         }
         assert restart.session_invocation(
-            RELEASE, DispatchCommand.MOVE_SESSION, TARGET, label, HOST
+            RELEASE, DispatchCommand.MOVE_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "move",
             "mode": "move",
-            "argv": restart.move_argv(ROOT, REGISTRY, HOST, TARGET, label),
+            "argv": session_argv.move_argv(ROOT, REGISTRY, HOST, TARGET, label),
             "types_requester": True,
             **sealed,
         }
+        assert restart.session_invocation(
+            RELEASE, DispatchCommand.HANDOFF_SESSION, TARGET, label, HOST, TASK
+        ) == {
+            "verb": "handoff",
+            "mode": "handoff",
+            "argv": session_argv.handoff_argv(ROOT, REGISTRY, HOST, TARGET, TASK, label),
+            "types_requester": True,
+            **sealed,
+        }
+
+    def test_a_handoff_that_reaches_its_invocation_with_no_task_is_a_routing_defect(self) -> None:
+        refusal = (
+            r"^HANDOFF_TASK_MISSING: a handoff reached its invocation with no task, "
+            r"past task_refusal$"
+        )
+        with pytest.raises(ValueError, match=refusal):
+            restart.session_invocation(
+                RELEASE, DispatchCommand.HANDOFF_SESSION, TARGET, "opus-mcps-1020-645e", HOST, None
+            )
 
     def test_a_command_that_is_not_a_session_verb_is_refused_by_code(self) -> None:
         refusal = r"^SESSION_COMMAND_UNKNOWN: 'check' is not a session verb$"
         with pytest.raises(ValueError, match=refusal):
             restart.session_invocation(
-                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5", HOST
+                RELEASE, DispatchCommand.CHECK, TARGET, "opus-mcps-0917-e7b5", HOST, None
             )
 
     def test_a_submitter_that_is_not_a_board_label_is_refused_before_argv(self) -> None:
@@ -232,6 +275,26 @@ class TestRefusals:
     def test_a_lawful_target_passes(self) -> None:
         assert restart.refusal_for(TARGET) is None
 
+    def test_a_handoff_with_no_task_is_refused_by_code(self) -> None:
+        """MCPs mig 831's CHECK forbids this row; a runner that met one anyway
+        names the fact rather than start a worker on nothing."""
+        refusal = restart.task_refusal(DispatchCommand.HANDOFF_SESSION, None)
+        assert refusal == (
+            "HANDOFF_TASK_MISSING: a handoff-session row names the board task its fresh worker "
+            "starts on and this one does not; the queue's CHECK should have refused it"
+        )
+
+    def test_a_handoff_task_outside_the_uuid_grammar_is_refused_before_argv(self) -> None:
+        for lawless in ("553cc92f", TASK.upper(), f"{TASK} --apply"):
+            refusal = restart.task_refusal(DispatchCommand.HANDOFF_SESSION, lawless)
+            if refusal is None:
+                raise AssertionError(f"expected a refusal for {lawless!r}")
+            assert refusal.startswith(f"{restart.TASK_INVALID_CODE}: task {lawless!r} is not")
+
+    def test_a_lawful_task_passes_and_every_other_verb_needs_none(self) -> None:
+        assert restart.task_refusal(DispatchCommand.HANDOFF_SESSION, TASK) is None
+        assert restart.task_refusal(DispatchCommand.MOVE_SESSION, None) is None
+
 
 class TestRunAndDescribe:
     def test_run_withholds_the_agents_paths_and_writes_no_bytecode(self) -> None:
@@ -242,12 +305,12 @@ class TestRunAndDescribe:
 
         result = restart.run_session_job(
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
             )
         )
 
         assert result["returncode"] == 0
-        assert runner.calls == [restart.restart_argv(ROOT, REGISTRY, HOST, TARGET)]
+        assert runner.calls == [session_argv.restart_argv(ROOT, REGISTRY, HOST, TARGET)]
         assert runner.unset_env == [restart.SESSION_ENVIRONMENT_EXCLUDED]
         assert restart.SESSION_ENVIRONMENT_EXCLUDED == ("VIRTUAL_ENV", "PYTHONPATH")
         assert runner.set_env == [(("PYTHONDONTWRITEBYTECODE", "1"),)]
@@ -257,13 +320,13 @@ class TestRunAndDescribe:
         runner = FakeRun([ok("REVIVE - REVIVED session x: now pid 5")])
         _test_hooks.run = runner
         invocation = restart.session_invocation(
-            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915", HOST
+            RELEASE, DispatchCommand.REVIVE_SESSION, TARGET, "fable-system-audit-0915", HOST, None
         )
 
         result = restart.run_session_job(invocation)
 
         assert runner.calls == [
-            restart.revive_argv(ROOT, REGISTRY, HOST, TARGET, "fable-system-audit-0915")
+            session_argv.revive_argv(ROOT, REGISTRY, HOST, TARGET, "fable-system-audit-0915")
         ]
         assert restart.describe_result(result, invocation) == (
             f"session-audit revive {SEALED} 0: REVIVE - REVIVED session x: now pid 5"
@@ -280,7 +343,7 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
             ),
         )
 
@@ -299,7 +362,7 @@ class TestRunAndDescribe:
                 timed_out=False,
             ),
             restart.session_invocation(
-                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST
+                RELEASE, DispatchCommand.RESTART_SESSION, TARGET, "fable-dm-0912", HOST, None
             ),
         )
 
