@@ -221,6 +221,11 @@ class FleetErrorCode(ErrorCodeBase):
     # question on the LOCAL machine, raised rather than read as runners
     # GitHub does not list, which would name every busy runner dropped.
     RUNNER_GITHUB_UNREADABLE = "RUNNER_GITHUB_UNREADABLE"
+    # fleet-runners --prune asked GitHub to delete a registration no roster
+    # host declares (MCPs board task 1e9ab738) and gh refused: the same LOCAL
+    # auth or permissions question, raised so the registrations not yet
+    # removed are not reported as gone.
+    RUNNER_DEREGISTRATION_REFUSED = "RUNNER_DEREGISTRATION_REFUSED"
 
 
 __all__ = ["FleetErrorCode"]
