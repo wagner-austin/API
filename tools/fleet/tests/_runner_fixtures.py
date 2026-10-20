@@ -168,8 +168,25 @@ def raw_windows_host() -> dict[str, JSONValue]:
         "name": "loki",
         "host": "loki",
         "payload_dir": "C:/fleet/runner-payloads",
+        "base": raw_windows_base(),
         "installs": installs,
     }
+
+
+def raw_windows_base() -> dict[str, JSONValue]:
+    """loki's base with one machine variable, as the roster's JSON spells it.
+
+    Returns:
+        The raw base.
+    """
+    variables: list[JSONValue] = [
+        {
+            "name": "POETRY_CACHE_DIR",
+            "value": "C:\\fleet\\poetry",
+            "reason": "the runners run as SYSTEM",
+        }
+    ]
+    return {"execution_policy": "RemoteSigned", "machine_environment": variables}
 
 
 def a_windows_host() -> WindowsRunnerHost:

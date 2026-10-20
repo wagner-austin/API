@@ -27,7 +27,7 @@ def _clean() -> str:
     """loki's audit output when every row holds.
 
     Returns:
-        The three OK lines.
+        One OK line per expected check: the base's four, then the runner's three.
     """
     checks = runner_windows_render.expected_checks(decode_windows_runner_host(raw_windows_host()))
     return "".join(f"CHECK {check['check_id']} OK\n" for check in checks)
@@ -54,6 +54,10 @@ class TestTheAudit:
         with caplog.at_level("INFO"):
             assert runners.main(["--spec", _roster(tmp_path), "--host", "loki"]) == 0
         assert [record.getMessage() for record in caplog.records] == [
+            "loki OK execution-policy:LocalMachine:RemoteSigned",
+            "loki OK long-paths",
+            "loki OK git-longpaths",
+            "loki OK machine-env:POETRY_CACHE_DIR",
             f"loki OK service:{_SERVICE}",
             f"loki OK account:{_SERVICE}",
             f"loki OK recovery:{_SERVICE}",

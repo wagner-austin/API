@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from fleet.contracts.runner_windows import WindowsRunnerInstall
-from fleet.core import runner_windows_render
+from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
+from fleet.core import runner_windows_base_render, runner_windows_render
 from fleet.core.runner_audit_types import ExpectedCheck
 from tests._runner_fixtures import a_windows_host
 
@@ -33,6 +33,20 @@ def _install(repo: str) -> WindowsRunnerInstall:
     )
 
 
+def _host(*installs: WindowsRunnerInstall) -> WindowsRunnerHost:
+    """loki with the given runners and the fixture's base.
+
+    Args:
+        installs: Its runners.
+
+    Returns:
+        The host.
+    """
+    host = a_windows_host()
+    host["installs"] = list(installs)
+    return host
+
+
 def _parameter_lines(script: str) -> list[str]:
     """The lines of a render's param block.
 
@@ -49,7 +63,7 @@ def _parameter_lines(script: str) -> list[str]:
 class TestTheInstallScript:
     def test_the_installs_are_one_json_string_the_script_decodes_in_its_body(self) -> None:
         script = runner_windows_render.render_install_script(
-            [_install("wagner-austin/chat"), _install("wagner-austin/MCPs")], {}
+            _host(_install("wagner-austin/chat"), _install("wagner-austin/MCPs")), {}
         )
         assert _parameter_lines(script)[-2:] == [
             "    [string]$Installs = '["
@@ -62,9 +76,22 @@ class TestTheInstallScript:
         ]
         assert "foreach ($install in ($Installs | ConvertFrom-Json)) {" in script.splitlines()
 
+    def test_the_base_parameters_and_lines_come_before_the_first_runner(self) -> None:
+        script = runner_windows_render.committed_install_script()
+        lines = script.splitlines()
+        assert _parameter_lines(script)[4:11] == [
+            *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
+            f"    [int]$StopWaitSeconds = {runner_windows_render.STOP_WAIT_SECONDS},",
+        ]
+        first = lines.index(runner_windows_base_render.INSTALL_LINES[0])
+        assert lines[first : first + len(runner_windows_base_render.INSTALL_LINES)] == list(
+            runner_windows_base_render.INSTALL_LINES
+        )
+        assert first < lines.index("foreach ($install in ($Installs | ConvertFrom-Json)) {")
+
     def test_the_tokens_are_one_pair_per_repository_in_order(self) -> None:
         script = runner_windows_render.render_install_script(
-            [_install("wagner-austin/chat")],
+            _host(_install("wagner-austin/chat")),
             {"wagner-austin/tree-bot": "BBB222", "wagner-austin/chat": "AAA111"},
         )
         assert (
@@ -80,10 +107,20 @@ class TestTheInstallScript:
     def test_a_token_that_could_break_its_quoting_is_refused(self) -> None:
         with pytest.raises(ValueError) as refused:
             runner_windows_render.render_install_script(
-                [_install("wagner-austin/chat")], {"wagner-austin/chat": "A'; rm"}
+                _host(_install("wagner-austin/chat")), {"wagner-austin/chat": "A'; rm"}
             )
         assert str(refused.value) == (
             "the registration token for wagner-austin/chat is not alphanumeric"
+        )
+
+    def test_an_install_value_a_script_could_not_carry_is_refused(self) -> None:
+        install = _install("wagner-austin/chat")
+        install["root"] = "C:/actions-runner/it's"
+        with pytest.raises(ValueError) as refused:
+            runner_windows_render.render_install_script(_host(install), {})
+        assert str(refused.value) == (
+            'root "C:/actions-runner/it\'s" contains "\'", which cannot be embedded in a '
+            "rendered script verbatim; rename the item rather than escaping it"
         )
 
     def test_the_release_is_the_pinned_one_and_sc_is_named_by_its_system32_path(self) -> None:
@@ -96,19 +133,26 @@ class TestTheInstallScript:
 
 
 class TestTheAudit:
-    def test_the_audit_names_each_service_and_nothing_else(self) -> None:
+    def test_the_audit_names_each_service_after_the_base(self) -> None:
         script = runner_windows_render.render_audit_script(
-            [_install("wagner-austin/chat"), _install("wagner-austin/MCPs")]
+            _host(_install("wagner-austin/chat"), _install("wagner-austin/MCPs"))
         )
         assert _parameter_lines(script) == [
             "param(",
             '    [string]$Sc = "$env:SystemRoot\\System32\\sc.exe",',
+            *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
             "    [string]$Installs = '["
             '{"Service":"actions.runner.wagner-austin-chat.loki"},'
             '{"Service":"actions.runner.wagner-austin-MCPs.loki"}'
             "]'",
             ")",
         ]
+
+    def test_a_service_name_a_script_could_not_carry_is_refused(self) -> None:
+        install = _install("wagner-austin/chat")
+        install["service"] = "actions.runner.$x"
+        with pytest.raises(ValueError, match=r"^service 'actions\.runner\.\$x' contains '\$'"):
+            runner_windows_render.render_audit_script(_host(install))
 
     def test_the_account_row_matches_the_name_the_install_registers_as_sc_reads_it(
         self,
@@ -118,9 +162,13 @@ class TestTheAudit:
             "-and $config.Text -match 'SERVICE_START_NAME : NT AUTHORITY\\\\SYSTEM') {"
         ) in runner_windows_render.committed_audit_script().splitlines()
 
-    def test_three_rows_per_install_in_the_order_the_script_prints_them(self) -> None:
+    def test_the_base_rows_then_three_rows_per_install_in_the_order_the_script_prints_them(
+        self,
+    ) -> None:
+        host = a_windows_host()
         service = "actions.runner.wagner-austin-chat.loki"
-        assert runner_windows_render.expected_checks(a_windows_host()) == [
+        assert runner_windows_render.expected_checks(host) == [
+            *runner_windows_base_render.expected_checks(host["base"]),
             ExpectedCheck(
                 check_id=f"service:{service}",
                 reason=f"{runner_windows_render.SERVICE_REASON}: wagner-austin/chat's runner loki",
@@ -133,7 +181,7 @@ class TestTheAudit:
             ),
         ]
 
-    def test_the_committed_copy_is_the_example_install_s(self) -> None:
+    def test_the_committed_copy_is_the_example_host_s(self) -> None:
         assert runner_windows_render.committed_audit_script() == (
-            runner_windows_render.render_audit_script(a_windows_host()["installs"])
+            runner_windows_render.render_audit_script(a_windows_host())
         )

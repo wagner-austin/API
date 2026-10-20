@@ -34,12 +34,7 @@ class TestTheInstall:
         [
             ("repo", "chat", "repo must be 'owner/name', got 'chat'"),
             ("repo", "wagner-austin/", "repo must be 'owner/name', got 'wagner-austin/'"),
-            (
-                "repo",
-                "it's/chat",
-                "repo must be non-empty with no quote, backtick, dollar sign or line break, "
-                'since a rendered PowerShell script embeds it verbatim; got "it\'s/chat"',
-            ),
+            ("runner_name", "", "runner_name must be non-empty"),
             (
                 "service",
                 "actions.runner.chat",
@@ -75,25 +70,29 @@ class TestTheInstall:
         with pytest.raises(JSONTypeError, match="labels must be non-empty"):
             decode_windows_runner_install(raw)
 
-    @pytest.mark.parametrize("label", ["loki,win", "lo'ki"])
-    def test_a_label_config_cmd_would_split_or_a_render_would_break_is_refused(
-        self, label: str
-    ) -> None:
+    @pytest.mark.parametrize("label", ["loki,win", ""])
+    def test_a_label_config_cmd_would_split_or_drop_is_refused(self, label: str) -> None:
         raw = raw_windows_install()
         labels: list[JSONValue] = [label]
         raw["labels"] = labels
         with pytest.raises(JSONTypeError) as refused:
             decode_windows_runner_install(raw)
-        assert str(refused.value) == (
-            f"a label must hold no comma or quoting character, got {label!r}"
-        )
+        assert str(refused.value) == f"a label must be non-empty and hold no comma, got {label!r}"
 
 
 class TestTheHost:
     def test_a_declared_host_round_trips(self) -> None:
         host = decode_windows_runner_host(raw_windows_host())
         assert host["payload_dir"] == "C:/fleet/runner-payloads"
+        assert host["base"]["execution_policy"] == "RemoteSigned"
         assert decode_windows_runner_host(dict(encode_windows_runner_host(host))) == host
+
+    def test_a_host_with_no_base_is_refused(self) -> None:
+        raw = raw_windows_host()
+        del raw["base"]
+        with pytest.raises(JSONTypeError) as refused:
+            decode_windows_runner_host(raw)
+        assert str(refused.value) == "windows host base must be a JSON object, got NoneType"
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError) as refused:

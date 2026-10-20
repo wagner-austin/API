@@ -81,7 +81,7 @@ def attempt_audit_windows_host(host: WindowsRunnerHost) -> AuditOutcome:
     outcome = remote.attempt_root_script(
         host["host"],
         payload_path(host, AUDIT_STEM),
-        render_audit_script(host["installs"]),
+        render_audit_script(host),
         platform=NodePlatform.WINDOWS,
         timeout_seconds=AUDIT_TIMEOUT_SECONDS,
     )
@@ -112,7 +112,7 @@ def rebuild_windows_host(host: WindowsRunnerHost) -> WindowsRebuildReport:
     output = remote.run_root_script(
         host["host"],
         payload_path(host, INSTALL_STEM),
-        render_install_script(host["installs"], tokens),
+        render_install_script(host, tokens),
         platform=NodePlatform.WINDOWS,
         timeout_seconds=INSTALL_TIMEOUT_SECONDS,
     )

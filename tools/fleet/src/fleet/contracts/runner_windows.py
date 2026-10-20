@@ -8,17 +8,17 @@ job, which no Linux runner can take. That machine is loki, and its runners
 are declared here so ``fleet-runners`` installs, audits and prunes them as it
 does lavender's, and nothing is installed on it by hand.
 
-A Windows host declares only its installs and where its payloads land. It
-carries no CI slice, apt base, systemd timers or assets: each runner is a
+A Windows host declares its installs, where its payloads land and the
+machine settings its runners need (:mod:`fleet.contracts.runner_windows_base`).
+It carries no CI slice, apt base, systemd timers or assets: each runner is a
 Windows service of the machine, run as SYSTEM by ``config.cmd`` (corvis-stick's
 images arm mounts a VHDX, which needs it), and restarted by the service
 manager when it fails.
 
-EVERY STRING IS EMBEDDED IN A RENDERED POWERSHELL SCRIPT inside single quotes
-(:mod:`fleet.core.runner_windows_render`), so the decoder refuses any value
-holding a character that would end or reinterpret one, rather than the
-renderer escaping it: a roster value that needs escaping is a value nobody
-meant.
+EVERY STRING IS EMBEDDED IN A RENDERED POWERSHELL SCRIPT, and the renderer
+refuses a value it cannot carry verbatim through
+:func:`fleet.core.script_values.scriptable`, as every renderer here does;
+the decoder holds each value to its shape.
 """
 
 from __future__ import annotations
@@ -35,13 +35,15 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-#: A value a single-quoted PowerShell string carries verbatim: no quote of
-#: either kind, no backtick, no dollar sign and no line break.
-_EMBEDDABLE = re.compile(r"^[^'\"`$\r\n]+$")
+from fleet.contracts.runner_windows_base import (
+    WindowsHostBase,
+    decode_windows_host_base,
+    encode_windows_host_base,
+)
 
 #: An absolute Windows path, drive letter first, forward slashes, the form
 #: every rendered script here spells a path in.
-_WINDOWS_PATH = re.compile(r"^[A-Za-z]:/[^'\"`$\r\n\\]*$")
+_WINDOWS_PATH = re.compile(r"^[A-Za-z]:/[^\\]*$")
 
 
 class WindowsRunnerInstall(TypedDict):
@@ -75,17 +77,19 @@ class WindowsRunnerHost(TypedDict):
             the install creates services.
         payload_dir: Where the scripts fleet-runners sends land, e.g.
             ``C:/fleet/runner-payloads``.
+        base: The machine settings every runner on it needs.
         installs: Its runners.
     """
 
     name: str
     host: str
     payload_dir: str
+    base: WindowsHostBase
     installs: list[WindowsRunnerInstall]
 
 
-def _embeddable(value: JSONObject, key: str) -> str:
-    """A string field a single-quoted PowerShell string can carry verbatim.
+def _nonempty(value: JSONObject, key: str) -> str:
+    """A string field that must say something.
 
     Args:
         value: The object holding the field.
@@ -95,15 +99,11 @@ def _embeddable(value: JSONObject, key: str) -> str:
         The string.
 
     Raises:
-        JSONTypeError: When it is missing, not a string, empty, or holds a
-            character that would end or reinterpret the quoted string.
+        JSONTypeError: When it is missing, not a string or empty.
     """
     text = require_str(value, key)
-    if not _EMBEDDABLE.match(text):
-        raise JSONTypeError(
-            f"{key} must be non-empty with no quote, backtick, dollar sign or line break, "
-            f"since a rendered PowerShell script embeds it verbatim; got {text!r}"
-        )
+    if not text:
+        raise JSONTypeError(f"{key} must be non-empty")
     return text
 
 
@@ -118,8 +118,7 @@ def _windows_path(value: JSONObject, key: str) -> str:
         The path.
 
     Raises:
-        JSONTypeError: When it is not ``<drive>:/...`` with forward slashes
-            and nothing a quoted PowerShell string cannot carry.
+        JSONTypeError: When it is not ``<drive>:/...`` with forward slashes.
     """
     path = require_str(value, key)
     if not _WINDOWS_PATH.match(path):
@@ -159,19 +158,20 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            not embeddable, ``repo`` is not ``owner/name``, ``labels`` is
-            empty, or ``service`` is not the name ``config.cmd`` gives this
-            repository and runner.
+            empty, ``repo`` is not ``owner/name``, ``labels`` is empty or a
+            label holds the comma ``config.cmd`` splits labels on, or
+            ``service`` is not the name ``config.cmd`` gives this repository
+            and runner.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(
             f"windows runner install must be a JSON object, got {type(value).__name__}"
         )
-    repo = _embeddable(value, "repo")
+    repo = _nonempty(value, "repo")
     if repo.count("/") != 1 or not all(repo.split("/")):
         raise JSONTypeError(f"repo must be 'owner/name', got {repo!r}")
-    runner_name = _embeddable(value, "runner_name")
-    service = _embeddable(value, "service")
+    runner_name = _nonempty(value, "runner_name")
+    service = _nonempty(value, "service")
     expected = f"actions.runner.{repo.replace('/', '-')}.{runner_name}"
     if service != expected:
         raise JSONTypeError(
@@ -185,8 +185,8 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
             "by any workflow here and would sit registered but unreachable"
         )
     for label in labels:
-        if not _EMBEDDABLE.match(label) or "," in label:
-            raise JSONTypeError(f"a label must hold no comma or quoting character, got {label!r}")
+        if not label or "," in label:
+            raise JSONTypeError(f"a label must be non-empty and hold no comma, got {label!r}")
     return WindowsRunnerInstall(
         repo=repo,
         runner_name=runner_name,
@@ -209,6 +209,7 @@ def encode_windows_runner_host(host: WindowsRunnerHost) -> JSONObject:
         "name": host["name"],
         "host": host["host"],
         "payload_dir": host["payload_dir"],
+        "base": encode_windows_host_base(host["base"]),
         "installs": [encode_windows_runner_install(each) for each in host["installs"]],
     }
 
@@ -241,9 +242,10 @@ def decode_windows_runner_host(value: JSONValue) -> WindowsRunnerHost:
         if repeated:
             raise JSONTypeError(f"two installs share a {key}: {', '.join(repeated)}")
     return WindowsRunnerHost(
-        name=_embeddable(value, "name"),
-        host=_embeddable(value, "host"),
+        name=_nonempty(value, "name"),
+        host=_nonempty(value, "host"),
         payload_dir=_windows_path(value, "payload_dir"),
+        base=decode_windows_host_base(value.get("base")),
         installs=installs,
     )
 

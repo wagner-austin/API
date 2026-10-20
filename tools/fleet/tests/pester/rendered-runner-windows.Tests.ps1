@@ -3,30 +3,39 @@ $ErrorActionPreference = 'Stop'
 
 # The Windows runner host's two scripts, executed from their committed
 # renders, rendered/runner-windows-install.ps1 and
-# rendered/runner-windows-audit.ps1 (fleet.core.runner_windows_render, MCPs
-# board task 1e9ab738). sc.exe is a stand-in passed as -Sc that records each
-# call and answers each subcommand as the case needs; the runner release is a
-# zip this suite builds and serves as a file:// URL, holding a config.cmd
-# stand-in that records its arguments, writes .runner beside itself and exits
-# with the case's code. Nothing on this machine's services changes.
+# rendered/runner-windows-audit.ps1 (fleet.core.runner_windows_render and
+# fleet.core.runner_windows_base_render, MCPs board task 1e9ab738). sc.exe
+# and git are stand-ins passed as -Sc and -Git that record each call: sc
+# keeps the service's state in a file beside it, so a stop moves it through
+# STOP_PENDING to STOPPED and a start to RUNNING. The registry keys are
+# scratch keys under HKCU, the machine variables are written in the Process
+# scope, and the runner release is a zip this suite builds and serves as a
+# file:// URL, holding a config.cmd stand-in that records its arguments,
+# writes .runner beside itself and exits with the case's code. Nothing on
+# this machine's services, registry or machine environment changes.
 
 BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
     $script:service = 'actions.runner.wagner-austin-chat.loki'
+    $script:scratch = 'HKCU:\Software\corvis-runner-windows-test'
 
     function Initialize-Sc {
         <#
         .SYNOPSIS
-            An sc.exe stand-in answering failure, query, start, qc and
-            qfailure with the case's exit codes and text.
+            An sc.exe stand-in keeping one service's state in a file.
         .PARAMETER FailureExit
             What `sc failure` exits with.
         .PARAMETER QueryExit
             What `sc query` exits with.
         .PARAMETER QueryState
-            The STATE word `sc query` prints.
+            The state the service starts in.
         .PARAMETER StartExit
-            What `sc start` exits with.
+            What `sc start` exits with; it leaves the service RUNNING.
+        .PARAMETER StopExit
+            What `sc stop` exits with.
+        .PARAMETER StopTo
+            The state `sc stop` leaves: STOP_PENDING reads STOPPED at the
+            query after it, FAIL makes every later query exit 1060.
         .PARAMETER QcExit
             What `sc qc` exits with.
         .PARAMETER StartType
@@ -46,6 +55,8 @@ BeforeAll {
             [int]$QueryExit = 0,
             [string]$QueryState = '4  RUNNING',
             [int]$StartExit = 0,
+            [int]$StopExit = 0,
+            [string]$StopTo = '3  STOP_PENDING',
             [int]$QcExit = 0,
             [string]$StartType = '2   AUTO_START',
             [string]$StartName = 'NT AUTHORITY\SYSTEM',
@@ -54,15 +65,25 @@ BeforeAll {
         )
         # Each concatenation is parenthesized: the comma binds tighter than
         # +, so unbracketed the whole list would join into the first line.
-        return Initialize-Batch 'sc' @(
+        $sc = Initialize-Batch 'sc' @(
             ('if /i "%1"=="failure" exit /b ' + $FailureExit),
-            ('if /i "%1"=="start" exit /b ' + $StartExit),
+            'if /i "%1"=="start" goto start',
+            'if /i "%1"=="stop" goto stop',
             'if /i "%1"=="query" goto query',
             'if /i "%1"=="qc" goto qc',
             'goto qfailure',
+            ':start',
+            '>"%~dp0state.txt" echo 4  RUNNING',
+            ('exit /b ' + $StartExit),
+            ':stop',
+            ('>"%~dp0state.txt" echo ' + $StopTo),
+            ('exit /b ' + $StopExit),
             ':query',
+            'set /p STATE=<"%~dp0state.txt"',
+            'if "%STATE%"=="FAIL" exit /b 1060',
             'echo SERVICE_NAME: %2',
-            "echo         STATE              : $QueryState",
+            'echo         STATE              : %STATE%',
+            'if "%STATE%"=="3  STOP_PENDING" (>"%~dp0state.txt" echo 1  STOPPED)',
             ('exit /b ' + $QueryExit),
             ':qc',
             "echo         START_TYPE         : $StartType",
@@ -72,6 +93,81 @@ BeforeAll {
             "echo         FAILURE_ACTIONS              : $Action",
             ('exit /b ' + $QfailureExit)
         )
+        [System.IO.File]::WriteAllText((Join-Path $sc.Directory 'state.txt'), "$QueryState`r`n", [System.Text.Encoding]::ASCII)
+        return $sc
+    }
+
+    function Initialize-Git {
+        <#
+        .SYNOPSIS
+            A git stand-in answering `config --system --get core.longpaths`
+            and `config --system core.longpaths true`.
+        .PARAMETER Held
+            What the get prints; empty prints nothing, as for a key not set.
+        .PARAMETER GetExit
+            What the get exits with: 0 when set, 1 when not, as git does.
+        .PARAMETER SetExit
+            What the set exits with.
+        .OUTPUTS
+            What Initialize-Batch answers.
+        #>
+        param([string]$Held = 'true', [int]$GetExit = 0, [int]$SetExit = 0)
+        $get = @(':get')
+        if ($Held) { $get += "echo $Held" }
+        return Initialize-Batch 'git' (@('if "%3"=="--get" goto get', ('exit /b ' + $SetExit)) + $get + @('exit /b ' + $GetExit))
+    }
+
+    function Initialize-RegistryScratch {
+        <#
+        .SYNOPSIS
+            Scratch registry keys standing in for the policy's and the file
+            system's, under HKCU.
+        .PARAMETER Policy
+            The ExecutionPolicy value to lay, or empty for none.
+        .PARAMETER LongPaths
+            The LongPathsEnabled value to lay.
+        .OUTPUTS
+            PSCustomObject: PolicyKey and FileSystemKey.
+        #>
+        param([string]$Policy = 'RemoteSigned', [int]$LongPaths = 1)
+        $root = Join-Path $script:scratch ([guid]::NewGuid().ToString('N'))
+        $policyKey = Join-Path $root 'Policy'
+        $fileSystemKey = Join-Path $root 'FileSystem'
+        [void](New-Item -Path $policyKey -Force)
+        [void](New-Item -Path $fileSystemKey -Force)
+        if ($Policy) { Set-ItemProperty -LiteralPath $policyKey -Name ExecutionPolicy -Value $Policy }
+        Set-ItemProperty -LiteralPath $fileSystemKey -Name LongPathsEnabled -Value $LongPaths -Type DWord
+        return [pscustomobject]@{ PolicyKey = $policyKey; FileSystemKey = $fileSystemKey }
+    }
+
+    function Get-CaseVariableName {
+        <#
+        .SYNOPSIS
+            A machine variable for one case, unset, in the Process scope.
+        .OUTPUTS
+            String: its name.
+        #>
+        return 'CORVIS_RUNNER_TEST_' + [guid]::NewGuid().ToString('N')
+    }
+
+    function Get-Base {
+        <#
+        .SYNOPSIS
+            The base parameters of either script, for a host already laid
+            unless a case says otherwise.
+        .PARAMETER Keys
+            The scratch keys.
+        .PARAMETER Git
+            The git stand-in.
+        .PARAMETER Variable
+            One machine variable's name, or empty for none declared.
+        .OUTPUTS
+            Hashtable: the parameters.
+        #>
+        param([object]$Keys, [object]$Git, [string]$Variable = '')
+        $declared = '[]'
+        if ($Variable) { $declared = ConvertTo-Json -InputObject @(@{ Name = $Variable; Value = 'C:\fleet\poetry' }) -Compress }
+        return @{ PolicyKey = $Keys.PolicyKey; FileSystemKey = $Keys.FileSystemKey; Git = $Git.Path; VariableScope = 'Process'; MachineEnvironment = $declared }
     }
 
     function Initialize-Release {
@@ -124,14 +220,38 @@ BeforeAll {
             The release URL.
         .PARAMETER Tokens
             The registration tokens.
+        .PARAMETER Base
+            The base parameters; a laid host's when omitted.
         .OUTPUTS
             String[]: what it printed.
         #>
-        param([string]$Root, [object]$Sc, [string]$Url, [hashtable]$Tokens)
+        param([string]$Root, [object]$Sc, [string]$Url, [hashtable]$Tokens, [hashtable]$Base)
+        if (-not $Base) { $Base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) }
         $install = @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = $Root; Service = $script:service }
         $installs = ConvertTo-Json -InputObject @($install) -Compress
-        return [string[]]@(Invoke-Rendered 'runner-windows-install' @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs })
+        $parameters = @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs; StopWaitSeconds = 2 } + $Base
+        return [string[]]@(Invoke-Rendered 'runner-windows-install' $parameters)
     }
+
+    function Invoke-Audit {
+        <#
+        .SYNOPSIS
+            Run the committed audit over the example install.
+        .PARAMETER Sc
+            The sc.exe stand-in.
+        .PARAMETER Base
+            The base parameters; a laid host's when omitted.
+        .OUTPUTS
+            String[]: its rows.
+        #>
+        param([object]$Sc, [hashtable]$Base)
+        if (-not $Base) { $Base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) }
+        return [string[]]@(Invoke-Rendered 'runner-windows-audit' (@{ Sc = $Sc.Path } + $Base))
+    }
+}
+
+AfterAll {
+    if (Test-Path -LiteralPath $script:scratch) { Remove-Item -LiteralPath $script:scratch -Recurse -Force }
 }
 
 Describe 'The install' {
@@ -155,14 +275,46 @@ Describe 'The install' {
         )
         Test-Path -LiteralPath (Join-Path $root 'runner.zip') | Should -BeFalse
     }
-    It 'touches neither the release nor the registration of a runner already in place, and starts nothing running' {
+    It 'touches nothing on a host laid and a runner in place and running' {
         $root = Initialize-Root -Unpacked -Registered
         $sc = Initialize-Sc
-        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{}
+        $git = Initialize-Git
+        $variable = Get-CaseVariableName
+        [Environment]::SetEnvironmentVariable($variable, 'C:\fleet\poetry', 'Process')
+        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{} (Get-Base (Initialize-RegistryScratch) $git $variable)
         $printed | Should -Be @("runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure")
         Read-CallRecord $sc | Should -Be @(
             "failure $($script:service) reset= 86400 actions= restart/60000/restart/60000/restart/60000",
             "query $($script:service)"
+        )
+        Read-CallRecord $git | Should -Be @('config --system --get core.longpaths')
+    }
+    It 'lays a stock host and restarts the running runner, which reads its variables only when it starts' {
+        $root = Initialize-Root -Unpacked -Registered
+        $sc = Initialize-Sc
+        $git = Initialize-Git -Held '' -GetExit 1
+        $keys = Initialize-RegistryScratch -Policy '' -LongPaths 0
+        $variable = Get-CaseVariableName
+        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{} (Get-Base $keys $git $variable)
+        $printed | Should -Be @(
+            'base: set the LocalMachine execution policy to RemoteSigned',
+            'base: enabled Win32 long paths',
+            'base: set git core.longpaths for the system',
+            "base: set the machine variable $variable",
+            "runner: stopped $($script:service) so it starts with the machine variables",
+            "runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure"
+        )
+        (Get-Item -LiteralPath $keys.PolicyKey).GetValue('ExecutionPolicy') | Should -Be 'RemoteSigned'
+        (Get-Item -LiteralPath $keys.FileSystemKey).GetValue('LongPathsEnabled') | Should -Be 1
+        [Environment]::GetEnvironmentVariable($variable, 'Process') | Should -Be 'C:\fleet\poetry'
+        Read-CallRecord $git | Should -Be @('config --system --get core.longpaths', 'config --system core.longpaths true')
+        Read-CallRecord $sc | Should -Be @(
+            "failure $($script:service) reset= 86400 actions= restart/60000/restart/60000/restart/60000",
+            "query $($script:service)",
+            "stop $($script:service)",
+            "query $($script:service)",
+            "query $($script:service)",
+            "start $($script:service)"
         )
     }
     It 'refuses to register a runner it holds no token for' {
@@ -172,6 +324,14 @@ Describe 'The install' {
     It 'stops when config.cmd refuses, with its status' {
         $root = Initialize-Root
         { Invoke-Install $root (Initialize-Sc) (Initialize-Release 3) @{ 'wagner-austin/chat' = 'TOKEN1' } } | Should -Throw 'RUNNER_CONFIG_FAILED: config.cmd for wagner-austin/chat exited 3'
+    }
+    It 'stops when git cannot read its system configuration' {
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git -Held '' -GetExit 128)
+        { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc) 'file:///absent.zip' @{} $base } | Should -Throw 'RUNNER_BASE_FAILED: git config --system --get core.longpaths exited 128'
+    }
+    It 'stops when git cannot write core.longpaths' {
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git -Held '' -GetExit 1 -SetExit 5)
+        { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc) 'file:///absent.zip' @{} $base } | Should -Throw 'RUNNER_BASE_FAILED: git config --system core.longpaths exited 5'
     }
     It 'stops when the recovery actions cannot be set' {
         $root = Initialize-Root -Unpacked -Registered
@@ -185,39 +345,62 @@ Describe 'The install' {
         $root = Initialize-Root -Unpacked -Registered
         { Invoke-Install $root (Initialize-Sc -QueryState '1  STOPPED' -StartExit 1053) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe start $($script:service) exited 1053"
     }
+    It 'stops when a running service it must restart refuses to stop' {
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) (Get-CaseVariableName)
+        { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc -StopExit 1051) 'file:///absent.zip' @{} $base } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe stop $($script:service) exited 1051"
+    }
+    It 'stops when a service it stopped cannot be read' {
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) (Get-CaseVariableName)
+        { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc -StopTo 'FAIL') 'file:///absent.zip' @{} $base } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe query $($script:service) exited 1060"
+    }
+    It 'stops when a service it stopped never reads STOPPED' {
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) (Get-CaseVariableName)
+        { Invoke-Install (Initialize-Root -Unpacked -Registered) (Initialize-Sc -StopTo '4  RUNNING') 'file:///absent.zip' @{} $base } | Should -Throw "RUNNER_SERVICE_FAILED: $($script:service) did not stop within 2 s"
+    }
 }
 
 Describe 'The audit' {
-    It 'reads a running, automatic SYSTEM service that restarts on failure as three OK rows' {
+    It 'reads a laid host and a running, automatic SYSTEM service that restarts on failure as OK rows' {
         $sc = Initialize-Sc
-        [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
+        $variable = Get-CaseVariableName
+        [Environment]::SetEnvironmentVariable($variable, 'C:\fleet\poetry', 'Process')
+        Invoke-Audit $sc (Get-Base (Initialize-RegistryScratch) (Initialize-Git) $variable) | Should -Be @(
+            'CHECK execution-policy:LocalMachine:RemoteSigned OK',
+            'CHECK long-paths OK',
+            'CHECK git-longpaths OK',
+            "CHECK machine-env:$variable OK",
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) OK",
             "CHECK recovery:$($script:service) OK"
         )
         Read-CallRecord $sc | Should -Be @("query $($script:service)", "qc $($script:service)", "qfailure $($script:service)")
     }
-    It 'reads a stopped, manual service with no restarts as three DRIFT rows naming what sc.exe said' {
+    It 'reads a stock host and a stopped, manual service with no restarts as DRIFT rows naming what each said' {
         $sc = Initialize-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
-        [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
+        $variable = Get-CaseVariableName
+        $base = Get-Base (Initialize-RegistryScratch -Policy '' -LongPaths 0) (Initialize-Git -Held '' -GetExit 1) $variable
+        Invoke-Audit $sc $base | Should -Be @(
+            'CHECK execution-policy:LocalMachine:RemoteSigned DRIFT the LocalMachine ExecutionPolicy value is: ',
+            'CHECK long-paths DRIFT LongPathsEnabled is: 0',
+            'CHECK git-longpaths DRIFT git config --system --get core.longpaths exited 1: ',
+            "CHECK machine-env:$variable DRIFT the machine variable holds: ",
             "CHECK service:$($script:service) DRIFT sc.exe query exited 0: SERVICE_NAME: $($script:service) STATE : 1 STOPPED",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : NT AUTHORITY\SYSTEM",
             "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 0: FAILURE_ACTIONS : NONE"
         )
     }
     It 'reads an automatic service under the runner default account as account drift alone' {
-        $sc = Initialize-Sc -StartName 'NT AUTHORITY\NetworkService'
-        [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
+        $rows = Invoke-Audit (Initialize-Sc -StartName 'NT AUTHORITY\NetworkService')
+        $rows[3..5] | Should -Be @(
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 2 AUTO_START SERVICE_START_NAME : NT AUTHORITY\NetworkService",
             "CHECK recovery:$($script:service) OK"
         )
     }
     It 'reads a service sc.exe cannot open as drift on every row, and still exits 0' {
-        $sc = Initialize-Sc -QueryExit 1060 -QcExit 1060 -QfailureExit 1060
-        $rows = [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path })
-        $rows[0] | Should -BeLike "CHECK service:$($script:service) DRIFT sc.exe query exited 1060: *"
-        $rows[1] | Should -BeLike "CHECK account:$($script:service) DRIFT sc.exe qc exited 1060: *"
-        $rows[2] | Should -BeLike "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 1060: *"
+        $rows = Invoke-Audit (Initialize-Sc -QueryExit 1060 -QcExit 1060 -QfailureExit 1060)
+        $rows[3] | Should -BeLike "CHECK service:$($script:service) DRIFT sc.exe query exited 1060: *"
+        $rows[4] | Should -BeLike "CHECK account:$($script:service) DRIFT sc.exe qc exited 1060: *"
+        $rows[5] | Should -BeLike "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 1060: *"
     }
 }

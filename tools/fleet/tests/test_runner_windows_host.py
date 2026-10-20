@@ -46,9 +46,7 @@ class TestTheAudit:
             reason="",
         )
         path = "C:/fleet/runner-payloads/runner-windows-audit.ps1"
-        assert runner.stdin[0] == runner_windows_render.render_audit_script(
-            host["installs"]
-        ).encode("utf-8")
+        assert runner.stdin[0] == runner_windows_render.render_audit_script(host).encode("utf-8")
         assert runner.calls[1][-6:] == (*dialect_windows.POWERSHELL_INVOCATION, path)
         assert runner.timeouts[1] == runner_windows_host.AUDIT_TIMEOUT_SECONDS
 
@@ -80,10 +78,11 @@ class TestTheRebuild:
             "runner: unpacked the release",
             "runner: registered wagner-austin/chat",
         ]
-        assert [finding["ok"] for finding in report["findings"]] == [True, True, True]
+        # The base's four rows and the one runner's three.
+        assert [finding["ok"] for finding in report["findings"]] == [True] * 7
         assert runner.calls[0][4] == "repos/wagner-austin/chat/actions/runners/registration-token"
         assert runner.stdin[1] == runner_windows_render.render_install_script(
-            host["installs"], {"wagner-austin/chat": "TOKEN1"}
+            host, {"wagner-austin/chat": "TOKEN1"}
         ).encode("utf-8")
         assert runner.calls[2][-1] == "C:/fleet/runner-payloads/runner-windows-install.ps1"
         assert runner.timeouts[2] == runner_windows_host.INSTALL_TIMEOUT_SECONDS

@@ -141,6 +141,16 @@
       "name": "loki",
       "host": "loki",
       "payload_dir": "C:/fleet/runner-payloads",
+      "base": {
+        "execution_policy": "RemoteSigned",
+        "machine_environment": [
+          {
+            "name": "POETRY_CACHE_DIR",
+            "value": "C:\\fleet\\poetry",
+            "reason": "the runners run as SYSTEM, whose profile is under System32, where 32-bit make (chocolatey's GNU Make 4.4.1 on loki, PE machine 0x14C) is redirected to SysWOW64 and cannot launch a venv's python (MCPs run 36264009927, on lavender's SYSTEM runners)"
+          }
+        ]
+      },
       "installs": [
         {
           "repo": "wagner-austin/chat",

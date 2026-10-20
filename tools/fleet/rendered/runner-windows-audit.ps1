@@ -1,5 +1,11 @@
 param(
     [string]$Sc = "$env:SystemRoot\System32\sc.exe",
+    [string]$Policy = 'RemoteSigned',
+    [string]$PolicyKey = 'HKLM:\SOFTWARE\Microsoft\PowerShell\1\ShellIds\Microsoft.PowerShell',
+    [string]$FileSystemKey = 'HKLM:\SYSTEM\CurrentControlSet\Control\FileSystem',
+    [string]$Git = 'git',
+    [string]$VariableScope = 'Machine',
+    [string]$MachineEnvironment = '[{"Name":"POETRY_CACHE_DIR","Value":"C:\\fleet\\poetry"}]',
     [string]$Installs = '[{"Service":"actions.runner.wagner-austin-chat.loki"}]'
 )
 Set-StrictMode -Version Latest
@@ -8,6 +14,32 @@ function Get-Answer {
     param([string]$Tool, [string[]]$Arguments)
     $text = ((& $Tool @Arguments) -join ' ') -replace '\s+', ' '
     return [pscustomobject]@{ Code = $LASTEXITCODE; Text = $text.Trim() }
+}
+$heldPolicy = [string](Get-Item -LiteralPath $PolicyKey).GetValue('ExecutionPolicy')
+if ($heldPolicy -eq $Policy) {
+    "CHECK execution-policy:LocalMachine:$Policy OK"
+} else {
+    "CHECK execution-policy:LocalMachine:$Policy DRIFT the LocalMachine ExecutionPolicy value is: $heldPolicy"
+}
+$heldLongPaths = (Get-Item -LiteralPath $FileSystemKey).GetValue('LongPathsEnabled')
+if ($heldLongPaths -eq 1) {
+    'CHECK long-paths OK'
+} else {
+    "CHECK long-paths DRIFT LongPathsEnabled is: $heldLongPaths"
+}
+$gitLongPaths = Get-Answer $Git @('config', '--system', '--get', 'core.longpaths')
+if ($gitLongPaths.Code -eq 0 -and $gitLongPaths.Text -eq 'true') {
+    'CHECK git-longpaths OK'
+} else {
+    "CHECK git-longpaths DRIFT git config --system --get core.longpaths exited $($gitLongPaths.Code): $($gitLongPaths.Text)"
+}
+foreach ($variable in ($MachineEnvironment | ConvertFrom-Json)) {
+    $heldValue = [string][Environment]::GetEnvironmentVariable($variable.Name, $VariableScope)
+    if ($heldValue -ceq $variable.Value) {
+        "CHECK machine-env:$($variable.Name) OK"
+    } else {
+        "CHECK machine-env:$($variable.Name) DRIFT the machine variable holds: $heldValue"
+    }
 }
 foreach ($install in ($Installs | ConvertFrom-Json)) {
     $service = $install.Service
