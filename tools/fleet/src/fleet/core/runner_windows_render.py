@@ -24,7 +24,9 @@ and the service started only when ``sc.exe`` does not read it RUNNING.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
+
+from platform_core.json_utils import dump_json_str
 
 from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
@@ -86,35 +88,45 @@ def _example() -> list[WindowsRunnerInstall]:
     ]
 
 
-def _installs_parameter(entries: list[str]) -> list[str]:
-    """The ``$Installs`` param-block lines for some hashtable literals.
+def _installs_parameter(rows: Sequence[Mapping[str, str]]) -> str:
+    """The ``$Installs`` parameter: the host's installs as one JSON string.
+
+    A string, not hashtable literals, because a constant default is no
+    command: a literal is, and only a run that leaves the default in place
+    reaches it, which for the install means a run on the machine's own
+    runner directories. The body decodes it with ``ConvertFrom-Json``, which
+    every run executes. The roster decoder admits no quote of either kind
+    in any field, so the JSON's only double quotes are its own and a
+    single-quoted string carries it verbatim.
 
     Args:
-        entries: One ``@{ ... }`` literal per install.
+        rows: One object per install, its fields named as the script reads
+            them.
 
     Returns:
-        The lines, the last one with no trailing comma since ``$Installs``
-        is the last parameter.
+        The line, with no trailing comma since ``$Installs`` is the last
+        parameter.
     """
-    body = [f"        {entry}," for entry in entries[:-1]] + [f"        {entries[-1]}"]
-    return ["    [hashtable[]]$Installs = @(", *body, "    )"]
+    return f"    [string]$Installs = '{dump_json_str(list(rows))}'"
 
 
-def _install_entry(install: WindowsRunnerInstall) -> str:
-    """One install as the install script's hashtable literal.
+def _install_row(install: WindowsRunnerInstall) -> dict[str, str]:
+    """One install as the install script reads it.
 
     Args:
-        install: The install; the roster decoder admitted every value as
-            embeddable in a single-quoted string.
+        install: The install.
 
     Returns:
-        The literal.
+        Its repository, runner name, comma-joined labels (``config.cmd``'s
+        ``--labels`` form), directory and service.
     """
-    return (
-        f"@{{ Repo = '{install['repo']}'; Name = '{install['runner_name']}'; "
-        f"Labels = '{','.join(install['labels'])}'; Root = '{install['root']}'; "
-        f"Service = '{install['service']}' }}"
-    )
+    return {
+        "Repo": install["repo"],
+        "Name": install["runner_name"],
+        "Labels": ",".join(install["labels"]),
+        "Root": install["root"],
+        "Service": install["service"],
+    }
 
 
 def _tokens_literal(tokens: Mapping[str, str]) -> str:
@@ -156,10 +168,10 @@ def render_install_script(installs: list[WindowsRunnerInstall], tokens: Mapping[
         f"    [string]$RunnerZipUrl = '{RUNNER_ZIP_URL}',",
         f"    {system32_parameter('Sc', 'sc.exe')},",
         f"    [hashtable]$Tokens = {_tokens_literal(tokens)},",
-        *_installs_parameter([_install_entry(install) for install in installs]),
+        _installs_parameter([_install_row(install) for install in installs]),
         ")",
         *STRICT_HEADER,
-        "foreach ($install in $Installs) {",
+        "foreach ($install in ($Installs | ConvertFrom-Json)) {",
         "    $root = $install.Root",
         '    if (-not (Test-Path -LiteralPath "$root/config.cmd")) {',
         "        [void][IO.Directory]::CreateDirectory($root)",
@@ -217,11 +229,10 @@ def render_audit_script(installs: list[WindowsRunnerInstall]) -> str:
         The complete script. It reads and changes nothing but ``sc.exe``'s
         answers, and exits 0: drift is data.
     """
-    entries = [f"@{{ Service = '{install['service']}' }}" for install in installs]
     lines = [
         "param(",
         f"    {system32_parameter('Sc', 'sc.exe')},",
-        *_installs_parameter(entries),
+        _installs_parameter([{"Service": install["service"]} for install in installs]),
         ")",
         *STRICT_HEADER,
         "function Get-Answer {",
@@ -229,7 +240,7 @@ def render_audit_script(installs: list[WindowsRunnerInstall]) -> str:
         "    $text = ((& $Tool @Arguments) -join ' ') -replace '\\s+', ' '",
         "    return [pscustomobject]@{ Code = $LASTEXITCODE; Text = $text.Trim() }",
         "}",
-        "foreach ($install in $Installs) {",
+        "foreach ($install in ($Installs | ConvertFrom-Json)) {",
         "    $service = $install.Service",
         "    $state = Get-Answer $Sc @('query', $service)",
         "    if ($state.Code -eq 0 -and $state.Text -match 'STATE : 4 RUNNING') {",

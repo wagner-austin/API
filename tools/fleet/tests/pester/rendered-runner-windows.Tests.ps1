@@ -14,7 +14,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
     $script:service = 'actions.runner.wagner-austin-chat.loki'
 
-    function New-Sc {
+    function Initialize-Sc {
         <#
         .SYNOPSIS
             An sc.exe stand-in answering failure, query, start, qc and
@@ -48,27 +48,29 @@ BeforeAll {
             [int]$QfailureExit = 0,
             [string]$Action = 'RESTART -- Delay = 60000 milliseconds.'
         )
+        # Each concatenation is parenthesized: the comma binds tighter than
+        # +, so unbracketed the whole list would join into the first line.
         return Initialize-Batch 'sc' @(
-            'if /i "%1"=="failure" exit /b ' + $FailureExit,
-            'if /i "%1"=="start" exit /b ' + $StartExit,
+            ('if /i "%1"=="failure" exit /b ' + $FailureExit),
+            ('if /i "%1"=="start" exit /b ' + $StartExit),
             'if /i "%1"=="query" goto query',
             'if /i "%1"=="qc" goto qc',
             'goto qfailure',
             ':query',
             'echo SERVICE_NAME: %2',
             "echo         STATE              : $QueryState",
-            'exit /b ' + $QueryExit,
+            ('exit /b ' + $QueryExit),
             ':qc',
             "echo         START_TYPE         : $StartType",
             'echo         SERVICE_START_NAME : LocalSystem',
-            'exit /b ' + $QcExit,
+            ('exit /b ' + $QcExit),
             ':qfailure',
             "echo         FAILURE_ACTIONS              : $Action",
-            'exit /b ' + $QfailureExit
+            ('exit /b ' + $QfailureExit)
         )
     }
 
-    function New-Release {
+    function Initialize-Release {
         <#
         .SYNOPSIS
             A runner release zip holding a config.cmd stand-in, as a file:// URL.
@@ -87,7 +89,7 @@ BeforeAll {
         return ([Uri]$zip).AbsoluteUri
     }
 
-    function New-Root {
+    function Initialize-Root {
         <#
         .SYNOPSIS
             An install directory under TestDrive, laid out as a case needs.
@@ -123,15 +125,16 @@ BeforeAll {
         #>
         param([string]$Root, [object]$Sc, [string]$Url, [hashtable]$Tokens)
         $install = @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = $Root; Service = $script:service }
-        return [string[]]@(Invoke-Rendered 'runner-windows-install' @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = @($install) })
+        $installs = ConvertTo-Json -InputObject @($install) -Compress
+        return [string[]]@(Invoke-Rendered 'runner-windows-install' @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs })
     }
 }
 
 Describe 'The install' {
     It 'unpacks the release, registers the runner as SYSTEM, sets its restarts and starts it' {
-        $root = New-Root
-        $sc = New-Sc -QueryState '1  STOPPED'
-        $url = New-Release 0
+        $root = Initialize-Root
+        $sc = Initialize-Sc -QueryState '1  STOPPED'
+        $url = Initialize-Release 0
         $printed = Invoke-Install $root $sc $url @{ 'wagner-austin/chat' = 'TOKEN1' }
         $printed | Should -Be @(
             "runner: unpacked $url into $root",
@@ -149,8 +152,8 @@ Describe 'The install' {
         Test-Path -LiteralPath (Join-Path $root 'runner.zip') | Should -BeFalse
     }
     It 'touches neither the release nor the registration of a runner already in place, and starts nothing running' {
-        $root = New-Root -Unpacked -Registered
-        $sc = New-Sc
+        $root = Initialize-Root -Unpacked -Registered
+        $sc = Initialize-Sc
         $printed = Invoke-Install $root $sc 'file:///absent.zip' @{}
         $printed | Should -Be @("runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure")
         Read-CallRecord $sc | Should -Be @(
@@ -159,30 +162,30 @@ Describe 'The install' {
         )
     }
     It 'refuses to register a runner it holds no token for' {
-        $root = New-Root -Unpacked
-        { Invoke-Install $root (New-Sc) 'file:///absent.zip' @{} } | Should -Throw 'RUNNER_TOKEN_MISSING: no registration token for wagner-austin/chat; fleet-runners --rebuild yes mints one'
+        $root = Initialize-Root -Unpacked
+        { Invoke-Install $root (Initialize-Sc) 'file:///absent.zip' @{} } | Should -Throw 'RUNNER_TOKEN_MISSING: no registration token for wagner-austin/chat; fleet-runners --rebuild yes mints one'
     }
     It 'stops when config.cmd refuses, with its status' {
-        $root = New-Root
-        { Invoke-Install $root (New-Sc) (New-Release 3) @{ 'wagner-austin/chat' = 'TOKEN1' } } | Should -Throw 'RUNNER_CONFIG_FAILED: config.cmd for wagner-austin/chat exited 3'
+        $root = Initialize-Root
+        { Invoke-Install $root (Initialize-Sc) (Initialize-Release 3) @{ 'wagner-austin/chat' = 'TOKEN1' } } | Should -Throw 'RUNNER_CONFIG_FAILED: config.cmd for wagner-austin/chat exited 3'
     }
     It 'stops when the recovery actions cannot be set' {
-        $root = New-Root -Unpacked -Registered
-        { Invoke-Install $root (New-Sc -FailureExit 5) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe failure $($script:service) exited 5"
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc -FailureExit 5) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe failure $($script:service) exited 5"
     }
     It 'stops when the service does not exist' {
-        $root = New-Root -Unpacked -Registered
-        { Invoke-Install $root (New-Sc -QueryExit 1060) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe query $($script:service) exited 1060"
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc -QueryExit 1060) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe query $($script:service) exited 1060"
     }
     It 'stops when a stopped service will not start' {
-        $root = New-Root -Unpacked -Registered
-        { Invoke-Install $root (New-Sc -QueryState '1  STOPPED' -StartExit 1053) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe start $($script:service) exited 1053"
+        $root = Initialize-Root -Unpacked -Registered
+        { Invoke-Install $root (Initialize-Sc -QueryState '1  STOPPED' -StartExit 1053) 'file:///absent.zip' @{} } | Should -Throw "RUNNER_SERVICE_FAILED: sc.exe start $($script:service) exited 1053"
     }
 }
 
 Describe 'The audit' {
     It 'reads a running, automatic SYSTEM service that restarts on failure as three OK rows' {
-        $sc = New-Sc
+        $sc = Initialize-Sc
         [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) OK",
@@ -191,7 +194,7 @@ Describe 'The audit' {
         Read-CallRecord $sc | Should -Be @("query $($script:service)", "qc $($script:service)", "qfailure $($script:service)")
     }
     It 'reads a stopped, manual service with no restarts as three DRIFT rows naming what sc.exe said' {
-        $sc = New-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
+        $sc = Initialize-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
         [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
             "CHECK service:$($script:service) DRIFT sc.exe query exited 0: SERVICE_NAME: $($script:service) STATE : 1 STOPPED",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : LocalSystem",
@@ -199,7 +202,7 @@ Describe 'The audit' {
         )
     }
     It 'reads a service sc.exe cannot open as drift on every row, and still exits 0' {
-        $sc = New-Sc -QueryExit 1060 -QcExit 1060 -QfailureExit 1060
+        $sc = Initialize-Sc -QueryExit 1060 -QcExit 1060 -QfailureExit 1060
         $rows = [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path })
         $rows[0] | Should -BeLike "CHECK service:$($script:service) DRIFT sc.exe query exited 1060: *"
         $rows[1] | Should -BeLike "CHECK account:$($script:service) DRIFT sc.exe qc exited 1060: *"

@@ -1,8 +1,6 @@
 param(
     [string]$Sc = "$env:SystemRoot\System32\sc.exe",
-    [hashtable[]]$Installs = @(
-        @{ Service = 'actions.runner.wagner-austin-chat.loki' }
-    )
+    [string]$Installs = '[{"Service":"actions.runner.wagner-austin-chat.loki"}]'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -11,7 +9,7 @@ function Get-Answer {
     $text = ((& $Tool @Arguments) -join ' ') -replace '\s+', ' '
     return [pscustomobject]@{ Code = $LASTEXITCODE; Text = $text.Trim() }
 }
-foreach ($install in $Installs) {
+foreach ($install in ($Installs | ConvertFrom-Json)) {
     $service = $install.Service
     $state = Get-Answer $Sc @('query', $service)
     if ($state.Code -eq 0 -and $state.Text -match 'STATE : 4 RUNNING') {

@@ -2,13 +2,11 @@ param(
     [string]$RunnerZipUrl = 'https://github.com/actions/runner/releases/download/v2.337.0/actions-runner-win-x64-2.337.0.zip',
     [string]$Sc = "$env:SystemRoot\System32\sc.exe",
     [hashtable]$Tokens = @{},
-    [hashtable[]]$Installs = @(
-        @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = 'C:/actions-runner/chat'; Service = 'actions.runner.wagner-austin-chat.loki' }
-    )
+    [string]$Installs = '[{"Repo":"wagner-austin/chat","Name":"loki","Labels":"loki","Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki"}]'
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
-foreach ($install in $Installs) {
+foreach ($install in ($Installs | ConvertFrom-Json)) {
     $root = $install.Root
     if (-not (Test-Path -LiteralPath "$root/config.cmd")) {
         [void][IO.Directory]::CreateDirectory($root)

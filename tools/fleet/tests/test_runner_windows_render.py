@@ -47,20 +47,20 @@ def _parameter_lines(script: str) -> list[str]:
 
 
 class TestTheInstallScript:
-    def test_each_install_is_one_hashtable_and_the_last_takes_no_comma(self) -> None:
+    def test_the_installs_are_one_json_string_the_script_decodes_in_its_body(self) -> None:
         script = runner_windows_render.render_install_script(
             [_install("wagner-austin/chat"), _install("wagner-austin/MCPs")], {}
         )
-        assert _parameter_lines(script)[-4:] == [
-            "        @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki,windows-ci'; "
-            "Root = 'C:/actions-runner/chat'; Service = 'actions.runner.wagner-austin-chat.loki' "
-            "},",
-            "        @{ Repo = 'wagner-austin/MCPs'; Name = 'loki'; Labels = 'loki,windows-ci'; "
-            "Root = 'C:/actions-runner/MCPs'; Service = 'actions.runner.wagner-austin-MCPs.loki' "
-            "}",
-            "    )",
+        assert _parameter_lines(script)[-2:] == [
+            "    [string]$Installs = '["
+            '{"Repo":"wagner-austin/chat","Name":"loki","Labels":"loki,windows-ci",'
+            '"Root":"C:/actions-runner/chat","Service":"actions.runner.wagner-austin-chat.loki"},'
+            '{"Repo":"wagner-austin/MCPs","Name":"loki","Labels":"loki,windows-ci",'
+            '"Root":"C:/actions-runner/MCPs","Service":"actions.runner.wagner-austin-MCPs.loki"}'
+            "]'",
             ")",
         ]
+        assert "foreach ($install in ($Installs | ConvertFrom-Json)) {" in script.splitlines()
 
     def test_the_tokens_are_one_pair_per_repository_in_order(self) -> None:
         script = runner_windows_render.render_install_script(
@@ -103,10 +103,10 @@ class TestTheAudit:
         assert _parameter_lines(script) == [
             "param(",
             '    [string]$Sc = "$env:SystemRoot\\System32\\sc.exe",',
-            "    [hashtable[]]$Installs = @(",
-            "        @{ Service = 'actions.runner.wagner-austin-chat.loki' },",
-            "        @{ Service = 'actions.runner.wagner-austin-MCPs.loki' }",
-            "    )",
+            "    [string]$Installs = '["
+            '{"Service":"actions.runner.wagner-austin-chat.loki"},'
+            '{"Service":"actions.runner.wagner-austin-MCPs.loki"}'
+            "]'",
             ")",
         ]
 
