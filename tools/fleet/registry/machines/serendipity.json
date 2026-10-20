@@ -1,12 +1,12 @@
 {
   "role": "worker",
-  "platform": "windows",
-  "user": "austi",
+  "platform": "linux",
+  "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
   "ledger_observer": "fleet-arm",
-  "tailnetIp": "100.111.226.22",
+  "tailnetIp": "100.113.184.12",
   "reachKey": null,
   "bootMac": null,
   "tunnel": null,
@@ -15,26 +15,6 @@
   "boot": {
     "units": []
   },
-  "notes": "Lenovo Yoga 9 14ITL5, the operator's own laptop. Enrolled and provisioned 2026-09-12 from a CORVIS stick by hand (board task 3027abcf, the recipe that became the fleet-node-setup skill): sshd key-only, sshd -T passwordauthentication no / kbdinteractiveauthentication no, host firewall Allow tcp/22 from the hub only plus a Block for the rest of CGNAT on 22 and 445. Reach measured from the hub the same night (task 8824a201): `ssh -o BatchMode=yes austi@100.111.226.22 hostname` -> Serendipity, exit 0, and a password-only attempt -> Permission denied (publickey). A dispatch node since 2026-09-25 (MCPs board task ea6856eb): the operator released it that day, and API/tools/fleet/fleet.json carries it in its nodes map with a measured budget. DC SLEEP CLOSED 2026-09-19: entered Modern Standby 02:56 PDT on its 5-minute battery idle timer after a charger came out (Kernel-Power 506/507, woke 04:12 on the replug, no reboot, Tailscale service never stopped) and read as ssh-timeout until then; standby-timeout-dc and hibernate-timeout-dc set to 0 over ssh and read back 0/0, matching AC. Lid-close is Do nothing on AC and DC.",
-  "dispatch": {
-    "held": null,
-    "stage_root": "C:/fleet/stage",
-    "logical_cores": 8,
-    "ram_gb": 15.7,
-    "gpu": null,
-    "budget": {
-      "reserved_cores": 2,
-      "reserved_ram_gb": 1.5,
-      "worker_ram_gb": 1.1,
-      "max_disk_gb": 40.0,
-      "checks_at_once": 1,
-      "pinned_checks_only": false
-    },
-    "test_database": false,
-    "rust": "1.99.0",
-    "cxx": "17.14.37710.0",
-    "docker": null,
-    "stack": null,
-    "elevated": true
-  }
+  "notes": "The operator's Lenovo Yoga 9 14ITL5 (8 threads, 15 GiB RAM, 468 GB NVMe root), enrolled on Windows from 2026-09-12 to 2026-10-20 as user austi at 100.111.226.22, reimaged to Ubuntu 24.04.4 LTS on 2026-10-20 from a CORVIS stick (fleet-node-setup, stick session opus-home-1019-c623). Re-enrolled from ziggurat with fleet-enroll on 2026-10-20 (MCPs board task ac5e8a88): its Windows dispatch capacity, elevated lane and stage root C:/fleet/stage were retired with the install, and diphtheria was added to its sshd admit list, which the stick's 0.81.0 bundle left out.",
+  "dispatch": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Replace this reason with that capacity when he decides; this line is the hold, not the verdict."
 }
