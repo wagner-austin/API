@@ -11,7 +11,7 @@
   "bootMac": "1c:69:7a:fe:78:9a",
   "tunnel": null,
   "guest": null,
-  "ciWorkersPerRunner": null,
+  "ciWorkersPerRunner": 2,
   "boot": {
     "units": []
   },
