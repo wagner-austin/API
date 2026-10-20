@@ -27,6 +27,9 @@ def publish_pass(
 ) -> None:
     """Publish the rolled registry to the queue, which refuses undeclared work.
 
+    The publication names the roster's node runners too, and the queue
+    retires every other runner's tick; the log line names each one retired.
+
     Args:
         credentials: The queue's endpoint and headers.
         identity: This runner's identity arguments; the publication is its.
@@ -38,8 +41,10 @@ def publish_pass(
             the registry sends nothing and is logged with its code, every
             tick it happens, since publishing a registry not read would
             refuse declared work.
-        InvalidJsonError: From the read, when a project file is not JSON.
-        JSONTypeError: From the read, when a project file does not decode.
+        InvalidJsonError: From the read, when a project or machine file is
+            not JSON.
+        JSONTypeError: From the read, when a project or machine file does
+            not decode.
     """
     read = declared.read_declared(repo_root)
     if isinstance(read, str):
@@ -48,11 +53,14 @@ def publish_pass(
     publication = declared.publish_registry(credentials, read, identity=identity)
     _log.info(
         "published %d project(s) from the registry at %s (%d dropped since the last "
-        "publication) and refused %d queued job(s) naming a project it does not declare",
+        "publication) and refused %d queued job(s) naming a project it does not declare; "
+        "%d node runner(s) declared, retired: %s",
         publication["published"],
         read["commit"],
         publication["removed"],
         publication["refused"],
+        len(read["runners"]),
+        ", ".join(publication["retired"]) or "none",
     )
 
 

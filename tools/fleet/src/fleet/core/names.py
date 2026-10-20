@@ -413,6 +413,24 @@ def runner_name(alias: str, *, elevated: bool) -> str:
     return f"{alias}-elevated" if elevated else alias
 
 
+def node_runner_label(alias: str, *, elevated: bool) -> str:
+    """The board label one of a node's runners acts as.
+
+    The one spelling of it: the runner checks in and ticks under it
+    (:func:`fleet.cli.node_agent.node_identity`), and the hub's registry
+    publication names it among the runners the roster declares
+    (:mod:`fleet.core.declared`), retiring every tick no label names.
+
+    Args:
+        alias: The node's workspace name.
+        elevated: Whether this is the node's elevated runner.
+
+    Returns:
+        ``fleet-node-<alias>`` or ``fleet-node-<alias>-elevated``.
+    """
+    return f"fleet-node-{runner_name(alias, elevated=elevated)}"
+
+
 def capacity_probe_stem(writer: str) -> str:
     """Name the capacity probe one writer sends to a node's stage root.
 
@@ -530,6 +548,7 @@ __all__ = [
     "dispatch_directory",
     "log_path",
     "make_directory_stem",
+    "node_runner_label",
     "recipe_directory",
     "registry_directory",
     "reset_directory_stem",

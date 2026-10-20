@@ -136,7 +136,7 @@ def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
         ``fleet-node-agent/<alias>/elevated``, a session of its own, since
         each runner collects and stops only the jobs its label holds.
     """
-    label = f"fleet-node-{names.runner_name(alias, elevated=elevated)}"
+    label = names.node_runner_label(alias, elevated=elevated)
     if elevated:
         return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}/elevated"))
     return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}"))
