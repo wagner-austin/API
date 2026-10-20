@@ -11,10 +11,13 @@ roots they read are the ones this repository declares, the same file
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Final
+
+import pytest
 
 #: The repository root: tools/maketools/tests/ is three levels below it.
 ROOT: Final[Path] = Path(__file__).resolve().parents[3]
@@ -93,6 +96,65 @@ def test_this_repository_declares_the_roots_ci_selects_its_packages_by() -> None
     ).stdout
     for package in ("clients/NavProbe", "services/turkic-api", "libs/platform_core"):
         assert f'"{package}"' in selected
-    source = (ROOT / "scripts" / "ci_select_packages.py").read_text(encoding="utf-8")
-    assert '"clients", "services"' not in source
-    assert "package_roots(repo)" in source
+
+
+def _select_in(
+    repo: Path, declaration: str, changed: list[str]
+) -> subprocess.CompletedProcess[str]:
+    """Run a copy of CI's selection in a repository declaring ``declaration``.
+
+    The script finds its repository from its own path, so the copy selects
+    among ``repo``'s packages by ``repo``'s declaration.
+
+    Args:
+        repo: A repository holding ``apps/web`` and ``clients/probe``, each gated.
+        declaration: The text of its ``scripts/make/project-roots.json``.
+        changed: The changed paths the selection is asked about.
+
+    Returns:
+        The finished run, its output captured.
+    """
+    (repo / "scripts" / "make").mkdir(parents=True, exist_ok=True)
+    script = repo / "scripts" / "ci_select_packages.py"
+    shutil.copyfile(ROOT / "scripts" / "ci_select_packages.py", script)
+    (repo / "scripts" / "make" / "project-roots.json").write_text(declaration, encoding="utf-8")
+    for package in ("apps/web", "clients/probe"):
+        (repo / package).mkdir(parents=True, exist_ok=True)
+        (repo / package / "Makefile").write_text("check:\n\ttrue\n", encoding="utf-8")
+    return subprocess.run(
+        [sys.executable, str(script), *changed],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def test_ci_selects_by_the_roots_its_repository_declares_not_by_this_one_s(tmp_path: Path) -> None:
+    """A repository declaring ``apps`` alone gates apps/web and not
+    clients/probe, though ``clients`` is one of this repository's roots: a
+    selection that read any roots but the declared ones selects otherwise."""
+    changed = ["apps/web/x.py", "clients/probe/x.py"]
+    run = _select_in(tmp_path, '{"nestedRoots": ["apps"]}\n', changed)
+    assert (run.returncode, run.stdout, run.stderr) == (0, '["apps/web"]', "")
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        '{"nestedRoots": "apps"}',
+        '{"nestedRoots": ["apps/web"]}',
+        '{"nestedRoots": [".."]}',
+        '{"nestedRoots": [3]}',
+        '{"roots": ["apps"]}',
+        '{"nestedRoots": ["apps"], "extra": []}',
+        '["apps"]',
+    ],
+)
+def test_ci_refuses_a_declaration_that_is_not_a_list_of_directory_names(
+    tmp_path: Path, declaration: str
+) -> None:
+    run = _select_in(tmp_path, declaration, ["apps/web/x.py"])
+    declared = tmp_path / "scripts" / "make" / "project-roots.json"
+    refusal = f'ValueError: {declared} is not {{"nestedRoots": [<directory name>, ...]}}'
+    assert (run.returncode, run.stdout) == (1, "")
+    assert run.stderr.rstrip("\n").split("\n")[-1] == refusal
