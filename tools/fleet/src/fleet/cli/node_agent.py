@@ -90,10 +90,12 @@ from collections.abc import Sequence
 
 from board_watch import config as board_config
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
+from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _config, node_serve, node_serve_claim, node_watch
 from fleet.cli.job_close import refuse
@@ -469,7 +471,7 @@ def entrypoint() -> None:
         instance_id=None,
         extra_fields=None,
     )
-    raise SystemExit(main())
+    raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
 # Without this, `python -m fleet.cli.node_agent` imports the module, runs

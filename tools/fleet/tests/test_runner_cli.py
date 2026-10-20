@@ -220,6 +220,39 @@ class TestEntrypoint:
             sys.argv = saved
         assert caught.value.code == 0
 
+    def test_help_prints_the_usage_line_and_exits_zero(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Measured 2026-10-20 on ziggurat: ``fleet-runners --help`` ended in
+        an uncaught HelpRequestedError traceback."""
+        saved = sys.argv
+        sys.argv = ["fleet-runners", "--help"]
+        try:
+            with pytest.raises(SystemExit) as caught:
+                runners.entrypoint()
+        finally:
+            sys.argv = saved
+        assert caught.value.code == 0
+        assert capsys.readouterr().out == (
+            "usage: --spec <value> --host <value> --render <value> --sample <value> "
+            "--report <value> --cores <value> --onboard <value> --rebuild <value>\n"
+        )
+
+    def test_a_refusal_is_one_line_on_stderr_and_exit_two(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        saved = sys.argv
+        sys.argv = ["fleet-runners", "--host", "lavender"]
+        try:
+            with pytest.raises(SystemExit) as caught:
+                runners.entrypoint()
+        finally:
+            sys.argv = saved
+        assert caught.value.code == 2
+        assert capsys.readouterr().err == (
+            "usage: --spec is required: the roster's path is passed, never searched for\n"
+        )
+
     def test_running_as_a_module_actually_runs(self, tmp_path: pathlib.Path) -> None:
         """The half that silently goes missing without an `if __name__` block."""
         saved_argv = sys.argv

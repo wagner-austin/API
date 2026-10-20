@@ -89,8 +89,10 @@ from enum import StrEnum
 from typing import Final, TypedDict
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.env_assignments import parse_env_assignments
 from platform_core.members import find_member
+from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import agent as agent_cli
 from fleet.cli import rolled as rolled_cli
@@ -391,11 +393,12 @@ def remove_stale_logs(directory: pathlib.Path, stem: str, *, now_unix: int) -> i
     return len(stale)
 
 
-def main(argv: Sequence[str]) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Run one tick and append its record to the day's log.
 
     Args:
-        argv: Command-line arguments excluding the program name.
+        argv: Command-line arguments excluding the program name. Defaults to
+            the process arguments.
 
     Returns:
         The agent's exit status, as the launcher reports it.
@@ -407,7 +410,8 @@ def main(argv: Sequence[str]) -> int:
         OSError: When the credentials file or the log directory cannot be
             read or written.
     """
-    parsed = cli_args.parse_single_flags(argv, _FLAGS)
+    tokens = list(argv) if argv is not None else list(sys.argv[1:])
+    parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     api_root = pathlib.Path(cli_args.require_flag(parsed, API_ROOT_FLAG))
     log_directory = pathlib.Path(cli_args.require_flag(parsed, LOG_DIRECTORY_FLAG))
     lane = require_lane(cli_args.require_flag(parsed, LANE_FLAG))
@@ -439,7 +443,7 @@ def entrypoint() -> None:
     Raises:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
 __all__ = [

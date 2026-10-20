@@ -36,7 +36,9 @@ from collections.abc import Sequence
 from typing import Final, TextIO
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _config
 from fleet.core import _test_hooks, rolled
@@ -140,11 +142,12 @@ def require_module(agent: str) -> str:
     return module
 
 
-def main(argv: Sequence[str]) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Extract the rolled tree and run one agent from it.
 
     Args:
-        argv: Command-line arguments excluding the program name.
+        argv: Command-line arguments excluding the program name. Defaults to
+            the process arguments.
 
     Returns:
         The agent's exit status, or :data:`REFUSED_EXIT` when the rolled
@@ -153,7 +156,7 @@ def main(argv: Sequence[str]) -> int:
     Raises:
         ValueError: For a malformed command line.
     """
-    parsed, passthrough = split_command_line(argv)
+    parsed, passthrough = split_command_line(list(argv) if argv is not None else sys.argv[1:])
     module = require_module(cli_args.require_flag(parsed, AGENT_FLAG))
     repo_root = pathlib.Path(cli_args.require_flag(parsed, REPO_ROOT_FLAG))
     tree = rolled.extract_rolled_tree(repo_root)
@@ -191,7 +194,7 @@ def entrypoint() -> None:
         SystemExit: Always, carrying :func:`main`'s exit code.
     """
     configure_logging()
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
 def configure_logging() -> None:

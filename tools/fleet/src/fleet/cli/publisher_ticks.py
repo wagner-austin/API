@@ -34,7 +34,9 @@ import sys
 from collections.abc import Sequence
 from typing import Final, TypedDict
 
+from platform_core.cli_boundary import run_cli
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli.tick import runner_identity
 from fleet.contracts.dispatch import DispatchLane
@@ -96,11 +98,12 @@ def parse_ran(token: str) -> RanPublisher:
     )
 
 
-def main(argv: Sequence[str]) -> int:
+def main(argv: Sequence[str] | None = None) -> int:
     """Record every bridge the pump ran.
 
     Args:
-        argv: One token per bridge, at least one.
+        argv: One token per bridge, at least one. Defaults to the process
+            arguments.
 
     Returns:
         0 once every tick is recorded.
@@ -114,9 +117,10 @@ def main(argv: Sequence[str]) -> int:
             not a checkout of a known repository; and any refusal of the
             queue's, each before the later ticks are sent.
     """
-    if not argv:
+    tokens = list(argv) if argv is not None else list(sys.argv[1:])
+    if not tokens:
         raise ValueError(f"{USAGE_CODE}: name at least one <publisher>=<exit code>=<directory>")
-    ran = [parse_ran(token) for token in argv]
+    ran = [parse_ran(token) for token in tokens]
     credentials = queue.load_credentials()
     host = _test_hooks.hostname()
     label, session = runner_identity(DispatchLane.HUB, host)
@@ -160,7 +164,7 @@ def entrypoint() -> None:
         instance_id=None,
         extra_fields=None,
     )
-    raise SystemExit(main(sys.argv[1:]))
+    raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
 __all__ = ["TOKEN_SEPARATOR", "USAGE_CODE", "RanPublisher", "entrypoint", "main", "parse_ran"]

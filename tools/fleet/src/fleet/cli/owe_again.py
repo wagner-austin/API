@@ -25,7 +25,9 @@ from collections.abc import Sequence
 from typing import Final
 
 from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _config
 from fleet.core import retire_owed
@@ -79,7 +81,7 @@ def entrypoint() -> None:
         instance_id=None,
         extra_fields=None,
     )
-    raise SystemExit(main())
+    raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
 __all__ = ["BECAUSE_FLAG", "RUN_FLAG", "entrypoint", "main"]
