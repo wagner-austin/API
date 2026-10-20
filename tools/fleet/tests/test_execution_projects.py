@@ -104,19 +104,27 @@ def test_each_half_runs_the_execution_directory_on_its_platform(
     )
 
 
-def test_no_project_reads_the_runner_host_before_its_runners_run() -> None:
-    """The runner host's live cases have no fleet project until lavender carries runners.
+def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
+    """tools/fleet-execution-runners reads lavender's live runner units.
 
-    tools/fleet-execution-runners ran them pinned to lavender-wsl, the WSL
-    guest that held the runners, which went with lavender's reimage to
-    Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). lavender is a Linux
-    worker again, but the cases read live runner units and no runner is
-    installed on it yet, so a project there could only fail. The recipe
-    still names the host ``runners.json`` declares, so the project returns
-    pinned to lavender with its runners.
+    It is pinned to the node its recipe names to the cases, the one host
+    ``runners.json`` declares, and it requires no ``docker`` tag: that would
+    isolate it as execdocker, while its full-slice case runs under the fleet
+    user's own systemd manager (MCPs board task 715b9ec5). It ran pinned to
+    lavender-wsl, the WSL guest that held the runners, until lavender's
+    reimage to Ubuntu on 2026-10-19, and returned pinned to lavender once
+    ``fleet-runners --rebuild yes`` laid its eight runners there (MCPs board
+    task 1e9ab738).
     """
     workspace = decode_fleet_workspace(shipped_document())
-    assert "tools/fleet-execution-runners" not in workspace["projects"]
+    project = require_project(workspace, "tools/fleet-execution-runners")
+    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX,), "lavender")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path="tools/fleet-execution-runners",
+        install=(),
+        companions=(),
+    )
     assert require_node(workspace, "lavender")["platform"] == NodeTag.LINUX.value
     recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
     given = f"{RUNNER_HOST_OPTION}="
