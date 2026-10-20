@@ -1,5 +1,5 @@
 ---
-title: WSL runner listeners sit outside their jobs' budget, and the hub ends a job GitHub dropped
+title: Runner listeners sit outside their jobs' budget, and the hub ends a job GitHub dropped
 tags: [fleet, github-actions, self-hosted-runners, systemd, cgroups, memory-pressure, infrastructure]
 related:
   - "[[monorepo-discipline]]"
@@ -10,21 +10,25 @@ source_paths:
   - tools/fleet/src/fleet/core/runner_reap_dropped.py
   - tools/fleet/src/fleet/core/runner_reaper_render.py
   - tools/fleet/tests/test_runner_placement_host.py
+  - tools/fleet/registry/machines/lavender.json
+  - tools/fleet/registry/projects/tools/fleet-execution-runners.json
 source_git_blobs:
-  "tools/fleet/src/fleet/contracts/runner_slice.py": b6b2115238d91a8485cb24fc2ed5edac0bbf9fea
-  "tools/fleet/src/fleet/core/runner_job_scope_render.py": aadaf3447a0ae0923c980fd772bcbc86806013f8
-  "tools/fleet/src/fleet/core/runner_dropped_check.py": e946b9ae156b05042934830476b9d9f0f24335d1
-  "tools/fleet/src/fleet/core/runner_reap_dropped.py": 32f8ee0d947fbc9283c91230e531d3aa2f4e6ada
-  "tools/fleet/src/fleet/core/runner_reaper_render.py": 931c3e1d4db9f1a804bd82f9e5c898b588dae0e5
-  "tools/fleet/tests/test_runner_placement_host.py": f79e194e1a0ac7b2e2e5948eabfd8f0e46015f52
-fact_checked: "2026-10-17"
+  "tools/fleet/src/fleet/contracts/runner_slice.py": b6009de5a15b2c4bfd49709e00d54c1bc16130d9
+  "tools/fleet/src/fleet/core/runner_job_scope_render.py": b052dd6a7c2b1b265e603d0947e10936486a8e77
+  "tools/fleet/src/fleet/core/runner_dropped_check.py": ea59f5c2549941f7837dd8a99bb414cfd29df883
+  "tools/fleet/src/fleet/core/runner_reap_dropped.py": 99720a7f2a335f205c722df15154ecba8f792da0
+  "tools/fleet/src/fleet/core/runner_reaper_render.py": da16357ac6536e6743d52c0a145f1a171bb13473
+  "tools/fleet/tests/test_runner_placement_host.py": 718d6f4ac6cff987b47d7f8898e97368a7b8d9b2
+  "tools/fleet/registry/machines/lavender.json": b31ef513d6f262c08c2c00eff7daece985e8e104
+  "tools/fleet/registry/projects/tools/fleet-execution-runners.json": baeefbb12b207d6e5b71acd6fc7f60f8c6f99858
+fact_checked: "2026-10-20"
 confidence: high
 hubs: [infrastructure]
 ---
 
-# WSL runner listeners sit outside their jobs' budget, and the hub ends a job GitHub dropped
+# Runner listeners sit outside their jobs' budget, and the hub ends a job GitHub dropped
 
-Lavender's WSL instance runs eight self-hosted GitHub Actions runners whose jobs share one bounded systemd slice, `runners.slice`.[^ci-slice] Until MCPs board task 715b9ec5 the runner units sat in that slice too, `Runner.Listener` included, and the listener is the process that holds each job's lease with GitHub. On 2026-10-02 and 2026-10-16 the slice sat at its `MemoryHigh`, the listeners' calls to GitHub timed out, GitHub dropped the jobs, and their Workers ran on unseen for 1 h 45 min.[^why]
+lavender runs eight self-hosted GitHub Actions runners whose jobs share one bounded systemd slice, `runners.slice`.[^ci-slice] They ran in its WSL guest, lavender-wsl, until lavender was reimaged to Ubuntu on 2026-10-19 and the guest went with the Windows install.[^reimage] Until MCPs board task 715b9ec5 the runner units sat in that slice too, `Runner.Listener` included, and the listener is the process that holds each job's lease with GitHub. On 2026-10-02 and 2026-10-16 the slice sat at its `MemoryHigh`, the listeners' calls to GitHub timed out, GitHub dropped the jobs, and their Workers ran on unseen for 1 h 45 min.[^why]
 
 ## Why no memory protection could have saved the listener
 
@@ -39,7 +43,7 @@ The kernel throttles every task that charges memory beneath a cgroup over its `m
 
 ## Proof the machine writes
 
-A note transcribing these readings was rejected as proof by two reviews of the task's closure. The proof is now a fleet project, `tools/fleet-execution-runners`, pinned to lavender-wsl, whose two cases run on the host as the fleet user.[^host-cases] One requires every unit `runners.json` declares for lavender to be active in `/listeners.slice`, that slice at `memory.high` max, `runners.slice` at the roster's bound, and every live Worker in its own job scope. The other fills a slice of the fleet user's systemd manager past its high with swap denied, beside an unbounded sibling. It requires the probe inside to stall at least a second and the sibling at most a hundredth of that. Run before lavender-wsl-3 moved, the first case failed on that unit, which is the fault it exists to catch. Its run at 3e4066d4a (fleet job c43c18f2) read 8 of 8 units in `/listeners.slice` and 4 Workers each in its scope, and the probe inside a slice over its high stalled 7,630,156 µs against the sibling's 0.[^a3]
+A note transcribing these readings was rejected as proof by two reviews of the task's closure. The proof is a fleet project, `tools/fleet-execution-runners`, pinned to lavender, whose two cases run on the host as the fleet user.[^host-cases] It was pinned to lavender-wsl until the reimage, and is pinned to lavender again since its eight runners were laid there.[^pin] One case requires every unit `runners.json` declares for lavender to be active in `/listeners.slice`, that slice at `memory.high` max, `runners.slice` at the roster's bound, and every live Worker in its own job scope. The other fills a slice of the fleet user's systemd manager past its high with swap denied, beside an unbounded sibling. It requires the probe inside to stall at least a second and the sibling at most a hundredth of that. Run before lavender-wsl-3 moved, the first case failed on that unit, which is the fault it exists to catch. Its run at 3e4066d4a on lavender-wsl (fleet job c43c18f2) read 8 of 8 units in `/listeners.slice` and 4 Workers each in its scope, and the probe inside a slice over its high stalled 7,630,156 µs against the sibling's 0.[^a3]
 
 ## Ending a job GitHub dropped
 
@@ -49,18 +53,20 @@ Every hub tick runs a reap pass that reads the roster **at the rolled ref**, rea
 
 **Offline is not dropped.** The first rolled pass, at 18:26:33Z on 2026-10-17, counted `offline busy=true` as dropped and ended two Workers GitHub still held, each failing on GitHub within two seconds. A listener out of touch reconnects and its job outlives it, so a runner GitHub reads busy is never reaped.[^offline]
 
-[^ci-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:41` -- `CI_SLICE_NAME = "runners.slice"`.
+[^ci-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:43` -- `CI_SLICE_NAME = "runners.slice"`.
+[^reimage]: `tools/fleet/registry/machines/lavender.json:18` -- the machine's notes: "replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist".
 [^why]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:3-8` -- module docstring: "the slice sat at its ``MemoryHigh`` and every listener's calls to"
-[^low]: `tools/fleet/src/fleet/contracts/runner_slice.py:45-51` -- comment on `LISTENER_SLICE_NAME`: "the budget its jobs fill timed out its calls to GitHub (2026-10-02 and"
-[^listener-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:54-55` -- "This slice carries no bound. No dash, so it is no child of either."
-[^scope]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:17-33` -- numbered steps 1 to 3: "A refusal fails the job by name, before its first step, rather than running"
-[^move]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:76-83` -- `MOVE_WAIT_SECONDS` comment: "move to land. ``StartTransientUnit`` answers once the scope's start job is"
-[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:285-300` -- `place()`: "# No Listener is a self-update under way, which a restart would cut short."
+[^low]: `tools/fleet/src/fleet/contracts/runner_slice.py:45-55` -- comment on `LISTENER_SLICE_NAME`: "the budget its jobs fill timed out its calls to GitHub (2026-10-02 and"
+[^listener-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:56-57` -- "This slice carries no bound. No dash, so it is no child of either."
+[^scope]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:18-35` -- numbered steps 1 to 3: "A refusal fails the job by name, before its first step, rather than running"
+[^move]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:81-88` -- `MOVE_WAIT_SECONDS` comment: "move to land. ``StartTransientUnit`` answers once the scope's start job is"
+[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:285-299` -- `place()`: "# No Listener is a self-update under way, which a restart would cut short."
 [^watch]: `tools/fleet/src/fleet/core/runner_reaper_render.py:77-83` and `:120` -- module docstring: "A pass that only looked once missed the gap between two jobs, which lasts"
-[^host-cases]: `tools/fleet/tests/test_runner_placement_host.py:182-211` and `:294-341` -- the two `host_runner_units` cases: "assert outside_stall * SIBLING_RATIO <= inside_stall"
-[^a3]: [synthesis] -- the two `host reading:` lines of fleet job c43c18f2 (tools/fleet-execution-runners at 3e4066d4a, node lavender-wsl, 2 passed), in its log `/home/corvis/fleet/stage/logs/tools-fleet-execution-runners-lavender-wsl-1792267202.log` on lavender-wsl; the repo carries the cases that print them, not the figures.
+[^host-cases]: `tools/fleet/tests/test_runner_placement_host.py:135-172` and `:249-303` -- the two `host_runner_units` cases: "assert outside_stall * SIBLING_RATIO <= inside_stall"
+[^pin]: `tools/fleet/registry/projects/tools/fleet-execution-runners.json:8` -- `"node": "lavender"`.
+[^a3]: [synthesis] -- the two `host reading:` lines of fleet job c43c18f2 (tools/fleet-execution-runners at 3e4066d4a, node lavender-wsl, 2 passed), in its log `/home/corvis/fleet/stage/logs/tools-fleet-execution-runners-lavender-wsl-1792267202.log` on lavender-wsl, a guest that no longer exists; the repo carries the cases that print them, not the figures.
 [^dropped]: `tools/fleet/src/fleet/core/runner_reap_dropped.py:3-8` -- module docstring: "the host alone cannot tell a long job from one GitHub let go of; on"
 [^rule]: `tools/fleet/src/fleet/core/runner_dropped_check.py:15-20` and `:45` -- "A runner GitHub reads busy holds its job however its listener reads."
 [^reap]: `tools/fleet/src/fleet/core/runner_reap_dropped.py:12-22` and `:61` -- "writes each pid's argv before it kills the Worker's tree and leaves the"
 [^shared]: `tools/fleet/src/fleet/core/runner_dropped_check.py:22-26` -- "(:func:`attempt_dropped_check`), one per host, which says how many runners it"
-[^offline]: `tools/fleet/src/fleet/core/runner_dropped_check.py:193-214` -- `_github_said` docstring: "counted ``offline busy=true`` as dropped, ended two Workers GitHub still"
+[^offline]: `tools/fleet/src/fleet/core/runner_dropped_check.py:192-213` -- `_github_said` docstring: "counted ``offline busy=true`` as dropped, ended two Workers GitHub still"
