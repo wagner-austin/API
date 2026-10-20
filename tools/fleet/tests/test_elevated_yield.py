@@ -37,7 +37,7 @@ from tests.conftest import (
 __all__ = ["_credentials_in_env"]
 
 #: The project that requires the tag, as the real registry names it.
-ELEVATED_PROJECT = "MCPs/execution-elevated"
+ELEVATED_PROJECT = "MCPs/scripts/ps-harness"
 
 #: Its registry tags, which a job of it carries when it is submitted correctly.
 ELEVATED_TAGS: list[JSONValue] = ["elevated", "windows"]

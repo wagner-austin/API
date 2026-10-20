@@ -61,12 +61,13 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # task 60458a21); 61 since MCPs/packages/session-audit-linux, the
     # package's Linux lane (MCPs board task 31e0a1eb); 62 since
     # MCPs/execution-netboot-diphtheria, the execution suite's netboot lane
-    # (MCPs board task d387271d).
+    # (MCPs board task d387271d). The unprepared lose
+    # MCPs/execution-elevated, whose installer cases MCPs board task
+    # 42fb4e26 deleted.
     assert len(prepared) == 62
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
-        "MCPs/execution-elevated",
         "MCPs/execution-linux",
     ]
     for steps in prepared.values():

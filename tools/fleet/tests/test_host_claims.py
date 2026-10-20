@@ -342,7 +342,7 @@ class TestTheClaims:
         second = HostClaim(
             job_id="f65df8f5",
             runner=ELEVATED,
-            project="MCPs/execution-elevated",
+            project="MCPs/scripts/ps-harness",
             workers=2,
             ram_gb=1.0,
             until_unix=1791453505,
