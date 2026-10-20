@@ -15,6 +15,26 @@
   "boot": {
     "units": []
   },
-  "notes": "The operator's Lenovo Yoga 9 14ITL5 (8 threads, 15 GiB RAM, 468 GB NVMe root), enrolled on Windows from 2026-09-12 to 2026-10-20 as user austi at 100.111.226.22, reimaged to Ubuntu 24.04.4 LTS on 2026-10-20 from a CORVIS stick (fleet-node-setup, stick session opus-home-1019-c623). Re-enrolled from ziggurat with fleet-enroll on 2026-10-20 (MCPs board task ac5e8a88): its Windows dispatch capacity, elevated lane and stage root C:/fleet/stage were retired with the install, and diphtheria was added to its sshd admit list, which the stick's 0.81.0 bundle left out.",
-  "dispatch": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Replace this reason with that capacity when he decides; this line is the hold, not the verdict."
+  "notes": "The operator's Lenovo Yoga 9 14ITL5 (8 threads, 15 GiB RAM, 468 GB NVMe root), enrolled on Windows from 2026-09-12 to 2026-10-20 as user austi at 100.111.226.22, reimaged to Ubuntu 24.04.4 LTS on 2026-10-20 from a CORVIS stick (fleet-node-setup, stick session opus-home-1019-c623). Re-enrolled from ziggurat with fleet-enroll on 2026-10-20 (MCPs board task ac5e8a88): its Windows dispatch capacity, elevated lane and stage root C:/fleet/stage were retired with the install, and diphtheria was added to its sshd admit list, which the stick's 0.81.0 bundle left out. Provisioned as a fleet worker on 2026-10-20 by MCPs make fleet-provision NODE=serendipity (scripts at MCPs d424701d7, pins at API 37cf382c0; MCPs board task 632b0802), after a reboot so corvis's lingering systemd manager carried the docker group, and measured by its steps at 22:2xZ: docker-ce 29.8.1 held, corvis-fleet-testdb up, the execdocker rootless lane, Node v24.21.0, Python 3.11.17, poetry 2.4.2, the hooks check pins, g++ 13.3.0, no NVIDIA card (Iris Xe only), sleep, suspend and hibernate masked, on mains power, and /dev/kvm read and written by corvis with wlp0s20f3 at MTU 1500. It keeps the one-check bound measured here on Windows (MCPs board task a85ef09e), since its 4 physical cores are the same.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 8,
+    "ram_gb": 15.4,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": 1,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": null,
+    "elevated": false
+  }
 }
