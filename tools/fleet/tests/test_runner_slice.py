@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
+from collections.abc import Callable
 
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
@@ -76,9 +77,6 @@ def _budget(**overrides: JSONValue) -> dict[str, JSONValue]:
 def _move(tmp_path: pathlib.Path, cgroup: str) -> tuple[str, list[str]]:
     """Run the rendered move for one unit whose live control group is ``cgroup``.
 
-    Only the lines from the control-group read onward run: the drop-in
-    before them writes under /etc/systemd, which a test host must not touch.
-
     Args:
         tmp_path: The case's directory.
         cgroup: What the stand-in reports as the unit's ControlGroup.
@@ -86,9 +84,8 @@ def _move(tmp_path: pathlib.Path, cgroup: str) -> tuple[str, list[str]]:
     Returns:
         The move's standard output, and the systemctl calls it made.
     """
-    lines = runner_slice_render.render_runner_slice_lines(_install())
-    first = next(index for index, line in enumerate(lines) if line.startswith("cgroup="))
-    (tmp_path / "move.sh").write_bytes(("\n".join(lines[first:]) + "\n").encode())
+    lines = runner_slice_render.render_runner_slice_move_lines(_install())
+    (tmp_path / "move.sh").write_bytes(("\n".join(lines) + "\n").encode())
     stand_ins = tmp_path / "bin"
     stand_ins.mkdir()
     (stand_ins / "systemctl").write_bytes(_systemctl_stand_in(cgroup).encode())
@@ -256,7 +253,6 @@ class TestRunnerPlacement:
     """Each runner's drop-in and the move into the slice."""
 
     def test_the_drop_in_names_the_listener_slice_through_the_one_unit_writer(self) -> None:
-        lines = runner_slice_render.render_runner_slice_lines(_install())
         drop_in = render_drop_in_lines(
             _install(),
             name="fleet-slice.conf",
@@ -264,7 +260,7 @@ class TestRunnerPlacement:
             announcement=f"listener slice named for {UNIT}",
         )
         assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=listeners.slice\n"
-        assert lines[: len(drop_in)] == drop_in
+        assert runner_slice_render.render_runner_slice_drop_in_lines(_install()) == drop_in
 
     def test_a_runner_already_in_the_listener_slice_is_left_running(
         self, tmp_path: pathlib.Path
@@ -287,7 +283,7 @@ class TestRunnerPlacement:
         assert calls == [f"show -p ControlGroup --value {UNIT}", f"restart {UNIT}"]
 
     def test_a_runner_running_a_job_is_named_and_never_restarted(self) -> None:
-        lines = runner_slice_render.render_runner_slice_lines(_install())
+        lines = runner_slice_render.render_runner_slice_move_lines(_install())
         busy = next(index for index, line in enumerate(lines) if "Runner.Worker" in line)
         assert lines[busy + 1] == (
             f"            echo 'listener placement pending: {UNIT} is running a job; "
@@ -295,11 +291,20 @@ class TestRunnerPlacement:
         )
         assert lines[busy + 2] == "        else"
 
-    def test_an_unscriptable_unit_name_is_refused(self) -> None:
+    @pytest.mark.parametrize(
+        "render",
+        [
+            runner_slice_render.render_runner_slice_drop_in_lines,
+            runner_slice_render.render_runner_slice_move_lines,
+        ],
+    )
+    def test_an_unscriptable_unit_name_is_refused(
+        self, render: Callable[[RunnerInstall], list[str]]
+    ) -> None:
         install = _install()
         install["service"] = "bad'unit.service"
         with pytest.raises(ValueError, match="service"):
-            runner_slice_render.render_runner_slice_lines(install)
+            render(install)
 
 
 def _roster_host() -> HostRunnerSpec:

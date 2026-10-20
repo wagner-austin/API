@@ -393,11 +393,12 @@ class TestTheInstallLines:
             f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}\n"
         ).encode()
 
-    def test_the_unit_is_set_before_it_starts_and_placed_after(self) -> None:
+    def test_every_drop_in_is_written_before_the_unit_starts(self) -> None:
         """The unit exists after svc.sh install and gets its restart policy,
-        its kill mode and its job hook before it starts; once it runs, it
-        gets the action cache's environment and is moved into the listener
-        slice."""
+        its kill mode, its job hook, the action cache and the listener slice
+        before it starts, since a new runner takes a queued job within
+        seconds; once it runs, a unit an older provision started is moved
+        onto the cache and into the slice."""
         install = an_install()
         root = runner_install.install_root_for(install)
         started = [f"(cd '{root}' && ./svc.sh start)"]
@@ -412,9 +413,11 @@ class TestTheInstallLines:
             runner_recovery.render_recovery_lines(install),
             runner_reaper_render.render_kill_mode_lines(install),
             runner_job_scope_render.render_job_hook_lines(install),
+            runner_cache_adopt.render_cache_drop_in_lines(install),
+            runner_slice_render.render_runner_slice_drop_in_lines(install),
             started,
-            runner_cache_adopt.render_cache_environment_lines(install),
-            runner_slice_render.render_runner_slice_lines(install),
+            runner_cache_adopt.render_cache_adopt_now_lines(install),
+            runner_slice_render.render_runner_slice_move_lines(install),
         )
 
     def test_a_directory_that_cannot_be_embedded_is_refused(self) -> None:

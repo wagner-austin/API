@@ -10,9 +10,11 @@ test_runner_cache_report.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Callable
 
 import pytest
 
+from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_action_cache, runner_cache_adopt, runner_render
 from fleet.core.runner_unit_files import render_unit_file_lines
 from tests._cache_host import FOURTH, OTHER, SECOND, SETTING, SETTLE, UNIT, Host
@@ -217,11 +219,18 @@ class TestProvisionGivesAUnitTheCache:
         assert f"restart {UNIT}" not in host.calls()
         assert host.sleeps() == 1
 
-    def test_an_unscriptable_unit_is_refused(self) -> None:
+    @pytest.mark.parametrize(
+        "render",
+        [
+            runner_cache_adopt.render_cache_drop_in_lines,
+            runner_cache_adopt.render_cache_adopt_now_lines,
+        ],
+    )
+    def test_an_unscriptable_unit_is_refused(
+        self, render: Callable[[RunnerInstall], list[str]]
+    ) -> None:
         with pytest.raises(ValueError, match="cannot be embedded in a rendered script verbatim"):
-            runner_cache_adopt.render_cache_environment_lines(
-                {**an_install(), "service": "bad'unit.service"}
-            )
+            render({**an_install(), "service": "bad'unit.service"})
 
 
 class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:

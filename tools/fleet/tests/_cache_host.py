@@ -281,7 +281,11 @@ class Host:
         )
 
     def provision(self, install: RunnerInstall) -> subprocess.CompletedProcess[str]:
-        """Run one install's drop-in lines, as provision does after it starts the unit.
+        """Run one install's cache lines, the drop-in then the adopt, as provision does.
+
+        Provision starts the unit between the two; the host :meth:`unit`
+        laid out is already running, the shape of a unit an older provision
+        started without the cache.
 
         Args:
             install: The install, laid out with :meth:`unit` under its unit's name.
@@ -289,7 +293,10 @@ class Host:
         Returns:
             The finished process.
         """
-        lines = runner_cache_adopt.render_cache_environment_lines(install)
+        lines = [
+            *runner_cache_adopt.render_cache_drop_in_lines(install),
+            *runner_cache_adopt.render_cache_adopt_now_lines(install),
+        ]
         body = "set -euo pipefail\n" + laid_out("\n".join(lines)) + "\n"
         (self.root / "provision.sh").write_bytes((STAND_INS + body).encode())
         return self.run("provision.sh")

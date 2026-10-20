@@ -280,7 +280,7 @@ def render_job_hook_lines(install: RunnerInstall) -> list[str]:
     """Bash lines that give one runner unit the job-started hook.
 
     Run before the unit starts or is restarted into the listener slice
-    (:func:`fleet.core.runner_slice_render.render_runner_slice_lines`), which
+    (:func:`fleet.core.runner_slice_render.render_runner_slice_move_lines`), which
     is when its runner reads its environment.
 
     Args:

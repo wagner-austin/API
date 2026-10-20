@@ -10,10 +10,10 @@ MCPs board task 45a4f22b; the budget and the incident behind it are
    systemd re-applies a loaded slice's cgroup limits on reload, so a changed
    budget reaches jobs already inside it without restarting any of them.
 2. A per-runner drop-in naming the listener slice, beside the restart
-   policy of :mod:`fleet.core.runner_recovery`. The unit runs there and its
-   jobs in scopes of the CI slice (:mod:`fleet.core.runner_job_scope_render`),
-   so the budget throttles the jobs and never the listener holding their
-   lease with GitHub.
+   policy of :mod:`fleet.core.runner_recovery`, written before the unit
+   first starts. The unit runs there and its jobs in scopes of the CI slice
+   (:mod:`fleet.core.runner_job_scope_render`), so the budget throttles the
+   jobs and never the listener holding their lease with GitHub.
 3. The move. ``Slice=`` takes effect only when a unit starts, so a runner
    still in its old cgroup is restarted, and only while it runs no job: a
    job is a ``Runner.Worker`` process in the unit's cgroup, which is where
@@ -132,18 +132,47 @@ def render_slice_unit_lines(budget: CiSlice) -> list[str]:
     ]
 
 
-def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that put one runner unit in the listener slice.
+def render_runner_slice_drop_in_lines(install: RunnerInstall) -> list[str]:
+    """Bash lines that name the listener slice in one runner unit's drop-in.
 
-    Run after the unit exists and after ``svc.sh start``, so the move sees
-    the unit's live cgroup.
+    Run after ``svc.sh install`` and BEFORE ``svc.sh start``, so a new unit
+    starts in the listener slice: a fresh runner takes a queued job within
+    seconds of its first start, and on lavender's rebuild of 2026-10-20 the
+    corvis-stick runner took one at 02:53:32Z, four seconds after starting
+    in ``system.slice``, so that job ran outside the CI budget.
 
     Args:
         install: The install; its ``service`` is the unit's name.
 
     Returns:
         The lines. The drop-in is written, and systemd reloaded, only when
-        it differs; the unit is restarted only when it is outside the slice
+        it differs.
+
+    Raises:
+        ValueError: When the unit name cannot be embedded verbatim.
+    """
+    unit = scriptable(install["service"], label="service")
+    return render_drop_in_lines(
+        install,
+        name=SLICE_DROP_IN_NAME,
+        body=SLICE_DROP_IN,
+        announcement=f"listener slice named for {unit}",
+    )
+
+
+def render_runner_slice_move_lines(install: RunnerInstall) -> list[str]:
+    """Bash lines that move a running unit still outside the listener slice into it.
+
+    Run after ``svc.sh start``, so the move sees the unit's live cgroup. A
+    unit that first started with :func:`render_runner_slice_drop_in_lines`
+    in place is already there and is left alone; the move is for a rebuild
+    over a unit an older provision started elsewhere.
+
+    Args:
+        install: The install; its ``service`` is the unit's name.
+
+    Returns:
+        The lines. The unit is restarted only when it is outside the slice
         and no job runs in it.
 
     Raises:
@@ -151,12 +180,6 @@ def render_runner_slice_lines(install: RunnerInstall) -> list[str]:
     """
     unit = scriptable(install["service"], label="service")
     return [
-        *render_drop_in_lines(
-            install,
-            name=SLICE_DROP_IN_NAME,
-            body=SLICE_DROP_IN,
-            announcement=f"listener slice named for {unit}",
-        ),
         f"cgroup=$(systemctl show -p ControlGroup --value {unit})",
         'case "$cgroup" in',
         f"    /{LISTENER_SLICE_NAME}/*) ;;",
@@ -184,7 +207,8 @@ __all__ = [
     "SLICE_DROP_IN",
     "SLICE_DROP_IN_NAME",
     "SLICE_UNIT_PATH",
-    "render_runner_slice_lines",
+    "render_runner_slice_drop_in_lines",
+    "render_runner_slice_move_lines",
     "render_slice_bounds",
     "render_slice_unit",
     "render_slice_unit_lines",

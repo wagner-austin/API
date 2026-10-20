@@ -39,7 +39,11 @@ from typing_extensions import TypedDict
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core.ci_clean import CI_CLEAN_SCRIPT, CI_CLEAN_SERVICE, CI_CLEAN_TIMER
 from fleet.core.runner_action_cache import render_fill_lines
-from fleet.core.runner_cache_adopt import render_adopt_lines, render_cache_environment_lines
+from fleet.core.runner_cache_adopt import (
+    render_adopt_lines,
+    render_cache_adopt_now_lines,
+    render_cache_drop_in_lines,
+)
 from fleet.core.runner_install import (
     RUNNER_ACCOUNT,
     RUNNER_VERSION,
@@ -49,7 +53,11 @@ from fleet.core.runner_install import (
 from fleet.core.runner_job_scope_render import render_job_hook_lines, render_job_scope_lines
 from fleet.core.runner_reaper_render import render_kill_mode_lines, render_reaper_lines
 from fleet.core.runner_recovery import render_recovery_lines
-from fleet.core.runner_slice_render import render_runner_slice_lines, render_slice_unit_lines
+from fleet.core.runner_slice_render import (
+    render_runner_slice_drop_in_lines,
+    render_runner_slice_move_lines,
+    render_slice_unit_lines,
+)
 from fleet.core.runner_unit_files import render_unit_file_lines
 from fleet.core.script_values import scriptable
 
@@ -190,6 +198,11 @@ def render_install_lines(install: RunnerInstall) -> list[str]:
     over a host that may be half built. ``svc.sh start`` always runs;
     starting a running unit is a no-op.
 
+    Every drop-in is written before that start, because a new runner takes
+    a queued job within seconds of it (the slice drop-in's docstring has
+    the measurement); only the moves of a unit an older provision started
+    come after it, and each restarts nothing that started with its drop-in.
+
     Args:
         install: The install to configure.
 
@@ -226,9 +239,11 @@ def render_install_lines(install: RunnerInstall) -> list[str]:
         *render_recovery_lines(install),
         *render_kill_mode_lines(install),
         *render_job_hook_lines(install),
+        *render_cache_drop_in_lines(install),
+        *render_runner_slice_drop_in_lines(install),
         f"(cd '{directory}' && ./svc.sh start)",
-        *render_cache_environment_lines(install),
-        *render_runner_slice_lines(install),
+        *render_cache_adopt_now_lines(install),
+        *render_runner_slice_move_lines(install),
     ]
 
 
