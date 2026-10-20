@@ -65,13 +65,13 @@ def test_an_absent_unit_is_written_byte_for_byte_and_systemd_reloaded(
     path = tmp_path / "etc" / "unit.d" / "fleet.conf"
     spelled = f"{bash_path(tmp_path)}/etc/unit.d/fleet.conf"
     out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
-    assert path.read_text(encoding="utf-8") == BODY
+    assert path.read_bytes() == BODY.encode()
     assert (out, calls) == ("set\n", ["daemon-reload"])
 
 
 def test_a_unit_holding_the_body_already_is_left_alone(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "unit.conf"
-    path.write_text(BODY, encoding="utf-8")
+    path.write_bytes(BODY.encode())
     spelled = f"{bash_path(tmp_path)}/unit.conf"
     out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
     assert (out, calls) == ("", [])
@@ -79,10 +79,10 @@ def test_a_unit_holding_the_body_already_is_left_alone(tmp_path: pathlib.Path) -
 
 def test_a_unit_holding_other_text_is_rewritten(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "unit.conf"
-    path.write_text("[Service]\nKillMode=control-group\n", encoding="utf-8")
+    path.write_bytes(b"[Service]\nKillMode=control-group\n")
     spelled = f"{bash_path(tmp_path)}/unit.conf"
     out, calls = _run(tmp_path, render_unit_file_lines(spelled, BODY, announcement="set"))
-    assert path.read_text(encoding="utf-8") == BODY
+    assert path.read_bytes() == BODY.encode()
     assert (out, calls) == ("set\n", ["daemon-reload"])
 
 

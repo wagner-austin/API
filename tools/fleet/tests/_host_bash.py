@@ -22,8 +22,8 @@ import sys
 #: How long ``git --exec-path`` may take; it prints one line and exits.
 GIT_EXEC_PATH_SECONDS = 30
 
-#: How long bash may take to enter a directory and print it.
-BASH_PWD_SECONDS = 30
+#: How long one short command under :func:`host_bash` may take.
+BASH_SAYS_SECONDS = 30
 
 
 def host_bash() -> str:
@@ -58,6 +58,38 @@ def host_bash() -> str:
     return on_path
 
 
+def bash_says(script: str, *arguments: str) -> str:
+    """What a short script prints under :func:`host_bash`.
+
+    A case whose expectation is a host tool's own output asks the tool here
+    rather than retyping its format: Git's ``sha256sum`` on Windows marks
+    the file it read in binary mode with ``*`` where GNU's on Linux prints a
+    second space, measured 2026-10-20 on serendipity (MCPs board task
+    1e9ab738, fleet job f7cc8edb).
+
+    Args:
+        script: The script text, reading its arguments as ``$1``, ``$2``...
+        arguments: The script's arguments.
+
+    Returns:
+        Its standard output, stripped.
+
+    Raises:
+        AssertionError: When it exits non-zero, naming the script, the
+            status and bash's stderr.
+    """
+    ran = subprocess.run(
+        [host_bash(), "-c", script, "bash", *arguments],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=BASH_SAYS_SECONDS,
+    )
+    if ran.returncode != 0:
+        raise AssertionError(f"bash exited {ran.returncode} on {script!r}: {ran.stderr.strip()}")
+    return ran.stdout.strip()
+
+
 def bash_path(directory: pathlib.Path) -> str:
     """A directory as :func:`host_bash` spells it, for a path written into a script.
 
@@ -75,15 +107,6 @@ def bash_path(directory: pathlib.Path) -> str:
         What ``pwd`` prints inside it.
 
     Raises:
-        AssertionError: When bash cannot enter it, naming bash's stderr.
+        AssertionError: When bash cannot enter it, from :func:`bash_says`.
     """
-    entered = subprocess.run(
-        [host_bash(), "-c", 'cd "$1" && pwd', "bash", str(directory)],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=BASH_PWD_SECONDS,
-    )
-    if entered.returncode != 0:
-        raise AssertionError(f"bash could not enter {directory}: {entered.stderr.strip()}")
-    return entered.stdout.strip()
+    return bash_says('cd "$1" && pwd', str(directory))

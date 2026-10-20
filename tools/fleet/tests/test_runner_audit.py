@@ -23,7 +23,7 @@ from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
 from fleet.core.runner_reaper_render import REAPER_PATH
 from tests._audit_rows import run_rows
-from tests._host_bash import bash_path
+from tests._host_bash import bash_path, bash_says
 from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
@@ -264,11 +264,10 @@ class TestTheScriptRunsForReal:
         spec = _host(tmp_path)
         (tmp_path / "game-lib.jar").write_bytes(b"another jar")
         rows = _audit(spec, tmp_path)
+        said = bash_says('sha256sum "$1"', f"{base}/game-lib.jar")
+        assert said.startswith(f"{hashlib.sha256(b'another jar').hexdigest()} ")
         assert rows[f"asset:{base}/game-lib.jar"] == "OK"
-        assert rows[f"sha256:{base}/game-lib.jar"] == (
-            f"DRIFT sha256sum said: {hashlib.sha256(b'another jar').hexdigest()}  "
-            f"{base}/game-lib.jar (exit 0)"
-        )
+        assert rows[f"sha256:{base}/game-lib.jar"] == f"DRIFT sha256sum said: {said} (exit 0)"
 
     def test_an_asset_the_runner_account_cannot_write_drifts(
         self, tmp_path: pathlib.Path, base: str
