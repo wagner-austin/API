@@ -396,7 +396,8 @@ def launch(
 
     Raises:
         AppError: With the builder's own codes (``STAGE_ARCHIVE_UNREADABLE``,
-            ``SHA_NOT_ON_REMOTE``, ``EXPORT_FAILED``),
+            ``SHA_NOT_ON_REMOTE``, ``REMOTE_CREDENTIAL_REJECTED``,
+            ``EXPORT_FAILED``),
             ``STAGE_DIGEST_MISMATCH`` from staging, or ``NODE_UNREACHABLE``
             or ``DISPATCH_FAILED`` from the transport. The lease is still
             held then; giving it back is the caller's act.

@@ -161,7 +161,8 @@ def prepare(
     Raises:
         AppError: ``PROJECT_REMOTE_MISSING``, ``SHA_NOT_ON_REMOTE``,
             ``INSTALL_PATH_NOT_IN_COMMIT``, ``COMPANION_REF_NOT_ON_REMOTE``,
-            ``EXPORT_FAILED``, or ``RESOURCE_HELD`` from
+            ``REMOTE_CREDENTIAL_REJECTED``, ``EXPORT_FAILED``, or
+            ``RESOURCE_HELD`` from
             :func:`fleet.cli.run.require_resources_free`; every one a local
             refusal the caller reports to the queue verbatim.
     """

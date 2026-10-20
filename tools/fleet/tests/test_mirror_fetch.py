@@ -31,6 +31,29 @@ TLS_LOST = (
 #: What austinpc's git said for jobs 3954f6c1 and b2469547 on 2026-10-17.
 RESET = "error: RPC failed; curl 56 Recv failure: Connection was reset\nfatal: early EOF"
 
+#: What diphtheria's git said for jobs dd3019d3 and e88466e8 on 2026-10-20,
+#: once its gh login was rejected and the credential helper answered nothing.
+NO_CREDENTIAL = "fatal: could not read Username for 'https://github.com': No such device or address"
+
+#: What git 2.43 says when GitHub refuses the token a helper answered with,
+#: measured on ziggurat against a private repository on 2026-10-20.
+TOKEN_REFUSED = (
+    "remote: Invalid username or token. Password authentication is not supported "
+    "for Git operations.\n"
+    "fatal: Authentication failed for 'https://github.com/wagner-austin/corvis-stick.git/'"
+)
+
+#: What git 2.43 says when GitHub refuses an ssh key it does not know, measured
+#: the same way.
+KEY_REFUSED = (
+    "git@github.com: Permission denied (publickey).\n"
+    "fatal: Could not read from remote repository.\n\n"
+    "Please make sure you have the correct access rights\nand the repository exists."
+)
+
+#: Every spelling of a refused credential the cases below drive.
+CREDENTIAL_REFUSALS = (NO_CREDENTIAL, TOKEN_REFUSED, KEY_REFUSED)
+
 
 class _Hanging(FakeRun):
     """A remote that never answers: each fetch is ended at its deadline."""
@@ -190,6 +213,93 @@ class TestALostFetch:
 
         assert raised.value.code is FleetErrorCode.SHA_NOT_ON_REMOTE
         assert len(runner.calls) == 3
+
+
+class TestARefusedCredential:
+    """A remote that refuses the hub's credential refuses every attempt the
+    same way, so the fetch is not sent again and the refusal sends its reader
+    to the control host's credential, not to the network or the commit."""
+
+    @pytest.mark.parametrize("stderr", CREDENTIAL_REFUSALS)
+    def test_a_commit_fetch_is_refused_at_once_by_name(
+        self, tmp_path: pathlib.Path, stderr: str
+    ) -> None:
+        clock = pin_clock(DEMO_NOW)
+        runner = FakeRun([failed(128, "missing"), failed(128, stderr)])
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as raised:
+            mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
+
+        assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
+        assert raised.value.message == (
+            f"{REMOTE} refused the credential this hub's git sent it, or asked for one "
+            f"its credential helper did not answer; nothing from it can be exported "
+            f"until that credential is renewed on the control host, and sending the "
+            f"fetch again would send the same one. git said: {stderr.strip()[:300]}"
+        )
+        assert [call[3] for call in runner.calls] == ["cat-file", "fetch"]
+        assert clock.seconds == DEMO_NOW
+
+    @pytest.mark.parametrize("stderr", CREDENTIAL_REFUSALS)
+    def test_a_ref_fetch_is_refused_at_once_by_name(
+        self, tmp_path: pathlib.Path, stderr: str
+    ) -> None:
+        clock = pin_clock(DEMO_NOW)
+        runner = FakeRun([failed(128, stderr)])
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as raised:
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main")
+
+        assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
+        assert raised.value.message.startswith(
+            f"{REMOTE} refused the credential this hub's git sent it"
+        )
+        assert raised.value.message.endswith(f"git said: {stderr.strip()[:300]}")
+        assert len(runner.calls) == 1
+        assert clock.seconds == DEMO_NOW
+
+    def test_one_refused_after_a_lost_attempt_is_refused_at_once(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A login that lapses between two attempts ends the fetch at the
+        attempt that meets it, whatever the attempts before it said."""
+        clock = pin_clock(DEMO_NOW)
+        runner = FakeRun([failed(128, "missing"), failed(128, RESET), failed(128, NO_CREDENTIAL)])
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as raised:
+            mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
+
+        assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
+        assert len(runner.calls) == 3
+        assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSE_SECONDS
+
+    def test_every_marker_is_one_git_was_measured_printing(self) -> None:
+        """A marker no measured refusal carries would be a rule for words git
+        never says; each one here matches exactly one of the three."""
+        assert [
+            sum(marker in refusal for refusal in CREDENTIAL_REFUSALS)
+            for marker in mirror_fetch.CREDENTIAL_REFUSED_MARKERS
+        ] == [1, 1, 1]
+
+    def test_a_repository_github_will_not_name_is_still_sent_again(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """GitHub answers a repository the credential cannot see and one that
+        does not exist with the same words, so they are not read as a refused
+        credential."""
+        pin_clock(DEMO_NOW)
+        unnamed = "ERROR: Repository not found.\nfatal: Could not read from remote repository."
+        runner = FakeRun([failed(128, "missing")] + [failed(128, unnamed)] * 3)
+        _test_hooks.run = runner
+
+        with pytest.raises(AppError) as raised:
+            mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
+
+        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
+        assert len(runner.calls) == 1 + mirror_fetch.FETCH_ATTEMPTS
 
 
 class TestFetchRef:

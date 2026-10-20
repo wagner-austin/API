@@ -19,6 +19,16 @@ fetch's deadline did: the claim path it runs in has a node runner's whole
 serve behind it, and a wait of three full deadlines would outlast it. A
 remote that answers it does not serve the object is not lost: that refusal
 is the commit's or the registry's, and it is raised at once.
+
+A REFUSED CREDENTIAL IS NOT LOST EITHER (MCPs board task 579a5ab0). On
+2026-10-20 diphtheria's gh login was rejected, its credential helper answered
+nothing, and every job of the proof of ae154507f was sent three times and
+refused ``EXPORT_FAILED`` with git's ``could not read Username``, which read
+as a network fault and was broadcast as the repository having gone private.
+Each further attempt sends the same credential, so the first one git
+answers with a :data:`CREDENTIAL_REFUSED_MARKERS` spelling is refused at once
+as ``REMOTE_CREDENTIAL_REJECTED``, naming the control host's credential as
+what must change.
 """
 
 from __future__ import annotations
@@ -70,6 +80,19 @@ NOT_ON_REMOTE_MARKERS: Final = (
     "not our ref",
 )
 
+#: What git says when the remote refused the hub's credential or asked for
+#: one the hub could not give, as git 2.43 printed each on 2026-10-20: no
+#: credential answered by the helper (prompts are unavailable to the
+#: runner), an https credential the remote refused, and an ssh key it does
+#: not know. GitHub's ``Repository not found`` is not one: it is also what
+#: a missing repository answers, so it stays git's own words under
+#: ``EXPORT_FAILED``.
+CREDENTIAL_REFUSED_MARKERS: Final = (
+    "could not read Username for",
+    "Authentication failed for",
+    "Permission denied (publickey)",
+)
+
 
 def _words(stderr: str) -> str:
     """git's own words from one command, bounded.
@@ -97,21 +120,50 @@ def git_failure(code: FleetErrorCode, verb: str, stderr: str) -> AppError[FleetE
     return AppError(code=code, message=f"{verb}: {_words(stderr)}")
 
 
+def _credential_refused(remote: str, stderr: str) -> AppError[FleetErrorCode]:
+    """Compose the refusal for a remote that refused the hub's credential.
+
+    Args:
+        remote: The remote the fetch was sent to.
+        stderr: git's own words, carried verbatim and bounded.
+
+    Returns:
+        ``REMOTE_CREDENTIAL_REJECTED``, naming the remote and the control
+        host's credential as what must change.
+    """
+    return AppError(
+        code=FleetErrorCode.REMOTE_CREDENTIAL_REJECTED,
+        message=(
+            f"{remote} refused the credential this hub's git sent it, or asked for one "
+            f"its credential helper did not answer; nothing from it can be exported "
+            f"until that credential is renewed on the control host, and sending the "
+            f"fetch again would send the same one. git said: {stderr.strip()[:300]}"
+        ),
+    )
+
+
 def _fetched(
-    argv: tuple[str, ...], *, verb: str, not_served: Callable[[str], AppError[FleetErrorCode]]
+    argv: tuple[str, ...],
+    *,
+    remote: str,
+    verb: str,
+    not_served: Callable[[str], AppError[FleetErrorCode]],
 ) -> None:
     """Send one fetch until it is done, the remote refuses it, or its attempts run out.
 
     Args:
         argv: The ``git fetch`` command.
+        remote: The remote ``argv`` fetches from, for a refused credential.
         verb: What is fetched where, for the refusal.
         not_served: The refusal for a remote that does not serve what was
             asked for, given git's words.
 
     Raises:
-        AppError: ``not_served``'s refusal, at the first attempt git answers
-            with one of :data:`NOT_ON_REMOTE_MARKERS`; ``EXPORT_FAILED``
-            naming every attempt's words when none was done.
+        AppError: ``REMOTE_CREDENTIAL_REJECTED`` at the first attempt git
+            answers with one of :data:`CREDENTIAL_REFUSED_MARKERS`;
+            ``not_served``'s refusal at the first it answers with one of
+            :data:`NOT_ON_REMOTE_MARKERS`; ``EXPORT_FAILED`` naming every
+            attempt's words when none was done.
     """
     deadline = _test_hooks.now() + FETCH_BUDGET_SECONDS
     said: list[str] = []
@@ -121,6 +173,8 @@ def _fetched(
         if fetched["returncode"] == 0:
             return
         stderr = fetched["stderr"]
+        if any(marker in stderr for marker in CREDENTIAL_REFUSED_MARKERS):
+            raise _credential_refused(remote, stderr)
         if any(marker in stderr for marker in NOT_ON_REMOTE_MARKERS):
             raise not_served(stderr)
         said.append(f"attempt {len(said) + 1}: {_words(stderr)}")
@@ -165,10 +219,11 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
         sha: The commit, forty hex.
 
     Raises:
-        AppError: ``SHA_NOT_ON_REMOTE`` when the remote will not serve the
-            object (one of :data:`NOT_ON_REMOTE_MARKERS` in git's words),
-            ``EXPORT_FAILED`` when no attempt was done, every attempt's
-            words verbatim.
+        AppError: ``REMOTE_CREDENTIAL_REJECTED`` when the remote refused
+            the hub's credential (one of :data:`CREDENTIAL_REFUSED_MARKERS`),
+            ``SHA_NOT_ON_REMOTE`` when it will not serve the object (one of
+            :data:`NOT_ON_REMOTE_MARKERS` in git's words), ``EXPORT_FAILED``
+            when no attempt was done, every attempt's words verbatim.
     """
     if has_commit(mirror, sha):
         return
@@ -185,6 +240,7 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
 
     _fetched(
         ("git", "-C", str(mirror), "fetch", "--quiet", "--no-tags", remote, sha),
+        remote=remote,
         verb=f"git fetch {remote} {sha} into {mirror}",
         not_served=not_served,
     )
@@ -206,10 +262,12 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
         The forty-hex commit the ref names.
 
     Raises:
-        AppError: ``COMPANION_REF_NOT_ON_REMOTE`` when the remote does not
-            serve the ref (one of :data:`NOT_ON_REMOTE_MARKERS` in git's
-            words), which is a registry line to correct rather than a
-            commit to push; ``EXPORT_FAILED`` when no attempt was done, or
+        AppError: ``REMOTE_CREDENTIAL_REJECTED`` when the remote refused
+            the hub's credential (one of :data:`CREDENTIAL_REFUSED_MARKERS`);
+            ``COMPANION_REF_NOT_ON_REMOTE`` when it does not serve the ref
+            (one of :data:`NOT_ON_REMOTE_MARKERS` in git's words), which is
+            a registry line to correct rather than a commit to push;
+            ``EXPORT_FAILED`` when no attempt was done, or
             for a fetched ref that does not resolve to a commit, git's
             words verbatim.
     """
@@ -236,6 +294,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
             remote,
             f"+{ref}:{COMPANION_REF}",
         ),
+        remote=remote,
         verb=f"git fetch {remote} {ref} into {mirror}",
         not_served=not_served,
     )
@@ -254,6 +313,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
 
 __all__ = [
     "COMPANION_REF",
+    "CREDENTIAL_REFUSED_MARKERS",
     "FETCH_ATTEMPTS",
     "FETCH_BUDGET_SECONDS",
     "FETCH_PAUSE_SECONDS",
