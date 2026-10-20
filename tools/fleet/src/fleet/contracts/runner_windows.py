@@ -35,6 +35,11 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.runner_registration import (
+    RunnerRegistration,
+    decode_runner_registration,
+    encode_runner_registration,
+)
 from fleet.contracts.runner_windows_base import (
     WindowsHostBase,
     decode_windows_host_base,
@@ -50,29 +55,22 @@ _WINDOWS_PATH = re.compile(r"^[A-Za-z]:/[^\\]*$")
 _PYTHON_VERSION = re.compile(r"^[0-9]+\.[0-9]+\.[0-9]+$")
 
 
-class WindowsRunnerInstall(TypedDict):
+class WindowsRunnerInstall(RunnerRegistration):
     """One GitHub Actions runner installed as a Windows service.
 
+    Its registration (:class:`fleet.contracts.runner_registration.RunnerRegistration`)
+    names a service with no unit suffix, as ``config.cmd`` creates it.
+
     Attributes:
-        repo: The repository it is registered to, ``owner/name``.
-        runner_name: The registration's name, e.g. ``loki``.
-        service: The Windows service ``config.cmd`` creates
-            (``actions.runner.<owner>-<repo>.<name>``), recorded exactly
-            because "is the service running" is the audit question.
         root: The install's directory, holding ``config.cmd`` and the
             runner's ``.runner`` file, e.g. ``C:/actions-runner/chat``.
-        labels: The custom labels it answers to, e.g. ``["loki"]``.
         python_toolcache: The exact CPython versions seeded into its tool
             cache, so ``actions/setup-python`` finds each rather than
             installing it (:mod:`fleet.core.runner_windows_python_render`);
             empty for a runner whose jobs set up no Python.
     """
 
-    repo: str
-    runner_name: str
-    service: str
     root: str
-    labels: list[str]
     python_toolcache: list[str]
 
 
@@ -148,11 +146,8 @@ def encode_windows_runner_install(install: WindowsRunnerInstall) -> JSONObject:
         JSON-serialisable mapping carrying every field.
     """
     return {
-        "repo": install["repo"],
-        "runner_name": install["runner_name"],
-        "service": install["service"],
+        **encode_runner_registration(install),
         "root": install["root"],
-        "labels": list(install["labels"]),
         "python_toolcache": list(install["python_toolcache"]),
     }
 
@@ -167,37 +162,16 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
         The validated install.
 
     Raises:
-        JSONTypeError: If the value is not an object, a field is missing or
-            empty, ``repo`` is not ``owner/name``, ``labels`` is empty or a
-            label holds the comma ``config.cmd`` splits labels on,
-            ``service`` is not the name ``config.cmd`` gives this repository
-            and runner, or a tool cache version is not exact or is named
-            twice.
+        JSONTypeError: If the value is not an object, its registration is
+            refused (:func:`fleet.contracts.runner_registration.decode_runner_registration`),
+            ``root`` is not a Windows path, or a tool cache version is not
+            exact or is named twice.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(
             f"windows runner install must be a JSON object, got {type(value).__name__}"
         )
-    repo = _nonempty(value, "repo")
-    if repo.count("/") != 1 or not all(repo.split("/")):
-        raise JSONTypeError(f"repo must be 'owner/name', got {repo!r}")
-    runner_name = _nonempty(value, "runner_name")
-    service = _nonempty(value, "service")
-    expected = f"actions.runner.{repo.replace('/', '-')}.{runner_name}"
-    if service != expected:
-        raise JSONTypeError(
-            f"service must be {expected!r}, the name config.cmd gives {repo}'s runner "
-            f"{runner_name}; got {service!r}"
-        )
-    labels = require_str_list(value, "labels")
-    if not labels:
-        raise JSONTypeError(
-            "labels must be non-empty; a runner with no custom label cannot be targeted "
-            "by any workflow here and would sit registered but unreachable"
-        )
-    for label in labels:
-        if not label or "," in label:
-            raise JSONTypeError(f"a label must be non-empty and hold no comma, got {label!r}")
+    registration = decode_runner_registration(value, unit_suffix="")
     toolcache = require_str_list(value, "python_toolcache")
     for version in toolcache:
         if not _PYTHON_VERSION.match(version):
@@ -208,11 +182,11 @@ def decode_windows_runner_install(value: JSONValue) -> WindowsRunnerInstall:
     if len(set(toolcache)) != len(toolcache):
         raise JSONTypeError(f"python_toolcache names a version twice: {toolcache}")
     return WindowsRunnerInstall(
-        repo=repo,
-        runner_name=runner_name,
-        service=service,
+        repo=registration["repo"],
+        runner_name=registration["runner_name"],
+        service=registration["service"],
+        labels=registration["labels"],
         root=_windows_path(value, "root"),
-        labels=labels,
         python_toolcache=toolcache,
     )
 

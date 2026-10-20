@@ -45,6 +45,12 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.runner_base import HostBase, decode_host_base, encode_host_base
+from fleet.contracts.runner_registration import (
+    LINUX_UNIT_SUFFIX,
+    RunnerRegistration,
+    decode_runner_registration,
+    encode_runner_registration,
+)
 from fleet.contracts.runner_slice import CiSlice, decode_ci_slice, encode_ci_slice
 from fleet.contracts.runner_windows import (
     WindowsRunnerHost,
@@ -53,34 +59,20 @@ from fleet.contracts.runner_windows import (
 )
 
 
-class RunnerInstall(TypedDict):
-    """One GitHub Actions runner install on a host.
+class RunnerInstall(RunnerRegistration):
+    """One GitHub Actions runner install on a Linux host.
+
+    Its registration (:class:`fleet.contracts.runner_registration.RunnerRegistration`)
+    names the systemd unit that runs it, ``.service`` suffix included.
 
     Attributes:
-        repo: The repository it is registered to, ``owner/name`` form --
-            registrations are per-repo, which is why one box carries many.
-        runner_name: The name shown by the repo's runner registration, e.g.
-            ``lavender-2``. Names are per-repo: two installs on one box may
-            share a name across repos without being the same install.
-        service: The systemd unit that runs it
-            (``actions.runner.<owner>-<repo>.<name>.service``). Recorded
-            exactly rather than derived, because "is the service running"
-            is the audit question.
         workdir: Absolute POSIX path of the install's ``_work`` tree. This
             is the path a poetry in-project venv bakes into its shebangs --
             the fact behind the 2026-09-08 cache poisoning -- and the audit
             asserts it exists.
-        labels: The custom labels the install answers to, e.g.
-            ``["lavender"]``. Labels are the pool: a workflow targets a
-            label, never a machine, which is what makes a new box a five
-            minute join instead of a workflow edit.
     """
 
-    repo: str
-    runner_name: str
-    service: str
     workdir: str
-    labels: list[str]
 
 
 class FileAsset(TypedDict):
@@ -193,13 +185,7 @@ def encode_runner_install(install: RunnerInstall) -> JSONObject:
     Returns:
         JSON-serialisable mapping carrying every field.
     """
-    return {
-        "repo": install["repo"],
-        "runner_name": install["runner_name"],
-        "service": install["service"],
-        "workdir": install["workdir"],
-        "labels": list(install["labels"]),
-    }
+    return {**encode_runner_registration(install), "workdir": install["workdir"]}
 
 
 def decode_runner_install(value: JSONValue) -> RunnerInstall:
@@ -212,33 +198,22 @@ def decode_runner_install(value: JSONValue) -> RunnerInstall:
         The validated install.
 
     Raises:
-        JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, ``repo`` is not ``owner/name``, ``labels`` is empty,
-            or ``workdir`` is not an absolute POSIX path. A runner with no
-            custom label is unreachable by every workflow in these
-            repositories, so declaring one would record an install nothing
-            can use.
+        JSONTypeError: If the value is not an object, its registration is
+            refused (:func:`fleet.contracts.runner_registration.decode_runner_registration`),
+            or ``workdir`` is not an absolute POSIX path.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"runner install must be a JSON object, got {type(value).__name__}")
-    repo = require_str(value, "repo")
-    if repo.count("/") != 1 or not all(repo.split("/")):
-        raise JSONTypeError(f"repo must be 'owner/name', got {repo!r}")
-    labels = require_str_list(value, "labels")
-    if not labels:
-        raise JSONTypeError(
-            "labels must be non-empty; a runner with no custom label cannot be targeted "
-            "by any workflow here and would sit registered but unreachable"
-        )
+    registration = decode_runner_registration(value, unit_suffix=LINUX_UNIT_SUFFIX)
     workdir = require_str(value, "workdir")
     if not workdir.startswith("/"):
         raise JSONTypeError(f"an install's workdir must be an absolute POSIX path, got {workdir!r}")
     return RunnerInstall(
-        repo=repo,
-        runner_name=require_str(value, "runner_name"),
-        service=require_str(value, "service"),
+        repo=registration["repo"],
+        runner_name=registration["runner_name"],
+        service=registration["service"],
+        labels=registration["labels"],
         workdir=workdir,
-        labels=labels,
     )
 
 

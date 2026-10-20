@@ -39,8 +39,8 @@ class TestTheInstall:
             (
                 "service",
                 "actions.runner.chat",
-                "service must be 'actions.runner.wagner-austin-chat.loki', the name config.cmd "
-                "gives wagner-austin/chat's runner loki; got 'actions.runner.chat'",
+                "service must be 'actions.runner.wagner-austin-chat.loki', the name the runner's "
+                "configuration gives wagner-austin/chat's runner loki; got 'actions.runner.chat'",
             ),
             (
                 "root",
@@ -116,6 +116,14 @@ class TestTheHost:
         with pytest.raises(JSONTypeError) as refused:
             decode_windows_runner_host(raw)
         assert str(refused.value) == "windows host base must be a JSON object, got NoneType"
+
+    @pytest.mark.parametrize("key", ["name", "host"])
+    def test_a_host_with_an_empty_name_or_ssh_destination_is_refused(self, key: str) -> None:
+        raw = raw_windows_host()
+        raw[key] = ""
+        with pytest.raises(JSONTypeError) as refused:
+            decode_windows_runner_host(raw)
+        assert str(refused.value) == f"{key} must be non-empty"
 
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError) as refused:

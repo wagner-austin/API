@@ -39,6 +39,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.node import NodePlatform
+from fleet.contracts.runner_registration import LINUX_UNIT_SUFFIX, runner_service_name
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
@@ -106,7 +107,7 @@ def plan_onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
     install = RunnerInstall(
         repo=repo,
         runner_name=name,
-        service=f"actions.runner.{repo.replace('/', '-')}.{name}.service",
+        service=runner_service_name(repo, name, unit_suffix=LINUX_UNIT_SUFFIX),
         workdir=f"/home/{RUNNER_ACCOUNT}/actions-runner-{_repo_slug(repo)}-1/_work",
         labels=[name],
     )
