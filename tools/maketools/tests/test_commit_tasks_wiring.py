@@ -56,13 +56,33 @@ def test_the_deploy_asks_about_the_commit_it_ships_before_infra() -> None:
     assert "\ninfra: commit-tasks executed services-executed\n" in makefile.replace("\r\n", "\n")
 
 
-def test_commit_msg_asks_before_the_commit_exists_reading_only_the_repository() -> None:
+def test_commit_msg_asks_before_the_commit_exists_reading_the_repository_and_its_python() -> None:
     lines = _executable(".githooks/commit-msg")
     assert (
-        'python "$REPO/.githooks/published_maketools.py" commit-message-tasks "$REPO/../MCPs" "$1"'
+        '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-message-tasks '
+        '"$REPO/../MCPs" "$1"'
     ) in lines
     assert "set -eu" in lines
-    assert _variables_read(lines) == ["REPO"]
+    assert _variables_read(lines) == ["HOOK_PYTHON", "REPO"]
+
+
+def test_every_hook_launches_python_by_the_one_choice_python_sh_makes_before_it() -> None:
+    # MCPs board task 6c0664bf: the hooks named `python`, which a Linux
+    # session host does not have, so none could run there. The choice is
+    # MCPs' .husky/run-at-head.sh's, on the shell's own OSTYPE.
+    assert [line for line in _executable(".githooks/python.sh") if line.strip()] == [
+        'case "${OSTYPE:-}" in',
+        "  msys* | cygwin*) HOOK_PYTHON=python ;;",
+        "  *) HOOK_PYTHON=python3 ;;",
+        "esac",
+    ]
+    for hook in (".githooks/commit-msg", ".githooks/post-commit", ".githooks/pre-push"):
+        lines = _executable(hook)
+        sourced = lines.index('. "$REPO/.githooks/python.sh"')
+        launch = '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py"'
+        launches = [index for index, line in enumerate(lines) if "published_maketools.py" in line]
+        assert launches, hook
+        assert all(index > sourced and launch in lines[index] for index in launches), hook
 
 
 def test_published_maketools_runs_origin_main_reading_no_environment() -> None:
@@ -97,14 +117,15 @@ def test_pre_push_asks_first_over_each_range_and_reads_only_what_git_hands_it() 
     end = text.index("\ndone\n", start)
     stanza = [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
     assert (
-        '        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" '
-        '"$ct_remote_sha..$ct_local_sha" < /dev/null'
+        '        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" '
+        '"$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null'
     ) in stanza
     assert (
-        '        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" '
-        '"$ct_local_sha" "^origin/main" < /dev/null'
+        '        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" '
+        '"$REPO" "$ct_local_sha" "^origin/main" < /dev/null'
     ) in stanza
     assert _variables_read(stanza) == [
+        "HOOK_PYTHON",
         "MCPS",
         "PUSH_INPUT",
         "REPO",

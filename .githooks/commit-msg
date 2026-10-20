@@ -22,4 +22,5 @@
 set -eu
 
 REPO="$(git rev-parse --show-toplevel)"
-python "$REPO/.githooks/published_maketools.py" commit-message-tasks "$REPO/../MCPs" "$1"
+. "$REPO/.githooks/python.sh"
+"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-message-tasks "$REPO/../MCPs" "$1"

@@ -127,6 +127,9 @@ def test_env_fan_out_compose_hooks_and_tools_reach_their_modules(world: World, c
         dispatch(["compose-down"])
     assert dispatch(["hooks", "install"]) == 0
     world.capturing_answers[("git", "config", "--get", "core.hooksPath")] = ok(".githooks")
+    world.capturing_answers[("git", "ls-files", "-s", "--", ".githooks")] = ok(
+        "100755 1111 0\t.githooks/pre-push\n"
+    )
     assert dispatch(["hooks", "check"]) == 0
     with pytest.raises(AppError, match=r"hooks takes install or check"):
         dispatch(["hooks", "remove"])

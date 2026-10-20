@@ -25,6 +25,45 @@ COMPOSE_FILE: Final[str] = "docker-compose.yml"
 #: The one value ``core.hooksPath`` may hold here.
 HOOKS_PATH: Final[str] = ".githooks"
 
+#: Every name git runs as a hook (githooks(5)). A file under
+#: :data:`HOOKS_PATH` named otherwise (python.sh, published_maketools.py) is
+#: read by a hook, never run by git, so its mode is no hook's business.
+GIT_HOOK_NAMES: Final[frozenset[str]] = frozenset(
+    {
+        "applypatch-msg",
+        "pre-applypatch",
+        "post-applypatch",
+        "pre-commit",
+        "pre-merge-commit",
+        "prepare-commit-msg",
+        "commit-msg",
+        "post-commit",
+        "pre-rebase",
+        "post-checkout",
+        "post-merge",
+        "pre-push",
+        "pre-receive",
+        "update",
+        "proc-receive",
+        "post-receive",
+        "post-update",
+        "reference-transaction",
+        "push-to-checkout",
+        "pre-auto-gc",
+        "post-rewrite",
+        "sendemail-validate",
+        "fsmonitor-watchman",
+        "p4-changelist",
+        "p4-prepare-changelist",
+        "p4-post-changelist",
+        "p4-pre-submit",
+        "post-index-change",
+    }
+)
+
+#: The mode git records for an executable file, the only mode it runs a hook at.
+EXECUTABLE_MODE: Final[str] = "100755"
+
 #: Wall clock on one fanned-out make target. Four hours, because what this
 #: runs IS a package's whole lint or test, so it inherits the suite bound
 #: rather than inventing a smaller one; a fan-out over libs, services,
@@ -204,22 +243,51 @@ def hooks_install(cwd: Path) -> int:
 def hooks_check(cwd: Path) -> int:
     """Report whether this clone runs the versioned hooks.
 
+    A HOOK GIT WILL NOT EXECUTE IS NOT INSTALLED (MCPs board task 6c0664bf).
+    Every hook here was tracked 100644 until that task, and git skips a hook
+    that is not executable with only a hint, so on ziggurat, the first Linux
+    host sessions committed from, no commit-msg, pre-commit or pre-push ever
+    ran while ``core.hooksPath`` alone would have read as installed. So the
+    modes git records for :data:`HOOKS_PATH` are read too.
+
     Args:
         cwd: The repository root.
 
     Returns:
-        0 when ``core.hooksPath`` is :data:`HOOKS_PATH`, else 1.
+        0 when ``core.hooksPath`` is :data:`HOOKS_PATH` and every hook git
+        runs from it is tracked executable, else 1.
     """
     result = _test_hooks.run_capturing(["git", "config", "--get", "core.hooksPath"], cwd=cwd)
     configured = result["stdout"].strip()
-    if result["returncode"] == 0 and configured == HOOKS_PATH:
-        _test_hooks.write_line(f"hooks installed: core.hooksPath = {configured}")
-        return 0
-    _test_hooks.write_error(
-        "hooks NOT installed. This clone runs no pre-commit checks; the shared-index sweep "
-        "is unguarded here. Run: make install-hooks"
+    if result["returncode"] != 0 or configured != HOOKS_PATH:
+        _test_hooks.write_error(
+            "hooks NOT installed. This clone runs no pre-commit checks; the shared-index sweep "
+            "is unguarded here. Run: make install-hooks"
+        )
+        return 1
+    listed = _test_hooks.run_capturing(["git", "ls-files", "-s", "--", HOOKS_PATH], cwd=cwd)
+    if listed["returncode"] != 0:
+        _test_hooks.write_error(
+            f"git ls-files -s -- {HOOKS_PATH} exited {listed['returncode']}: "
+            f"{listed['stderr'].strip()}"
+        )
+        return 1
+    skipped = sorted(
+        path
+        for mode, path in (
+            (line.split(" ", 1)[0], line.split("\t", 1)[1])
+            for line in listed["stdout"].splitlines()
+        )
+        if Path(path).name in GIT_HOOK_NAMES and mode != EXECUTABLE_MODE
     )
-    return 1
+    if skipped:
+        _test_hooks.write_error(
+            f"hooks NOT runnable: git skips {', '.join(skipped)}, tracked without the "
+            f"executable bit ({EXECUTABLE_MODE}). Run: git add --chmod=+x on each, and commit"
+        )
+        return 1
+    _test_hooks.write_line(f"hooks installed: core.hooksPath = {configured}")
+    return 0
 
 
 def require_tool(name: str, hint: str) -> None:

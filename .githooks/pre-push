@@ -45,6 +45,7 @@
 set -eu
 
 REPO="$(git rev-parse --show-toplevel)"
+. "$REPO/.githooks/python.sh"
 
 # THE LEDGER IS THE PUMP'S, NOT THIS CHECKOUT'S (MCPs board task 88a2853f).
 # The scheduled pump reads the hub checkout's tools/ci-wake/runs/pushes.jsonl
@@ -96,9 +97,9 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remot
     [ -z "$ct_local_sha" ] && continue
     [ "$ct_local_sha" = "$ZERO" ] && continue
     if [ "$ct_remote_sha" = "$ZERO" ]; then
-        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_local_sha" "^origin/main" < /dev/null
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_local_sha" "^origin/main" < /dev/null
     else
-        python "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" commit-tasks "$MCPS" "$REPO" "$ct_remote_sha..$ct_local_sha" < /dev/null
     fi
 done
 
@@ -180,7 +181,7 @@ if [ -d "$MCPS/.git" ]; then
     done <<EOF
 $PUSH_INPUT
 EOF
-    (cd "$MCPS" && python "$REPO/.githooks/published_maketools.py" wiki-mirror-hook push --repo "$REPO" --remote "$REMOTE_NAME" $MIRROR_UPDATES < /dev/null) \
+    (cd "$MCPS" && "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" wiki-mirror-hook push --repo "$REPO" --remote "$REMOTE_NAME" $MIRROR_UPDATES < /dev/null) \
         || echo "wiki-mirror: wiki-mirror-hook exited $?, so this push may not be mirrored; $MCPS/.action-events.jsonl says why" >&2
 else
     echo "wiki-mirror: $MCPS is not on this host; this push is not mirrored from here" >&2

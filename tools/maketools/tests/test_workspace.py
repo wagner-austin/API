@@ -9,6 +9,7 @@ from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
 from maketools.workspace import (
+    GIT_HOOK_NAMES,
     compose_down,
     compose_up,
     fan_out,
@@ -18,6 +19,9 @@ from maketools.workspace import (
     require_tool,
 )
 from tests.conftest import World, failed, ok
+
+#: The read hooks_check makes of the versioned hooks' tracked modes.
+LS_HOOKS = ("git", "ls-files", "-s", "--", ".githooks")
 
 
 def package(root: Path, name: str, *, makefile: bool = True) -> Path:
@@ -108,10 +112,49 @@ def test_hooks_install_and_check(world: World, tmp_path: Path) -> None:
     world.inheriting_code = 1
     assert hooks_install(tmp_path) == 1
     world.capturing_answers[("git", "config", "--get", "core.hooksPath")] = ok(".githooks\n")
+    world.capturing_answers[LS_HOOKS] = ok(
+        "100755 1111 0\t.githooks/commit-msg\n"
+        "100755 2222 0\t.githooks/pre-push\n"
+        "100644 3333 0\t.githooks/python.sh\n"
+        "100644 4444 0\t.githooks/published_maketools.py\n"
+    )
     assert hooks_check(tmp_path) == 0
+    assert world.lines[-1] == "hooks installed: core.hooksPath = .githooks"
     world.capturing_answers[("git", "config", "--get", "core.hooksPath")] = failed(1, "")
     assert hooks_check(tmp_path) == 1
     assert world.errors[-1].startswith("hooks NOT installed.")
+
+
+def test_hooks_check_names_every_hook_git_would_skip_as_not_executable(
+    world: World, tmp_path: Path
+) -> None:
+    """MCPs board task 6c0664bf: every hook here was tracked 100644, so git
+    ran none of them on ziggurat while core.hooksPath read as installed."""
+    world.capturing_answers[("git", "config", "--get", "core.hooksPath")] = ok(".githooks\n")
+    world.capturing_answers[LS_HOOKS] = ok(
+        "100644 1111 0\t.githooks/pre-push\n"
+        "100755 2222 0\t.githooks/post-commit\n"
+        "100644 3333 0\t.githooks/commit-msg\n"
+        "100644 4444 0\t.githooks/python.sh\n"
+    )
+    assert hooks_check(tmp_path) == 1
+    assert world.errors[-1] == (
+        "hooks NOT runnable: git skips .githooks/commit-msg, .githooks/pre-push, tracked "
+        "without the executable bit (100755). Run: git add --chmod=+x on each, and commit"
+    )
+    world.capturing_answers[LS_HOOKS] = failed(128, "fatal: not a git repository\n")
+    assert hooks_check(tmp_path) == 1
+    assert world.errors[-1] == (
+        "git ls-files -s -- .githooks exited 128: fatal: not a git repository"
+    )
+
+
+def test_this_repositorys_hooks_are_the_ones_git_runs() -> None:
+    """Every git hook name the versioned directory holds is one the check
+    reads, so a hook added under a name git runs is judged by its mode."""
+    hooks_dir = Path(__file__).resolve().parents[3] / ".githooks"
+    named = sorted(path.name for path in hooks_dir.iterdir() if path.name in GIT_HOOK_NAMES)
+    assert named == ["commit-msg", "post-commit", "pre-commit", "pre-push"]
 
 
 def test_require_tool_finds_the_interpreter_and_refuses_a_missing_one(world: World) -> None:

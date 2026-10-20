@@ -22,8 +22,9 @@
 
 REPO="$(git rev-parse --show-toplevel)"
 MCPS="$REPO/../MCPs"
+. "$REPO/.githooks/python.sh"
 if [ -d "$MCPS/.git" ]; then
-    (cd "$MCPS" && python "$REPO/.githooks/published_maketools.py" wiki-mirror-hook commit --repo "$REPO" < /dev/null) \
+    (cd "$MCPS" && "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" wiki-mirror-hook commit --repo "$REPO" < /dev/null) \
         || echo "wiki-mirror: wiki-mirror-hook exited $?, so this commit may not be mirrored; $MCPS/.action-events.jsonl says why" >&2
 else
     echo "wiki-mirror: $MCPS is not on this host; this commit is not mirrored from here" >&2
