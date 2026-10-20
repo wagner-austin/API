@@ -15,6 +15,6 @@
   "boot": {
     "units": []
   },
-  "notes": "Enrolled by fleet-enroll.",
+  "notes": "The operator's Lenovo Yoga 3 14 (80JH, i5-5200U, 4 threads, 7.6 GiB RAM, 116 GB root), the machine enrolled on Windows 10 as lenovoold, reimaged to Ubuntu 24.04.4 LTS on 2026-10-20 from a CORVIS stick (fleet-node-setup Initialize-Node.sh, VERIFY ALL PASSED, session opus-home-1020-df00). Enrolled from ziggurat with fleet-enroll on 2026-10-20 (MCPs board task 447efce2), lenovoold's file retired in the same change. Its USB Brother MFC-7340 made it the print host while it ran Windows; print-mcp drives a Windows spooler and does not yet reach this install.",
   "dispatch": "Enrolled by fleet-enroll and reachable from the hub. Held out of dispatch until the operator says it takes work: no budget (cores, RAM, whether it stays on AC) has been measured. Replace this reason with that capacity when he decides; this line is the hold, not the verdict."
 }
