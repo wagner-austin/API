@@ -89,6 +89,26 @@ def test_every_package_with_a_check_is_declared_or_excused() -> None:
     assert len(checkable) >= 57
 
 
+def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None:
+    # The other direction (MCPs board task 1e9ab738): 44239417a declared
+    # tools/fleet-execution-runners again with its directory still deleted,
+    # every suite here passed, and its first fleet run (job eccb2ea0) died
+    # at "cd: can't cd to .../tools/fleet-execution-runners" before its build.
+    declared = sorted(_declared())
+
+    missing = [
+        path
+        for path in declared
+        if not (ROOT / path / "Makefile").is_file()
+        or not CHECK_TARGET.search((ROOT / path / "Makefile").read_text(encoding="utf-8"))
+    ]
+
+    assert missing == []
+    # Not a pass over nothing: the registry's 62 projects sourced from this
+    # repository ran in 60 distinct paths on 2026-10-20.
+    assert len(declared) >= 60
+
+
 def test_every_excuse_names_a_package_that_still_needs_one() -> None:
     checkable = set(_checkable())
     declared = _declared()
