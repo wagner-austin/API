@@ -1,4 +1,4 @@
-"""Move this main checkout to a pushed commit: ``make align-commit COMMIT=<sha>``.
+"""Move a main checkout to a pushed commit: ``make align-commit COMMIT=<sha> [REPO=<path>]``.
 
 THE ONE SANCTIONED MOVER OF A MAIN CHECKOUT WITH LINKED TREES. The hub's
 Claude Code hook ``block-shared-checkout-commit`` refuses every hand-run git
@@ -32,11 +32,21 @@ A commit ``git cherry`` reads as patch-equivalent to one on the target is
 carried whole. The report names every commit, what became of it and why, so
 the board post that cites the move carries the evidence.
 
+ANY PEER CHECKOUT, ON ITS OWN DEFAULT BRANCH (MCPs board task a0d34aa8).
+The checkout is named, ``REPO`` defaulting to this one, because a session
+host holds main checkouts of repositories that carry no mover of their own:
+on 2026-10-20 ziggurat's corvis-stick was 2 commits behind and Dashboards
+8, and audit 33b33cb9 measured packages/wiki-check's corpus case failing on
+ziggurat for that alone. The branch a target must be on is the
+repository's own default, read from ``origin/HEAD``, because slime's is
+``master``; until that task it was the constant ``origin/main``.
+
 WHAT IT REFUSES. A dirty tracked path (someone's work: commit, restore or
 preserve it first); an untracked path the target tracks (the move would
-overwrite it); a commit origin/main does not contain (push first); a target
-that reads back as anything but the commit. Untracked paths the target does
-not track are carried unchanged and named.
+overwrite it); a commit the default branch does not contain (push first); a
+checkout whose ``origin/HEAD`` is not recorded; a target that reads back as
+anything but the commit. Untracked paths the target does not track are
+carried unchanged and named.
 """
 
 from __future__ import annotations
@@ -50,9 +60,17 @@ from platform_core.errors import AppError
 
 from maketools import _test_hooks
 
-#: The remote and branch a main checkout aligns to.
+#: The remote a main checkout aligns to.
 REMOTE: Final[str] = "origin"
-TRACKING_BRANCH: Final[str] = "origin/main"
+
+#: The question that names the remote's default branch, as ``origin/<name>``:
+#: git records it at clone, and ``git remote set-head origin --auto`` again.
+DEFAULT_BRANCH_ARGV: Final[tuple[str, ...]] = (
+    "git",
+    "symbolic-ref",
+    "--short",
+    f"refs/remotes/{REMOTE}/HEAD",
+)
 
 #: A git status row's untracked marker.
 UNTRACKED: Final[str] = "??"
@@ -340,8 +358,28 @@ def _refuse_dirty(repo_root: Path, target: str) -> list[str]:
     return untracked
 
 
+def default_branch(repo_root: Path) -> str:
+    """The remote branch a checkout's targets must be on.
+
+    Args:
+        repo_root: The checkout.
+
+    Returns:
+        ``origin/<its default branch>``, as ``origin/HEAD`` records it.
+
+    Raises:
+        AppError: ``MAKETOOLS_ALIGN`` when ``origin/HEAD`` is not recorded,
+            naming the command that records it.
+    """
+    return _capture_word(
+        DEFAULT_BRANCH_ARGV,
+        repo_root,
+        f"reading {REMOTE}'s default branch (git remote set-head {REMOTE} --auto records it)",
+    )
+
+
 def align_checkout(repo_root: Path, commit: str, drop: Sequence[str]) -> AlignReport:
-    """Move a main checkout to a commit origin/main contains.
+    """Move a main checkout to a commit its remote's default branch contains.
 
     Args:
         repo_root: The checkout.
@@ -356,13 +394,14 @@ def align_checkout(repo_root: Path, commit: str, drop: Sequence[str]) -> AlignRe
             names.
     """
     _capture(["git", "fetch", REMOTE], repo_root, f"git fetch {REMOTE}")
+    branch = default_branch(repo_root)
     target = _capture_word(
         ["git", "rev-parse", "--verify", f"{commit}^{{commit}}"], repo_root, f"resolving {commit}"
     )
-    if not _succeeds(["git", "merge-base", "--is-ancestor", target, TRACKING_BRANCH], repo_root):
+    if not _succeeds(["git", "merge-base", "--is-ancestor", target, branch], repo_root):
         raise AppError(
             MaketoolsErrorCode.ALIGN,
-            f"{target[:12]} is not on {TRACKING_BRANCH}; a main checkout moves only to a pushed "
+            f"{target[:12]} is not on {branch}; a main checkout moves only to a pushed "
             "commit, so push it first",
         )
     carried_untracked = _refuse_dirty(repo_root, target)
@@ -408,14 +447,15 @@ def render_report(report: AlignReport) -> list[str]:
 
 
 __all__ = [
+    "DEFAULT_BRANCH_ARGV",
     "REMOTE",
-    "TRACKING_BRANCH",
     "UNTRACKED",
     "AlignReport",
     "Fate",
     "LocalCommit",
     "PathReading",
     "align_checkout",
+    "default_branch",
     "overwritten_paths",
     "read_local_commits",
     "read_path",

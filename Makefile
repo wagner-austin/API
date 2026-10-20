@@ -9,17 +9,21 @@ MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 # ---------------------------------------------------------------------------
 # The main checkout
 # ---------------------------------------------------------------------------
-# align-commit COMMIT=<sha> [DROP=<sha>,<sha>]: move THIS main checkout to a
-# commit origin/main contains, the one sanctioned mover of a checkout with
-# linked session trees beside it (MCPs board task f2f89c69). The hub's hook
-# refuses every hand-run git verb that moves such a checkout, and names this
-# target as the route, because git inside a recipe is what the recipe does.
-# The pump checkout's local commits are re-commits of content origin already
-# carries, so the move may drop them; a local commit whose change the target
-# does not carry is refused by name unless DROP names it. A dirty tracked
-# path refuses the move; an untracked one the target tracks refuses it too.
+# align-commit COMMIT=<sha> [DROP=<sha>,<sha>] [REPO=<path>]: move a main
+# checkout, THIS one unless REPO names another, to a commit its origin's
+# default branch contains, the one sanctioned mover of a checkout with linked
+# session trees beside it (MCPs board task f2f89c69). The hub's hook refuses
+# every hand-run git verb that moves such a checkout, and names this target
+# as the route, because git inside a recipe is what the recipe does. REPO
+# moves a peer that carries no mover of its own, as a session host's
+# ../corvis-stick (MCPs board task a0d34aa8). The pump checkout's local
+# commits are re-commits of content origin already carries, so the move may
+# drop them; a local commit whose change the target does not carry is refused
+# by name unless DROP names it. A dirty tracked path refuses the move; an
+# untracked one the target tracks refuses it too.
+REPO ?= .
 align-commit:
-	$(MAKETOOLS) align --commit $(COMMIT) --drop $(DROP)
+	$(MAKETOOLS) align --repo $(REPO) --commit $(COMMIT) --drop $(DROP)
 
 # ---------------------------------------------------------------------------
 # Infrastructure

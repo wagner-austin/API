@@ -10,6 +10,7 @@ from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
 from maketools.align_checkout import (
+    DEFAULT_BRANCH_ARGV,
     AlignReport,
     LocalCommit,
     PathReading,
@@ -77,6 +78,7 @@ def script_until_head(
     """Script the questions every align asks before it reads local commits."""
     answers: dict[tuple[str, ...], CommandResult] = {
         ("git", "fetch", "origin"): ok(""),
+        DEFAULT_BRANCH_ARGV: ok("origin/main\n"),
         ("git", "rev-parse", "--verify", f"{TARGET}^{{commit}}"): ok(TARGET),
         ("git", "merge-base", "--is-ancestor", TARGET, "origin/main"): ok(""),
         ("git", "status", "--porcelain"): ok(status),
@@ -122,6 +124,22 @@ def test_a_failed_fetch_is_refused_with_its_stderr(world: MovingWorld) -> None:
     world.capturing_answers[("git", "fetch", "origin")] = failed(128, "could not resolve host")
     with pytest.raises(AppError, match=r"git fetch origin failed \(exit 128\): could not resolve"):
         align_checkout(ROOT, TARGET, [])
+
+
+def test_a_checkout_with_no_recorded_default_branch_is_refused_naming_the_cure(
+    world: MovingWorld,
+) -> None:
+    script_until_head(world)
+    world.capturing_answers[DEFAULT_BRANCH_ARGV] = failed(
+        128, "fatal: ref refs/remotes/origin/HEAD is not a symbolic ref"
+    )
+    with pytest.raises(
+        AppError,
+        match=r"reading origin's default branch \(git remote set-head origin --auto records "
+        r"it\) failed \(exit 128\): fatal: ref refs/remotes/origin/HEAD",
+    ):
+        align_checkout(ROOT, TARGET, [])
+    assert ("git", "status", "--porcelain") not in world.captured
 
 
 def test_a_commit_origin_main_does_not_contain_is_refused(world: MovingWorld) -> None:
