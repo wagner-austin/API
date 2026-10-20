@@ -69,24 +69,6 @@
           0
         ],
         "purpose": "the markets paper campaign's tick every three minutes until 2026-12-12, writing files/market-edge-20261012/campaign-20261014-20261212 (API libs/covenant_ml/docs/MARKET_RESEARCH.md)"
-      },
-      {
-        "kind": "scheduled-task",
-        "path": "\\",
-        "name": "API-KalshiDemo-Batch-20261015",
-        "expect": "periodic",
-        "okResults": [
-          0
-        ],
-        "purpose": "the bounded Kalshi demo-exchange batch every fifteen minutes for seven days from 2026-10-15 (API libs/covenant_ml/docs/DEMO_BATCH_VALIDATION_20261015.md)"
-      },
-      {
-        "kind": "scheduled-task",
-        "path": "\\",
-        "name": "API-EquityPaper-Outcome-20261113",
-        "expect": "registered",
-        "okResults": [],
-        "purpose": "the stock-panel pilot's one outcome capture, dated 2026-11-12 16:05 local (API libs/covenant_ml/docs/EQUITY_SCHEDULE.md)"
       }
     ]
   },
