@@ -44,10 +44,12 @@ from fleet.core.workspace_files import read_workspace_document
 #: because it checks no other. loki and serendipity leave their owner only
 #: the operating system's 2 cores since MCPs board task e447de72 (the
 #: operator, 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all
-#: workers"), so 14 and 6 cores are left to the fleet.
+#: workers"), and loki a core more for each of the four GitHub runners
+#: runners.json declares on it (MCPs board task 1e9ab738), so 10 and 6
+#: cores are left to the fleet.
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
-    "loki": ("MCPs/mcp-shared", 7),
+    "loki": ("MCPs/mcp-shared", 5),
     "serendipity": ("MCPs/mcp-shared", 3),
 }
 
