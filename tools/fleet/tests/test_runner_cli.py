@@ -17,7 +17,8 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import runners
 from fleet.core import _test_hooks, runner_render
-from tests._runner_fixtures import no_dropped_jobs
+from fleet.core.runner_registrations import REGISTRATIONS_REASON
+from tests._runner_fixtures import all_declared, no_dropped_jobs
 from tests._runner_roster_files import (
     clean_transcript,
     manual_asset,
@@ -95,24 +96,61 @@ class TestAudit:
                 ok(""),
                 ok(clean_transcript(sedona)),
                 *no_dropped_jobs(sedona),
+                *all_declared([lavender, sedona]),
             ]
         )
         with caplog.at_level("INFO"):
             assert runners.main(["--spec", spec_path]) == 0
         messages = [record.getMessage() for record in caplog.records]
-        assert "lavender OK memory:31gb" in messages
-        assert "sedona OK dropped-jobs:sedona" in messages
+        assert [message for message in messages if " OK " not in message] == []
+        assert messages.index("lavender OK memory:31gb") < messages.index(
+            "sedona OK dropped-jobs:sedona"
+        )
+        assert messages[-1] == "roster OK registrations:wagner-austin/API"
 
     def test_host_filters_to_one_machine(self, tmp_path: pathlib.Path) -> None:
         spec_path = write_roster(tmp_path, [raw_host("lavender"), raw_host("sedona")])
         sedona = roster_host(spec_path, "sedona")
-        runner = FakeRun([ok(""), ok(clean_transcript(sedona)), *no_dropped_jobs(sedona)])
+        runner = FakeRun(
+            [
+                ok(""),
+                ok(clean_transcript(sedona)),
+                *no_dropped_jobs(sedona),
+                *all_declared([sedona]),
+            ]
+        )
         _test_hooks.run = runner
         assert runners.main(["--spec", spec_path, "--host", "sedona"]) == 0
-        # The audit's send and run, then the dropped-job row's two reads.
-        assert len(runner.calls) == 4
+        # The audit's send and run, the dropped-job row's two reads, then the
+        # registrations row's one.
+        assert len(runner.calls) == 5
         assert "sedona" in runner.calls[0]
         assert not any("lavender" in call for call in runner.calls)
+
+    def test_a_registration_no_host_declares_drifts_the_roster_row(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """lavender-wsl's registrations outlived the WSL guest on 2026-10-20."""
+        spec_path = write_roster(tmp_path, [raw_host("lavender"), raw_host("sedona")])
+        sedona = roster_host(spec_path, "sedona")
+        _test_hooks.run = FakeRun(
+            [
+                ok(""),
+                ok(clean_transcript(sedona)),
+                *no_dropped_jobs(sedona),
+                ok("1 sedona online false\n21 lavender-wsl offline false\n"),
+            ]
+        )
+        with caplog.at_level("INFO"):
+            assert runners.main(["--spec", spec_path, "--host", "sedona"]) == 1
+        messages = [record.getMessage() for record in caplog.records]
+        assert messages[-2] == (
+            "roster DRIFT registrations:wagner-austin/API -- examined 2 registration(s) of "
+            "wagner-austin/API against the 2 runner name(s) the roster declares for it; 1 no "
+            "roster host declares: lavender-wsl (id 21, offline, idle); fleet-runners --prune "
+            f"yes removes the offline idle ones ({REGISTRATIONS_REASON})"
+        )
+        assert messages[-1] == "1 fault(s); the fleet does not match its roster"
 
     def test_drift_exits_one_with_the_roster_s_reason_beside_it(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -123,7 +161,9 @@ class TestAudit:
         transcript = clean_transcript(lavender).replace(
             f"service:{unit} OK", f"service:{unit} DRIFT systemctl is-active said: inactive"
         )
-        _test_hooks.run = FakeRun([ok(""), ok(transcript), *no_dropped_jobs(lavender)])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok(transcript), *no_dropped_jobs(lavender), *all_declared([lavender])]
+        )
         with caplog.at_level("INFO"):
             assert runners.main(["--spec", spec_path]) == 1
         messages = [record.getMessage() for record in caplog.records]
@@ -144,6 +184,7 @@ class TestAudit:
                 ok(""),
                 ok(clean_transcript(sedona)),
                 *no_dropped_jobs(sedona),
+                *all_declared([sedona]),
             ]
         )
         with caplog.at_level("INFO"):
@@ -235,7 +276,8 @@ class TestEntrypoint:
         assert caught.value.code == 0
         assert capsys.readouterr().out == (
             "usage: --spec <value> --host <value> --render <value> --sample <value> "
-            "--report <value> --cores <value> --onboard <value> --rebuild <value>\n"
+            "--report <value> --cores <value> --onboard <value> --rebuild <value> "
+            "--prune <value>\n"
         )
 
     def test_a_refusal_is_one_line_on_stderr_and_exit_two(

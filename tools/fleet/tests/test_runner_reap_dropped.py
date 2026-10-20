@@ -23,7 +23,7 @@ from tests.conftest import FakeClock, FakeRun, FakeSleep, failed, ok
 from tests.test_runner_dropped_check import API_BUSY, INSTALLS, X_BUSY, _answer, _host, _worker
 
 #: GitHub reading API's first runner offline, every other runner online and busy.
-API_ONE_OFFLINE = "lavender offline false\nlavender-2 online true\nlavender-3 online true\n"
+API_ONE_OFFLINE = "1 lavender offline false\n2 lavender-2 online true\n3 lavender-3 online true\n"
 
 #: The Worker the offline runner holds, past the grace.
 HELD = _worker(41, 6300)

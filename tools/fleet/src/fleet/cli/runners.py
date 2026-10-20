@@ -8,6 +8,16 @@ Usage:
     fleet-runners --spec runners.json --report load.jsonl --cores 16
     fleet-runners --spec runners.json --host lavender --onboard owner/repo
     fleet-runners --spec runners.json --host lavender --rebuild yes
+    fleet-runners --spec runners.json --prune yes
+
+This module parses the flags and refuses what it cannot honour; each mode's
+act is :mod:`fleet.cli._runner_acts`.
+
+``--prune yes`` deletes each registration of the roster's repositories that
+no roster host declares and GitHub reads offline and idle, the remains of a
+machine that was reimaged or retired, and names any online one it leaves
+(:mod:`fleet.core.runner_registrations`). The audit holds the same
+registrations to the roster, one row per repository.
 
 ``--rebuild yes`` takes a fleet node a CORVIS stick or a netboot installed
 and enrolled to an audited runner host: the base and the reboot it asks
@@ -56,27 +66,12 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import dump_json_str
-from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
+from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.contracts.runners import (
-    HostRunnerSpec,
-    RunnerSpec,
-    encode_runner_spec,
-    parse_runner_spec,
-)
-from fleet.core import (
-    _test_hooks,
-    runner_audit,
-    runner_load,
-    runner_onboard,
-    runner_rebuild,
-    runner_render,
-)
-from fleet.core.runner_audit_types import AuditFinding
-
-_log = get_logger(__name__)
+from fleet.cli import _runner_acts
+from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, parse_runner_spec
+from fleet.core import _test_hooks
 
 SPEC_FLAG = "--spec"
 
@@ -94,6 +89,8 @@ ONBOARD_FLAG = "--onboard"
 
 REBUILD_FLAG = "--rebuild"
 
+PRUNE_FLAG = "--prune"
+
 _FLAGS = (
     SPEC_FLAG,
     HOST_FLAG,
@@ -103,6 +100,7 @@ _FLAGS = (
     CORES_FLAG,
     ONBOARD_FLAG,
     REBUILD_FLAG,
+    PRUNE_FLAG,
 )
 
 
@@ -151,240 +149,32 @@ def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec
     return matches
 
 
-def _audit(hosts: Sequence[HostRunnerSpec]) -> int:
-    """Audit every selected host and print the verdicts.
-
-    Args:
-        hosts: The hosts to audit.
-
-    Returns:
-        0 when every check on every reachable host passed and every host was
-        reachable; 1 otherwise.
-
-    Raises:
-        AppError: ``RUNNER_AUDIT_UNPARSABLE`` from the scorer -- a transcript
-            this tooling cannot score is a fault in the tooling, not a fleet
-            condition, and must stop the audit rather than print as a line.
-    """
-    faults = 0
-    for host in hosts:
-        outcome = runner_audit.attempt_audit_host(host)
-        findings = outcome["findings"]
-        if findings is None:
-            _log.info("%s UNREACHABLE %s", host["name"], outcome["reason"])
-            faults += 1
-            continue
-        faults += _log_findings(host, findings)
-    if faults:
-        _log.info("%d fault(s); the fleet does not match its roster", faults)
-        return 1
-    return 0
-
-
-def _render(host: HostRunnerSpec, out_dir: str) -> int:
-    """Write the converge scripts for one host and print the run order.
-
-    Args:
-        host: The host to render for.
-        out_dir: Directory receiving ``base.sh`` and ``provision.sh``.
-
-    Returns:
-        0 always: rendering is a local act that either completes or raises.
-    """
-    rendered = runner_render.render_provision(host)
-    base_path = pathlib.Path(out_dir) / "base.sh"
-    provision_path = pathlib.Path(out_dir) / "provision.sh"
-    _test_hooks.write_text(base_path, rendered["base_script"])
-    _test_hooks.write_text(provision_path, rendered["provision_script"])
-    _log.info("wrote %s", base_path)
-    _log.info("wrote %s", provision_path)
-    _log.info("RUN ORDER for %s:", host["name"])
-    _log.info(
-        "  1. base.sh on the host as root, then reboot if it printed %s",
-        runner_render.REBOOT_MARKER,
-    )
-    _log.info("  2. provision.sh on the host as root, with each RUNNER_TOKEN_* exported")
-    for step in rendered["manual_steps"]:
-        _log.info("  %s", step)
-    _log.info("  3. fleet-runners --spec <roster> --host %s", host["name"])
-    return 0
-
-
-def _sample(hosts: Sequence[HostRunnerSpec], out_path: str) -> int:
-    """Append one load reading per host to the record file.
-
-    Args:
-        hosts: The hosts to sample.
-        out_path: The JSONL record to append to.
-
-    Returns:
-        0 always: an unreachable host RAISES here rather than scoring, per
-        :func:`fleet.core.runner_load.sample_host` -- a recorded zero from a
-        host the sampler could not see would be the healthiest possible
-        reading taken at the exact moment it knows nothing.
-    """
-    for host in hosts:
-        sample = runner_load.sample_host(host, at=_test_hooks.now())
-        _test_hooks.append_text(pathlib.Path(out_path), runner_load.render_sample_line(sample))
-        _log.info(
-            "%s total=%d %s",
-            host["name"],
-            sample["total"],
-            " ".join(
-                f"{install['runner_name']}({install['repo'].split('/')[1]})="
-                f"{install['descendants']}"
-                for install in sample["installs"]
-            ),
-        )
-    return 0
-
-
-def _report(record_path: str, *, cores: int, host_name: str | None) -> int:
-    """Print the distribution over a sample record.
-
-    Args:
-        record_path: The JSONL record ``--sample`` appended to.
-        cores: The reference core count. A reference line, not a threshold.
-        host_name: Restrict to one host's samples, or None for all.
-
-    Returns:
-        0 always: the report judges nothing, so it has no failing verdict
-        to exit with. See :class:`fleet.core.runner_load.LoadReport`.
-
-    Raises:
-        ValueError: From the reporter, on an empty selection or bad cores.
-        JSONTypeError: From the record decoder, on a corrupt line.
-    """
-    samples = runner_load.decode_sample_file(_test_hooks.read_text(pathlib.Path(record_path)))
-    if host_name is not None:
-        samples = [sample for sample in samples if sample["host"] == host_name]
-    report = runner_load.report_over_cores(samples, cores=cores)
-    _log.info("samples: %d", report["samples"])
-    _log.info("total descendants: min=%d max=%d", report["minimum"], report["maximum"])
-    _log.info(
-        "over %d cores: %.1f%% of samples (longest consecutive streak: %d)",
-        cores,
-        report["over_fraction"] * 100.0,
-        report["longest_over_streak"],
-    )
-    _log.info("at or under %d cores: %.1f%% of samples", cores, report["under_fraction"] * 100.0)
-    return 0
-
-
-def _onboard(spec: RunnerSpec, spec_path: str, host: HostRunnerSpec, repo: str) -> int:
-    """Onboard a repo onto a host, rewrite the roster, print the audit.
-
-    Args:
-        spec: The whole roster; the host entry inside it is mutated by the
-            onboarder and the whole document is rewritten on success.
-        spec_path: Where the roster lives, for the rewrite.
-        host: The target host's entry within ``spec``.
-        repo: The repository, ``owner/name``.
-
-    Returns:
-        0 when the post-onboard audit is clean; 1 when it reports drift --
-        the runner exists and the roster records it either way, and the
-        drift lines say exactly what to repair.
-
-    Raises:
-        AppError: As :func:`fleet.core.runner_onboard.onboard` describes.
-    """
-    plan, findings = runner_onboard.onboard(host, repo)
-    _test_hooks.write_text(
-        pathlib.Path(spec_path), dump_json_str(encode_runner_spec(spec), indent=2) + "\n"
-    )
-    install = plan["install"]
-    _log.info(
-        "onboarded %s runner %s (labels: %s)",
-        repo,
-        install["runner_name"],
-        ",".join(install["labels"]),
-    )
-    _log.info("roster rewritten: %s", spec_path)
-    faults = _log_findings(host, findings)
-    if faults:
-        _log.info("%d fault(s) after onboarding; the drift lines name the repairs", faults)
-        return 1
-    _log.info("onboarding verified: every check green, %s covered from birth", repo)
-    return 0
-
-
-def _rebuild(host: HostRunnerSpec) -> int:
-    """Rebuild one runner host and print each stage and the audit.
-
-    Args:
-        host: The host to rebuild.
-
-    Returns:
-        0 when the post-rebuild audit is clean; 1 when it reports drift, a
-        manual asset being the usual one, named by its own line.
-
-    Raises:
-        AppError: As :func:`fleet.core.runner_rebuild.rebuild` describes.
-    """
-    report = runner_rebuild.rebuild(host)
-    for step in report["steps"]:
-        _log.info("%s rebuild: %s", host["name"], step)
-    for step in report["manual_steps"]:
-        _log.info("%s %s", host["name"], step)
-    faults = _log_findings(host, report["findings"])
-    if faults:
-        _log.info("%d fault(s) after the rebuild; the drift lines name the repairs", faults)
-        return 1
-    _log.info("rebuild verified: every check green on %s", host["name"])
-    return 0
-
-
-def _log_findings(host: HostRunnerSpec, findings: Sequence[AuditFinding]) -> int:
-    """Print one host's audit verdicts.
-
-    Args:
-        host: The audited host.
-        findings: Its verdicts.
-
-    Returns:
-        How many drifted.
-    """
-    faults = 0
-    for finding in findings:
-        if finding["ok"]:
-            _log.info("%s OK %s", host["name"], finding["check_id"])
-        else:
-            _log.info(
-                "%s DRIFT %s -- %s (%s)",
-                host["name"],
-                finding["check_id"],
-                finding["detail"],
-                finding["reason"],
-            )
-            faults += 1
-    return faults
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit, render, sample, report, onboard or rebuild, per the flags.
+    """Audit, render, sample, report, onboard, rebuild or prune, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
             the process arguments.
 
     Returns:
-        0 when the audit found every check passing on every reachable host,
-        or the render, sample or report completed. 1 when any audited check
-        drifted or any audited host did not answer.
+        0 when the audit found every check passing on every reachable host
+        and every registration declared, the prune left no undeclared
+        registration, or the render, sample or report completed. 1 when any
+        audited check drifted, any audited host did not answer, or the prune
+        kept a registration GitHub reads online or busy.
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value,
             ``--spec`` is absent, more than one mode flag is given (each
             names a different act and a combined invocation would do one
             silently), ``--render`` or ``--rebuild`` was given without
-            ``--host``, ``--rebuild`` with any value but ``yes``,
-            ``--report`` without ``--cores``, or ``--cores`` is not a
-            positive integer.
+            ``--host``, ``--prune`` with it, ``--rebuild`` or ``--prune``
+            with any value but ``yes``, ``--report`` without ``--cores``, or
+            ``--cores`` is not a positive integer.
         AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
             ``RUNNER_AUDIT_UNPARSABLE``, ``RUNNER_TOKEN_UNAVAILABLE``,
-            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as the helpers
-            describe.
+            ``RUNNER_GITHUB_UNREADABLE``, ``RUNNER_DEREGISTRATION_REFUSED``,
+            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as the acts describe.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -395,7 +185,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     modes = [
         flag
-        for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REBUILD_FLAG)
+        for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REBUILD_FLAG, PRUNE_FLAG)
         if flag in parsed
     ]
     if len(modes) > 1:
@@ -407,22 +197,32 @@ def main(argv: Sequence[str] | None = None) -> int:
     onboard_repo = parsed.get(ONBOARD_FLAG)
     if onboard_repo is not None:
         _require_host(parsed, ONBOARD_FLAG, "onboarding registers a runner on one machine")
-        return _onboard(spec, spec_path, hosts[0], onboard_repo)
+        return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo)
     if REBUILD_FLAG in parsed:
-        _require_rebuild_confirmation(parsed)
+        _require_confirmation(parsed, REBUILD_FLAG, "it lays a machine's whole runner host")
         _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
-        return _rebuild(hosts[0])
+        return _runner_acts.rebuild(hosts[0])
+    if PRUNE_FLAG in parsed:
+        _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
+        if HOST_FLAG in parsed:
+            raise ValueError(
+                f"{PRUNE_FLAG} takes no {HOST_FLAG}: it holds every repository's registrations "
+                "to the whole roster, which no one host's installs describe"
+            )
+        return _runner_acts.prune(spec)
     render_dir = parsed.get(RENDER_FLAG)
     if render_dir is not None:
         _require_host(parsed, RENDER_FLAG, "a render is for one machine")
-        return _render(hosts[0], render_dir)
+        return _runner_acts.render(hosts[0], render_dir)
     sample_path = parsed.get(SAMPLE_FLAG)
     if sample_path is not None:
-        return _sample(hosts, sample_path)
+        return _runner_acts.sample(hosts, sample_path)
     report_path = parsed.get(REPORT_FLAG)
     if report_path is not None:
-        return _report(report_path, cores=_parse_cores(parsed), host_name=parsed.get(HOST_FLAG))
-    return _audit(hosts)
+        return _runner_acts.report(
+            report_path, cores=_parse_cores(parsed), host_name=parsed.get(HOST_FLAG)
+        )
+    return _runner_acts.audit(spec, hosts)
 
 
 def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
@@ -440,20 +240,22 @@ def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
         raise ValueError(f"{flag} requires {HOST_FLAG}: {why}, and defaulting one would be a guess")
 
 
-def _require_rebuild_confirmation(parsed: dict[str, str]) -> None:
-    """Refuse a ``--rebuild`` whose value is not the literal ``yes``.
+def _require_confirmation(parsed: dict[str, str], flag: str, act: str) -> None:
+    """Refuse a confirming mode whose value is not the literal ``yes``.
 
     Args:
-        parsed: The parsed flags, ``--rebuild`` among them.
+        parsed: The parsed flags, ``flag`` among them.
+        flag: ``--rebuild`` or ``--prune``.
+        act: The clause naming what the mode does that needs confirming.
 
     Raises:
-        ValueError: When the value is anything else: the act lays a whole
-            runner host, and the value is its confirmation.
+        ValueError: When the value is anything else: the value is the act's
+            confirmation.
     """
-    if parsed[REBUILD_FLAG] != "yes":
+    if parsed[flag] != "yes":
         raise ValueError(
-            f"{REBUILD_FLAG} takes the literal value yes, got {parsed[REBUILD_FLAG]!r}: it "
-            "lays a machine's whole runner host, and a value is its confirmation"
+            f"{flag} takes the literal value yes, got {parsed[flag]!r}: {act}, and a value is "
+            "its confirmation"
         )
 
 
@@ -503,6 +305,7 @@ __all__ = [
     "CORES_FLAG",
     "HOST_FLAG",
     "ONBOARD_FLAG",
+    "PRUNE_FLAG",
     "REBUILD_FLAG",
     "RENDER_FLAG",
     "REPORT_FLAG",

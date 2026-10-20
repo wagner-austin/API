@@ -208,3 +208,56 @@ class TestRebuildMode:
             "fetched by a script; place it, then re-run fleet-runners audit.",
         ]
         assert messages[-1] == "1 fault(s) after the rebuild; the drift lines name the repairs"
+
+
+class TestPruneMode:
+    """The --prune mode: its confirmation, its scope, and what it removes and keeps."""
+
+    def test_prune_takes_only_the_literal_yes(self, tmp_path: pathlib.Path) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        with pytest.raises(ValueError) as refused:
+            runners.main(["--spec", spec_path, "--prune", "true"])
+        assert str(refused.value) == (
+            "--prune takes the literal value yes, got 'true': it deletes registrations from "
+            "GitHub, and a value is its confirmation"
+        )
+
+    def test_prune_takes_no_host(self, tmp_path: pathlib.Path) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        with pytest.raises(ValueError, match="--prune takes no --host"):
+            runners.main(["--spec", spec_path, "--host", "lavender", "--prune", "yes"])
+
+    def test_the_offline_undeclared_are_removed_and_the_run_exits_zero(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        runner = FakeRun([ok("1 lavender online true\n21 lavender-wsl offline false\n"), ok("")])
+        _test_hooks.run = runner
+        with caplog.at_level("INFO"):
+            assert runners.main(["--spec", spec_path, "--prune", "yes"]) == 0
+        assert tuple(runner.calls[1]) == (
+            "gh",
+            "api",
+            "-X",
+            "DELETE",
+            "repos/wagner-austin/API/actions/runners/21",
+        )
+        assert [record.getMessage() for record in caplog.records] == [
+            "roster PRUNED wagner-austin/API lavender-wsl (id 21, offline, idle)",
+            "prune: examined 2 registration(s); removed 1, kept 0",
+        ]
+
+    def test_an_online_undeclared_registration_is_kept_and_the_run_exits_one(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        runner = FakeRun([ok("1 lavender online false\n9 loki online false\n")])
+        _test_hooks.run = runner
+        with caplog.at_level("INFO"):
+            assert runners.main(["--spec", spec_path, "--prune", "yes"]) == 1
+        assert len(runner.calls) == 1
+        assert [record.getMessage() for record in caplog.records] == [
+            "roster KEPT wagner-austin/API loki (id 9, online, idle) -- a live machine no "
+            "roster host declares: declare it, or stop its runner and prune again",
+            "prune: examined 2 registration(s); removed 0, kept 1",
+        ]

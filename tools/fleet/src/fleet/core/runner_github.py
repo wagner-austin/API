@@ -1,11 +1,13 @@
 """What the fleet asks GitHub about its self-hosted runners, through ``gh`` on this machine.
 
-Two reads, one auth: a registration token for onboarding and rebuilding a
-host (:mod:`fleet.core.runner_onboard`, :mod:`fleet.core.runner_rebuild`), and
-each repository's runner list for the audit's dropped-job row
-(:mod:`fleet.core.runner_dropped_check`, MCPs board task 715b9ec5). Both run
-``gh api`` on the machine running ``fleet-runners``, so a failure of either is
-a local auth or permissions condition and is named as one.
+Two reads and one removal, one auth: a registration token for onboarding and
+rebuilding a host (:mod:`fleet.core.runner_onboard`,
+:mod:`fleet.core.runner_rebuild`); each repository's runner list, for the
+audit's dropped-job row (:mod:`fleet.core.runner_dropped_check`, MCPs board
+task 715b9ec5) and its registrations row (:mod:`fleet.core.runner_registrations`);
+and the deletion of a registration no roster host declares. Each runs
+``gh api`` on the machine running ``fleet-runners``, so a failure of any is a
+local auth or permissions condition and is named as one.
 """
 
 from __future__ import annotations
@@ -25,10 +27,12 @@ class GitHubRunner(TypedDict):
     """GitHub's reading of one self-hosted runner.
 
     Attributes:
+        id: GitHub's id for the registration, which a deletion names.
         status: ``online`` or ``offline``.
         busy: Whether GitHub holds a job on it.
     """
 
+    id: int
     status: str
     busy: bool
 
@@ -93,9 +97,10 @@ def read_github_runners(repo: str) -> dict[str, GitHubRunner]:
 
     Raises:
         AppError: ``RUNNER_GITHUB_UNREADABLE`` when ``gh`` exits non-zero or
-            prints a line that is not ``<name> <status> <busy>``: a local
-            auth or permission condition, or a change in GitHub's answer,
-            named as such rather than read as runners GitHub does not list.
+            prints a line that is not ``<id> <name> <status> <busy>``: a
+            local auth or permission condition, or a change in GitHub's
+            answer, named as such rather than read as runners GitHub does
+            not list.
     """
     result = _test_hooks.run(
         [
@@ -104,7 +109,7 @@ def read_github_runners(repo: str) -> dict[str, GitHubRunner]:
             "--paginate",
             f"repos/{repo}/actions/runners",
             "--jq",
-            '.runners[] | "\\(.name) \\(.status) \\(.busy)"',
+            '.runners[] | "\\(.id) \\(.name) \\(.status) \\(.busy)"',
         ],
         timeout_seconds=GH_API_TIMEOUT_SECONDS,
     )
@@ -118,18 +123,44 @@ def read_github_runners(repo: str) -> dict[str, GitHubRunner]:
     runners: dict[str, GitHubRunner] = {}
     for line in result["stdout"].splitlines():
         words = line.split()
-        if len(words) != 3 or words[2] not in ("true", "false"):
+        if len(words) != 4 or not words[0].isdigit() or words[3] not in ("true", "false"):
             raise AppError(
                 FleetErrorCode.RUNNER_GITHUB_UNREADABLE,
-                f"gh listed a runner of {repo} as {line!r}, not '<name> <status> <busy>'",
+                f"gh listed a runner of {repo} as {line!r}, not '<id> <name> <status> <busy>'",
             )
-        runners[words[0]] = GitHubRunner(status=words[1], busy=words[2] == "true")
+        runners[words[1]] = GitHubRunner(id=int(words[0]), status=words[2], busy=words[3] == "true")
     return runners
+
+
+def delete_registration(repo: str, runner_id: int) -> None:
+    """Remove one runner registration from a repository.
+
+    Args:
+        repo: The repository, ``owner/name``.
+        runner_id: GitHub's id for the registration.
+
+    Raises:
+        AppError: ``RUNNER_DEREGISTRATION_REFUSED`` when ``gh`` exits
+            non-zero, naming its stderr: a local auth or permission
+            condition, never a registration to report as removed.
+    """
+    result = _test_hooks.run(
+        ["gh", "api", "-X", "DELETE", f"repos/{repo}/actions/runners/{runner_id}"],
+        timeout_seconds=GH_API_TIMEOUT_SECONDS,
+    )
+    if result["returncode"] != 0:
+        detail = result["stderr"].strip() or "<no stderr>"
+        raise AppError(
+            FleetErrorCode.RUNNER_DEREGISTRATION_REFUSED,
+            f"gh could not delete runner {runner_id} of {repo}: {detail}. This is local auth "
+            "or repo permissions, not the fleet.",
+        )
 
 
 __all__ = [
     "GH_API_TIMEOUT_SECONDS",
     "GitHubRunner",
+    "delete_registration",
     "mint_registration_token",
     "read_github_runners",
 ]

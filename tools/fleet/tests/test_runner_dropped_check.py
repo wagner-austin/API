@@ -81,10 +81,10 @@ def _answer(*units: tuple[HostWorker, ...]) -> str:
 
 
 #: GitHub reading every API runner online and busy.
-API_BUSY = "lavender online true\nlavender-2 online true\nlavender-3 online true\n"
+API_BUSY = "1 lavender online true\n2 lavender-2 online true\n3 lavender-3 online true\n"
 
 #: GitHub reading x's runner online and busy.
-X_BUSY = "lavender online true\n"
+X_BUSY = "4 lavender online true\n"
 
 
 def _one(*, passed: bool, detail: str) -> AuditOutcome:
@@ -117,7 +117,7 @@ class TestTheReading:
     def test_each_dropped_worker_is_named_by_its_runner_pid_and_start(self) -> None:
         """The 2026-10-16 shape: GitHub reads the runners offline or idle, or
         lists them no more, while their Workers run on."""
-        github = "lavender offline false\nlavender-2 online false\nlavender-3 online true\n"
+        github = "1 lavender offline false\n2 lavender-2 online false\n3 lavender-3 online true\n"
         runner = FakeRun(
             [
                 ok(github),
@@ -171,7 +171,7 @@ class TestTheReading:
     def test_a_worker_inside_the_grace_or_none_is_not_named(self) -> None:
         """GitHub's list lags a job's start, so a Worker of exactly the grace
         under a runner GitHub reads idle is a job starting, not a dropped one."""
-        idle = "lavender offline false\nlavender-2 online false\n"
+        idle = "1 lavender offline false\n2 lavender-2 online false\n"
         _test_hooks.run = FakeRun(
             [ok(idle), ok(""), ok(_answer((_worker(61, 300),), (), (_worker(62, 12),), ()))]
         )
@@ -227,7 +227,7 @@ class TestTheAuditRow:
     def test_each_dropped_worker_drifts_the_row_by_name(self) -> None:
         _test_hooks.run = FakeRun(
             [
-                ok("lavender online false\n"),
+                ok("1 lavender online false\n"),
                 ok(X_BUSY),
                 ok(_answer((_worker(81, 700),), (), (), ())),
             ]
@@ -246,7 +246,7 @@ class TestTheAuditRow:
         GitHub still held on 2026-10-17."""
         _test_hooks.run = FakeRun(
             [
-                ok("lavender offline true\nlavender-2 offline true\n"),
+                ok("1 lavender offline true\n2 lavender-2 offline true\n"),
                 ok(X_BUSY),
                 ok(_answer((_worker(91, 9000),), (_worker(92, 9000),), (), ())),
             ]

@@ -137,6 +137,31 @@ def no_dropped_jobs(spec: HostRunnerSpec) -> list[_test_hooks.CommandResult]:
     ]
 
 
+def all_declared(hosts: Sequence[HostRunnerSpec]) -> list[_test_hooks.CommandResult]:
+    """The registrations rows' reads where GitHub lists exactly what the hosts declare.
+
+    Args:
+        hosts: The audited hosts.
+
+    Returns:
+        One ``gh`` runner list per repository of their installs, in sorted
+        order, listing each install of those hosts with an id, online and
+        idle.
+    """
+    installs = [install for host in hosts for install in host["installs"]]
+    repos = sorted({install["repo"] for install in installs})
+    return [
+        ok(
+            "".join(
+                f"{index} {install['runner_name']} online false\n"
+                for index, install in enumerate(installs, start=1)
+                if install["repo"] == repo
+            )
+        )
+        for repo in repos
+    ]
+
+
 def quiet_rebuild_answers(
     transcript: str, spec: HostRunnerSpec, *, repos: int
 ) -> list[_test_hooks.CommandResult]:
@@ -205,6 +230,7 @@ __all__ = [
     "a_base",
     "a_ci_slice",
     "a_host",
+    "all_declared",
     "an_install",
     "base_json",
     "ci_slice_json",
