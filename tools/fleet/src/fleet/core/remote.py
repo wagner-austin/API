@@ -466,35 +466,60 @@ ROOT_PREFIX: tuple[str, ...] = ("sudo", "-n")
 ROOT_BASH: tuple[str, ...] = (*ROOT_PREFIX, "/bin/bash")
 
 
+def root_invocation(platform: NodePlatform) -> tuple[str, ...]:
+    """How a node runs a payload with the machine's full rights.
+
+    Args:
+        platform: The node's platform.
+
+    Returns:
+        :data:`ROOT_BASH` on Linux; on Windows the dialect's PowerShell
+        invocation, since the one Windows runner host's ssh session already
+        holds an elevated token (loki, measured at High Mandatory Level on
+        2026-10-20, MCPs board task 1e9ab738).
+    """
+    if platform is NodePlatform.LINUX:
+        return ROOT_BASH
+    return dialect.for_platform(platform).invocation()
+
+
 def attempt_root_script(
-    host: str, remote_path: str, body: str, *, timeout_seconds: int
+    host: str, remote_path: str, body: str, *, platform: NodePlatform, timeout_seconds: int
 ) -> RemoteOutcome:
-    """Send a bash payload to a Linux node and run it as root, reporting failure as a value.
+    """Send a payload to a node and run it with full rights, reporting failure as a value.
 
     For a CI runner host's payloads (:mod:`fleet.core.runner_audit`,
-    :mod:`fleet.core.runner_rebuild`): they read and write units, slices and
-    the runner account's files, which only root may. The send keeps the
-    short deadline; only the run takes the caller's, because a provision
-    that installs packages was never sized for :data:`SSH_TIMEOUT_SECONDS`.
+    :mod:`fleet.core.runner_rebuild`, :mod:`fleet.core.runner_windows_host`):
+    they read and write units, slices, services and the runner account's
+    files, which only root or an administrator may. The send keeps the short
+    deadline; only the run takes the caller's, because a provision that
+    installs packages was never sized for :data:`SSH_TIMEOUT_SECONDS`.
 
     Args:
         host: SSH destination.
         remote_path: Absolute path on the node to write and then run.
-        body: The payload's complete text.
+        body: The payload's complete text: bash on Linux, PowerShell on
+            Windows.
+        platform: The node's platform, which decides how the payload is
+            written and run (:func:`root_invocation`).
         timeout_seconds: The deadline for running it.
 
     Returns:
         The payload's standard output, or the reason there is none. A send
         that fails short-circuits, as :func:`attempt_script` explains.
     """
-    failure = attempt_send(host, remote_path, body, platform=NodePlatform.LINUX)
+    failure = attempt_send(host, remote_path, body, platform=platform)
     if failure is not None:
         return RemoteOutcome(output="", failure=failure)
-    return _attempt_ssh_within(host, (*ROOT_BASH, remote_path), timeout_seconds=timeout_seconds)
+    return _attempt_ssh_within(
+        host, (*root_invocation(platform), remote_path), timeout_seconds=timeout_seconds
+    )
 
 
-def run_root_script(host: str, remote_path: str, body: str, *, timeout_seconds: int) -> str:
-    """Send a bash payload to a Linux node and run it as root.
+def run_root_script(
+    host: str, remote_path: str, body: str, *, platform: NodePlatform, timeout_seconds: int
+) -> str:
+    """Send a payload to a node and run it with full rights.
 
     The raising boundary over :func:`attempt_root_script`.
 
@@ -502,6 +527,7 @@ def run_root_script(host: str, remote_path: str, body: str, *, timeout_seconds: 
         host: SSH destination.
         remote_path: Absolute path on the node to write and then run.
         body: The payload's complete text.
+        platform: The node's platform.
         timeout_seconds: The deadline for running it.
 
     Returns:
@@ -512,7 +538,9 @@ def run_root_script(host: str, remote_path: str, body: str, *, timeout_seconds: 
             still running at the deadline is ended and reported as the
             latter, and one exiting non-zero as the latter with its stderr.
     """
-    outcome = attempt_root_script(host, remote_path, body, timeout_seconds=timeout_seconds)
+    outcome = attempt_root_script(
+        host, remote_path, body, platform=platform, timeout_seconds=timeout_seconds
+    )
     _raise_on(outcome["failure"])
     return outcome["output"]
 
@@ -531,6 +559,7 @@ __all__ = [
     "attempt_send",
     "attempt_ssh",
     "read_script",
+    "root_invocation",
     "run_root_script",
     "run_script",
     "run_ssh",

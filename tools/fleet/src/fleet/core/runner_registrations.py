@@ -101,13 +101,16 @@ def declared_names(spec: RunnerSpec) -> dict[str, set[str]]:
         spec: The roster.
 
     Returns:
-        Each repository any host's installs name, with those installs'
-        runner names.
+        Each repository any host's installs name, Linux and Windows alike,
+        with those installs' runner names.
     """
     declared: dict[str, set[str]] = {}
     for host in spec["hosts"]:
         for install in host["installs"]:
             declared.setdefault(install["repo"], set()).add(install["runner_name"])
+    for windows in spec["windows_hosts"]:
+        for runner in windows["installs"]:
+            declared.setdefault(runner["repo"], set()).add(runner["runner_name"])
     return declared
 
 

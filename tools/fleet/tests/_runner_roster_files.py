@@ -70,18 +70,28 @@ def manual_asset(reason: str) -> dict[str, JSONValue]:
     }
 
 
-def write_roster(tmp_path: pathlib.Path, hosts: list[dict[str, JSONValue]]) -> str:
+def write_roster(
+    tmp_path: pathlib.Path,
+    hosts: list[dict[str, JSONValue]],
+    windows_hosts: list[dict[str, JSONValue]] | None = None,
+) -> str:
     """Write a roster file.
 
     Args:
         tmp_path: The case's directory.
-        hosts: The raw host entries.
+        hosts: The raw Linux host entries.
+        windows_hosts: The raw Windows host entries; None writes the empty
+            list a roster with no Windows host declares.
 
     Returns:
         The roster's path, as the ``--spec`` flag takes it.
     """
     path = tmp_path / "runners.json"
-    path.write_text(dump_json_str({"hosts": hosts}), encoding="utf-8")
+    windows: list[JSONValue] = list(windows_hosts) if windows_hosts is not None else []
+    hosts_value: list[JSONValue] = list(hosts)
+    path.write_text(
+        dump_json_str({"hosts": hosts_value, "windows_hosts": windows}), encoding="utf-8"
+    )
     return str(path)
 
 

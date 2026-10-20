@@ -41,6 +41,7 @@ from typing import Final
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import _test_hooks, remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
@@ -152,7 +153,11 @@ def _base(spec: HostRunnerSpec, steps: list[str]) -> None:
     path = payload_path(spec, "fleet-rebuild-base")
     script = runner_render.render_base_script(spec)
     output = remote.run_root_script(
-        spec["host"], path, script, timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS
+        spec["host"],
+        path,
+        script,
+        platform=NodePlatform.LINUX,
+        timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     if runner_render.REBOOT_MARKER not in output:
         steps.append("base: laid, and nothing asked for a reboot")
@@ -160,7 +165,11 @@ def _base(spec: HostRunnerSpec, steps: list[str]) -> None:
     boot = reboot_and_wait(spec)
     steps.append(f"base: laid, and the host rebooted for it (boot {boot})")
     again = remote.run_root_script(
-        spec["host"], path, script, timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS
+        spec["host"],
+        path,
+        script,
+        platform=NodePlatform.LINUX,
+        timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     if runner_render.REBOOT_MARKER in again:
         raise AppError(
@@ -188,6 +197,7 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> None:
         spec["host"],
         payload_path(spec, "fleet-rebuild-provision"),
         runner_render.render_provision_script(spec, tokens),
+        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     steps.append(f"provision: ran for {len(spec['installs'])} runners")

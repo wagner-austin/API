@@ -27,7 +27,7 @@ from fleet.contracts.runners import (
 from fleet.contracts.tagged_tools import CHROME_LINUX_PATH, TAGGED_TOOLS
 from fleet.contracts.workspace import decode_fleet_workspace
 from tests._registry import shipped_document
-from tests._runner_fixtures import base_json, ci_slice_json
+from tests._runner_fixtures import base_json, ci_slice_json, raw_windows_host
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
@@ -287,14 +287,25 @@ class TestRunnerSpec:
 
     def test_an_empty_roster_is_refused_because_it_reads_as_healthy(self) -> None:
         with pytest.raises(JSONTypeError, match="reads exactly like a healthy fleet"):
-            decode_runner_spec({"hosts": []})
+            decode_runner_spec({"hosts": [], "windows_hosts": []})
 
     def test_duplicate_host_names_are_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be unique, got duplicates: lavender"):
-            decode_runner_spec({"hosts": [_host(), _host()]})
+            decode_runner_spec({"hosts": [_host(), _host()], "windows_hosts": []})
+
+    def test_a_windows_host_may_not_share_a_linux_host_s_name(self) -> None:
+        windows = raw_windows_host()
+        windows["name"] = "lavender"
+        with pytest.raises(JSONTypeError, match="must be unique, got duplicates: lavender"):
+            decode_runner_spec({"hosts": [_host()], "windows_hosts": [windows]})
+
+    def test_a_roster_that_names_no_windows_hosts_is_refused(self) -> None:
+        with pytest.raises(JSONTypeError, match="windows_hosts"):
+            decode_runner_spec({"hosts": [_host()]})
 
     def test_encode_then_decode_is_the_identity(self) -> None:
-        spec = decode_runner_spec({"hosts": [_host()]})
+        spec = decode_runner_spec({"hosts": [_host()], "windows_hosts": [raw_windows_host()]})
+        assert spec["windows_hosts"][0]["name"] == "loki"
         assert decode_runner_spec(dict(encode_runner_spec(spec))) == spec
 
     def test_the_shipped_roster_decodes_and_round_trips(self) -> None:

@@ -10,7 +10,9 @@ A RUNNER HOST IS A LINUX MACHINE. Until 2026-10-19 lavender was a Windows
 machine whose WSL distro held the Linux runners beside four Windows ones;
 it was reimaged to Ubuntu that day and every Windows install was deleted
 (MCPs board task 1e9ab738), so each runner is a systemd service on the host
-itself, reached over ssh like every other fleet node.
+itself, reached over ssh like every other fleet node. The one exception is
+``windows_hosts``: loki, the machine that stays Windows, carrying only the
+CI arms that test Windows itself (:mod:`fleet.contracts.runner_windows`).
 
 THIS IS A SECOND MACHINE DOCUMENT, NOT A COPY OF THE FIRST. The fleet's
 roster, ``registry/machines`` (:mod:`fleet.contracts.machine`), owns which
@@ -44,6 +46,11 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runner_base import HostBase, decode_host_base, encode_host_base
 from fleet.contracts.runner_slice import CiSlice, decode_ci_slice, encode_ci_slice
+from fleet.contracts.runner_windows import (
+    WindowsRunnerHost,
+    decode_windows_runner_host,
+    encode_windows_runner_host,
+)
 
 
 class RunnerInstall(TypedDict):
@@ -168,10 +175,13 @@ class RunnerSpec(TypedDict):
     """The whole roster.
 
     Attributes:
-        hosts: Every machine serving GitHub Actions for these repositories.
+        hosts: Every Linux machine serving GitHub Actions for these
+            repositories.
+        windows_hosts: Every Windows machine doing so, loki alone.
     """
 
     hosts: list[HostRunnerSpec]
+    windows_hosts: list[WindowsRunnerHost]
 
 
 def encode_runner_install(install: RunnerInstall) -> JSONObject:
@@ -424,7 +434,10 @@ def encode_runner_spec(spec: RunnerSpec) -> JSONObject:
     Returns:
         JSON-serialisable mapping carrying every host.
     """
-    return {"hosts": [encode_host_runner_spec(host) for host in spec["hosts"]]}
+    return {
+        "hosts": [encode_host_runner_spec(host) for host in spec["hosts"]],
+        "windows_hosts": [encode_windows_runner_host(host) for host in spec["windows_hosts"]],
+    }
 
 
 def decode_runner_spec(value: JSONValue) -> RunnerSpec:
@@ -437,10 +450,11 @@ def decode_runner_spec(value: JSONValue) -> RunnerSpec:
         The validated roster.
 
     Raises:
-        JSONTypeError: If the value is not an object, ``hosts`` is missing
-            or holds a non-object, two hosts share a name, or the roster is
-            empty. An empty roster audits nothing and exits 0, which reads
-            exactly like a healthy fleet.
+        JSONTypeError: If the value is not an object, ``hosts`` or
+            ``windows_hosts`` is missing or holds a non-object, two hosts of
+            either kind share a name, or ``hosts`` is empty. An empty roster
+            audits nothing and exits 0, which reads exactly like a healthy
+            fleet.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"runner spec must be a JSON object, got {type(value).__name__}")
@@ -450,14 +464,17 @@ def decode_runner_spec(value: JSONValue) -> RunnerSpec:
             "hosts must be non-empty; an empty roster audits nothing and exits 0, which "
             "reads exactly like a healthy fleet"
         )
-    names = [host["name"] for host in hosts]
+    windows_hosts = [
+        decode_windows_runner_host(entry) for entry in require_list(value, "windows_hosts")
+    ]
+    names = [host["name"] for host in hosts] + [host["name"] for host in windows_hosts]
     duplicates = sorted({name for name in names if names.count(name) > 1})
     if duplicates:
         raise JSONTypeError(
             f"host names must be unique, got duplicates: {', '.join(duplicates)}; two "
             "declarations for one machine would audit it twice and disagree"
         )
-    return RunnerSpec(hosts=hosts)
+    return RunnerSpec(hosts=hosts, windows_hosts=windows_hosts)
 
 
 def parse_runner_spec(raw: str, *, source: str) -> RunnerSpec:

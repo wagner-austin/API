@@ -65,6 +65,8 @@ class TestTheCommittedCopies:
             "dialect-init-repository",
             "dialect-companion-repository",
             "dialect-build",
+            "runner-windows-install",
+            "runner-windows-audit",
         ]
 
 

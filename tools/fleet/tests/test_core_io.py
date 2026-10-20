@@ -559,3 +559,22 @@ class TestRemote:
             == "output"
         )
         assert runner.calls[1][-2:] == ("/bin/sh", "/s/p.sh")
+
+    def test_a_windows_root_payload_runs_in_the_elevated_session_under_its_deadline(
+        self,
+    ) -> None:
+        """loki's ssh session holds High Mandatory Level, so no sudo stands
+        between it and the payload; only the run takes the caller's deadline."""
+        runner = FakeRun([ok(""), ok("installed")])
+        _test_hooks.run = runner
+
+        output = remote.run_root_script(
+            "loki", "C:/fleet/p.ps1", "body", platform=NodePlatform.WINDOWS, timeout_seconds=900
+        )
+
+        assert output == "installed"
+        assert remote.root_invocation(NodePlatform.WINDOWS) == (
+            dialect_windows.POWERSHELL_INVOCATION
+        )
+        assert runner.calls[1][-6:] == (*dialect_windows.POWERSHELL_INVOCATION, "C:/fleet/p.ps1")
+        assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS, 900]

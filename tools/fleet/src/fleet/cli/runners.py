@@ -68,8 +68,10 @@ from platform_core.cli_boundary import run_cli
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
+from typing_extensions import TypedDict
 
 from fleet.cli import _runner_acts
+from fleet.contracts.runner_windows import WindowsRunnerHost
 from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, parse_runner_spec
 from fleet.core import _test_hooks
 
@@ -122,7 +124,19 @@ def load_runner_spec(path: str) -> RunnerSpec:
     return parse_runner_spec(_test_hooks.read_text(pathlib.Path(path)), source=path)
 
 
-def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec]:
+class Selection(TypedDict):
+    """The hosts one invocation covers, by kind.
+
+    Attributes:
+        hosts: The Linux runner hosts, in roster order.
+        windows_hosts: The Windows runner hosts, in roster order.
+    """
+
+    hosts: list[HostRunnerSpec]
+    windows_hosts: list[WindowsRunnerHost]
+
+
+def select_hosts(spec: RunnerSpec, host_name: str | None) -> Selection:
     """The hosts one invocation covers.
 
     Args:
@@ -130,7 +144,7 @@ def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec
         host_name: What ``--host`` was given, or None for every host.
 
     Returns:
-        The matching hosts, in roster order.
+        Every host of both kinds, or the one named.
 
     Raises:
         AppError: ``RUNNER_HOST_UNKNOWN`` when a named host is not in the
@@ -138,15 +152,19 @@ def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec
             a healthy host.
     """
     if host_name is None:
-        return list(spec["hosts"])
-    matches = [host for host in spec["hosts"] if host["name"] == host_name]
-    if not matches:
-        known = ", ".join(host["name"] for host in spec["hosts"])
+        return Selection(hosts=list(spec["hosts"]), windows_hosts=list(spec["windows_hosts"]))
+    linux = [host for host in spec["hosts"] if host["name"] == host_name]
+    windows = [host for host in spec["windows_hosts"] if host["name"] == host_name]
+    if not linux and not windows:
+        known = ", ".join(
+            [host["name"] for host in spec["hosts"]]
+            + [host["name"] for host in spec["windows_hosts"]]
+        )
         raise AppError(
             FleetErrorCode.RUNNER_HOST_UNKNOWN,
             f"the roster declares no host named {host_name!r}; it declares: {known}",
         )
-    return matches
+    return Selection(hosts=linux, windows_hosts=windows)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -193,36 +211,98 @@ def main(argv: Sequence[str] | None = None) -> int:
             f"{' and '.join(modes)} are different acts; give one, or neither for the audit"
         )
     spec = load_runner_spec(spec_path)
-    hosts = select_hosts(spec, parsed.get(HOST_FLAG))
+    selection = select_hosts(spec, parsed.get(HOST_FLAG))
+    if ONBOARD_FLAG in parsed or REBUILD_FLAG in parsed or PRUNE_FLAG in parsed:
+        return _change(parsed, spec, spec_path, selection)
+    return _read(parsed, spec, selection)
+
+
+def _change(parsed: dict[str, str], spec: RunnerSpec, spec_path: str, selection: Selection) -> int:
+    """Run the one mode that changes a host or GitHub: onboard, rebuild or prune.
+
+    Args:
+        parsed: The parsed flags, naming exactly one of the three.
+        spec: The roster.
+        spec_path: Where it lives, which an onboard rewrites.
+        selection: The hosts ``--host`` selected.
+
+    Returns:
+        The act's exit status.
+
+    Raises:
+        ValueError: As :func:`main` describes for these modes.
+    """
+    hosts, windows_hosts = selection["hosts"], selection["windows_hosts"]
     onboard_repo = parsed.get(ONBOARD_FLAG)
     if onboard_repo is not None:
         _require_host(parsed, ONBOARD_FLAG, "onboarding registers a runner on one machine")
+        _require_linux(windows_hosts, ONBOARD_FLAG)
         return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo)
     if REBUILD_FLAG in parsed:
         _require_confirmation(parsed, REBUILD_FLAG, "it lays a machine's whole runner host")
         _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
+        if windows_hosts:
+            return _runner_acts.rebuild_windows(windows_hosts[0])
         return _runner_acts.rebuild(hosts[0])
-    if PRUNE_FLAG in parsed:
-        _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
-        if HOST_FLAG in parsed:
-            raise ValueError(
-                f"{PRUNE_FLAG} takes no {HOST_FLAG}: it holds every repository's registrations "
-                "to the whole roster, which no one host's installs describe"
-            )
-        return _runner_acts.prune(spec)
+    _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
+    if HOST_FLAG in parsed:
+        raise ValueError(
+            f"{PRUNE_FLAG} takes no {HOST_FLAG}: it holds every repository's registrations "
+            "to the whole roster, which no one host's installs describe"
+        )
+    return _runner_acts.prune(spec)
+
+
+def _read(parsed: dict[str, str], spec: RunnerSpec, selection: Selection) -> int:
+    """Run the one mode that only reads or writes locally: render, sample, report or the audit.
+
+    Args:
+        parsed: The parsed flags, naming at most one of the first three.
+        spec: The roster.
+        selection: The hosts ``--host`` selected.
+
+    Returns:
+        The act's exit status.
+
+    Raises:
+        ValueError: As :func:`main` describes for these modes.
+    """
+    hosts, windows_hosts = selection["hosts"], selection["windows_hosts"]
     render_dir = parsed.get(RENDER_FLAG)
     if render_dir is not None:
         _require_host(parsed, RENDER_FLAG, "a render is for one machine")
+        _require_linux(windows_hosts, RENDER_FLAG)
         return _runner_acts.render(hosts[0], render_dir)
     sample_path = parsed.get(SAMPLE_FLAG)
     if sample_path is not None:
+        if HOST_FLAG in parsed:
+            _require_linux(windows_hosts, SAMPLE_FLAG)
         return _runner_acts.sample(hosts, sample_path)
     report_path = parsed.get(REPORT_FLAG)
     if report_path is not None:
         return _runner_acts.report(
             report_path, cores=_parse_cores(parsed), host_name=parsed.get(HOST_FLAG)
         )
-    return _runner_acts.audit(spec, hosts)
+    return _runner_acts.audit(spec, hosts, windows_hosts)
+
+
+def _require_linux(windows_hosts: list[WindowsRunnerHost], flag: str) -> None:
+    """Refuse a Linux-only mode pointed at a Windows runner host.
+
+    Args:
+        windows_hosts: The Windows hosts selected.
+        flag: The mode.
+
+    Raises:
+        ValueError: When one is selected: the base, the slices, the load
+            sample and an onboard are a Linux host's, and a Windows host's
+            runners are laid by ``--rebuild yes`` from the roster.
+    """
+    if windows_hosts:
+        raise ValueError(
+            f"{flag} covers Linux runner hosts; {windows_hosts[0]['name']} is a Windows runner "
+            f"host, whose runners {REBUILD_FLAG} yes lays from the roster and the audit reads"
+        )
 
 
 def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
@@ -311,6 +391,7 @@ __all__ = [
     "REPORT_FLAG",
     "SAMPLE_FLAG",
     "SPEC_FLAG",
+    "Selection",
     "entrypoint",
     "load_runner_spec",
     "main",

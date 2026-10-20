@@ -38,6 +38,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
+from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
@@ -142,6 +143,7 @@ def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFin
         spec["host"],
         payload_path(spec, f"fleet-onboard-{_repo_slug(repo)}"),
         runner_render.render_provision_script(spec, {repo: token}),
+        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     outcome = runner_audit.attempt_audit_host(spec)

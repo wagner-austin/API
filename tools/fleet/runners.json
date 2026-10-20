@@ -135,5 +135,42 @@
         "io_read_iops": 5000
       }
     }
+  ],
+  "windows_hosts": [
+    {
+      "name": "loki",
+      "host": "loki",
+      "payload_dir": "C:/fleet/runner-payloads",
+      "installs": [
+        {
+          "repo": "wagner-austin/chat",
+          "runner_name": "loki",
+          "service": "actions.runner.wagner-austin-chat.loki",
+          "root": "C:/actions-runner/chat",
+          "labels": ["loki"]
+        },
+        {
+          "repo": "wagner-austin/corvis-stick",
+          "runner_name": "loki",
+          "service": "actions.runner.wagner-austin-corvis-stick.loki",
+          "root": "C:/actions-runner/corvis-stick",
+          "labels": ["loki"]
+        },
+        {
+          "repo": "wagner-austin/tree-bot",
+          "runner_name": "loki",
+          "service": "actions.runner.wagner-austin-tree-bot.loki",
+          "root": "C:/actions-runner/tree-bot",
+          "labels": ["loki"]
+        },
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "loki",
+          "service": "actions.runner.wagner-austin-MCPs.loki",
+          "root": "C:/actions-runner/MCPs",
+          "labels": ["loki"]
+        }
+      ]
+    }
   ]
 }

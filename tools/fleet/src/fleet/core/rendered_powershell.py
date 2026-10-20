@@ -12,9 +12,11 @@ entry here, and ``tests/pester`` executes each copy to every command and
 branch. Nothing is added to the harness to see them: a committed render is a
 tracked script like any other, and one no suite runs is PS-NO-SUITE.
 
-Every one is the Windows dispatch dialect's; the CI runner host's scripts
-are bash since lavender was reimaged to Linux (MCPs board task 1e9ab738).
-They depend on a dispatch, so they are rendered for one example dispatch
+Every one but two is the Windows dispatch dialect's. The other two are the
+one Windows runner host's, loki's install and audit
+(:mod:`fleet.core.runner_windows_render`), rendered for one example install;
+every Linux runner host's scripts are bash (MCPs board task 1e9ab738).
+The dialect's depend on a dispatch, so they are rendered for one example dispatch
 (:data:`EXAMPLE_STAGE_ROOT`, :data:`EXAMPLE_RUN_ID`): every location they read
 is a parameter defaulting to the rendered path, so the suite runs the
 committed text against a directory it laid out, and a real dispatch's copy
@@ -32,6 +34,7 @@ from fleet.core import (
     dialect,
     names,
     retire,
+    runner_windows_render,
     stage_repository,
     verdict,
 )
@@ -165,6 +168,14 @@ def render_all() -> list[RenderedScript]:
                 elevated=False,
                 agent=EXAMPLE_AGENT,
             ),
+        ),
+        RenderedScript(
+            name=runner_windows_render.INSTALL_STEM,
+            text=runner_windows_render.committed_install_script(),
+        ),
+        RenderedScript(
+            name=runner_windows_render.AUDIT_STEM,
+            text=runner_windows_render.committed_audit_script(),
         ),
     ]
 
