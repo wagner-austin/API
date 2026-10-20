@@ -123,10 +123,10 @@ class FleetErrorCode(ErrorCodeBase):
     # splits: a project the registry declares without a remote is a
     # registry line to write; a sha the remote does not have is a push the
     # submitter has not made; a fetch or archive that failed for any other
-    # reason is git's own words, a network or credential question on the
-    # hub; and a job whose tags disagree with the registry's declaration for
-    # its project is a submitter that copied the wrong line, refused rather
-    # than run under the wrong capability.
+    # reason is git's own words, a network question on the hub; and a job
+    # whose tags disagree with the registry's declaration for its project is
+    # a submitter that copied the wrong line, refused rather than run under
+    # the wrong capability.
     PROJECT_REMOTE_MISSING = "PROJECT_REMOTE_MISSING"
     SHA_NOT_ON_REMOTE = "SHA_NOT_ON_REMOTE"
     EXPORT_FAILED = "EXPORT_FAILED"
@@ -149,6 +149,17 @@ class FleetErrorCode(ErrorCodeBase):
     # commit. It is neither the commit nor the submitter: today's registry
     # cannot build that commit, so it is refused before any lease.
     INSTALL_PATH_NOT_IN_COMMIT = "INSTALL_PATH_NOT_IN_COMMIT"
+    # The seventh (MCPs board task 579a5ab0): a remote that refused the
+    # credential the hub's git sent it, or asked for one the hub's
+    # credential helper did not answer. Never sent again: the next attempt
+    # carries the same credential and is refused the same way, and neither
+    # the commit nor a registry line is wrong. On 2026-10-20 diphtheria's gh
+    # login was rejected, and every job of the proof of ae154507f was sent
+    # three times and refused EXPORT_FAILED with git's 'could not read
+    # Username', which read as a network fault and was broadcast as the
+    # repository having gone private. The fix is on the control host, so
+    # the code names that.
+    REMOTE_CREDENTIAL_REJECTED = "REMOTE_CREDENTIAL_REJECTED"
 
     # Dispatch and its record.
     DISPATCH_FAILED = "DISPATCH_FAILED"
