@@ -500,10 +500,11 @@ tags the hub plans by are the devices the nodes have.
 **`testdb` is the one tag the roster does not measure** (MCPs board task
 6bbfd171). A node declares `test_database: true` when it runs
 `corvis-fleet-testdb`, the loopback postgres container on tmpfs that MCPs
-`scripts/host/lib/fleet-testdb.sh` defines once and both testdb nodes'
-provisioning sources (diphtheria's `scripts/host/diphtheria/provision.sh`, and
-lavender-wsl's `scripts/host/lavender/provision-fleet-node.sh`, MCPs board
-task c4fc4f3e), and that MCPs
+`scripts/host/lib/fleet-testdb.sh` defines once and every Linux testdb
+node's provisioning sources (diphtheria's `scripts/host/diphtheria/provision.sh`,
+and every other Linux node's `scripts/host/fleet-node/provision.sh`, which
+replaced lavender-wsl's `scripts/host/lavender/provision-fleet-node.sh` of
+MCPs board task c4fc4f3e), and that MCPs
 `scripts/testdb-setup.sh --container corvis-fleet-testdb` restarts empty and
 migrates before a run, as a CI job's service container is fresh. Every MCPs
 project whose suite starts from `packages/db`'s global test setup names that
@@ -561,25 +562,29 @@ this, the name read as fleet-wide, and on 2026-09-29 lavender-wsl closed
 every testdb job it claimed while diphtheria ran one as `RESOURCE_HELD ...
 held fleet-wide`, so two testdb nodes still ran one testdb suite at a time.
 
-**lavender-wsl is the second testdb node** (MCPs board task c4fc4f3e). Until
-2026-09-29 diphtheria was the only node carrying `linux` and `testdb`, and
-that day 17 queued jobs could land nowhere else, the tail about six hours
-behind, while diphtheria sat at load 42 to 57 on 8 cores. lavender-wsl is the
-WSL2 Ubuntu on lavender that already hosts the GitHub runners: 16 logical
-cores and 25.4 GB given to the distro, g++ 13.3.0, Node 24.21.0 from
-NodeSource. The hub reaches it as `Host lavender-wsl` through lavender's own
-sshd, which runs `nc` to `127.0.0.1:2222` inside the distro over the
-session's stdin and stdout, so no port opens on the tailnet; the first way
-in, `ProxyJump lavender` through WSL's localhost relay, kept a dead mapping
-for the port after an sshd restart on 2026-09-29. Half its cores and memory
-are reserved for the runners beside it.
+**lavender-wsl was the second testdb node** (MCPs board task c4fc4f3e), from
+2026-09-29 until lavender was reimaged to Ubuntu on 2026-10-19 and the WSL
+guest went with Windows (MCPs board task 1e9ab738); lavender itself carries
+the lane since. Until 2026-09-29 diphtheria was the only node carrying
+`linux` and `testdb`, and that day 17 queued jobs could land nowhere else, the
+tail about six hours behind, while diphtheria sat at load 42 to 57 on 8
+cores. lavender-wsl was the WSL2 Ubuntu on lavender that already hosted the
+GitHub runners: 16 logical cores and 25.4 GB given to the distro, g++ 13.3.0,
+Node 24.21.0 from NodeSource. The hub reached it as `Host lavender-wsl`
+through lavender's own sshd, which ran `nc` to `127.0.0.1:2222` inside the
+distro over the session's stdin and stdout, so no port opened on the tailnet;
+the first way in, `ProxyJump lavender` through WSL's localhost relay, kept a
+dead mapping for the port after an sshd restart on 2026-09-29. Half its cores
+and memory were reserved for the runners beside it, as half of lavender's
+cores are now.
 
-**lavender-wsl is the second docker node** (MCPs board task c4fc4f3e). On
+**lavender-wsl was the second docker node** (MCPs board task c4fc4f3e), over
+the same span. On
 2026-09-29 diphtheria's stack grew past the half of its memory the fleet
 leaves it (14.2 GB available against the 16 GB reservation after the 09:54Z
 reboot), so it claimed nothing, and every project requiring `docker`,
 `tools/fleet-execution-linux` among them and so every roll, had nowhere to
-run. lavender-wsl's system daemon is Ubuntu's docker.io, the runners' rootful
+run. lavender-wsl's system daemon was Ubuntu's docker.io, the runners' rootful
 one, which ships no rootless tooling, so MCPs
 `scripts/host/lib/fleet-exec-docker.sh`, the definition diphtheria's
 provisioning sources too, installs Docker's `docker-rootless-extras` archive
@@ -587,7 +592,7 @@ of the same release (29.1.3, pinned by its sha256, since Docker publishes
 none), gives `execdocker` its own rootless daemon, grants the runner account
 the sudo the isolated build uses, and holds docker.io, because Ubuntu's
 unattended upgrades would otherwise move it away from the declaration. Its
-`docker` is `29.1.3`, the ServerVersion that daemon reports as rootless.
+`docker` was `29.1.3`, the ServerVersion that daemon reported as rootless.
 
 **`rust` is declared as a version and re-measured every tick** (MCPs board
 task 1e2da299). `services/covenant-radar-api` builds the maturin crate
@@ -665,7 +670,7 @@ build the package's Makefile puts first on PATH, and then the PATH. Every
 live runner had it on 2026-10-11, but nothing declared it and the roster's
 apt packages lacked poppler-utils; a node without it is offered
 `sudo apt-get install -y poppler-utils`, or Git for Windows through winget or
-choco. lavender's distro, which is the node lavender-wsl, gets go, ffmpeg and
+choco. lavender, the runner host since its reimage to Ubuntu, gets go, ffmpeg and
 pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
 `assets`, so a `--rebuild` keeps all four tags, and
 `test_runner_contracts.py` fails if a tagged tool apt can supply is missing
@@ -903,9 +908,9 @@ was granted come off the node's cores and `workers x worker_ram_gb` comes off
 its free memory, whether or not those workers have spawned yet, and what is left
 is granted. One grant is capped at `capacity.job_ceiling`, half the cores the
 owner leaves rounded up and never below the project's `minimum_workers`, so the
-first job leaves room for a second. On the fleet as declared the ceiling is
-sedona 8, lavender 6, pendragon and lavender-wsl 4, diphtheria and serendipity
-2, unless a project's minimum is higher.
+first job leaves room for a second. On the fleet as declared on 2026-10-20 the
+ceiling is sedona and lacrymal 9, pendragon 7, loki 5, colossus and lavender 4,
+serendipity 3 and diphtheria 2, unless a project's minimum is higher.
 
 **A node running several jobs is never offered one its own lease file would
 refuse.** The projects a runner hands `dispatch_claim` are the ones that fit by
@@ -920,7 +925,7 @@ A node shared with CI keeps its headroom through its reservations, not a run
 count: lavender became a CI runner on 2026-09-06 and `opus-artifact-sweep-0902`
 saw a heavy job saturate it until ssh connections were **reset** (TCP 22 and 445
 open, tailscale direct: alive and overloaded, not down). That is why
-`lavender-wsl` reserves 8 of its 16 cores and the linux probe reads the CI
+`lavender` reserves 8 of its 16 cores and the linux probe reads the CI
 slice, and both still bound every grant.
 
 ## The roster, and `enabled`
@@ -997,10 +1002,11 @@ reports `LEDGER NOT OBSERVED <node> <age>`, exiting non-zero, when it is
 older than three of that arm's ticks or was never stamped.
 
 **`guest` names the machine a node runs inside** (MCPs board task c4fc4f3e).
-The first is lavender-wsl, lavender's WSL2 Ubuntu: the hub's ssh config
-reaches it through lavender's sshd, which runs `nc` to
-`127.0.0.1:<sshPort>` inside the distro, and its sshd binds that loopback
-address alone. A guest has no tailnet device, so its `tailnetIp` is its
+The first was lavender-wsl, lavender's WSL2 Ubuntu, until lavender's reimage
+to Ubuntu on 2026-10-19 (MCPs board task 1e9ab738), and no machine declares a
+guest now: the hub's ssh config reached it through lavender's sshd, which ran
+`nc` to `127.0.0.1:<sshPort>` inside the distro, and its sshd bound that
+loopback address alone. A guest has no tailnet device, so its `tailnetIp` is its
 host's, the tailnet policy owes it no hosts entry, and the audit judges its
 sshd bind and AllowUsers against 127.0.0.1. Here the guest's host is the
 node's `wsl_host`, which the decoder refuses unless it is a Windows node of
@@ -1024,11 +1030,11 @@ claim work or the reason they do not. A node dispatches exactly when its
 machine is enabled and not held, and a held reason on a machine that is off
 is refused, since a machine that is off claims nothing already. lavender's
 Windows lane was held that way on 2026-09-29 (MCPs board task 7e467416): it
-keeps its capacity because lavender-wsl's `guest` names it, and stays
-enabled because the audit and the session observer still visit it, so a
-runner whose scheduled task outlived the retirement logs `lavender is
-disabled in registry/machines/lavender.json; claiming nothing` and asks the
-node nothing.
+kept its capacity because lavender-wsl's `guest` named it, and stayed
+enabled because the audit and the session observer still visited it, so a
+runner whose scheduled task outlived the retirement logged `lavender is
+disabled in registry/machines/lavender.json; claiming nothing` and asked the
+node nothing, until the reimage to Ubuntu on 2026-10-19 replaced both.
 
 Every machine declares `enabled`, and the decoder refuses one that leaves it
 out. Neither default is safe: defaulting it to `true` is the defect this
@@ -1187,8 +1193,8 @@ measurement, and `gpu` keeps the meaning it has always had here — a CUDA
 device `nvidia-smi` reports, never an integrated adapter. The fleet audit's
 `roster.gpu` row holds each declaration to the devices its inventory reads
 through `nvidia-smi` on every pass (MCPs board task e447de72), which is how
-"which nodes may carry this tag" is a measured fact: sedona, lavender,
-lavender-wsl and diphtheria, as of 2026-10-19.
+"which nodes may carry this tag" is a measured fact: sedona, lavender and
+diphtheria, as of 2026-10-20.
 
 The planner checks tags **first**, before disk, cores and memory, and
 refuses with `NODE_LACKS_TAG` naming the tags missing:
@@ -1290,7 +1296,7 @@ install through MCPs' `fleet-netboot`, which mints the VM its own tailnet
 key, and then reaches the VM over ssh at its tailnet address, which
 diphtheria's tailnet grant allows and a `tag:corvis-node` machine's does not.
 Its last install step, `netboot-lane ENV_FILE=/home/corvis/PROJECTS/MCPs/.env
-VM_HOST=lavender-wsl`, copies only `TAILSCALE_API_KEY` from that host's
+VM_HOST=lavender`, copies only `TAILSCALE_API_KEY` from that host's
 workspace `.env` into the export, after the steps whose untracked files the
 node stores, so the key is never stored with the tree, and names the host
 whose KVM boots the VM. The VM is not diphtheria's: its 7.5 GB never fit
@@ -1299,7 +1305,8 @@ containers' promises (job 86c7afcc sat queued three hours declared at
 8.5 GB), and mapped from a file instead it was what the kernel reclaimed
 with the swap full, its qemu reading 156 GB and writing 75 GB to the SSD
 before job a6c3dec8 missed its check-in. So the case runs qemu on
-lavender-wsl over ssh, reserving its four cores there in
+lavender over ssh (on its WSL guest lavender-wsl until the reimage to Ubuntu
+on 2026-10-19), reserving its four cores there in
 `.fleet/reservations` and forwarding the server's port back, and its
 `worker_ram_gb` of 1.0 is what it holds on diphtheria. Its server listens on
 the definition's fixed port, so `netboot-http-8780` is its exclusive

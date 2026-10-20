@@ -1,8 +1,9 @@
 """The share of a runner host its GitHub Actions jobs may take.
 
-MCPs board task 45a4f22b. Lavender's WSL instance carries eight self-hosted
+MCPs board task 45a4f22b. Lavender's WSL instance carried eight self-hosted
 runners and, beside them, the fleet's second testdb lane (lavender-wsl) with
-its ``corvis-fleet-testdb`` container. On 2026-09-29 at 11:36Z the runners
+its ``corvis-fleet-testdb`` container, as lavender itself has since its
+reimage to Ubuntu on 2026-10-19. On 2026-09-29 at 11:36Z the runners
 were running an API training job, four MCPs ``tsc`` jobs and four pgvector
 test databases at once: load 132 on 16 cores, 3.4 GB of 26 GB available,
 and sshd stopped answering, so every fleet tick for lavender-wsl read

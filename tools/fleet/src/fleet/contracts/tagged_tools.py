@@ -155,7 +155,7 @@ PDFTOTEXT_WINDOWS_PATH: Final = "C:\\Program Files\\Git\\mingw64\\bin\\pdftotext
 #: Chromium, in three real-browser cases, and a node without it fails those
 #: three and passes the other 490 (MCPs board task 2f596185: fleet job
 #: 874c160c on 2026-10-04 and 56d7fbb5 on 2026-10-09, both on diphtheria,
-#: while lavender-wsl, whose runner provisioning installs Chrome as a
+#: while lavender-wsl, whose runner provisioning installed Chrome as a
 #: ``runners.json`` asset, passed the same suite). It is not an executable on
 #: a PATH on either platform, so each probe asks for it at the path
 #: Playwright opens (:data:`CHROME_LINUX_PATH`, :data:`CHROME_WINDOWS_RELATIVE`)

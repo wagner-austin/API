@@ -2,8 +2,8 @@
 
 MCPs board task 5d6e57e7. On 2026-09-29 lavender's runners.slice (45a4f22b)
 was allowed 18 GB (``MemoryMax``, 16 GB ``MemoryHigh``) of the WSL VM that
-lavender-wsl runs in, while the registry reserved 12 GB of that same VM before
-any fleet worker. The node declares 25.4 GB, so while CI held its budget the
+lavender-wsl ran in, while the registry reserved 12 GB of that same VM before
+any fleet worker. The node declared 25.4 GB, so while CI held its budget the
 lane could never dispatch: 18 + 12 is past the machine before a single
 worker. Every tick answered ``NODE_OWNER_RESERVED`` from 17:15Z, and the
 testdb queue stood still with twelve rows, by declaration rather than by

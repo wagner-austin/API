@@ -94,7 +94,7 @@ _CHROME_DEFAULT = ", ".join(
 #: it holds no such container (MCPs board task daae17f2: measured 2026-10-03,
 #: sedona's build account reaches Docker Desktop, so the loopback container
 #: ``scripts/install-windows-testdb.ps1`` creates there gives it the lane
-#: lavender-wsl and diphtheria carry). ``docker`` is always ``no`` here:
+#: the Linux testdb nodes carry). ``docker`` is always ``no`` here:
 #: the capability is the execution suite's rootless daemon under its own
 #: Linux user (MCPs board task 6c4516af), which no Windows node carries,
 #: and Docker Desktop is exactly the kind of shared daemon it excludes. The
