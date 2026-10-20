@@ -105,12 +105,14 @@ a98d7083): the tag means the node declares ``elevated`` and runs a SECOND
 runner whose builds launch at RunLevel Highest, and that runner re-measures
 its ssh session's token every tick (:mod:`fleet.contracts.elevation`).
 
-``elevated`` IS EXCLUSIVE. Every other tag is a floor, so a runner claims
-whatever it can satisfy; a node's ordinary runner claims without
-``elevated`` (:func:`runner_tags`), and the queue's claim gives an elevated
-job only to a runner carrying the tag and that runner only elevated jobs
-(MCPs ``FLEET_DISPATCH_EXCLUSIVE_TAGS``), so an ordinary suite never runs as
-an administrator and an elevated one never waits behind ordinary checks.
+``elevated`` AND ``windows`` ARE EXCLUSIVE. Every other tag is a floor, so a
+runner claims whatever it can satisfy; a node's ordinary runner claims without
+``elevated`` (:func:`runner_tags`), and the queue's claim gives a job requiring
+either tag only to a runner carrying it and that runner only jobs requiring
+it (MCPs ``FLEET_DISPATCH_EXCLUSIVE_TAGS``), so an ordinary suite never runs as
+an administrator and an elevated one never waits behind ordinary checks. A
+Windows node therefore takes only the jobs that must run on Windows, and a
+project naming no platform runs on a Linux node (MCPs board task 42fb4e26).
 
 A project naming both platforms is refused at decode: no node is both, so
 the declaration could never match anything, and the honest way to say "either"
