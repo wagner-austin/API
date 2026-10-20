@@ -18,7 +18,7 @@ foreach ($install in ($Installs | ConvertFrom-Json)) {
         "CHECK service:$service DRIFT sc.exe query exited $($state.Code): $($state.Text)"
     }
     $config = Get-Answer $Sc @('qc', $service)
-    if ($config.Code -eq 0 -and $config.Text -match 'START_TYPE : 2 AUTO_START' -and $config.Text -match 'SERVICE_START_NAME : LocalSystem') {
+    if ($config.Code -eq 0 -and $config.Text -match 'START_TYPE : 2 AUTO_START' -and $config.Text -match 'SERVICE_START_NAME : NT AUTHORITY\\SYSTEM') {
         "CHECK account:$service OK"
     } else {
         "CHECK account:$service DRIFT sc.exe qc exited $($config.Code): $($config.Text)"

@@ -110,6 +110,14 @@ class TestTheAudit:
             ")",
         ]
 
+    def test_the_account_row_matches_the_name_the_install_registers_as_sc_reads_it(
+        self,
+    ) -> None:
+        assert (
+            "    if ($config.Code -eq 0 -and $config.Text -match 'START_TYPE : 2 AUTO_START' "
+            "-and $config.Text -match 'SERVICE_START_NAME : NT AUTHORITY\\\\SYSTEM') {"
+        ) in runner_windows_render.committed_audit_script().splitlines()
+
     def test_three_rows_per_install_in_the_order_the_script_prints_them(self) -> None:
         service = "actions.runner.wagner-austin-chat.loki"
         assert runner_windows_render.expected_checks(a_windows_host()) == [

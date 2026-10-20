@@ -49,6 +49,13 @@ RUNNER_ZIP_URL = (
 #: mounts a VHDX, which needs it.
 SERVICE_ACCOUNT = "NT AUTHORITY\\SYSTEM"
 
+#: The audit's ``-match`` pattern for that account in ``sc.exe qc``'s output.
+#: config.cmd hands the name to CreateService as given, and the service
+#: manager keeps it so: measured on loki 2026-10-20, a service created with
+#: obj= "NT AUTHORITY\SYSTEM" reads SERVICE_START_NAME : NT AUTHORITY\SYSTEM,
+#: not LocalSystem. The backslash is doubled, as a regex needs.
+_START_NAME_PATTERN = "SERVICE_START_NAME : " + SERVICE_ACCOUNT.replace("\\", "\\\\")
+
 #: How long the service manager waits before each restart, in milliseconds.
 RESTART_DELAY_MS = 60000
 
@@ -250,7 +257,7 @@ def render_audit_script(installs: list[WindowsRunnerInstall]) -> str:
         "    }",
         "    $config = Get-Answer $Sc @('qc', $service)",
         "    if ($config.Code -eq 0 -and $config.Text -match 'START_TYPE : 2 AUTO_START' "
-        "-and $config.Text -match 'SERVICE_START_NAME : LocalSystem') {",
+        f"-and $config.Text -match '{_START_NAME_PATTERN}') {{",
         '        "CHECK account:$service OK"',
         "    } else {",
         '        "CHECK account:$service DRIFT sc.exe qc exited $($config.Code): $($config.Text)"',

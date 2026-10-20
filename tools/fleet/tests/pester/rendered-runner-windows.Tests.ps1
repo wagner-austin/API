@@ -31,6 +31,9 @@ BeforeAll {
             What `sc qc` exits with.
         .PARAMETER StartType
             The START_TYPE `sc qc` prints.
+        .PARAMETER StartName
+            The SERVICE_START_NAME `sc qc` prints; the service manager keeps
+            the name config.cmd gave it, measured on loki 2026-10-20.
         .PARAMETER QfailureExit
             What `sc qfailure` exits with.
         .PARAMETER Action
@@ -45,6 +48,7 @@ BeforeAll {
             [int]$StartExit = 0,
             [int]$QcExit = 0,
             [string]$StartType = '2   AUTO_START',
+            [string]$StartName = 'NT AUTHORITY\SYSTEM',
             [int]$QfailureExit = 0,
             [string]$Action = 'RESTART -- Delay = 60000 milliseconds.'
         )
@@ -62,7 +66,7 @@ BeforeAll {
             ('exit /b ' + $QueryExit),
             ':qc',
             "echo         START_TYPE         : $StartType",
-            'echo         SERVICE_START_NAME : LocalSystem',
+            "echo         SERVICE_START_NAME : $StartName",
             ('exit /b ' + $QcExit),
             ':qfailure',
             "echo         FAILURE_ACTIONS              : $Action",
@@ -197,8 +201,16 @@ Describe 'The audit' {
         $sc = Initialize-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
         [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
             "CHECK service:$($script:service) DRIFT sc.exe query exited 0: SERVICE_NAME: $($script:service) STATE : 1 STOPPED",
-            "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : LocalSystem",
+            "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : NT AUTHORITY\SYSTEM",
             "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 0: FAILURE_ACTIONS : NONE"
+        )
+    }
+    It 'reads an automatic service under the runner default account as account drift alone' {
+        $sc = Initialize-Sc -StartName 'NT AUTHORITY\NetworkService'
+        [string[]]@(Invoke-Rendered 'runner-windows-audit' @{ Sc = $sc.Path }) | Should -Be @(
+            "CHECK service:$($script:service) OK",
+            "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 2 AUTO_START SERVICE_START_NAME : NT AUTHORITY\NetworkService",
+            "CHECK recovery:$($script:service) OK"
         )
     }
     It 'reads a service sc.exe cannot open as drift on every row, and still exits 0' {
