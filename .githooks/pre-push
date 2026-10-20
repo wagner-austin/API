@@ -179,7 +179,15 @@ esac
 # enrolment enrols a push only when a workflow's push trigger admits the
 # ref it updates, and git's local ref for a push of HEAD is HEAD, which
 # names no branch.
+#
+# A PUSH OF NOTHING ENROLS NOTHING (MCPs board task b4005697). git runs
+# this hook even when every ref is already up to date, with empty input,
+# and printf still hands the loop one empty line; without the guard that
+# line reached the enrolment as --ref '' and was refused, so a tree with no
+# commits of its own could not run worktree-publish to sync. Every other
+# loop in this hook, and MCPs' .husky/pre-push, already skips it.
 printf '%s\n' "$PUSH_INPUT" | while read -r _local_ref local_sha remote_ref _remote_sha; do
+    [ -z "$local_sha" ] && continue
     [ "$local_sha" = "$ZERO" ] && continue
     "$PYTHON" -m ci_wake.cli.enrol \
         --enrolment "$LEDGER" \
