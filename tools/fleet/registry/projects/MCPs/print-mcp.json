@@ -3,6 +3,7 @@
   "minimum_workers": 2,
   "expected_minutes": 10,
   "required_tags": [
+    "linux",
     "cxx"
   ],
   "source": {
