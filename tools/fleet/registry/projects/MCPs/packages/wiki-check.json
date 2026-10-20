@@ -73,7 +73,7 @@
       {
         "remote": "https://github.com/wagner-austin/API.git",
         "ref": "main",
-        "directory": "api"
+        "directory": "API"
       },
       {
         "remote": "https://github.com/wagner-austin/corvis-stick.git",
