@@ -11,8 +11,9 @@ files. 400 - 600 lines"). It is now a directory of three parts:
   file of and every fleet reader in either repository reads.
 * ``settings.json``, every other fleet-wide setting (the record paths, the
   serve and poll seconds, the node-local resources, and under ``identity``
-  the fleet's ssh key, Cloudflare zone and account and UCI VPN profile
-  digest, which MCPs ``fleet-mcp`` reads and this package does not).
+  the fleet's ssh key, Cloudflare zone and account, UCI VPN profile digest
+  and the host and port a vpn-jump exists to reach (hpc3's sshd), which MCPs
+  ``fleet-mcp`` reads and this package does not).
 * ``projects/<key>.json``, ONE FILE PER PROJECT, whose key is its path under
   ``projects/`` without the suffix: ``projects/MCPs/packages/db.json`` is
   ``MCPs/packages/db`` and ``projects/MCPs.json`` is ``MCPs``. A key is a
