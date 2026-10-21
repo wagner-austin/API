@@ -91,7 +91,7 @@ from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import DispatchStatus
 from fleet.contracts.node import NodeConfig
-from fleet.core import collect, queue
+from fleet.core import collect, queue_listing
 from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
@@ -178,9 +178,9 @@ def collect_ended(
 
     Raises:
         AppError: As :func:`fleet.cli.node_collect.collect_one_job` and
-            :func:`fleet.core.queue.held_by` describe. Not caught.
+            :func:`fleet.core.queue_listing.held_by` describe. Not caught.
     """
-    for job in queue.held_by(credentials, agent=agent):
+    for job in queue_listing.held_by(credentials, agent=agent):
         if job["run_id"] == run_id and job["status"] is DispatchStatus.RUNNING:
             return collect_one_job(loaded, credentials, board, job, identity)
     return Collected(

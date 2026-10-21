@@ -32,7 +32,7 @@ from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
 from fleet.contracts.dispatch import DispatchJob, encode_job_line
-from fleet.core import queue, queue_lost, tick_run
+from fleet.core import queue_listing, queue_lost, tick_run
 
 _log = get_logger(__name__)
 
@@ -102,7 +102,7 @@ def orphan_pass(
             cannot be asked about a unit.
     """
     reported: list[DispatchJob] = []
-    for job in queue.held_by(credentials, agent=agent):
+    for job in queue_listing.held_by(credentials, agent=agent):
         detail = lost_detail(job, own)
         if detail is None:
             continue

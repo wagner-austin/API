@@ -30,7 +30,7 @@ from fleet.contracts.workspace import (
     NODE_SERVE_CEILING_SECONDS,
     decode_fleet_workspace,
 )
-from fleet.core import _test_hooks, queue
+from fleet.core import _test_hooks, queue, queue_listing
 from tests._node_agent_fixtures import (
     NPM_CI,
     PROBED,
@@ -422,7 +422,11 @@ class TestTheQueuedJobsAServeWatches:
             {"11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"}
         )
         assert endpoint.tools == ["dispatch_list"]
-        assert endpoint.arguments[0] == {"status": "queued", "limit": queue.LISTING_PAGE_LIMIT}
+        assert endpoint.arguments[0] == {
+            "status": "queued",
+            "limit": queue_listing.LISTING_PAGE_LIMIT,
+            "full": True,
+        }
 
 
 class TestAServingRunner:
@@ -458,7 +462,11 @@ class TestAServingRunner:
         )
         assert len(node.calls) == 1 + len(PROBED)
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_list"]
-        assert endpoint.arguments[2] == {"status": "queued", "limit": queue.LISTING_PAGE_LIMIT}
+        assert endpoint.arguments[2] == {
+            "status": "queued",
+            "limit": queue_listing.LISTING_PAGE_LIMIT,
+            "full": True,
+        }
         assert caplog.records[-1].getMessage() == (
             "lavender served 150 s from 2025-09-04T15:33:20+00:00: 0 fire(s), 1 fill pass(es), "
             "0 poll(s), 0 run(s) closed, 0 still watched; handed over at "

@@ -22,7 +22,7 @@ runner holds and settles every run it launched in one of four ways:
   a run that finished there is refused on collection for exactly that reason,
   and one still going there is stopped for it.
 * CANCELLED UNDER IT. Stop it. A cancel marks the queue row terminal and
-  cannot reach a node, and :func:`fleet.core.queue.held_by` stops returning
+  cannot reach a node, and :func:`fleet.core.queue_listing.held_by` stops returning
   a cancelled job, so before this nothing ever looked at it again: measured,
   slime-1790104328 was cancelled on the queue at 2026-09-22 20:22Z and closed
   on this machine only at 00:49Z, after its processes had been killed by hand.
@@ -68,7 +68,7 @@ from fleet.contracts.dispatch import DispatchJob, DispatchStatus, encode_job_lin
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, collect, host_claims, queue, retire_owed, stop
+from fleet.core import _test_hooks, collect, host_claims, queue, queue_listing, retire_owed, stop
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
 
 _log = get_logger(__name__)
@@ -386,7 +386,7 @@ def stop_cancelled(
     stopped = 0
     offset: int | None = 0
     while offset is not None and candidates:
-        page = queue.cancelled_page(credentials, agent=agent, offset=offset)
+        page = queue_listing.cancelled_page(credentials, agent=agent, offset=offset)
         for job in page["jobs"]:
             # A job cancelled before its start landed names no run; its run
             # is found as a claim's is (:func:`launched_by_claim`).
@@ -517,7 +517,7 @@ def collect_pass(
             leases_path=loaded.leases,
             ledger_path=loaded.ledger,
         )
-    held = queue.held_by(credentials, agent=agent)
+    held = queue_listing.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     holder.hold(running)
     accounted = {job["run_id"] for job in held}

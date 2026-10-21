@@ -18,7 +18,7 @@ WHAT A SERVE DOES. It runs a start's two passes as every start did
 thread (:mod:`fleet.cli.node_watch`) reads each held run every
 ``node_poll_seconds`` of the workspace and settles one the moment it has
 ended, and at the same pace the loop's thread lists the queued jobs (one
-``dispatch_list`` call, :func:`fleet.core.queue.queued_for`) and runs the
+``dispatch_list`` call, :func:`fleet.core.queue_listing.queued_for`) and runs the
 fill pass again when a job naming this node or no node has arrived since
 its last fill, or the watch has settled a run since then. The
 fill pass is the one every start runs, so the claim still goes through the

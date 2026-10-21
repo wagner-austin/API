@@ -1,4 +1,6 @@
-"""Talking to the corvis dispatch queue: claim, report, and find own work.
+"""Talking to the corvis dispatch queue: claim, report, and read one job.
+
+Its listings, own work among them, are :mod:`fleet.core.queue_listing`.
 
 Every function here is one MCP call and one decode. The transport is
 :func:`platform_core.mcp_client.call_mcp_tool`, shared with
@@ -33,11 +35,8 @@ from fleet.contracts.dispatch import (
     ClosingStatus,
     DispatchJob,
     DispatchLane,
-    ListingPage,
     TrailClaim,
     decode_claim,
-    decode_listing,
-    decode_listing_page,
     decode_reported,
     decode_trail_claims,
 )
@@ -52,10 +51,6 @@ TENANT_ID_VARIABLE: Final = "CORVIS_TENANT_ID"
 
 #: Environment variable overriding the endpoint, for a non-default deployment.
 URL_VARIABLE: Final = "FLEET_DISPATCH_URL"
-
-#: The page size a paged listing asks for: ``dispatch_list``'s own maximum,
-#: so a reader walking every page makes as few calls as the tool allows.
-LISTING_PAGE_LIMIT: Final = 100
 
 
 def load_credentials() -> McpCredentials:
@@ -319,122 +314,6 @@ def get_job(credentials: McpCredentials, *, job_id: str) -> DispatchJob:
     )
 
 
-def held_by(credentials: McpCredentials, *, agent: str) -> tuple[DispatchJob, ...]:
-    """List the live jobs this runner is holding.
-
-    Asked of the QUEUE rather than remembered locally. A runner that crashed
-    between launching a suite and writing a note to itself would otherwise
-    leave a job running on a node with nothing left that knows to collect it.
-
-    Args:
-        credentials: Endpoint and headers.
-        agent: This runner's label.
-
-    Returns:
-        Its live jobs, newest first.
-
-    Raises:
-        AppError: Any transport or contract failure from the underlying call.
-    """
-    arguments: JSONObject = {"claimedBy": agent, "status": "live"}
-    return decode_listing(
-        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
-    )
-
-
-def queued_for(credentials: McpCredentials, *, project: str | None) -> tuple[DispatchJob, ...]:
-    """List the first page of the jobs still waiting for a runner.
-
-    One page is enough for both questions this answers: whether ANY job of a
-    project waits, since the first page holds up to
-    :data:`LISTING_PAGE_LIMIT` jobs and a project with more queued than that
-    has one on it; and, for a serving node runner, whether a job has arrived
-    since it last looked (:mod:`fleet.cli.node_serve`), since the page is
-    newest first and an arrival is always on it.
-
-    Args:
-        credentials: Endpoint and headers.
-        project: The project's key in the registry, or None for every
-            project's.
-
-    Returns:
-        The queued jobs, newest first.
-
-    Raises:
-        AppError: Any transport or contract failure from the underlying call.
-    """
-    arguments: JSONObject = {"status": "queued", "limit": LISTING_PAGE_LIMIT}
-    if project is not None:
-        arguments["project"] = project
-    return decode_listing(
-        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
-    )
-
-
-def cancelled_page(credentials: McpCredentials, *, agent: str, offset: int) -> ListingPage:
-    """List one page of the jobs cancelled while this runner held them.
-
-    A cancel keeps the row's ``claimed_by`` and ``run_id`` (MCPs
-    ``cancelDispatchJob`` sets only the status, detail, lease and close
-    time), so the runner that launched a build can still find it here after
-    :func:`held_by` has stopped returning it, and that is the only route a
-    cancel has to the node: the queue has no route to the tailnet.
-
-    Args:
-        credentials: Endpoint and headers.
-        agent: This runner's label.
-        offset: Where the page begins, ``0`` for the newest.
-
-    Returns:
-        The page, and where the next one begins.
-
-    Raises:
-        AppError: Any transport or contract failure from the underlying call.
-    """
-    arguments: JSONObject = {
-        "claimedBy": agent,
-        "status": "cancelled",
-        "offset": offset,
-        "limit": LISTING_PAGE_LIMIT,
-    }
-    return decode_listing_page(
-        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
-    )
-
-
-def submitted_page(
-    credentials: McpCredentials, *, project: str, submitted_by: str, offset: int
-) -> ListingPage:
-    """List one page of one submitter's jobs for one project, any status.
-
-    The route from a ledger row back to the job that launched it once the
-    job has left this runner (board task fd402617): the row names its
-    project and submitter, and a reclaim overwrites every field of the job
-    that named this runner.
-
-    Args:
-        credentials: Endpoint and headers.
-        project: The project's key in the registry.
-        submitted_by: The submitting session's label.
-        offset: Where the page begins, ``0`` for the newest.
-
-    Returns:
-        The page, and where the next one begins.
-
-    Raises:
-        AppError: Any transport or contract failure from the underlying call.
-    """
-    arguments: JSONObject = {
-        "project": project,
-        "submittedBy": submitted_by,
-        "offset": offset,
-        "limit": LISTING_PAGE_LIMIT,
-    }
-    return decode_listing_page(
-        call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_list", arguments)
-    )
-
-
 def trail_claims(credentials: McpCredentials, *, job_id: str) -> tuple[TrailClaim, ...]:
     """Read every claim ever taken on one job, from its trail.
 
@@ -577,16 +456,13 @@ def announce(
 __all__ = [
     "ANNOUNCE_FLAG",
     "API_KEY_VARIABLE",
-    "LISTING_PAGE_LIMIT",
     "RUNNER_HARNESS",
     "TENANT_ID_VARIABLE",
     "URL_VARIABLE",
     "VERDICT_ROOM",
     "announce",
-    "cancelled_page",
     "claim_next",
     "get_job",
-    "held_by",
     "identity_arguments",
     "load_credentials",
     "observe_sessions",
@@ -594,6 +470,5 @@ __all__ = [
     "report_close",
     "report_progress",
     "report_start",
-    "submitted_page",
     "trail_claims",
 ]

@@ -178,7 +178,7 @@ class TestWhoYields:
         assert answer is True
         assert endpoint.tools == ["dispatch_list"]
         assert endpoint.arguments == [
-            {"project": ELEVATED_PROJECT, "status": "queued", "limit": 100}
+            {"project": ELEVATED_PROJECT, "status": "queued", "limit": 100, "full": True}
         ]
         assert any(
             record.getMessage().startswith(
@@ -293,7 +293,12 @@ def test_a_whole_ordinary_tick_claims_nothing_while_an_elevated_job_waits(
         assert node_agent.main(node_argv(config_path)) == 0
 
     assert endpoint.tools == ["dispatch_list", "dispatch_list"]
-    assert endpoint.arguments[1] == {"project": ELEVATED_PROJECT, "status": "queued", "limit": 100}
+    assert endpoint.arguments[1] == {
+        "project": ELEVATED_PROJECT,
+        "status": "queued",
+        "limit": 100,
+        "full": True,
+    }
     assert [tick_body(tick) for tick in endpoint.ticks] == [
         {
             "node": "lavender",

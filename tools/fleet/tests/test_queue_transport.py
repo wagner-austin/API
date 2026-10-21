@@ -27,7 +27,7 @@ from platform_core.mcp_client import (
     call_mcp_tool,
 )
 
-from fleet.core import _test_hooks, queue
+from fleet.core import _test_hooks, queue_listing
 from fleet.core.declared import PUBLISH_TOOL
 from fleet.core.queue_transport import answering, unanswered
 from tests._queue_fakes import QUEUE_CREDENTIALS
@@ -160,7 +160,7 @@ class TestTheProductionSeam:
         )
 
         with pytest.raises(AppError) as raised:
-            queue.held_by(credentials, agent="fleet-node-lavender")
+            queue_listing.held_by(credentials, agent="fleet-node-lavender")
 
         assert raised.value.code is FleetErrorCode.QUEUE_UNANSWERED
         assert (

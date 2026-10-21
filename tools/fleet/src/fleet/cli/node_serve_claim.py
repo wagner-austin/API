@@ -28,7 +28,7 @@ from platform_core.errors import AppError
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.core import queue
+from fleet.core import queue_listing
 from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
@@ -53,7 +53,7 @@ def queued_here(credentials: McpCredentials, *, alias: str) -> frozenset[str] | 
         AppError: Any other failure of the queue listing.
     """
     try:
-        listed = queue.queued_for(credentials, project=None)
+        listed = queue_listing.queued_for(credentials, project=None)
     except AppError as refusal:
         if not unanswered(refusal):
             raise

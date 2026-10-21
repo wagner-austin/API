@@ -54,7 +54,7 @@ from fleet.contracts.dispatch import DispatchJob, encode_job_line
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import FleetWorkspace
-from fleet.core import queue, run_lease
+from fleet.core import queue_listing, run_lease
 
 _log = get_logger(__name__)
 
@@ -117,7 +117,7 @@ def waiting_elevated_job(
             ", ".join(held),
         )
     for project in (name for name in candidates if name not in held):
-        for job in queue.queued_for(credentials, project=project):
+        for job in queue_listing.queued_for(credentials, project=project):
             if job["requested_node"] in (None, alias):
                 return job
     return None

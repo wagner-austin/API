@@ -21,7 +21,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_collect
 from fleet.contracts.ledger import LedgerEntry
-from fleet.core import _test_hooks, dialect, leases, names, queue, records
+from fleet.core import _test_hooks, dialect, leases, names, queue_listing, records
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
     PROBED,
@@ -201,7 +201,8 @@ class TestCancelledUnderIt:
             "claimedBy": "fleet-node-lavender",
             "status": "cancelled",
             "offset": 0,
-            "limit": queue.LISTING_PAGE_LIMIT,
+            "limit": queue_listing.LISTING_PAGE_LIMIT,
+            "full": True,
         }
         assert runner.stdin[0] == _stop_body(sourced_config).encode("utf-8")
         # Stopped first, then retired, before the row closed.
@@ -285,7 +286,8 @@ class TestCancelledUnderIt:
             "project": "libs/demo",
             "submittedBy": "opus-dispatch-0905",
             "offset": 0,
-            "limit": queue.LISTING_PAGE_LIMIT,
+            "limit": queue_listing.LISTING_PAGE_LIMIT,
+            "full": True,
         }
         assert len(runner.calls) == len(PROBED)
         assert _ledger(sourced_config)[-1]["outcome"] == "running"

@@ -280,28 +280,3 @@ class TestReport:
 
         assert "DISPATCH_NOT_CLAIMANT" in raised.value.message
         assert endpoint.tools == ["dispatch_report"]
-
-
-class TestHeldBy:
-    def test_asks_the_queue_which_live_jobs_this_runner_holds(self) -> None:
-        """Asked of the QUEUE rather than remembered locally: a runner that
-        crashed between launching and writing a note to itself would strand a
-        job on a node with nothing left that knows to collect it."""
-        endpoint = FakeQueue(
-            [dump_json_str({"jobs": [queue_job(status="running")], "pagination": {}})]
-        )
-        _test_hooks.http_post = endpoint
-
-        jobs = queue.held_by(QUEUE_CREDENTIALS, agent="fleet-runner-austinpc")
-
-        assert len(jobs) == 1
-        assert endpoint.tools == ["dispatch_list"]
-        assert endpoint.arguments[0] == {
-            "claimedBy": "fleet-runner-austinpc",
-            "status": "live",
-        }
-
-    def test_holding_nothing_is_an_empty_tuple(self) -> None:
-        _test_hooks.http_post = FakeQueue([dump_json_str({"jobs": []})])
-
-        assert queue.held_by(QUEUE_CREDENTIALS, agent="fleet-runner-austinpc") == ()

@@ -4,7 +4,7 @@ A node runner renews each running job's claim on every tick. A tick that
 cannot reach its node or the queue for longer than the claim's lease lets it
 lapse, and the queue hands the job to another runner, which overwrites every
 field of the job that named this one: ``claimedBy``, ``claimedAt``, ``node``
-and ``runId``. From then on :func:`fleet.core.queue.held_by` does not return
+and ``runId``. From then on :func:`fleet.core.queue_listing.held_by` does not return
 it and it is not cancelled, so neither half of the collect pass looks at the
 run again, and its ledger row stays ``running`` for good. Measured
 2026-09-30: MCPs/search's job baca2609 was claimed by lavender-wsl at 13:36Z,
@@ -48,7 +48,7 @@ from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
-from fleet.core import queue, stop
+from fleet.core import queue, queue_listing, stop
 from fleet.core.claim_window import launched_within
 
 _log = get_logger(__name__)
@@ -112,7 +112,7 @@ def launching_jobs(
     matches: list[DispatchJob] = []
     offset: int | None = 0
     while offset is not None:
-        page = queue.submitted_page(
+        page = queue_listing.submitted_page(
             credentials, project=row["project"], submitted_by=row["agent"], offset=offset
         )
         for job in page["jobs"]:
