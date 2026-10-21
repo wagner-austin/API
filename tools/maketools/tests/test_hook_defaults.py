@@ -28,8 +28,7 @@ def test_run_inheriting_returns_the_childs_status(tmp_path: Path) -> None:
         [sys.executable, "-c", "import sys; sys.exit(7)"],
         cwd=tmp_path,
         env=_test_hooks.environ(),
-        # No setsid on loki, where this package's check also lands.
-        new_session=sys.platform != "win32",
+        new_session=True,
         timeout_seconds=PROBE_WALL_SECONDS,
     )
     assert code == 7
@@ -169,26 +168,12 @@ def test_tracked_files_asks_git_and_refuses_outside_a_repository(tmp_path: Path)
         _test_hooks.tracked_files(tmp_path, "*Makefile")
 
 
-# The four cases below split on win32 because this package's check lands on
-# loki, the Windows fleet node kept, whose runner reads the CIM table.
-@pytest.mark.skipif(sys.platform == "win32", reason="/proc exists off Windows only")
 def test_the_linux_table_reader_reads_the_real_proc_root() -> None:
     assert any(r["pid"] == _test_hooks.process_id() for r in _test_hooks._linux_table())
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="there is no /proc on Windows")
-def test_the_linux_table_reader_has_no_proc_root_on_windows() -> None:
-    with pytest.raises(FileNotFoundError):
-        _test_hooks._linux_table()
-
-
-@pytest.mark.skipif(sys.platform != "win32", reason="PowerShell exists on Windows only")
-def test_the_windows_table_reader_runs_powershell() -> None:
-    assert any(r["pid"] == _test_hooks.process_id() for r in _test_hooks._windows_table())
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="the refusal is the off-Windows behaviour")
 def test_the_windows_table_reader_has_no_powershell_off_windows() -> None:
+    """loki's reader, run where this suite runs: a Linux node has no powershell."""
     with pytest.raises(FileNotFoundError):
         _test_hooks._windows_table()
 

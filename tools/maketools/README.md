@@ -59,12 +59,15 @@ it runs on loki; the last of the two to drop its arm deletes the fence.
 ## The Windows arms are loki's
 
 loki is the one Windows fleet node the operator keeps (2026-10-21), and its
-runner runs this package: `tools/fleet-execution`'s `test --host-execution`,
-`tools/ps-harness`'s `lint-makefiles` and `ps-harness`, and this package's
-own check. So the launcher's job object, the CIM process table, the SIGTERM
-kill and the suite's `win32` cases stay, each commented as loki's. Every
-other Windows arm went (board task `3d612cad`): no Windows node carries
-`rust`, so the uv venv commands read a Linux venv's `bin` only.
+runner runs this package for the projects that require `windows`:
+`tools/fleet-execution`'s `test --host-execution` and `tools/ps-harness`'s
+`lint-makefiles` and `ps-harness`. So the launcher's job object, the CIM
+process table and the SIGTERM kill stay, each commented as loki's. This
+package's own check requires no tag, and `windows` is an exclusive dispatch
+tag, so the check runs on Linux nodes only and its suite carries no `win32`
+arm: it walks loki's arms through the seams. Every other Windows arm went
+(board task `3d612cad`): no Windows node carries `rust`, so the uv venv
+commands read a Linux venv's `bin` only.
 
 ## The commands
 

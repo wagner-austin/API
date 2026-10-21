@@ -19,7 +19,6 @@ the isolated script as execdocker and never on a CI runner.
 
 from __future__ import annotations
 
-import sys
 from typing import Final
 
 import pytest
@@ -37,8 +36,7 @@ PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan
     execution_only={DOCKER_MARKER: "linux"},
     needs={DOCKER_MARKER: "needs a node's execdocker user and its rootless daemon"},
     projects={"linux": PROJECT},
-    # windows is loki, the Windows fleet node this package's check lands on.
-    here="windows" if sys.platform == "win32" else "linux",
+    here="linux",
 )
 
 

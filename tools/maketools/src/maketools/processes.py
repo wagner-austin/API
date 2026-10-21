@@ -74,8 +74,7 @@ LINUX_PROC_ROOT: Final[Path] = Path("/proc")
 
 #: Ticks per second in ``/proc/<pid>/stat``. ``USER_HZ`` is fixed at 100 by
 #: the kernel's userspace ABI on every architecture Linux runs on; it is not
-#: the scheduler's ``HZ``. Written as a constant rather than read through
-#: ``os.sysconf``, which the type checker on Windows does not know.
+#: the scheduler's ``HZ``, so it is written as the constant it is.
 LINUX_CLOCK_TICKS: Final[int] = 100
 
 #: The PowerShell program that renders every process as one JSON row in the

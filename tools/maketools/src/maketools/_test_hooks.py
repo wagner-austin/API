@@ -24,9 +24,9 @@ EVERY WINDOWS ARM HERE IS LOKI'S. loki is the one Windows fleet node the
 operator keeps (2026-10-21: "we should keep loki in the fleet. as
 windows."), and its runner runs this launcher: tools/fleet-execution's
 ``test --host-execution`` joins the job object and reads the CIM process
-table there (its log of 2026-10-21, board task 3d612cad), and this
-package's own check lands on it, which is also why a Windows type checker
-still reads this file.
+table there (its log of 2026-10-21, board task 3d612cad). This package's
+own check needs no Windows tag, so it runs on Linux nodes only, and the
+suite covers loki's arms through the seams above.
 """
 
 from __future__ import annotations
@@ -261,15 +261,6 @@ class TrackedFilesProtocol(Protocol):
 #: rather than stare at a blank line.
 CAPTURE_TIMEOUT_SECONDS: Final[int] = 120
 
-#: The signal :func:`_default_kill` sends. ``SIGKILL`` (9) off Windows,
-#: because a wedged xdist worker blocked in ``sys.stdin.readline()`` is the
-#: thing being reaped and a catchable signal is a request it will not
-#: answer; ``SIGTERM`` on loki, where ``os.kill`` maps every signal to
-#: ``TerminateProcess`` and ``SIGKILL`` is not defined. Spelled as a number
-#: rather than ``signal.SIGKILL`` because that name does not exist on
-#: Windows and the type checker there, on loki, would refuse it.
-POSIX_KILL_SIGNAL: Final[int] = 9
-
 
 def _default_run_inheriting(
     argv: Sequence[str],
@@ -407,11 +398,17 @@ def _linux_table() -> Sequence[ProcessRow]:
 def _default_kill(pid: int) -> None:
     """Terminate a real process.
 
+    ``SIGKILL`` on Linux, because a wedged xdist worker blocked in
+    ``sys.stdin.readline()`` is the thing being reaped and a catchable
+    signal is a request it will not answer. ``SIGTERM`` on loki, where
+    ``os.kill`` maps every signal to ``TerminateProcess`` and ``SIGKILL`` is
+    not defined; the expression reads ``signal.SIGKILL`` only off win32.
+
     Args:
         pid: The process.
     """
     # The win32 arm is loki's runner's: its reap kills with SIGTERM.
-    os.kill(pid, POSIX_KILL_SIGNAL if sys.platform != "win32" else signal.SIGTERM)
+    os.kill(pid, signal.SIGKILL if sys.platform != "win32" else signal.SIGTERM)
 
 
 def _default_process_alive(pid: int) -> bool:
@@ -526,7 +523,6 @@ job_api: JobApiFactoryProtocol = _default_job_api
 
 __all__ = [
     "CAPTURE_TIMEOUT_SECONDS",
-    "POSIX_KILL_SIGNAL",
     "CommandResult",
     "DrawProtocol",
     "EnvironProtocol",

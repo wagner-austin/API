@@ -134,12 +134,9 @@ def test_it_reads_mcps_inside_a_hook_where_git_exported_this_repositorys_git_dir
 def _path_without_sh(parent: Path) -> str:
     """A PATH on which git resolves and sh does not.
 
-    On Windows it is the first directory holding a git and no sh.exe (Git
-    for Windows keeps ``cmd`` apart from its sh), which is what a
-    PowerShell-launched make hands its recipes; that arm is loki's, the
-    Windows fleet node this package's check still lands on. Elsewhere git
-    sits in /usr/bin beside sh, so it is a directory holding only a link to
-    git.
+    A PowerShell-launched make on loki hands its recipes such a PATH. This
+    suite runs on Linux nodes only, where git sits in /usr/bin beside sh, so
+    the PATH is a directory holding only a link to git.
 
     Args:
         parent: Where a directory of links may be made.
@@ -150,19 +147,6 @@ def _path_without_sh(parent: Path) -> str:
     git = shutil.which("git")
     if git is None:
         pytest.fail("the script runs git, and it is not on this machine's PATH")
-    # loki's arm, as the docstring says.
-    if sys.platform == "win32":
-        found = subprocess.run(
-            ["where.exe", "git"],
-            check=True,
-            capture_output=True,
-            text=True,
-            timeout=PROBE_WALL_SECONDS,
-        ).stdout.splitlines()
-        dirs = [Path(line).parent for line in found if not (Path(line).parent / "sh.exe").exists()]
-        if not dirs:
-            pytest.fail("every git on this PATH sits beside an sh.exe")
-        return str(dirs[0])
     link = parent / "bin" / "git"
     link.parent.mkdir(parents=True)
     link.symlink_to(git)
