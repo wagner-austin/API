@@ -46,6 +46,17 @@ _log = get_logger(__name__)
 #: own ExecutionTimeLimit ends anything past that.
 CLAIM_LEASE_SECONDS = 3600
 
+#: How long a claim survives before its start is reported.
+#:
+#: Five minutes, not :data:`CLAIM_LEASE_SECONDS` (MCPs board task 05dd6588):
+#: between the claim and the start a tick only checks what it was started
+#: with and the release it runs, local reads of seconds, and no run id yet
+#: names the run, so a tick ended there leaves a job no later tick can prove
+#: abandoned (:mod:`fleet.cli.orphans`). The short lease frees it for the
+#: next claim within minutes rather than an hour; the start renews it to the
+#: full lease.
+PRESTART_LEASE_SECONDS = 300
+
 
 def _start(
     credentials: McpCredentials, job: DispatchJob, identity: JSONObject, *, node: str, run_id: str
@@ -77,14 +88,16 @@ def rebuild_job(
     *,
     mcps_root: pathlib.Path,
     node: str,
+    run_id: str,
 ) -> DispatchJob:
     """Execute a claimed ``build-bases`` job on the hub, start to close.
 
     Synchronous, unlike a suite dispatch: the bake is a local make, minutes
     long, and closing it in the same tick leaves no cross-tick state to
     collect (module docstring of :mod:`fleet.core.rebuild`). A runner that
-    dies mid-bake leaves the job ``running`` until its lease lapses, after
-    which a later tick reclaims it and re-runs the idempotent make.
+    dies mid-bake leaves the job ``running`` under a run whose unit is gone,
+    which the next tick's claim pass requeues once, and the requeued job
+    re-runs the idempotent make (:mod:`fleet.cli.orphans`).
 
     Args:
         credentials: The queue's endpoint and headers.
@@ -94,6 +107,8 @@ def rebuild_job(
         node: This machine's alias, which the job is reported started on:
             the job names none, since holding the control duty is the
             placement (MCPs board task c39ee056).
+        run_id: The tick's run, which the job is reported started as
+            (:func:`fleet.core.tick_run.encode_run_id`).
 
     Returns:
         The job, whatever became of it.
@@ -104,7 +119,7 @@ def rebuild_job(
     refusal = rebuild.refusal_for(mcps_root, job["submitted_by"])
     if refusal is not None:
         return job_close.refuse(credentials, job, identity, detail=refusal)
-    _start(credentials, job, identity, node=node, run_id=f"bases-{job['job_id']}")
+    _start(credentials, job, identity, node=node, run_id=run_id)
     result = rebuild.run_build_bases(mcps_root, submitted_by=job["submitted_by"])
     return job_close.close(
         credentials,
@@ -122,6 +137,7 @@ def session_job(
     identity: JSONObject,
     *,
     node: str,
+    run_id: str,
 ) -> DispatchJob:
     """Execute a claimed session job (restart, revive, kill, compact or exit)
     on this machine, start to close.
@@ -147,6 +163,7 @@ def session_job(
         job: The claimed session job.
         identity: This runner's identity arguments.
         node: This machine's alias, which the job is reported started on.
+        run_id: The tick's run, which the job is reported started as.
 
     Returns:
         The job, whatever became of it.
@@ -178,7 +195,7 @@ def session_job(
         requester_refusal = restart.requester_refusal(job["submitted_by"])
         if requester_refusal is not None:
             return job_close.refuse(credentials, job, identity, detail=requester_refusal)
-    _start(credentials, job, identity, node=node, run_id=f"{invocation['verb']}-{job['job_id']}")
+    _start(credentials, job, identity, node=node, run_id=run_id)
     result = restart.run_session_job(invocation)
     return job_close.close(
         credentials,
@@ -197,6 +214,7 @@ def netboot_job(
     *,
     place: netboot_arm.NetbootPlace,
     node: str,
+    run_id: str,
 ) -> DispatchJob:
     """Execute a claimed ``netboot-arm`` job on this machine, start to close.
 
@@ -214,6 +232,7 @@ def netboot_job(
         identity: This runner's identity arguments.
         place: Where arms run from and write to.
         node: This machine's alias, which the job is reported started on.
+        run_id: The tick's run, which the job is reported started as.
 
     Returns:
         The job, whatever became of it.
@@ -235,7 +254,7 @@ def netboot_job(
     ready = netboot_arm.ready(place)
     if isinstance(ready, str):
         return job_close.refuse(credentials, job, identity, detail=ready)
-    _start(credentials, job, identity, node=node, run_id=f"netboot-arm-{job['job_id']}")
+    _start(credentials, job, identity, node=node, run_id=run_id)
     result = netboot_arm.run_cli(
         netboot_arm.arm_argv(place, ready["release"], machine),
         ready["key"],
@@ -254,6 +273,7 @@ def netboot_job(
 
 __all__ = [
     "CLAIM_LEASE_SECONDS",
+    "PRESTART_LEASE_SECONDS",
     "netboot_job",
     "rebuild_job",
     "session_job",

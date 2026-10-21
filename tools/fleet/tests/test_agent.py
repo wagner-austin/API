@@ -33,9 +33,9 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 from fleet.cli import agent, hub_jobs
 from fleet.contracts.dispatch import DispatchLane
 from fleet.core import _test_hooks, queue
-from tests._agent_cli import agent_argv, sessions_argv
+from tests._agent_cli import NOTHING_HELD, agent_argv, bind_hub_tick, sessions_argv
 from tests._hub_tick import UNROLLED, UNROLLED_TICK, unrolled_calls
-from tests._queue_fakes import FakeEnv, FakeQueue, queue_env
+from tests._queue_fakes import FakeEnv, FakeQueue
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document, machine_of, machines_of
 from tests.conftest import FakeRun, failed, ok, workspace_document
@@ -51,8 +51,9 @@ BOARD_ENV = {
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """Give every test the two variables the agent refuses to run without."""
-    _test_hooks.env = queue_env()
+    """Give every test the two variables the agent refuses to run without,
+    and the machine and unit a hub runner's tick runs in."""
+    bind_hub_tick()
 
 
 class TestAnEmptyHubLane:
@@ -61,28 +62,32 @@ class TestAnEmptyHubLane:
     ) -> None:
         """The outcome of most ticks, and it must be exit 0 -- a scheduling
         loop that stopped on an empty lane would stop immediately."""
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         assert agent.main(agent_argv(config_path, repo)) == 0
-        assert endpoint.tools == ["dispatch_claim"]
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
 
     def test_the_claim_is_the_hub_lane_with_no_tags_and_nothing_is_collected(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         """The partition that keeps a revive out of a queue of checks (board
-        task fd5cabfa, A5): this runner asks for hub verbs only, and it has
-        no held_by pass because every hub verb closes in its own tick."""
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        task fd5cabfa, A5): this runner asks for hub verbs only. Every hub
+        verb closes in its own tick, so the jobs it holds are asked for first
+        only to give back those whose run a restart ended (MCPs board task
+        05dd6588), and the claim holds the short pre-start lease."""
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         agent.main(agent_argv(config_path, repo))
 
-        assert endpoint.tools == ["dispatch_claim"]
-        assert endpoint.arguments[0]["lane"] == "hub"
-        assert endpoint.arguments[0]["tags"] == []
-        assert endpoint.arguments[0]["leaseSeconds"] == hub_jobs.CLAIM_LEASE_SECONDS
-        assert "node" not in endpoint.arguments[0]
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        assert endpoint.arguments[0]["claimedBy"] == "fleet-hub-austinpc"
+        assert endpoint.arguments[0]["status"] == "live"
+        assert endpoint.arguments[1]["lane"] == "hub"
+        assert endpoint.arguments[1]["tags"] == []
+        assert endpoint.arguments[1]["leaseSeconds"] == hub_jobs.PRESTART_LEASE_SECONDS
+        assert "node" not in endpoint.arguments[1]
 
 
 class TestTheSessionsLane:
@@ -94,16 +99,17 @@ class TestTheSessionsLane:
     ) -> None:
         run = FakeRun([])
         _test_hooks.run = run
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
             assert agent.main(sessions_argv(config_path, repo, "ziggurat")) == 0
 
-        assert endpoint.tools == ["dispatch_claim"]
-        assert endpoint.arguments[0]["lane"] == "sessions"
-        assert endpoint.arguments[0]["node"] == "ziggurat"
-        assert endpoint.arguments[0]["tags"] == []
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
+        assert endpoint.arguments[0]["claimedBy"] == "fleet-sessions-ziggurat"
+        assert endpoint.arguments[1]["lane"] == "sessions"
+        assert endpoint.arguments[1]["node"] == "ziggurat"
+        assert endpoint.arguments[1]["tags"] == []
         # No publish pass read the rolled ref, and no observe pass ran.
         assert run.calls == []
         messages = [record.getMessage() for record in caplog.records]
@@ -209,17 +215,17 @@ class TestCredentialsAndEntryPoint:
     def test_a_node_scoped_agent_passes_its_node_to_the_claim(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         agent.main([*agent_argv(config_path, repo), agent.NODE_FLAG, "austinpc"])
 
-        assert endpoint.arguments[0]["node"] == "austinpc"
+        assert endpoint.arguments[1]["node"] == "austinpc"
 
     def test_the_console_entry_point_exits_zero(
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
-        _test_hooks.http_post = FakeQueue([dump_json_str({"claimed": None})])
+        _test_hooks.http_post = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         saved = sys.argv
         sys.argv = ["fleet-agent", *agent_argv(config_path, repo)]
         try:
@@ -237,7 +243,7 @@ class TestCredentialsAndEntryPoint:
         `python -m` would import the module, run nothing, and exit 0 -- which
         reads as a tick that found an empty queue, on a runner that never
         asked."""
-        _test_hooks.http_post = FakeQueue([dump_json_str({"claimed": None})])
+        _test_hooks.http_post = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.agent", None)
         sys.argv = ["x", *agent_argv(config_path, repo)]
@@ -351,7 +357,7 @@ class TestObservingSessions:
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.run = FakeRun([UNROLLED, failed(255, "ssh: serendipity is asleep"), UNROLLED])
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
@@ -359,7 +365,7 @@ class TestObservingSessions:
 
         # The queue pass ran, the hub was skipped, the one worker was asked
         # and its silence was logged as an outcome rather than raised.
-        assert endpoint.tools == ["dispatch_claim"]
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         # By the node's own prefix, not by the word anywhere in the line: on
         # serendipity the run's stage path carries it too, so the publish and
         # reap passes' lines naming the test repo matched (fleet job
@@ -397,6 +403,7 @@ class TestObservingSessions:
         )
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str({"claimed": None}),
                 "observed 0 session(s) for win32:serendipity (0 new row(s)) at t",
             ]
@@ -405,9 +412,9 @@ class TestObservingSessions:
 
         agent.main(agent_argv(_registry(tmp_path), repo))
 
-        assert endpoint.tools == ["dispatch_claim", "task_session_observe"]
-        assert endpoint.arguments[1]["machine"] == "win32:serendipity"
-        assert endpoint.arguments[1]["agent"] == "fleet-hub-austinpc"
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim", "task_session_observe"]
+        assert endpoint.arguments[2]["machine"] == "win32:serendipity"
+        assert endpoint.arguments[2]["agent"] == "fleet-hub-austinpc"
 
     def test_a_roster_with_nothing_to_observe_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -417,7 +424,7 @@ class TestObservingSessions:
         unset here, is never read."""
         run = FakeRun([*UNROLLED_TICK])
         _test_hooks.run = run
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
@@ -427,7 +434,7 @@ class TestObservingSessions:
         # rolled ref, which resolved nothing, so the queue was sent no
         # registry and no host was read.
         assert run.calls == [*unrolled_calls(repo)]
-        assert endpoint.tools == ["dispatch_claim"]
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert (
             "observed no session: none of the roster's 1 machine(s) is an enabled worker, "
@@ -450,11 +457,11 @@ class TestObservingSessions:
         for the board's before the queue pass ran would stall dispatch on a
         credential dispatch does not use."""
         board_watch_hooks.env = FakeEnv({})
-        endpoint = FakeQueue([dump_json_str({"claimed": None})])
+        endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
         with pytest.raises(AppError) as raised:
             agent.main(agent_argv(_registry(tmp_path), repo))
 
         assert raised.value.code is BoardWatchErrorCode.API_KEY_MISSING
-        assert endpoint.tools == ["dispatch_claim"]
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim"]

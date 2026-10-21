@@ -49,7 +49,9 @@ a netboot tick is the first and then the netboot duty's own adopt pass,
 which gives each machine that checked in after a reinstall its roster name
 and address (MCPs board task 49d366ac, :mod:`fleet.core.netboot_adopt`):
 
-    1. CLAIM. Take at most one job of the lane and run it to its close.
+    1. CLAIM. Give back each job held under this label whose run a restart
+       ended (:mod:`fleet.cli.orphans`), then take at most one job of the
+       lane and run it to its close, reported started as this tick's run.
     2. PUBLISH. Read every project the registry declares at the commit
        ``refs/fleet/rolled`` names now, with the tags each requires, and
        hand them to the queue (MCPs board tasks 1915b042 and 0be88a36,
@@ -105,14 +107,14 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import _config, hub_jobs, hub_passes, job_close
+from fleet.cli import _config, hub_jobs, hub_passes, job_close, orphans
 from fleet.contracts.dispatch import (
     DispatchCommand,
     DispatchJob,
     DispatchLane,
     encode_job_line,
 )
-from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, rebuild
+from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, rebuild, tick_run
 
 _log = get_logger(__name__)
 
@@ -152,22 +154,33 @@ def claim_pass(
     credentials: McpCredentials,
     identity: JSONObject,
     *,
+    agent: str,
+    run: tick_run.TickRun,
     lane: DispatchLane,
     node: str | None,
     host: str,
     mcps_root: pathlib.Path | None,
     netboot: netboot_arm.NetbootPlace | None,
 ) -> DispatchJob | None:
-    """Take one job of this runner's lane and run it to its close.
+    """Give back every held job whose run is gone, then take one job of this
+    runner's lane and run it to its close.
 
     A job is run by its command, whichever lane gave it: until the MCPs
     queue split the session verbs into their own lane (mig 795), the hub
     lane gave both kinds. So a job whose kind needs what this runner was not
     started with is refused naming the flag, rather than run without it.
 
+    The give-back comes first (:mod:`fleet.cli.orphans`, MCPs board task
+    05dd6588): a job whose run a restart of the hub runner ended is back in
+    the queue before this claim asks for one, so this tick takes it again.
+    The claim holds a short lease until the start, which reports the job
+    started as this tick's run and renews it to the full lease.
+
     Args:
         credentials: The queue's endpoint and headers.
         identity: This runner's identity arguments.
+        agent: This runner's label, which the queue holds its jobs under.
+        run: This tick's run, which a job is reported started as.
         lane: The hub, sessions or netboot lane.
         node: Restrict claims to this node, plus jobs that name none, or
             None to take any job of the lane.
@@ -183,25 +196,28 @@ def claim_pass(
         lane was empty -- the outcome of most ticks.
 
     Raises:
-        AppError: Only from the queue calls themselves. A LOCAL refusal (no
+        AppError: Only from the queue calls themselves, and from asking this
+            machine's user manager about a held job's run. A LOCAL refusal (no
             MCPs checkout, a target that cannot be resolved, a release that
             is missing or fails its seal, no key to mint with) is reported
             to the queue as ``refused`` with its code and message verbatim
             and does not propagate; see the module docstring for why that is
             transport rather than recovery.
     """
+    orphans.orphan_pass(credentials, identity, agent=agent, own=run)
     job = queue.claim_next(
         credentials,
         lane=lane,
         tags=(),
         node=node,
         projects=None,
-        lease_seconds=hub_jobs.CLAIM_LEASE_SECONDS,
+        lease_seconds=hub_jobs.PRESTART_LEASE_SECONDS,
         identity=identity,
     )
     if job is None:
         return None
     _log.info("claimed %s", encode_job_line(job))
+    run_id = tick_run.encode_run_id(run)
     if job["command"] is DispatchCommand.BUILD_BASES:
         # The verbs that run on the hub itself, synchronously —
         # fleet.core.rebuild's module docstring carries the why.
@@ -217,7 +233,9 @@ def claim_pass(
                     "scheduled"
                 ),
             )
-        return hub_jobs.rebuild_job(credentials, job, identity, mcps_root=mcps_root, node=host)
+        return hub_jobs.rebuild_job(
+            credentials, job, identity, mcps_root=mcps_root, node=host, run_id=run_id
+        )
     if job["command"] is DispatchCommand.NETBOOT_ARM:
         if netboot is None:
             return job_close.refuse(
@@ -230,8 +248,10 @@ def claim_pass(
                     "from; the netboot duty's fleet-netboot runner claims arms"
                 ),
             )
-        return hub_jobs.netboot_job(credentials, job, identity, place=netboot, node=host)
-    return hub_jobs.session_job(credentials, job, identity, node=host)
+        return hub_jobs.netboot_job(
+            credentials, job, identity, place=netboot, node=host, run_id=run_id
+        )
+    return hub_jobs.session_job(credentials, job, identity, node=host, run_id=run_id)
 
 
 #: What each lane's check-in says the runner claims.
@@ -376,8 +396,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             runner does not claim, or a tick given a flag only another lane
             reads.
         AppError: When the queue or the board cannot be reached or answered
-            a shape this runner cannot read, or when the workspace does not
-            decode.
+            a shape this runner cannot read, when the workspace does not
+            decode, when a claiming tick runs in no unit of a user manager
+            (:data:`fleet.core.tick_run.UNBOUND_CODE`), or when that manager
+            cannot be asked about a held job's run.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     announce = queue.ANNOUNCE_FLAG in tokens
@@ -418,6 +440,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     claimed = claim_pass(
         credentials,
         identity,
+        agent=agent,
+        run=tick_run.read_own_run(),
         lane=lane,
         node=parsed.get(NODE_FLAG),
         host=host,

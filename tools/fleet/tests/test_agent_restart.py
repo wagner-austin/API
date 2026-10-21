@@ -18,9 +18,17 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, narro
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, restart, sealed_release, session_argv, session_release
-from tests._agent_cli import HUB_HOST, agent_argv, hub_host, sessions_argv
+from tests._agent_cli import (
+    HELD_THEN_CLAIMED,
+    HUB_HOST,
+    NOTHING_HELD,
+    agent_argv,
+    bind_hub_tick,
+    sessions_argv,
+    tick_run_id,
+)
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
+from tests._queue_fakes import FakeQueue, queue_job
 from tests._session_release_fixtures import (
     RELEASE_ID,
     REVISION,
@@ -41,10 +49,9 @@ HANDOFF_TASK = "553cc92f-39d0-49f3-a631-0d6108a2c5ec"
 def _credentials_in_env() -> None:
     """Give every test the two variables the agent refuses to run without.
 
-    And the machine it runs on, which a hub lane job is reported started on.
+    And the machine and unit it runs in, which a hub lane job is started on.
     """
-    _test_hooks.env = queue_env()
-    _test_hooks.hostname = hub_host
+    bind_hub_tick()
 
 
 def opening(mode: str, returncode: int) -> str:
@@ -98,6 +105,7 @@ def ran_queue(command: str, closed: str) -> FakeQueue:
     """
     return FakeQueue(
         [
+            NOTHING_HELD,
             dump_json_str({"claimed": restart_row(command=command)}),
             dump_json_str({"job": restart_row(command=command, status="running", node="austinpc")}),
             dump_json_str({"job": restart_row(command=command, status=closed, node="austinpc")}),
@@ -116,6 +124,7 @@ def refused_queue(**claimed: JSONValue) -> FakeQueue:
     """
     return FakeQueue(
         [
+            NOTHING_HELD,
             dump_json_str({"claimed": restart_row(**claimed)}),
             dump_json_str({"job": restart_row(status="refused")}),
         ]
@@ -162,11 +171,11 @@ class TestRestartLane:
         # No --mcps-root: a session verb never reads the MCPs checkout.
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
+        assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report", "dispatch_report"]
         # The hub lane, with the hub's own tags: none. What keeps a revive
         # out of a queue of checks (board task fd5cabfa, A5).
-        assert endpoint.arguments[0]["lane"] == "hub"
-        assert endpoint.arguments[0]["tags"] == []
+        assert endpoint.arguments[1]["lane"] == "hub"
+        assert endpoint.arguments[1]["tags"] == []
         # The release's own verifier runs first, then the verb runs the
         # release's session-audit against its register (MCPs c7c2527d).
         assert runner.calls == [
@@ -185,11 +194,11 @@ class TestRestartLane:
             == [sealed_release.VERIFY_TIMEOUT_SECONDS, restart.SESSION_JOB_TIMEOUT_SECONDS]
             == [300, 600]
         )
-        started = endpoint.arguments[1]
+        started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
-        assert started["runId"] == f"restart-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        assert started["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
@@ -212,6 +221,7 @@ class TestRestartLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str({"claimed": restart_row(requestedNode=None)}),
                 dump_json_str({"job": restart_row(status="running", node="ziggurat")}),
                 dump_json_str({"job": restart_row(status="passed", node="ziggurat")}),
@@ -221,10 +231,10 @@ class TestRestartLane:
 
         assert agent.main(sessions_argv(config_path, repo, "ziggurat")) == 0
 
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
-        assert endpoint.arguments[0]["lane"] == "sessions"
-        assert endpoint.arguments[1]["node"] == "ziggurat"
-        assert endpoint.arguments[1]["runId"] == f"restart-{DEFAULT_JOB_ID}"
+        assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report", "dispatch_report"]
+        assert endpoint.arguments[1]["lane"] == "sessions"
+        assert endpoint.arguments[2]["node"] == "ziggurat"
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
         # The verb and nothing after it: a sessions tick has no publish pass.
         # It acts on the host the tick runs as, which a tick on the sessions
         # duty's machine names for a session host it reaches in to (MCPs
@@ -266,9 +276,9 @@ class TestRestartLane:
             *unrolled_calls(repo),
         ]
         assert runner.unset_env[1] == restart.SESSION_ENVIRONMENT_EXCLUDED
-        started = endpoint.arguments[1]
-        assert started["runId"] == f"revive-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        started = endpoint.arguments[2]
+        assert started["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail.startswith(opening("revive", 0))
@@ -289,7 +299,7 @@ class TestRestartLane:
 
         # The release was verified; session-audit never ran.
         assert runner.calls == [verify_call(tmp_path), *unrolled_calls(repo)]
-        closed = endpoint.arguments[1]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "refused"
         assert "SESSION_REQUESTER_INVALID" in narrow_json_to_str(closed["detail"])
 
@@ -333,8 +343,8 @@ class TestRestartLane:
             *unrolled_calls(repo),
         ]
         assert runner.set_env[1] == restart.SESSION_ENVIRONMENT_SET
-        assert endpoint.arguments[1]["runId"] == f"kill-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"{opening('kill', 0)} {line.strip()}"
@@ -362,8 +372,8 @@ class TestRestartLane:
             ),
             *unrolled_calls(repo),
         ]
-        assert endpoint.arguments[1]["runId"] == f"compact-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"{opening('compact', 0)} {line.strip()}"
@@ -390,8 +400,8 @@ class TestRestartLane:
             ),
             *unrolled_calls(repo),
         ]
-        assert endpoint.arguments[1]["runId"] == f"move-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["status"] == "passed"
         detail = narrow_json_to_str(closed["detail"])
         assert detail == f"{opening('move', 0)} {line.strip()}"
@@ -408,6 +418,7 @@ class TestRestartLane:
         row = {"command": "handoff-session", "taskId": HANDOFF_TASK}
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str({"claimed": restart_row(**row)}),
                 dump_json_str({"job": restart_row(**row, status="running", node="austinpc")}),
                 dump_json_str({"job": restart_row(**row, status="passed", node="austinpc")}),
@@ -424,8 +435,8 @@ class TestRestartLane:
             ),
             *unrolled_calls(repo),
         ]
-        assert endpoint.arguments[1]["runId"] == f"handoff-{DEFAULT_JOB_ID}"
-        detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
+        detail = narrow_json_to_str(endpoint.arguments[3]["detail"])
         assert detail == f"{opening('handoff', 0)} {line.strip()}"
 
     def test_an_approved_exit_runs_the_graceful_kill_under_its_own_run_verb(
@@ -446,8 +457,8 @@ class TestRestartLane:
         assert runner.calls[1] == session_argv.kill_argv(
             release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER, hard=False
         )
-        assert endpoint.arguments[1]["runId"] == f"exit-{DEFAULT_JOB_ID}"
-        assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
+        assert endpoint.arguments[2]["runId"] == tick_run_id()
+        assert narrow_json_to_str(endpoint.arguments[3]["detail"]) == (
             f"{opening('kill', 0)} {line.strip()}"
         )
 
@@ -462,7 +473,7 @@ class TestRestartLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[3]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 1
         assert "KILL - REFUSED" in narrow_json_to_str(closed["detail"])
@@ -491,7 +502,7 @@ class TestRestartLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[3]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 1
         assert "SKIPPED    mcps-6e" in narrow_json_to_str(closed["detail"])
@@ -515,8 +526,8 @@ class TestReleaseRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report"]
-        closed = endpoint.arguments[1]
+        assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report"]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "refused"
         assert "exitCode" not in closed
         detail = narrow_json_to_str(closed["detail"])
@@ -537,7 +548,7 @@ class TestReleaseRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [verify_call(tmp_path), *unrolled_calls(repo)]
-        closed = endpoint.arguments[1]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "refused"
         detail = narrow_json_to_str(closed["detail"])
         assert detail.startswith(f"{sealed_release.UNSEALED_CODE}: ")
@@ -555,7 +566,7 @@ class TestReleaseRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        closed = endpoint.arguments[1]
+        closed = endpoint.arguments[2]
         assert "RESTART_TARGET_INVALID" in narrow_json_to_str(closed["detail"])
 
     def test_a_row_with_no_target_is_refused_by_name(
@@ -570,7 +581,7 @@ class TestReleaseRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])
+        assert "RESTART_TARGET_MISSING" in narrow_json_to_str(endpoint.arguments[2]["detail"])
 
     def test_a_handoff_naming_no_task_is_refused_before_the_release_is_read(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
@@ -585,4 +596,4 @@ class TestReleaseRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        assert "HANDOFF_TASK_MISSING" in narrow_json_to_str(endpoint.arguments[1]["detail"])
+        assert "HANDOFF_TASK_MISSING" in narrow_json_to_str(endpoint.arguments[2]["detail"])

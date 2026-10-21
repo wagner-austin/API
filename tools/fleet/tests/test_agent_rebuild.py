@@ -14,11 +14,11 @@ import pathlib
 import pytest
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
-from fleet.cli import agent
+from fleet.cli import agent, hub_jobs
 from fleet.core import _test_hooks, rebuild
-from tests._agent_cli import agent_argv, hub_host
+from tests._agent_cli import NOTHING_HELD, agent_argv, bind_hub_tick, tick_run_id
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_env, queue_job
+from tests._queue_fakes import FakeQueue, queue_job
 from tests.conftest import FakeRun
 
 
@@ -26,10 +26,9 @@ from tests.conftest import FakeRun
 def _credentials_in_env() -> None:
     """Give every test the two variables the agent refuses to run without.
 
-    And the machine it runs on, which a base rebuild is reported started on.
+    And the machine and unit it runs in, which a base rebuild is started on.
     """
-    _test_hooks.env = queue_env()
-    _test_hooks.hostname = hub_host
+    bind_hub_tick()
 
 
 def rebuild_argv(config_path: pathlib.Path, repo: pathlib.Path, mcps: pathlib.Path) -> list[str]:
@@ -63,6 +62,7 @@ class TestRebuildLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str(
                     {
                         "claimed": queue_job(
@@ -82,7 +82,12 @@ class TestRebuildLane:
 
         assert agent.main(rebuild_argv(config_path, repo, mcps)) == 0
 
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
+        assert endpoint.tools == [
+            "dispatch_list",
+            "dispatch_claim",
+            "dispatch_report",
+            "dispatch_report",
+        ]
         assert runner.calls == [
             (
                 "make",
@@ -96,11 +101,14 @@ class TestRebuildLane:
         # A bake that wedges under the fleet lock ends at the lane's own
         # deadline rather than holding the tick to the scheduler's ceiling.
         assert runner.timeouts[0] == rebuild.BUILD_BASES_TIMEOUT_SECONDS == 1800
-        started = endpoint.arguments[1]
+        started = endpoint.arguments[2]
         assert started["action"] == "start"
         assert started["node"] == "austinpc"
-        assert started["runId"] == f"bases-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        # The run is the tick's own unit, which a later tick asks about if
+        # the bake ends without closing the job (MCPs board task 05dd6588).
+        assert started["runId"] == tick_run_id()
+        assert started["leaseSeconds"] == hub_jobs.CLAIM_LEASE_SECONDS
+        closed = endpoint.arguments[3]
         assert closed["action"] == "close"
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
@@ -124,6 +132,7 @@ class TestRebuildLane:
         )
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str(
                     {"claimed": queue_job(status="claimed", command="build-bases", project="MCPs")}
                 ),
@@ -135,7 +144,7 @@ class TestRebuildLane:
 
         assert agent.main(rebuild_argv(config_path, repo, mcps)) == 0
 
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[3]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 2
         assert "Error 2" in narrow_json_to_str(closed["detail"])
@@ -147,6 +156,7 @@ class TestRebuildLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str(
                     {"claimed": queue_job(status="claimed", command="build-bases", project="MCPs")}
                 ),
@@ -158,7 +168,7 @@ class TestRebuildLane:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        closed = endpoint.arguments[1]
+        closed = endpoint.arguments[2]
         assert closed["status"] == "refused"
         assert "exitCode" not in closed
         assert "REBUILD_ROOT_MISSING" in narrow_json_to_str(closed["detail"])
@@ -172,6 +182,7 @@ class TestRebuildLane:
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str(
                     {
                         "claimed": queue_job(
@@ -190,5 +201,5 @@ class TestRebuildLane:
         assert agent.main(rebuild_argv(config_path, repo, mcps)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        closed = endpoint.arguments[1]
+        closed = endpoint.arguments[2]
         assert "REBUILD_LABEL_INVALID" in narrow_json_to_str(closed["detail"])

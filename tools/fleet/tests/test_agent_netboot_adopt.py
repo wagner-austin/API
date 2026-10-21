@@ -17,7 +17,7 @@ from platform_core.json_utils import dump_json_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, netboot_adopt, sealed_release
-from tests._agent_cli import hub_host, netboot_argv
+from tests._agent_cli import NOTHING_HELD, bind_hub_tick, netboot_argv
 from tests._netboot_tick import (
     API_KEY,
     NOTHING_PENDING,
@@ -28,7 +28,7 @@ from tests._netboot_tick import (
     place,
     verify_reply,
 )
-from tests._queue_fakes import FakeQueue, queue_env
+from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed
 
 #: How every line the pass logs opens.
@@ -43,9 +43,8 @@ ADOPTED: Final = (
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """The queue's variables, and the machine the tick runs on."""
-    _test_hooks.env = queue_env()
-    _test_hooks.hostname = hub_host
+    """The queue's variables, and the machine and unit the tick runs in."""
+    bind_hub_tick()
 
 
 def empty_tick(
@@ -69,11 +68,11 @@ def empty_tick(
         exited 0.
     """
     _test_hooks.run = runner
-    endpoint = FakeQueue([dump_json_str({"claimed": None})])
+    endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
     with caplog.at_level("INFO"):
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
-    assert endpoint.tools == ["dispatch_claim"]
+    assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
     return [record.getMessage() for record in caplog.records]
 
 

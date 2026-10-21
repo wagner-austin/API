@@ -20,7 +20,7 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, dump_
 from fleet.cli import agent
 from fleet.contracts.tags import NodeTag
 from fleet.core import _test_hooks, declared, queue, rolled
-from tests._agent_cli import agent_argv
+from tests._agent_cli import NOTHING_HELD, agent_argv, bind_hub_tick
 from tests._git_fixtures import committed_repository
 from tests._hub_tick import UNROLLED, unrolled_call
 from tests._queue_fakes import FakeQueue, queue_env
@@ -354,9 +354,10 @@ class TestTheHubTickPublishes:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         repo, commit = rolled_repo
-        _test_hooks.env = queue_env()
+        bind_hub_tick()
         endpoint = FakeQueue(
             [
+                NOTHING_HELD,
                 dump_json_str({"claimed": None}),
                 dump_json_str(
                     {
@@ -374,14 +375,14 @@ class TestTheHubTickPublishes:
         with caplog.at_level("INFO"):
             assert agent.main(agent_argv(config_path, repo)) == 0
 
-        assert endpoint.tools == ["dispatch_claim", "dispatch_registry_publish"]
-        assert endpoint.arguments[1]["projects"] == [
+        assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_registry_publish"]
+        assert endpoint.arguments[2]["projects"] == [
             {"project": "MCPs", "requiredTags": []},
             {"project": "MCPs/packages/wiki-check", "requiredTags": ["cxx", "pdftotext"]},
             {"project": "tools/fleet", "requiredTags": ["linux"]},
         ]
-        assert endpoint.arguments[1]["runners"] == list(RUNNERS)
-        assert endpoint.arguments[1]["commit"] == commit
+        assert endpoint.arguments[2]["runners"] == list(RUNNERS)
+        assert endpoint.arguments[2]["commit"] == commit
         assert (
             f"published 3 project(s) from the registry at {commit} (0 dropped since the last "
             "publication) and refused 1 queued job(s) naming a project it does not declare; "
@@ -395,7 +396,7 @@ class TestTheHubTickPublishes:
         caplog: pytest.LogCaptureFixture,
     ) -> None:
         repo, commit = rolled_repo
-        _test_hooks.env = queue_env()
+        bind_hub_tick()
         answer: JSONObject = {
             "published": 3,
             "removed": 0,
@@ -403,7 +404,9 @@ class TestTheHubTickPublishes:
             "retired": [],
             "commit": commit,
         }
-        _test_hooks.http_post = FakeQueue([dump_json_str({"claimed": None}), dump_json_str(answer)])
+        _test_hooks.http_post = FakeQueue(
+            [NOTHING_HELD, dump_json_str({"claimed": None}), dump_json_str(answer)]
+        )
 
         with caplog.at_level("INFO"):
             assert agent.main(agent_argv(config_path, repo)) == 0

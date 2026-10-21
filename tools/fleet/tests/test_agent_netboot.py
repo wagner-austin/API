@@ -24,7 +24,16 @@ from platform_core.mcp_testing import DECLARED_TASKBOARD_URL
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, netboot_adopt, netboot_arm, queue, sealed_release
-from tests._agent_cli import HUB_HOST, agent_argv, hub_host, netboot_argv, sessions_argv
+from tests._agent_cli import (
+    HELD_THEN_CLAIMED,
+    HUB_HOST,
+    NOTHING_HELD,
+    agent_argv,
+    bind_hub_tick,
+    netboot_argv,
+    sessions_argv,
+    tick_run_id,
+)
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._netboot_tick import (
     API_KEY,
@@ -37,7 +46,7 @@ from tests._netboot_tick import (
     sealed,
     verify_reply,
 )
-from tests._queue_fakes import DEFAULT_JOB_ID, FakeEnv, FakeQueue, queue_env, queue_job
+from tests._queue_fakes import FakeEnv, FakeQueue, queue_job
 from tests.conftest import FakeRun, failed, ok
 
 #: What the arm prints once lavender is armed: the key's id, never a key.
@@ -51,9 +60,8 @@ SUBMITTER: Final = "opus-mcps-1015-9d59"
 
 @pytest.fixture(name="credentials_in_env", autouse=True)
 def _credentials_in_env() -> None:
-    """The queue's variables, and the machine the tick runs on."""
-    _test_hooks.env = queue_env()
-    _test_hooks.hostname = hub_host
+    """The queue's variables, and the machine and unit the tick runs in."""
+    bind_hub_tick()
 
 
 def arm_row(**overrides: JSONValue) -> JSONObject:
@@ -89,6 +97,7 @@ def ran_queue(closed: str) -> FakeQueue:
     """
     return FakeQueue(
         [
+            NOTHING_HELD,
             dump_json_str({"claimed": arm_row()}),
             dump_json_str({"job": arm_row(status="running", node=HUB_HOST)}),
             dump_json_str({"job": arm_row(status=closed, node=HUB_HOST)}),
@@ -107,6 +116,7 @@ def refused_queue(**claimed: JSONValue) -> FakeQueue:
     """
     return FakeQueue(
         [
+            NOTHING_HELD,
             dump_json_str({"claimed": arm_row(**claimed)}),
             dump_json_str({"job": arm_row(status="refused")}),
         ]
@@ -145,10 +155,11 @@ class TestTheNetbootLane:
 
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report", "dispatch_report"]
+        assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report", "dispatch_report"]
         # Every arm, whatever machine it names: the machine is the target.
-        assert endpoint.arguments[0]["lane"] == "netboot"
-        assert "node" not in endpoint.arguments[0]
+        assert endpoint.arguments[0]["claimedBy"] == f"fleet-netboot-{HUB_HOST}"
+        assert endpoint.arguments[1]["lane"] == "netboot"
+        assert "node" not in endpoint.arguments[1]
         # The release's own verifier, then the release's own arm, then the
         # adopt pass, and no hub pass after it.
         assert runner.calls == [
@@ -166,10 +177,10 @@ class TestTheNetbootLane:
         key = (("TAILSCALE_API_KEY", API_KEY),)
         assert runner.set_env == [(), key, (), key]
         assert not any(API_KEY in token for call in runner.calls for token in call)
-        started = endpoint.arguments[1]
+        started = endpoint.arguments[2]
         assert started["node"] == HUB_HOST
-        assert started["runId"] == f"netboot-arm-{DEFAULT_JOB_ID}"
-        closed = endpoint.arguments[2]
+        assert started["runId"] == tick_run_id()
+        closed = endpoint.arguments[3]
         assert closed["status"] == "passed"
         assert closed["exitCode"] == 0
         assert narrow_json_to_str(closed["detail"]) == (
@@ -195,7 +206,7 @@ class TestTheNetbootLane:
 
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[3]
         assert closed["status"] == "refused"
         assert "exitCode" not in closed
         assert narrow_json_to_str(closed["detail"]) == refusal
@@ -216,7 +227,7 @@ class TestTheNetbootLane:
 
         assert agent.main(netboot_argv(config_path, repo, paths)) == 0
 
-        closed = endpoint.arguments[2]
+        closed = endpoint.arguments[3]
         assert closed["status"] == "failed"
         assert closed["exitCode"] == 1
         assert narrow_json_to_str(closed["detail"]).endswith(
@@ -243,8 +254,8 @@ class TestNetbootRefusals:
 
         verify = sealed_release.verify_argv(paths[agent.NETBOOT_RELEASE_FLAG], "netboot")
         assert runner.calls == [verify, verify]
-        assert endpoint.tools == ["dispatch_claim", "dispatch_report"]
-        detail = narrow_json_to_str(endpoint.arguments[1]["detail"])
+        assert endpoint.tools == [*HELD_THEN_CLAIMED, "dispatch_report"]
+        detail = narrow_json_to_str(endpoint.arguments[2]["detail"])
         assert detail.startswith(f"{sealed_release.UNSEALED_CODE}: ")
         assert "RELEASE_DIGEST_MISMATCH: the payload changed" in detail
 
@@ -263,7 +274,7 @@ class TestNetbootRefusals:
 
         # The arm's verify and the adopt pass's, and neither command ran.
         assert len(runner.calls) == 2
-        assert narrow_json_to_str(endpoint.arguments[1]["detail"]) == (
+        assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
             f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no TAILSCALE_API_KEY, "
             "or sets it empty, and the netboot duty's commands run with it; nothing ran"
         )
@@ -281,7 +292,7 @@ class TestNetbootRefusals:
 
         # Only the adopt pass ran.
         assert runner.calls == adopt_calls(paths, config_path)
-        assert narrow_json_to_str(endpoint.arguments[1]["detail"]).startswith(
+        assert narrow_json_to_str(endpoint.arguments[2]["detail"]).startswith(
             f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine to arm"
         )
 
@@ -299,7 +310,7 @@ class TestNetbootRefusals:
         assert agent.main(agent_argv(config_path, repo)) == 0
 
         assert runner.calls == [*unrolled_calls(repo)]
-        assert narrow_json_to_str(endpoint.arguments[1]["detail"]) == (
+        assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
             f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
             "--netboot-release, --nodejs, --served-root, --env-file, so it has no netboot "
             "release to arm from; the netboot duty's fleet-netboot runner claims arms"
