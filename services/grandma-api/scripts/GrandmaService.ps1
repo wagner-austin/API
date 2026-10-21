@@ -17,18 +17,23 @@
     frontend build's exit code is read (GRANDMA_WEB_BUILD_FAILED) where it
     was discarded with its stderr (MCPs board task d69786fa).
 
-    A port is answered by the listening sockets on it, read from the full
-    table: Get-NetTCPConnection -LocalPort throws when nothing matches,
-    which the old script silenced with SilentlyContinue along with every
-    other failure to read the table.
+    A port is answered by the listening sockets on it, read through
+    scripts/lib/PortListener.ps1: Get-NetTCPConnection throws when nothing
+    matches, which the old script silenced with SilentlyContinue along with
+    every other failure to read the table (board task 2a044a37).
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '..\..\..\scripts\lib\PortListener.ps1')
 
 function Get-GrandmaListener {
     <#
     .SYNOPSIS
-        The processes listening on a local port.
+        The service processes listening on a local port: the repository's
+        listener read (scripts/lib's Get-PortListener) less System.
+    .DESCRIPTION
+        System (pid 4) owns the HTTP.sys listeners, which no start started
+        and no stop may end.
     .PARAMETER Port
         The port.
     .OUTPUTS
@@ -36,9 +41,7 @@ function Get-GrandmaListener {
     #>
     [OutputType([uint32[]])]
     param([Parameter(Mandatory)][int]$Port)
-    $owners = @(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq $Port -and $_.OwningProcess -gt 4 } |
-        ForEach-Object { $_.OwningProcess } | Select-Object -Unique)
-    return [uint32[]]$owners
+    return [uint32[]]@(Get-PortListener -Port $Port | Where-Object { $_ -gt 4 })
 }
 
 function Wait-GrandmaListener {
