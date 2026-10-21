@@ -19,6 +19,7 @@ from __future__ import annotations
 import pathlib
 from collections.abc import Sequence
 
+import pytest
 from platform_core.errors import FleetErrorCode
 from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
@@ -34,7 +35,7 @@ from tests._node_agent_fixtures import (
     prebuilt_export,
     sourced_document,
 )
-from tests._queue_fakes import FakeQueue, queue_job
+from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests.conftest import DEMO_NOW, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, ok, timed_out
 
 __all__ = ["_credentials_in_env", "_sourced_config", "sourced_document"]
@@ -71,14 +72,18 @@ HOLDER_RUN_ID = f"libs-demo-lavender-{DEMO_NOW - 60}"
 
 
 class TestAStagingFaultIsReported:
-    def test_a_payload_send_that_ends_at_its_deadline_is_refused_by_name(
+    def test_a_payload_send_that_ends_at_its_deadline_gives_the_job_back_by_name(
         self, sourced_config: pathlib.Path
     ) -> None:
-        """The queue is told, rather than the row being left claimed.
+        """The queue is told, rather than the row being left claimed, and a
+        node that could not be reached gives the job back instead of refusing
+        it, since nothing ran (MCPs board task ee3d6cdc).
 
-        Before A3 this tick ended with the AppError escaping and the job
-        sitting in status claimed for the rest of its lease, which is the
-        shape a waiting session cannot distinguish from a slow run.
+        Before 1e57ebe5's A3 this tick ended with the AppError escaping and
+        the job sitting in status claimed for the rest of its lease, which is
+        the shape a waiting session cannot distinguish from a slow run; until
+        ee3d6cdc the tick refused it, and 12 of loki's 585 jobs in a week were
+        refused that way, each submitter left to resubmit.
         """
         # The archive the faked ``git archive`` would have written, where the
         # tick reads it: the payload has to be real for staging to carry it.
@@ -88,22 +93,49 @@ class TestAStagingFaultIsReported:
             [
                 dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": queue_job(status="claimed")}),
-                dump_json_str({"job": queue_job(status="refused")}),
+                dump_json_str({"job": queue_job(status="queued")}),
             ]
         )
         _test_hooks.http_post = endpoint
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
-        closed = endpoint.arguments[2]
-        assert closed["action"] == "close"
-        assert closed["status"] == "refused"
-        assert "exitCode" not in closed
-        detail = narrow_json_to_str(closed["detail"])
-        assert FleetErrorCode.NODE_UNREACHABLE in detail
-        # The reason reaches the queue, not just the fact: a refusal that
-        # said only "it failed" would send the reader to the node.
+        given_back = endpoint.arguments[2]
+        assert endpoint.tools[2] == "dispatch_report"
+        assert given_back["action"] == "lost"
+        assert "status" not in given_back
+        detail = narrow_json_to_str(given_back["detail"])
+        assert detail.startswith(f"{FleetErrorCode.NODE_UNREACHABLE}: ")
+        # The reason reaches the queue, not just the fact: a detail that said
+        # only "it failed" would send the reader to the node.
         assert f"timed out after {SSH_DEADLINE_SECONDS} s" in detail
+        assert detail.endswith("; nothing ran on lavender, so the job is given back")
+
+    def test_a_job_given_back_before_is_failed_by_the_queue_and_the_log_says_so(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The queue gives a job back once and fails it the second time
+        (MCPs reportDispatchRunLost), so a node that stays unreachable cannot
+        loop one job; the runner logs what the queue did, not what it asked."""
+        prebuilt_export(sourced_config)
+        _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
+        _test_hooks.http_post = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="failed")}),
+            ]
+        )
+
+        with caplog.at_level("INFO"):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert any(
+            record.getMessage().startswith(
+                f"gave back {DEFAULT_JOB_ID}, which the queue left failed: "
+            )
+            for record in caplog.records
+        )
 
     def test_the_lease_the_dead_run_took_is_given_back_and_its_feed_ends(
         self, sourced_config: pathlib.Path
@@ -114,7 +146,8 @@ class TestAStagingFaultIsReported:
         for the project's whole window, so job 7143a25e was refused
         ``LEASE_HELD`` by the dead run of job 4d8b28a9. Now nothing is held
         afterwards, the feed's last word on the run is ``refused`` with the
-        same reason, and the ledger never counted it.
+        same reason, and the ledger never counted it; the queue, told the
+        node was unreachable, left the job queued for another claim.
         """
         prebuilt_export(sourced_config)
         _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
@@ -122,7 +155,7 @@ class TestAStagingFaultIsReported:
             [
                 dump_json_str({"jobs": []}),
                 dump_json_str({"claimed": queue_job(status="claimed")}),
-                dump_json_str({"job": queue_job(status="refused")}),
+                dump_json_str({"job": queue_job(status="queued")}),
             ]
         )
 

@@ -27,7 +27,8 @@ read. The launch removes the claim once it has ended, by which time its run
 is on the ledger, which charges it from there on. The launch keeps its order
 and its refusals: the commit's fetch before the lease, the lease given back
 when the launch fails after it, and every local refusal reported to the
-queue verbatim.
+queue verbatim, but one: a node the launch could not reach gives the job
+back to the queue, since nothing ran (MCPs board task ee3d6cdc).
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ from concurrent.futures import Future
 from types import TracebackType
 from typing import Final, TypedDict
 
-from platform_core.errors import AppError
+from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
@@ -53,6 +54,7 @@ from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
 from fleet.core import _test_hooks, dispatch, export, host_claims, run_lease
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS
+from fleet.core.queue_lost import report_lost
 from fleet.core.queue_transport import unanswered
 
 _log = get_logger(__name__)
@@ -79,6 +81,39 @@ class Launching(TypedDict):
     jobs: frozenset[str]
 
 
+class Launched(TypedDict):
+    """What a claimed job's launch did.
+
+    Attributes:
+        row: The running ledger row, or None when nothing was launched.
+        unreachable: When nothing was, whether the node could not be reached
+            (``NODE_UNREACHABLE``), which gives the job back to the queue
+            (:meth:`Launcher._launch_row`); any other refusal refuses it.
+        detail: When nothing was, the ``CODE: message`` line the queue and
+            the feed read; empty for a launch.
+    """
+
+    row: LedgerEntry | None
+    unreachable: bool
+    detail: str
+
+
+def _unlaunched(refusal: AppError[FleetErrorCode]) -> Launched:
+    """What a launch's refusal tells the queue.
+
+    Args:
+        refusal: The error that ended the launch.
+
+    Returns:
+        No row, whether it was the node's transport, and the line naming it.
+    """
+    return Launched(
+        row=None,
+        unreachable=refusal.code is FleetErrorCode.NODE_UNREACHABLE,
+        detail=f"{refusal.code}: {refusal.message}",
+    )
+
+
 class _InFlight(TypedDict):
     """One claimed job whose launch is under way.
 
@@ -101,7 +136,7 @@ def launch_claimed(
     node: NodeConfig,
     prepared: Prepared,
     build: dispatch.PayloadBuilder,
-) -> LedgerEntry | str:
+) -> Launched:
     """Take the project's lease on this node and launch the job under it.
 
     GUARDED LIKE ``prepare``, because a fault here is otherwise reported
@@ -129,7 +164,7 @@ def launch_claimed(
         build: Builds the job's export once the lease is held.
 
     Returns:
-        The running ledger row, or the ``CODE: message`` refusal to report.
+        The running ledger row, or why nothing was launched.
     """
     try:
         lease = run_lease.take(
@@ -145,9 +180,9 @@ def launch_claimed(
             node_local=loaded.workspace["node_local_resources"],
         )
     except AppError as refusal:
-        return f"{refusal.code}: {refusal.message}"
+        return _unlaunched(refusal)
     try:
-        return dispatch.launch(
+        row = dispatch.launch(
             loaded.ledger,
             loaded.feed,
             lease=lease,
@@ -163,10 +198,13 @@ def launch_claimed(
             registry=loaded.registry,
         )
     except AppError as refusal:
-        detail = f"{refusal.code}: {refusal.message}"
-        given_back = run_lease.abandon(loaded.leases, loaded.feed, lease=lease, detail=detail)
+        unlaunched = _unlaunched(refusal)
+        given_back = run_lease.abandon(
+            loaded.leases, loaded.feed, lease=lease, detail=unlaunched["detail"]
+        )
         _log.info("%s never launched; %s", lease["run_id"], given_back)
-        return detail
+        return unlaunched
+    return Launched(row=row, unreachable=False, detail="")
 
 
 class Launcher:
@@ -416,13 +454,34 @@ class Launcher:
             data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
             return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
 
-        row = launch_claimed(
+        launched = launch_claimed(
             self._loaded, job, alias=self._alias, node=self._node, prepared=prepared, build=build
         )
-        if isinstance(row, str):
-            refuse(self._credentials, job, self._identity, detail=row)
+        if launched["row"] is not None:
+            return launched["row"]
+        if launched["unreachable"]:
+            # The node's transport failed before anything ran, which says
+            # nothing about the job: it goes back to the queue once, and a
+            # second loss fails it (MCPs reportDispatchRunLost; board task
+            # ee3d6cdc, where 12 of loki's 585 jobs in a week were refused
+            # on a tunnel stall and each one's submitter had to resubmit).
+            answered = report_lost(
+                self._credentials,
+                job_id=job["job_id"],
+                detail=(
+                    f"{launched['detail']}; nothing ran on {self._alias}, so the job is given back"
+                ),
+                identity=self._identity,
+            )
+            _log.info(
+                "gave back %s, which the queue left %s: %s",
+                job["job_id"],
+                answered["status"].value,
+                launched["detail"],
+            )
             return None
-        return row
+        refuse(self._credentials, job, self._identity, detail=launched["detail"])
+        return None
 
 
 __all__ = [
