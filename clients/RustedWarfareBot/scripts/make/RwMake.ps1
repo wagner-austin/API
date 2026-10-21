@@ -18,9 +18,12 @@
     A PORT IS OPEN WHEN SOMETHING LISTENS ON IT, read from the listening
     socket table rather than by connecting: a connect needs a catch for
     every refusal, and the agent's channel is a listening socket either way.
+    The table is read by the repository's one reader, scripts/lib's
+    Get-PortListener (board task 2a044a37).
 #>
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot '..\..\..\..\scripts\lib\PortListener.ps1')
 
 function Invoke-RwNative {
     <#
@@ -98,21 +101,6 @@ function Remove-RwBuildPath {
     }
 }
 
-function Get-RwListener {
-    <#
-    .SYNOPSIS
-        The processes listening on a local port, each once.
-    .PARAMETER Port
-        The port.
-    .OUTPUTS
-        UInt32[].
-    #>
-    [OutputType([uint32[]])]
-    param([Parameter(Mandatory)][int]$Port)
-    return [uint32[]]@(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq $Port } |
-        ForEach-Object { $_.OwningProcess } | Select-Object -Unique)
-}
-
 function Wait-RwListener {
     <#
     .SYNOPSIS
@@ -129,7 +117,7 @@ function Wait-RwListener {
     param([Parameter(Mandatory)][int]$Port, [Parameter(Mandatory)][int]$Seconds,
         [Parameter(Mandatory)][string]$Code, [Parameter(Mandatory)][string]$Reason)
     $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
-    while (@(Get-RwListener $Port).Count -eq 0) {
+    while (@(Get-PortListener -Port $Port).Count -eq 0) {
         if ([DateTime]::UtcNow -ge $deadline) {
             throw "${Code}: nothing listened on port $Port within ${Seconds}s: $Reason"
         }

@@ -40,7 +40,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'RwMake.ps1')
 
 $base = (Resolve-Path -LiteralPath $Root).ProviderPath
-$held = @(Get-RwListener $Port)
+$held = @(Get-PortListener -Port $Port)
 if ($held.Count -gt 0) {
     throw "RW_DOOR_ALREADY_UP: the door is already listening on $Port (pid $($held -join ', ')); stop it first"
 }
@@ -51,4 +51,4 @@ $commandLine = "cmd.exe /c cd /d $base & set PYTHONPATH=$base\src & " +
     "$Python -u -m scripts.match_service `"$dsn`" >> $log 2>> $log.err"
 $spawned = Invoke-RwDetachedSpawn $commandLine 'RW_DOOR_SPAWN_FAILED'
 Wait-RwListener $Port $ReadySeconds 'RW_DOOR_NOT_LISTENING' "the door spawned as pid $spawned; see $DoorLog.err"
-Write-Information "door up: pid $(@(Get-RwListener $Port) -join ', '), http://127.0.0.1:$Port/, log $DoorLog" -InformationAction Continue
+Write-Information "door up: pid $(@(Get-PortListener -Port $Port) -join ', '), http://127.0.0.1:$Port/, log $DoorLog" -InformationAction Continue

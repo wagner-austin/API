@@ -14,9 +14,11 @@ $ErrorActionPreference = 'Stop'
 BeforeAll {
     $makeRoot = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'scripts\make'
     . (Join-Path $makeRoot 'RwMake.ps1')
+    # Each entry is written by its whole file name: MCPs' harness measures
+    # only the scripts a suite's text names by file (its Measure.ps1).
     $script:entry = @{}
-    foreach ($name in 'agent', 'selftest', 'probe', 'host', 'watch', 'door', 'fleet-up') {
-        $script:entry[$name] = Join-Path $makeRoot "$name.ps1"
+    foreach ($file in 'agent.ps1', 'selftest.ps1', 'probe.ps1', 'host.ps1', 'watch.ps1', 'door.ps1', 'fleet-up.ps1') {
+        $script:entry[[System.IO.Path]::GetFileNameWithoutExtension($file)] = Join-Path $makeRoot $file
     }
     $script:taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
 
@@ -55,7 +57,7 @@ BeforeAll {
 
     function Invoke-TestListenerEnd {
         param([int]$Port)
-        foreach ($owner in @(Get-RwListener $Port)) {
+        foreach ($owner in @(Get-PortListener -Port $Port)) {
             $said = & $script:taskkill /F /T /PID $owner
             $LASTEXITCODE | Should -BeIn @(0, 128) -Because "$said"
         }
@@ -223,7 +225,7 @@ Describe 'The match service launchers' {
         $world = Initialize-RwServiceWorld
         try {
             $said = @(Invoke-TestEntry $script:entry['door'] @{ Port = $world.Port; Root = $world.Root; Docker = $world.Docker; Python = $world.Door } 6>&1 | ForEach-Object { "$_" })
-            $said | Should -Be @("door up: pid $(@(Get-RwListener $world.Port) -join ', '), http://127.0.0.1:$($world.Port)/, log runs/door.log")
+            $said | Should -Be @("door up: pid $(@(Get-PortListener -Port $world.Port) -join ', '), http://127.0.0.1:$($world.Port)/, log runs/door.log")
         } finally { Invoke-TestListenerEnd $world.Port }
     }
     It 'refuses a door already listening, before reading the password' {
