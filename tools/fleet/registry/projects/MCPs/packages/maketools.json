@@ -2,7 +2,9 @@
   "worker_ram_gb": 0.3,
   "minimum_workers": 4,
   "expected_minutes": 5,
-  "required_tags": [],
+  "required_tags": [
+    "linux"
+  ],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "packages/maketools",
