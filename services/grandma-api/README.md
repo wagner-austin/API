@@ -225,6 +225,9 @@ class ServiceContainer:
 make lint         # Run guards + ruff + mypy
 make test         # Run pytest with coverage
 make check        # Run lint + test
+make up           # Build and start the compose service (needs the root's make infra)
+make down         # Stop the compose service
+make logs         # Follow the compose service's logs
 ```
 
 ### Quality Gates

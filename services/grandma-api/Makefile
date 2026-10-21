@@ -29,29 +29,16 @@ check:
 
 _check-unbudgeted: lint test
 
-# The host-mode start/stop scripts and the log tail are Windows PowerShell
-# (scripts/start.ps1 and stop.ps1 over GrandmaService.ps1, which read the
-# listening-socket table and end process trees with taskkill); the docker
-# route (`make up-grandma` at the root) is the portable one.
-ifeq ($(OS),Windows_NT)
+# up, down and logs drive this directory's compose file, the route the
+# root's up-grandma takes; the container joins platform-network, which the
+# root's `make infra` creates. They were a Windows PowerShell host mode over
+# the Windows socket table until MCPs board task 703fec5a; the web
+# frontend's local HTTPS server is `make -C web serve`.
 up:
-	& .\scripts\start.ps1
+	$(MAKETOOLS) compose-up .
 
 down:
-	& .\scripts\stop.ps1
+	$(MAKETOOLS) compose-down .
 
 logs:
-	$$logDir = ".\logs"; if (Test-Path "$$logDir\api.log") { Write-Host "=== API Log ===" -ForegroundColor Cyan; Get-Content "$$logDir\api.log" -Tail 50 }; if (Test-Path "$$logDir\web.log") { Write-Host "`n=== Web Log ===" -ForegroundColor Cyan; Get-Content "$$logDir\web.log" -Tail 20 }
-else
-up:
-	@echo "up is Windows-only here (the start script is Windows PowerShell over the Windows socket table): use make up-grandma at the root"
-	@exit 1
-
-down:
-	@echo "down is Windows-only here (the stop script under scripts): use docker compose down in this directory"
-	@exit 1
-
-logs:
-	@echo "logs is Windows-only here (it tails the host-mode logs/ directory): use docker compose logs -f"
-	@exit 1
-endif
+	docker compose logs -f

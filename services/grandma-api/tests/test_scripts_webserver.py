@@ -273,7 +273,7 @@ def test_webserver_subprocess_integration(served_dir: Path) -> None:
     project_root = Path(__file__).parent.parent
     port = _find_free_port()
 
-    # Launched exactly as scripts/start.ps1 launches it: `-m` from the project
+    # Launched exactly as web/Makefile's serve launches it: `-m` from the project
     # root, with the directory to serve passed as argv[2] (main() chdirs to it).
     # Running the file BY PATH with cwd=served_dir instead put scripts/ on
     # sys.path[0] rather than the project root, so `from scripts import
