@@ -23,19 +23,21 @@ revision to be exactly the pointer's. The verb then runs that release's
 session-audit with its sealed environment and its registry. The job's
 closing detail names the release id and revision.
 
-THE STORE IS THE PLATFORM'S (MCPs board task 315111e4). The sessions duty
-moved to diphtheria, a Linux host, on 2026-10-18, and its first kill was
-refused because this module read the store only from ``LOCALAPPDATA``, which
-Linux does not set. MCPs keeps every kind's store under one per-user base per
-platform (maketools ``release/store.py`` ``STORE_BASE``), and
-:data:`STORE_BASES` says the same: ``<LOCALAPPDATA>/Corvis`` on Windows,
-``<HOME>/.local/share/corvis`` on Linux. This package cannot import
-maketools, which lives in another repository and environment, so the pair is
-written here and the verifier, which is maketools, is the release's own.
+THE STORE IS THE LINUX HUB'S (MCPs board task 315111e4, API board task
+2fab5e74). The sessions duty moved to diphtheria, a Linux host, on
+2026-10-18, and its first kill was refused because this module read the
+store only from ``LOCALAPPDATA``, which Linux does not set. It then read
+each platform's store by the runner's ``sys.platform``; no hub job runs on
+Windows any more (measured 2026-10-21 on austinpc and loki), so the store
+is the one MCPs keeps on Linux (maketools ``release/store.py``
+``STORE_BASE``): ``<HOME>/.local/share/corvis``, :data:`STORE_ROOT_VARIABLE`
+and :data:`STORE_BASE`. This package cannot import maketools, which lives in
+another repository and environment, so the pair is written here and the
+verifier, which is maketools, is the release's own.
 
-NO FALLBACK. An unknown platform, an unset base variable, no pointer, a
-malformed one, a release that fails its seal or a verified release that is
-not the pointer's refuses the job with a named code, and nothing runs;
+NO FALLBACK. An unset ``HOME``, no pointer, a malformed one, a release that
+fails its seal or a verified release that is not the pointer's refuses the
+job with a named code, and nothing runs;
 running the checkout or ``origin/main`` on the day the release is missing is
 exactly what the ruling removed.
 """
@@ -43,7 +45,6 @@ exactly what the ruling removed.
 from __future__ import annotations
 
 import pathlib
-from collections.abc import Mapping
 from typing import Final, TypedDict
 
 from platform_core.json_utils import load_json_str
@@ -53,15 +54,15 @@ from fleet.core import _test_hooks, sealed_release
 #: The release kind a session verb runs, as MCPs ``release-kinds.json`` names it.
 KIND: Final = "session-verbs"
 
-#: Where each platform keeps every release kind's store: the environment
-#: variable naming the per-user root, and the base under it, as MCPs
-#: maketools ``release/store.py`` ``STORE_BASE`` lays them out.
-STORE_BASES: Final[Mapping[str, tuple[str, pathlib.PurePosixPath]]] = {
-    "win32": ("LOCALAPPDATA", pathlib.PurePosixPath("Corvis")),
-    "linux": ("HOME", pathlib.PurePosixPath(".local/share/corvis")),
-}
+#: The environment variable naming the per-user root every release kind's
+#: store is under.
+STORE_ROOT_VARIABLE: Final = "HOME"
 
-#: The kind's store under its platform's base.
+#: The base under that root, as MCPs maketools ``release/store.py``
+#: ``STORE_BASE`` lays it out on Linux.
+STORE_BASE: Final = pathlib.PurePosixPath(".local/share/corvis")
+
+#: The kind's store under the base.
 STORE: Final = pathlib.PurePosixPath(f"{KIND}-releases")
 
 #: The pointer file in the store naming the active release.
@@ -73,10 +74,7 @@ POINTER_KEYS: Final[tuple[str, ...]] = ("kind", "release", "revision", "root")
 #: The source registry inside a release, passed to every verb.
 REGISTRY_DIR: Final = pathlib.PurePosixPath("mcp-shared/src/source-registry")
 
-#: Detail prefix when this process runs on a platform with no store base.
-PLATFORM_UNSUPPORTED_CODE: Final = "SESSION_RELEASE_PLATFORM_UNSUPPORTED"
-
-#: Detail prefix when the environment names no root for the platform's store.
+#: Detail prefix when the environment names no root for the store.
 NO_STORE_BASE_CODE: Final = "SESSION_RELEASE_NO_STORE_BASE"
 
 #: Detail prefix when no release has been activated.
@@ -105,35 +103,21 @@ class SessionRelease(TypedDict):
     registry_dir: str
 
 
-def pointer_path(operating_system: str) -> pathlib.Path | str:
-    """Locate the active-release pointer in this platform's store.
-
-    Args:
-        operating_system: The platform this runner is on, as
-            ``sys.platform`` names it; the caller passes it so one suite
-            reads every platform's store.
+def pointer_path() -> pathlib.Path | str:
+    """Locate the active-release pointer in the store.
 
     Returns:
-        ``<base>/session-verbs-releases/active.json`` under the platform's
-        :data:`STORE_BASES` root, or a refusal detail when the platform has
-        no store base or the environment names no root for it.
+        ``<HOME>/.local/share/corvis/session-verbs-releases/active.json``,
+        or a refusal detail when the environment names no ``HOME``.
     """
-    base = STORE_BASES.get(operating_system)
-    if base is None:
-        return (
-            f"{PLATFORM_UNSUPPORTED_CODE}: this runner is on {operating_system!r}, and a "
-            f"session-verbs release store is kept only on {', '.join(STORE_BASES)}; "
-            "nothing was run"
-        )
-    variable, relative = base
-    root = _test_hooks.env(variable)
+    root = _test_hooks.env(STORE_ROOT_VARIABLE)
     # The env seam answers None for unset and blank alike.
     if root is None:
         return (
-            f"{NO_STORE_BASE_CODE}: {variable} is unset in this runner's environment, so the "
-            f"{operating_system} session-verbs release store cannot be found; nothing was run"
+            f"{NO_STORE_BASE_CODE}: {STORE_ROOT_VARIABLE} is unset in this runner's "
+            "environment, so the session-verbs release store cannot be found; nothing was run"
         )
-    return pathlib.Path(root) / relative / STORE / POINTER_NAME
+    return pathlib.Path(root) / STORE_BASE / STORE / POINTER_NAME
 
 
 def _pointed(path: pathlib.Path) -> SessionRelease | str:
@@ -176,12 +160,8 @@ def _pointed(path: pathlib.Path) -> SessionRelease | str:
     )
 
 
-def active_session_release(operating_system: str) -> SessionRelease | str:
+def active_session_release() -> SessionRelease | str:
     """Find the active session-verbs release and verify its seal.
-
-    Args:
-        operating_system: The platform this runner is on, as
-            ``sys.platform`` names it, which decides where its store is.
 
     Returns:
         The verified release, or a ``CODE: message`` refusal detail for the
@@ -189,7 +169,7 @@ def active_session_release(operating_system: str) -> SessionRelease | str:
         not verify, or the release its verifier verified is not the
         pointer's.
     """
-    path = pointer_path(operating_system)
+    path = pointer_path()
     if isinstance(path, str):
         return path
     release = _pointed(path)
@@ -211,14 +191,14 @@ __all__ = [
     "KIND",
     "NOT_ACTIVE_CODE",
     "NO_STORE_BASE_CODE",
-    "PLATFORM_UNSUPPORTED_CODE",
     "POINTER_INVALID_CODE",
     "POINTER_KEYS",
     "POINTER_MISMATCH_CODE",
     "POINTER_NAME",
     "REGISTRY_DIR",
     "STORE",
-    "STORE_BASES",
+    "STORE_BASE",
+    "STORE_ROOT_VARIABLE",
     "SessionRelease",
     "active_session_release",
     "pointer_path",

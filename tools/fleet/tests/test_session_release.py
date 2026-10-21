@@ -1,8 +1,7 @@
 """Finding and verifying the sealed session-verbs release a session verb runs.
 
-The pointer is read from a real file in the running platform's store under
-a per-test root, each platform's store is located by naming that platform,
-and the verifier's answer is scripted through the command seam
+The pointer is read from a real file in the store under a per-test
+``HOME``, and the verifier's answer is scripted through the command seam
 (``tests._session_release_fixtures``). Every refusal is a named code with
 nothing run after it: no fallback (MCPs board task c7c2527d).
 """
@@ -10,7 +9,6 @@ nothing run after it: no fallback (MCPs board task c7c2527d).
 from __future__ import annotations
 
 import pathlib
-import sys
 
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue
@@ -60,7 +58,7 @@ class TestActiveRelease:
         runner = FakeRun([verify_reply(tmp_path)])
         _test_hooks.run = runner
 
-        assert session_release.active_session_release(sys.platform) == expected
+        assert session_release.active_session_release() == expected
         assert expected["release"] == RELEASE_ID
         assert expected["revision"] == REVISION
         assert expected["registry_dir"] == str(
@@ -76,57 +74,25 @@ class TestActiveRelease:
     ) -> None:
         point_environment(tmp_path)
 
-        assert session_release.pointer_path(sys.platform) == pointer_file(tmp_path)
+        assert session_release.pointer_path() == pointer_file(tmp_path)
 
-    def test_on_linux_the_pointer_lives_in_the_store_under_home(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_the_pointer_lives_in_the_store_under_home(self, tmp_path: pathlib.Path) -> None:
         _test_hooks.env = FakeEnv({"HOME": str(tmp_path), "LOCALAPPDATA": "/elsewhere"})
 
-        assert session_release.pointer_path("linux") == (
+        assert session_release.pointer_path() == (
             tmp_path / ".local" / "share" / "corvis" / "session-verbs-releases" / "active.json"
         )
 
-    def test_on_windows_the_pointer_lives_in_the_store_under_local_application_data(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        _test_hooks.env = FakeEnv({"LOCALAPPDATA": str(tmp_path), "HOME": "/elsewhere"})
-
-        assert session_release.pointer_path("win32") == (
-            tmp_path / "Corvis" / "session-verbs-releases" / "active.json"
-        )
-
-    @pytest.mark.parametrize(
-        ("operating_system", "variable"), [("linux", "HOME"), ("win32", "LOCALAPPDATA")]
-    )
-    def test_without_the_platforms_root_nothing_is_read_or_run(
-        self, operating_system: str, variable: str
-    ) -> None:
+    def test_without_home_nothing_is_read_or_run(self) -> None:
         _test_hooks.env = queue_env()
         runner = FakeRun([])
         _test_hooks.run = runner
 
-        detail = refusal(session_release.active_session_release(operating_system))
+        detail = refusal(session_release.active_session_release())
 
         assert detail == (
-            f"{session_release.NO_STORE_BASE_CODE}: {variable} is unset in this runner's "
-            f"environment, so the {operating_system} session-verbs release store cannot be "
-            "found; nothing was run"
-        )
-        assert runner.calls == []
-
-    def test_on_a_platform_with_no_store_nothing_is_read_or_run(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        point_environment(tmp_path)
-        runner = FakeRun([])
-        _test_hooks.run = runner
-
-        detail = refusal(session_release.active_session_release("darwin"))
-
-        assert detail == (
-            f"{session_release.PLATFORM_UNSUPPORTED_CODE}: this runner is on 'darwin', and a "
-            "session-verbs release store is kept only on win32, linux; nothing was run"
+            f"{session_release.NO_STORE_BASE_CODE}: HOME is unset in this runner's "
+            "environment, so the session-verbs release store cannot be found; nothing was run"
         )
         assert runner.calls == []
 
@@ -137,7 +103,7 @@ class TestActiveRelease:
         runner = FakeRun([])
         _test_hooks.run = runner
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail == (
             f"{session_release.NOT_ACTIVE_CODE}: {pointer_file(tmp_path)} does not exist, so "
@@ -151,13 +117,13 @@ class TestPointerRefusals:
     @pytest.mark.parametrize(
         "record",
         [
-            {"release": RELEASE_ID, "kind": "session-verbs", "revision": REVISION, "root": "C:/r"},
+            {"release": RELEASE_ID, "kind": "session-verbs", "revision": REVISION, "root": "/r"},
             {"kind": "session-verbs", "release": RELEASE_ID, "revision": REVISION},
             {
                 "kind": "session-verbs",
                 "release": RELEASE_ID,
                 "revision": REVISION,
-                "root": "C:/r",
+                "root": "/r",
                 "extra": "x",
             },
         ],
@@ -168,7 +134,7 @@ class TestPointerRefusals:
         path = write_pointer(tmp_path, record)
         _test_hooks.run = FakeRun([])
 
-        assert refusal(session_release.active_session_release(sys.platform)) == (
+        assert refusal(session_release.active_session_release()) == (
             f"{session_release.POINTER_INVALID_CODE}: {path} is not an object of "
             "kind, release, revision, root"
         )
@@ -180,7 +146,7 @@ class TestPointerRefusals:
         path.write_text('["session-verbs"]', encoding="utf-8")
         _test_hooks.run = FakeRun([])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail.startswith(f"{session_release.POINTER_INVALID_CODE}: {path} is not an object")
 
@@ -193,7 +159,7 @@ class TestPointerRefusals:
         path = write_pointer(tmp_path, record)
         _test_hooks.run = FakeRun([])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         code = session_release.POINTER_INVALID_CODE
         assert detail.startswith(f"{code}: {path} must hold strings")
@@ -216,7 +182,7 @@ class TestPointerRefusals:
         runner = FakeRun([])
         _test_hooks.run = runner
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail.startswith(f"{session_release.POINTER_INVALID_CODE}: {path} names kind ")
         assert detail.endswith("a session-verbs release with an id and a full commit is required")
@@ -230,7 +196,7 @@ class TestVerification:
         plant_release(tmp_path)
         _test_hooks.run = FakeRun([failed(1, "RELEASE_DIGEST_MISMATCH: payload changed\n")])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail == (
             f"{sealed_release.UNSEALED_CODE}: {verifier(tmp_path)} exited 1: "
@@ -251,7 +217,7 @@ class TestVerification:
         plant_release(tmp_path)
         _test_hooks.run = FakeRun([ok(f"{answer}\n")])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail.startswith(f"{sealed_release.ANSWER_MISMATCH_CODE}: ")
         assert f"answered {answer!r}" in detail
@@ -270,7 +236,7 @@ class TestVerification:
         sealed = verified_line(tmp_path).replace(REVISION, other)
         _test_hooks.run = FakeRun([ok(f"{sealed}\n")])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail == (
             f"{session_release.POINTER_MISMATCH_CODE}: the pointer {pointer_file(tmp_path)} "
@@ -286,7 +252,7 @@ class TestVerification:
         write_pointer(tmp_path, record)
         _test_hooks.run = FakeRun([verify_reply(tmp_path)])
 
-        detail = refusal(session_release.active_session_release(sys.platform))
+        detail = refusal(session_release.active_session_release())
 
         assert detail.startswith(f"{session_release.POINTER_MISMATCH_CODE}: ")
         assert f"names release {'a' * 32} at revision {REVISION}" in detail

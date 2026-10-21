@@ -1,9 +1,9 @@
 """CLI: run a fleet agent from the rolled commit (board task 465689f5).
 
 Usage:
-    python -m fleet.cli.rolled --repo-root C:/Users/Test/PROJECTS/API \\
+    python -m fleet.cli.rolled --repo-root /home/corvis/PROJECTS/API \\
         --agent fleet-agent -- --agent fleet-hub-diphtheria --session <uuid> ...
-    python -m fleet.cli.rolled --repo-root C:/Users/Test/PROJECTS/API \\
+    python -m fleet.cli.rolled --repo-root /home/corvis/PROJECTS/API \\
         --agent fleet-node-agent -- --node sedona
 
 What each scheduled tick runs instead of the checkout's ``fleet-agent``:

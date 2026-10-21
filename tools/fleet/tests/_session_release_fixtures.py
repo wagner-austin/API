@@ -3,9 +3,8 @@
 Shared by ``test_session_release`` (finding and verifying the release) and
 ``test_agent_restart`` (the tick that does so before every session verb), so
 the pointer MCPs writes, the verifier call and its answer are written down
-once. The pointer is planted for real in the store of the platform the
-suite runs on (the agent passes ``sys.platform``), under a per-test root
-the environment names: the release is found through the real
+once. The pointer is planted for real in the store under a per-test
+``HOME``: the release is found through the real
 ``file_exists`` and ``read_text`` hooks, so what a test plants is what the
 code reads.
 """
@@ -30,17 +29,13 @@ RELEASE_ID: Final = "3f0c9d5e8a7b4c21b6e0f1d2a3c4b5e6"
 #: The commit the release was checked out at.
 REVISION: Final = "58efcb92d6c1e0a4b3f2e1d0c9b8a7f6e5d4c3b2"
 
-#: Each platform's store root variable and the store under it, as MCPs
-#: maketools ``release/store.py`` lays them out, written out rather than read
-#: from the module under test.
-STORES: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
-    "win32": ("LOCALAPPDATA", ("Corvis", "session-verbs-releases")),
-    "linux": ("HOME", (".local", "share", "corvis", "session-verbs-releases")),
-}
+#: The store under ``HOME``, as MCPs maketools ``release/store.py`` lays it
+#: out, written out rather than read from the module under test.
+STORE_PARTS: Final[tuple[str, ...]] = (".local", "share", "corvis", "session-verbs-releases")
 
 
 def store_root(tmp_path: pathlib.Path) -> pathlib.Path:
-    """The per-test directory the platform's root variable names.
+    """The per-test directory ``HOME`` names.
 
     Args:
         tmp_path: The test's temporary directory.
@@ -52,16 +47,15 @@ def store_root(tmp_path: pathlib.Path) -> pathlib.Path:
 
 
 def store(tmp_path: pathlib.Path) -> pathlib.Path:
-    """The kind's store for the platform the suite runs on.
+    """The kind's store.
 
     Args:
         tmp_path: The test's temporary directory.
 
     Returns:
-        ``<root>/.local/share/corvis/session-verbs-releases`` on Linux,
-        ``<root>/Corvis/session-verbs-releases`` on Windows.
+        ``<root>/.local/share/corvis/session-verbs-releases``.
     """
-    return store_root(tmp_path).joinpath(*STORES[sys.platform][1])
+    return store_root(tmp_path).joinpath(*STORE_PARTS)
 
 
 def release_root(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -89,13 +83,12 @@ def pointer_file(tmp_path: pathlib.Path) -> pathlib.Path:
 
 
 def point_environment(tmp_path: pathlib.Path) -> None:
-    """Give the agent the queue's variables and the platform's store root.
+    """Give the agent the queue's variables and the store's ``HOME``.
 
     Args:
         tmp_path: The test's temporary directory.
     """
-    variable = STORES[sys.platform][0]
-    _test_hooks.env = FakeEnv({**queue_env().values, variable: str(store_root(tmp_path))})
+    _test_hooks.env = FakeEnv({**queue_env().values, "HOME": str(store_root(tmp_path))})
 
 
 def write_pointer(tmp_path: pathlib.Path, record: JSONObject) -> pathlib.Path:
@@ -218,7 +211,7 @@ def verify_reply(tmp_path: pathlib.Path) -> _test_hooks.CommandResult:
 __all__ = [
     "RELEASE_ID",
     "REVISION",
-    "STORES",
+    "STORE_PARTS",
     "plant_release",
     "point_environment",
     "pointer_file",

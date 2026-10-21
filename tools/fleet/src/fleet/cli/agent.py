@@ -2,11 +2,11 @@
 lane, its sessions lane or its netboot lane.
 
 Usage:
-    fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
+    fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
         --agent fleet-hub-diphtheria --session <uuid> --lane hub [--announce]
-    fleet-agent --config registry --repo-root C:/Users/Test/PROJECTS/API \\
-        --agent fleet-sessions-austinpc --session <uuid> --lane sessions \\
-        --node austinpc [--announce]
+    fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
+        --agent fleet-sessions-diphtheria --session <uuid> --lane sessions \\
+        --node diphtheria [--announce]
     fleet-agent --config registry --repo-root /home/corvis/PROJECTS/API \\
         --agent fleet-netboot-diphtheria --session <uuid> --lane netboot \\
         --netboot-release <release>/MCPs --nodejs /usr/bin/node \\

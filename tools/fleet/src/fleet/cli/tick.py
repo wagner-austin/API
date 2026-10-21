@@ -1,8 +1,8 @@
 """CLI: one fleet tick, run by the MCPs hub runner as a native process.
 
 Usage:
-    poetry run -- python -m fleet.cli.tick --api-root C:/Users/Test/PROJECTS/API \\
-        --log-directory C:/Users/Test/AppData/Local/Temp/claude --lane hub
+    poetry run -- python -m fleet.cli.tick --api-root /home/corvis/PROJECTS/API \\
+        --log-directory /home/corvis/.local/state/corvis/logs --lane hub
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane node --node sedona
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
@@ -12,7 +12,7 @@ Usage:
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane hub-announce
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
-        --lane sessions --node austinpc
+        --lane sessions --node diphtheria
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane netboot --netboot-release <release>/MCPs --nodejs /usr/bin/node \\
         --served-root /srv/corvis-netboot --env-file <workspace>/.env

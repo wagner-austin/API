@@ -2,8 +2,8 @@
 
 Usage:
     poetry run -- python -m fleet.cli.publisher_ticks \\
-        hpc-wake=0=C:/Users/Test/PROJECTS/API/tools/hpc-wake \\
-        ci-wake=0=C:/Users/Test/PROJECTS/API/tools/ci-wake ...
+        hpc-wake=0=/home/corvis/PROJECTS/API/tools/hpc-wake \\
+        ci-wake=0=/home/corvis/PROJECTS/API/tools/ci-wake ...
 
 The hpc-wake pump (``tools/hpc-wake/scripts/run_cycle.py``) runs every wake
 bridge from a checkout on the hub, then runs this once with one

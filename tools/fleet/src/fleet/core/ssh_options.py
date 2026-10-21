@@ -1,4 +1,4 @@
-"""The options every ssh and scp to a node carries, chosen for the machine that runs them.
+"""The options every ssh and scp from the hub to a node carries.
 
 ``BatchMode=yes`` makes a missing key fail immediately instead of prompting
 for a password no automated caller can answer -- the failure is the point,
@@ -11,7 +11,7 @@ ESTABLISHED with nothing on either end to say so. Measured 2026-09-17
 11:15Z on pendragon (board tasks 35940277 and 41ac6ed2): one such ssh sat
 three days. Four missed probes fifteen seconds apart end it in a minute.
 
-ONE CONNECTION PER NODE, SHARED, ON A POSIX HUB (MCPs board task ee3d6cdc).
+ONE CONNECTION PER NODE, SHARED (MCPs board task ee3d6cdc).
 Every call of a job opened its own connection, and loki is reached only
 through a Cloudflare tunnel, where a login costs a websocket and a full
 handshake, about 2 s and now and then more than ``ConnectTimeout``: measured
@@ -24,13 +24,18 @@ after its last session, and the keepalive above ends a master whose peer
 went away, so the next call starts a fresh one. Measured the same morning:
 the first call 2.15 s, each of the next seven 0.22 s, a 200 KB answer 0.53
 s, and a persisted master holds none of a captured call's pipes open.
-OpenSSH for Windows has no multiplexing, so a Windows hub keeps one
-connection per call.
+
+THE HUB IS LINUX (API board task 2fab5e74). These options were chosen per
+hub platform while austinpc could be the hub, because OpenSSH for Windows
+has no multiplexing. Every hub duty is diphtheria's (``registry/machines``),
+and no hub job runs on a Windows machine (measured 2026-10-21 on austinpc and
+loki), so every connection shares its node's master. Windows nodes such as
+loki are the far end of these connections, which multiplexing never
+touches.
 """
 
 from __future__ import annotations
 
-import sys
 from typing import Final
 
 #: How long a node's shared connection outlives its last session, in seconds:
@@ -44,7 +49,7 @@ MASTER_PERSIST_SECONDS: Final[int] = 300
 #: length limit.
 CONTROL_PATH: Final[str] = "~/.ssh/fleet-mux-%C"
 
-#: The options every connection carries, on any hub.
+#: The options that bound a connection's waits.
 BASE_OPTIONS: Final[tuple[str, ...]] = (
     "-o",
     "BatchMode=yes",
@@ -67,23 +72,9 @@ SHARED_CONNECTION_OPTIONS: Final[tuple[str, ...]] = (
 )
 
 
-def ssh_options(platform: str) -> tuple[str, ...]:
-    """The options a hub on ``platform`` gives every ssh and scp to a node.
-
-    Args:
-        platform: The hub's ``sys.platform``.
-
-    Returns:
-        :data:`BASE_OPTIONS`, and on any platform but Windows
-        :data:`SHARED_CONNECTION_OPTIONS` after them.
-    """
-    if platform == "win32":
-        return BASE_OPTIONS
-    return (*BASE_OPTIONS, *SHARED_CONNECTION_OPTIONS)
-
-
-#: The options for this hub.
-SSH_OPTIONS: Final[tuple[str, ...]] = ssh_options(sys.platform)
+#: The options every ssh and scp to a node carries: the bounds, then the
+#: shared connection.
+SSH_OPTIONS: Final[tuple[str, ...]] = (*BASE_OPTIONS, *SHARED_CONNECTION_OPTIONS)
 
 __all__ = [
     "BASE_OPTIONS",
@@ -91,5 +82,4 @@ __all__ = [
     "MASTER_PERSIST_SECONDS",
     "SHARED_CONNECTION_OPTIONS",
     "SSH_OPTIONS",
-    "ssh_options",
 ]
