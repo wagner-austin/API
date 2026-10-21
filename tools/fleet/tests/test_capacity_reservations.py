@@ -51,9 +51,10 @@ class TestReservedCores:
 
         assert workers == 0
         assert reason == (
-            "diphtheria affords 1 worker(s) for a suite that declares a minimum of 2: 20.0 GB "
-            "free, 0.3 GB per worker, 4.0 GB reserved for the node's owner, and its 1 live "
-            "fleet run(s) hold 2 worker(s) and 0.6 GB, and its reservations hold 4 core(s). "
+            "diphtheria affords 1 worker(s) for a suite that declares a minimum of 2: 8 cores "
+            "against 1 reserved, 20.0 GB free, 0.3 GB per worker, 4.0 GB reserved for the "
+            "node's owner, and its 1 live fleet run(s) hold 2 worker(s) and 0.6 GB, and its "
+            "reservations hold 4 core(s). "
             "Dispatching anyway would run a suite at a fraction of its workers until its own "
             "lease expired underneath it."
         )

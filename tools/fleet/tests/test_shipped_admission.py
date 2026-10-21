@@ -21,7 +21,11 @@ these nodes a second check fits the core pool and still pushes both past the
   Its first job, MCPs/sms-gateway (fleet job 1b910743), took 307 s of 300
   alone while its firmware's 65 C passive trip clamped the processor; with
   that trip moved to 85 C the same check took 165 s (MCPs board task
-  5e59a3ae), and the bound stays.
+  5e59a3ae), and the bound stays. It does not take MCPs/mcp-shared at all
+  (MCPs board task c2f29d21): at the 2 workers its cores afford, that check
+  took 354 s of 300 there with every test passing (fleet job 7912af42: lint
+  80 s, vitest 271 s), against 140 s at 3 workers on serendipity (97af0de3),
+  so the suite declares a minimum of 3 workers and lenovold refuses it.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
@@ -58,12 +62,12 @@ from fleet.core.workspace_files import read_workspace_document
 #: operator, 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all
 #: workers"), and loki a core more for each of the four GitHub runners
 #: runners.json declares on it (MCPs board task 1e9ab738), so 10 and 6
-#: cores are left to the fleet. lenovold keeps the same 2 of its 4, and the
-#: suite's declared minimum of 2 workers, all the cores left, outranks half
-#: of them (MCPs board task 6747753b).
+#: cores are left to the fleet. lenovold keeps the same 2 of its 4, and
+#: MCPs/sms-gateway's declared minimum of 2 workers, all the cores left,
+#: outranks half of them (MCPs board task 6747753b).
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
-    "lenovold": ("MCPs/mcp-shared", 2),
+    "lenovold": ("MCPs/sms-gateway", 2),
     "loki": ("MCPs/mcp-shared", 5),
     "serendipity": ("MCPs/mcp-shared", 3),
 }
@@ -153,6 +157,38 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
         "workers": grant,
         "code": None,
         "reason": "",
+    }
+
+
+def test_lenovold_refuses_the_shared_library_suite_and_no_other_node_does() -> None:
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/mcp-shared"]
+    lenovold = workspace["nodes"]["lenovold"]
+
+    assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
+        "workers": 0,
+        "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+        "reason": (
+            "lenovold affords 2 worker(s) for a suite that declares a minimum of 3: 4 cores "
+            "against 2 reserved, 24.0 GB free, 0.5 GB per worker, 1.5 GB reserved for the "
+            "node's owner. Dispatching anyway would run a suite at a fraction of its workers "
+            "until its own lease expired underneath it."
+        ),
+    }
+    granted = {
+        name: assess(node, _idle(node), project, node_tags(node))["workers"]
+        for name, node in workspace["nodes"].items()
+    }
+    assert granted == {
+        "colossus": 4,
+        "diphtheria": 0,
+        "lacrymal": 9,
+        "lavender": 4,
+        "lenovold": 0,
+        "loki": 5,
+        "pendragon": 0,
+        "sedona": 9,
+        "serendipity": 3,
     }
 
 

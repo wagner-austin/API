@@ -321,7 +321,8 @@ def assess(
             code=FleetErrorCode.NODE_MEMORY_EXHAUSTED,
             reason=(
                 f"{node['host']} affords {workers} worker(s) for a suite that declares a "
-                f"minimum of {project['minimum_workers']}: {state['free_ram_gb']:.1f} GB "
+                f"minimum of {project['minimum_workers']}: {node['logical_cores']} cores against "
+                f"{node['budget']['reserved_cores']} reserved, {state['free_ram_gb']:.1f} GB "
                 f"free, {project['worker_ram_gb']:.1f} GB per worker, "
                 f"{node['budget']['reserved_ram_gb']:.1f} GB reserved for the node's owner"
                 f"{_live_clause(state)}. Dispatching anyway would run a suite at a fraction of "

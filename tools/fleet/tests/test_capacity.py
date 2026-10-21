@@ -348,10 +348,11 @@ class TestLivePools:
 
         assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
         assert verdict["reason"] == (
-            "lavender affords 3 worker(s) for a suite that declares a minimum of 4: 16.0 GB "
-            "free, 1.1 GB per worker, 4.0 GB reserved for the node's owner, and its 1 live "
-            "fleet run(s) hold 7 worker(s) and 7.7 GB. Dispatching anyway would run a suite at "
-            "a fraction of its workers until its own lease expired underneath it."
+            "lavender affords 3 worker(s) for a suite that declares a minimum of 4: 16 cores "
+            "against 2 reserved, 16.0 GB free, 1.1 GB per worker, 4.0 GB reserved for the "
+            "node's owner, and its 1 live fleet run(s) hold 7 worker(s) and 7.7 GB. "
+            "Dispatching anyway would run a suite at a fraction of its workers until its own "
+            "lease expired underneath it."
         )
 
     def test_live_runs_holding_every_spare_core_leave_nothing(self) -> None:
