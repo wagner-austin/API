@@ -257,6 +257,7 @@ def queue_job(**overrides: JSONValue) -> JSONObject:
         "submittedBy": "opus-dispatch-0905",
         "sessionId": "11111111-aaaa-4aaa-8aaa-111111111111",
         "sessionTarget": None,
+        "sessionReason": None,
         "sha": DEFAULT_SHA,
         "requiredTags": [],
         "taskId": None,

@@ -236,7 +236,7 @@ def claim_pass(
         return hub_jobs.rebuild_job(
             credentials, job, identity, mcps_root=mcps_root, node=host, run_id=run_id
         )
-    if job["command"] is DispatchCommand.NETBOOT_ARM:
+    if job["command"] in (DispatchCommand.NETBOOT_ARM, DispatchCommand.NETBOOT_RETIRE):
         if netboot is None:
             return job_close.refuse(
                 credentials,
@@ -244,8 +244,9 @@ def claim_pass(
                 identity,
                 detail=(
                     f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
-                    f"{', '.join(NETBOOT_FLAGS)}, so it has no netboot release to arm "
-                    "from; the netboot duty's fleet-netboot runner claims arms"
+                    f"{', '.join(NETBOOT_FLAGS)}, so it has no netboot release to run "
+                    f"{job['command']} from; the netboot duty's fleet-netboot runner claims "
+                    "the netboot lane"
                 ),
             )
         return hub_jobs.netboot_job(
@@ -258,7 +259,7 @@ def claim_pass(
 _LANE_CLAIMS = {
     DispatchLane.HUB: "the queue's hub lane (build-bases)",
     DispatchLane.SESSIONS: "the queue's sessions lane (the session verbs)",
-    DispatchLane.NETBOOT: "the queue's netboot lane (netboot-arm)",
+    DispatchLane.NETBOOT: "the queue's netboot lane (netboot-arm, netboot-retire)",
 }
 
 

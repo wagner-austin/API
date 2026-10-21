@@ -295,7 +295,8 @@ class TestNetbootRefusals:
         # Only the adopt pass ran.
         assert runner.calls == adopt_calls(paths, config_path)
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]).startswith(
-            f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine to arm"
+            f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine; dispatch_netboot_arm "
+            "and dispatch_netboot_retire queue one naming a roster machine; nothing ran"
         )
 
     def test_a_hub_runner_that_claims_an_arm_refuses_it_naming_the_flags(
@@ -315,7 +316,8 @@ class TestNetbootRefusals:
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
             f"{netboot_arm.NO_RELEASE_CODE}: this runner was started without "
             "--netboot-release, --nodejs, --served-root, --env-file, so it has no netboot "
-            "release to arm from; the netboot duty's fleet-netboot runner claims arms"
+            "release to run netboot-arm from; the netboot duty's fleet-netboot runner claims "
+            "the netboot lane"
         )
 
 
@@ -405,6 +407,7 @@ class TestTheNetbootCommandLine:
         assert checkin["machine"] == f"{sys.platform}:{HUB_HOST}"
         assert checkin["agent"] == f"fleet-netboot-{HUB_HOST}"
         assert checkin["body"] == (
-            f"fleet-netboot-{HUB_HOST}: claims the queue's netboot lane (netboot-arm) and closes "
+            f"fleet-netboot-{HUB_HOST}: claims the queue's netboot lane (netboot-arm, "
+            "netboot-retire) and closes "
             "each job it claims, which posts the outcome to the job's task thread under this label"
         )

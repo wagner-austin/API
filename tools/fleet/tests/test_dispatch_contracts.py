@@ -210,7 +210,7 @@ class TestMalformedAnswers:
         assert (
             "command 'deploy' is not one of check, lint, test, build-bases, restart-session, "
             "revive-session, kill-session, kill-session-hard, compact-session, exit-session, "
-            "move-session, handoff-session, netboot-arm" in raised.value.message
+            "move-session, handoff-session, netboot-arm, netboot-retire" in raised.value.message
         )
 
     def test_an_arm_decodes_naming_the_machine_and_logs_as_an_arm_not_a_make(self) -> None:
@@ -228,9 +228,44 @@ class TestMalformedAnswers:
 
         assert job["command"] is DispatchCommand.NETBOOT_ARM
         assert job["requested_node"] == "sedona"
+        assert job["session_reason"] is None
         line = encode_job_line(job)
         assert "arm netboot install @sedona" in line
         assert "make" not in line
+
+    def test_a_retirement_decodes_with_its_reason_and_logs_as_a_retirement(self) -> None:
+        """The queue admits netboot-retire only after every runner can read it
+        (MCPs mig 833, board task 7b7570c5); it carries why, which the
+        retirement hands its command, and its line names the machine."""
+        reason = "its ISO download was cut by a hub runner restart"
+        job = claimed_job(
+            answer(
+                {
+                    "claimed": queue_job(
+                        command="netboot-retire",
+                        project="MCPs",
+                        requestedNode="pendragon",
+                        sessionReason=reason,
+                        sha=None,
+                    )
+                }
+            )
+        )
+
+        assert job["command"] is DispatchCommand.NETBOOT_RETIRE
+        assert job["session_reason"] == reason
+        line = encode_job_line(job)
+        assert "retire netboot arm @pendragon" in line
+        assert "make" not in line
+
+    def test_a_missing_reason_key_is_a_changed_contract_not_an_absent_reason(self) -> None:
+        row = queue_job()
+        del row["sessionReason"]
+        with pytest.raises(AppError) as raised:
+            decode_claim(answer({"claimed": row}))
+
+        assert raised.value.code is FleetErrorCode.QUEUE_ANSWER_MALFORMED
+        assert "'sessionReason' is missing" in raised.value.message
 
     def test_the_refusal_names_the_repository_the_fix_belongs_in(self) -> None:
         """A malformed answer means the TOOL moved. A reader who has to work

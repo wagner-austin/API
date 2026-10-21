@@ -94,6 +94,10 @@ class DispatchCommand(StrEnum):
     # here before the queue admits one, since a command this reader does not
     # know makes every listing raise QUEUE_ANSWER_MALFORMED.
     NETBOOT_ARM = "netboot-arm"
+    # MCPs mig 833, board task 7b7570c5: end one machine's live netboot arm
+    # whose install has failed, revoking its key, so it can be armed again;
+    # run by the same duty, carrying why in sessionReason.
+    NETBOOT_RETIRE = "netboot-retire"
 
 
 class DispatchLane(StrEnum):
@@ -104,9 +108,9 @@ class DispatchLane(StrEnum):
     is the session verbs, run by ``fleet-agent`` on the machine holding the
     sessions duty; ``node`` is the make targets a fleet node runs on a
     checked-out commit, claimed by ``fleet-node-agent``; ``netboot`` is the
-    arms, run on the machine holding the netboot duty (MCPs board task
-    bea0264b). The queue partitions its claims by lane, which is what stops
-    a revive queueing behind a check.
+    arms and their retirements, run on the machine holding the netboot duty
+    (MCPs board tasks bea0264b and 7b7570c5). The queue partitions its
+    claims by lane, which is what stops a revive queueing behind a check.
     """
 
     HUB = "hub"
@@ -152,6 +156,11 @@ class DispatchJob(TypedDict):
             None for every other command. The tool renders it as an explicit
             ``null`` on those, so a missing key is a changed contract, not
             an absent target.
+        session_reason: Why the job was asked for, which a kill, a compact,
+            an exit, a move and a netboot retirement carry (MCPs migs 526
+            and 833), and None on every other command, rendered as an
+            explicit ``null`` like the target. Decoded because a retirement
+            hands it to ``fleet-netboot retire`` (MCPs board task 7b7570c5).
         sha: The commit a make-target job checks (MCPs mig 532), forty
             lowercase hex, and None on the hub verbs. The export runner
             fetches exactly this and a closure cites it.
@@ -187,6 +196,7 @@ class DispatchJob(TypedDict):
     submitted_by: str
     session_id: str
     session_target: str | None
+    session_reason: str | None
     sha: str | None
     required_tags: tuple[NodeTag, ...]
     task_id: str | None
@@ -295,6 +305,7 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         submitted_by=require_str(value, "submittedBy", answer=answer),
         session_id=require_str(value, "sessionId", answer=answer),
         session_target=require_optional_str(value, "sessionTarget", answer=answer),
+        session_reason=require_optional_str(value, "sessionReason", answer=answer),
         sha=require_optional_str(value, "sha", answer=answer),
         required_tags=_require_tags(value, answer=answer),
         task_id=require_optional_str(value, "taskId", answer=answer),
@@ -484,6 +495,9 @@ def encode_job_line(job: DispatchJob) -> str:
     elif job["command"] is DispatchCommand.NETBOOT_ARM:
         # An arm is not a make either; the machine it arms is @where.
         verb = "arm netboot install"
+    elif job["command"] is DispatchCommand.NETBOOT_RETIRE:
+        # Nor is a retirement; the machine whose arm it ends is @where.
+        verb = "retire netboot arm"
     else:
         verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"

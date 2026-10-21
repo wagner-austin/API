@@ -14,7 +14,9 @@ it and closes in the tick that claimed it, so nothing crosses ticks:
   the sessions duty's) runs the active sealed session-verbs release's
   session-audit (:mod:`fleet.core.restart`);
 * a NETBOOT ARM (the netboot duty's) runs the installed sealed netboot
-  release's ``fleet-netboot arm`` (:mod:`fleet.core.netboot_arm`).
+  release's ``fleet-netboot arm`` (:mod:`fleet.core.netboot_arm`), and a
+  NETBOOT RETIREMENT its ``fleet-netboot retire``
+  (:mod:`fleet.core.netboot_retire`, MCPs board task 7b7570c5).
 
 Each refuses before it starts what it cannot run, by a named code, with
 nothing run; then reports the job started on this machine, runs it, and
@@ -32,8 +34,8 @@ from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import job_close
-from fleet.contracts.dispatch import ClosingStatus, DispatchJob
-from fleet.core import netboot_arm, queue, rebuild, restart, session_release
+from fleet.contracts.dispatch import ClosingStatus, DispatchCommand, DispatchJob
+from fleet.core import netboot_arm, netboot_retire, queue, rebuild, restart, session_release
 
 _log = get_logger(__name__)
 
@@ -214,19 +216,21 @@ def netboot_job(
     node: str,
     run_id: str,
 ) -> DispatchJob:
-    """Execute a claimed ``netboot-arm`` job on this machine, start to close.
+    """Execute a claimed ``netboot-arm`` or ``netboot-retire`` job on this machine, start to close.
 
-    The job names the machine to arm as its requested node (MCPs mig 807),
-    which is why the lane claims with no node filter: the runner is placed
-    by holding the netboot duty, and the requested node is the target. The
-    installed netboot release's seal is checked and the key read before
-    the job is reported started, so a release that fails its seal or an
-    env file with no key refuses the job with nothing minted
-    (:mod:`fleet.core.netboot_arm` carries the rest).
+    The job names the machine to arm, or whose live arm to retire, as its
+    requested node (MCPs migs 807 and 833), which is why the lane claims
+    with no node filter: the runner is placed by holding the netboot duty,
+    and the requested node is the target. A retirement also carries why, as
+    its session reason. The installed netboot release's seal is checked and
+    the writer client read before the job is reported started, so a release
+    that fails its seal or an env file with no client refuses the job with
+    nothing minted or revoked (:mod:`fleet.core.netboot_arm` and
+    :mod:`fleet.core.netboot_retire` carry the rest).
 
     Args:
         credentials: The queue's endpoint and headers.
-        job: The claimed ``netboot-arm`` job.
+        job: The claimed ``netboot-arm`` or ``netboot-retire`` job.
         identity: This runner's identity arguments.
         place: Where arms run from and write to.
         node: This machine's alias, which the job is reported started on.
@@ -245,20 +249,42 @@ def netboot_job(
             job,
             identity,
             detail=(
-                f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine to arm; "
-                "dispatch_netboot_arm queues one naming a roster machine; nothing ran"
+                f"{netboot_arm.NO_MACHINE_CODE}: the job names no machine; dispatch_netboot_arm "
+                "and dispatch_netboot_retire queue one naming a roster machine; nothing ran"
+            ),
+        )
+    retiring = job["command"] is DispatchCommand.NETBOOT_RETIRE
+    # The reason a retirement hands its command; an arm carries none (mig 833).
+    retirement = job["session_reason"] if retiring else None
+    if retiring and retirement is None:
+        return job_close.refuse(
+            credentials,
+            job,
+            identity,
+            detail=(
+                f"{netboot_retire.NO_REASON_CODE}: the retirement of {machine}'s arm carries no "
+                "reason, which dispatch_netboot_retire requires; nothing ran"
             ),
         )
     ready = netboot_arm.ready(place)
     if isinstance(ready, str):
         return job_close.refuse(credentials, job, identity, detail=ready)
     _start(credentials, job, identity, node=node, run_id=run_id)
-    result = netboot_arm.run_cli(
-        netboot_arm.arm_argv(place, ready["release"], machine),
-        ready["writer"],
-        timeout_seconds=netboot_arm.ARM_TIMEOUT_SECONDS,
-    )
-    outcome = netboot_arm.arm_outcome(result, ready["release"], machine)
+    release = ready["release"]
+    if retirement is not None:
+        result = netboot_arm.run_cli(
+            netboot_retire.retire_argv(place, release, machine, retirement),
+            ready["writer"],
+            timeout_seconds=netboot_retire.RETIRE_TIMEOUT_SECONDS,
+        )
+        outcome = netboot_retire.retire_outcome(result, release, machine)
+    else:
+        result = netboot_arm.run_cli(
+            netboot_arm.arm_argv(place, release, machine),
+            ready["writer"],
+            timeout_seconds=netboot_arm.ARM_TIMEOUT_SECONDS,
+        )
+        outcome = netboot_arm.arm_outcome(result, release, machine)
     return job_close.close(
         credentials,
         job,
