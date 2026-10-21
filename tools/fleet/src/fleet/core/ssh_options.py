@@ -11,46 +11,31 @@ ESTABLISHED with nothing on either end to say so. Measured 2026-09-17
 11:15Z on pendragon (board tasks 35940277 and 41ac6ed2): one such ssh sat
 three days. Four missed probes fifteen seconds apart end it in a minute.
 
-ONE CONNECTION PER NODE, SHARED (MCPs board task ee3d6cdc).
-Every call of a job opened its own connection, and loki is reached only
-through a Cloudflare tunnel, where a login costs a websocket and a full
-handshake, about 2 s and now and then more than ``ConnectTimeout``: measured
-from diphtheria on 2026-10-21, 322 timed logins with 19 over 3 s and one of
-10.6 s, and 9 of loki's 585 jobs in the week before closed on 'Connection
-timed out during banner exchange'. ``ControlMaster=auto`` makes the first
-call to a node the master and every later one a session on its connection,
-``ControlPersist`` keeps that master for :data:`MASTER_PERSIST_SECONDS`
-after its last session, and the keepalive above ends a master whose peer
-went away, so the next call starts a fresh one. Measured the same morning:
-the first call 2.15 s, each of the next seven 0.22 s, a 200 KB answer 0.53
-s, and a persisted master holds none of a captured call's pipes open.
-
-THE HUB IS LINUX (API board task 2fab5e74). These options were chosen per
-hub platform while austinpc could be the hub, because OpenSSH for Windows
-has no multiplexing. Every hub duty is diphtheria's (``registry/machines``),
-and no hub job runs on a Windows machine (measured 2026-10-21 on austinpc and
-loki), so every connection shares its node's master. Windows nodes such as
-loki are the far end of these connections, which multiplexing never
-touches.
+ONE CONNECTION PER CALL, NEVER A SHARED ONE (MCPs board task ee3d6cdc).
+loki is reached only through a Cloudflare tunnel, where a login costs a
+websocket and a full handshake, and now and then one stalls past
+``ConnectTimeout``. Sharing one connection per node (``ControlMaster``) was
+tried for that and measured worse on 2026-10-21 from diphtheria: over the
+shared connection the fleet's own script send to loki hung 120 s once in 91
+sends, and its remote writer outlived the caller holding the file for as
+long as the master lived, so 70 of the next 77 sends failed 'The process
+cannot access the file'; then over 100 alternating rounds a shared
+connection hung 8 of 200 sends past 30 s, in consecutive pairs on one
+master, while a fresh connection per send hung none of 100 (the slowest
+6.70 s). A stall on a shared connection holds every call riding it until
+the keepalive ends the master; a stall on a fresh one costs that one call,
+and a launch whose transport fails is given back to the queue rather than
+judged (:mod:`fleet.cli.node_launch`). ``ControlPath=none`` makes the
+fresh connection explicit, so neither a ``ControlMaster`` line in the hub
+account's ssh config nor a master an earlier release left behind is used.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
-#: How long a node's shared connection outlives its last session, in seconds:
-#: longer than the gap between one job's calls, which a collect pass three
-#: minutes after the launch reaches too.
-MASTER_PERSIST_SECONDS: Final[int] = 300
-
-#: Where a node's shared connection listens, under the hub account's ssh
-#: directory: ``%C`` is ssh's hash of the local host, the node, its port and
-#: its user, so it names one node's master and stays short of a socket path's
-#: length limit.
-CONTROL_PATH: Final[str] = "~/.ssh/fleet-mux-%C"
-
-#: The options that bound a connection's waits.
-BASE_OPTIONS: Final[tuple[str, ...]] = (
+#: The options every ssh and scp to a node carries.
+SSH_OPTIONS: Final[tuple[str, ...]] = (
     "-o",
     "BatchMode=yes",
     "-o",
@@ -59,27 +44,8 @@ BASE_OPTIONS: Final[tuple[str, ...]] = (
     "ServerAliveInterval=15",
     "-o",
     "ServerAliveCountMax=4",
+    "-o",
+    "ControlPath=none",
 )
 
-#: The options that share one connection per node.
-SHARED_CONNECTION_OPTIONS: Final[tuple[str, ...]] = (
-    "-o",
-    "ControlMaster=auto",
-    "-o",
-    f"ControlPath={CONTROL_PATH}",
-    "-o",
-    f"ControlPersist={MASTER_PERSIST_SECONDS}",
-)
-
-
-#: The options every ssh and scp to a node carries: the bounds, then the
-#: shared connection.
-SSH_OPTIONS: Final[tuple[str, ...]] = (*BASE_OPTIONS, *SHARED_CONNECTION_OPTIONS)
-
-__all__ = [
-    "BASE_OPTIONS",
-    "CONTROL_PATH",
-    "MASTER_PERSIST_SECONDS",
-    "SHARED_CONNECTION_OPTIONS",
-    "SSH_OPTIONS",
-]
+__all__ = ["SSH_OPTIONS"]

@@ -1,8 +1,9 @@
 """The options the hub gives every ssh and scp to a node (MCPs board task ee3d6cdc, A2).
 
-The hub shares one connection per node across a job's calls, so loki's
-tunnel is crossed once per job rather than once per call. Every call site
-sends :data:`fleet.core.ssh_options.SSH_OPTIONS`.
+Every call opens its own connection and never shares one: over loki's
+tunnel a shared connection hung 8 of 200 sends against none of 100 fresh
+ones (measured 2026-10-21). Every call site sends
+:data:`fleet.core.ssh_options.SSH_OPTIONS`.
 """
 
 from __future__ import annotations
@@ -11,26 +12,26 @@ import pathlib
 
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, remote
-from fleet.core.ssh_options import BASE_OPTIONS, MASTER_PERSIST_SECONDS, SSH_OPTIONS
+from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import FakeRun, ok
 
 
 def _settings(options: tuple[str, ...]) -> dict[str, str]:
     """Every ``-o Key=Value`` pair the options carry, by key."""
-    pairs = [options[index + 1] for index, word in enumerate(options) if word == "-o"]
-    return dict(pair.split("=", 1) for pair in pairs)
+    assert options[::2] == ("-o",) * (len(options) // 2)
+    return dict(pair.split("=", 1) for pair in options[1::2])
 
 
 class TestTheOptions:
-    def test_share_one_connection_per_node_and_keep_it_past_its_last_session(self) -> None:
+    def test_open_a_connection_per_call_and_use_no_shared_one(self) -> None:
         settings = _settings(SSH_OPTIONS)
-        assert settings["ControlMaster"] == "auto"
-        # %C is ssh's hash of the local host, the node, its port and its user.
-        assert settings["ControlPath"] == "~/.ssh/fleet-mux-%C"
-        assert settings["ControlPersist"] == str(MASTER_PERSIST_SECONDS) == "300"
+        # none is ssh's word for no control socket: no master is made, and
+        # one the hub's ssh config or an earlier release names is not used.
+        assert settings["ControlPath"] == "none"
+        assert "ControlMaster" not in settings
+        assert "ControlPersist" not in settings
 
     def test_keep_every_bound_a_dead_or_silent_peer_meets(self) -> None:
-        assert SSH_OPTIONS[: len(BASE_OPTIONS)] == BASE_OPTIONS
         settings = _settings(SSH_OPTIONS)
         assert (
             settings["BatchMode"],
