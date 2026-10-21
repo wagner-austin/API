@@ -17,7 +17,7 @@
   },
   "notes": "The operator's Lenovo Yoga 3 14 (80JH, i5-5200U, 4 threads, 7.6 GiB RAM, 116 GB root), the machine enrolled on Windows 10 as lenovoold, reimaged to Ubuntu 24.04.4 LTS on 2026-10-20 from a CORVIS stick (fleet-node-setup Initialize-Node.sh, VERIFY ALL PASSED, session opus-home-1020-df00). Enrolled from ziggurat with fleet-enroll on 2026-10-20 (MCPs board task 447efce2), lenovoold's file retired in the same change. Its USB Brother MFC-7340 makes it the print host: print-mcp reaches its CUPS queue MFC-7340 (brlaser, Brother MFC-7360N) over ssh with ipptool (MCPs board task 9dd740e5), and that queue runs a PPD trimmed with lpadmin -P to the printer's two sources, Auto and Manual, because brlaser sends Tray 1 as SOURCETRAY T1, which this printer answers by asking for the manual feed slot (measured 2026-10-21).",
   "dispatch": {
-    "held": null,
+    "held": "Held after its first fleet job, MCPs board task 6747753b. The queue gave it MCPs/sms-gateway at c94040f3b (fleet job 1b910743, 2026-10-21), which passed all 651 tests at 100 percent coverage and still failed at 307 s of the 300 s check budget, alone on lenovold's 2 physical cores. Dispatch has no way to give a node only the suites that finish inside the budget at its speed, so every larger suite would fail here the same way. The capacity below is what its provision measured; set this to null when dispatch can bound a node by speed, or when the operator rules that it takes work anyway.",
     "stage_root": "/home/corvis/fleet/stage",
     "logical_cores": 4,
     "ram_gb": 7.6,
