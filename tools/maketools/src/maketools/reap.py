@@ -47,7 +47,7 @@ from maketools.processes import ProcessRow
 #: (a pid reused by a descendant) would otherwise never end.
 MAX_DEPTH: Final[int] = 15
 
-#: The names a run's processes carry, without a Windows ``.exe``.
+#: The names a run's processes carry, without the ``.exe`` loki's rows add.
 TEST_PROCESS_NAMES: Final[frozenset[str]] = frozenset({"pytest", "poetry"})
 
 #: Sweep defaults: minimum age, sample gap, and the aggregate CPU that still
@@ -86,6 +86,7 @@ def is_test_process(row: ProcessRow) -> bool:
     Returns:
         True for a candidate.
     """
+    # The .exe is loki's: its runner's rows come from the CIM table.
     name = row["name"].lower().removesuffix(".exe")
     if not (name.startswith("python") or name in TEST_PROCESS_NAMES):
         return False

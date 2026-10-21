@@ -151,7 +151,7 @@ def test_uv_venv_exec_native_wheel_and_poetry_build_reach_their_modules(
     assert world.inheriting_calls[-1]["argv"][1:] == ("format", ".")
     (cwd / ".venv" / "bin" / "python").write_bytes(b"")
     python = str(cwd / ".venv" / "bin" / "python")
-    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok("/site\n/base\n")
+    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok("/site\n")
     assert dispatch(["venv-embed", "cargo", "test"]) == 0
     assert list(world.inheriting_calls[-1]["argv"]) == ["cargo", "test"]
     assert dispatch(["native-wheel", "--crate", "../crate", "--package", "cleargbm_rs"]) == 0

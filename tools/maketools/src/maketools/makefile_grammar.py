@@ -110,6 +110,14 @@ MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
 #: the ``else`` arm is portable and checked like any other line. A target
 #: that has no meaning off Windows (Task Scheduler registration) lives in
 #: such a block with an ``else`` arm that says so.
+#:
+#: Kept while loki stays a Windows node: its runner runs this lint on every
+#: tracked Makefile (tools/fleet-execution's and tools/ps-harness's
+#: ``lint``), and two of them still fence a Windows arm,
+#: clients/RustedWarfareBot and services/grandma-api, whose own board tasks
+#: (0eae9619, 703fec5a) decide whether those arms run on loki. The last of
+#: the two to drop its arm deletes this fence and its cases (board task
+#: 3d612cad).
 WINDOWS_CONDITION: Final[re.Pattern[str]] = re.compile(
     r"^(ifeq|ifneq)\s*\(\s*\$\(OS\)\s*,\s*Windows_NT\s*\)\s*(#.*)?$"
 )

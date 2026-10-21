@@ -10,6 +10,9 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
 
 1. KILL-ON-CLOSE. On Windows the launcher joins a job object before it
    spawns anything (:mod:`platform_core.process_job`), so the whole tree dies with it.
+   That is loki, the one Windows fleet node kept: its tools/fleet-execution
+   log of 2026-10-21 reads "joined kill-on-close job object" (board task
+   3d612cad).
    On POSIX the suite starts in its own session and the launcher reaps its
    descendants on the way out; a launcher killed with ``SIGKILL`` cannot,
    and the pre-run sweep is what cleans that up next time.
@@ -186,6 +189,7 @@ def run_tests(
         pytest's exit status, or 1 when the launcher refused to start it.
     """
     windows = _test_hooks.platform() == "win32"
+    # The win32 arm is loki's runner's (item 1 above).
     if windows:
         if not join_job_or_refuse():
             return 1

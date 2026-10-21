@@ -52,7 +52,19 @@ One fence is allowed: inside `ifeq ($(OS),Windows_NT)` ... `else` ... `endif`
 the Windows arm may use PowerShell, because a target that registers a Task
 Scheduler job has no meaning elsewhere; the `else` arm is checked like any
 other line and defines the same names so a Linux host gets a refusal that
-says why.
+says why. Only `clients/RustedWarfareBot` and `services/grandma-api` still
+fence an arm, and their board tasks (`0eae9619`, `703fec5a`) decide whether
+it runs on loki; the last of the two to drop its arm deletes the fence.
+
+## The Windows arms are loki's
+
+loki is the one Windows fleet node the operator keeps (2026-10-21), and its
+runner runs this package: `tools/fleet-execution`'s `test --host-execution`,
+`tools/ps-harness`'s `lint-makefiles` and `ps-harness`, and this package's
+own check. So the launcher's job object, the CIM process table, the SIGTERM
+kill and the suite's `win32` cases stay, each commented as loki's. Every
+other Windows arm went (board task `3d612cad`): no Windows node carries
+`rust`, so the uv venv commands read a Linux venv's `bin` only.
 
 ## The commands
 
@@ -61,7 +73,7 @@ says why.
 | `align --repo PATH --commit SHA [--drop SHA,SHA]` | move a main checkout (this one, or a peer such as a session host's `../corvis-stick`) to a commit its origin's default branch contains, read from `origin/HEAD`; the route `make align-commit [REPO=<path>]` takes because the hub's hook refuses hand-run git verbs that move a checkout with linked trees; a local commit the target carries (patch-equivalent, or every path's blob equal) is dropped and named, one it does not carry is refused unless `--drop` names it, and tracked dirt or an untracked path the target tracks refuses the move |
 | `venv-check` | remove `.venv` when `poetry run mypy --version` cannot answer, so the `poetry sync` that follows builds a fresh one |
 | `guard` | run `poetry run python -m scripts.guard` when the package has a shim; say "not applicable, 0 rules run" when it has none |
-| `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a kill-on-close job object on Windows, a new session and a descendant reap on POSIX, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
+| `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a kill-on-close job object on Windows (loki), a new session and a descendant reap on POSIX, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
 | `reap-stale [--older-than-minutes N]` | the standalone sweep, the port of `scripts/reap-test-processes.ps1`: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
 | `lint-makefiles` | the grammar, the pass-banner rule and the budget rule over every tracked Makefile |
 | `check-budget` | run this package's `_check-unbudgeted` and time it: print `CHECK BUDGET` with its seconds, or exit 3 with a `CHECK OVER BUDGET` block when it passed but took over 300 s (below) |
@@ -72,7 +84,7 @@ says why.
 | `compose-up DIR [--git-commit] [--build-progress X]`, `compose-down DIR...` | `docker compose` bring-up per service directory (with `GIT_COMMIT` from `git rev-parse HEAD` when asked) and the matching teardown |
 | `hooks install\|check` | set or verify `core.hooksPath` |
 | `require-tool NAME HINT` | refuse with the hint when a tool is not on PATH |
-| `uv-venv-check`, `venv-exec NAME ARGS...` | the `uv` venv of a Rust-backed package and an executable from its `.venv` |
+| `uv-venv-check`, `venv-exec NAME ARGS...`, `venv-embed CMD...` | the `uv` venv of a Rust-backed package, an executable from its `.venv/bin`, and a command that embeds Python against that venv |
 | `native-wheel --crate DIR --package NAME`, `poetry-build DIR...` | install a crate's newest maturin wheel into the package venv; build first-party wheels |
 
 ## The five-minute budget on `make check`
@@ -109,7 +121,7 @@ the first (board task `28e47ae3`): on sedona at `c20080a69` its tests took
 ## Where the process table comes from
 
 The reaper's questions are the same on both platforms; the source differs.
-Windows answers through PowerShell's `Get-CimInstance Win32_Process`,
+Windows (loki) answers through PowerShell's `Get-CimInstance Win32_Process`,
 rendered as JSON rows; Linux answers from `/proc`. Each reader takes its
 input through a seam (the command runner, a `/proc` root), so the parsing is
 exercised by the suite on the platform that cannot produce the real input.

@@ -3,10 +3,12 @@
 Three packages step outside the poetry template:
 
 * ``libs/cleargbm_rs`` is a maturin crate whose Python side lives in a
-  ``uv`` venv; its recipes ran ``.venv\\Scripts\\ruff`` by Windows path.
-  ``venv-exec`` resolves the executable for whichever layout the venv has
-  (``Scripts`` on Windows, ``bin`` elsewhere) and ``uv-venv-check``
-  recreates the venv when it is missing or cannot answer. Its Rust tests
+  ``uv`` venv. ``venv-exec`` runs an executable from the venv's ``bin``
+  and ``uv-venv-check`` recreates the venv when it is missing or cannot
+  answer. Only the Linux layout is read: the crate and its one consumer
+  need ``rust``, which no Windows node carries (loki, the Windows node the
+  operator keeps, has no cargo, rustc or uv, measured 2026-10-21 for board
+  task 3d612cad), so a ``Scripts`` venv is never built here. Its Rust tests
   embed Python through pyo3 and import numpy there, and an embedded
   interpreter is the installation pyo3 linked, never the venv: on
   serendipity, whose system Python had no numpy, 94 of 1680 failed with
@@ -28,7 +30,6 @@ Three packages step outside the poetry template:
 
 from __future__ import annotations
 
-import os
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Final
@@ -39,8 +40,8 @@ from platform_core.errors import AppError
 from maketools import _test_hooks
 from maketools.venv_check import VENV_DIRECTORY
 
-#: The two layouts a venv puts its executables in.
-EXECUTABLE_DIRECTORIES: Final[tuple[str, ...]] = ("Scripts", "bin")
+#: Where a Linux venv puts its executables.
+EXECUTABLE_DIRECTORY: Final[str] = "bin"
 
 #: What ``uv`` is told to install into a fresh venv.
 UV_INSTALL_ARGV: Final[tuple[str, ...]] = ("uv", "pip", "install", "-e", ".[dev]")
@@ -65,22 +66,22 @@ def venv_executable(project: Path, name: str) -> Path:
 
     Args:
         project: The package directory.
-        name: The executable's name without a suffix.
+        name: The executable's name.
 
     Returns:
         Its path.
 
     Raises:
-        AppError: ``MAKETOOLS_ARTIFACT_MISSING`` when neither layout has it.
+        AppError: ``MAKETOOLS_ARTIFACT_MISSING`` when the venv's
+            :data:`EXECUTABLE_DIRECTORY` does not have it.
     """
     venv = project / VENV_DIRECTORY
-    for directory in EXECUTABLE_DIRECTORIES:
-        for candidate in (venv / directory / name, venv / directory / f"{name}.exe"):
-            if candidate.is_file():
-                return candidate
+    candidate = venv / EXECUTABLE_DIRECTORY / name
+    if candidate.is_file():
+        return candidate
     raise AppError(
         MaketoolsErrorCode.ARTIFACT_MISSING,
-        f"{venv} has no {name} under {' or '.join(EXECUTABLE_DIRECTORIES)}",
+        f"{venv} has no {name} under {EXECUTABLE_DIRECTORY}",
     )
 
 
@@ -110,22 +111,18 @@ def venv_exec(project: Path, argv: Sequence[str]) -> int:
 
 
 #: What the venv's interpreter is asked before an embedding command runs:
-#: its site-packages, then the installation it was made from, one a line.
-EMBED_PROBE: Final[str] = (
-    "import sys, sysconfig; print(sysconfig.get_paths()['purelib']); print(sys.base_prefix)"
-)
+#: its site-packages, on one line.
+EMBED_PROBE: Final[str] = "import sysconfig; print(sysconfig.get_paths()['purelib'])"
 
 
 def venv_embed(project: Path, argv: Sequence[str]) -> int:
     """Run a command that embeds Python so it embeds the project's venv.
 
-    Three variables, each read from the venv's own interpreter rather than
+    Two variables, each read from the venv's own interpreter rather than
     assumed: ``PYO3_PYTHON`` is that interpreter, so pyo3 builds against the
     Python version the venv's packages were installed for; ``PYTHONPATH`` is
     its site-packages and nothing else, so the embedded interpreter imports
-    the venv's numpy and never the node's; and its base installation leads
-    ``PATH``, where Windows looks for the ``python3XX.dll`` an embedding
-    binary loads, so the library is the one the venv was made from.
+    the venv's numpy and never the node's.
 
     Args:
         project: The package directory.
@@ -137,24 +134,23 @@ def venv_embed(project: Path, argv: Sequence[str]) -> int:
     Raises:
         AppError: ``MAKETOOLS_USAGE`` when no command was named, or
             ``MAKETOOLS_ARTIFACT_MISSING`` when the venv has no interpreter
-            or it cannot report its paths.
+            or it cannot report its site-packages.
     """
     if not argv:
         raise AppError(MaketoolsErrorCode.USAGE, "venv-embed needs a command")
     python = venv_executable(project, "python")
     probe = _test_hooks.run_capturing([str(python), "-c", EMBED_PROBE], cwd=project)
     paths = probe["stdout"].splitlines()
-    if probe["returncode"] != 0 or len(paths) != 2:
+    if probe["returncode"] != 0 or len(paths) != 1:
         raise AppError(
             MaketoolsErrorCode.ARTIFACT_MISSING,
-            f"{python} could not report its site-packages and base installation "
+            f"{python} could not report its site-packages "
             f"(exit {probe['returncode']}, printed {probe['stdout']!r}); run uv-venv-check",
         )
-    site_packages, base = paths
+    site_packages = paths[0]
     environment = _test_hooks.environ()
     environment["PYO3_PYTHON"] = str(python)
     environment["PYTHONPATH"] = site_packages
-    environment["PATH"] = os.pathsep.join([base, environment.get("PATH", "")])
     _test_hooks.write_line(f"venv-embed: {' '.join(argv)} against {site_packages}")
     return _test_hooks.run_inheriting(
         list(argv),
@@ -309,7 +305,7 @@ def poetry_build(project: Path, packages: Sequence[Path]) -> int:
 
 __all__ = [
     "EMBED_PROBE",
-    "EXECUTABLE_DIRECTORIES",
+    "EXECUTABLE_DIRECTORY",
     "UV_INSTALL_ARGV",
     "installed_dist_info",
     "modified_at",

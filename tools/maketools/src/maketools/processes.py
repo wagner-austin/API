@@ -9,6 +9,10 @@ answers from ``/proc``. Each reader takes its source through a parameter (a
 command runner, a ``/proc`` root) so the parsing is exercised on the
 platform that cannot produce the real input.
 
+THE WINDOWS READER IS LOKI'S. loki is the one Windows fleet node kept, and
+its runner's test launcher sweeps and reaps through this reader (board task
+3d612cad); the ``.exe`` names and ``Scripts`` paths below are its rows.
+
 WHY ``/proc`` AND NOT ``ps``. ``ps`` output is a table for people, with
 columns that wrap and a command line that ``ps`` truncates and re-quotes;
 ``/proc/<pid>/stat`` and ``cmdline`` are the source ``ps`` itself reads.
@@ -128,7 +132,7 @@ def decode_process_row(value: JSONValue) -> ProcessRow:
 
 
 def windows_process_table(run: RunCapturingProtocol) -> Sequence[ProcessRow]:
-    """Snapshot the Windows process table.
+    """Snapshot the Windows process table, which loki's runner reads.
 
     Args:
         run: The command runner that executes PowerShell.

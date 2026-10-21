@@ -26,31 +26,28 @@ from maketools.venvs import (
 from tests.conftest import World, failed, ok
 
 
-def make_venv(project: Path, layout: str, *names: str) -> None:
-    directory = project / ".venv" / layout
+def make_venv(project: Path, *names: str) -> None:
+    directory = project / ".venv" / "bin"
     directory.mkdir(parents=True)
     for name in names:
         (directory / name).write_bytes(b"")
 
 
-def test_venv_executable_finds_either_layout_with_or_without_exe(tmp_path: Path) -> None:
-    make_venv(tmp_path, "Scripts", "ruff.exe", "python.exe")
-    assert venv_executable(tmp_path, "ruff") == tmp_path / ".venv" / "Scripts" / "ruff.exe"
-    posix = tmp_path / "posix"
-    make_venv(posix, "bin", "ruff")
-    assert venv_executable(posix, "ruff") == posix / ".venv" / "bin" / "ruff"
+def test_venv_executable_finds_one_under_bin(tmp_path: Path) -> None:
+    make_venv(tmp_path, "ruff")
+    assert venv_executable(tmp_path, "ruff") == tmp_path / ".venv" / "bin" / "ruff"
 
 
 def test_venv_executable_refuses_a_missing_one(tmp_path: Path) -> None:
-    make_venv(tmp_path, "bin", "python")
+    make_venv(tmp_path, "python")
     with pytest.raises(AppError) as caught:
         venv_executable(tmp_path, "mypy")
     assert caught.value.code is MaketoolsErrorCode.ARTIFACT_MISSING
-    assert caught.value.message.endswith("has no mypy under Scripts or bin")
+    assert caught.value.message == f"{tmp_path / '.venv'} has no mypy under bin"
 
 
 def test_venv_exec_runs_the_resolved_executable(world: World, tmp_path: Path) -> None:
-    make_venv(tmp_path, "bin", "ruff")
+    make_venv(tmp_path, "ruff")
     world.inheriting_code = 3
     assert venv_exec(tmp_path, ["ruff", "check", "."]) == 3
     call = world.inheriting_calls[0]
@@ -61,18 +58,16 @@ def test_venv_exec_runs_the_resolved_executable(world: World, tmp_path: Path) ->
 
 
 def test_venv_embed_points_the_command_at_the_venv(world: World, tmp_path: Path) -> None:
-    make_venv(tmp_path, "bin", "python")
+    make_venv(tmp_path, "python")
     python = str(tmp_path / ".venv" / "bin" / "python")
     site = "/v/lib/python3.11/site-packages"
-    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok(f"{site}\n/opt/py311\n")
+    world.capturing_answers[(python, "-c", EMBED_PROBE)] = ok(f"{site}\n")
     world.inheriting_code = 4
     assert venv_embed(tmp_path, ["cargo", "test", "--all-features"]) == 4
     call = world.inheriting_calls[0]
     assert call["argv"] == ("cargo", "test", "--all-features")
     assert call["cwd"] == tmp_path
-    assert call["env"]["PYO3_PYTHON"] == python
-    assert call["env"]["PYTHONPATH"] == site
-    assert call["env"]["PATH"] == f"/opt/py311{os.pathsep}/bin"
+    assert call["env"] == {**world.environment, "PYO3_PYTHON": python, "PYTHONPATH": site}
     assert world.lines == [f"venv-embed: cargo test --all-features against {site}"]
 
 
@@ -87,13 +82,13 @@ def test_venv_embed_refuses_an_empty_command(world: World, tmp_path: Path) -> No
     ("answer", "shown"),
     [
         (failed(1, "boom"), "exit 1, printed ''"),
-        (ok("/only/one/line\n"), "exit 0, printed '/only/one/line\\n'"),
+        (ok("/site\n/more\n"), "exit 0, printed '/site\\n/more\\n'"),
     ],
 )
 def test_venv_embed_refuses_a_venv_that_cannot_report_its_paths(
     world: World, tmp_path: Path, answer: CommandResult, shown: str
 ) -> None:
-    make_venv(tmp_path, "bin", "python")
+    make_venv(tmp_path, "python")
     python = str(tmp_path / ".venv" / "bin" / "python")
     world.capturing_answers[(python, "-c", EMBED_PROBE)] = answer
     with pytest.raises(AppError) as caught:
@@ -110,7 +105,7 @@ def test_uv_venv_check_creates_a_missing_venv(world: World, tmp_path: Path) -> N
 
 
 def test_uv_venv_check_keeps_an_answering_venv(world: World, tmp_path: Path) -> None:
-    make_venv(tmp_path, "bin", "python")
+    make_venv(tmp_path, "python")
     python = str(tmp_path / ".venv" / "bin" / "python")
     world.capturing_answers[(python, "-m", "mypy", "--version")] = ok("mypy 2.3.1")
     assert uv_venv_check(tmp_path) == 0
@@ -121,7 +116,7 @@ def test_uv_venv_check_keeps_an_answering_venv(world: World, tmp_path: Path) -> 
 def test_uv_venv_check_recreates_a_stale_venv_and_stops_at_a_failed_uv(
     world: World, tmp_path: Path
 ) -> None:
-    make_venv(tmp_path, "bin", "python")
+    make_venv(tmp_path, "python")
     python = str(tmp_path / ".venv" / "bin" / "python")
     world.capturing_answers[(python, "-m", "mypy", "--version")] = failed(1, "no mypy")
     world.inheriting_codes = [7]
@@ -160,7 +155,9 @@ def test_native_wheel_skips_reinstalls_and_refreshes(world: World, tmp_path: Pat
     wheel = tmp_path / "crate" / "target" / "wheels" / "cleargbm_rs-0.1.0.whl"
     touch(wheel, now - 50)
     project = tmp_path / "proj"
-    info = project / ".venv" / "Lib" / "site-packages" / "cleargbm_rs-0.1.0.dist-info"
+    info = (
+        project / ".venv" / "lib" / "python3.11" / "site-packages" / "cleargbm_rs-0.1.0.dist-info"
+    )
     info.mkdir(parents=True)
     os.utime(info, (now, now))
     assert native_wheel(project, crate=crate, package="cleargbm_rs") == 0

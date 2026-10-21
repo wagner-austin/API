@@ -19,6 +19,14 @@ bound by a conditional EXPRESSION rather than an ``if`` statement so that
 the binding line carries no branch the other platform cannot execute, and
 each reader takes its input through a seam (the command runner, a ``/proc``
 root) so its parsing is exercised everywhere.
+
+EVERY WINDOWS ARM HERE IS LOKI'S. loki is the one Windows fleet node the
+operator keeps (2026-10-21: "we should keep loki in the fleet. as
+windows."), and its runner runs this launcher: tools/fleet-execution's
+``test --host-execution`` joins the job object and reads the CIM process
+table there (its log of 2026-10-21, board task 3d612cad), and this
+package's own check lands on it, which is also why a Windows type checker
+still reads this file.
 """
 
 from __future__ import annotations
@@ -256,10 +264,10 @@ CAPTURE_TIMEOUT_SECONDS: Final[int] = 120
 #: The signal :func:`_default_kill` sends. ``SIGKILL`` (9) off Windows,
 #: because a wedged xdist worker blocked in ``sys.stdin.readline()`` is the
 #: thing being reaped and a catchable signal is a request it will not
-#: answer; ``SIGTERM`` on Windows, where ``os.kill`` maps every signal to
+#: answer; ``SIGTERM`` on loki, where ``os.kill`` maps every signal to
 #: ``TerminateProcess`` and ``SIGKILL`` is not defined. Spelled as a number
 #: rather than ``signal.SIGKILL`` because that name does not exist on
-#: Windows and the type checker there would refuse it.
+#: Windows and the type checker there, on loki, would refuse it.
 POSIX_KILL_SIGNAL: Final[int] = 9
 
 
@@ -379,7 +387,7 @@ def _default_platform() -> str:
 
 
 def _windows_table() -> Sequence[ProcessRow]:
-    """Snapshot the process table through PowerShell's CIM query.
+    """Snapshot the process table through PowerShell's CIM query, on loki.
 
     Returns:
         The rows.
@@ -402,6 +410,7 @@ def _default_kill(pid: int) -> None:
     Args:
         pid: The process.
     """
+    # The win32 arm is loki's runner's: its reap kills with SIGTERM.
     os.kill(pid, POSIX_KILL_SIGNAL if sys.platform != "win32" else signal.SIGTERM)
 
 
@@ -498,7 +507,7 @@ environ: EnvironProtocol = _default_environ
 platform: PlatformProtocol = _default_platform
 # A conditional expression, not an ``if``: the line has no branch a suite on
 # the other platform would leave uncovered, and both readers are exercised
-# through their own seams.
+# through their own seams. The win32 arm is loki's runner's.
 _default_process_table: ProcessTableProtocol = (
     _windows_table if sys.platform == "win32" else _linux_table
 )

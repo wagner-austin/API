@@ -37,6 +37,7 @@ PLAN: Final[host_execution.HostExecutionPlan] = host_execution.HostExecutionPlan
     execution_only={DOCKER_MARKER: "linux"},
     needs={DOCKER_MARKER: "needs a node's execdocker user and its rootless daemon"},
     projects={"linux": PROJECT},
+    # windows is loki, the Windows fleet node this package's check lands on.
     here="windows" if sys.platform == "win32" else "linux",
 )
 

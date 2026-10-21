@@ -136,8 +136,10 @@ def _path_without_sh(parent: Path) -> str:
 
     On Windows it is the first directory holding a git and no sh.exe (Git
     for Windows keeps ``cmd`` apart from its sh), which is what a
-    PowerShell-launched make hands its recipes. Elsewhere git sits in
-    /usr/bin beside sh, so it is a directory holding only a link to git.
+    PowerShell-launched make hands its recipes; that arm is loki's, the
+    Windows fleet node this package's check still lands on. Elsewhere git
+    sits in /usr/bin beside sh, so it is a directory holding only a link to
+    git.
 
     Args:
         parent: Where a directory of links may be made.
@@ -148,6 +150,7 @@ def _path_without_sh(parent: Path) -> str:
     git = shutil.which("git")
     if git is None:
         pytest.fail("the script runs git, and it is not on this machine's PATH")
+    # loki's arm, as the docstring says.
     if sys.platform == "win32":
         found = subprocess.run(
             ["where.exe", "git"],
