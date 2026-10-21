@@ -31,7 +31,7 @@ BeforeAll {
 
     function Read-Tail {
         param([string]$Log, [int]$Lines)
-        return [string[]]@(Invoke-Rendered 'dialect-log-tail' @{ Log = $Log; Lines = $Lines })
+        return [string[]]@(Invoke-Rendered 'dialect-log-tail.ps1' @{ Log = $Log; Lines = $Lines })
     }
 
     $script:utf16Mark = [byte[]](255, 254)
@@ -97,7 +97,7 @@ Describe 'The transcript tail' {
         }
         [void]$builder.Append("CHECK BUDGET: mcp-shared took 73s of 300s.`r`n=== ALL CHECKS PASSED ===`r`n")
         $log = Write-Transcript $Mark ($Encoding.GetBytes($builder.ToString()))
-        $printed = [string[]]@(Invoke-Rendered 'dialect-log-tail' @{ Log = $log })
+        $printed = [string[]]@(Invoke-Rendered 'dialect-log-tail.ps1' @{ Log = $log })
         $printed.Count | Should -Be 826
         $printed[0] | Should -BeExactly '      Tests  10401 passed | 74 skipped (10475)'
         $printed[-1] | Should -BeExactly '=== ALL CHECKS PASSED ==='

@@ -67,7 +67,7 @@ Describe 'The toolchain probe' {
         # Chrome and pdftotext are named like the hooks route, at paths this
         # case lays nothing under, so a Chrome or a Git for Windows installed
         # on the machine running the suite does not read as a node's.
-        $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{
+        $said = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{
                 VsWhere = (Join-Path $script:root 'vs\vswhere.cmd'); HooksRoute = (Join-Path $script:root 'no-route.json')
                 Chrome = @((Join-Path $script:root 'no-chrome\chrome.exe'))
                 Pdftotext = (Join-Path $script:root 'no-git\pdftotext.exe')
@@ -95,7 +95,7 @@ Describe 'The toolchain probe' {
         $alias = Join-Path $script:root 'Microsoft\WindowsApps'
         $calls = Initialize-Python $alias 0
         $env:PATH = $alias
-        $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'absent\vswhere.exe') })
+        $said = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = (Join-Path $script:root 'absent\vswhere.exe') })
         $said[0] | Should -BeExactly 'python=no='
         $said[5] | Should -BeExactly 'ffmpeg=no='
         $said[6] | Should -BeExactly 'go=no='
@@ -108,7 +108,7 @@ Describe 'The toolchain probe' {
         [void](Initialize-Python $tools 1)
         [void](Initialize-Answer (Join-Path $script:root 'vs') 'vswhere' @() 0)
         $env:PATH = $tools
-        $said = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
+        $said = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = (Join-Path $script:root 'vs\vswhere.cmd') })
         $said[0] | Should -BeExactly 'python=yes=Python 3.11.9'
         $said[11] | Should -BeExactly 'pip=no='
         $said[12] | Should -BeExactly 'cxx=no='
@@ -133,7 +133,7 @@ Describe 'The toolchain probe' {
         $calls = Initialize-Cargo $whole @('fmt', 'clippy', 'llvm-cov')
         [void](Initialize-Answer $whole 'uv' @('uv 0.13.0') 0)
         $env:PATH = $whole
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[8] |
             Should -BeExactly 'cargo=yes=cargo 1.99.0 5f94df478 2026-08-27'
         [System.IO.File]::ReadAllLines($calls) |
             Should -Be @('fmt --version', 'clippy --version', 'llvm-cov --version', '--version')
@@ -141,47 +141,47 @@ Describe 'The toolchain probe' {
         [void](Initialize-Cargo $minimal @('clippy', 'llvm-cov'))
         [void](Initialize-Answer $minimal 'uv' @('uv 0.13.0') 0)
         $env:PATH = $minimal
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
         $noUv = Join-Path $script:root 'no-uv'
         [void](Initialize-Cargo $noUv @('fmt', 'clippy', 'llvm-cov'))
         $env:PATH = $noUv
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[8] | Should -BeExactly 'cargo=no='
     }
     It 'reports the CUDA device nvidia-smi lists, and none when it fails or lists nothing (MCPs 939ec5c7)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
         $card = Join-Path $script:root 'card'
         $calls = Initialize-Answer $card 'nvidia-smi' @('NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6') 0
         $env:PATH = $card
-        $found = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })
+        $found = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })
         $found[13] | Should -BeExactly 'gpu=yes=NVIDIA GeForce RTX 3070 Ti Laptop GPU, 8.6'
         $found[14] | Should -BeExactly 'testdb=no='
         [System.IO.File]::ReadAllText($calls).Trim() | Should -BeExactly '--query-gpu=name,compute_cap --format=csv,noheader'
         $failing = Join-Path $script:root 'failing'
         [void](Initialize-Answer $failing 'nvidia-smi' @('NVIDIA-SMI has failed') 9)
         $env:PATH = $failing
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
         $silent = Join-Path $script:root 'silent'
         [void](Initialize-Answer $silent 'nvidia-smi' @() 0)
         $env:PATH = $silent
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[13] | Should -BeExactly 'gpu=no='
     }
     It 'reports the image of the corvis-fleet-testdb container docker answers, and none when it fails or answers nothing (MCPs daae17f2)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
         $running = Join-Path $script:root 'running'
         $calls = Initialize-Answer $running 'docker' @('pgvector/pgvector:pg16-bookworm') 0
         $env:PATH = $running
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[14] |
             Should -BeExactly 'testdb=yes=pgvector/pgvector:pg16-bookworm'
         [System.IO.File]::ReadAllText($calls).Trim() |
             Should -BeExactly 'container inspect --format "{{.Config.Image}}" corvis-fleet-testdb'
         $missing = Join-Path $script:root 'missing'
         [void](Initialize-Answer $missing 'docker' @('Error: No such container: corvis-fleet-testdb') 1 -Stderr)
         $env:PATH = $missing
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
         $silent = Join-Path $script:root 'silent'
         [void](Initialize-Answer $silent 'docker' @() 0)
         $env:PATH = $silent
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent })[14] | Should -BeExactly 'testdb=no='
     }
     It 'reports the hooks route only when the file exists and the check tools are at their pins (MCPs ec895824, 09a34e03)' {
         $absent = Join-Path $script:root 'absent\vswhere.exe'
@@ -191,17 +191,17 @@ Describe 'The toolchain probe' {
         $ready = Join-Path $script:root 'ready'
         $readyCalls = Initialize-Python $ready 0 0
         $env:PATH = $ready
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly "hooks=yes=$route"
         [System.IO.File]::ReadAllLines($readyCalls) |
             Should -Be @('--version', '-m pip --version', '-c "import sys, importlib.metadata as m; a = sys.argv[1:]; sys.exit(any(m.version(a[i]) != a[i + 1] for i in range(0, len(a), 2)))" ruff 0.17.1 mypy 2.4.0 pytest 9.1.1 pytest-xdist 3.8.0 pytest-cov 7.1.0 coverage 7.16.2 pytest-timeout 2.4.0')
         $lacking = Join-Path $script:root 'lacking'
         [void](Initialize-Python $lacking 0 1)
         $env:PATH = $lacking
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly 'hooks=no='
         $env:PATH = Join-Path $script:root 'empty'
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; HooksRoute = $route })[16] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; HooksRoute = $route })[16] |
             Should -BeExactly 'hooks=no='
     }
     It 'reports Chrome from the first candidate path that exists with its file version, never from PATH, and none when no candidate exists (MCPs 2f596185)' {
@@ -214,13 +214,13 @@ Describe 'The toolchain probe' {
         $expected = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($installed).ProductVersion
         $perUser = Join-Path $script:root 'Local\Google\Chrome\Application\chrome.exe'
         $candidates = @((Join-Path $script:root 'Program Files (x86)\Google\Chrome\Application\chrome.exe'), $installed, $perUser)
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Chrome = $candidates })[17] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Chrome = $candidates })[17] |
             Should -BeExactly "chrome=yes=$expected"
         # A chrome on the PATH counts for nothing: Playwright opens the path, not the PATH.
         $onPath = Join-Path $script:root 'onpath'
         [void](Initialize-Answer $onPath 'chrome' @('Google Chrome 155.0.8059.39') 0)
         $env:PATH = $onPath
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Chrome = @($perUser) })[17] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Chrome = @($perUser) })[17] |
             Should -BeExactly 'chrome=no='
     }
     It 'reports pdftotext from the Git for Windows path first, then from PATH, and none when neither has it (MCPs 6dd73ada)' {
@@ -232,22 +232,22 @@ Describe 'The toolchain probe' {
         $onPath = Join-Path $script:root 'onpath'
         [void](Initialize-Answer $onPath 'pdftotext' @('pdftotext version 24.02.0') 0)
         $env:PATH = $onPath
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = (Join-Path $git 'pdftotext.cmd') })[18] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Pdftotext = (Join-Path $git 'pdftotext.cmd') })[18] |
             Should -BeExactly 'pdftotext=yes=pdftotext version 4.00'
         [System.IO.File]::ReadAllLines($gitCalls) | Should -Be @('-v')
         $missing = Join-Path $script:root 'no-git\pdftotext.exe'
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
             Should -BeExactly 'pdftotext=yes=pdftotext version 24.02.0'
         $env:PATH = Join-Path $script:root 'empty'
-        @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
+        @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Pdftotext = $missing })[18] |
             Should -BeExactly 'pdftotext=no='
     }
     It 'reports an administrator token yes and a filtered one no, as the elevated runner reads them' {
         $env:PATH = Join-Path $script:root 'empty'
         $absent = Join-Path $script:root 'absent\vswhere.exe'
-        $admin = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Administrator = { $true } })
+        $admin = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Administrator = { $true } })
         $admin[-1] | Should -BeExactly 'integrity=yes=administrator'
-        $limited = @(Invoke-Rendered 'dialect-toolchain-probe' @{ VsWhere = $absent; Administrator = { $false } })
+        $limited = @(Invoke-Rendered 'dialect-toolchain-probe.ps1' @{ VsWhere = $absent; Administrator = { $false } })
         $limited[-1] | Should -BeExactly 'integrity=no=limited'
     }
 }

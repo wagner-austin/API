@@ -65,7 +65,7 @@ Describe 'The launch' {
     It 'registers the build as an S4U task that runs on battery at priority 4, starts it, and says so once the build has recorded itself' {
         # The build sleeps before recording, so the launch is seen waiting.
         $target = Initialize-Dispatch "Start-Sleep -Seconds 2`r`n`$PID | Set-Content -LiteralPath `"`$PSScriptRoot/build.pid`"`r`n"
-        Invoke-Rendered 'dialect-launch' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly 'launched'
+        Invoke-Rendered 'dialect-launch.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly 'launched'
         $task = (Get-TaskDefinition $script:taskName).Task
         $task.Actions.Exec.Command | Should -BeExactly 'powershell.exe'
         $task.Actions.Exec.Arguments | Should -BeExactly "-NoProfile -ExecutionPolicy Bypass -File `"$target/build.ps1`""
@@ -78,7 +78,7 @@ Describe 'The launch' {
     }
     It 'refuses by name a build that never records itself' {
         $target = Initialize-Dispatch "exit 0`r`n"
-        { Invoke-Rendered 'dialect-launch' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
+        { Invoke-Rendered 'dialect-launch.ps1' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
             Should -Throw "FLEET_LAUNCH_NOT_STARTED: $($script:taskName) registered, but its build had not recorded itself after 3 s"
     }
     # The elevated runner's launch (MCPs board task a98d7083): registering at
@@ -87,7 +87,7 @@ Describe 'The launch' {
     # ssh session does.
     It 'registers an elevated build at RunLevel Highest and starts it like any other' {
         $target = Initialize-Dispatch "`$PID | Set-Content -LiteralPath `"`$PSScriptRoot/build.pid`"`r`n"
-        Invoke-Rendered 'dialect-launch-elevated' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly 'launched'
+        Invoke-Rendered 'dialect-launch-elevated.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly 'launched'
         $task = (Get-TaskDefinition $script:taskName).Task
         $task.Principals.Principal.LogonType | Should -BeExactly 'S4U'
         $task.Principals.Principal.RunLevel | Should -BeExactly 'HighestAvailable'
@@ -95,7 +95,7 @@ Describe 'The launch' {
     }
     It 'refuses by name an elevated build that never records itself' {
         $target = Initialize-Dispatch "exit 0`r`n"
-        { Invoke-Rendered 'dialect-launch-elevated' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
+        { Invoke-Rendered 'dialect-launch-elevated.ps1' @{ Target = $target; TaskName = $script:taskName; LaunchSeconds = 3 } } |
             Should -Throw "FLEET_LAUNCH_NOT_STARTED: $($script:taskName) registered, but its build had not recorded itself after 3 s"
     }
 }
@@ -118,7 +118,7 @@ Describe 'The stop' {
         $target = Initialize-Dispatch ''
         $tree = Initialize-BuildTree $target
         Register-ScheduledTask -TaskName $script:taskName -Action (New-ScheduledTaskAction -Execute 'cmd.exe' -Argument '/c exit 0') | Out-Null
-        Invoke-Rendered 'dialect-stop' @{ Target = $target; TaskName = $script:taskName } | Select-Object -Last 1 |
+        Invoke-Rendered 'dialect-stop.ps1' @{ Target = $target; TaskName = $script:taskName } | Select-Object -Last 1 |
             Should -BeExactly "stopped $($script:taskName)"
         Test-Alive $tree.Build | Should -BeFalse
         Test-Alive $tree.Child | Should -BeFalse
@@ -127,18 +127,18 @@ Describe 'The stop' {
     It 'kills nothing when the recorded id names another process, since ids are reused' {
         $target = Initialize-Dispatch ''
         [System.IO.File]::WriteAllText((Join-Path $target 'build.pid'), "$PID`r`n")
-        Invoke-Rendered 'dialect-stop' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly "stopped $($script:taskName)"
+        Invoke-Rendered 'dialect-stop.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly "stopped $($script:taskName)"
         Test-Alive $PID | Should -BeTrue
     }
     It 'stops by task alone a build that never recorded an id' {
         $target = Initialize-Dispatch ''
-        Invoke-Rendered 'dialect-stop' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly "stopped $($script:taskName)"
+        Invoke-Rendered 'dialect-stop.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly "stopped $($script:taskName)"
     }
     It 'refuses by name a kill taskkill refuses, so a stop that ended nothing never reads as one' {
         $target = Initialize-Dispatch ''
         $tree = Initialize-BuildTree $target
         $taskkill = Initialize-StandIn 128
-        { Invoke-Rendered 'dialect-stop' @{ Target = $target; TaskName = $script:taskName; Taskkill = $taskkill.Path } } |
+        { Invoke-Rendered 'dialect-stop.ps1' @{ Target = $target; TaskName = $script:taskName; Taskkill = $taskkill.Path } } |
             Should -Throw "FLEET_STOP_KILL_FAILED: taskkill of $($tree.Build) exited 128"
         [System.IO.File]::ReadAllText($taskkill.Record).Trim() | Should -BeExactly "/PID $($tree.Build) /T /F"
         Test-Alive $tree.Build | Should -BeTrue

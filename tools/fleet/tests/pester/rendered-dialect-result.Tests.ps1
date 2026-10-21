@@ -89,7 +89,7 @@ Describe 'The result render' {
         $target = Initialize-Target 'running'
         Initialize-CaseTask -Execute "$PSHOME\powershell.exe" -Argument '-NoProfile -Command Start-Sleep 300'
         Wait-CaseTask -State 4 -LastResult 0x41301
-        @(Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName }).Count | Should -Be 0
+        @(Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName }).Count | Should -Be 0
         @([System.IO.Directory]::GetFileSystemEntries($target)).Count | Should -Be 0
     }
     It 'prints the status the build wrote and the UTC epoch second it wrote it, touching nothing' {
@@ -97,7 +97,7 @@ Describe 'The result render' {
         $result = Join-Path $target 'result.txt'
         [System.IO.File]::WriteAllText($result, "3`r`n")
         [System.IO.File]::SetLastWriteTimeUtc($result, [datetime]::new(2026, 9, 27, 17, 0, 0, [System.DateTimeKind]::Utc))
-        Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '3 1790528400'
+        Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '3 1790528400'
         Test-Path -LiteralPath (Join-Path $target 'result.txt.log') | Should -BeFalse
     }
     It 'floors a write late in its second rather than rounding it into the next' {
@@ -105,7 +105,7 @@ Describe 'The result render' {
         $result = Join-Path $target 'result.txt'
         [System.IO.File]::WriteAllText($result, "0`r`n")
         [System.IO.File]::SetLastWriteTimeUtc($result, [datetime]::new(2026, 9, 27, 17, 0, 0, 600, [System.DateTimeKind]::Utc))
-        Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '0 1790528400'
+        Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName } | Should -BeExactly '0 1790528400'
     }
     It 'records the exit status of a task that ended without the build''s status, with a line saying how' {
         $target = Initialize-Target 'ended'
@@ -113,11 +113,11 @@ Describe 'The result render' {
         [System.IO.File]::WriteAllText($log, "npm warn deprecated boolean@3.2.0`r`n")
         Initialize-CaseTask -Execute 'cmd.exe' -Argument '/c exit 3'
         Wait-CaseTask -State 3 -LastResult 3
-        $said = @(Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName })
+        $said = @(Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName })
         Assert-Reported -Said $said -Target $target -Code '3'
         [System.IO.File]::ReadAllText($log) | Should -BeExactly ("npm warn deprecated boolean@3.2.0`r`n" +
             "FLEET_UNIT_ENDED: task $($script:taskName) ended with Task Scheduler state 3 (Ready) and last result 0x00000003 before the build wrote its status; recorded exit 3`r`n")
-        $again = @(Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName })
+        $again = @(Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName })
         $again | Should -HaveCount 1
         $again[0] | Should -BeExactly $said[0]
         ([regex]::Matches([System.IO.File]::ReadAllText($log), 'FLEET_UNIT_ENDED')).Count | Should -Be 1
@@ -126,14 +126,14 @@ Describe 'The result render' {
         $target = Initialize-Target 'zero'
         Initialize-CaseTask -Execute 'cmd.exe' -Argument '/c exit 0'
         Wait-CaseTask -State 3 -LastResult 0
-        $said = @(Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName })
+        $said = @(Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName })
         Assert-Reported -Said $said -Target $target -Code '125'
         [System.IO.File]::ReadAllText((Join-Path $target 'result.txt.log')) | Should -BeExactly (
             "FLEET_UNIT_ENDED: task $($script:taskName) ended with Task Scheduler state 3 (Ready) and last result 0x00000000 before the build wrote its status; recorded exit 125`r`n")
     }
     It 'records the unexplained status for a task no longer registered, starting the transcript when there was none' {
         $target = Initialize-Target 'unregistered'
-        $said = @(Invoke-Rendered 'dialect-result' @{ Target = $target; TaskName = $script:taskName })
+        $said = @(Invoke-Rendered 'dialect-result.ps1' @{ Target = $target; TaskName = $script:taskName })
         Assert-Reported -Said $said -Target $target -Code '125'
         [System.IO.File]::ReadAllText((Join-Path $target 'result.txt.log')) | Should -BeExactly (
             "FLEET_UNIT_ENDED: task $($script:taskName) is no longer registered before the build wrote its status; recorded exit 125`r`n")

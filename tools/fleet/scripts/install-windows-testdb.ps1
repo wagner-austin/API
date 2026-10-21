@@ -75,7 +75,16 @@
     2026-10-10. It has no trigger: the node standard is what runs it, at
     boot and whenever the daemon is down. The tasks are read through Task
     Scheduler's COM service, because the scheduled-task cmdlets fail while
-    another process deletes a task (MCPs board task d69786fa).
+    another process deletes a task (MCPs board task d69786fa). After a
+    registration the folder is read again, and a launcher still missing is
+    refused by name (TESTDB_LAUNCHER_MISSING). Both Task Scheduler functions
+    are testdb-launcher.ps1's, dot-sourced from beside this script so a suite
+    can run them for real (MCPs board task 2a044a37).
+
+    A FAILED CLIENT INSTALL LEAVES NOTHING BEHIND. A download, digest or
+    unpack that throws removes the zip and bin.partial before the error
+    propagates, and a run removes any an interrupted one left, so Root holds
+    a whole bin or none.
 
 .PARAMETER Root
     The directory the client's bin directory is unpacked into.
@@ -155,6 +164,8 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+. (Join-Path $PSScriptRoot 'testdb-launcher.ps1')
+. (Join-Path $PSScriptRoot '..\..\..\scripts\lib\PortListener.ps1')
 
 $Cmd = "$env:SystemRoot\System32\cmd.exe"
 
@@ -164,57 +175,53 @@ function Get-TestdbPortListener {
         The process listening on a loopback port, as '<name> (pid N)', or
         $null when the port is free: what the default -Listener answers.
     .DESCRIPTION
-        Filtered by pipeline, not by the cmdlets' own filters: a filter that
-        matches nothing makes Get-NetTCPConnection and Get-Process write an
-        error, and the harness refuses a suppressed one. No listener is an
-        answer here, and an owner that vanished between the two reads is
-        named by its pid alone.
+        The listener is the repository's one read, scripts/lib's
+        Get-PortListener. The owner is filtered by pipeline, not by
+        Get-Process -Id, which writes an error for a process that is gone,
+        and the harness refuses a suppressed one; an owner that vanished
+        between the two reads is named by its pid alone.
     .PARAMETER LocalPort
         The loopback port.
     #>
     param([int]$LocalPort)
-    $bound = @(Get-NetTCPConnection -State Listen | Where-Object { $_.LocalAddress -eq '127.0.0.1' -and $_.LocalPort -eq $LocalPort })
-    if ($bound.Count -eq 0) { return $null }
-    $names = @(Get-Process | Where-Object { $_.Id -eq $bound[0].OwningProcess } | ForEach-Object { $_.ProcessName })
-    return "$(@($names + 'an unnamed process')[0]) (pid $($bound[0].OwningProcess))"
+    $owners = @(Get-PortListener -Port $LocalPort -Address '127.0.0.1')
+    if ($owners.Count -eq 0) { return $null }
+    $names = @(Get-Process | Where-Object { $_.Id -eq $owners[0] } | ForEach-Object { $_.ProcessName })
+    return "$(@($names + 'an unnamed process')[0]) (pid $($owners[0]))"
 }
 
-function Get-RootTaskRunning {
+function Assert-DockerDesktopLauncher {
     <#
     .SYNOPSIS
-        The names of the root folder's tasks with an action that runs a
-        program: what the default -ReadLaunchers answers.
+        Read the root folder again for a task running Docker Desktop after
+        one was registered, and refuse by name when there is still none.
     .DESCRIPTION
-        Read through Task Scheduler's COM service, hidden tasks included. An
-        action's Path is read only on an exec action (type 0), the one kind
-        that has it.
-    .PARAMETER Execute
-        The program's full path.
+        A registration that returned and left no task would otherwise read
+        as done, and the node would run no daemon after its next reboot.
     #>
-    param([string]$Execute)
-    $scheduler = New-Object -ComObject Schedule.Service
-    $scheduler.Connect()
-    return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object {
-            @($_.Definition.Actions | Where-Object { $_.Type -eq 0 -and $_.Path -eq $Execute }).Count -gt 0
-        } | ForEach-Object { $_.Name })
+    if (@(& $ReadLaunchers $DockerDesktop).Count -eq 0) {
+        throw "TESTDB_LAUNCHER_MISSING: \$Launcher was registered, but no root folder task runs $DockerDesktop"
+    }
 }
 
-function Register-DockerDesktopLauncher {
+function Undo-ClientDownload {
     <#
     .SYNOPSIS
-        Register the root folder task that starts Docker Desktop as the
-        account running this script, with no logon and no trigger: what the
-        default -RegisterLauncher does.
-    .PARAMETER Name
-        The task's name.
-    .PARAMETER Execute
-        Docker Desktop.exe's full path.
+        Remove what a failed client install left under Root, the zip and the
+        half-unpacked bin.partial, so the node is as it was before the run.
+    .DESCRIPTION
+        File.Delete on a file that is absent is a no-op; the directory is
+        asked for first, since Directory.Delete on an absent one throws.
+    .PARAMETER Zip
+        The downloaded zip.
+    .PARAMETER Partial
+        The directory the client is unpacked into before its rename.
     #>
-    param([string]$Name, [string]$Execute)
-    $action = New-ScheduledTaskAction -Execute $Execute
-    $principal = New-ScheduledTaskPrincipal -UserId ([Security.Principal.WindowsIdentity]::GetCurrent().User.Value) -LogonType S4U -RunLevel Highest
-    $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -ExecutionTimeLimit ([TimeSpan]::Zero)
-    [void](Register-ScheduledTask -TaskPath '\' -TaskName $Name -Action $action -Principal $principal -Settings $settings)
+    param([string]$Zip, [string]$Partial)
+    [System.IO.File]::Delete($Zip)
+    if ([System.IO.Directory]::Exists($Partial)) {
+        [System.IO.Directory]::Delete($Partial, $true)
+    }
 }
 
 function Invoke-Native {
@@ -239,30 +246,33 @@ $bin = Join-Path $Root 'bin'
 if (-not [System.IO.Directory]::Exists($bin)) {
     [void][System.IO.Directory]::CreateDirectory($Root)
     $zip = Join-Path $Root 'client.zip'
-    (New-Object System.Net.WebClient).DownloadFile($ClientUrl, $zip)
-    $digest = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($digest -ne $ClientSha256) {
-        [System.IO.File]::Delete($zip)
-        throw "TESTDB_CLIENT_DIGEST_MISMATCH: $ClientUrl has sha256 $digest, pinned $ClientSha256"
-    }
     $partial = Join-Path $Root 'bin.partial'
-    if ([System.IO.Directory]::Exists($partial)) {
-        [System.IO.Directory]::Delete($partial, $true)
-    }
-    [void][System.IO.Directory]::CreateDirectory($partial)
-    $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+    # What an earlier run left half-done is removed before this one starts.
+    Undo-ClientDownload $zip $partial
     try {
-        $entries = @($archive.Entries | Where-Object { $_.FullName -match '^pgsql/bin/[^/]+$' })
-        if ($entries.Count -eq 0) {
-            throw "TESTDB_CLIENT_EMPTY: $ClientUrl holds no pgsql/bin entries"
+        (New-Object System.Net.WebClient).DownloadFile($ClientUrl, $zip)
+        $digest = (Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+        if ($digest -ne $ClientSha256) {
+            throw "TESTDB_CLIENT_DIGEST_MISMATCH: $ClientUrl has sha256 $digest, pinned $ClientSha256"
         }
-        foreach ($entry in $entries) {
-            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $partial $entry.Name))
+        [void][System.IO.Directory]::CreateDirectory($partial)
+        $archive = [System.IO.Compression.ZipFile]::OpenRead($zip)
+        try {
+            $entries = @($archive.Entries | Where-Object { $_.FullName -match '^pgsql/bin/[^/]+$' })
+            if ($entries.Count -eq 0) {
+                throw "TESTDB_CLIENT_EMPTY: $ClientUrl holds no pgsql/bin entries"
+            }
+            foreach ($entry in $entries) {
+                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $partial $entry.Name))
+            }
+        } finally {
+            $archive.Dispose()
         }
-    } finally {
-        $archive.Dispose()
+        [System.IO.Directory]::Move($partial, $bin)
+    } catch {
+        Undo-ClientDownload $zip $partial
+        throw
     }
-    [System.IO.Directory]::Move($partial, $bin)
     [System.IO.File]::Delete($zip)
     Write-Output "fleet-testdb: unpacked $($entries.Count) client file(s) into $bin"
 }
@@ -275,6 +285,7 @@ if ($parts -notcontains $bin) {
 
 if (@(& $ReadLaunchers $DockerDesktop).Count -eq 0) {
     & $RegisterLauncher $Launcher $DockerDesktop
+    Assert-DockerDesktopLauncher
     Write-Output "fleet-testdb: registered \$Launcher, the task the node standard starts $DockerDesktop through"
 }
 

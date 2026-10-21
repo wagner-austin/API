@@ -190,7 +190,7 @@ BeforeAll {
         .OUTPUTS
             String: the hook's text.
         #>
-        $encoded = Get-RenderedDefault 'runner-windows-install' 'JobHook'
+        $encoded = Get-RenderedDefault 'runner-windows-install.ps1' 'JobHook'
         return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
     }
 
@@ -300,7 +300,7 @@ BeforeAll {
         $install = @{ Repo = 'wagner-austin/chat'; Name = 'loki'; Labels = 'loki'; Root = $Root; Service = $script:service; Python = @($Python) }
         $installs = ConvertTo-Json -InputObject @($install) -Compress
         $parameters = @{ RunnerZipUrl = $Url; Sc = $Sc.Path; Tokens = $Tokens; Installs = $installs; StopWaitSeconds = 2; PythonPackageUrl = $PackageUrl; PythonName = 'python.cmd' } + $Base
-        return [string[]]@(Invoke-Rendered 'runner-windows-install' $parameters)
+        return [string[]]@(Invoke-Rendered 'runner-windows-install.ps1' $parameters)
     }
 
     function Invoke-Audit {
@@ -322,7 +322,7 @@ BeforeAll {
         if (-not $Base) { $Base = Get-Base (Initialize-RegistryScratch) (Initialize-Git) }
         if (-not $Root) { $Root = Initialize-Root }
         $installs = ConvertTo-Json -InputObject @(@{ Service = $script:service; Root = $Root; Python = @($Python) }) -Compress
-        return [string[]]@(Invoke-Rendered 'runner-windows-audit' (@{ Sc = $Sc.Path; Installs = $installs } + $Base))
+        return [string[]]@(Invoke-Rendered 'runner-windows-audit.ps1' (@{ Sc = $Sc.Path; Installs = $installs } + $Base))
     }
 }
 

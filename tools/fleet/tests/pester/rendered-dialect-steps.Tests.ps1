@@ -24,19 +24,19 @@ BeforeAll {
 Describe 'The extract' {
     It 'unpacks the archive landed beside the dispatch into it, with the node''s clock' {
         $tar = Initialize-StandIn 0 -Append
-        Invoke-Rendered 'dialect-extract' @{ Tar = $tar.Path }
+        Invoke-Rendered 'dialect-extract.ps1' @{ Tar = $tar.Path }
         Read-Record $tar.Record | Should -Be @("-xzmf $($script:target).stage/tree.tgz -C $($script:target)")
     }
     It 'ends with tar''s own status when tar refuses' {
         $tar = Initialize-StandIn 2 -Append
-        { Invoke-Rendered 'dialect-extract' @{ Tar = $tar.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-extract exited 2'
+        { Invoke-Rendered 'dialect-extract.ps1' @{ Tar = $tar.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-extract.ps1 exited 2'
     }
 }
 
 Describe 'The staged tree''s repository' {
     It 'initialises, indexes every file the commit carries, and commits under the export identity' {
         $git = Initialize-StandIn 0 -Append
-        Invoke-Rendered 'dialect-init-repository' @{ Git = $git.Path }
+        Invoke-Rendered 'dialect-init-repository.ps1' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:target) init --quiet",
             "-C $($script:target) config gc.auto 0",
@@ -46,7 +46,7 @@ Describe 'The staged tree''s repository' {
     }
     It 'stops at the first step git refuses, with git''s status' {
         $git = Initialize-StandIn 128 -Append
-        { Invoke-Rendered 'dialect-init-repository' @{ Git = $git.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-init-repository exited 128'
+        { Invoke-Rendered 'dialect-init-repository.ps1' @{ Git = $git.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-init-repository.ps1 exited 128'
         Read-Record $git.Record | Should -Be @("-C $($script:target) init --quiet")
     }
 }
@@ -57,7 +57,7 @@ Describe 'A companion''s repository' {
         # origin/main still lets a check that runs MCPs' published maketools
         # read ../MCPs on a node (MCPs board task a8ee9b21).
         $git = Initialize-StandIn 0 -Append
-        Invoke-Rendered 'dialect-companion-repository' @{ Git = $git.Path }
+        Invoke-Rendered 'dialect-companion-repository.ps1' @{ Git = $git.Path }
         Read-Record $git.Record | Should -Be @(
             "-C $($script:companion) init --quiet",
             "-C $($script:companion) config gc.auto 0",
@@ -69,7 +69,7 @@ Describe 'A companion''s repository' {
     }
     It 'stops at the first step git refuses, with git''s status' {
         $git = Initialize-StandIn 1 -Append
-        { Invoke-Rendered 'dialect-companion-repository' @{ Git = $git.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-companion-repository exited 1'
+        { Invoke-Rendered 'dialect-companion-repository.ps1' @{ Git = $git.Path } } | Should -Throw 'TEST_RENDER_EXITED: dialect-companion-repository.ps1 exited 1'
         Read-Record $git.Record | Should -Be @("-C $($script:companion) init --quiet")
     }
 }

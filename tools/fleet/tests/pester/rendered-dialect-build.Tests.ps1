@@ -79,7 +79,7 @@ Describe 'The build' {
         $export = Initialize-Export
         $install = Initialize-Tool 'installer' 0
         $make = Initialize-Tool 'make' 0
-        Invoke-Rendered 'dialect-build' @{
+        Invoke-Rendered 'dialect-build.ps1' @{
             Target = $export.Target; Recipe = $export.Recipe; Workers = 3; CacheRoot = $export.Cache
             Install = @("`"$($install.Path)`" ci", "`"$($install.Path)`" second"); InstallPhases = @('install', 'workspace-build'); Make = $make.Path
         }
@@ -133,12 +133,12 @@ Describe 'The build' {
 
         [System.IO.File]::WriteAllText($current, $young)
         $first = Initialize-Export
-        Invoke-Rendered 'dialect-build' @{ Target = $first.Target; Recipe = $first.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $first.Target; Recipe = $first.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
         [System.IO.File]::ReadAllText((Join-Path $first.Target 'cache-generation')) | Should -BeExactly $young
 
         [System.IO.File]::WriteAllText($current, $old)
         $second = Initialize-Export
-        Invoke-Rendered 'dialect-build' @{ Target = $second.Target; Recipe = $second.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $second.Target; Recipe = $second.Recipe; CacheRoot = $cacheRoot; Install = @(); InstallPhases = @(); Make = $make.Path }
         $started = [System.IO.File]::ReadAllText($current)
         [long]$started | Should -BeGreaterOrEqual $now
         [System.IO.File]::ReadAllText((Join-Path $second.Target 'cache-generation')) | Should -BeExactly $started
@@ -150,7 +150,7 @@ Describe 'The build' {
         $export = Initialize-Export
         $make = Initialize-Tool 'make' 0
         $before = [DateTime]::UtcNow.AddSeconds(-1)
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
         $after = [DateTime]::UtcNow.AddSeconds(1)
         $lines = [System.IO.File]::ReadAllLines((Join-Path $export.Target 'result.txt.log'))
         $styles = [Globalization.DateTimeStyles]'AdjustToUniversal, AssumeUniversal'
@@ -169,7 +169,7 @@ Describe 'The build' {
         $failing = Initialize-Tool 'installer' 5
         $after = Initialize-Tool 'after' 0
         $make = Initialize-Tool 'make' 0
-        Invoke-Rendered 'dialect-build' @{
+        Invoke-Rendered 'dialect-build.ps1' @{
             Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache
             Install = @("`"$($failing.Path)`" ci", "`"$($after.Path)`""); InstallPhases = @('install', 'install'); Make = $make.Path
         }
@@ -181,7 +181,7 @@ Describe 'The build' {
     It 'writes the status of a recipe that fails' {
         $export = Initialize-Export
         $make = Initialize-Tool 'make' 2
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @(); InstallPhases = @(); Make = $make.Path }
         Read-Result $export.Target | Should -BeExactly '2'
         Read-TranscriptShape $export.Target | Should -Be @(
             "fleet-temp $(Get-RunTemp $export.Target)",
@@ -192,7 +192,7 @@ Describe 'The build' {
         $npm = Initialize-Tool 'npm' 0
         $make = Initialize-Tool 'make' 0
         $env:PATH = "$($npm.Directory);$env:PATH"
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Make = $make.Path }
         [System.IO.File]::ReadAllLines($npm.Record) | Should -Be @("$($export.Target) ci")
         (Read-TranscriptShape $export.Target)[2] | Should -BeExactly 'fleet-phase install started <utc>'
         Read-Result $export.Target | Should -BeExactly '0'
@@ -203,7 +203,7 @@ Describe 'The build' {
         $git = Initialize-Tool 'bash' 0
         $make = Initialize-Tool 'make' 0
         $env:PATH = "$($wsl.Directory);$env:PATH"
-        Invoke-Rendered 'dialect-build' @{
+        Invoke-Rendered 'dialect-build.ps1' @{
             Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache
             Install = @('bash scripts/testdb-setup.sh --port 5432'); InstallPhases = @('test-database'); Make = $make.Path; GitBin = $git.Directory
         }
@@ -218,7 +218,7 @@ Describe 'The build' {
         # ERRORLEVEL inside a session.
         $export = Initialize-Export
         $make = Initialize-Tool 'make' 0
-        Invoke-Rendered 'dialect-build' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @('fleet-no-such-tool ci'); InstallPhases = @('install'); Make = $make.Path }
+        Invoke-Rendered 'dialect-build.ps1' @{ Target = $export.Target; Recipe = $export.Recipe; CacheRoot = $export.Cache; Install = @('fleet-no-such-tool ci'); InstallPhases = @('install'); Make = $make.Path }
         Read-Result $export.Target | Should -BeExactly '1'
         [System.IO.File]::ReadAllText((Join-Path $export.Target 'result.txt.log')) | Should -BeLike "*fleet-no-such-tool*not recognized*"
         Test-Path -LiteralPath $make.Record | Should -BeFalse

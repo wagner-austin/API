@@ -15,13 +15,15 @@ function Invoke-Rendered {
         A render fails by throwing; a native it ran leaves its exit code in
         $LASTEXITCODE, so a non-zero one left behind is itself an error here.
     .PARAMETER Name
-        The render's file stem under rendered/.
+        The render's file name under rendered/. A suite writes it whole
+        because MCPs' harness measures only the scripts a suite's text names
+        by file (its Measure.ps1); a stem would leave the render unmeasured.
     .PARAMETER Parameters
         The render's parameters.
     #>
     param([string]$Name, [hashtable]$Parameters)
     $global:LASTEXITCODE = 0
-    & (Join-Path $script:rendered "$Name.ps1") @Parameters
+    & (Join-Path $script:rendered $Name) @Parameters
     if ($LASTEXITCODE -ne 0) {
         throw "TEST_RENDER_EXITED: $Name exited $LASTEXITCODE"
     }
@@ -33,14 +35,15 @@ function Get-RenderedDefault {
         A default from a render's param block, evaluated as the literal it
         is, so a suite reads the roster's values rather than restating them.
     .PARAMETER Name
-        The render's file stem under rendered/.
+        The render's file name under rendered/, written whole as
+        Invoke-Rendered's is.
     .PARAMETER Parameter
         The parameter's name, without the $.
     .OUTPUTS
         The default's value: a string, or an array of them.
     #>
     param([string]$Name, [string]$Parameter)
-    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $script:rendered "$Name.ps1"), [ref]$null, [ref]$null)
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $script:rendered $Name), [ref]$null, [ref]$null)
     $found = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq $Parameter })
     return $found[0].DefaultValue.SafeGetValue()
 }

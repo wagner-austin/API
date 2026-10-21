@@ -15,7 +15,7 @@ BeforeAll {
 
     function Read-ObserveDocument {
         param([string]$Directory)
-        $said = @(Invoke-Rendered 'dialect-observe-sessions' @{ SessionsDirectory = $Directory })
+        $said = @(Invoke-Rendered 'dialect-observe-sessions.ps1' @{ SessionsDirectory = $Directory })
         $said.Count | Should -Be 1
         return ($said[0] | ConvertFrom-Json)
     }
@@ -36,7 +36,7 @@ Describe 'The capacity probe' {
             $saved = $env:USERPROFILE
             try {
                 $env:USERPROFILE = $ProfileDirectory
-                return @(Invoke-Rendered 'dialect-capacity-probe' @{})
+                return @(Invoke-Rendered 'dialect-capacity-probe.ps1' @{})
             } finally {
                 $env:USERPROFILE = $saved
             }
@@ -56,7 +56,7 @@ Describe 'The capacity probe' {
         $saved = $env:USERPROFILE
         try {
             $env:USERPROFILE = $userProfile
-            $said = @(Invoke-Rendered 'dialect-capacity-probe' @{})
+            $said = @(Invoke-Rendered 'dialect-capacity-probe.ps1' @{})
         } finally {
             $env:USERPROFILE = $saved
         }
@@ -129,8 +129,8 @@ Describe 'The session observer' {
 Describe 'A dispatch directory' {
     It 'is made with its parents, brackets taken literally, and making it again changes nothing' {
         $directory = Join-Path $TestDrive 'stage\run-[1]\nested'
-        Invoke-Rendered 'dialect-make-directory' @{ Directory = $directory }
-        Invoke-Rendered 'dialect-make-directory' @{ Directory = $directory }
+        Invoke-Rendered 'dialect-make-directory.ps1' @{ Directory = $directory }
+        Invoke-Rendered 'dialect-make-directory.ps1' @{ Directory = $directory }
         [System.IO.Directory]::Exists($directory) | Should -BeTrue
     }
     It 'is emptied read-only files and all, and made when it was never there' {
@@ -139,10 +139,10 @@ Describe 'A dispatch directory' {
         $object = Join-Path $directory '.git\objects\ab'
         [System.IO.File]::WriteAllText($object, 'loose object')
         [System.IO.File]::SetAttributes($object, [System.IO.FileAttributes]::ReadOnly)
-        Invoke-Rendered 'dialect-reset-directory' @{ Directory = $directory }
+        Invoke-Rendered 'dialect-reset-directory.ps1' @{ Directory = $directory }
         @([System.IO.Directory]::GetFileSystemEntries($directory)).Count | Should -Be 0
         $fresh = Join-Path $TestDrive 'never-made'
-        Invoke-Rendered 'dialect-reset-directory' @{ Directory = $fresh }
+        Invoke-Rendered 'dialect-reset-directory.ps1' @{ Directory = $fresh }
         [System.IO.Directory]::Exists($fresh) | Should -BeTrue
     }
 }
@@ -224,7 +224,7 @@ Describe 'Retiring a settled dispatch' {
     It 'keeps the transcript, removes the tree read-only files and all and its staging directory, and removes only the run''s root scripts' {
         $root = Join-Path $TestDrive 'kept'
         $run = Initialize-SettledRun -Root $root -Transcript
-        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
         [System.IO.File]::ReadAllText($run.Retained) | Should -BeExactly '887 passed'
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         @([System.IO.Directory]::GetFileSystemEntries($root) | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object) |
@@ -239,7 +239,7 @@ Describe 'Retiring a settled dispatch' {
         $holder = Initialize-TranscriptHolder $run.Log
         { Move-Item -LiteralPath $run.Log -Destination (Join-Path $root 'moved.log') } |
             Should -Throw -ExpectedMessage '*being used by another process*'
-        $said = @(Invoke-Rendered 'dialect-retire' $run)
+        $said = @(Invoke-Rendered 'dialect-retire.ps1' $run)
         $said | Should -HaveCount 1
         $said[0] | Should -BeLike ("FLEET_RETIRE_HOLDER_ENDED: pid $($holder.Id) powershell.exe (*Start-Sleep 600*) held " + [WildcardPattern]::Escape($run.Log))
         $holder.HasExited | Should -BeTrue
@@ -253,7 +253,7 @@ Describe 'Retiring a settled dispatch' {
         $run = Initialize-SettledRun -Root $root -Transcript
         $holder = Initialize-TranscriptHolder $run.Log
         $run.EndableTypes = [int[]]@()
-        { Invoke-Rendered 'dialect-retire' $run } |
+        { Invoke-Rendered 'dialect-retire.ps1' $run } |
             Should -Throw -ExpectedMessage ("FLEET_RETIRE_HOLDER_PROTECTED: pid $($holder.Id) powershell.exe (*), of Restart Manager type 5, holds " + [WildcardPattern]::Escape($run.Log))
         $holder.HasExited | Should -BeFalse
         Stop-Process -Id $holder.Id -Force
@@ -264,8 +264,8 @@ Describe 'Retiring a settled dispatch' {
     It 'retires a run that wrote no transcript, and a second retire finds nothing left and is not an error' {
         $root = Join-Path $TestDrive 'untranscribed'
         $run = Initialize-SettledRun -Root $root
-        Invoke-Rendered 'dialect-retire' $run
-        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
         @([System.IO.Directory]::GetFileSystemEntries((Join-Path $root 'logs'))).Count | Should -Be 0
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
@@ -287,7 +287,7 @@ Describe 'Retiring a settled dispatch' {
         [System.IO.File]::WriteAllText((Join-Path $outside 'keep.txt'), 'keep')
         & cmd.exe /d /c mklink /J (Join-Path $run.Target 'link') $outside | Out-Null
         $LASTEXITCODE | Should -Be 0
-        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         [System.IO.File]::ReadAllText((Join-Path $outside 'keep.txt')) | Should -BeExactly 'keep'
     }
@@ -297,7 +297,7 @@ Describe 'Retiring a settled dispatch' {
         $inert = Join-Path $TestDrive 'inert.cmd'
         [System.IO.File]::WriteAllText($inert, "@echo off`r`nexit /b 0`r`n", [System.Text.Encoding]::ASCII)
         $run.Cmd = $inert
-        { Invoke-Rendered 'dialect-retire' $run } |
+        { Invoke-Rendered 'dialect-retire.ps1' $run } |
             Should -Throw -ExpectedMessage ([WildcardPattern]::Escape("FLEET_RETIRE_INCOMPLETE: rd exited 0 and left $($run.Target)"))
         [System.IO.Directory]::Exists($run.Target) | Should -BeTrue
     }
@@ -310,9 +310,9 @@ Describe 'Retiring a settled dispatch' {
         $run = Initialize-SettledRun -Root (Join-Path $TestDrive 'tasked')
         $run.TaskName = $name
         Test-RootTaskRegistered $name | Should -BeTrue
-        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
         Test-RootTaskRegistered $name | Should -BeFalse
-        Invoke-Rendered 'dialect-retire' $run
+        Invoke-Rendered 'dialect-retire.ps1' $run
         Test-RootTaskRegistered $name | Should -BeFalse
     }
 }
@@ -322,7 +322,7 @@ Describe 'What the node reports back' {
         $target = Join-Path $TestDrive 'digested'
         [void][System.IO.Directory]::CreateDirectory($target)
         [System.IO.File]::WriteAllText((Join-Path $target 'tree.tgz'), 'abc')
-        Invoke-Rendered 'dialect-digest' @{ Target = $target } |
+        Invoke-Rendered 'dialect-digest.ps1' @{ Target = $target } |
             Should -BeExactly 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'
     }
 }

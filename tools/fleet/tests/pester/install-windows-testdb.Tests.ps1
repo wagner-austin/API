@@ -12,6 +12,16 @@ BeforeAll {
     $script:install = Join-Path (Split-Path -Parent (Split-Path -Parent $PSScriptRoot)) 'scripts\install-windows-testdb.ps1'
     Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+    # The port every case declares: one the operating system hands out free,
+    # read through the script's real -Listener, so no case meets a node's own
+    # corvis-fleet-testdb on the fleet's port 15432 (loki's, fleet job
+    # 7d381946, MCPs board task 2a044a37). The default is its own case.
+    $probe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $probe.Start()
+    $script:port = ([System.Net.IPEndPoint]$probe.LocalEndpoint).Port
+    $probe.Stop()
+    $script:declared = "127.0.0.1:$($script:port)"
+
     # pg_isready: refused once and then accepting, unless a 'ready' file
     # says it already accepts or a 'never' file says it never will.
     $script:isReady = "@echo off`r`necho %*>>`"%~dp0isready.calls.txt`"`r`n" +
@@ -55,7 +65,7 @@ BeforeAll {
             PSCustomObject: Path, Directory and Calls (the record).
         #>
         param(
-            [string]$Port = '127.0.0.1:15432', [string]$RunPort = '127.0.0.1:15432', [string]$Mounts = '0',
+            [string]$Port = $script:declared, [string]$RunPort = $script:declared, [string]$Mounts = '0',
             [switch]$Exists, [switch]$PullFails
         )
         $directory = Join-Path $TestDrive ('docker-' + [guid]::NewGuid().ToString('N'))
@@ -121,7 +131,7 @@ BeforeAll {
         # A node whose root folder already has a launcher, as sedona's has
         # \SlimeDockerAutoStart, so a case registers nothing unless it says so.
         $parameters = @{
-            Root = $Root; Docker = $Docker.Path; PathScope = 'Process'; ClientUrl = 'file:///absent.zip'
+            Root = $Root; Docker = $Docker.Path; PathScope = 'Process'; ClientUrl = 'file:///absent.zip'; Port = $script:port
             ReadLaunchers = { 'SlimeDockerAutoStart' }
             RegisterLauncher = { param([string]$Name) throw "TEST_UNEXPECTED_REGISTER: $Name" }
         }
@@ -153,8 +163,8 @@ Describe 'install-windows-testdb' {
         $bin = Join-Path $root 'bin'
         $said | Should -Be @(
             "fleet-testdb: unpacked 2 client file(s) into $bin", "fleet-testdb: added $bin to the Process PATH",
-            'fleet-testdb: created corvis-fleet-testdb on 127.0.0.1:15432',
-            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+            "fleet-testdb: created corvis-fleet-testdb on $($script:declared)",
+            "fleet-testdb: measured corvis-fleet-testdb accepting connections on $($script:declared), 0 volume mounts")
         @([System.IO.Directory]::GetFiles($bin) | ForEach-Object { [System.IO.Path]::GetFileName($_) } | Sort-Object) |
             Should -Be @('isready.calls.txt', 'pg_isready.cmd', 'psql.cmd', 'ready')
         Test-Path -LiteralPath (Join-Path $root 'client.zip') | Should -BeFalse
@@ -166,28 +176,29 @@ Describe 'install-windows-testdb' {
             'ps -aq --filter "name=^corvis-fleet-testdb$"',
             "--config `"$anonymous`" pull pgvector/pgvector:pg16-bookworm",
             ('run -d --name corvis-fleet-testdb --label corvis.role=fleet-testdb --restart unless-stopped ' +
-                '-p 127.0.0.1:15432:5432 --tmpfs /var/lib/postgresql/data:rw,size=4g -e POSTGRES_PASSWORD=postgres ' +
+                "-p $($script:declared):5432 --tmpfs /var/lib/postgresql/data:rw,size=4g -e POSTGRES_PASSWORD=postgres " +
                 'pgvector/pgvector:pg16-bookworm'),
             'port corvis-fleet-testdb 5432/tcp',
             'inspect corvis-fleet-testdb --format "{{len .Mounts}}"')
         [System.IO.File]::ReadAllText((Join-Path $docker.Directory 'pull-path.txt')).Trim() |
             Should -BeExactly "PATH=$env:SystemRoot\System32"
         [System.IO.File]::ReadAllLines((Join-Path $bin 'isready.calls.txt')) |
-            Should -Be @('-h 127.0.0.1 -p 15432 -U postgres', '-h 127.0.0.1 -p 15432 -U postgres')
+            Should -Be @("-h 127.0.0.1 -p $($script:port) -U postgres", "-h 127.0.0.1 -p $($script:port) -U postgres")
     }
     It 'removes a container published on another port and creates it again on the declared one' {
         $root = Initialize-Installed
-        $docker = Initialize-Docker -Exists -Port '127.0.0.1:53681'
+        # 5432 is below Windows's dynamic range, so it is never the case's port.
+        $docker = Initialize-Docker -Exists -Port '127.0.0.1:5432'
         $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
         $said = @(Invoke-Install (Get-InstallParameterSet $root $docker $null))
         $said | Should -Be @(
-            "fleet-testdb: removed corvis-fleet-testdb published on '127.0.0.1:53681', not 127.0.0.1:15432",
-            'fleet-testdb: created corvis-fleet-testdb on 127.0.0.1:15432',
-            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+            "fleet-testdb: removed corvis-fleet-testdb published on '127.0.0.1:5432', not $($script:declared)",
+            "fleet-testdb: created corvis-fleet-testdb on $($script:declared)",
+            "fleet-testdb: measured corvis-fleet-testdb accepting connections on $($script:declared), 0 volume mounts")
         $calls = [System.IO.File]::ReadAllLines($docker.Calls)
         $calls[0..2] | Should -Be @(
             'ps -aq --filter "name=^corvis-fleet-testdb$"', 'port corvis-fleet-testdb 5432/tcp', 'rm -f corvis-fleet-testdb')
-        $calls[4] | Should -Match '^run -d --name corvis-fleet-testdb .* -p 127\.0\.0\.1:15432:5432 '
+        $calls[4] | Should -Match "^run -d --name corvis-fleet-testdb .* -p 127\.0\.0\.1:$($script:port):5432 "
         $calls.Count | Should -Be 7
     }
     It 'refuses a port another process already holds, naming the port and the process, and runs nothing' {
@@ -195,7 +206,7 @@ Describe 'install-windows-testdb' {
         $parameters = Get-InstallParameterSet (Initialize-Installed) $docker $null
         $parameters.Listener = { param([int]$LocalPort) "python (pid 4242) on $LocalPort" }
         { Invoke-Install $parameters } | Should -Throw -ExpectedMessage (
-            'TESTDB_PORT_BOUND: 127.0.0.1:15432 is already bound by python (pid 4242) on 15432, so corvis-fleet-testdb cannot be published there')
+            "TESTDB_PORT_BOUND: $($script:declared) is already bound by python (pid 4242) on $($script:port), so corvis-fleet-testdb cannot be published there")
         [System.IO.File]::ReadAllLines($docker.Calls) | Should -Be @('ps -aq --filter "name=^corvis-fleet-testdb$"')
         Test-Path -LiteralPath (Join-Path $docker.Directory 'exists') | Should -BeFalse
     }
@@ -215,9 +226,15 @@ Describe 'install-windows-testdb' {
         }
     }
     It 'refuses a container that came up anywhere but the declared port' {
-        $docker = Initialize-Docker -RunPort '0.0.0.0:15432'
+        $docker = Initialize-Docker -RunPort "0.0.0.0:$($script:port)"
         { Invoke-Install (Get-InstallParameterSet (Initialize-Installed) $docker $null) } |
-            Should -Throw -ExpectedMessage "TESTDB_NOT_ON_DECLARED_PORT: corvis-fleet-testdb is published on '0.0.0.0:15432', not 127.0.0.1:15432"
+            Should -Throw -ExpectedMessage "TESTDB_NOT_ON_DECLARED_PORT: corvis-fleet-testdb is published on '0.0.0.0:$($script:port)', not $($script:declared)"
+    }
+    It 'declares the fleet''s one test database port, 15432, as its default' {
+        # MCPs packages/maketools fleet/test_database.py's TESTDB_PORT.
+        $ast = [System.Management.Automation.Language.Parser]::ParseFile($script:install, [ref]$null, [ref]$null)
+        $found = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Port' })
+        $found[0].DefaultValue.SafeGetValue() | Should -Be 15432
     }
     It 'leaves an unpacked client, a PATH that has it and an existing container as they are, and verifies them' {
         $root = Initialize-Installed
@@ -225,7 +242,7 @@ Describe 'install-windows-testdb' {
         $env:PATH = "$env:PATH;$(Join-Path $root 'bin')"
         $before = $env:PATH
         $said = @(Invoke-Install (Get-InstallParameterSet $root $docker $null))
-        $said | Should -Be @('fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+        $said | Should -Be @("fleet-testdb: measured corvis-fleet-testdb accepting connections on $($script:declared), 0 volume mounts")
         $env:PATH | Should -BeExactly $before
         [System.IO.File]::ReadAllLines($docker.Calls) | Should -Be @(
             'ps -aq --filter "name=^corvis-fleet-testdb$"', 'port corvis-fleet-testdb 5432/tcp',
@@ -241,7 +258,12 @@ Describe 'install-windows-testdb' {
         $parameters = Get-InstallParameterSet $root $docker $null
         $asked = New-Object System.Collections.Generic.List[string]
         $registered = New-Object System.Collections.Generic.List[string]
-        $parameters.ReadLaunchers = { param([string]$Execute) $asked.Add($Execute) }.GetNewClosure()
+        # The folder holds no launcher until the registration adds one.
+        $parameters.ReadLaunchers = {
+            param([string]$Execute)
+            $asked.Add($Execute)
+            $registered | ForEach-Object { ($_ -split '\|')[0] }
+        }.GetNewClosure()
         $parameters.RegisterLauncher = {
             param([string]$Name, [string]$Execute)
             $registered.Add("$Name|$Execute|$(Test-Path -LiteralPath $docker.Calls)")
@@ -250,9 +272,20 @@ Describe 'install-windows-testdb' {
         $said = @(Invoke-Install $parameters)
         $said | Should -Be @(
             "fleet-testdb: registered \corvis-docker-desktop-start, the task the node standard starts $desktop through",
-            'fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
-        @($asked) | Should -Be @($desktop)
+            "fleet-testdb: measured corvis-fleet-testdb accepting connections on $($script:declared), 0 volume mounts")
+        @($asked) | Should -Be @($desktop, $desktop)
         @($registered) | Should -Be @("corvis-docker-desktop-start|$desktop|False")
+    }
+    It 'refuses a registration that leaves the root folder with no launcher, before any docker call' {
+        $docker = Initialize-Docker -Exists
+        $parameters = Get-InstallParameterSet (Initialize-Installed) $docker $null
+        # A folder that never holds a launcher, and a registration that adds none.
+        $parameters.ReadLaunchers = { }
+        $parameters.RegisterLauncher = { }
+        $desktop = "$env:ProgramFiles\Docker\Docker\Docker Desktop.exe"
+        { Invoke-Install $parameters } | Should -Throw -ExpectedMessage (
+            "TESTDB_LAUNCHER_MISSING: \corvis-docker-desktop-start was registered, but no root folder task runs $desktop")
+        Test-Path -LiteralPath $docker.Calls | Should -BeFalse
     }
     It 'registers a real S4U launcher with no trigger through Task Scheduler, and finds it on the rerun' {
         . (Join-Path $PSScriptRoot 'task-fixtures.ps1')
@@ -277,7 +310,7 @@ Describe 'install-windows-testdb' {
             $task.Settings.DisallowStartIfOnBatteries | Should -BeExactly 'false'
             @($task.SelectNodes("*[local-name()='Triggers']/*")).Count | Should -Be 0
             @(Invoke-Install $parameters) |
-                Should -Be @('fleet-testdb: measured corvis-fleet-testdb accepting connections on 127.0.0.1:15432, 0 volume mounts')
+                Should -Be @("fleet-testdb: measured corvis-fleet-testdb accepting connections on $($script:declared), 0 volume mounts")
         } finally {
             Invoke-TaskCleanup $name
         }
@@ -291,12 +324,22 @@ Describe 'install-windows-testdb' {
         Test-Path -LiteralPath (Join-Path $root 'client.zip') | Should -BeFalse
         Test-Path -LiteralPath (Join-Path $root 'bin') | Should -BeFalse
     }
-    It 'refuses a client zip with no pgsql/bin entries' {
+    It 'refuses a client zip with no pgsql/bin entries, and removes the zip and the half-unpacked directory' {
         $client = Initialize-ClientZip @{ 'pgsql/doc/readme.txt' = 'no client here' }
         $root = Join-Path $TestDrive 'empty'
         { Invoke-Install (Get-InstallParameterSet $root (Initialize-Docker) $client) } |
             Should -Throw -ExpectedMessage "TESTDB_CLIENT_EMPTY: $($client.Url) holds no pgsql/bin entries"
-        Test-Path -LiteralPath (Join-Path $root 'bin') | Should -BeFalse
+        @([System.IO.Directory]::GetFileSystemEntries($root)) | Should -Be @()
+    }
+    It 'removes the zip an interrupted run left, and a download that fails leaves nothing, raising WebException' {
+        $root = Join-Path $TestDrive 'interrupted'
+        [void][System.IO.Directory]::CreateDirectory($root)
+        [System.IO.File]::WriteAllText((Join-Path $root 'client.zip'), 'half a download')
+        $parameters = Get-InstallParameterSet $root (Initialize-Docker) $null
+        $parameters.ClientUrl = ([Uri](Join-Path $TestDrive 'absent-client.zip')).AbsoluteUri
+        $thrown = { Invoke-Install $parameters } | Should -Throw -PassThru
+        $thrown.Exception.InnerException | Should -BeOfType ([System.Net.WebException])
+        @([System.IO.Directory]::GetFileSystemEntries($root)) | Should -Be @()
     }
     It 'names a docker call that fails, with what docker said' {
         $docker = Initialize-Docker -PullFails
@@ -318,7 +361,7 @@ Describe 'install-windows-testdb' {
         $parameters.ReadySeconds = 2
         $parameters.Sleep = { $sleeps.Add(1) }.GetNewClosure()
         { Invoke-Install $parameters } |
-            Should -Throw -ExpectedMessage 'TESTDB_NOT_READY: corvis-fleet-testdb not accepting on 127.0.0.1:15432 after 2 s'
+            Should -Throw -ExpectedMessage "TESTDB_NOT_READY: corvis-fleet-testdb not accepting on $($script:declared) after 2 s"
         $sleeps.Count | Should -Be 2
         @([System.IO.File]::ReadAllLines((Join-Path $root 'bin\isready.calls.txt'))).Count | Should -Be 3
     }

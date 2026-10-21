@@ -42,7 +42,7 @@ Describe 'The cache generations removal' {
         [System.IO.File]::WriteAllText((Join-Path $run 'cache-generation'), $marked)
         [void][System.IO.Directory]::CreateDirectory((Join-Path $layout.Stage 'logs'))
 
-        Invoke-Rendered 'dialect-cache-generations' @{ StageRoot = $layout.Stage } |
+        Invoke-Rendered 'dialect-cache-generations.ps1' @{ StageRoot = $layout.Stage } |
             Should -BeExactly "cache-generations: $($layout.Stage)/cache/tools: generation $current current, removed 1 of 4 (2 MB)"
 
         Test-Path -LiteralPath (Join-Path $layout.Tools $unread) | Should -BeFalse
@@ -56,13 +56,13 @@ Describe 'The cache generations removal' {
         $current = Initialize-Generation $layout.Tools 600
         [System.IO.File]::WriteAllText((Join-Path $layout.Tools 'current'), $current)
 
-        Invoke-Rendered 'dialect-cache-generations' @{ StageRoot = $layout.Stage } |
+        Invoke-Rendered 'dialect-cache-generations.ps1' @{ StageRoot = $layout.Stage } |
             Should -BeExactly "cache-generations: $($layout.Stage)/cache/tools: generation $current current, removed 0 of 2 (0 MB)"
         Test-Path -LiteralPath (Join-Path $layout.Tools $previous) | Should -BeTrue
     }
     It 'says so when no build on the node has started a generation' {
         $stage = Join-Path $TestDrive 'fresh-node'
-        Invoke-Rendered 'dialect-cache-generations' @{ StageRoot = $stage } |
+        Invoke-Rendered 'dialect-cache-generations.ps1' @{ StageRoot = $stage } |
             Should -BeExactly "cache-generations: $stage/cache/tools: none yet"
     }
     It 'stops at an entry that is no generation, naming it' {
@@ -71,10 +71,10 @@ Describe 'The cache generations removal' {
         [System.IO.File]::WriteAllText((Join-Path $layout.Tools 'current'), $current)
         [void][System.IO.Directory]::CreateDirectory((Join-Path $layout.Tools 'npm'))
 
-        { Invoke-Rendered 'dialect-cache-generations' @{ StageRoot = $layout.Stage } } |
+        { Invoke-Rendered 'dialect-cache-generations.ps1' @{ StageRoot = $layout.Stage } } |
             Should -Throw "cache-generations: *npm is no generation"
     }
     It 'defaults its stage root to the example dispatch''s' {
-        Get-RenderedDefault 'dialect-cache-generations' 'StageRoot' | Should -BeExactly 'C:/fleet/stage'
+        Get-RenderedDefault 'dialect-cache-generations.ps1' 'StageRoot' | Should -BeExactly 'C:/fleet/stage'
     }
 }

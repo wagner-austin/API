@@ -12,7 +12,7 @@ BeforeAll {
     . (Join-Path $PSScriptRoot 'rendered-fixtures.ps1')
     $script:selfName = (Get-CimInstance Win32_Process -Filter "ProcessId = $PID").Name
 
-    function Start-Child {
+    function Invoke-WaitingChild {
         <#
         .SYNOPSIS
             A child of this process that waits until it is stopped.
@@ -32,12 +32,12 @@ Describe 'The job-started hook' {
     }
     It 'lowers the worker among its ancestors to BelowNormal, which every process the worker then starts inherits' {
         [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = [System.Diagnostics.ProcessPriorityClass]::Normal
-        $child = Start-Child
+        $child = Invoke-WaitingChild
         try {
-            $printed = [string[]]@(Invoke-Rendered 'runner-windows-job-started' @{ Start = $child.Id; WorkerName = $script:selfName })
+            $printed = [string[]]@(Invoke-Rendered 'runner-windows-job-started.ps1' @{ Start = $child.Id; WorkerName = $script:selfName })
             $printed | Should -Be @("runner job: $($script:selfName) $PID and every process it starts run at BelowNormal, under the fleet's checks")
             [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass | Should -Be 'BelowNormal'
-            $later = Start-Child
+            $later = Invoke-WaitingChild
             try {
                 $later.PriorityClass | Should -Be 'BelowNormal'
             } finally {
@@ -50,9 +50,9 @@ Describe 'The job-started hook' {
     }
     It 'refuses a walk that reaches no worker, and lowers nothing' {
         [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass = [System.Diagnostics.ProcessPriorityClass]::Normal
-        $child = Start-Child
+        $child = Invoke-WaitingChild
         try {
-            { Invoke-Rendered 'runner-windows-job-started' @{ Start = $child.Id; WorkerName = 'Runner.Worker.exe' } } | Should -Throw "RUNNER_JOB_PRIORITY_FAILED: no Runner.Worker.exe is among the ancestors of process $($child.Id), so the job would run at the fleet's own priority"
+            { Invoke-Rendered 'runner-windows-job-started.ps1' @{ Start = $child.Id; WorkerName = 'Runner.Worker.exe' } } | Should -Throw "RUNNER_JOB_PRIORITY_FAILED: no Runner.Worker.exe is among the ancestors of process $($child.Id), so the job would run at the fleet's own priority"
             [System.Diagnostics.Process]::GetCurrentProcess().PriorityClass | Should -Be 'Normal'
         } finally {
             Stop-Process -Id $child.Id -Force

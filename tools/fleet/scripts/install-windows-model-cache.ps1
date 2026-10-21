@@ -64,6 +64,41 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+function Undo-PartialDownload {
+    <#
+    .SYNOPSIS
+        Remove the .partial a failed download may or may not have opened,
+        so the directory is as it was before the fetch.
+    .DESCRIPTION
+        File.Delete on a path that is absent is a no-op, so no branch asks.
+    .PARAMETER Partial
+        The download's .partial path.
+    #>
+    param([string]$Partial)
+    [System.IO.File]::Delete($Partial)
+}
+
+function Test-ModelWeight {
+    <#
+    .SYNOPSIS
+        Measure the weights file the directory now holds, and refuse one
+        under the size the real weights take as a truncated copy.
+    .PARAMETER Path
+        onnx\model.onnx's path.
+    .PARAMETER Minimum
+        The least the weights may be, in bytes.
+    .OUTPUTS
+        Int64: the weights' size in bytes.
+    #>
+    [OutputType([long])]
+    param([string]$Path, [long]$Minimum)
+    $size = (Get-Item -LiteralPath $Path).Length
+    if ($size -lt $Minimum) {
+        throw "MODEL_CACHE_TRUNCATED: $Path is $size bytes, under the $Minimum the weights take; remove it and rerun"
+    }
+    return $size
+}
+
 $model = Join-Path $Root ($Repo -replace '/', '\')
 $fetched = 0
 foreach ($file in $Files) {
@@ -73,23 +108,18 @@ foreach ($file in $Files) {
     }
     [void][System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($path))
     $partial = "$path.partial"
-    # File.Delete on a path that is absent is a no-op, so the empty file
-    # the exists check let through and the partial a failed download may
-    # or may not have opened are both removed without a branch.
     try {
         (New-Object System.Net.WebClient).DownloadFile("$BaseUrl/$file", $partial)
     } catch {
-        [System.IO.File]::Delete($partial)
+        Undo-PartialDownload $partial
         throw
     }
+    # File.Delete on a path that is absent is a no-op, so the empty file
+    # the exists check let through is removed without a branch.
     [System.IO.File]::Delete($path)
     [System.IO.File]::Move($partial, $path)
     $fetched += 1
 }
 
-$weights = Join-Path $model 'onnx\model.onnx'
-$size = (Get-Item -LiteralPath $weights).Length
-if ($size -lt $MinimumWeightBytes) {
-    throw "MODEL_CACHE_TRUNCATED: $weights is $size bytes, under the $MinimumWeightBytes the weights take; remove it and rerun"
-}
+$size = Test-ModelWeight (Join-Path $model 'onnx\model.onnx') $MinimumWeightBytes
 Write-Output "fleet-model-cache: measured $Repo under $Root, model.onnx $size bytes, fetched $fetched of $($Files.Count) file(s)"
