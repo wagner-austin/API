@@ -63,10 +63,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # package's Linux lane (MCPs board task 31e0a1eb); 62 since
     # MCPs/execution-netboot-diphtheria, the execution suite's netboot lane
     # (MCPs board task d387271d); 63 since MCPs/execution-twin, the
-    # execution suite's twin lane (MCPs board task 83b5c38f). The unprepared
-    # lose MCPs/execution-elevated, whose installer cases MCPs board task
-    # 42fb4e26 deleted.
-    assert len(prepared) == 63
+    # execution suite's twin lane (MCPs board task 83b5c38f); 62 since
+    # session-audit's Windows lane, MCPs/packages/session-audit, was dropped
+    # with the package's Windows code (MCPs board task c8cb0ac5). The
+    # unprepared lose MCPs/execution-elevated, whose installer cases MCPs
+    # board task 42fb4e26 deleted.
+    assert len(prepared) == 62
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -88,8 +90,10 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # 28 since MCPs/execution-testdb (MCPs board task c04519f9, A2); 29 since
     # MCPs/brief-generator (MCPs board task b1089284); 30 since
     # MCPs/packages/session-audit (MCPs board task 55189157); 31 since its
-    # Linux lane, MCPs/packages/session-audit-linux (MCPs board task 31e0a1eb).
-    assert len(databases) == 31
+    # Linux lane, MCPs/packages/session-audit-linux (MCPs board task 31e0a1eb);
+    # 30 again since the package dropped its Windows lane (MCPs board task
+    # c8cb0ac5).
+    assert len(databases) == 30
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
