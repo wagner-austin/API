@@ -12,7 +12,8 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, load_json_str
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core import _test_hooks, remote, runner_load
+from fleet.core import _test_hooks, runner_load
+from fleet.core.ssh_options import SSH_OPTIONS
 from tests._runner_fixtures import a_host, an_install
 from tests.conftest import FakeRun, failed, ok
 
@@ -136,7 +137,7 @@ class TestSampleHost:
         assert sample["total"] == 5
         assert tuple(runner.calls[0]) == (
             "ssh",
-            *remote.SSH_OPTIONS,
+            *SSH_OPTIONS,
             "lavender",
             "ps",
             "-eo",

@@ -18,6 +18,7 @@ from platform_core.mcp_client import McpCredentials
 from fleet.contracts.machine import Machine, MachineRole
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, observe, remote
+from fleet.core.ssh_options import SSH_OPTIONS
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, failed, ok, timed_out
 
@@ -312,7 +313,7 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
     assert "C:/Users/austin/.fleet/observe-sessions.ps1" in run.calls[0][-1]
     assert run.calls[1] == (
         "ssh",
-        *remote.SSH_OPTIONS,
+        *SSH_OPTIONS,
         "serendipity",
         *dialect_windows.POWERSHELL_INVOCATION,
         "C:/Users/austin/.fleet/observe-sessions.ps1",
@@ -388,13 +389,13 @@ def test_observe_node_speaks_sh_to_a_linux_node_and_records_its_machine() -> Non
     assert run.stdin[0] == dialect_linux.OBSERVE_SESSIONS_SCRIPT.encode("utf-8")
     assert run.calls[0] == (
         "ssh",
-        *remote.SSH_OPTIONS,
+        *SSH_OPTIONS,
         "diphtheria",
         dialect_linux.WRITE_COMMAND.format(path=path),
     )
     assert run.calls[1] == (
         "ssh",
-        *remote.SSH_OPTIONS,
+        *SSH_OPTIONS,
         "diphtheria",
         *dialect_linux.SH_INVOCATION,
         path,

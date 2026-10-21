@@ -29,6 +29,7 @@ from fleet.core import (
     stage_repository,
     staging,
 )
+from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import (
     DEMO_DEPENDENCY,
     DEMO_PROJECT,
@@ -58,7 +59,7 @@ def _scp(host: str, remote_path: str) -> tuple[str, ...]:
     Returns:
         The argv :func:`fleet.core.remote.send_file` runs.
     """
-    return ("scp", "-q", *remote.SSH_OPTIONS, str(SOURCE), f"{host}:{remote_path}")
+    return ("scp", "-q", *SSH_OPTIONS, str(SOURCE), f"{host}:{remote_path}")
 
 
 #: The deadline for the real tar calls these tests make over a tiny tree:

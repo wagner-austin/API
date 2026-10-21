@@ -52,6 +52,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect
+from fleet.core.ssh_options import SSH_OPTIONS
 from fleet.core.stderr_tail import stderr_tail
 
 
@@ -134,29 +135,6 @@ def _raise_on(failure: RemoteFailure | None) -> None:
     if failure is not None:
         raise AppError(failure["code"], failure["message"])
 
-
-#: Options every ssh invocation carries.
-#:
-#: ``BatchMode=yes`` makes a missing key fail immediately instead of prompting
-#: for a password no automated caller can answer -- the failure is the point,
-#: because a prompt would hang a dispatch forever.
-#:
-#: ``ServerAliveInterval`` and ``ServerAliveCountMax`` make ssh notice a peer
-#: that went away AFTER the handshake: ``ConnectTimeout`` bounds only the
-#: connection, and a laptop that sleeps mid-command leaves the TCP session
-#: ESTABLISHED with nothing on either end to say so. Measured 2026-09-17
-#: 11:15Z on pendragon (board tasks 35940277 and 41ac6ed2): one such ssh sat
-#: three days. Four missed probes fifteen seconds apart end it in a minute.
-SSH_OPTIONS = (
-    "-o",
-    "BatchMode=yes",
-    "-o",
-    "ConnectTimeout=10",
-    "-o",
-    "ServerAliveInterval=15",
-    "-o",
-    "ServerAliveCountMax=4",
-)
 
 #: The deadline every ssh this module runs carries, in seconds.
 #:
@@ -550,7 +528,6 @@ __all__ = [
     "ROOT_BASH",
     "ROOT_PREFIX",
     "SSH_FAILURE",
-    "SSH_OPTIONS",
     "SSH_TIMEOUT_SECONDS",
     "Answered",
     "RemoteFailure",
