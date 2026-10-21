@@ -152,9 +152,13 @@ def test_this_runs_own_unit_is_named_and_reads_live(
 
 
 @pytest.mark.host_fleet_hub
+@pytest.mark.parametrize("left", ["queued", "failed"])
 def test_the_claim_pass_reports_the_killed_run_lost_and_leaves_the_live_one(
-    units: list[str],
+    units: list[str], left: str
 ) -> None:
+    """Both of the queue's answers to a lost run: ``queued`` the first time,
+    ``failed`` for a job it had requeued before (MCPs reportDispatchRunLost),
+    each returned as the job the pass reported."""
     machine = _test_hooks.hostname()
     killed = start_unit()
     live = start_unit()
@@ -180,7 +184,7 @@ def test_the_claim_pass_reports_the_killed_run_lost_and_leaves_the_live_one(
     endpoint = FakeQueue(
         [
             dump_json_str({"jobs": rows}),
-            dump_json_str({"job": queue_job(status="queued", command="netboot-arm", sha=None)}),
+            dump_json_str({"job": queue_job(status=left, command="netboot-arm", sha=None)}),
         ]
     )
     _test_hooks.http_post = endpoint
@@ -198,4 +202,5 @@ def test_the_claim_pass_reports_the_killed_run_lost_and_leaves_the_live_one(
     assert str(endpoint.arguments[1]["detail"]).startswith(
         f"run {killed} on {machine} is gone: systemctl --user show read ActiveState="
     )
-    assert [job["status"].value for job in reported] == ["queued"]
+    assert endpoint.arguments[1]["action"] == "lost"
+    assert [job["status"].value for job in reported] == [left]
