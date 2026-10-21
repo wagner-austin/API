@@ -7,13 +7,15 @@ $ErrorActionPreference = 'Stop'
 # after the commit API pins, so what is proved is that the PINNED commit's
 # installer runs over the PINNED commit's pins, not main's. That installer is
 # a recording stand-in, because MCPs' real one downloads from the PowerShell
-# Gallery. The last case runs the real one: API's own pin, read out of the
-# MCPs clone beside this checkout, refusing a repository that is not
-# registered, which Save-Module does before any download.
+# Gallery. The last case runs the real one, as the harness running this suite
+# carries it (CORVIS_PS_HARNESS_ROOT, the MCPs tree at API's pin), committed
+# to a world shaped like MCPs, refusing a repository that is not registered,
+# which Save-Module does before any download. It read MCPs from a clone
+# beside this checkout until a push's clean checkout, which has none, refused
+# it (MCPs board task 7ab88e52).
 
 BeforeAll {
     $script:entry = Join-Path (Split-Path -Parent $PSScriptRoot) 'Save-HarnessModules.ps1'
-    $script:apiRoot = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
     # The pinned requirements carry a byte outside ASCII, an e-acute in a
     # comment, so a copy decoded through the console's code page shows.
     $script:pinnedText = "@{ Pester = '5.7.1' } # caf$([char]0xE9)"
@@ -67,6 +69,26 @@ exit $ExitCode
             Parameters = @{ RepoRoot = $api; McpsRoot = $mcps; ModuleRoot = $modules }
             Record = Join-Path $modules 'record.txt'
         }
+    }
+
+    function Initialize-HarnessWorld {
+        # MCPs' real requirements and installer, from the harness's own tree,
+        # as the one commit of a world shaped like MCPs that API's pin names.
+        $root = Join-Path $TestDrive ('real-' + [guid]::NewGuid().ToString('N'))
+        $mcps = Join-Path $root 'MCPs'
+        $api = Join-Path $root 'API'
+        foreach ($relative in @('scripts\powershell-requirements.psd1', 'scripts\ps-harness\Install-HarnessModule.ps1')) {
+            $target = Join-Path $mcps $relative
+            [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $target))
+            [System.IO.File]::Copy((Join-Path $env:CORVIS_PS_HARNESS_ROOT $relative), $target)
+        }
+        [void][System.IO.Directory]::CreateDirectory((Join-Path $api '.githooks'))
+        [void](Invoke-TestGit $mcps @('init', '--quiet'))
+        [void](Invoke-TestGit $mcps @('add', '.'))
+        [void](Invoke-TestGit $mcps @('commit', '--quiet', '-m', 'the harness'))
+        $pin = [string](Invoke-TestGit $mcps @('rev-parse', 'HEAD'))
+        [System.IO.File]::WriteAllText((Join-Path $api '.githooks\mcps-harness.sha'), "$pin`n")
+        return [pscustomobject]@{ Api = $api; Mcps = $mcps; Modules = Join-Path $root 'modules' }
     }
 
     function Invoke-TestEntry {
@@ -125,7 +147,7 @@ Describe 'Saving the modules the pinned harness imports' {
         { Invoke-TestEntry $world.Parameters } |
             Should -Throw "HARNESS_INSTALLER_EXITED: the installer at MCPs $pin exited 3"
     }
-    It 'runs MCPs'' real installer at API''s own pin, which refuses a repository that is not registered' {
+    It 'runs MCPs'' real installer, as the pinned harness carries it, which refuses a repository that is not registered' {
         # In a child PowerShell, because PackageManagement opens a file under
         # TEMP\Microsoft.PackageManagement and holds it for a moment after
         # Save-Module returns: run in the harness worker, the worker's whole
@@ -136,13 +158,13 @@ Describe 'Saving the modules the pinned harness imports' {
         # child's handles close when it exits. Its stderr goes to a file, as
         # the script's own git does: under Stop, PowerShell 5.1 would raise
         # the first stderr line it read from a child as an error here.
-        $modules = Join-Path $TestDrive 'real-modules'
+        $world = Initialize-HarnessWorld
         $stderr = Join-Path $TestDrive 'real-installer.stderr'
         $child = Start-Process -FilePath "$PSHOME\powershell.exe" -ArgumentList @(
             '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script:entry`"",
-            '-RepoRoot', "`"$script:apiRoot`"",
-            '-McpsRoot', "`"$(Join-Path (Split-Path -Parent $script:apiRoot) 'MCPs')`"",
-            '-ModuleRoot', "`"$modules`"", '-Repository', 'NoSuchRepository-test'
+            '-RepoRoot', "`"$($world.Api)`"",
+            '-McpsRoot', "`"$($world.Mcps)`"",
+            '-ModuleRoot', "`"$($world.Modules)`"", '-Repository', 'NoSuchRepository-test'
         ) -RedirectStandardOutput "$stderr.out" -RedirectStandardError $stderr -NoNewWindow -Wait -PassThru
         $child.ExitCode | Should -Be 1
         # The child's console wraps its error record at its own width, mid-word
@@ -155,6 +177,6 @@ Describe 'Saving the modules the pinned harness imports' {
             $said | Should -Match ([regex]::Escape(($expected -replace '\s', '')))
         }
         # The installer created the root before it asked the gallery.
-        [System.IO.Directory]::Exists($modules) | Should -BeTrue
+        [System.IO.Directory]::Exists($world.Modules) | Should -BeTrue
     }
 }
