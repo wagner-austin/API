@@ -1251,8 +1251,12 @@ starts Keycloak and mailpit, so the build runs as execdocker against that
 user's rootless daemon. A push from ziggurat touching one of mcp-proxy's
 Keycloak twins queues it, because a node runs a project's `make check`
 whatever the command (`MAKE_TARGET`), and only `vitest.twin.config.ts`
-includes the twins. It names no node, so any node carrying the tag runs it,
-and it is no deploy gate: `MCPs/execution-deploy` runs the same case.
+includes the twins. Since MCPs board task 94d23062 sent a push's container
+suites to their project's fleet `make test`, the twins, which that run never
+includes, were refused as UNRUNNABLE; before it they ran on ziggurat and
+failed EACCES on `/var/run/docker.sock`. It names no node, so any node
+carrying the tag runs it, and it is no deploy gate: `MCPs/execution-deploy`
+runs the same case.
 
 ## A project that names its node: `node`
 
