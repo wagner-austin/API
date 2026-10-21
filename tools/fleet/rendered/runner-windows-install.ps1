@@ -8,6 +8,9 @@ param(
     [string]$Git = 'git',
     [string]$VariableScope = 'Machine',
     [string]$MachineEnvironment = '[{"Name":"POETRY_CACHE_DIR","Value":"C:\\fleet\\poetry"}]',
+    [string]$JobHookPath = 'C:\fleet\runner-hooks\job-started.ps1',
+    [string]$JobHookVariable = 'ACTIONS_RUNNER_HOOK_JOB_STARTED',
+    [string]$JobHook = 'cGFyYW0oCiAgICBbaW50XSRTdGFydCA9ICRQSUQsCiAgICBbc3RyaW5nXSRXb3JrZXJOYW1lID0gJ1J1bm5lci5Xb3JrZXIuZXhlJwopClNldC1TdHJpY3RNb2RlIC1WZXJzaW9uIExhdGVzdAokRXJyb3JBY3Rpb25QcmVmZXJlbmNlID0gJ1N0b3AnCiRwcm9jZXNzID0gR2V0LUNpbUluc3RhbmNlIFdpbjMyX1Byb2Nlc3MgLUZpbHRlciAiUHJvY2Vzc0lkID0gJFN0YXJ0IgpkbyB7CiAgICAkY2hpbGQgPSAkcHJvY2VzcwogICAgJHByb2Nlc3MgPSBHZXQtQ2ltSW5zdGFuY2UgV2luMzJfUHJvY2VzcyAtRmlsdGVyICJQcm9jZXNzSWQgPSAkKCRjaGlsZC5QYXJlbnRQcm9jZXNzSWQpIEFORCBQcm9jZXNzSWQgPD4gMCIgfAogICAgICAgIFdoZXJlLU9iamVjdCB7ICRfLkNyZWF0aW9uRGF0ZSAtbHQgJGNoaWxkLkNyZWF0aW9uRGF0ZSB9Cn0gd2hpbGUgKCRudWxsIC1uZSAkcHJvY2VzcyAtYW5kICRwcm9jZXNzLk5hbWUgLW5lICRXb3JrZXJOYW1lKQppZiAoJG51bGwgLWVxICRwcm9jZXNzKSB7CiAgICB0aHJvdyAiUlVOTkVSX0pPQl9QUklPUklUWV9GQUlMRUQ6IG5vICRXb3JrZXJOYW1lIGlzIGFtb25nIHRoZSBhbmNlc3RvcnMgb2YgcHJvY2VzcyAkU3RhcnQsIHNvIHRoZSBqb2Igd291bGQgcnVuIGF0IHRoZSBmbGVldCdzIG93biBwcmlvcml0eSIKfQooR2V0LVByb2Nlc3MgLUlkICRwcm9jZXNzLlByb2Nlc3NJZCkuUHJpb3JpdHlDbGFzcyA9IFtTeXN0ZW0uRGlhZ25vc3RpY3MuUHJvY2Vzc1ByaW9yaXR5Q2xhc3NdOjpCZWxvd05vcm1hbAoicnVubmVyIGpvYjogJFdvcmtlck5hbWUgJCgkcHJvY2Vzcy5Qcm9jZXNzSWQpIGFuZCBldmVyeSBwcm9jZXNzIGl0IHN0YXJ0cyBydW4gYXQgQmVsb3dOb3JtYWwsIHVuZGVyIHRoZSBmbGVldCdzIGNoZWNrcyIK',
     [string]$PythonPackageUrl = 'https://www.nuget.org/api/v2/package/python/{0}',
     [string]$PythonName = 'python.exe',
     [int]$StopWaitSeconds = 60,
@@ -41,6 +44,17 @@ foreach ($variable in ($MachineEnvironment | ConvertFrom-Json)) {
         "base: set the machine variable $($variable.Name)"
         $restart = $true
     }
+}
+$jobHookText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($JobHook))
+if (-not (Test-Path -LiteralPath $JobHookPath) -or [IO.File]::ReadAllText($JobHookPath) -cne $jobHookText) {
+    [void][IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($JobHookPath))
+    [IO.File]::WriteAllText($JobHookPath, $jobHookText)
+    "base: wrote the job-started hook $JobHookPath"
+}
+if ([Environment]::GetEnvironmentVariable($JobHookVariable, $VariableScope) -cne $JobHookPath) {
+    [Environment]::SetEnvironmentVariable($JobHookVariable, $JobHookPath, $VariableScope)
+    "base: set the machine variable $JobHookVariable"
+    $restart = $true
 }
 foreach ($install in ($Installs | ConvertFrom-Json)) {
     $root = $install.Root

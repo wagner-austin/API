@@ -12,9 +12,11 @@ entry here, and ``tests/pester`` executes each copy to every command and
 branch. Nothing is added to the harness to see them: a committed render is a
 tracked script like any other, and one no suite runs is PS-NO-SUITE.
 
-Every one but two is the Windows dispatch dialect's. The other two are the
-one Windows runner host's, loki's install and audit
-(:mod:`fleet.core.runner_windows_render`), rendered for one example install;
+Every one but three is the Windows dispatch dialect's. The other three are
+the one Windows runner host's, loki's install and audit
+(:mod:`fleet.core.runner_windows_render`), rendered for one example install,
+and the job-started hook the install lays
+(:mod:`fleet.core.runner_windows_job_render`);
 every Linux runner host's scripts are bash (MCPs board task 1e9ab738).
 The dialect's depend on a dispatch, so they are rendered for one example dispatch
 (:data:`EXAMPLE_STAGE_ROOT`, :data:`EXAMPLE_RUN_ID`): every location they read
@@ -34,6 +36,7 @@ from fleet.core import (
     dialect,
     names,
     retire,
+    runner_windows_job_render,
     runner_windows_render,
     stage_repository,
     verdict,
@@ -176,6 +179,10 @@ def render_all() -> list[RenderedScript]:
         RenderedScript(
             name=runner_windows_render.AUDIT_STEM,
             text=runner_windows_render.committed_audit_script(),
+        ),
+        RenderedScript(
+            name=runner_windows_job_render.JOB_HOOK_STEM,
+            text=runner_windows_job_render.hook_script(),
         ),
     ]
 

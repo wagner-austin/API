@@ -67,6 +67,7 @@ class TestTheCommittedCopies:
             "dialect-build",
             "runner-windows-install",
             "runner-windows-audit",
+            "runner-windows-job-started",
         ]
 
 

@@ -11,6 +11,7 @@ import pytest
 from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
 from fleet.core import (
     runner_windows_base_render,
+    runner_windows_job_render,
     runner_windows_python_render,
     runner_windows_render,
 )
@@ -88,15 +89,15 @@ class TestTheInstallScript:
     def test_the_base_parameters_and_lines_come_before_the_first_runner(self) -> None:
         script = runner_windows_render.committed_install_script()
         lines = script.splitlines()
-        assert _parameter_lines(script)[4:13] == [
+        assert _parameter_lines(script)[4:16] == [
             *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
+            *runner_windows_job_render.parameter_lines(),
             *runner_windows_python_render.PARAMETER_LINES,
             f"    [int]$StopWaitSeconds = {runner_windows_render.STOP_WAIT_SECONDS},",
         ]
         first = lines.index(runner_windows_base_render.INSTALL_LINES[0])
-        assert lines[first : first + len(runner_windows_base_render.INSTALL_LINES)] == list(
-            runner_windows_base_render.INSTALL_LINES
-        )
+        laid = [*runner_windows_base_render.INSTALL_LINES, *runner_windows_job_render.INSTALL_LINES]
+        assert lines[first : first + len(laid)] == laid
         assert first < lines.index("foreach ($install in ($Installs | ConvertFrom-Json)) {")
 
     def test_each_runner_s_tool_cache_is_seeded_after_its_registration_before_its_service(
@@ -165,6 +166,7 @@ class TestTheAudit:
             "param(",
             '    [string]$Sc = "$env:SystemRoot\\System32\\sc.exe",',
             *runner_windows_base_render.parameter_lines(a_windows_host()["base"]),
+            *runner_windows_job_render.parameter_lines(),
             "    [string]$Installs = '["
             '{"Service":"actions.runner.wagner-austin-chat.loki",'
             '"Root":"C:/actions-runner/chat","Python":["3.11.9"]},'
@@ -174,6 +176,9 @@ class TestTheAudit:
             ")",
         ]
         lines = script.splitlines()
+        base = lines.index(runner_windows_base_render.AUDIT_LINES[0])
+        read = [*runner_windows_base_render.AUDIT_LINES, *runner_windows_job_render.AUDIT_LINES]
+        assert lines[base : base + len(read)] == read
         rows = lines.index(runner_windows_python_render.AUDIT_LINES[0])
         assert lines[rows : rows + len(runner_windows_python_render.AUDIT_LINES)] == list(
             runner_windows_python_render.AUDIT_LINES
@@ -200,6 +205,7 @@ class TestTheAudit:
         service = "actions.runner.wagner-austin-chat.loki"
         assert runner_windows_render.expected_checks(host) == [
             *runner_windows_base_render.expected_checks(host["base"]),
+            *runner_windows_job_render.expected_checks(),
             ExpectedCheck(
                 check_id=f"service:{service}",
                 reason=f"{runner_windows_render.SERVICE_REASON}: wagner-austin/chat's runner loki",

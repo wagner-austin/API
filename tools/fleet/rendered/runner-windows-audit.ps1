@@ -6,6 +6,9 @@ param(
     [string]$Git = 'git',
     [string]$VariableScope = 'Machine',
     [string]$MachineEnvironment = '[{"Name":"POETRY_CACHE_DIR","Value":"C:\\fleet\\poetry"}]',
+    [string]$JobHookPath = 'C:\fleet\runner-hooks\job-started.ps1',
+    [string]$JobHookVariable = 'ACTIONS_RUNNER_HOOK_JOB_STARTED',
+    [string]$JobHook = 'cGFyYW0oCiAgICBbaW50XSRTdGFydCA9ICRQSUQsCiAgICBbc3RyaW5nXSRXb3JrZXJOYW1lID0gJ1J1bm5lci5Xb3JrZXIuZXhlJwopClNldC1TdHJpY3RNb2RlIC1WZXJzaW9uIExhdGVzdAokRXJyb3JBY3Rpb25QcmVmZXJlbmNlID0gJ1N0b3AnCiRwcm9jZXNzID0gR2V0LUNpbUluc3RhbmNlIFdpbjMyX1Byb2Nlc3MgLUZpbHRlciAiUHJvY2Vzc0lkID0gJFN0YXJ0IgpkbyB7CiAgICAkY2hpbGQgPSAkcHJvY2VzcwogICAgJHByb2Nlc3MgPSBHZXQtQ2ltSW5zdGFuY2UgV2luMzJfUHJvY2VzcyAtRmlsdGVyICJQcm9jZXNzSWQgPSAkKCRjaGlsZC5QYXJlbnRQcm9jZXNzSWQpIEFORCBQcm9jZXNzSWQgPD4gMCIgfAogICAgICAgIFdoZXJlLU9iamVjdCB7ICRfLkNyZWF0aW9uRGF0ZSAtbHQgJGNoaWxkLkNyZWF0aW9uRGF0ZSB9Cn0gd2hpbGUgKCRudWxsIC1uZSAkcHJvY2VzcyAtYW5kICRwcm9jZXNzLk5hbWUgLW5lICRXb3JrZXJOYW1lKQppZiAoJG51bGwgLWVxICRwcm9jZXNzKSB7CiAgICB0aHJvdyAiUlVOTkVSX0pPQl9QUklPUklUWV9GQUlMRUQ6IG5vICRXb3JrZXJOYW1lIGlzIGFtb25nIHRoZSBhbmNlc3RvcnMgb2YgcHJvY2VzcyAkU3RhcnQsIHNvIHRoZSBqb2Igd291bGQgcnVuIGF0IHRoZSBmbGVldCdzIG93biBwcmlvcml0eSIKfQooR2V0LVByb2Nlc3MgLUlkICRwcm9jZXNzLlByb2Nlc3NJZCkuUHJpb3JpdHlDbGFzcyA9IFtTeXN0ZW0uRGlhZ25vc3RpY3MuUHJvY2Vzc1ByaW9yaXR5Q2xhc3NdOjpCZWxvd05vcm1hbAoicnVubmVyIGpvYjogJFdvcmtlck5hbWUgJCgkcHJvY2Vzcy5Qcm9jZXNzSWQpIGFuZCBldmVyeSBwcm9jZXNzIGl0IHN0YXJ0cyBydW4gYXQgQmVsb3dOb3JtYWwsIHVuZGVyIHRoZSBmbGVldCdzIGNoZWNrcyIK',
     [string]$Installs = '[{"Service":"actions.runner.wagner-austin-chat.loki","Root":"C:/actions-runner/chat","Python":["3.11.9"]}]'
 )
 Set-StrictMode -Version Latest
@@ -40,6 +43,21 @@ foreach ($variable in ($MachineEnvironment | ConvertFrom-Json)) {
     } else {
         "CHECK machine-env:$($variable.Name) DRIFT the machine variable holds: $heldValue"
     }
+}
+$heldHook = ''
+if (Test-Path -LiteralPath $JobHookPath) {
+    $heldHook = [IO.File]::ReadAllText($JobHookPath)
+}
+if ($heldHook -ceq [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($JobHook))) {
+    'CHECK job-hook OK'
+} else {
+    "CHECK job-hook DRIFT $JobHookPath does not hold the job-started hook"
+}
+$heldHookVariable = [string][Environment]::GetEnvironmentVariable($JobHookVariable, $VariableScope)
+if ($heldHookVariable -ceq $JobHookPath) {
+    'CHECK job-hook-variable OK'
+} else {
+    "CHECK job-hook-variable DRIFT $JobHookVariable holds: $heldHookVariable"
 }
 foreach ($install in ($Installs | ConvertFrom-Json)) {
     $service = $install.Service

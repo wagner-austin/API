@@ -16,7 +16,9 @@ machine changes (:mod:`fleet.core.powershell_text` says why the default is a
 string). The runner release is a URL parameter, which a suite serves as a
 ``file://`` archive it built, holding a ``config.cmd`` stand-in. The host's
 base (:mod:`fleet.core.runner_windows_base_render`) runs first and its
-effects are parameters too.
+effects are parameters too, and the job-started hook that runs every job
+below the fleet's priority (:mod:`fleet.core.runner_windows_job_render`)
+is laid right after it.
 
 AN INSTALL IS IDEMPOTENT, step by step. The base writes only what differs;
 the release is unpacked only where ``config.cmd`` is absent and registered
@@ -40,6 +42,7 @@ from platform_core.json_utils import JSONValue, dump_json_str
 from fleet.contracts.runner_windows import WindowsRunnerHost, WindowsRunnerInstall
 from fleet.contracts.runner_windows_base import MachineVariable, WindowsHostBase
 from fleet.core import runner_windows_base_render as base_render
+from fleet.core import runner_windows_job_render as job_render
 from fleet.core import runner_windows_python_render as python_render
 from fleet.core.powershell_text import STRICT_HEADER, system32_parameter
 from fleet.core.runner_audit_types import ExpectedCheck
@@ -285,12 +288,14 @@ def render_install_script(host: WindowsRunnerHost, tokens: Mapping[str, str]) ->
         f"    {system32_parameter('Sc', 'sc.exe')},",
         f"    [hashtable]$Tokens = {_tokens_literal(tokens)},",
         *base_render.parameter_lines(host["base"]),
+        *job_render.parameter_lines(),
         *python_render.PARAMETER_LINES,
         f"    [int]$StopWaitSeconds = {STOP_WAIT_SECONDS},",
         _installs_parameter([_install_row(install) for install in host["installs"]]),
         ")",
         *STRICT_HEADER,
         *base_render.INSTALL_LINES,
+        *job_render.INSTALL_LINES,
         "foreach ($install in ($Installs | ConvertFrom-Json)) {",
         "    $root = $install.Root",
         '    if (-not (Test-Path -LiteralPath "$root/config.cmd")) {',
@@ -347,6 +352,7 @@ def render_audit_script(host: WindowsRunnerHost) -> str:
         "param(",
         f"    {system32_parameter('Sc', 'sc.exe')},",
         *base_render.parameter_lines(host["base"]),
+        *job_render.parameter_lines(),
         _installs_parameter(services),
         ")",
         *STRICT_HEADER,
@@ -356,6 +362,7 @@ def render_audit_script(host: WindowsRunnerHost) -> str:
         "    return [pscustomobject]@{ Code = $LASTEXITCODE; Text = $text.Trim() }",
         "}",
         *base_render.AUDIT_LINES,
+        *job_render.AUDIT_LINES,
         "foreach ($install in ($Installs | ConvertFrom-Json)) {",
         "    $service = $install.Service",
         "    $state = Get-Answer $Sc @('query', $service)",
@@ -398,11 +405,13 @@ def expected_checks(host: WindowsRunnerHost) -> list[ExpectedCheck]:
 
     Returns:
         The base's rows (:func:`fleet.core.runner_windows_base_render.expected_checks`),
-        then per install its state, its configuration, its recovery
-        actions and one row per tool cache version
+        the job-started hook's
+        (:func:`fleet.core.runner_windows_job_render.expected_checks`), then
+        per install its state, its configuration, its recovery actions and
+        one row per tool cache version
         (:func:`fleet.core.runner_windows_python_render.expected_checks`).
     """
-    checks = base_render.expected_checks(host["base"])
+    checks = [*base_render.expected_checks(host["base"]), *job_render.expected_checks()]
     for install in host["installs"]:
         service = install["service"]
         checks += [

@@ -164,13 +164,34 @@ BeforeAll {
             The git stand-in.
         .PARAMETER Variable
             One machine variable's name, or empty for none declared.
+        .PARAMETER NoHook
+            Lay neither the job-started hook nor its variable, as on a stock
+            host; a scratch path and a case variable stand in for both.
         .OUTPUTS
             Hashtable: the parameters.
         #>
-        param([object]$Keys, [object]$Git, [string]$Variable = '')
+        param([object]$Keys, [object]$Git, [string]$Variable = '', [switch]$NoHook)
         $declared = '[]'
         if ($Variable) { $declared = ConvertTo-Json -InputObject @(@{ Name = $Variable; Value = 'C:\fleet\poetry' }) -Compress }
-        return @{ PolicyKey = $Keys.PolicyKey; FileSystemKey = $Keys.FileSystemKey; Git = $Git.Path; VariableScope = 'Process'; MachineEnvironment = $declared }
+        $hookPath = Join-Path $TestDrive ('hook-' + [guid]::NewGuid().ToString('N') + '\job-started.ps1')
+        $hookVariable = Get-CaseVariableName
+        if (-not $NoHook) {
+            [void][System.IO.Directory]::CreateDirectory((Split-Path -Parent $hookPath))
+            [System.IO.File]::WriteAllText($hookPath, (Get-JobHookText))
+            [Environment]::SetEnvironmentVariable($hookVariable, $hookPath, 'Process')
+        }
+        return @{ PolicyKey = $Keys.PolicyKey; FileSystemKey = $Keys.FileSystemKey; Git = $Git.Path; VariableScope = 'Process'; MachineEnvironment = $declared; JobHookPath = $hookPath; JobHookVariable = $hookVariable }
+    }
+
+    function Get-JobHookText {
+        <#
+        .SYNOPSIS
+            The job-started hook as the committed install carries it.
+        .OUTPUTS
+            String: the hook's text.
+        #>
+        $encoded = Get-RenderedDefault 'runner-windows-install' 'JobHook'
+        return [System.Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($encoded))
     }
 
     function Initialize-Release {
@@ -350,18 +371,23 @@ Describe 'The install' {
         $git = Initialize-Git -Held '' -GetExit 1
         $keys = Initialize-RegistryScratch -Policy '' -LongPaths 0
         $variable = Get-CaseVariableName
-        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{} (Get-Base $keys $git $variable)
+        $base = Get-Base $keys $git $variable -NoHook
+        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{} $base
         $printed | Should -Be @(
             'base: set the LocalMachine execution policy to RemoteSigned',
             'base: enabled Win32 long paths',
             'base: set git core.longpaths for the system',
             "base: set the machine variable $variable",
+            "base: wrote the job-started hook $($base.JobHookPath)",
+            "base: set the machine variable $($base.JobHookVariable)",
             "runner: stopped $($script:service) so it starts with the machine variables",
             "runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure"
         )
         (Get-Item -LiteralPath $keys.PolicyKey).GetValue('ExecutionPolicy') | Should -Be 'RemoteSigned'
         (Get-Item -LiteralPath $keys.FileSystemKey).GetValue('LongPathsEnabled') | Should -Be 1
         [Environment]::GetEnvironmentVariable($variable, 'Process') | Should -Be 'C:\fleet\poetry'
+        [System.IO.File]::ReadAllText($base.JobHookPath) | Should -BeExactly (Get-JobHookText)
+        [Environment]::GetEnvironmentVariable($base.JobHookVariable, 'Process') | Should -Be $base.JobHookPath
         Read-CallRecord $git | Should -Be @('config --system --get core.longpaths', 'config --system core.longpaths true')
         Read-CallRecord $sc | Should -Be @(
             "failure $($script:service) reset= 86400 actions= restart/60000/restart/60000/restart/60000",
@@ -370,6 +396,22 @@ Describe 'The install' {
             "query $($script:service)",
             "query $($script:service)",
             "start $($script:service)"
+        )
+    }
+    It 'rewrites a job-started hook that differs, and restarts nothing for it, since each job reads the file' {
+        $root = Initialize-Root -Unpacked -Registered
+        $sc = Initialize-Sc
+        $base = Get-Base (Initialize-RegistryScratch) (Initialize-Git)
+        [System.IO.File]::WriteAllText($base.JobHookPath, 'an older hook')
+        $printed = Invoke-Install $root $sc 'file:///absent.zip' @{} $base
+        $printed | Should -Be @(
+            "base: wrote the job-started hook $($base.JobHookPath)",
+            "runner: wagner-austin/chat runner loki runs as $($script:service), restarted on failure"
+        )
+        [System.IO.File]::ReadAllText($base.JobHookPath) | Should -BeExactly (Get-JobHookText)
+        Read-CallRecord $sc | Should -Be @(
+            "failure $($script:service) reset= 86400 actions= restart/60000/restart/60000/restart/60000",
+            "query $($script:service)"
         )
     }
     It 'refuses to register a runner it holds no token for' {
@@ -460,6 +502,8 @@ Describe 'The audit' {
             'CHECK long-paths OK',
             'CHECK git-longpaths OK',
             "CHECK machine-env:$variable OK",
+            'CHECK job-hook OK',
+            'CHECK job-hook-variable OK',
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) OK",
             "CHECK recovery:$($script:service) OK",
@@ -470,7 +514,7 @@ Describe 'The audit' {
     It 'reads a stock host and a stopped, manual service with no restarts and no Python as DRIFT rows naming what each said' {
         $sc = Initialize-Sc -QueryState '1  STOPPED' -StartType '3   DEMAND_START' -Action 'NONE'
         $variable = Get-CaseVariableName
-        $base = Get-Base (Initialize-RegistryScratch -Policy '' -LongPaths 0) (Initialize-Git -Held '' -GetExit 1) $variable
+        $base = Get-Base (Initialize-RegistryScratch -Policy '' -LongPaths 0) (Initialize-Git -Held '' -GetExit 1) $variable -NoHook
         $root = Initialize-Root
         $python = Join-Path $root '_work\_tool\Python\3.11.9'
         Invoke-Audit $sc $base $root '3.11.9' | Should -Be @(
@@ -478,6 +522,8 @@ Describe 'The audit' {
             'CHECK long-paths DRIFT LongPathsEnabled is: 0',
             'CHECK git-longpaths DRIFT git config --system --get core.longpaths exited 1: ',
             "CHECK machine-env:$variable DRIFT the machine variable holds: ",
+            "CHECK job-hook DRIFT $($base.JobHookPath) does not hold the job-started hook",
+            "CHECK job-hook-variable DRIFT $($base.JobHookVariable) holds: ",
             "CHECK service:$($script:service) DRIFT sc.exe query exited 0: SERVICE_NAME: $($script:service) STATE : 1 STOPPED",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 3 DEMAND_START SERVICE_START_NAME : NT AUTHORITY\SYSTEM",
             "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 0: FAILURE_ACTIONS : NONE",
@@ -486,7 +532,7 @@ Describe 'The audit' {
     }
     It 'reads an automatic service under the runner default account as account drift alone' {
         $rows = Invoke-Audit (Initialize-Sc -StartName 'NT AUTHORITY\NetworkService')
-        $rows[3..5] | Should -Be @(
+        $rows[5..7] | Should -Be @(
             "CHECK service:$($script:service) OK",
             "CHECK account:$($script:service) DRIFT sc.exe qc exited 0: START_TYPE : 2 AUTO_START SERVICE_START_NAME : NT AUTHORITY\NetworkService",
             "CHECK recovery:$($script:service) OK"
@@ -494,8 +540,8 @@ Describe 'The audit' {
     }
     It 'reads a service sc.exe cannot open as drift on every row, and still exits 0' {
         $rows = Invoke-Audit (Initialize-Sc -QueryExit 1060 -QcExit 1060 -QfailureExit 1060)
-        $rows[3] | Should -BeLike "CHECK service:$($script:service) DRIFT sc.exe query exited 1060: *"
-        $rows[4] | Should -BeLike "CHECK account:$($script:service) DRIFT sc.exe qc exited 1060: *"
-        $rows[5] | Should -BeLike "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 1060: *"
+        $rows[5] | Should -BeLike "CHECK service:$($script:service) DRIFT sc.exe query exited 1060: *"
+        $rows[6] | Should -BeLike "CHECK account:$($script:service) DRIFT sc.exe qc exited 1060: *"
+        $rows[7] | Should -BeLike "CHECK recovery:$($script:service) DRIFT sc.exe qfailure exited 1060: *"
     }
 }
