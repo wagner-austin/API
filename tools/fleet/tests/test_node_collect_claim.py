@@ -11,6 +11,7 @@ ssh runner, starting from that state or from the cancel that followed it.
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from urllib.error import URLError
 
@@ -214,37 +215,47 @@ class TestTheNextTick:
 
         assert endpoint.arguments[1]["runId"] == DEMO_RUN_ID
 
-    def test_refuses_a_claim_that_launched_nothing_and_claims_again_in_the_same_tick(
-        self, sourced_config: pathlib.Path
+    @pytest.mark.parametrize("left", ["queued", "failed"])
+    def test_gives_back_a_claim_that_launched_nothing_and_claims_again_in_the_same_tick(
+        self, sourced_config: pathlib.Path, left: str, caplog: pytest.LogCaptureFixture
     ) -> None:
+        """MCPs board task 0866f132: a claim whose tick a fleet roll cut off
+        ran nothing, so it goes back through the queue's lost report, never a
+        refusal; the queue requeues it the first time and fails it the
+        second, and the log says which."""
         _test_hooks.run = FakeRun(list(PROBED))
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [ORPHANED]}),
-                dump_json_str({"job": queue_job(status="refused")}),
+                dump_json_str({"job": queue_job(status=left)}),
                 dump_json_str({"claimed": None}),
             ]
         )
         _test_hooks.http_post = endpoint
 
-        assert node_agent.main(node_argv(sourced_config)) == 0
+        with caplog.at_level(logging.INFO):
+            assert node_agent.main(node_argv(sourced_config)) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
-        assert endpoint.arguments[1]["action"] == "close"
-        assert endpoint.arguments[1]["status"] == "refused"
+        assert endpoint.arguments[1]["action"] == "lost"
+        assert "status" not in endpoint.arguments[1]
         assert endpoint.arguments[1]["detail"] == (
             f"DISPATCH_NOT_LAUNCHED: {DEFAULT_JOB_ID} was claimed on lavender, its start report "
-            "never reached the queue, and nothing was launched; refused so the submitter can "
-            "resubmit it"
+            "never reached the queue, and nothing was launched, so the job is given back"
         )
+        assert (
+            f"launched nothing, so it is given back and the queue left it {left}; its host "
+            "claim on lavender is discharged"
+        ) in caplog.text
 
-    def test_a_refused_claim_stops_charging_its_host_in_the_tick_that_refuses_it(
+    def test_a_given_back_claim_stops_charging_its_host_in_the_tick_that_gives_it_back(
         self, sourced_config: pathlib.Path
     ) -> None:
         """MCPs board task 3f7d40fe. A tick killed mid-launch leaves the
         claim file its launch would have removed, as the hub runner's restart
-        at 2026-10-16T07:10:08Z left six; until the refusal removed it, the
-        host was charged for it until its lease lapsed an hour later."""
+        at 2026-10-16T07:10:08Z left six; until the collect removed it, the
+        host was charged for it until its lease lapsed an hour later. The
+        give-back of board task 0866f132 removes it in the same tick."""
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         host_claims.record(
             loaded.host_claims,
@@ -262,7 +273,7 @@ class TestTheNextTick:
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [ORPHANED]}),
-                dump_json_str({"job": queue_job(status="refused")}),
+                dump_json_str({"job": queue_job(status="queued")}),
                 dump_json_str({"claimed": None}),
             ]
         )
@@ -270,7 +281,7 @@ class TestTheNextTick:
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
-        assert endpoint.arguments[1]["status"] == "refused"
+        assert endpoint.arguments[1]["action"] == "lost"
         claims = host_claims.claims_directory(loaded.host_claims, alias="lavender")
         assert list(claims.iterdir()) == []
         assert host_claims.host_load(

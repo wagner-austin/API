@@ -59,7 +59,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, job_close, node_lost
+from fleet.cli import _config, node_lost
 from fleet.cli import collect as collect_cli
 from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
@@ -70,6 +70,7 @@ from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import require_node, require_project
 from fleet.core import _test_hooks, collect, host_claims, queue, queue_listing, retire_owed, stop
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS, launched_within
+from fleet.core.queue_lost import report_lost
 
 _log = get_logger(__name__)
 
@@ -281,7 +282,18 @@ def reconcile_claim(
     alias: str,
     running: frozenset[str],
 ) -> Reconciled:
-    """Adopt the run a claim launched, or refuse a claim that launched nothing.
+    """Adopt the run a claim launched, or give back a claim that launched nothing.
+
+    A claim that launched nothing ran nothing: its tick was cut off before
+    the start report, as a fleet roll or a runner restart does (MCPs board
+    task 0866f132: at 2026-10-21T04:46:17Z the roll of API 7b3dc2512 replaced
+    loki's elevated tick three minutes into 1bcd5184's launch). Refusing it
+    judged a job that never ran and left the rerun to its submitter, and the
+    audit's gatherer never resubmits, so db32d739's audit read its check as
+    unverifiable. It is given back through the queue's lost report, as a
+    launch that cannot reach its node is (:mod:`fleet.cli.node_launch`): the
+    queue requeues it once and fails it on a second loss, so a launch that
+    kills its own tick cannot loop.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -305,19 +317,26 @@ def reconcile_claim(
     )
     row = launched_by_claim(rows, job, alias=alias)
     if row is None:
-        detail = (
-            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {job['job_id']} was claimed on "
-            f"{alias}, its start report never reached the queue, and nothing was launched; "
-            "refused so the submitter can resubmit it"
+        answered = report_lost(
+            credentials,
+            job_id=job["job_id"],
+            detail=(
+                f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {job['job_id']} was claimed on "
+                f"{alias}, its start report never reached the queue, and nothing was launched, "
+                "so the job is given back"
+            ),
+            identity=identity,
         )
-        job_close.refuse(credentials, job, identity, detail=detail)
         # The launch that would have removed its host claim never ended: its
         # tick was killed (MCPs board task 3f7d40fe), so the claim is removed
         # here, or it charges the host until its lease lapses an hour later.
-        # The refusal logged itself; this line says what followed it.
         host_claims.discharge(loaded.host_claims, alias=alias, job_id=job["job_id"])
         return Reconciled(
-            line=f"{encode_job_line(job)}: its host claim on {alias} is discharged", adopted=None
+            line=(
+                f"{encode_job_line(job)}: launched nothing, so it is given back and the queue "
+                f"left it {answered['status'].value}; its host claim on {alias} is discharged"
+            ),
+            adopted=None,
         )
     queue.report_start(
         credentials,
