@@ -75,6 +75,46 @@ def test_the_tests_run_after_commit_tasks_and_before_any_remote_ends_the_hook() 
     assert "set -eu" in text.split("\n")
 
 
+def test_a_push_that_only_stages_a_tip_ends_the_hook_before_any_check() -> None:
+    """pushed-tests stages a container suite's tip as refs/heads/pushed-tests/<tip>
+    from inside pre-push, and that nested push runs this hook again; without
+    the exit it ran pushed-tests over the same tip and staged it again, about
+    45 processes deep on 2026-10-21 (MCPs board task 703fec5a). The exit is
+    maketools' push-staging over every update git hands the hook, read before
+    the first check, and only its 0 ends the hook: 3 goes on, anything else
+    refuses."""
+    text = (ROOT / ".githooks" / "pre-push").read_text(encoding="utf-8").replace("\r\n", "\n")
+    start = text.index("# A PUSH THAT ONLY STAGES A TIP FOR ITS FLEET RUN")
+    end = text.index("\nfi\n", start)
+    assert text.index('PUSH_INPUT="$(cat)"') < start < text.index("# EVERY COMMIT NAMES ITS TASK")
+    lines = [
+        line.strip()
+        for line in text[start:end].split("\n")
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert lines == [
+        'STAGING_UPDATES=""',
+        "while read -r _st_local_ref st_local_sha st_remote_ref _st_remote_sha; do",
+        '[ -z "$st_local_sha" ] && continue',
+        'STAGING_UPDATES="$STAGING_UPDATES $st_local_sha:$st_remote_ref"',
+        "done <<EOF",
+        "$PUSH_INPUT",
+        "EOF",
+        'if [ -n "$STAGING_UPDATES" ]; then',
+        "staging_status=0",
+        '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" push-staging '
+        "$STAGING_UPDATES < /dev/null || staging_status=$?",
+        'if [ "$staging_status" -eq 0 ]; then',
+        "exit 0",
+        "fi",
+        'if [ "$staging_status" -ne 3 ]; then',
+        'echo "=== PRE-PUSH BLOCKED: push-staging exited $staging_status, so whether this '
+        'push only stages a tip is unknown ==="',
+        "exit 1",
+        "fi",
+    ]
+
+
 def test_this_repository_declares_the_roots_ci_selects_its_packages_by() -> None:
     """The roots are stated once: the file pushed-tests reads from the tip is
     the one CI's package selection reads, run here as the workflow runs it.
