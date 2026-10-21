@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import hashlib
 import io
-import os
 import pathlib
 import subprocess
 import zipfile
 
 import pytest
 
-from fleet.core import names, stage_repository
+from fleet.core import _test_hooks, names, stage_repository
 
 #: The loose-object directory ``git gc --auto`` samples to estimate how many
 #: loose objects a repository holds: past ``ceil(gc.auto / 256)`` objects in
@@ -228,14 +227,17 @@ class TestKeepBytes:
 
     LINE_ENDING_WARNING = "LF will be replaced by CRLF"
 
-    def _node_like(self, tmp_path: pathlib.Path) -> tuple[pathlib.Path, dict[str, str]]:
-        """Three LF files to stage, and an environment whose git converts line endings.
+    def _node_like(
+        self, tmp_path: pathlib.Path
+    ) -> tuple[pathlib.Path, tuple[tuple[str, str], ...]]:
+        """Three LF files to stage, and the variables that make git convert line endings.
 
         Args:
             tmp_path: Where the tree and the global configuration are made.
 
         Returns:
-            The tree, and the environment naming that configuration.
+            The tree, and the variables naming that configuration as git's
+            global one and leaving out the system's.
         """
         tree = tmp_path / "run"
         tree.mkdir()
@@ -243,29 +245,25 @@ class TestKeepBytes:
             (tree / f"file{index}.txt").write_bytes(b"line one\nline two\n")
         configuration = tmp_path / "node.gitconfig"
         configuration.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
-        environment = {
-            **os.environ,
-            "GIT_CONFIG_GLOBAL": str(configuration),
-            "GIT_CONFIG_NOSYSTEM": "1",
-        }
-        return tree, environment
+        return tree, (("GIT_CONFIG_GLOBAL", str(configuration)), ("GIT_CONFIG_NOSYSTEM", "1"))
 
-    def _stderr_of(self, commands: tuple[tuple[str, ...], ...], environment: dict[str, str]) -> str:
-        """Run commands for real and answer what they wrote to stderr.
+    def _stderr_of(
+        self, commands: tuple[tuple[str, ...], ...], variables: tuple[tuple[str, str], ...]
+    ) -> str:
+        """Run commands for real through the package's own runner and answer their stderr.
 
         Args:
             commands: The argument vectors, in order.
-            environment: The environment each runs in.
+            variables: The variables each runs with.
 
         Returns:
             Their standard error, joined.
         """
-        said = [
-            subprocess.run(
-                command, check=True, capture_output=True, text=True, timeout=60, env=environment
-            ).stderr
-            for command in commands
-        ]
+        said: list[str] = []
+        for command in commands:
+            result = _test_hooks.run(command, timeout_seconds=60, set_env=variables)
+            assert result["returncode"] == 0, result["stderr"]
+            said.append(result["stderr"])
         return "".join(said)
 
     def test_without_the_setting_the_index_step_warns_once_per_file(
