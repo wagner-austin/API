@@ -150,6 +150,7 @@ class TestClaim:
             "submitted_by": "opus-dispatch-0905",
             "session_id": "11111111-aaaa-4aaa-8aaa-111111111111",
             "session_target": None,
+            "session_reason": None,
             "sha": DEFAULT_SHA,
             "required_tags": (),
             "task_id": None,
