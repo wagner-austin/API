@@ -175,20 +175,21 @@ def test_lenovold_refuses_the_shared_library_suite_and_no_other_node_does() -> N
             "until its own lease expired underneath it."
         ),
     }
-    granted = {
-        name: assess(node, _idle(node), project, node_tags(node))["workers"]
+    # Every other node that claims work admits it, read by property rather
+    # than by each node's worker count: a netboot reimage rewrites a
+    # worker's roster file with what its provision measured (MCPs board
+    # task 9fa23d42), and it should fail here only if it makes that node
+    # refuse. diphtheria refuses because it checks only its pinned suites.
+    refused = {
+        name: verdict["code"]
         for name, node in workspace["nodes"].items()
+        if node["enabled"]
+        for verdict in (assess(node, _idle(node), project, node_tags(node)),)
+        if verdict["code"] is not None
     }
-    assert granted == {
-        "colossus": 4,
-        "diphtheria": 0,
-        "lacrymal": 9,
-        "lavender": 4,
-        "lenovold": 0,
-        "loki": 5,
-        "pendragon": 0,
-        "sedona": 9,
-        "serendipity": 3,
+    assert refused == {
+        "diphtheria": FleetErrorCode.NODE_NOT_PINNED,
+        "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
     }
 
 

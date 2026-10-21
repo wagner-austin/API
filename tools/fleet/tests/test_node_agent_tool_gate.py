@@ -16,7 +16,7 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import node_agent
 from fleet.contracts.project import encode_project_config
@@ -25,7 +25,7 @@ from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_document
 from tests._queue_fakes import FakeQueue
 from tests._registry import shipped_document, write_registry
-from tests._roster_fixtures import machine_of
+from tests._roster_fixtures import dispatch_document, machine_document
 from tests._toolchain_fixtures import LAVENDER_2026_09_23
 from tests.conftest import DEMO_PROJECT, FakeRun, ok
 
@@ -41,6 +41,31 @@ WAITING = ("libs/platform_core", "tools/fleet", "tools/maketools")
 PENDRAGON_ROOM = "free_ram_gb=9.0\nfree_disk_gb=400.0\nreserved_cores=0\n"
 
 
+def pendragon_2026_10_02() -> JSONObject:
+    """pendragon's machine file as the replayed tick read it: the Windows worker it was then.
+
+    Written out rather than read from the shipped roster, because a netboot
+    reimage rewrites that file (MCPs board task 9fa23d42): on 2026-10-21 it
+    became a Linux install, and a replay of the Windows tick must not change
+    with it.
+
+    Returns:
+        The machine's object: a Windows worker with 16 logical cores and
+        11.7 GB, its owner's 2 cores and 1.5 GB reserved.
+    """
+    dispatch = dispatch_document()
+    dispatch["ram_gb"] = 11.7
+    dispatch["budget"] = {
+        "reserved_cores": 2,
+        "reserved_ram_gb": 1.5,
+        "worker_ram_gb": 1.1,
+        "max_disk_gb": 40.0,
+        "checks_at_once": None,
+        "pinned_checks_only": False,
+    }
+    return machine_document(role="worker", platform="windows", dispatch=dispatch)
+
+
 @pytest.fixture(name="pendragon_config")
 def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
     """The shared workspace with pendragon as its node and the real projects beside the demo.
@@ -51,14 +76,9 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
     Returns:
         The same path, rewritten.
     """
-    shipped = shipped_document()
-    real = decode_fleet_workspace(shipped)
+    real = decode_fleet_workspace(shipped_document())
     document = sourced_document((NPM_CI,))
-    pendragon = machine_of(shipped, "pendragon")
-    # The replayed tick ran while pendragon served; the roster disables it
-    # while it is reinstalled, which is not the state this case replays.
-    pendragon["enabled"] = True
-    document["machines"] = {"pendragon": pendragon}
+    document["machines"] = {"pendragon": pendragon_2026_10_02()}
     projects = document["projects"]
     assert isinstance(projects, dict)
     for name in (GRANDMA, *WAITING):
