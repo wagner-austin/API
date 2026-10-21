@@ -54,7 +54,11 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
     shipped = shipped_document()
     real = decode_fleet_workspace(shipped)
     document = sourced_document((NPM_CI,))
-    document["machines"] = {"pendragon": machine_of(shipped, "pendragon")}
+    pendragon = machine_of(shipped, "pendragon")
+    # The replayed tick ran while pendragon served; the roster disables it
+    # while it is reinstalled, which is not the state this case replays.
+    pendragon["enabled"] = True
+    document["machines"] = {"pendragon": pendragon}
     projects = document["projects"]
     assert isinstance(projects, dict)
     for name in (GRANDMA, *WAITING):

@@ -2,7 +2,7 @@
   "role": "worker",
   "platform": "windows",
   "user": "austi",
-  "enabled": true,
+  "enabled": false,
   "disabledUntil": null,
   "duties": [],
   "ledger_observer": "fleet-arm",
