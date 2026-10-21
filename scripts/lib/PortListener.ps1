@@ -2,11 +2,12 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 # Which processes listen on a local TCP port: the one read behind every API
-# script that waits for a port to open or refuses one already held
-# (clients/RustedWarfareBot's RwMake.ps1 and tools/fleet's
-# install-windows-testdb.ps1, which each carried their own copy until board
-# task 2a044a37; services/grandma-api's GrandmaService.ps1 was a third until
-# its Windows host mode was deleted for board task 703fec5a).
+# script that waits for a port to open or refuses one already held, which is
+# now tools/fleet's install-windows-testdb.ps1 alone, on loki. Until board task
+# 2a044a37 each caller carried its own copy; services/grandma-api's
+# GrandmaService.ps1 left with its Windows host mode (board task 703fec5a) and
+# clients/RustedWarfareBot's RwMake.ps1 with its PowerShell make scripts
+# (board task 0eae9619).
 #
 # READ FROM CIM, NOT FROM Get-NetTCPConnection. The cmdlet reads the same
 # class, MSFT_NetTCPConnection, but answers a query matching nothing by
