@@ -126,16 +126,31 @@ Describe 'Saving the modules the pinned harness imports' {
             Should -Throw "HARNESS_INSTALLER_EXITED: the installer at MCPs $pin exited 3"
     }
     It 'runs MCPs'' real installer at API''s own pin, which refuses a repository that is not registered' {
+        # In a child PowerShell, because PackageManagement opens a file under
+        # TEMP\Microsoft.PackageManagement and holds it for a moment after
+        # Save-Module returns: run in the harness worker, the worker's whole
+        # delete of its TEMP failed on it ('The process cannot access the
+        # file avwdgobd.qwq'), the worker died and the suite reported no
+        # result (fleet job 5f279820 on loki, MCPs board task 2a044a37;
+        # reproduced there, where a second delete 500 ms later succeeds). A
+        # child's handles close when it exits. Its stderr goes to a file, as
+        # the script's own git does: under Stop, PowerShell 5.1 would raise
+        # the first stderr line it read from a child as an error here.
         $modules = Join-Path $TestDrive 'real-modules'
-        $parameters = @{
-            RepoRoot = $script:apiRoot
-            McpsRoot = Join-Path (Split-Path -Parent $script:apiRoot) 'MCPs'
-            ModuleRoot = $modules
-            Repository = 'NoSuchRepository-test'
-        }
-        { Invoke-TestEntry $parameters } | Should -Throw `
-            -ExpectedMessage "Unable to find repository 'NoSuchRepository-test'. Use Get-PSRepository to see all available repositories." `
-            -ErrorId 'SourceNotFound,Microsoft.PowerShell.PackageManagement.Cmdlets.GetPackageSource'
+        $stderr = Join-Path $TestDrive 'real-installer.stderr'
+        $child = Start-Process -FilePath "$PSHOME\powershell.exe" -ArgumentList @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$script:entry`"",
+            '-RepoRoot', "`"$script:apiRoot`"",
+            '-McpsRoot', "`"$(Join-Path (Split-Path -Parent $script:apiRoot) 'MCPs')`"",
+            '-ModuleRoot', "`"$modules`"", '-Repository', 'NoSuchRepository-test'
+        ) -RedirectStandardOutput "$stderr.out" -RedirectStandardError $stderr -NoNewWindow -Wait -PassThru
+        $child.ExitCode | Should -Be 1
+        # The child's console wraps its error record, so whitespace is collapsed.
+        $said = [System.IO.File]::ReadAllText($stderr) -replace '\s+', ' '
+        $said | Should -Match ([regex]::Escape(
+                "Unable to find repository 'NoSuchRepository-test'. Use Get-PSRepository to see all available repositories."))
+        $said | Should -Match ([regex]::Escape(
+                'FullyQualifiedErrorId : SourceNotFound,Microsoft.PowerShell.PackageManagement.Cmdlets.GetPackageSource'))
         # The installer created the root before it asked the gallery.
         [System.IO.Directory]::Exists($modules) | Should -BeTrue
     }
