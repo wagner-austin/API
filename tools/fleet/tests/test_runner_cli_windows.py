@@ -59,6 +59,8 @@ class TestTheAudit:
             "loki OK long-paths",
             "loki OK git-longpaths",
             "loki OK machine-env:POETRY_CACHE_DIR",
+            "loki OK job-hook",
+            "loki OK job-hook-variable",
             f"loki OK service:{_SERVICE}",
             f"loki OK account:{_SERVICE}",
             f"loki OK recovery:{_SERVICE}",
