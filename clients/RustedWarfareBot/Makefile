@@ -16,13 +16,13 @@ help:
 	@echo ""
 	@echo "Code health:"
 	@echo "  make check                       lint + sources + test (the gate, on any clean checkout)"
-	@echo "  make execution                   agent-selftest against the pinned game (Windows hub only)"
+	@echo "  make execution                   agent-selftest against the pinned game (needs it at $(GAME_DIR))"
 	@echo "  make lint                        guard + ruff + mypy over src, tests, scripts"
 	@echo "  make test                        pytest + coverage (100% statements and branches)"
 	@echo "  make sources                     wiki provenance and navigation gate"
 	@echo "  make install                     poetry install"
 	@echo ""
-	@echo "Game probes (need the pinned copy at $(GAME_DIR), Windows hub only):"
+	@echo "Game probes (need the pinned Linux depot at $(GAME_DIR), PROBE_DISPLAY=N starts an X server):"
 	@echo "  make boot-probe                  headless boot, archive the engine log"
 	@echo "  make unit-dump                   -printunits stat catalogue"
 	@echo "  make type-flags                  placement rules from the live type registry"
@@ -38,20 +38,20 @@ help:
 	@echo "                                   INCOME_STAGES=4 INCOME_IDLE=200 INCOME_LOG=runs/income.log"
 	@echo "  make sweep                       play a batch of matches in parallel, resumably"
 	@echo "                                   SWEEP_JOBS=sweeps/x.txt SWEEP_NAME=x SWEEP_WORKERS=4"
-	@echo "  make watch                       one windowed match a human can watch (Windows hub)"
+	@echo "  make watch                       one windowed match a human can watch (needs a desktop)"
 	@echo "  make fleet                       match fleet manager UI on 127.0.0.1:27500 (spawn/kill/restart parallel matches)"
 	@echo "                                   WATCH_DIFFICULTY=3 WATCH_DOCTRINE=doctrines/aa-counter-guard.doctrine"
-	@echo "  make host                        bot-hosted LAN game a human can join (Windows hub)"
-	@echo "  make door                        match-service HTTP door, detached (port 27501, Windows hub)"
-	@echo "  make fleet-up                    start any missing match workers, detached (Windows hub)"
+	@echo "  make host                        bot-hosted LAN game a human can join"
+	@echo "  make door                        match-service HTTP door, detached (port 27501)"
+	@echo "  make fleet-up                    start any missing match workers, detached"
 	@echo "                                   HOST_MAP=maps/skirmish/[p2]duel_lake.tmx"
 	@echo ""
-	@echo "Java agent (the pinned game's jvm64 is a Windows JDK, so Windows hub only):"
+	@echo "Java agent (built with the host JDK on PATH, as the game's depot ships only a JRE):"
 	@echo "  make agent                       compile + jar the javaagent"
 	@echo "  make agent-selftest              patch the real jar, verify via the JVM verifier (make execution runs it)"
 	@echo ""
 	@echo "Static analysis:"
-	@echo "  make decompile                   CFR the pinned jar into a readable tree (gitignored, Windows hub)"
+	@echo "  make decompile                   CFR the pinned jar into a readable tree (gitignored)"
 	@echo ""
 
 install:
@@ -134,34 +134,9 @@ _check-unbudgeted: lint sources | test
 # in the pinned jar and lets the game's own JVM verifier certify the result, so
 # a patcher regression or an obfuscated name that moved in a game update fails
 # here rather than inside a live engine. Run it after any agent or game change,
-# on the hub that holds the game. Nothing skips: without the game it fails on
-# the missing JDK, and off Windows it fails by name.
+# on a machine that holds the game and a JDK. Nothing skips: without the game
+# it fails on the missing runtime, and without a JDK on the missing javac.
 execution: agent-selftest
-
-# The javaagent compiles with the game's OWN bundled JDK 13, so the compiler
-# matches the runtime exactly, and targets Java 11 bytecode for headroom. No
-# third-party libraries by design: the agent loads into the game's classloader
-# beside obfuscated 1.15 classes, where every dependency is a conflict surface.
-JAVAC ?= $(GAME_DIR)/jvm64/bin/javac.exe
-JAVA ?= $(GAME_DIR)/jvm64/bin/java.exe
-JAR ?= $(GAME_DIR)/jvm64/bin/jar.exe
-AGENT_JAR := agent/build/rw-agent.jar
-
-# Bytecode level the agent is compiled to, and it is NOT a preference.
-#
-# The oldest JVM the agent must load into is the Linux depot's JRE 1.8.0_131,
-# whose class-file ceiling is 52. A class above a JVM's level does not
-# degrade -- it fails at load with UnsupportedClassVersionError, fatally,
-# before the game starts.
-#
-# This recipe built with `--release 11` until 2026-08-30 while
-# rw_bot.harness.agent_build.JAVA_RELEASE said 8, and the jar that ships is
-# this recipe's. The staged agent was class version 55 and aborted the JVM on
-# the first Linux launch. The two are held equal by
-# tests/test_agent_release.py, which is what makes this comment load-bearing
-# rather than decorative.
-AGENT_RELEASE := 8
-AGENT_CP := $(AGENT_JAR);$(GAME_DIR)/game-lib.jar;$(GAME_DIR)/libs/*
 
 # Pin the engine's generator so repeated runs face the same opponent choices.
 # 0 leaves it alone, which is the honest default: a run that silently became
@@ -179,14 +154,6 @@ PLAY_SETTLE ?= 22
 # was reported as never firing, because the confirmation was grepped for in the
 # game's file rather than the agent's.
 PLAY_LOG ?= runs/play.log
-# Owned by rw_bot.harness.launch (CATALOGUE / TYPE_DUMP), which is what the
-# play launcher defaults to and what a sweep therefore runs under. These two
-# remain only because `host` and `watch` are still PowerShell recipes -- they
-# drive an interactive session on this workstation and have no cluster
-# equivalent, so they were deliberately not ported with `play`. Keep them
-# equal to the module's constants until those recipes follow.
-CATALOGUE := wiki/sources/m0-probe/printunits.log
-TYPE_DUMP := wiki/sources/m11-pools/type-flags.ndjson
 
 # Which planner the harness drives, and what to pass it after the three paths
 # every planner takes. Parameterised so a probe reuses this recipe rather than
@@ -240,8 +207,8 @@ PLAY_EXTRA_AGENT ?=
 
 # How many extractors the income probe builds, and how long it stands still
 # between each one. Target-specific variables rather than a recursive $(MAKE):
-# the argument list contains a space, and quoting it through a sub-make under
-# PowerShell splits it into a stray target.
+# the argument list contains a space, and quoting it through a sub-make split
+# it into a stray target.
 INCOME_STAGES ?= 4
 INCOME_IDLE ?= 200
 INCOME_LOG ?= runs/income.log
@@ -259,8 +226,10 @@ PLAY_PORT_HIGH := 27999
 # It was scripts/make/play.ps1 until the cluster port. PowerShell cannot start
 # a match on a Linux compute node, and a second shell script beside the first
 # would be two launchers to keep in step -- with a missed edit meaning a batch
-# that runs the wrong configuration and still files a scorecard. One launcher,
-# both platforms; this recipe is now just the variables it is given.
+# that runs the wrong configuration and still files a scorecard. One launcher
+# for the workstation and the cluster; this recipe is just the variables it is
+# given. Every other game recipe below followed it on 2026-10-21 (board task
+# 0eae9619), each one a module under rw_bot.harness or scripts.
 #
 # The port was ``PLAY_PORT := $(shell python -c "...randint...")`` until the
 # portable grammar: ``$(shell`` runs the platform shell, so the draw moves into
@@ -270,11 +239,12 @@ PLAY_PORT_HIGH := 27999
 # same number. The launcher prints the port it bound.
 #
 # The optional flags are appended with $(if ...) rather than passed empty.
-# Make hands the recipe to PowerShell, which DROPS an empty argument entirely
-# -- so `--map ""` arrived as a bare `--map` and swallowed the next flag as
-# its value ("--map requires a value, got the flag '--opponents'"). Omitting
-# them is also what a sweep does (rw_bot.harness.sweep.make_argv), so both
-# callers now spell "not asked for" the same way: absent.
+# PowerShell, which ran these recipes until 2026-10-21, DROPPED an empty
+# argument entirely -- so `--map ""` arrived as a bare `--map` and swallowed
+# the next flag as its value ("--map requires a value, got the flag
+# '--opponents'"). Omitting them is also what a sweep does
+# (rw_bot.harness.sweep.make_argv), so both callers spell "not asked for" the
+# same way: absent.
 play:
 	@echo ""
 	@echo "=== play (headless match, port drawn from $(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH), log: $(PLAY_LOG))"
@@ -351,11 +321,15 @@ sweep: agent
 # wiki/sources/ as an excerpt, the same discipline the javap artifacts follow.
 #
 # CFR is pinned by version: a decompiler is a heuristic, and an unpinned one
-# would silently change the source we reason about between runs.
+# would silently change the source we reason about between runs. The body is
+# rw_bot.harness.decompile_cli, which fetches the pinned jar into .tools once.
 CFR_VERSION ?= 0.152
-CFR_JAR := .tools/cfr-$(CFR_VERSION).jar
-CFR_URL := https://repo1.maven.org/maven2/org/benf/cfr/$(CFR_VERSION)/cfr-$(CFR_VERSION).jar
 DECOMPILED ?= .decompiled
+
+# An X display the probes start their own server on (xvfb-run), or 0 for the
+# machine's own. -nodisplay still opens a display ([[harness-nodisplay]]), so a
+# headless node needs one; a desktop does not.
+PROBE_DISPLAY ?= 0
 
 # Headless engine boot writes the engine log to the path given by LOG
 # (default: a timestamped file under runs/). Uses the flag set proven in
@@ -414,43 +388,32 @@ WATCH_SAMPLES ?= 20000
 WATCH_DOCTRINE ?= doctrines/flame-nocover.doctrine
 WATCH_LOG ?= runs/watch.log
 
-# Everything below drives the pinned game copy through its bundled jvm64, a
-# Windows JDK, or a PowerShell script under scripts/make that does; none of it
-# has a meaning off the hub, so it is fenced and the else arm says why.
-ifeq ($(OS),Windows_NT)
-# ":=" and not "?=", which cost a debugging round. A "?=" variable is
-# recursively expanded, so $(shell ...) re-runs on every single reference: the
-# game bound one port, the readiness poll watched a second, the planner dialled
-# a third, and the error message named a fourth. Expanding once is the whole
-# fix. A command-line override still wins over ":=". Only host and watch
-# still read it; play draws its own through the launcher.
-PLAY_PORT := $(shell python -c "import random; print(random.randint($(PLAY_PORT_LOW), $(PLAY_PORT_HIGH)))")
+# Everything below drives the pinned game copy, the Linux depot at GAME_DIR,
+# through a module that composes and runs it: rw_bot.harness.probe_cli for the
+# probes, agent_cli for the agent, decompile_cli for CFR, interactive_cli for a
+# watched or hosted game, scripts.service_up for the match service. Each was a
+# PowerShell script under scripts/make until 2026-10-21 (board task 0eae9619).
+PROBE := poetry run python -m rw_bot.harness.probe_cli
 
 boot-probe:
-	@Write-Host ""
-	@Write-Host "==> boot-probe (headless, log: $(LOG))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force (Split-Path -Parent "$(LOG)") | Out-Null
-	$$log = (Resolve-Path -LiteralPath ".").Path + "\\$(LOG)"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -width 800 -height 600 -log $$log } finally { Pop-Location }
+	@echo ""
+	@echo "=== boot-probe (headless, log: $(LOG))"
+	$(PROBE) --kind boot --game-dir "$(GAME_DIR)" --log "$(LOG)" --display $(PROBE_DISPLAY)
 
 # Builds the runtime jar, which is what a game attaches with -javaagent.
 #
-# Compiles into a per-invocation directory and moves the finished jar into
-# place, so two agents building at once cannot interleave class files or
-# publish a half-written jar. Replacing the jar still fails while a game holds
-# it open -- that is the operating system, not something a build can route
-# around -- so the failure says which cause to look for instead of surfacing as
-# a bare "Device or resource busy".
-#
-# Move-Item needs -ErrorAction Stop for that catch to fire at all. Without it
-# the failure is non-terminating: PowerShell prints the error, skips the catch,
-# leaves $failed empty, and the target reports a successful build over a jar it
-# never replaced. Observed -- a stale jar reported as built while a game held
-# it open.
+# Compiles into a per-invocation directory with the host JDK at
+# rw_bot.harness.agent_build.JAVA_RELEASE, the level the depot's Java 8 loads,
+# and publishes the finished jar in one rename, so two agents building at once
+# cannot interleave class files or publish a half-written jar. The rename is
+# read back: the PowerShell recipe once reported a build over a jar it never
+# replaced. No third-party libraries by design: the agent loads into the game's
+# classloader beside obfuscated 1.15 classes, where every dependency is a
+# conflict surface.
 agent:
-	@Write-Host ""
-	@Write-Host "==> agent (javac --release $(AGENT_RELEASE), zero third-party deps)" -ForegroundColor Cyan
-	& scripts/make/agent.ps1 -Javac "$(JAVAC)" -Jar "$(JAR)" -AgentJar "$(AGENT_JAR)" -Release "$(AGENT_RELEASE)"
-	@Write-Host "[agent] built $(AGENT_JAR)" -ForegroundColor Green
+	@echo ""
+	@echo "=== agent (host JDK, zero third-party deps)"
+	poetry run python -m rw_bot.harness.agent_cli build
 
 # Patches every Targets entry in the real pinned jar and DEFINES each result,
 # so the JVM's own bytecode verifier -- not a second reading by the code that
@@ -463,134 +426,68 @@ agent:
 # gate pass while a game is running: a JVM with the agent attached holds
 # rw-agent.jar open, and a gate that rebuilt it would fail for a reason that
 # has nothing to do with the code under test. It also lets two agents run
-# `make execution` on one working tree at the same time.
+# `make execution` on one working tree at the same time. The self-test runs on
+# the game's own runtime, the verifier the engine loads a patch under.
 agent-selftest:
-	@Write-Host ""
-	@Write-Host "==> agent-selftest (JVM verifier as oracle)" -ForegroundColor Cyan
-	& scripts/make/selftest.ps1 -Javac "$(JAVAC)" -Java "$(JAVA)" -GameDir "$(GAME_DIR)"
-	@Write-Host "[agent-selftest] passed" -ForegroundColor Green
+	@echo ""
+	@echo "=== agent-selftest (JVM verifier as oracle)"
+	poetry run python -m rw_bot.harness.agent_cli selftest --game-dir "$(GAME_DIR)"
 
 sandbox-probe: agent
-	@Write-Host ""
-	@Write-Host "==> sandbox-probe (live skirmish, agent attached, log: $(SANDBOX_LOG))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force (Split-Path -Parent "$(SANDBOX_LOG)") | Out-Null
-	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -Log "$(SANDBOX_LOG)"
+	@echo ""
+	@echo "=== sandbox-probe (live skirmish, agent attached, log: $(SANDBOX_LOG))"
+	$(PROBE) --kind sandbox --game-dir "$(GAME_DIR)" --log "$(SANDBOX_LOG)" --display $(PROBE_DISPLAY)
 
 discover-probe: agent
-	@Write-Host ""
-	@Write-Host "==> discover-probe (snapshots at $(DISCOVER_AT)s -> $(DISCOVER_OUT))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force (Split-Path -Parent "$(DISCOVER_OUT)") | Out-Null
-	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(DISCOVER_AT);exitAfterDiscovery=true" -Log "$(DISCOVER_OUT)"
-	@Write-Host "[discover-probe] snapshots written to $(DISCOVER_OUT)" -ForegroundColor Green
+	@echo ""
+	@echo "=== discover-probe (snapshots at $(DISCOVER_AT)s into $(DISCOVER_OUT))"
+	$(PROBE) --kind discover --game-dir "$(GAME_DIR)" --log "$(DISCOVER_OUT)" --at "$(DISCOVER_AT)" --display $(PROBE_DISPLAY)
 
 decompile:
-	@Write-Host ""
-	@Write-Host "==> decompile (CFR $(CFR_VERSION) -> $(DECOMPILED))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force ".tools" | Out-Null
-	if (-not (Test-Path "$(CFR_JAR)")) { Write-Host "  fetching $(CFR_URL)" -ForegroundColor DarkCyan; Invoke-WebRequest -Uri "$(CFR_URL)" -OutFile "$(CFR_JAR)" -UseBasicParsing }
-	if (Test-Path "$(DECOMPILED)") { Remove-Item -Recurse -Force "$(DECOMPILED)" }
-	& "$(JAVA)" -Xmx2g -jar "$(CFR_JAR)" "$(GAME_DIR)/game-lib.jar" --outputdir "$(DECOMPILED)" --comments false --silent true; if ($$LASTEXITCODE -ne 0) { Write-Host "[decompile] CFR failed" -ForegroundColor Red; exit $$LASTEXITCODE }
-	$$n = (Get-ChildItem "$(DECOMPILED)" -Recurse -Filter *.java | Measure-Object).Count; Write-Host "[decompile] $$n source files" -ForegroundColor Green
-	@Write-Host "  Reminder: decompiled Java is a RECONSTRUCTION. Pin load-bearing" -ForegroundColor DarkGray
-	@Write-Host "  claims to javap bytecode or observed runtime behaviour." -ForegroundColor DarkGray
+	@echo ""
+	@echo "=== decompile (CFR $(CFR_VERSION) into $(DECOMPILED))"
+	poetry run python -m rw_bot.harness.decompile_cli --game-dir "$(GAME_DIR)" --cfr-version "$(CFR_VERSION)" --out "$(DECOMPILED)"
 
 wire-capture: agent
-	@Write-Host ""
-	@Write-Host "==> wire-capture (live world stream at $(WIRE_CAPTURE_AT)s -> $(WIRE_CAPTURE_OUT))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force (Split-Path -Parent "$(WIRE_CAPTURE_OUT)") | Out-Null
-	if (Test-Path "$(WIRE_CAPTURE_OUT)") { Remove-Item -Force "$(WIRE_CAPTURE_OUT)" }
-	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(WIRE_CAPTURE_AT);stateOutPath={OUT};exitAfterDiscovery=true" -Out "$(WIRE_CAPTURE_OUT)" -Log "runs/wire-capture.log"
-	$$n = (Get-Content "$(WIRE_CAPTURE_OUT)" | Measure-Object -Line).Lines; Write-Host "[wire-capture] $$n record(s) written to $(WIRE_CAPTURE_OUT)" -ForegroundColor Green
+	@echo ""
+	@echo "=== wire-capture (live world stream at $(WIRE_CAPTURE_AT)s into $(WIRE_CAPTURE_OUT))"
+	$(PROBE) --kind wire --game-dir "$(GAME_DIR)" --log "runs/wire-capture.log" --at "$(WIRE_CAPTURE_AT)" --out "$(WIRE_CAPTURE_OUT)" --display $(PROBE_DISPLAY)
 
 type-flags: agent
-	@Write-Host ""
-	@Write-Host "==> type-flags (placement rules from the live registry -> $(TYPE_FLAGS_OUT))" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force (Split-Path -Parent "$(TYPE_FLAGS_OUT)") | Out-Null
-	& scripts/make/probe.ps1 -GameDir "$(GAME_DIR)" -AgentJar "$(AGENT_JAR)" -AgentArgs "discoverAtSeconds=$(TYPE_FLAGS_AT);typeFlagsPath={OUT};exitAfterDiscovery=true" -Out "$(TYPE_FLAGS_OUT)" -Log "runs/type-flags.log"
-	$$n = (Get-Content "$(TYPE_FLAGS_OUT)" | Measure-Object -Line).Lines; Write-Host "[type-flags] $$n type(s) written to $(TYPE_FLAGS_OUT)" -ForegroundColor Green
+	@echo ""
+	@echo "=== type-flags (placement rules from the live registry into $(TYPE_FLAGS_OUT))"
+	$(PROBE) --kind type-flags --game-dir "$(GAME_DIR)" --log "runs/type-flags.log" --at "$(TYPE_FLAGS_AT)" --out "$(TYPE_FLAGS_OUT)" --display $(PROBE_DISPLAY)
 
 unit-dump:
-	@Write-Host ""
-	@Write-Host "==> unit-dump (-printunits stat catalogue)" -ForegroundColor Cyan
-	New-Item -ItemType Directory -Force "runs" | Out-Null
-	$$log = (Resolve-Path -LiteralPath ".").Path + "\\runs\\printunits.log"; Push-Location "$(GAME_DIR)"; try { & ".\\jvm64\\bin\\java.exe" -Xmx1000M "-Djava.library.path=." -cp "game-lib.jar;libs/*" com.corrodinggames.rts.java.Main -nodisplay -nosound -printunits -log $$log } finally { Pop-Location }
+	@echo ""
+	@echo "=== unit-dump (-printunits stat catalogue)"
+	$(PROBE) --kind units --game-dir "$(GAME_DIR)" --log "runs/printunits.log" --display $(PROBE_DISPLAY)
 
+# A watched or hosted game draws its channel port per invocation exactly as
+# play does, through the launcher's env --draw.
 host:
-	@Write-Host ""
-	@Write-Host "==> host (bot-hosted LAN game on port 5123, log: $(HOST_LOG))" -ForegroundColor Cyan
-	& scripts/make/host.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(HOST_LOG)" -HostMap "$(HOST_MAP)" -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(HOST_SAMPLES) $(HOST_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
+	@echo ""
+	@echo "=== host (bot-hosted LAN game on port 5123, log: $(HOST_LOG))"
+	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m rw_bot.harness.interactive_cli --mode host --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(HOST_LOG)" --map "$(HOST_MAP)" --module $(PLAY_MODULE) --play-args "$(HOST_SAMPLES) $(HOST_DOCTRINE) -"
 
 watch:
-	@Write-Host ""
-	@Write-Host "==> watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))" -ForegroundColor Cyan
-	& scripts/make/watch.ps1 -Port $(PLAY_PORT) -GameDir "$(GAME_DIR)" -PlayLog "$(WATCH_LOG)" -Map "$(WATCH_MAP)" -Opponents $(WATCH_OPPONENTS) -Difficulty $(WATCH_DIFFICULTY) -Module $(PLAY_MODULE) -Catalogue "$(CATALOGUE)" -TypeDump "$(TYPE_DUMP)" -PlayArgs "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -" -Javac "$(JAVAC)" -Jar "$(JAR)"
+	@echo ""
+	@echo "=== watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))"
+	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m rw_bot.harness.interactive_cli --mode watch --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(WATCH_LOG)" --map "$(WATCH_MAP)" --opponents $(WATCH_OPPONENTS) --difficulty $(WATCH_DIFFICULTY) --module $(PLAY_MODULE) --play-args "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -"
 
 # The match service's HTTP door, detached from the launching terminal.
 # Reads the database password from the platform-postgres container at
 # launch; the DSN never lands on disk.
 door:
-	@Write-Host ""
-	@Write-Host "==> door (match service on http://127.0.0.1:27501/)" -ForegroundColor Cyan
-	& scripts/make/door.ps1
+	@echo ""
+	@echo "=== door (match service on http://127.0.0.1:27501/)"
+	poetry run python -m scripts.service_up door
 
 # The worker fleet, detached: starts any of the 8 workers not already
 # running. The whole Docker-crash recovery is `make door` (if the door
 # also died) + `make fleet-up` -- the queue rows survive Postgres
 # restarts and the startup reap requeues what dead owners held.
 fleet-up:
-	@Write-Host ""
-	@Write-Host "==> fleet-up (8 detached match workers)" -ForegroundColor Cyan
-	& scripts/make/fleet-up.ps1
-else
-boot-probe:
-	@echo "boot-probe is Windows-only (the pinned game's jvm64 is a Windows JVM)"
-	@exit 1
-
-agent:
-	@echo "agent is Windows-only (the build script under scripts/make compiles with the pinned game's Windows JDK)"
-	@exit 1
-
-agent-selftest:
-	@echo "agent-selftest is Windows-only (it patches the pinned jar under the pinned game's Windows JVM)"
-	@exit 1
-
-sandbox-probe:
-	@echo "sandbox-probe is Windows-only (the probe script under scripts/make drives the pinned game's Windows JVM)"
-	@exit 1
-
-discover-probe:
-	@echo "discover-probe is Windows-only (the probe script under scripts/make drives the pinned game's Windows JVM)"
-	@exit 1
-
-decompile:
-	@echo "decompile is Windows-only (it runs CFR under the pinned game's Windows JVM)"
-	@exit 1
-
-wire-capture:
-	@echo "wire-capture is Windows-only (the probe script under scripts/make drives the pinned game's Windows JVM)"
-	@exit 1
-
-type-flags:
-	@echo "type-flags is Windows-only (the probe script under scripts/make drives the pinned game's Windows JVM)"
-	@exit 1
-
-unit-dump:
-	@echo "unit-dump is Windows-only (the pinned game's jvm64 is a Windows JVM)"
-	@exit 1
-
-host:
-	@echo "host is Windows-only (the host script under scripts/make drives an interactive session on the hub)"
-	@exit 1
-
-watch:
-	@echo "watch is Windows-only (the watch script under scripts/make drives a windowed session on the hub)"
-	@exit 1
-
-door:
-	@echo "door is Windows-only (the door script under scripts/make detaches the match service on the hub)"
-	@exit 1
-
-fleet-up:
-	@echo "fleet-up is Windows-only (the fleet-up script under scripts/make detaches the workers on the hub)"
-	@exit 1
-endif
+	@echo ""
+	@echo "=== fleet-up (8 detached match workers)"
+	poetry run python -m scripts.service_up fleet-up

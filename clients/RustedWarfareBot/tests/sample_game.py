@@ -13,11 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from rw_bot.harness.jvm import JVM_RELEASE_FILE, JVM_VERSION_KEY, jvm_dir
-
-#: The platform the cluster runs, and the one these trees are shaped for. The
-#: Windows spelling is reachable from the same helper by passing it.
-LINUX = "linux"
+from rw_bot.harness.jvm import JVM_DIR, JVM_RELEASE_FILE, JVM_VERSION_KEY
 
 #: What the Linux depot's runtime states about itself, read off the real
 #: ``jvm-linux/release`` on 2026-08-29.
@@ -37,7 +33,6 @@ SAMPLE_MARKER_PATH = "builtin_mods_enabled"
 def write_sample_game(
     root: Path,
     *,
-    platform: str = LINUX,
     jar: bytes = b"pretend this is a game",
     java_version: str = SAMPLE_JAVA_VERSION,
     runtime: bytes = b"pretend this is a java launcher",
@@ -47,9 +42,6 @@ def write_sample_game(
 
     Args:
         root: Directory to build. Created along with its parents.
-        platform: A ``sys.platform`` value deciding the runtime's directory
-            name, so a Windows workstation can build the tree a Linux node
-            would have.
         jar: Bytes of the engine's jar.
         java_version: What the runtime states as its ``JAVA_VERSION``.
         runtime: Bytes of a file inside the runtime's tree.
@@ -58,7 +50,7 @@ def write_sample_game(
     Returns:
         The game directory.
     """
-    runtime_root = root / jvm_dir(platform)
+    runtime_root = root / JVM_DIR
     (runtime_root / "bin").mkdir(parents=True, exist_ok=True)
     (root / "assets" / "maps").mkdir(parents=True, exist_ok=True)
 
@@ -73,7 +65,6 @@ def write_sample_game(
 
 
 __all__ = [
-    "LINUX",
     "SAMPLE_ASSET_PATH",
     "SAMPLE_JAVA_VERSION",
     "SAMPLE_MARKER_PATH",

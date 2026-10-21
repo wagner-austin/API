@@ -6,10 +6,10 @@ themselves were tested against a fake nothing would ever exercise the real
 socket, the real process or the real filesystem, and the whole suite would be
 green against an operating system that does not exist.
 
-The pure decisions each of these APPLIES -- which command fells a tree, which
-flags isolate a spawn -- are checked exhaustively and cross-platform in
-``test_harness_process_tree.py``. What is checked here is that the application
-works: that a real child really is felled, that a real socket really is seen.
+The pure decisions each of these APPLIES -- which command fells a tree, who
+holds a port -- are checked exhaustively in ``test_harness_process_tree.py``.
+What is checked here is that the application works: that a real child really
+is felled, that a real socket really is seen.
 """
 
 from __future__ import annotations
@@ -35,8 +35,8 @@ from rw_bot.harness._hook_defaults import (
     _probe_port_impl,
     _read_environment_impl,
     _read_executable_impl,
-    _read_platform_impl,
     _remove_path_impl,
+    _replace_path_impl,
     _resolve_root_impl,
     _run_capture_impl,
     _run_inherited_impl,
@@ -44,8 +44,6 @@ from rw_bot.harness._hook_defaults import (
     _spawn_game_impl,
 )
 from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
-from rw_bot.harness.process_tree import spawn_isolation
-from rw_bot.platform_id import WINDOWS, is_windows
 
 #: Long enough that a slow machine still connects, short enough that the
 #: negative case does not dominate the suite.
@@ -64,16 +62,13 @@ _LISTEN_PORT = 28998
 _UNUSED_PORT = 28999
 
 #: How long the sleep test asks for, and the floor it holds the result to.
-#: Windows' timer granularity returns a few milliseconds early, so the floor
-#: sits below the request -- far enough above zero that a no-op still fails.
+#: The floor sits below the request, because a timer may return a few
+#: milliseconds early -- far enough above zero that a no-op still fails.
 _SLEEP_SECONDS = 0.05
 _SLEEP_FLOOR_SECONDS = 0.03
 
 
 class TestReadingTheMachine:
-    def test_the_platform_is_the_interpreters_own(self) -> None:
-        assert _read_platform_impl() == sys.platform
-
     def test_the_executable_is_the_running_interpreter(self) -> None:
         """The planner runs in the environment the harness runs in, which is
         what removes ``poetry`` from a path that must work inside an image."""
@@ -86,9 +81,7 @@ class TestReadingTheMachine:
         assert Path(str(root)).is_absolute()
 
     def test_the_environment_carries_what_a_child_needs(self) -> None:
-        environment = _read_environment_impl()
-        key = "Path" if is_windows(sys.platform) else "PATH"
-        assert key in {name.title() if is_windows(sys.platform) else name for name in environment}
+        assert "PATH" in _read_environment_impl()
 
     def test_the_environment_is_a_copy_a_caller_may_overlay(self) -> None:
         """A caller adds PYTHONPATH to it; reaching back into this process's
@@ -112,12 +105,11 @@ class TestStamps:
 
 class TestSleeping:
     def test_it_actually_waits(self) -> None:
-        """The tolerance is not slack, it is the platform: Windows' timer
-        granularity lets ``time.sleep`` return a few milliseconds early, and
-        this asserted the full interval once and failed at 0.047s against
-        0.05. The floor still separates a real wait from a no-op by an order
-        of magnitude, which is the property that matters -- the teardown pause
-        exists so a file handle can be released before the delete.
+        """The tolerance is not slack: a timer's granularity can let
+        ``time.sleep`` return a few milliseconds early, and this asserted the
+        full interval once and failed at 0.047s against 0.05. The floor still
+        separates a real wait from a no-op by an order of magnitude, which is
+        the property that matters.
         """
         started = time.monotonic()
         _sleep_impl(_SLEEP_SECONDS)
@@ -390,26 +382,26 @@ def _await_exit(child: SpawnedMatchProto) -> None:
     raise AssertionError("the spawned child did not exit within 30s")
 
 
-@pytest.mark.skipif(sys.platform != WINDOWS, reason="the priority class exists on Windows only")
-def test_the_spawn_flags_are_accepted_by_the_standard_library() -> None:
-    """The pair this package passes -- a priority class and a session flag --
-    is legal on both platforms, which is what lets one call site serve both.
-    Windows ignores the session; POSIX rejects any non-zero creation flag.
+class TestReplacingAPath:
+    def test_the_finished_file_takes_the_destinations_name(self, tmp_path: Path) -> None:
+        """The agent jar is published this way, so a game attaching it sees
+        the old jar or the new one and never a half-written one."""
+        staged = tmp_path / "rw-agent.jar.stamp.new"
+        published = tmp_path / "rw-agent.jar"
+        staged.write_bytes(b"new")
+        published.write_bytes(b"old")
+        _replace_path_impl(staged, published)
+        assert published.read_bytes() == b"new"
+        assert not staged.exists()
 
-    The inner guard is for the TYPE CHECKER, not the runtime -- the marker
-    above already stops this running off Windows. mypy analyses a skipped
-    test's body like any other, so on a Linux runner it resolves the priority
-    class against Linux stubs, does not find it, and fails the lint. Narrowing
-    on ``sys.platform`` makes the block statically unreachable there while
-    leaving it fully checked on Windows.
-
-    The comparison must be against the LITERAL ``"win32"``: mypy narrows on
-    the syntactic form, and ``sys.platform == WINDOWS`` does not narrow.
-    """
-    if sys.platform == "win32":
-        isolation = spawn_isolation(sys.platform)
-        assert isolation["creationflags"] == subprocess.ABOVE_NORMAL_PRIORITY_CLASS
-        assert isolation["start_new_session"] is False
+    def test_an_absent_source_is_refused_and_the_destination_kept(self, tmp_path: Path) -> None:
+        """A build that wrote nothing must not leave the published jar gone:
+        the rename is refused and the old jar stays exactly as it was."""
+        published = tmp_path / "rw-agent.jar"
+        published.write_bytes(b"old")
+        with pytest.raises(FileNotFoundError):
+            _replace_path_impl(tmp_path / "never-written.new", published)
+        assert published.read_bytes() == b"old"
 
 
 class TestCopyingAnEntry:

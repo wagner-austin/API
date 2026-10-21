@@ -18,10 +18,10 @@ from pathlib import Path
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import (
-    AGENT_BUILD_DIR,
     AGENT_MANIFEST,
     AGENT_SOURCE_DIR,
     AGENT_SOURCE_SUFFIX,
+    BUILT_AGENT_JAR,
     FROZEN_AGENT_JAR,
 )
 from rw_bot.harness.launch import (
@@ -58,7 +58,7 @@ TREE_SOURCES = (
     # and a tree without it would fail at model load, member by member
     # ([[impossible-step-three-design]]).
     "models",
-    f"{AGENT_BUILD_DIR}/{FROZEN_AGENT_JAR}",
+    BUILT_AGENT_JAR,
     CATALOGUE,
     TYPE_DUMP,
 )
@@ -105,8 +105,8 @@ def check_agent_jar_fresh() -> None:
     on 2026-09-11: both pin-recertification batches (dettwinpin96, 96b)
     measured a jar built before either pin existed, because nothing between
     the pin commits and submission ever ran ``make agent``, and their floor
-    numbers were void as pin measurements. The freeze is the last moment the
-    workstation -- the only depot with a compiler -- can notice.
+    numbers were void as pin measurements. The freeze is the last moment a
+    machine with a JDK can notice.
 
     Equal times pass: a checkout or copy can land a source and the jar in the
     same second, and only a source strictly newer than the jar is evidence
@@ -118,7 +118,7 @@ def check_agent_jar_fresh() -> None:
             same way: run ``make agent``, then freeze.
         OSError: When the agent source directory or manifest cannot be read.
     """
-    jar = Path(AGENT_BUILD_DIR) / FROZEN_AGENT_JAR
+    jar = Path(BUILT_AGENT_JAR)
     if not _test_hooks.path_exists(jar):
         raise SweepError(
             _JAR_STALE,

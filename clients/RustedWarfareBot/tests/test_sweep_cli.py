@@ -36,7 +36,7 @@ def _pinned_game_on_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
         monkeypatch: Used to enter that directory, since the sweep names the
             game by a path relative to the process.
     """
-    write_sample_game(tmp_path / SOURCE_GAME_DIR, platform=sys.platform)
+    write_sample_game(tmp_path / SOURCE_GAME_DIR)
     monkeypatch.chdir(tmp_path)
 
 
@@ -79,7 +79,7 @@ def _flag(argv: tuple[str, ...], name: str) -> str | None:
 
 @pytest.mark.parametrize("args", [[], ["one"], ["a", "b", "c", "d", "e"]])
 def test_a_bad_argument_count_prints_usage(args: list[str]) -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         assert main(args) == EXIT_BAD_USAGE
         assert any(line.startswith("usage: sweep") for line in host.printed)
 
@@ -92,7 +92,7 @@ def test_a_duel_is_asked_for_by_map_and_difficulty() -> None:
     Every measurement before this ran against the engine's hardcoded
     ten-player free-for-all, which nobody chose.
     """
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "-2"]) == EXIT_OK
         assert _flag(host.commands[0], "--map") == "maps/skirmish/[p2]duel_lake.tmx"
@@ -110,7 +110,7 @@ def test_a_pinned_batch_passes_the_delta_to_every_match() -> None:
     must stay silent -- a tree frozen before the option existed runs an agent
     that rejects the unknown key.
     """
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3"])
         assert code == EXIT_OK
@@ -126,7 +126,7 @@ def test_a_fast_batch_passes_the_multiple_to_every_match() -> None:
     """The eighth positional: the gym knob, certified bit-exact against
     realtime at 10x (log 2026-08-06). A batch that omits it stays silent so
     trees frozen before the option existed keep running."""
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "duel|1|doctrines/default.doctrine|1500")
         code = main([_JOBS, "demo", "1", "75", "maps/skirmish/[p2]duel_lake.tmx", "1", "3", "10"])
         assert code == EXIT_OK
@@ -141,7 +141,7 @@ def test_a_fast_batch_passes_the_multiple_to_every_match() -> None:
 
 
 def test_every_match_in_the_file_is_played_once() -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(
             host,
             "tank|1|doctrines/default.doctrine|1500",
@@ -157,7 +157,7 @@ def test_a_second_run_replays_only_what_is_missing() -> None:
     """This is the whole of resumability, and it is why a batch is never a
     single unit of work.
     """
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(
             host,
             "tank|1|doctrines/default.doctrine|1500",
@@ -175,7 +175,7 @@ def test_a_second_run_replays_only_what_is_missing() -> None:
 
 def test_a_batch_that_could_not_finish_reports_it() -> None:
     transcripts: dict[str, tuple[str, ...]] = {".game-w1": ("[play] game stopped",)}
-    with FakeHost(platform=sys.platform, transcripts=transcripts) as host:
+    with FakeHost(transcripts=transcripts) as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1"]) == EXIT_INCOMPLETE
         assert _results(host) == []
@@ -184,7 +184,7 @@ def test_a_batch_that_could_not_finish_reports_it() -> None:
 
 def test_the_pool_never_exceeds_the_number_of_matches() -> None:
     """A batch of one should not copy the game four times to leave three idle."""
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "4"]) == EXIT_OK
         assert host.path_exists(Path(".game-w1"))
@@ -196,28 +196,28 @@ def test_every_match_is_locked_to_the_tick_by_default() -> None:
     """Free running, parallel matches under CPU contention sample at different
     game-times, so running a sweep in parallel would change its results.
     """
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1"]) == EXIT_OK
         assert _flag(host.commands[0], "--lockstep") == "75"
 
 
 def test_the_lockstep_is_an_argument_so_an_arm_can_change_it() -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1", "40"]) == EXIT_OK
         assert _flag(host.commands[0], "--lockstep") == "40"
 
 
 def test_the_worker_count_defaults_when_not_given() -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, *[f"tank|{n}|doctrines/default.doctrine|1500" for n in range(6)])
         assert main([_JOBS, "demo"]) == EXIT_OK
         assert any("over 4 workers" in line for line in host.printed)
 
 
 def test_a_malformed_job_file_stops_the_batch_rather_than_playing_part_of_it() -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(
             host,
             "tank|1|doctrines/default.doctrine|1500",
@@ -233,7 +233,7 @@ def test_a_batch_with_nothing_outstanding_starts_no_pool_at_all() -> None:
     """Re-running a finished sweep should cost nothing, not spin up workers to
     discover they have no work.
     """
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         assert main([_JOBS, "demo", "1"]) == EXIT_OK
         host.commands.clear()
@@ -248,7 +248,7 @@ def test_the_module_entry_point_exits_with_the_batch_result() -> None:
     already_imported = sys.modules.pop("scripts.sweep")
     sys.argv = ["sweep"]
     try:
-        with FakeHost(platform=sys.platform) as host, pytest.raises(SystemExit) as caught:
+        with FakeHost() as host, pytest.raises(SystemExit) as caught:
             runpy.run_module("scripts.sweep", run_name="__main__")
         assert any(line.startswith("usage: sweep") for line in host.printed)
     finally:
@@ -258,7 +258,7 @@ def test_the_module_entry_point_exits_with_the_batch_result() -> None:
 
 
 def test_the_arguments_are_read_from_the_process_when_none_are_given() -> None:
-    with FakeHost(platform=sys.platform) as host:
+    with FakeHost() as host:
         _plant(host, "tank|1|doctrines/default.doctrine|1500")
         host.argv = [_JOBS, "demo", "1"]
         assert main(None) == EXIT_OK

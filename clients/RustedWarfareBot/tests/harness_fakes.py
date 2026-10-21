@@ -17,37 +17,22 @@ one mechanism this repository uses for injection.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from pathlib import Path, PurePath, PurePosixPath, PureWindowsPath
+from pathlib import Path, PurePath, PurePosixPath
 from types import TracebackType
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import (
-    AGENT_BUILD_DIR,
     AGENT_MANIFEST,
     AGENT_SOURCE_DIR,
-    FROZEN_AGENT_JAR,
+    BUILT_AGENT_JAR,
 )
-from rw_bot.harness.jvm import JVM_TOOLS, tool_path
-from rw_bot.platform_id import WINDOWS
+from rw_bot.harness.jvm import JAVA_PATH
 from tests.harness_fake_game import FakeGame
 
 #: Programs the launcher consults rather than launches a match with. They
 #: answer empty by default, which reads as "nothing holds the port" and "the
 #: build said nothing", both of which are the uneventful case.
-_CONSULTED_TOOLS = frozenset(
-    {
-        "javac",
-        "javac.exe",
-        "jar",
-        "jar.exe",
-        "netstat",
-        "netstat.exe",
-        "ss",
-        "tasklist",
-        "tasklist.exe",
-        "ps",
-    }
-)
+_CONSULTED_TOOLS = frozenset({"javac", "jar", "java", "ss", "ps"})
 
 
 class FakeHost:
@@ -62,17 +47,9 @@ class FakeHost:
         transcripts: What a command prints, keyed by the game directory it names.
             A command whose directory is absent prints a finished match.
         argv: What :func:`read_argv` returns.
-        platform: What :func:`read_platform` returns. Stated rather than read
-            off the running machine so a test's expectations do not change
-            with where the suite is run, and so both platforms' rules are
-            reachable from either.
     """
 
-    def __init__(
-        self,
-        transcripts: dict[str, tuple[str, ...]] | None = None,
-        platform: str = WINDOWS,
-    ) -> None:
+    def __init__(self, transcripts: dict[str, tuple[str, ...]] | None = None) -> None:
         self.files: dict[str, tuple[str, ...]] = {}
         self.dirs: set[str] = set()
         #: Modification times by path, for files whose age matters to a test.
@@ -84,11 +61,10 @@ class FakeHost:
         self.walls: list[float] = []
         self.transcripts = transcripts or {}
         self.argv: list[str] = []
-        self.platform = platform
-        self.root: PurePath = (
-            PureWindowsPath("C:/repo") if platform == WINDOWS else PurePosixPath("/repo")
-        )
-        self.executable = "C:/venv/python.exe" if platform == WINDOWS else "/venv/bin/python"
+        self.root: PurePath = PurePosixPath("/repo")
+        self.executable = "/venv/bin/python"
+        #: Every :meth:`replace_path`, as ``(source, destination)``.
+        self.replaced: list[tuple[str, str]] = []
         self.stamp = "stamp001"
         self.environment: dict[str, str] = {"PATH": "/usr/bin"}
         self.spawned: list[tuple[tuple[str, ...], str, str, str]] = []
@@ -126,7 +102,7 @@ class FakeHost:
         self._make_dirs: _test_hooks.MakeDirsProto = _test_hooks.make_dirs
         self._path_exists: _test_hooks.PathExistsProto = _test_hooks.path_exists
         self._read_argv: _test_hooks.ReadArgvProto = _test_hooks.read_argv
-        self._read_platform: _test_hooks.ReadPlatformProto = _test_hooks.read_platform
+        self._replace_path: _test_hooks.ReplacePathProto = _test_hooks.replace_path
         self._kill_tree: _test_hooks.KillTreeProto = _test_hooks.kill_tree
         self._new_stamp: _test_hooks.NewStampProto = _test_hooks.new_stamp
         self._read_environment: _test_hooks.ReadEnvironmentProto = _test_hooks.read_environment
@@ -154,15 +130,12 @@ class FakeHost:
             source: The source game directory's path.
         """
         self.dirs.add(source)
-        for entry in ("assets", "libs", "jvm64", "saves", "cache"):
+        for entry in ("assets", "libs", "jvm-linux", "saves", "cache"):
             self.dirs.add(f"{source}/{entry}")
         self.files[f"{source}/game-lib.jar"] = ()
         # Asked of the same module the clone check asks, so a planted source
-        # cannot satisfy a requirement the real one would not -- and so a
-        # POSIX host plants POSIX tool names without a second list to keep in
-        # step with the first.
-        for tool in JVM_TOOLS:
-            self.files[f"{source}/{tool_path(tool, self.platform)}"] = ()
+        # cannot satisfy a requirement the real one would not.
+        self.files[f"{source}/{JAVA_PATH}"] = ()
 
     def plant_agent(self, jar_mtime: float = 0.0, source_mtime: float = 0.0) -> None:
         """Plant a prebuilt agent jar and the sources it claims to be built from.
@@ -177,7 +150,7 @@ class FakeHost:
                 The default pair -- both zero -- is a fresh build, because
                 equal times pass the check by design.
         """
-        jar = f"{AGENT_BUILD_DIR}/{FROZEN_AGENT_JAR}"
+        jar = BUILT_AGENT_JAR
         source = f"{AGENT_SOURCE_DIR}/Premain.java"
         self.files[jar] = ()
         self.mtimes[jar] = jar_mtime
@@ -286,13 +259,22 @@ class FakeHost:
         """
         return list(self.argv)
 
-    def read_platform(self) -> str:
-        """Return the platform this host pretends to be.
+    def replace_path(self, source: Path, destination: Path) -> None:
+        """Move a written file over its destination, as one rename would.
 
-        Returns:
-            The stated ``sys.platform`` value.
+        Args:
+            source: The finished file.
+            destination: Where it is published.
+
+        Raises:
+            FileNotFoundError: When the source was never written, exactly as
+                the real rename refuses one.
         """
-        return self.platform
+        key = source.as_posix()
+        if key not in self.files:
+            raise FileNotFoundError(key)
+        self.replaced.append((key, destination.as_posix()))
+        self.files[destination.as_posix()] = self.files.pop(key)
 
     def read_executable(self) -> str:
         """Return the interpreter the harness is pretending to run under.
@@ -306,8 +288,7 @@ class FakeHost:
         """Return the repository root.
 
         Returns:
-            The stated root, shaped for this host's platform so composed
-            absolute paths read the way they would on it.
+            The stated root.
         """
         return self.root
 
@@ -493,6 +474,9 @@ class FakeHost:
             if known in program or known == argv[0]:
                 return result
         if program in _CONSULTED_TOOLS:
+            if program == "jar":
+                # ``jar cfm <jar> ...`` writes the jar, and a publish reads it back.
+                self.files[argv[2]] = ()
             return 0, ()
         game_dir = next(
             argv[index + 1] for index, token in enumerate(argv) if token == "--game-dir"
@@ -518,7 +502,7 @@ class FakeHost:
         self._make_dirs = _test_hooks.make_dirs
         self._path_exists = _test_hooks.path_exists
         self._read_argv = _test_hooks.read_argv
-        self._read_platform = _test_hooks.read_platform
+        self._replace_path = _test_hooks.replace_path
         self._kill_tree = _test_hooks.kill_tree
         self._new_stamp = _test_hooks.new_stamp
         self._read_environment = _test_hooks.read_environment
@@ -542,7 +526,7 @@ class FakeHost:
         _test_hooks.make_dirs = self.make_dirs
         _test_hooks.path_exists = self.path_exists
         _test_hooks.read_argv = self.read_argv
-        _test_hooks.read_platform = self.read_platform
+        _test_hooks.replace_path = self.replace_path
         _test_hooks.kill_tree = self.kill_tree
         _test_hooks.new_stamp = self.new_stamp
         _test_hooks.read_environment = self.read_environment
@@ -580,7 +564,7 @@ class FakeHost:
         _test_hooks.make_dirs = self._make_dirs
         _test_hooks.path_exists = self._path_exists
         _test_hooks.read_argv = self._read_argv
-        _test_hooks.read_platform = self._read_platform
+        _test_hooks.replace_path = self._replace_path
         _test_hooks.kill_tree = self._kill_tree
         _test_hooks.new_stamp = self._new_stamp
         _test_hooks.read_environment = self._read_environment

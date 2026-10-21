@@ -43,7 +43,7 @@ from platform_core.stage_manifest import encode_stage_manifest
 from rw_bot import RwBotError
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.clone import VOLATILE_FILES, entries_to_copy
-from rw_bot.harness.jvm import tool_path
+from rw_bot.harness.jvm import JAVA_PATH
 from rw_bot.stage_record import stage_manifest
 from rw_bot.staged_tree import (
     APP_ID,
@@ -60,11 +60,6 @@ from rw_bot.staged_tree import (
 )
 from rw_bot.tree_archive import write_archive
 from rw_bot.tree_identity import TreeEntry, tree_digest, tree_entries
-
-#: The platform the staged tree is for. Stated rather than read from the
-#: running interpreter: this describes a tree destined for a Linux node and is
-#: run on a Windows workstation, so the two are deliberately different.
-TARGET_PLATFORM = "linux"
 
 #: Indent the document is written with. Committed and read by people.
 DOCUMENT_INDENT = 2
@@ -189,11 +184,10 @@ def check_runtime_is_executable(executables: Sequence[str]) -> None:
         StageTreeError: ``RW-STAGE-001`` when the bundled ``java`` is not
             among them.
     """
-    java = tool_path("java", TARGET_PLATFORM)
-    if java not in executables:
+    if JAVA_PATH not in executables:
         raise StageTreeError(
             _RUNTIME_NOT_EXECUTABLE,
-            f"{java} would extract without its executable bit, so every match on the "
+            f"{JAVA_PATH} would extract without its executable bit, so every match on the "
             "cluster would fail to start it; the archive marks a member executable when "
             "it begins with the ELF magic number, and this one did not",
         )
@@ -304,7 +298,6 @@ __all__ = [
     "DOCUMENT_INDENT",
     "EXIT_OK",
     "REQUIRED_FLAGS",
-    "TARGET_PLATFORM",
     "StageTreeError",
     "check_reset_state_present",
     "check_runtime_is_executable",

@@ -19,12 +19,9 @@ same reason: a jar is one file and the others are trees, so recording them
 needed :mod:`rw_bot.tree_identity` before it could be done at all.
 
 * :data:`GAME_DISTRIBUTION` -- the engine's code, ``game-lib.jar``.
-* :data:`JVM_DISTRIBUTION` -- the runtime that executes it. The two platforms
-  ship DIFFERENT MAJOR VERSIONS, Java 8 on Linux and Java 13 on Windows, so
-  this is not a formality. Today the host axis separates those two by
-  accident, because the operating systems differ; two Linux runs either side
-  of a depot that bumped its bundled JRE would fingerprint identically and be
-  silently incomparable.
+* :data:`JVM_DISTRIBUTION` -- the runtime that executes it. Not a formality:
+  two runs either side of a depot that bumped its bundled JRE would otherwise
+  fingerprint identically and be silently incomparable.
 * :data:`ASSETS_DISTRIBUTION` -- the maps, mods and unit definitions the
   simulation reads. A jar digest does not cover them, and this project has
   already lost a batch family to exactly that gap: a map missing from a clone
@@ -63,7 +60,7 @@ from platform_core.environment_record import (
 )
 from platform_core.run_record import Observation, RunRecord, run_record
 
-from rw_bot.harness.jvm import JVM_RELEASE_FILE, jvm_dir, release_version
+from rw_bot.harness.jvm import JVM_DIR, JVM_RELEASE_FILE, release_version
 from rw_bot.harness.scorecards import MatchRow
 from rw_bot.tree_identity import digest_tree
 
@@ -118,16 +115,12 @@ def game_build(jar: Path) -> PackageVersion:
     )
 
 
-def bundled_runtime(game_dir: Path, platform: str) -> PackageVersion:
+def bundled_runtime(game_dir: Path) -> PackageVersion:
     """Identify the JVM a run's simulation actually executed on.
 
     Args:
-        game_dir: The game directory the run played from.
-        platform: A ``sys.platform`` value, which decides the runtime's
-            directory name -- ``jvm64`` on Windows and ``jvm-linux``
-            elsewhere. Passed rather than read from the running interpreter so
-            a Windows workstation can state what a Linux node's record would
-            say.
+        game_dir: The game directory the run played from; its runtime is the
+            :data:`~rw_bot.harness.jvm.JVM_DIR` inside it.
 
     Returns:
         The runtime, named :data:`JVM_DISTRIBUTION` and versioned by its own
@@ -143,7 +136,7 @@ def bundled_runtime(game_dir: Path, platform: str) -> PackageVersion:
         OSError: When the release file or a file under the runtime cannot be
             read.
     """
-    root = game_dir / jvm_dir(platform)
+    root = game_dir / JVM_DIR
     version = release_version((root / JVM_RELEASE_FILE).read_text(encoding="utf-8").splitlines())
     digest = digest_tree(root)[:DIGEST_LENGTH]
     return PackageVersion(
@@ -176,12 +169,11 @@ def asset_tree(game_dir: Path) -> PackageVersion:
     )
 
 
-def game_packages(game_dir: Path, platform: str) -> tuple[PackageVersion, ...]:
+def game_packages(game_dir: Path) -> tuple[PackageVersion, ...]:
     """Name everything about the game whose behaviour decides the numbers.
 
     Args:
         game_dir: The game directory the run played from.
-        platform: A ``sys.platform`` value, for the runtime's directory name.
 
     Returns:
         The code, the runtime and the data, in the shared axis's canonical
@@ -199,7 +191,7 @@ def game_packages(game_dir: Path, platform: str) -> tuple[PackageVersion, ...]:
         ValueError: When a digest or a stated version came back empty.
     """
     code = game_build(game_dir / GAME_JAR_NAME)
-    runtime = bundled_runtime(game_dir, platform)
+    runtime = bundled_runtime(game_dir)
     assets = asset_tree(game_dir)
     return package_versions(
         {
@@ -215,7 +207,6 @@ def sweep_fingerprint(
     get_env: Callable[[str], str | None],
     probe: HostProbe,
     game_dir: Path,
-    platform: str,
 ) -> RunFingerprint:
     """Describe the configuration a sweep's numbers were produced under.
 
@@ -229,7 +220,6 @@ def sweep_fingerprint(
             the jar it holds: two of the three package axes are trees beside
             that jar, and a signature taking only the jar could not have
             reached them.
-        platform: A ``sys.platform`` value, for the runtime's directory name.
 
     Returns:
         The fingerprint. The GPU axes are stated absent rather than omitted:
@@ -246,7 +236,7 @@ def sweep_fingerprint(
         determinism,
         get_env,
         capture_host_record(probe),
-        game_packages(game_dir, platform),
+        game_packages(game_dir),
     )
 
 

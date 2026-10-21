@@ -27,30 +27,30 @@ from pathlib import Path, PurePath
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import (
     AGENT_SOURCE_DIR,
+    HOST_JAR,
+    HOST_JAVAC,
     agent_jar,
     agent_sources,
     classes_dir,
     compile_command,
     package_command,
 )
-from rw_bot.harness.jvm import tool_path
 from rw_bot.harness.launch import (
+    GAME_ENVIRONMENT,
     PORT_POLL_SECONDS,
     PORT_QUIET_SECONDS,
     LaunchConfig,
     game_command,
-    game_environment,
     planner_command,
     planner_pythonpath,
 )
 from rw_bot.harness.process_tree import (
+    PORT_LISTENER_COMMAND,
     holder_is_an_orphaned_engine,
     parse_port_listener,
     parse_process_name,
-    port_listener_command,
     process_name_command,
 )
-from rw_bot.platform_id import pure_path
 
 #: The match played and the planner returned its own verdict.
 EXIT_OK = 0
@@ -63,10 +63,9 @@ EXIT_AGENT_BUILD_FAILED = 3
 #: are diagnosed in completely different places.
 EXIT_NO_CHANNEL = 4
 
-#: How long to let file handles settle before deleting a per-match jar.
-#: Windows keeps a handle briefly after the JVM exits and the delete fails
-#: without it; on POSIX the wait is harmless and the branch it would save is
-#: not worth owning.
+#: How long to let a felled orphan engine release its port before this
+#: launch binds it. The fell is a signal, and the kernel frees the socket
+#: when the process is reaped rather than when the signal is sent.
 TEARDOWN_SETTLE_SECONDS = 0.5
 
 #: Where the engine's own log goes, relative to the play log.
@@ -95,14 +94,48 @@ TOOL_WALL_SECONDS = 600.0
 PLANNER_WALL_SECONDS = 14400.0
 
 
-def build_agent(config: LaunchConfig, jar_path: str, classes: str, platform: str) -> bool:
-    """Compile and package the agent for a match that is not using a snapshot.
+def compile_agent(classes: str) -> bool:
+    """Compile the agent's sources into a directory with the host JDK.
+
+    :data:`~rw_bot.harness.agent_build.HOST_JAVAC`, because the depot the
+    game runs on ships no compiler. The self-test stops here; every other
+    caller packages the classes next (:func:`build_agent`).
 
     Args:
-        config: The launch.
-        jar_path: The jar to produce.
+        classes: Directory for the compiled classes, created if absent.
+
+    Returns:
+        True when every source compiled. On failure the compiler's own lines
+        are printed first, then which tool failed.
+
+    Raises:
+        ValueError: When the agent source directory holds no Java.
+        OSError: When the compiler cannot be started -- including a host with
+            no JDK on ``PATH``, which names ``javac`` rather than failing later.
+    """
+    _test_hooks.make_dirs(Path(classes))
+    sources = agent_sources(_test_hooks.list_names(Path(AGENT_SOURCE_DIR)))
+    status, output = _test_hooks.run_capture(
+        compile_command(HOST_JAVAC, classes, sources), TOOL_WALL_SECONDS
+    )
+    if status != 0:
+        for line in output:
+            _test_hooks.write_line(line)
+        _test_hooks.write_line("[agent] javac failed")
+        return False
+    return True
+
+
+def build_agent(jar_path: str, classes: str) -> bool:
+    """Compile and package the agent with the host JDK.
+
+    The one build every jar-producing caller shares: a match that is not
+    using a snapshot, ``make agent`` publishing the jar a batch freezes, and
+    the watched and hosted games.
+
+    Args:
+        jar_path: The jar to produce, relative to the repository root.
         classes: Directory for the compiled classes.
-        platform: A ``sys.platform`` value.
 
     Returns:
         True when the jar was built.
@@ -111,34 +144,20 @@ def build_agent(config: LaunchConfig, jar_path: str, classes: str, platform: str
         ValueError: When the agent source directory holds no Java.
         OSError: When a tool cannot be started.
     """
-    # The stated platform decides the separator, not the interpreter that
-    # happens to be composing: a launch composed on one platform for the
-    # other would otherwise carry the composer's slashes.
-    game_dir = pure_path(platform)(config["game_dir"])
-    _test_hooks.make_dirs(Path(classes))
-    sources = agent_sources(_test_hooks.list_names(Path(AGENT_SOURCE_DIR)))
-    javac = str(game_dir / tool_path("javac", platform))
-    status, output = _test_hooks.run_capture(
-        compile_command(javac, classes, sources), TOOL_WALL_SECONDS
-    )
-    if status != 0:
-        for line in output:
-            _test_hooks.write_line(line)
-        _test_hooks.write_line("[play] javac failed")
+    if not compile_agent(classes):
         return False
-    jar_tool = str(game_dir / tool_path("jar", platform))
     status, output = _test_hooks.run_capture(
-        package_command(jar_tool, jar_path, classes), TOOL_WALL_SECONDS
+        package_command(HOST_JAR, jar_path, classes), TOOL_WALL_SECONDS
     )
     if status != 0:
         for line in output:
             _test_hooks.write_line(line)
-        _test_hooks.write_line("[play] jar failed")
+        _test_hooks.write_line("[agent] jar failed")
         return False
     return True
 
 
-def clear_orphaned_engine(port: int, platform: str) -> None:
+def clear_orphaned_engine(port: int) -> None:
     """Fell a dead match's engine if it is still holding this match's port.
 
     Only a JVM may legitimately hold a match port, so a JVM holder is always
@@ -149,18 +168,17 @@ def clear_orphaned_engine(port: int, platform: str) -> None:
 
     Args:
         port: The channel port this match will bind.
-        platform: A ``sys.platform`` value.
 
     Raises:
         OSError: When the listing command cannot be started.
     """
-    _, listing = _test_hooks.run_capture(port_listener_command(platform), TOOL_WALL_SECONDS)
-    holder = parse_port_listener(listing, port, platform)
+    _, listing = _test_hooks.run_capture(PORT_LISTENER_COMMAND, TOOL_WALL_SECONDS)
+    holder = parse_port_listener(listing, port)
     if holder is None:
         return
-    _, named = _test_hooks.run_capture(process_name_command(holder, platform), TOOL_WALL_SECONDS)
-    name = parse_process_name(named, platform)
-    if not holder_is_an_orphaned_engine(name, platform):
+    _, named = _test_hooks.run_capture(process_name_command(holder), TOOL_WALL_SECONDS)
+    name = parse_process_name(named)
+    if not holder_is_an_orphaned_engine(name):
         _test_hooks.write_line(
             f"[play] port {port} is held by {name!r} (pid {holder}), which is not an "
             "engine; leaving it alone so the bind fails loudly"
@@ -171,13 +189,12 @@ def clear_orphaned_engine(port: int, platform: str) -> None:
     _test_hooks.sleep(TEARDOWN_SETTLE_SECONDS)
 
 
-def run_planner(config: LaunchConfig, root: PurePath, platform: str) -> int:
+def run_planner(config: LaunchConfig, root: PurePath) -> int:
     """Run the planner against a live match.
 
     Args:
         config: The launch.
         root: Absolute path of the repository root.
-        platform: A ``sys.platform`` value.
 
     Returns:
         The planner's exit status.
@@ -187,7 +204,7 @@ def run_planner(config: LaunchConfig, root: PurePath, platform: str) -> int:
     """
     environment = dict(_test_hooks.read_environment())
     if config["tree"]:
-        environment["PYTHONPATH"] = planner_pythonpath(root, config["tree"], platform)
+        environment["PYTHONPATH"] = planner_pythonpath(root, config["tree"])
     command = planner_command(_test_hooks.read_executable(), config)
     return _test_hooks.run_inherited(command, environment, PLANNER_WALL_SECONDS)
 
@@ -203,7 +220,6 @@ def _teardown_build(config: LaunchConfig, jar_path: str, classes: str) -> None:
     if config["tree"]:
         return
     _test_hooks.remove_path(Path(classes))
-    _test_hooks.sleep(TEARDOWN_SETTLE_SECONDS)
     _test_hooks.remove_path(Path(jar_path))
 
 
@@ -269,7 +285,6 @@ def play(config: LaunchConfig) -> int:
         OSError: When a process cannot be started or a stream file opened.
         ValueError: When the agent source directory holds no Java.
     """
-    platform = _test_hooks.read_platform()
     root = _test_hooks.resolve_root()
     stamp = _test_hooks.new_stamp()
     jar_path = agent_jar(config, stamp)
@@ -277,18 +292,18 @@ def play(config: LaunchConfig) -> int:
     try:
         if config["tree"]:
             _test_hooks.write_line(f"[play] frozen tree: {config['tree']}")
-        elif not build_agent(config, jar_path, classes, platform):
+        elif not build_agent(jar_path, classes):
             return EXIT_AGENT_BUILD_FAILED
-        clear_orphaned_engine(config["port"], platform)
+        clear_orphaned_engine(config["port"])
         log = Path(config["play_log"])
         game = _test_hooks.spawn_game(
-            game_command(config, root, jar_path, platform),
+            game_command(config, root, jar_path),
             root / config["game_dir"],
             Path(f"{log}{ENGINE_STDOUT_SUFFIX}"),
             Path(f"{log}{ENGINE_STDERR_SUFFIX}"),
             # Inherited, plus what the dynamic linker needs to resolve the
-            # engine's native GUI stack against itself on Linux.
-            {**_test_hooks.read_environment(), **game_environment(platform)},
+            # engine's native GUI stack against itself.
+            {**_test_hooks.read_environment(), **GAME_ENVIRONMENT},
         )
         try:
             failure = wait_for_channel(config["port"], game, log)
@@ -310,7 +325,7 @@ def play(config: LaunchConfig) -> int:
                     f"[play] channel open; letting the map settle {config['settle']}s"
                 )
                 _test_hooks.sleep(config["settle"])
-            return run_planner(config, root, platform)
+            return run_planner(config, root)
         finally:
             _test_hooks.kill_tree(game.pid)
             _test_hooks.write_line("[play] game stopped")
@@ -328,6 +343,7 @@ __all__ = [
     "TOOL_WALL_SECONDS",
     "build_agent",
     "clear_orphaned_engine",
+    "compile_agent",
     "play",
     "run_planner",
     "wait_for_channel",

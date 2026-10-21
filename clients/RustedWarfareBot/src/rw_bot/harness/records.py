@@ -144,7 +144,6 @@ def batch_fingerprint(source_game_dir: str) -> RunFingerprint:
         _test_hooks.get_env,
         stdlib_host_probe(_test_hooks.count_cores),
         Path(source_game_dir),
-        _test_hooks.read_platform(),
     )
 
 

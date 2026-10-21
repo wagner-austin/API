@@ -48,10 +48,10 @@ def test_an_empty_file_reads_as_no_lines(tmp_path: Path) -> None:
 
 
 def test_names_are_listed_sorted_and_without_their_parent(tmp_path: Path) -> None:
-    for name in ("jvm64", "assets", "saves"):
+    for name in ("jvm-linux", "assets", "saves"):
         (tmp_path / name).mkdir()
     (tmp_path / "game-lib.jar").write_text("", encoding="utf-8")
-    assert _test_hooks.list_names(tmp_path) == ("assets", "game-lib.jar", "jvm64", "saves")
+    assert _test_hooks.list_names(tmp_path) == ("assets", "game-lib.jar", "jvm-linux", "saves")
 
 
 def test_a_file_is_copied_into_a_directory(tmp_path: Path) -> None:
@@ -65,12 +65,12 @@ def test_a_file_is_copied_into_a_directory(tmp_path: Path) -> None:
 
 def test_a_tree_is_copied_whole(tmp_path: Path) -> None:
     """The clone needs the JVM, which is nested three deep."""
-    (tmp_path / "jvm64" / "bin").mkdir(parents=True)
-    (tmp_path / "jvm64" / "bin" / "java.exe").write_text("exe", encoding="utf-8")
+    (tmp_path / "jvm-linux" / "bin").mkdir(parents=True)
+    (tmp_path / "jvm-linux" / "bin" / "java").write_text("elf", encoding="utf-8")
     destination = tmp_path / "clone"
     destination.mkdir()
-    _test_hooks.copy_entry(tmp_path / "jvm64", destination)
-    assert (destination / "jvm64" / "bin" / "java.exe").read_text(encoding="utf-8") == "exe"
+    _test_hooks.copy_entry(tmp_path / "jvm-linux", destination)
+    assert (destination / "jvm-linux" / "bin" / "java").read_text(encoding="utf-8") == "elf"
 
 
 def test_copying_over_an_existing_tree_is_not_an_error(tmp_path: Path) -> None:

@@ -18,12 +18,12 @@ from typing import TypedDict
 
 from rw_bot.harness import _test_hooks
 from rw_bot.harness.clone import (
+    REQUIRED_ENTRIES,
     VOLATILE_FILES,
     clone_name,
     entries_to_copy,
     leased_display,
     leased_port,
-    required_entries,
     verify,
 )
 from rw_bot.harness.match import MatchConfig, describe
@@ -238,19 +238,9 @@ def prepare_clone(index: int, config: SweepConfig) -> str:
     synced = _sync_maps(source, destination)
     if synced:
         _test_hooks.write_line(f"[sweep] {name} synced {synced} map(s) from {source}")
-    # The platform decides what the JDK's tools are called, so it decides what
-    # a complete clone even is; asked once and passed to both halves so the
-    # check and the requirement it checks against cannot disagree.
-    platform = _test_hooks.read_platform()
-    # A batch with a frozen tree carries its agent jar and compiles nothing,
-    # so it must not demand a compiler the Linux depot's JRE does not ship.
-    compiles_agent = not config["tree"]
-    needed = required_entries(platform, compiles_agent=compiles_agent)
     verify(
         name,
-        [entry for entry in needed if _test_hooks.path_exists(destination / entry)],
-        platform,
-        compiles_agent=compiles_agent,
+        [entry for entry in REQUIRED_ENTRIES if _test_hooks.path_exists(destination / entry)],
     )
     return name
 

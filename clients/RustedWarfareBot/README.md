@@ -28,19 +28,26 @@ Claims about engine internals are pinned to a game build (`game_version` frontma
 
 ```bash
 make check          # lint + sources + test (the gate, on any clean checkout)
-make execution      # agent-selftest against the pinned game, on the hub
+make execution      # agent-selftest against the pinned game, where it is staged
 make lint           # guard + ruff + mypy over src, tests, scripts
 make sources        # wiki provenance and navigation: anchors, links, counts
 make test           # pytest + coverage, 100% statements and branches
-make agent          # compile + jar the javaagent with the game's own JDK
+make agent          # compile + jar the javaagent with the host JDK on PATH
 make agent-selftest # patch the real jar, verified by the JVM's bytecode verifier
 ```
 
 `make execution` runs `agent-selftest`, so the Java half is gated too: a patcher
 regression, or an obfuscated class name that moved in a game update, fails
 there rather than inside a live engine. It is kept out of `make check` because
-it patches the real pinned jar, which is never tracked, so only the hub that
-holds the game can run it; run it after any agent or game change.
+it patches the real pinned jar, which is never tracked, so only a machine that
+holds the game and a JDK can run it; run it after any agent or game change.
+
+Every recipe runs under `/bin/sh` through a Python module: `rw_bot.harness`'s
+`play_match_cli`, `agent_cli`, `probe_cli`, `interactive_cli` and
+`decompile_cli`, and `scripts.service_up` for the match service. The game runs
+on its Linux depot, whose `jvm-linux` is a Java 8 JRE with no compiler, so the
+agent is built with the host's own JDK at `--release 8`. Until 2026-10-21 these
+were PowerShell scripts for the Windows depot (board task 0eae9619).
 
 ## Playing
 
@@ -77,7 +84,7 @@ seed — traces carry a world digest that proves it. The pins are skipped for
 
 ## Game probes
 
-The pinned game copy lives at `.game/` (untracked). Runs launch from there, never from the Steam install — every run rewrites `preferences.ini`, and Steam would otherwise update the build out from under the recorded class mappings. Sweeps give each worker its own clone (`.game-w1` …).
+The pinned game copy, the Linux depot, lives at `.game/` (untracked); on a machine with no display, `PROBE_DISPLAY=N` gives each probe its own X server. Runs launch from there, never from the Steam install — every run rewrites `preferences.ini`, and Steam would otherwise update the build out from under the recorded class mappings. Sweeps give each worker its own clone (`.game-w1` …).
 
 ```bash
 make boot-probe     # headless engine boot, archives the engine log

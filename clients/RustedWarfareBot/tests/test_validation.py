@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import pytest
 
-from rw_bot.platform_id import WINDOWS
 from rw_bot.validation import (
     DecodeError,
     require_absolute_path,
@@ -15,10 +14,6 @@ from rw_bot.validation import (
     require_positive_int,
     require_str,
 )
-
-#: The platform the cluster runs, so the POSIX half of every rule below is
-#: exercised from the Windows workstation the suite runs on.
-LINUX = "linux"
 
 
 def test_require_str_returns_value() -> None:
@@ -90,72 +85,32 @@ def test_require_bool_rejects_int() -> None:
     assert caught.value.message == "field 'sandbox' must be bool, got int"
 
 
-@pytest.mark.parametrize(
-    "value",
-    [
-        "C:/runs/boot.log",
-        "C:\\runs\\boot.log",
-        "\\\\server\\share\\boot.log",
-    ],
-)
-def test_require_absolute_path_accepts_absolute_windows_paths(value: str) -> None:
-    assert require_absolute_path({"log_path": value}, "log_path", WINDOWS) == value
-
-
 @pytest.mark.parametrize("value", ["/runs/boot.log", "/pub/rw/runs/boot.log"])
-def test_require_absolute_path_accepts_absolute_posix_paths(value: str) -> None:
-    assert require_absolute_path({"log_path": value}, "log_path", LINUX) == value
-
-
-@pytest.mark.parametrize(
-    "value",
-    [
-        "runs/boot.log",
-        "./boot.log",
-        "/runs/boot.log",
-    ],
-)
-def test_require_absolute_path_rejects_relative_paths(value: str) -> None:
-    """``/runs/boot.log`` is drive-rooted but not absolute under Windows rules."""
-    with pytest.raises(DecodeError) as caught:
-        require_absolute_path({"log_path": value}, "log_path", WINDOWS)
-    assert caught.value.code == "RW-DECODE-005"
-    assert "must be an absolute path" in caught.value.message
+def test_require_absolute_path_accepts_absolute_paths(value: str) -> None:
+    assert require_absolute_path({"log_path": value}, "log_path") == value
 
 
 @pytest.mark.parametrize("value", ["runs/boot.log", "./boot.log", "C:/runs/boot.log"])
-def test_require_absolute_path_rejects_relative_posix_paths(value: str) -> None:
+def test_require_absolute_path_rejects_relative_paths(value: str) -> None:
     """``C:/runs/boot.log`` has no root at all on POSIX -- it is a directory
     literally named ``C:``, relative to wherever the process happens to be."""
     with pytest.raises(DecodeError) as caught:
-        require_absolute_path({"log_path": value}, "log_path", LINUX)
+        require_absolute_path({"log_path": value}, "log_path")
     assert caught.value.code == "RW-DECODE-005"
-
-
-def test_the_two_families_disagree_about_the_case_that_matters() -> None:
-    """Reading a path under the wrong family does not mis-parse it -- it
-    INVERTS this check, accepting exactly what it exists to reject. Both
-    directions, because a rule that is only wrong one way is a rule half
-    checked."""
-    drive_rooted = {"log_path": "/runs/boot.log"}
-    lettered = {"log_path": "C:/runs/boot.log"}
-    assert require_absolute_path(drive_rooted, "log_path", LINUX) == "/runs/boot.log"
-    assert require_absolute_path(lettered, "log_path", WINDOWS) == "C:/runs/boot.log"
-    with pytest.raises(DecodeError):
-        require_absolute_path(drive_rooted, "log_path", WINDOWS)
-    with pytest.raises(DecodeError):
-        require_absolute_path(lettered, "log_path", LINUX)
+    assert caught.value.message.startswith(
+        f"field 'log_path' must be an absolute path, got {value!r}: "
+    )
 
 
 def test_require_absolute_path_rejects_blank_before_testing_shape() -> None:
     with pytest.raises(DecodeError) as caught:
-        require_absolute_path({"log_path": "  "}, "log_path", WINDOWS)
+        require_absolute_path({"log_path": "  "}, "log_path")
     assert caught.value.code == "RW-DECODE-003"
 
 
 def test_require_absolute_path_rejects_wrong_type() -> None:
     with pytest.raises(DecodeError) as caught:
-        require_absolute_path({"log_path": 5}, "log_path", WINDOWS)
+        require_absolute_path({"log_path": 5}, "log_path")
     assert caught.value.code == "RW-DECODE-002"
 
 

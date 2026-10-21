@@ -28,10 +28,7 @@ from rw_bot.provenance import (
 )
 from rw_bot.tree_identity import TreeIdentityError
 from tests.harness_fakes import FakeHost
-from tests.sample_game import LINUX, SAMPLE_JAVA_VERSION, write_sample_game
-
-#: The other platform, so the runtime axis is exercised as both.
-WINDOWS = "win32"
+from tests.sample_game import SAMPLE_JAVA_VERSION, write_sample_game
 
 OUT_DIR = Path("runs/sweeps/demo")
 TRACES = Path("runs/traces")
@@ -69,7 +66,7 @@ def _host_with_batch(*stems: str) -> FakeHost:
     Returns:
         The host.
     """
-    host = FakeHost(platform="linux")
+    host = FakeHost()
     host.dirs.add(OUT_DIR.as_posix())
     for stem in stems:
         host.files[f"{OUT_DIR.as_posix()}/{stem}.txt"] = CARD
@@ -127,7 +124,7 @@ class TestReadingABatch:
         assert [row["seed"] for row in rows] == [1]
 
     def test_an_empty_batch_reads_as_no_rows(self) -> None:
-        with FakeHost(platform="linux") as host:
+        with FakeHost() as host:
             host.dirs.add(OUT_DIR.as_posix())
             assert read_batch_rows(OUT_DIR, TRACES, BATCH) == ()
 
@@ -139,7 +136,7 @@ class TestTheFingerprint:
         2026-08-29, which made two Linux batches on different bundled JREs
         fingerprint identically."""
         game = write_sample_game(tmp_path / "game")
-        with FakeHost(platform=LINUX):
+        with FakeHost():
             fingerprint = batch_fingerprint(str(game))
         assert {p["name"] for p in fingerprint["packages"]} == {
             GAME_DISTRIBUTION,
@@ -147,12 +144,11 @@ class TestTheFingerprint:
             ASSETS_DISTRIBUTION,
         }
 
-    def test_the_runtime_read_is_the_one_this_machine_would_run(self, tmp_path: Path) -> None:
-        """The platform comes from the running interpreter here and nowhere
-        else in this package: everything else composes a command for a machine
-        it is not on, while this describes a batch that already played."""
-        game = write_sample_game(tmp_path / "game", platform=WINDOWS)
-        with FakeHost(platform=WINDOWS):
+    def test_the_runtime_read_is_the_one_the_batch_played_on(self, tmp_path: Path) -> None:
+        """Read off the game directory's own runtime, by the version that
+        runtime states about itself."""
+        game = write_sample_game(tmp_path / "game")
+        with FakeHost():
             fingerprint = batch_fingerprint(str(game))
         runtime = [p for p in fingerprint["packages"] if p["name"] == JVM_DISTRIBUTION]
         assert runtime[0]["version"].startswith(SAMPLE_JAVA_VERSION)
@@ -160,7 +156,7 @@ class TestTheFingerprint:
     def test_an_absent_jar_is_refused_rather_than_recorded_as_unknown(self) -> None:
         """A record saying "some build" about an obfuscated binary says
         nothing, and every claim here is valid for one build only."""
-        with FakeHost(platform=LINUX), pytest.raises(FileNotFoundError):
+        with FakeHost(), pytest.raises(FileNotFoundError):
             batch_fingerprint("no-such-directory")
 
     def test_an_absent_asset_tree_is_refused(self, tmp_path: Path) -> None:
@@ -169,13 +165,13 @@ class TestTheFingerprint:
         every scorecard, with the jar digest matching throughout."""
         game = write_sample_game(tmp_path / "game")
         shutil.rmtree(game / "assets")
-        with FakeHost(platform=LINUX), pytest.raises(TreeIdentityError) as caught:
+        with FakeHost(), pytest.raises(TreeIdentityError) as caught:
             batch_fingerprint(str(game))
         assert caught.value.code == "RW-TREE-001"
 
     def test_a_workstation_run_states_no_image_and_no_card(self, tmp_path: Path) -> None:
         game = write_sample_game(tmp_path / "game")
-        with FakeHost(platform=LINUX):
+        with FakeHost():
             fingerprint = batch_fingerprint(str(game))
         assert fingerprint["image_digest"] == NO_VALUE
         assert fingerprint["gpu_model"] == NO_VALUE

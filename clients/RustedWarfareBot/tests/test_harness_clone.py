@@ -8,7 +8,7 @@ from rw_bot.harness.clone import (
     DISPLAY_BASE,
     NO_DISPLAY,
     PLAY_PORT_BASE,
-    UNUSED_DIRS,
+    REQUIRED_ENTRIES,
     VOLATILE_DIRS,
     VOLATILE_FILES,
     CloneError,
@@ -17,15 +17,8 @@ from rw_bot.harness.clone import (
     leased_display,
     leased_port,
     missing_requirements,
-    required_entries,
     verify,
 )
-from rw_bot.platform_id import WINDOWS
-
-#: A ``sys.platform`` value for the platform the cluster runs, so the rules
-#: below are exercised as both rather than as the one the suite happens to be
-#: running on.
-LINUX = "linux"
 
 
 def test_clones_are_numbered_from_one_so_they_read_like_worker_labels() -> None:
@@ -43,19 +36,9 @@ def test_the_trees_the_game_rewrites_are_not_copied() -> None:
     """Copying them risks reading one while a match already in flight is
     part-way through writing it, and the game rebuilds both on boot.
     """
-    copied = entries_to_copy(["assets", "saves", "jvm64", "cache", "game-lib.jar"])
-    assert copied == ("assets", "jvm64", "game-lib.jar")
+    copied = entries_to_copy(["assets", "saves", "jvm-linux", "cache", "game-lib.jar"])
+    assert copied == ("assets", "jvm-linux", "game-lib.jar")
     assert set(VOLATILE_DIRS).isdisjoint(copied)
-
-
-def test_the_thirty_two_bit_jvm_is_not_copied_because_nothing_names_it() -> None:
-    """The launcher names jvm64 for the game, for javac and for jar. At 118 MB
-    the tree beside it is the largest thing a clone could carry for nothing, and
-    it would be carried once per worker.
-    """
-    copied = entries_to_copy(["jvm", "jvm64", "game-lib.jar"])
-    assert copied == ("jvm64", "game-lib.jar")
-    assert UNUSED_DIRS == ("jvm",)
 
 
 def test_the_settings_file_is_named_as_rewritable() -> None:
@@ -72,25 +55,18 @@ def test_an_entry_the_game_gains_later_is_copied_rather_than_dropped() -> None:
     assert "someNewTree" in entries_to_copy(["someNewTree", "saves"])
 
 
-@pytest.mark.parametrize("platform", [WINDOWS, LINUX])
-def test_a_complete_clone_has_nothing_missing(platform: str) -> None:
-    complete = required_entries(platform, compiles_agent=True)
-    assert missing_requirements(complete, platform, compiles_agent=True) == ()
-    verify(".game-w1", complete, platform, compiles_agent=True)
+def test_a_complete_clone_has_nothing_missing() -> None:
+    assert missing_requirements(REQUIRED_ENTRIES) == ()
+    verify(".game-w1", REQUIRED_ENTRIES)
 
 
-@pytest.mark.parametrize("platform", [WINDOWS, LINUX])
-def test_a_truncated_clone_names_every_missing_path_not_just_the_first(platform: str) -> None:
+def test_a_truncated_clone_names_every_missing_path_not_just_the_first() -> None:
     """The failure this replaces is "the agent never opened port N" ninety
     seconds later, which reads like a fault in the agent rather than a bad copy.
     """
-    present = [
-        name
-        for name in required_entries(platform, compiles_agent=True)
-        if name != "game-lib.jar" and name != "libs"
-    ]
+    present = [name for name in REQUIRED_ENTRIES if name not in ("game-lib.jar", "libs")]
     with pytest.raises(CloneError) as caught:
-        verify(".game-w2", present, platform, compiles_agent=True)
+        verify(".game-w2", present)
     assert caught.value.code == "RW-CLONE-001"
     assert "game-lib.jar" in str(caught.value)
     assert "libs" in str(caught.value)
@@ -98,17 +74,13 @@ def test_a_truncated_clone_names_every_missing_path_not_just_the_first(platform:
 
 
 def test_the_jvm_is_required_because_the_launcher_runs_it_from_the_clone() -> None:
-    assert "jvm64/bin/java.exe" in required_entries(WINDOWS, compiles_agent=True)
-    assert "jvm-linux/bin/java" in required_entries(LINUX, compiles_agent=True)
+    assert REQUIRED_ENTRIES[0] == "jvm-linux/bin/java"
 
 
-def test_a_windows_clone_is_not_a_complete_linux_one() -> None:
-    """The whole reason the requirement is computed rather than written down:
-    a tree carrying java.exe satisfies nothing on a cluster node, and saying so
-    here is what turns that into a clone error instead of a launch failure."""
-    assert missing_requirements(
-        required_entries(WINDOWS, compiles_agent=True), LINUX, compiles_agent=True
-    ) == ("jvm-linux/bin/java",)
+def test_no_compiler_is_required_because_the_depot_ships_none() -> None:
+    """The depot is a JRE. Demanding ``javac`` or ``jar`` in a clone would
+    reject every valid tree, and the agent is built with the host's JDK."""
+    assert not [entry for entry in REQUIRED_ENTRIES if entry.endswith(("javac", "/jar"))]
 
 
 def test_a_numbered_clone_owns_the_port_its_ordinal_names() -> None:

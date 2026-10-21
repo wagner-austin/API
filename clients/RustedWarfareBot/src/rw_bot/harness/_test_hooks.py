@@ -31,9 +31,9 @@ from rw_bot.harness._hook_defaults import (
     _read_argv_impl,
     _read_environment_impl,
     _read_executable_impl,
-    _read_platform_impl,
     _read_text_lines_impl,
     _remove_path_impl,
+    _replace_path_impl,
     _resolve_root_impl,
     _run_capture_impl,
     _run_inherited_impl,
@@ -61,9 +61,9 @@ from rw_bot.harness._hook_protocols import (
     ReadArgvProto,
     ReadEnvironmentProto,
     ReadExecutableProto,
-    ReadPlatformProto,
     ReadTextLinesProto,
     RemovePathProto,
+    ReplacePathProto,
     ResolveRootProto,
     RunCaptureProto,
     RunInheritedProto,
@@ -93,9 +93,9 @@ path_exists: PathExistsProto = _path_exists_impl
 read_argv: ReadArgvProto = _read_argv_impl
 read_environment: ReadEnvironmentProto = _read_environment_impl
 read_executable: ReadExecutableProto = _read_executable_impl
-read_platform: ReadPlatformProto = _read_platform_impl
 read_text_lines: ReadTextLinesProto = _read_text_lines_impl
 remove_path: RemovePathProto = _remove_path_impl
+replace_path: ReplacePathProto = _replace_path_impl
 resolve_root: ResolveRootProto = _resolve_root_impl
 run_capture: RunCaptureProto = _run_capture_impl
 run_inherited: RunInheritedProto = _run_inherited_impl
@@ -122,9 +122,9 @@ __all__ = [
     "ReadArgvProto",
     "ReadEnvironmentProto",
     "ReadExecutableProto",
-    "ReadPlatformProto",
     "ReadTextLinesProto",
     "RemovePathProto",
+    "ReplacePathProto",
     "ResolveRootProto",
     "RunCaptureProto",
     "RunInheritedProto",
@@ -150,9 +150,9 @@ __all__ = [
     "read_argv",
     "read_environment",
     "read_executable",
-    "read_platform",
     "read_text_lines",
     "remove_path",
+    "replace_path",
     "resolve_root",
     "run_capture",
     "run_inherited",

@@ -2,12 +2,13 @@
 
 Split from :mod:`rw_bot.harness.launch` when that file passed the six-hundred
 line ceiling, and the boundary is a real one: building the agent runs a
-COMPILER, which only the Windows depot ships. The Linux depot is a JRE, so a
-cluster node never builds anything -- it attaches the jar its batch froze.
+COMPILER, which the game's depot does not ship -- it is a JRE. The host's own
+JDK builds the agent (:data:`HOST_JAVAC`, :data:`HOST_JAR`), and a cluster
+node never builds anything: it attaches the jar its batch froze.
 
 The two therefore change for different reasons. A new launch option touches
 how a match STARTS; a new agent source touches how it is BUILT; and the
-platform that can do the second is a strict subset of the one that can do the
+machines that can do the second are a strict subset of those that can do the
 first.
 """
 
@@ -15,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from rw_bot.harness.jvm import JAVA_PATH, classpath
 from rw_bot.harness.launch import LaunchConfig
 
 #: Where the agent's Java sources live.
@@ -32,16 +34,25 @@ AGENT_BUILD_DIR = "agent/build"
 #: What a frozen tree's prebuilt agent jar is called inside it.
 FROZEN_AGENT_JAR = "rw-agent.jar"
 
+#: The prebuilt agent jar ``make agent`` publishes and a batch freezes, under
+#: the same basename it carries inside a frozen tree.
+BUILT_AGENT_JAR = f"{AGENT_BUILD_DIR}/{FROZEN_AGENT_JAR}"
+
+#: The host JDK's compiler and archiver, found on ``PATH``. Not the game's:
+#: the depot's ``jvm-linux`` is a JRE with neither, and any JDK from 9 on
+#: honours ``--release`` (:data:`JAVA_RELEASE`), so the classes it writes
+#: load on the depot's Java 8 whichever JDK wrote them.
+HOST_JAVAC = "javac"
+HOST_JAR = "jar"
+
 #: Bytecode level the agent is compiled to.
 #:
-#: Eight, because the OLDEST JVM the agent must load into is the Linux depot's
-#: JRE 1.8.0_131 -- and a class file above a JVM's level does not degrade, it
-#: fails at load with ``UnsupportedClassVersionError``. Eight also runs on the
-#: Windows depot's OpenJDK 13, so one target serves both; the reverse is not
-#: true, which is why this is the minimum rather than a middle.
+#: Eight, because the JVM the agent loads into is the Linux depot's JRE
+#: 1.8.0_131 -- and a class file above a JVM's level does not degrade, it
+#: fails at load with ``UnsupportedClassVersionError``.
 #:
-#: It was 11 while only Windows was in view, which would have loaded on
-#: nothing the cluster runs.
+#: It was 11 while only the Windows depot's OpenJDK 13 was in view, which
+#: would have loaded on nothing the cluster runs.
 JAVA_RELEASE = "8"
 
 
@@ -119,6 +130,36 @@ def compile_command(javac: str, classes: str, sources: Sequence[str]) -> tuple[s
     return (javac, "--release", JAVA_RELEASE, "-Xlint:all", "-Werror", "-d", classes, *sources)
 
 
+#: The agent's self-check entry point: patches every Targets entry in the real
+#: jar and lets the JVM's own verifier certify each result.
+SELFTEST_CLASS = "rwbot.agent.SelfTest"
+
+
+def selftest_command(game_dir: str, classes: str) -> tuple[str, ...]:
+    """Return the command that runs the agent's self-checks on the real jar.
+
+    Run on the game's OWN runtime rather than the host JDK, because the
+    verifier the patch has to satisfy is the one the engine will load it
+    under. Every path is relative to the repository root, which is where the
+    command runs: the self-test reads the jar, it does not boot the engine.
+
+    Args:
+        game_dir: The pinned game directory, relative to the root.
+        classes: The freshly compiled agent classes, relative to the root.
+
+    Returns:
+        The argument vector, the bundled ``java`` first.
+    """
+    jar = f"{game_dir}/game-lib.jar"
+    return (
+        f"{game_dir}/{JAVA_PATH}",
+        "-cp",
+        classpath((classes, jar, f"{game_dir}/libs/*")),
+        SELFTEST_CLASS,
+        jar,
+    )
+
+
 def package_command(jar_tool: str, jar_path: str, classes: str) -> tuple[str, ...]:
     """Return the command that packages compiled classes into the agent jar.
 
@@ -138,11 +179,16 @@ __all__ = [
     "AGENT_MANIFEST",
     "AGENT_SOURCE_DIR",
     "AGENT_SOURCE_SUFFIX",
+    "BUILT_AGENT_JAR",
     "FROZEN_AGENT_JAR",
+    "HOST_JAR",
+    "HOST_JAVAC",
     "JAVA_RELEASE",
+    "SELFTEST_CLASS",
     "agent_jar",
     "agent_sources",
     "classes_dir",
     "compile_command",
     "package_command",
+    "selftest_command",
 ]

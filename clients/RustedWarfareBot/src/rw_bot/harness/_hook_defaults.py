@@ -5,11 +5,11 @@ is imported directly by anything but :mod:`rw_bot.harness._test_hooks`, which
 binds each to its protocol; callers go through the binding so a test can
 replace one without the call site changing shape.
 
-Every platform difference in here is COMPOSED rather than branched -- the
-argument vector and the spawn flags come from
-:mod:`rw_bot.harness.process_tree`, which decides them as pure functions of a
-stated platform. That is what keeps both platforms' behaviour reachable from
-whichever one the suite happens to run on.
+Every spawn here starts a NEW SESSION. That makes the child a process-group
+leader whose group holds everything it starts, and the group is what
+:func:`~rw_bot.harness.process_tree.fell_command` signals -- so the spawn and
+the kill are one decision, and a spawn that stopped starting a session would
+leave every fell here reaching only the root.
 """
 
 from __future__ import annotations
@@ -29,11 +29,11 @@ from typing import Final
 from platform_core.config import config_test_hooks
 
 from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
-from rw_bot.harness.process_tree import fell_command, spawn_isolation
+from rw_bot.harness.process_tree import fell_command
 
-#: Wall-clock bound on a FELL command, the ``taskkill`` tree walk on Windows
-#: and the process-group signal on POSIX. Thirty seconds is far longer than
-#: either needs and still finite, which is the whole point: a kill is the
+#: Wall-clock bound on a FELL command, the process-group signal. Thirty
+#: seconds is far longer than it needs and still finite, which is the whole
+#: point: a kill is the
 #: last thing standing between a hung match and the next one, and a kill
 #: that hangs takes the recovery path down with the thing it was recovering
 #: from. One of the two call sites below runs INSIDE the handler for a child
@@ -55,7 +55,7 @@ def _run_capture_impl(argv: Sequence[str], timeout_seconds: float) -> tuple[int,
     for seven minutes because one cosmetic byte was not UTF-8.
 
     A child still running at the wall is felled -- the whole tree, through
-    the same platform command every other kill here uses, because an ``ssh``
+    the same group signal every other kill here uses, because an ``ssh``
     with a ``ProxyCommand`` is two processes and orphaning the proxy leaks
     the hang -- and reported as :data:`CAPTURE_TIMEOUT_STATUS`. The
     ``TimeoutExpired`` is converted at this edge rather than propagated: the
@@ -74,26 +74,20 @@ def _run_capture_impl(argv: Sequence[str], timeout_seconds: float) -> tuple[int,
     Raises:
         OSError: When the program cannot be started.
     """
-    isolation = spawn_isolation(_read_platform_impl())
     child = subprocess.Popen(
         list(argv),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         encoding="utf-8",
         errors="replace",
-        # Ranking and fellability, decided by platform in
-        # :mod:`rw_bot.harness.process_tree` so neither arm needs a branch
-        # here. On Windows this carries the priority class the batch needs
-        # to survive a co-tenant spike (log 2026-08-10); on POSIX it puts
-        # the match in its own process group so it can be felled whole.
-        creationflags=isolation["creationflags"],
-        start_new_session=isolation["start_new_session"],
+        # Its own process group, so the wall's fell reaches the whole tree.
+        start_new_session=True,
     )
     try:
         output, _ = child.communicate(timeout=timeout_seconds)
     except subprocess.TimeoutExpired:
         subprocess.run(
-            fell_command(child.pid, _read_platform_impl()),
+            fell_command(child.pid),
             check=False,
             capture_output=True,
             timeout=FELL_WALL_SECONDS,
@@ -198,6 +192,10 @@ def _spawn_match_impl(argv: Sequence[str], transcript: Path) -> SpawnedMatchProt
     the spawn — the child keeps its inherited handle, so the report lines
     the planner prints at match end still land in the file.
 
+    Standard input is the null device, and the child leads its own session:
+    nothing ties it to the terminal that started it, which is what lets a
+    fleet worker or the match service outlive ``make`` (door, fleet-up).
+
     Args:
         argv: Argument vector, program first.
         transcript: File that receives the child's combined output.
@@ -209,19 +207,17 @@ def _spawn_match_impl(argv: Sequence[str], transcript: Path) -> SpawnedMatchProt
         OSError: When the program cannot be started or the transcript
             cannot be opened.
     """
-    isolation = spawn_isolation(_read_platform_impl())
     transcript.parent.mkdir(parents=True, exist_ok=True)
     with transcript.open("ab") as sink:
         return subprocess.Popen(
             list(argv),
+            stdin=subprocess.DEVNULL,
             stdout=sink,
             stderr=subprocess.STDOUT,
-            # Same decision as run_capture, and on POSIX it is what makes
-            # :func:`~rw_bot.harness.process_tree.fell_command` able to reach
-            # the whole match: the session started here is the group that
-            # command signals.
-            creationflags=isolation["creationflags"],
-            start_new_session=isolation["start_new_session"],
+            # What makes :func:`~rw_bot.harness.process_tree.fell_command`
+            # able to reach the whole match: the session started here is the
+            # group that command signals.
+            start_new_session=True,
         )
 
 
@@ -242,10 +238,8 @@ def _kill_tree_impl(pid: int) -> None:
     match — leaving an engine holding a leased channel port, which kills the
     NEXT match at the bind (vhdoom96b, 2026-08-09).
 
-    Which command does that is
-    :func:`~rw_bot.harness.process_tree.fell_command`'s decision, so this
-    reaches two very different mechanisms — a Windows tree walk and a POSIX
-    process-group signal — without a conditional here.
+    The command is :func:`~rw_bot.harness.process_tree.fell_command`'s, a
+    signal to the process group every spawn here starts.
 
     Args:
         pid: Root process id of the tree.
@@ -254,7 +248,7 @@ def _kill_tree_impl(pid: int) -> None:
         ValueError: When the pid is not positive.
     """
     subprocess.run(
-        list(fell_command(pid, _read_platform_impl())),
+        list(fell_command(pid)),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.STDOUT,
         check=False,
@@ -323,7 +317,6 @@ def _spawn_game_impl(
         OSError: When the engine cannot be started or a stream cannot be
             opened.
     """
-    isolation = spawn_isolation(_read_platform_impl())
     stdout_path.parent.mkdir(parents=True, exist_ok=True)
     stderr_path.parent.mkdir(parents=True, exist_ok=True)
     with stdout_path.open("ab") as out, stderr_path.open("ab") as err:
@@ -333,8 +326,7 @@ def _spawn_game_impl(
             env=dict(env),
             stdout=out,
             stderr=err,
-            creationflags=isolation["creationflags"],
-            start_new_session=isolation["start_new_session"],
+            start_new_session=True,
         )
 
 
@@ -493,15 +485,21 @@ def _count_cores_impl() -> int | None:
     return os.cpu_count()
 
 
-def _read_platform_impl() -> str:
-    """Production implementation of :class:`ReadPlatformProto`.
+def _replace_path_impl(source: Path, destination: Path) -> None:
+    """Production implementation of :class:`ReplacePathProto`.
 
-    Returns:
-        ``sys.platform``. A hook rather than a direct read so a test can drive
-        the real control flow as either platform: the decisions this feeds are
-        pure, so both answers are legitimate inputs wherever the suite runs.
+    ``os.replace`` is one rename: a reader of the destination sees the old
+    file or the new one and never a half-written one, which is why a jar a
+    game is about to attach is published this way rather than copied.
+
+    Args:
+        source: The finished file.
+        destination: Where it is published, replaced if present.
+
+    Raises:
+        OSError: When the source is absent or the rename is refused.
     """
-    return sys.platform
+    os.replace(source, destination)
 
 
 def _read_argv_impl() -> list[str]:
@@ -570,9 +568,9 @@ __all__ = [
     "_read_argv_impl",
     "_read_environment_impl",
     "_read_executable_impl",
-    "_read_platform_impl",
     "_read_text_lines_impl",
     "_remove_path_impl",
+    "_replace_path_impl",
     "_resolve_root_impl",
     "_run_capture_impl",
     "_run_inherited_impl",

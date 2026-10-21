@@ -260,9 +260,7 @@ class ResolveRootProto(Protocol):
             to be made absolute against this first.
 
             Typed as :class:`~pathlib.PurePath` rather than :class:`Path`
-            because the value is COMPOSED into commands, never opened, and a
-            concrete path carries the running interpreter's flavour into a
-            launch that may be for the other platform.
+            because the value is COMPOSED into commands, never opened.
         """
         ...
 
@@ -509,16 +507,19 @@ class CountCoresProto(Protocol):
         ...
 
 
-class ReadPlatformProto(Protocol):
-    """Report which operating system this process is running on."""
+class ReplacePathProto(Protocol):
+    """Publish a finished file at its final name in one rename."""
 
-    def __call__(self) -> str:
-        """Return the platform.
+    def __call__(self, source: Path, destination: Path) -> None:
+        """Move a file over its destination atomically.
 
-        Returns:
-            A ``sys.platform`` value, which
-            :mod:`rw_bot.harness.jvm` reads to decide what the JDK's tools are
-            called and how a classpath is joined.
+        Args:
+            source: The finished file.
+            destination: Where it is published. A reader sees the old file or
+                the new one, never a half-written one.
+
+        Raises:
+            OSError: When the source is absent or the rename is refused.
         """
         ...
 
@@ -540,9 +541,9 @@ __all__ = [
     "ReadArgvProto",
     "ReadEnvironmentProto",
     "ReadExecutableProto",
-    "ReadPlatformProto",
     "ReadTextLinesProto",
     "RemovePathProto",
+    "ReplacePathProto",
     "ResolveRootProto",
     "RunCaptureProto",
     "RunInheritedProto",

@@ -1,13 +1,12 @@
 """Every command a headless match is started by, as the pure composition it is.
 
-Parameterised across platforms throughout, because that is the whole reason
-this moved out of PowerShell: one description of a launch that a Windows
-workstation and a Linux compute node both read, checkable from either.
+One description of a launch that the workstation and a compute node both
+read, which is why it moved out of PowerShell.
 """
 
 from __future__ import annotations
 
-from pathlib import PurePosixPath, PureWindowsPath
+from pathlib import PurePosixPath
 
 import pytest
 
@@ -21,7 +20,9 @@ from rw_bot.harness.agent_build import (
 )
 from rw_bot.harness.launch import (
     DISPLAY_SIZE_TEXT,
+    GAME_ENVIRONMENT,
     HEAP,
+    LIBRARY_PATH,
     MAIN_CLASS,
     SANDBOX_FLAG,
     XVFB_SCREEN,
@@ -30,17 +31,14 @@ from rw_bot.harness.launch import (
     decode_launch_config,
     display_prefix,
     encode_launch_config,
+    engine_command,
     game_command,
-    game_environment,
+    java_agent_flag,
     planner_command,
     planner_pythonpath,
 )
-from rw_bot.platform_id import WINDOWS
 from rw_bot.validation import DecodeError
 
-LINUX = "linux"
-
-WINDOWS_ROOT = PureWindowsPath(r"C:\repo")
 POSIX_ROOT = PurePosixPath("/repo")
 
 
@@ -276,63 +274,102 @@ class TestTheEngineCommand:
     def test_it_runs_the_jvm_out_of_the_clone(self) -> None:
         """Not the system java: the clone's JVM is the pinned one, and a match
         played on another is a match played on a different runtime."""
-        command = game_command(_config(), WINDOWS_ROOT, "a.jar", WINDOWS)
-        assert command[0] == r"C:\repo\.game-w1\jvm64\bin\java.exe"
-        posix = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
-        assert posix[0] == "/repo/.game-w1/jvm-linux/bin/java"
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
+        assert command[0] == "/repo/.game-w1/jvm-linux/bin/java"
 
-    def test_the_classpath_takes_the_platforms_separator(self) -> None:
+    def test_the_classpath_is_joined_with_a_colon(self) -> None:
         """Joined wrongly the JVM reads it as ONE entry, finds no such file,
         and fails as a missing main class -- which reads like a broken jar."""
-        windows = game_command(_config(), WINDOWS_ROOT, "a.jar", WINDOWS)
-        assert windows[windows.index("-cp") + 1] == "game-lib.jar;libs/*"
-        posix = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
-        assert posix[posix.index("-cp") + 1] == "game-lib.jar:libs/*"
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
+        assert command[command.index("-cp") + 1] == "game-lib.jar:libs/*"
 
     def test_the_agent_and_the_log_are_absolute(self) -> None:
         """The engine runs with the GAME directory as its working directory,
         so a relative path would resolve against the clone."""
-        command = game_command(_config(), POSIX_ROOT, "agent/build/a.jar", LINUX)
+        command = game_command(_config(), POSIX_ROOT, "agent/build/a.jar")
         assert f"-javaagent:/repo/agent/build/a.jar={agent_arguments(_config())}" in command
         assert command[command.index("-log") + 1] == "/repo/runs/play.log"
 
     def test_it_is_headless_and_silent(self) -> None:
-        command = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
         assert "-nodisplay" in command
         assert "-nosound" in command
 
     def test_a_display_size_is_stated_because_nodisplay_still_opens_one(self) -> None:
         """-nodisplay is not a no-OpenGL mode; the 10x10 display it picks for
         itself fails once in-game UI renders."""
-        command = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
         assert command[command.index("-width") + 1] == "800"
         assert command[command.index("-height") + 1] == "600"
 
     def test_no_map_means_the_engines_own_sandbox(self) -> None:
-        assert SANDBOX_FLAG in game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
+        assert SANDBOX_FLAG in game_command(_config(), POSIX_ROOT, "a.jar")
 
     def test_a_named_map_withholds_the_sandbox_because_the_agent_starts_it(self) -> None:
-        command = game_command(_config(map_path="maps/x.tmx"), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(map_path="maps/x.tmx"), POSIX_ROOT, "a.jar")
         assert SANDBOX_FLAG not in command
 
     def test_the_heap_and_entry_point_are_named(self) -> None:
-        command = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
         assert HEAP in command
         assert MAIN_CLASS in command
 
-    def test_the_module_opens_are_paired_with_their_targets_on_a_modular_jvm(self) -> None:
-        """Without them the agent's reflection fails at class-load on 13."""
-        command = game_command(_config(), WINDOWS_ROOT, "a.jar", WINDOWS)
-        opens = [command[i + 1] for i, token in enumerate(command) if token == "--add-opens"]
-        assert opens == ["java.base/java.lang=ALL-UNNAMED", "java.base/java.util=ALL-UNNAMED"]
-
-    def test_a_java_eight_runtime_is_given_no_module_options_at_all(self) -> None:
+    def test_the_java_eight_runtime_is_given_no_module_options_at_all(self) -> None:
         """The Linux depot ships a JRE 8, which has no module system and
         REJECTS ``--add-opens`` as unrecognised. Passing it there is not a
         harmless extra -- it is a JVM that never starts, which on a compute
         node is a scheduled job that dies in its first second."""
-        command = game_command(_config(), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(), POSIX_ROOT, "a.jar")
         assert "--add-opens" not in command
+
+    def test_the_whole_vector_in_order(self) -> None:
+        """Pinned whole, so a flag moved across the main class -- where the
+        JVM would read it as the ENGINE's and the engine would reject it -- is
+        a failure here rather than a match that never boots."""
+        assert game_command(_config(), POSIX_ROOT, "a.jar") == (
+            "/repo/.game-w1/jvm-linux/bin/java",
+            HEAP,
+            LIBRARY_PATH,
+            f"-javaagent:/repo/a.jar={agent_arguments(_config())}",
+            "-cp",
+            "game-lib.jar:libs/*",
+            MAIN_CLASS,
+            "-nodisplay",
+            "-nosound",
+            SANDBOX_FLAG,
+            "-width",
+            "800",
+            "-height",
+            "600",
+            "-log",
+            "/repo/runs/play.log",
+        )
+
+
+class TestTheSharedEngineInvocation:
+    def test_an_engine_without_an_agent_carries_no_agent_option(self) -> None:
+        """The boot probe and the unit dump run the engine alone."""
+        command = engine_command(POSIX_ROOT, ".game", (), ("-printunits",), "runs/u.log")
+        assert command == (
+            "/repo/.game/jvm-linux/bin/java",
+            HEAP,
+            LIBRARY_PATH,
+            "-cp",
+            "game-lib.jar:libs/*",
+            MAIN_CLASS,
+            "-printunits",
+            "-log",
+            "/repo/runs/u.log",
+        )
+
+    def test_an_agent_with_options_carries_them_after_an_equals(self) -> None:
+        assert java_agent_flag(POSIX_ROOT / "a.jar", "channelPort=1") == (
+            "-javaagent:/repo/a.jar=channelPort=1"
+        )
+
+    def test_an_agent_without_options_takes_no_equals(self) -> None:
+        """The agent reads an empty option string as one blank key."""
+        assert java_agent_flag(POSIX_ROOT / "a.jar", "") == "-javaagent:/repo/a.jar"
 
     def test_the_agent_targets_the_oldest_runtime_it_must_load_into(self) -> None:
         """A class file above a JVM's level does not degrade, it fails at load
@@ -343,15 +380,12 @@ class TestTheEngineCommand:
 
 
 class TestTheEngineEnvironment:
-    def test_linux_gets_the_dynamic_linker_search_path(self) -> None:
+    def test_it_carries_the_dynamic_linker_search_path(self) -> None:
         """``-Djava.library.path`` tells the JVM where to find a library it is
         asked to load. It does NOT tell the linker where that library's own
         dependencies are, and librocketConnector.so links against
         libRocketCore.so.1 beside it. Read off the game's own Linux launcher."""
-        assert game_environment(LINUX) == {"LD_LIBRARY_PATH": "."}
-
-    def test_windows_needs_no_help_resolving_its_own_dlls(self) -> None:
-        assert game_environment(WINDOWS) == {}
+        assert GAME_ENVIRONMENT == {"LD_LIBRARY_PATH": "."}
 
 
 class TestTheXServer:
@@ -360,13 +394,13 @@ class TestTheXServer:
     nothing; on a headless compute node there is no server to open at all."""
 
     def test_a_leased_display_brings_its_own_server(self) -> None:
-        command = game_command(_config(display=91), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(display=91), POSIX_ROOT, "a.jar")
         assert command[:5] == ("xvfb-run", "-n", "91", "-s", "-screen 0 800x600x24")
 
     def test_the_server_wraps_the_jvm_rather_than_following_it(self) -> None:
         """It has to be the program, not an argument: the wrapper starts the
         server, runs what follows under it, and takes it down again."""
-        command = game_command(_config(display=91), POSIX_ROOT, "a.jar", LINUX)
+        command = game_command(_config(display=91), POSIX_ROOT, "a.jar")
         assert command.index("xvfb-run") == 0
         assert command.index("/repo/.game-w1/jvm-linux/bin/java") > 0
 
@@ -378,29 +412,21 @@ class TestTheXServer:
 
     def test_no_display_means_no_server(self) -> None:
         """Zero says the machine already has one -- a workstation desktop."""
-        assert display_prefix(0, LINUX) == ()
-        assert game_command(_config(), POSIX_ROOT, "a.jar", LINUX)[0].endswith("java")
-
-    def test_windows_never_starts_one_whatever_the_display_says(self) -> None:
-        """There is no X there, and xvfb-run is a command that does not
-        exist -- so a display number reaching a Windows launch is ignored
-        rather than turned into a launch that cannot start."""
-        assert display_prefix(91, WINDOWS) == ()
-        command = game_command(_config(display=91), WINDOWS_ROOT, "a.jar", WINDOWS)
-        assert command[0].endswith("java.exe")
+        assert display_prefix(0) == ()
+        assert game_command(_config(), POSIX_ROOT, "a.jar")[0].endswith("java")
 
     def test_a_negative_display_is_refused(self) -> None:
         """Zero is already the "none" sentinel, so a number below it is not a
         spare value but a bug."""
         with pytest.raises(ValueError, match="non-negative number"):
-            display_prefix(-1, LINUX)
+            display_prefix(-1)
 
     def test_the_server_number_is_a_lease_and_not_a_search(self) -> None:
         """``xvfb-run -a`` picks one by scanning for a free lock file, which
         is the same shape as the random port draw that collided the first
         time eight matches launched in one instant."""
-        assert "-a" not in display_prefix(91, LINUX)
-        assert "-n" in display_prefix(91, LINUX)
+        assert "-a" not in display_prefix(91)
+        assert "-n" in display_prefix(91)
 
 
 class TestThePlannerCommand:
@@ -430,15 +456,11 @@ class TestThePlannerCommand:
 
 class TestThePlannersPath:
     def test_it_carries_the_snapshot_and_its_source_directory(self) -> None:
-        path = planner_pythonpath(POSIX_ROOT, "runs/sweeps/d/.tree", LINUX)
+        path = planner_pythonpath(POSIX_ROOT, "runs/sweeps/d/.tree")
         assert path == "/repo/runs/sweeps/d/.tree:/repo/runs/sweeps/d/.tree/src"
-
-    def test_it_takes_the_platforms_separator(self) -> None:
-        path = planner_pythonpath(WINDOWS_ROOT, "t", WINDOWS)
-        assert path == r"C:\repo\t;C:\repo\t\src"
 
     def test_composing_one_without_a_tree_is_refused(self) -> None:
         """A blank PYTHONPATH is not an unset one: it would put the working
         directory back on a path that was told not to have it."""
         with pytest.raises(ValueError, match="only composed for a frozen tree"):
-            planner_pythonpath(POSIX_ROOT, "", LINUX)
+            planner_pythonpath(POSIX_ROOT, "")

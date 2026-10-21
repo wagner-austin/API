@@ -15,7 +15,7 @@ a digest-pinned artifact like the game, named in the record, verified on both
 sides of the transfer, and re-checkable on the cluster with coreutils.
 
 THE AGENT JAR IS WHY THIS CANNOT BE SKIPPED. The Linux depot ships a JRE with
-no ``javac`` and no ``jar`` (:func:`~rw_bot.harness.jvm.bundled_tools`), so a
+no ``javac`` and no ``jar`` (:mod:`rw_bot.harness.jvm`), so a
 node cannot build the Java agent a match attaches. It has to arrive built, and
 this is what carries it.
 

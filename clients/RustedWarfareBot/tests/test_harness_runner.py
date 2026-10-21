@@ -172,7 +172,7 @@ def test_a_clone_is_a_copy_of_the_game_without_the_trees_it_rewrites() -> None:
         host.plant_source(_SOURCE)
         name = prepare_clone(0, _config())
         assert name == ".game-w1"
-        assert host.path_exists(Path(".game-w1/jvm64/bin/java.exe"))
+        assert host.path_exists(Path(".game-w1/jvm-linux/bin/java"))
         assert host.path_exists(Path(".game-w1/game-lib.jar"))
         # Copied from the source, not created: the source's saves tree is left
         # behind and the game rebuilds it on boot.

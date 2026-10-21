@@ -10,17 +10,17 @@ PowerShell cannot start a match on a Linux compute node, and rewriting it as a
 second shell script beside the first would make two launchers to keep in step
 -- with the failure of a missed edit being a batch that runs the wrong
 configuration and still reports a scorecard. The composition here is one
-description of a launch that both platforms read, which is the only shape in
+description of a launch that every caller reads, which is the only shape in
 which "the workstation and the cluster ran the same experiment" is checkable
 rather than hoped for.
 
 WHAT IS DELIBERATELY STILL A STRING. The agent takes its options as one
 ``key=value;key=value`` argument, and that semicolon is the AGENT's separator,
-not the operating system's -- it is identical on every platform and must not
-be routed through :func:`~rw_bot.platform_id.path_list_separator`, which is
-the character that genuinely does change. Two separators that look alike and
-mean different things is exactly the confusion this package has already paid
-for once, so they are named apart here.
+not the operating system's -- it must not be confused with
+:data:`~rw_bot.harness.jvm.PATH_LIST_SEPARATOR`, which joins a classpath and a
+``PYTHONPATH``. Two separators that look alike and mean different things is
+exactly the confusion this package has already paid for once, so they are
+named apart here.
 """
 
 from __future__ import annotations
@@ -29,8 +29,7 @@ from collections.abc import Mapping
 from pathlib import PurePath
 from typing import TypedDict
 
-from rw_bot.harness.jvm import game_classpath, has_module_system, tool_path
-from rw_bot.platform_id import is_windows, path_list_separator
+from rw_bot.harness.jvm import GAME_CLASSPATH, JAVA_PATH, PATH_LIST_SEPARATOR
 from rw_bot.validation import (
     require_int,
     require_non_empty_str,
@@ -43,16 +42,6 @@ from rw_bot.validation import (
 #: than a target.
 HEAP = "-Xmx1000M"
 
-#: Modules the agent reflects into.
-#:
-#: Passed only to a JVM that HAS a module system. The engine is built for Java
-#: 8 semantics; the Windows depot runs it on OpenJDK 13, which enforces module
-#: boundaries and needs these or the agent's reflection fails at class-load.
-#: The Linux depot ships a JRE 8, which has no module system and REJECTS the
-#: option outright -- so passing it there is not harmless, it is a JVM that
-#: never starts (:func:`~rw_bot.harness.jvm.has_module_system`).
-ADD_OPENS = ("java.base/java.lang", "java.base/java.util")
-
 #: Where the engine looks for its native libraries: the game directory, which
 #: is also its working directory. Relative for that reason -- an absolute path
 #: here would pin a clone to the machine that made it.
@@ -61,9 +50,20 @@ LIBRARY_PATH = "-Djava.library.path=."
 #: What the dynamic linker reads to resolve a loaded library's OWN
 #: dependencies, and the value the game's Linux launcher gives it. The JVM
 #: option above covers the first load; this covers what that library links
-#: against (see :func:`game_environment`).
+#: against (see :data:`GAME_ENVIRONMENT`).
 LIBRARY_SEARCH_VAR = "LD_LIBRARY_PATH"
 LIBRARY_SEARCH_VALUE = "."
+
+#: The environment overlay the engine needs, beyond what it inherits.
+#:
+#: ``-Djava.library.path`` tells the JVM where to find a library it is asked
+#: to load. It does NOT tell the dynamic linker where to find that library's
+#: OWN dependencies, and the engine's native GUI stack has them:
+#: ``librocketConnector.so`` links against ``libRocketCore.so.1`` beside it.
+#: Without this the first load fails as a missing shared object naming a file
+#: that is plainly there. Read off the game's own Linux launcher, which sets
+#: exactly this before invoking the JVM.
+GAME_ENVIRONMENT: Mapping[str, str] = {LIBRARY_SEARCH_VAR: LIBRARY_SEARCH_VALUE}
 
 #: The engine's entry point.
 MAIN_CLASS = "com.corrodinggames.rts.java.Main"
@@ -325,44 +325,16 @@ def agent_arguments(config: LaunchConfig) -> str:
     return AGENT_OPTION_SEPARATOR.join(options)
 
 
-def game_environment(platform: str) -> dict[str, str]:
-    """Return the environment overlay the engine needs, beyond what it inherits.
-
-    ``-Djava.library.path`` tells the JVM where to find a library it is asked
-    to load. It does NOT tell the dynamic linker where to find that library's
-    OWN dependencies, and the engine's native GUI stack has them:
-    ``librocketConnector.so`` links against ``libRocketCore.so.1`` beside it.
-    Without this the first load fails as a missing shared object naming a file
-    that is plainly there.
-
-    Read off the game's own Linux launcher, which sets exactly this before
-    invoking the JVM.
-
-    Args:
-        platform: A ``sys.platform`` value.
-
-    Returns:
-        The variables to add. Empty on Windows, which resolves a DLL's
-        dependencies from the process's own directory and needs no help.
-    """
-    if is_windows(platform):
-        return {}
-    return {LIBRARY_SEARCH_VAR: LIBRARY_SEARCH_VALUE}
-
-
-def display_prefix(display: int, platform: str) -> tuple[str, ...]:
+def display_prefix(display: int) -> tuple[str, ...]:
     """Return the wrapper that gives a match an X server, if it needs one.
 
     Args:
         display: The X display this match owns, or
             :data:`~rw_bot.harness.clone.NO_DISPLAY` for none.
-        platform: A ``sys.platform`` value.
 
     Returns:
-        The wrapper tokens, or an empty tuple when no server is to be started.
-        Empty on Windows whatever the display says: there is no X there, the
-        engine draws on the desktop compositor, and a wrapper would be a
-        command that does not exist.
+        The wrapper tokens, or an empty tuple when the machine's own display
+        is to be used.
 
     Raises:
         ValueError: When the display is negative. ``:0`` is already excluded
@@ -372,7 +344,7 @@ def display_prefix(display: int, platform: str) -> tuple[str, ...]:
     """
     if display < 0:
         raise ValueError(f"an X display is named by a non-negative number, got {display}")
-    if is_windows(platform) or display == 0:
+    if display == 0:
         return ()
     # The server number is a lease, not a search. `xvfb-run -a` picks one by
     # scanning for a free lock file, which is the same shape as the random
@@ -381,50 +353,87 @@ def display_prefix(display: int, platform: str) -> tuple[str, ...]:
     return (XVFB_COMMAND, "-n", str(display), "-s", XVFB_SCREEN)
 
 
-def game_command(
-    config: LaunchConfig, root: PurePath, jar_path: str, platform: str
-) -> tuple[str, ...]:
-    """Return the command that starts the engine.
+def java_agent_flag(jar: PurePath, options: str) -> str:
+    """Return the JVM option that attaches the agent.
 
-    The agent jar and the log are absolute because the engine runs with the
+    Args:
+        jar: The agent jar, absolute: the engine runs from the game directory.
+        options: The agent's own ``key=value;key=value`` string, or empty for
+            none -- in which case no ``=`` follows the jar, because the agent
+            reads an empty option string as one blank key.
+
+    Returns:
+        The ``-javaagent`` option.
+    """
+    if options:
+        return f"-javaagent:{jar}={options}"
+    return f"-javaagent:{jar}"
+
+
+def engine_command(
+    root: PurePath,
+    game_dir: str,
+    agent: tuple[str, ...],
+    engine_flags: tuple[str, ...],
+    log: str,
+) -> tuple[str, ...]:
+    """Return the JVM invocation every engine launch here shares.
+
+    One composition for the match, the probes and the watched and hosted
+    games, which differ only in whether an agent rides along and in the
+    engine's own flags. The log is absolute because the engine runs with the
     GAME directory as its working directory, so a relative path would resolve
     against the clone rather than the repository.
+
+    Args:
+        root: Absolute path of the repository root.
+        game_dir: The game directory, relative to the root.
+        agent: The agent's ``-javaagent`` option (:func:`java_agent_flag`), or
+            empty for an engine that runs alone.
+        engine_flags: The engine's own flags, after its main class.
+        log: The engine's log, relative to the root.
+
+    Returns:
+        The argument vector, the bundled ``java`` first.
+    """
+    return (
+        str(root / game_dir / JAVA_PATH),
+        HEAP,
+        LIBRARY_PATH,
+        *agent,
+        "-cp",
+        GAME_CLASSPATH,
+        MAIN_CLASS,
+        *engine_flags,
+        "-log",
+        str(root / log),
+    )
+
+
+def game_command(config: LaunchConfig, root: PurePath, jar_path: str) -> tuple[str, ...]:
+    """Return the command that starts a headless match's engine.
 
     Args:
         config: The launch.
         root: Absolute path of the repository root.
         jar_path: The agent jar, relative to the root.
-        platform: A ``sys.platform`` value, which decides the classpath
-            separator and what ``java`` is called.
 
     Returns:
         The argument vector. The JVM is first unless the match brings its own
         X server, in which case :func:`display_prefix` comes first and the JVM
         follows it.
     """
-    command = [
-        *display_prefix(config["display"], platform),
-        str(root / config["game_dir"] / tool_path("java", platform)),
-        HEAP,
-    ]
-    if has_module_system(platform):
-        for module in ADD_OPENS:
-            command.extend(("--add-opens", f"{module}=ALL-UNNAMED"))
-    command.extend(
-        (
-            LIBRARY_PATH,
-            f"-javaagent:{root / jar_path}={agent_arguments(config)}",
-            "-cp",
-            game_classpath(platform),
-            MAIN_CLASS,
-            *HEADLESS_FLAGS,
-        )
+    sandbox = () if config["map"] else (SANDBOX_FLAG,)
+    return (
+        *display_prefix(config["display"]),
+        *engine_command(
+            root,
+            config["game_dir"],
+            (java_agent_flag(root / jar_path, agent_arguments(config)),),
+            (*HEADLESS_FLAGS, *sandbox, "-width", DISPLAY_SIZE[0], "-height", DISPLAY_SIZE[1]),
+            config["play_log"],
+        ),
     )
-    if not config["map"]:
-        command.append(SANDBOX_FLAG)
-    command.extend(("-width", DISPLAY_SIZE[0], "-height", DISPLAY_SIZE[1]))
-    command.extend(("-log", str(root / config["play_log"])))
-    return tuple(command)
 
 
 def planner_command(interpreter: str, config: LaunchConfig) -> tuple[str, ...]:
@@ -455,16 +464,16 @@ def planner_command(interpreter: str, config: LaunchConfig) -> tuple[str, ...]:
     return tuple(command)
 
 
-def planner_pythonpath(root: PurePath, tree: str, platform: str) -> str:
+def planner_pythonpath(root: PurePath, tree: str) -> str:
     """Return the ``PYTHONPATH`` a planner importing a frozen tree needs.
 
     Args:
         root: Absolute path of the repository root.
         tree: The frozen snapshot, relative to the root.
-        platform: A ``sys.platform`` value, which decides the separator.
 
     Returns:
-        The snapshot and its ``src`` directory, joined for the platform.
+        The snapshot and its ``src`` directory, joined by
+        :data:`~rw_bot.harness.jvm.PATH_LIST_SEPARATOR`.
 
     Raises:
         ValueError: When no tree is given. A blank ``PYTHONPATH`` is not the
@@ -477,17 +486,17 @@ def planner_pythonpath(root: PurePath, tree: str, platform: str) -> str:
             "put the working directory back on a path that was told not to have it"
         )
     snapshot = root / tree
-    return path_list_separator(platform).join((str(snapshot), str(snapshot / "src")))
+    return PATH_LIST_SEPARATOR.join((str(snapshot), str(snapshot / "src")))
 
 
 __all__ = [
-    "ADD_OPENS",
     "AGENT_OPTION_SEPARATOR",
     "CATALOGUE",
     "DISPLAY_SIZE",
     "DISPLAY_SIZE_TEXT",
     "FROZEN_CATALOGUE",
     "FROZEN_TYPE_DUMP",
+    "GAME_ENVIRONMENT",
     "HEADLESS_FLAGS",
     "HEAP",
     "LIBRARY_PATH",
@@ -505,8 +514,9 @@ __all__ = [
     "decode_launch_config",
     "display_prefix",
     "encode_launch_config",
+    "engine_command",
     "game_command",
-    "game_environment",
+    "java_agent_flag",
     "planner_command",
     "planner_pythonpath",
 ]

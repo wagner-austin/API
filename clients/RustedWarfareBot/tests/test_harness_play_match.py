@@ -7,8 +7,6 @@ the real orphan check, the real frozen-tree branch.
 
 from __future__ import annotations
 
-import pytest
-
 from rw_bot.harness.launch import LaunchConfig
 from rw_bot.harness.play_match import (
     EXIT_AGENT_BUILD_FAILED,
@@ -19,10 +17,7 @@ from rw_bot.harness.play_match import (
     clear_orphaned_engine,
     play,
 )
-from rw_bot.platform_id import WINDOWS
 from tests.harness_fakes import FakeHost
-
-LINUX = "linux"
 
 
 def _config(
@@ -62,16 +57,13 @@ def _config(
     )
 
 
-def _host(platform: str = LINUX) -> FakeHost:
+def _host() -> FakeHost:
     """Build a host with the agent sources planted.
-
-    Args:
-        platform: Which platform to pretend to be.
 
     Returns:
         The host.
     """
-    host = FakeHost(platform=platform)
+    host = FakeHost()
     host.files["agent/src/rwbot/agent/Agent.java"] = ()
     host.files["agent/src/rwbot/agent/Targets.java"] = ()
     return host
@@ -83,46 +75,54 @@ class TestBuildingTheAgent:
         which attaches without error and never opens the channel."""
         with _host() as host:
             host.command_results["javac"] = (1, ("error: cannot find symbol",))
-            assert build_agent(_config(), "a.jar", "build/x", LINUX) is False
+            assert build_agent("a.jar", "build/x") is False
             assert not [c for c in host.commands if c[0].rsplit("/", 1)[-1] == "jar"]
 
     def test_a_failing_compiler_reports_what_it_said(self) -> None:
         with _host() as host:
             host.command_results["javac"] = (1, ("error: cannot find symbol",))
-            build_agent(_config(), "a.jar", "build/x", LINUX)
+            build_agent("a.jar", "build/x")
             assert "error: cannot find symbol" in host.printed
-            assert "[play] javac failed" in host.printed
+            assert "[agent] javac failed" in host.printed
 
     def test_a_failing_packager_is_reported_as_itself(self) -> None:
         with _host() as host:
             host.command_results["jar"] = (1, ("no manifest",))
-            assert build_agent(_config(), "a.jar", "build/x", LINUX) is False
-            assert "[play] jar failed" in host.printed
+            assert build_agent("a.jar", "build/x") is False
+            assert "[agent] jar failed" in host.printed
 
     def test_a_clean_build_reports_success(self) -> None:
         with _host():
-            assert build_agent(_config(), "a.jar", "build/x", LINUX) is True
+            assert build_agent("a.jar", "build/x") is True
 
-    def test_the_tools_come_out_of_the_clone(self) -> None:
-        """The clone's JDK is the pinned one; the system compiler is a
-        different toolchain."""
+    def test_the_tools_are_the_host_jdks(self) -> None:
+        """The depot's runtime is a JRE with no compiler, so the host's JDK
+        builds the agent, at a release the depot's Java 8 loads."""
         with _host() as host:
-            build_agent(_config(), "a.jar", "build/x", LINUX)
-            assert host.commands[0][0] == ".game-w1/jvm-linux/bin/javac"
-            assert host.commands[1][0] == ".game-w1/jvm-linux/bin/jar"
+            build_agent("a.jar", "build/x")
+            assert host.commands[0][:3] == ("javac", "--release", "8")
+            assert host.commands[1] == (
+                "jar",
+                "cfm",
+                "a.jar",
+                "agent/manifest.mf",
+                "-C",
+                "build/x",
+                ".",
+            )
 
     def test_the_tools_run_under_the_tool_wall(self) -> None:
         """A compiler that never returns is a hang to surface, not a wait --
         the 2026-09-09 driver wedge, kept out of this module by the wall."""
         with _host() as host:
-            build_agent(_config(), "a.jar", "build/x", LINUX)
+            build_agent("a.jar", "build/x")
             assert host.walls == [TOOL_WALL_SECONDS, TOOL_WALL_SECONDS]
 
 
 class TestClearingAnOrphanedEngine:
     def test_a_free_port_is_left_alone(self) -> None:
         with _host() as host:
-            clear_orphaned_engine(27511, LINUX)
+            clear_orphaned_engine(27511)
             assert host.felled == []
 
     def test_a_jvm_holding_the_port_is_felled(self) -> None:
@@ -134,7 +134,7 @@ class TestClearingAnOrphanedEngine:
                 ('LISTEN 0 1 127.0.0.1:27511 0.0.0.0:* users:(("java",pid=999,fd=5))',),
             )
             host.command_results["ps"] = (0, ("java",))
-            clear_orphaned_engine(27511, LINUX)
+            clear_orphaned_engine(27511)
             assert host.felled == [999]
 
     def test_a_bystander_on_the_port_is_not_felled(self) -> None:
@@ -146,7 +146,7 @@ class TestClearingAnOrphanedEngine:
                 ('LISTEN 0 1 127.0.0.1:27511 0.0.0.0:* users:(("code",pid=999,fd=5))',),
             )
             host.command_results["ps"] = (0, ("code",))
-            clear_orphaned_engine(27511, LINUX)
+            clear_orphaned_engine(27511)
             assert host.felled == []
             assert any("leaving it alone" in line for line in host.printed)
 
@@ -315,11 +315,8 @@ class TestPlayingAMatch:
             play(_config(tree="runs/sweeps/demo/.tree"))
             assert host.removed == []
 
-    @pytest.mark.parametrize("platform", [WINDOWS, LINUX])
-    def test_a_match_plays_the_same_way_on_either_platform(self, platform: str) -> None:
-        """The point of the whole lift: one launcher, two platforms, and the
-        only differences are the ones the platform genuinely forces."""
-        with _host(platform=platform) as host:
+    def test_a_frozen_match_spawns_one_engine_and_one_planner(self) -> None:
+        with _host() as host:
             assert play(_config(tree="t")) == 0
             assert len(host.spawned) == 1
             assert len(host.inherited) == 1

@@ -15,7 +15,6 @@ from platform_core.json_utils import load_json_str
 from scripts.stage_tree import (
     EXIT_OK,
     REQUIRED_FLAGS,
-    TARGET_PLATFORM,
     StageTreeError,
     check_reset_state_present,
     check_runtime_is_executable,
@@ -25,7 +24,7 @@ from scripts.stage_tree import (
 )
 
 from rw_bot.harness.clone import VOLATILE_FILES
-from rw_bot.harness.jvm import tool_path
+from rw_bot.harness.jvm import JAVA_PATH
 from rw_bot.staged_tree import (
     APP_ID,
     ORIGIN_ASSEMBLED,
@@ -105,7 +104,7 @@ def _tree(root: Path, runtime: bytes = _RUNTIME) -> Path:
     _write(root, "game-lib.jar", b"engine")
     _write(root, _STEAM_MAP, _MAP_BYTES)
     _write(root, _SHELL_SAFE_MAP, _MAP_BYTES)
-    _write(root, tool_path("java", TARGET_PLATFORM), runtime)
+    _write(root, JAVA_PATH, runtime)
     _write(root, "libsteam_api64.so", b"native")
     _write(root, "preferences.ini", b"nextBackgroundMap=9\n")
     return root
@@ -211,7 +210,7 @@ class TestNamingTheDepots:
 
 class TestTheRuntimeMustBeRunnable:
     def test_a_packed_java_is_accepted(self) -> None:
-        check_runtime_is_executable((tool_path("java", TARGET_PLATFORM), "other"))
+        check_runtime_is_executable((JAVA_PATH, "other"))
 
     def test_a_java_that_would_extract_unexecutable_is_refused(self) -> None:
         """The tree was assembled on Windows, which has no executable bit, so
@@ -251,7 +250,7 @@ class TestTheDocumentItWrites:
         assert origins["game-lib.jar"] == ORIGIN_VERIFIED
         assert origins[_STEAM_MAP] == ORIGIN_VERIFIED
         assert origins[_SHELL_SAFE_MAP] == ORIGIN_RENAMED
-        assert origins[tool_path("java", TARGET_PLATFORM)] == ORIGIN_ASSEMBLED
+        assert origins[JAVA_PATH] == ORIGIN_ASSEMBLED
 
     def test_the_renamed_map_names_the_steam_file_it_copies(self, tmp_path: Path) -> None:
         """The finding that made this module necessary: every sweep plays the

@@ -1,10 +1,10 @@
-"""The bytecode level the agent is built to, held to one answer.
+"""The bytecode level the agent is built to, held to one answer and one builder.
 
-TWO PLACES BUILD THIS JAR AND ONLY ONE OF THEM SHIPS IT.
-:mod:`rw_bot.harness.agent_build` composes the compile command a batch uses;
-the Makefile's ``agent`` recipe composes the one ``make agent`` uses, and the
-jar on disk -- the jar that gets frozen, staged and attached -- is the
-Makefile's.
+TWO PLACES USED TO BUILD THIS JAR AND ONLY ONE OF THEM SHIPPED IT.
+:mod:`rw_bot.harness.agent_build` composed the compile command a match used;
+the Makefile's ``agent`` recipe, through ``scripts/make/agent.ps1``, composed
+the one ``make agent`` used, and the jar on disk -- the jar that gets frozen,
+staged and attached -- was the recipe's.
 
 They disagreed. The recipe said ``--release 11`` while the module said 8, so
 the staged agent was class-file version 55 and the Linux depot's JRE 1.8.0_131
@@ -15,12 +15,12 @@ refused to load it:
     version of the Java Runtime only recognizes class file versions up to 52.0
     FATAL ERROR in native method: processing of -javaagent failed
 
-Fatal, before the game starts, on every member of every campaign. Nothing on
-this workstation could have caught it: the Windows depot ships an OpenJDK 13,
-which loads 55 happily.
+Fatal, before the game starts, on every member of every campaign.
 
-So this reads the recipe and holds it to the module. A comment saying the two
-must agree is a comment; this is the thing that makes them.
+Since 2026-10-21 (board task 0eae9619) the recipe calls
+:mod:`rw_bot.harness.agent_cli`, which builds through the module's own
+compile, so there is one builder. These hold it that way: the Makefile names
+no compiler and no release of its own, and the one release loads on the depot.
 """
 
 from __future__ import annotations
@@ -28,13 +28,10 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from rw_bot.harness.agent_build import JAVA_RELEASE
+from rw_bot.harness.agent_build import JAVA_RELEASE, compile_command
 
 #: The repository root, from this file rather than from a working directory.
 _ROOT = Path(__file__).resolve().parents[1]
-
-#: What the recipe declares, as ``AGENT_RELEASE := <n>``.
-_MAKEFILE_RELEASE = re.compile(r"^AGENT_RELEASE\s*:=\s*(\d+)\s*$", re.MULTILINE)
 
 #: The class-file version each Java release produces, for the two that matter
 #: here. Java 8 is 52 and Java 11 is 55; the depot's JRE reads up to 52.
@@ -43,53 +40,27 @@ _CLASS_FILE_VERSIONS = {"8": 52, "11": 55}
 #: What the Linux depot's JRE 1.8.0_131 will load, read off its own refusal.
 _DEPOT_JRE_CEILING = 52
 
-
-def _declared_release() -> str:
-    """Read the release the Makefile's agent recipe compiles to.
-
-    Returns:
-        The value of ``AGENT_RELEASE``.
-
-    Raises:
-        AssertionError: When the Makefile does not declare one. Absence is a
-            failure rather than a skip: the recipe would then be back to
-            hardcoding a level nothing checks.
-    """
-    found = _MAKEFILE_RELEASE.search((_ROOT / "Makefile").read_text(encoding="utf-8"))
-    if found is None:
-        raise AssertionError(
-            "the Makefile declares no AGENT_RELEASE; the agent recipe must name the "
-            "bytecode level as a variable so this test can hold it to JAVA_RELEASE"
-        )
-    return found.group(1)
+#: A second builder's tells: a compiler named, or a release stated.
+_SECOND_BUILDER = re.compile(r"javac|--release|AGENT_RELEASE")
 
 
-def test_the_recipe_and_the_module_agree() -> None:
-    """The whole point. One rule, two builders, and only one ships the jar."""
-    assert _declared_release() == JAVA_RELEASE
+def test_the_makefile_composes_no_compile_of_its_own() -> None:
+    """A second compile command in the recipe is the second builder that
+    shipped class version 55. Comments may tell that history; only the lines
+    make runs or assigns are read."""
+    lines = (_ROOT / "Makefile").read_text(encoding="utf-8").splitlines()
+    live = [line for line in lines if not line.lstrip().startswith("#")]
+    assert len(live) > 100
+    assert [line for line in live if _SECOND_BUILDER.search(line)] == []
 
 
-def test_the_recipe_passes_it_rather_than_hardcoding_one() -> None:
-    """``agent.ps1`` took no release parameter and hardcoded 11, so making the
-    Makefile declare a variable would have changed nothing on its own.
-
-    The entry hands its -Release to the shared compile, which puts it after
-    javac's --release; tests/pester/make-scripts.Tests.ps1 runs the entry
-    against a stand-in javac and reads ``--release 8`` off its command line.
-    """
-    make = _ROOT / "scripts" / "make"
-    script = (make / "agent.ps1").read_text(encoding="utf-8")
-    assert "Invoke-RwAgentCompile $base $Javac $Release " in script
-    assert "'11'" not in script
-    library = (make / "RwMake.ps1").read_text(encoding="utf-8")
-    assert "@('--release', $Release, " in library
-
-
-def test_the_recipe_forwards_the_variable() -> None:
-    """Declared and passed are different things: a variable nothing reads is
-    a variable that agrees with anything."""
+def test_the_agent_recipe_is_the_modules_builder() -> None:
     recipe = (_ROOT / "Makefile").read_text(encoding="utf-8")
-    assert '-Release "$(AGENT_RELEASE)"' in recipe
+    assert "poetry run python -m rw_bot.harness.agent_cli build" in recipe
+
+
+def test_the_one_compile_passes_the_release() -> None:
+    assert compile_command("javac", "b", ("A.java",))[1:3] == ("--release", JAVA_RELEASE)
 
 
 def test_the_level_is_one_the_depots_jre_can_load() -> None:
@@ -100,7 +71,5 @@ def test_the_level_is_one_the_depots_jre_can_load() -> None:
 
 
 def test_eleven_would_not_have_loaded() -> None:
-    """The negative half, so the assertion above is measuring something. The
-    Windows depot's OpenJDK 13 reads 55 happily, which is why this went
-    unnoticed on the workstation."""
+    """The negative half, so the assertion above is measuring something."""
     assert _CLASS_FILE_VERSIONS["11"] > _DEPOT_JRE_CEILING

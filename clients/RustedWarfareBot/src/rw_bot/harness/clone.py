@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from rw_bot import RwBotError
-from rw_bot.harness.jvm import bundled_tools, tool_path
+from rw_bot.harness.jvm import JAVA_PATH
 
 _INCOMPLETE = "RW-CLONE-001"
 _NOT_POSITIVE = "RW-CLONE-002"
@@ -32,14 +32,6 @@ _NOT_POSITIVE = "RW-CLONE-002"
 #: while a match already in flight is part-way through writing it, and the game
 #: rebuilds both on boot, so there is nothing in them worth the risk.
 VOLATILE_DIRS = ("saves", "cache")
-
-#: Directories a headless match never reads.
-#:
-#: The launcher names ``jvm64`` for the game, for ``javac`` and for ``jar``, and
-#: nothing anywhere names the 32-bit tree beside it. At 118 MB it is the single
-#: largest thing in the directory after the JVM that *is* used, and it would
-#: otherwise be copied once per worker for nothing.
-UNUSED_DIRS = ("jvm",)
 
 #: Files a match starts from the pinned copy of, every time.
 #:
@@ -56,44 +48,20 @@ UNUSED_DIRS = ("jvm",)
 #: between arms rather than as an error ([[policy-determinism]]).
 VOLATILE_FILES = ("preferences.ini",)
 
-#: The one tool every match needs, whether or not it builds an agent.
-JAVA_TOOL = "java"
-
-#: Paths a clone must have whatever it runs on.
+#: Paths a clone must have before a worker gets it.
 #:
-#: The game's own code, the libraries it loads beside it, and the assets a map
-#: is read from. None of the three is named differently on any platform, which
-#: is what separates them from the JDK tools listed with them.
-REQUIRED_CONTENT = ("game-lib.jar", "libs", "assets")
-
-
-def required_entries(platform: str, *, compiles_agent: bool) -> tuple[str, ...]:
-    """Return the paths that must exist in a clone before a worker gets it.
-
-    A clone missing any of them fails ninety seconds later as "the agent never
-    opened port N", which reads like a fault in the agent rather than a
-    truncated copy -- so the copy is checked here, where the message can still
-    be accurate.
-
-    THE COMPILER IS NOT ALWAYS REQUIRED, and demanding it was wrong. Every
-    match runs ``java`` out of the clone; only a match that BUILDS its agent
-    needs ``javac`` and ``jar`` beside it. The Linux depot ships a JRE with
-    neither, so requiring them unconditionally rejected every valid Linux tree
-    -- and a batch does not need them there anyway, because it compiles its
-    agent once and carries the jar inside its frozen tree.
-
-    Args:
-        platform: A ``sys.platform`` value.
-        compiles_agent: Whether this run builds its own agent. False for a
-            batch reusing a frozen snapshot, which is every cluster member.
-
-    Returns:
-        The required paths, JDK tools first, in declaration order. Only the
-        tools the platform's bundled runtime actually carries are ever asked
-        for (:func:`~rw_bot.harness.jvm.bundled_tools`).
-    """
-    tools = bundled_tools(platform) if compiles_agent else (JAVA_TOOL,)
-    return (*(tool_path(tool, platform) for tool in tools), *REQUIRED_CONTENT)
+#: The bundled ``java`` every match runs out of the clone, then the game's own
+#: code, the libraries it loads beside it, and the assets a map is read from.
+#: A clone missing any of them fails ninety seconds later as "the agent never
+#: opened port N", which reads like a fault in the agent rather than a
+#: truncated copy -- so the copy is checked against this, where the message
+#: can still be accurate.
+#:
+#: NO COMPILER IS REQUIRED. The depot ships a JRE with neither ``javac`` nor
+#: ``jar``, and a clone needs neither: an agent is built with the host's JDK
+#: (:mod:`rw_bot.harness.agent_build`), and a batch carries its jar inside
+#: its frozen tree.
+REQUIRED_ENTRIES = (JAVA_PATH, "game-lib.jar", "libs", "assets")
 
 
 class CloneError(RwBotError):
@@ -229,10 +197,10 @@ def _clone_ordinal(game_dir: str, prefix: str) -> int | None:
 def entries_to_copy(present: Sequence[str]) -> tuple[str, ...]:
     """Return the top-level entries a clone takes from the source directory.
 
-    Everything except the trees the game rewrites and the one it never reads,
-    listed by exclusion rather than by an allow-list: a directory added to the
-    game by a future patch is then copied rather than silently dropped, and a
-    dropped directory shows up as a match that will not boot.
+    Everything except the trees the game rewrites, listed by exclusion rather
+    than by an allow-list: a directory added to the game by a future patch is
+    then copied rather than silently dropped, and a dropped directory shows up
+    as a match that will not boot.
 
     Args:
         present: Top-level entry names in the source directory.
@@ -240,48 +208,36 @@ def entries_to_copy(present: Sequence[str]) -> tuple[str, ...]:
     Returns:
         The names to copy, in the order given.
     """
-    skip = (*VOLATILE_DIRS, *UNUSED_DIRS)
-    return tuple(name for name in present if name not in skip)
+    return tuple(name for name in present if name not in VOLATILE_DIRS)
 
 
-def missing_requirements(
-    present: Sequence[str], platform: str, *, compiles_agent: bool
-) -> tuple[str, ...]:
+def missing_requirements(present: Sequence[str]) -> tuple[str, ...]:
     """Return the required paths a finished clone does not have.
 
     Args:
         present: Paths that exist in the clone, relative to it, with forward
             slashes.
-        platform: A ``sys.platform`` value, which decides what the JDK's tools
-            are called.
-        compiles_agent: Whether this run builds its own agent.
 
     Returns:
-        The required paths that are absent, in declaration order.
+        The :data:`REQUIRED_ENTRIES` that are absent, in declaration order.
     """
     have = set(present)
-    return tuple(
-        needed
-        for needed in required_entries(platform, compiles_agent=compiles_agent)
-        if needed not in have
-    )
+    return tuple(needed for needed in REQUIRED_ENTRIES if needed not in have)
 
 
-def verify(name: str, present: Sequence[str], platform: str, *, compiles_agent: bool) -> None:
+def verify(name: str, present: Sequence[str]) -> None:
     """Raise unless a clone carries everything a match needs.
 
     Args:
         name: The clone's directory name, for the message.
         present: Paths that exist in the clone, relative to it, with forward
             slashes.
-        platform: A ``sys.platform`` value.
-        compiles_agent: Whether this run builds its own agent.
 
     Raises:
         CloneError: ``RW-CLONE-001`` when anything required is absent, naming
             every missing path rather than only the first.
     """
-    missing = missing_requirements(present, platform, compiles_agent=compiles_agent)
+    missing = missing_requirements(present)
     if missing:
         raise CloneError(
             _INCOMPLETE,
@@ -293,11 +249,9 @@ def verify(name: str, present: Sequence[str], platform: str, *, compiles_agent: 
 __all__ = [
     "CLONE_PREFIX",
     "DISPLAY_BASE",
-    "JAVA_TOOL",
     "NO_DISPLAY",
     "PLAY_PORT_BASE",
-    "REQUIRED_CONTENT",
-    "UNUSED_DIRS",
+    "REQUIRED_ENTRIES",
     "VOLATILE_DIRS",
     "VOLATILE_FILES",
     "CloneError",
@@ -306,6 +260,5 @@ __all__ = [
     "leased_display",
     "leased_port",
     "missing_requirements",
-    "required_entries",
     "verify",
 ]

@@ -219,7 +219,7 @@ class TestRunningIt:
             main(["--port", "27511"])
 
     def test_a_complete_launch_reaches_the_match(self) -> None:
-        with FakeHost(platform="linux") as host:
+        with FakeHost() as host:
             host.files["agent/src/rwbot/agent/Agent.java"] = ()
             assert main(list(MINIMAL)) == 0
             assert len(host.spawned) == 1
