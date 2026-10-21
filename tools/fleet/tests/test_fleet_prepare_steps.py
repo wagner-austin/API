@@ -14,6 +14,7 @@ failing inside make.
 from __future__ import annotations
 
 from fleet.contracts.source import InstallStep
+from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import export
 from tests._registry import shipped_document
@@ -61,10 +62,11 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # task 60458a21); 61 since MCPs/packages/session-audit-linux, the
     # package's Linux lane (MCPs board task 31e0a1eb); 62 since
     # MCPs/execution-netboot-diphtheria, the execution suite's netboot lane
-    # (MCPs board task d387271d). The unprepared lose
-    # MCPs/execution-elevated, whose installer cases MCPs board task
+    # (MCPs board task d387271d); 63 since MCPs/execution-twin, the
+    # execution suite's twin lane (MCPs board task 83b5c38f). The unprepared
+    # lose MCPs/execution-elevated, whose installer cases MCPs board task
     # 42fb4e26 deleted.
-    assert len(prepared) == 62
+    assert len(prepared) == 63
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
@@ -130,6 +132,34 @@ def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None
     assert sorted(marking) == ["MCPs/execution-served-colossus", "MCPs/execution-served-diphtheria"]
     for steps in marking.values():
         assert [step["phase"] for step in steps] == ["install", "workspace-build", "served-lane"]
+
+
+def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() -> None:
+    """MCPs fleet-prepare's twin-lane phase writes the marker that makes the
+    execution workspace collect tests/passkey-twin.test.ts alone (MCPs board
+    task 83b5c38f): a push touching one of mcp-proxy's Keycloak twins queues
+    that row and reads the twins' own cases from its log. The case starts
+    Keycloak and mailpit, so its row requires the docker tag, which runs its
+    build as execdocker against that user's rootless daemon, and the step
+    follows install and workspace-build, which store the tree's untracked
+    files for the node's next row."""
+    workspace = decode_fleet_workspace(shipped_document())
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:] == ("twin-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-twin"]
+    assert [step["phase"] for step in marking["MCPs/execution-twin"]] == [
+        "install",
+        "workspace-build",
+        "twin-lane",
+    ]
+    project = workspace["projects"]["MCPs/execution-twin"]
+    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX, NodeTag.DOCKER), None)
+    assert project["source"] is not None
+    assert project["source"]["path"] == "execution"
 
 
 def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:

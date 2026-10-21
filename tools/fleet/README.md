@@ -1243,6 +1243,17 @@ passes, 6c81f413 among them, ran on diphtheria, whose linux toolchain builds
 it. The tag says so rather than letting a Windows node claim a check it
 cannot install.
 
+**`MCPs/execution-twin` requires `docker`** (MCPs board task 83b5c38f,
+2026-10-21). It is the execution workspace again, ending with MCPs
+fleet-prepare's `twin-lane` phase, whose marker makes its `make check` run
+`tests/passkey-twin.test.ts` alone: mcp-proxy's `make test-twin`, which
+starts Keycloak and mailpit, so the build runs as execdocker against that
+user's rootless daemon. A push from ziggurat touching one of mcp-proxy's
+Keycloak twins queues it, because a node runs a project's `make check`
+whatever the command (`MAKE_TARGET`), and only `vitest.twin.config.ts`
+includes the twins. It names no node, so any node carrying the tag runs it,
+and it is no deploy gate: `MCPs/execution-deploy` runs the same case.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
