@@ -37,7 +37,7 @@ rust-cov:
 	$(MAKETOOLS) venv-embed cargo run --bin check_segment_coverage -- --threshold 100
 
 # Python linting: ruff + mypy + guard, through the uv venv's own executables
-# (``venv-exec`` resolves .venv/Scripts on Windows and .venv/bin elsewhere).
+# (``venv-exec`` runs them from .venv/bin).
 python-lint:
 	$(MAKETOOLS) uv-venv-check
 	$(MAKETOOLS) venv-exec python -m scripts.guard
