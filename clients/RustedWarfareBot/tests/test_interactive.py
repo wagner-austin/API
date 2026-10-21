@@ -9,8 +9,7 @@ from __future__ import annotations
 import runpy
 
 import pytest
-
-from rw_bot.harness.interactive_cli import (
+from scripts.interactive import (
     HOST,
     OPTIONAL_FLAGS,
     WAIT_SECONDS,
@@ -21,6 +20,7 @@ from rw_bot.harness.interactive_cli import (
     main,
     play_interactive,
 )
+
 from rw_bot.harness.launch import (
     CATALOGUE,
     HEAP,
@@ -207,5 +207,5 @@ class TestTheCommandLine:
         with _host() as host:
             host.argv = ["--mode", "watch", *BASE]
             with pytest.raises(SystemExit) as caught:
-                runpy.run_module("rw_bot.harness.interactive_cli", run_name="__main__")
+                runpy.run_module("scripts.interactive", run_name="__main__")
             assert caught.value.code == 0

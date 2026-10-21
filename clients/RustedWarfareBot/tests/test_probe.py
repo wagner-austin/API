@@ -12,10 +12,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePath, PurePosixPath
 
 import pytest
-
-from rw_bot.harness.launch import HEAP, LIBRARY_PATH, MAIN_CLASS
-from rw_bot.harness.play_match import EXIT_OK
-from rw_bot.harness.probe_cli import (
+from scripts.probe import (
     EXIT_PROBE_FAILED,
     EXIT_PROBE_TIMED_OUT,
     PROBE_WALL_SECONDS,
@@ -25,6 +22,9 @@ from rw_bot.harness.probe_cli import (
     probe_command,
     run_probe,
 )
+
+from rw_bot.harness.launch import HEAP, LIBRARY_PATH, MAIN_CLASS
+from rw_bot.harness.play_match import EXIT_OK
 from tests.harness_fake_game import FakeGame
 from tests.harness_fakes import FakeHost
 
@@ -225,5 +225,5 @@ class TestTheCommandLine:
             host.engine_exit_status = 0
             host.argv = ["--kind", "boot", "--game-dir", ".game", "--log", "l"]
             with pytest.raises(SystemExit) as caught:
-                runpy.run_module("rw_bot.harness.probe_cli", run_name="__main__")
+                runpy.run_module("scripts.probe", run_name="__main__")
             assert caught.value.code == EXIT_OK

@@ -10,9 +10,7 @@ from __future__ import annotations
 import runpy
 
 import pytest
-
-from rw_bot.harness.agent_build import BUILT_AGENT_JAR, selftest_command
-from rw_bot.harness.agent_cli import (
+from scripts.agent import (
     EXIT_SELFTEST_FAILED,
     AgentCommandError,
     check_published,
@@ -20,6 +18,8 @@ from rw_bot.harness.agent_cli import (
     publish_agent,
     run_selftest,
 )
+
+from rw_bot.harness.agent_build import BUILT_AGENT_JAR, selftest_command
 from rw_bot.harness.play_match import EXIT_AGENT_BUILD_FAILED, EXIT_OK, TOOL_WALL_SECONDS
 from tests.harness_fakes import FakeHost
 
@@ -169,9 +169,9 @@ class TestTheCommandLine:
         assert caught.value.code == "RW-AGENT-002"
 
     def test_the_module_guard_runs_main_on_the_process_arguments(self) -> None:
-        """``python -m rw_bot.harness.agent_cli build`` is the Makefile's."""
+        """``python -m scripts.agent build`` is the Makefile's."""
         with _host() as host:
             host.argv = ["build"]
             with pytest.raises(SystemExit) as caught:
-                runpy.run_module("rw_bot.harness.agent_cli", run_name="__main__")
+                runpy.run_module("scripts.agent", run_name="__main__")
             assert caught.value.code == EXIT_OK

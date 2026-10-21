@@ -20,8 +20,8 @@ so it runs while a game holds that jar, and runs them on the game's bundled
 runtime, because the verifier a patch must satisfy is the one the engine
 loads it under.
 
-Run as ``python -m rw_bot.harness.agent_cli build`` or
-``python -m rw_bot.harness.agent_cli selftest --game-dir .game``.
+Run as ``python -m scripts.agent build`` or
+``python -m scripts.agent selftest --game-dir .game``.
 """
 
 from __future__ import annotations

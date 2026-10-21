@@ -19,7 +19,7 @@ The build, the planner and the teardown are ``play``'s own
 :func:`~rw_bot.harness.play_match.run_planner`), against a stamped jar so a
 watched game never holds the jar a batch freezes.
 
-Run as ``python -m rw_bot.harness.interactive_cli --mode watch --port N
+Run as ``python -m scripts.interactive --mode watch --port N
 --game-dir .game --play-log runs/watch.log --map MAP [--opponents N]
 [--difficulty N] [--module M] [--play-args ARGS]``.
 """

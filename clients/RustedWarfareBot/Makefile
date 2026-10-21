@@ -229,7 +229,7 @@ PLAY_PORT_HIGH := 27999
 # that runs the wrong configuration and still files a scorecard. One launcher
 # for the workstation and the cluster; this recipe is just the variables it is
 # given. Every other game recipe below followed it on 2026-10-21 (board task
-# 0eae9619), each one a module under rw_bot.harness or scripts.
+# 0eae9619), each one an entry point under scripts/.
 #
 # The port was ``PLAY_PORT := $(shell python -c "...randint...")`` until the
 # portable grammar: ``$(shell`` runs the platform shell, so the draw moves into
@@ -322,7 +322,7 @@ sweep: agent
 #
 # CFR is pinned by version: a decompiler is a heuristic, and an unpinned one
 # would silently change the source we reason about between runs. The body is
-# rw_bot.harness.decompile_cli, which fetches the pinned jar into .tools once.
+# scripts/decompile.py, which fetches the pinned jar into .tools once.
 CFR_VERSION ?= 0.152
 DECOMPILED ?= .decompiled
 
@@ -389,11 +389,11 @@ WATCH_DOCTRINE ?= doctrines/flame-nocover.doctrine
 WATCH_LOG ?= runs/watch.log
 
 # Everything below drives the pinned game copy, the Linux depot at GAME_DIR,
-# through a module that composes and runs it: rw_bot.harness.probe_cli for the
-# probes, agent_cli for the agent, decompile_cli for CFR, interactive_cli for a
-# watched or hosted game, scripts.service_up for the match service. Each was a
+# through an entry point under scripts/ that composes and runs it: probe for
+# the probes, agent for the agent, decompile for CFR, interactive for a
+# watched or hosted game, service_up for the match service. Each was a
 # PowerShell script under scripts/make until 2026-10-21 (board task 0eae9619).
-PROBE := poetry run python -m rw_bot.harness.probe_cli
+PROBE := poetry run python -m scripts.probe
 
 boot-probe:
 	@echo ""
@@ -413,7 +413,7 @@ boot-probe:
 agent:
 	@echo ""
 	@echo "=== agent (host JDK, zero third-party deps)"
-	poetry run python -m rw_bot.harness.agent_cli build
+	poetry run python -m scripts.agent build
 
 # Patches every Targets entry in the real pinned jar and DEFINES each result,
 # so the JVM's own bytecode verifier -- not a second reading by the code that
@@ -431,7 +431,7 @@ agent:
 agent-selftest:
 	@echo ""
 	@echo "=== agent-selftest (JVM verifier as oracle)"
-	poetry run python -m rw_bot.harness.agent_cli selftest --game-dir "$(GAME_DIR)"
+	poetry run python -m scripts.agent selftest --game-dir "$(GAME_DIR)"
 
 sandbox-probe: agent
 	@echo ""
@@ -446,7 +446,7 @@ discover-probe: agent
 decompile:
 	@echo ""
 	@echo "=== decompile (CFR $(CFR_VERSION) into $(DECOMPILED))"
-	poetry run python -m rw_bot.harness.decompile_cli --game-dir "$(GAME_DIR)" --cfr-version "$(CFR_VERSION)" --out "$(DECOMPILED)"
+	poetry run python -m scripts.decompile --game-dir "$(GAME_DIR)" --cfr-version "$(CFR_VERSION)" --out "$(DECOMPILED)"
 
 wire-capture: agent
 	@echo ""
@@ -468,12 +468,12 @@ unit-dump:
 host:
 	@echo ""
 	@echo "=== host (bot-hosted LAN game on port 5123, log: $(HOST_LOG))"
-	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m rw_bot.harness.interactive_cli --mode host --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(HOST_LOG)" --map "$(HOST_MAP)" --module $(PLAY_MODULE) --play-args "$(HOST_SAMPLES) $(HOST_DOCTRINE) -"
+	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m scripts.interactive --mode host --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(HOST_LOG)" --map "$(HOST_MAP)" --module $(PLAY_MODULE) --play-args "$(HOST_SAMPLES) $(HOST_DOCTRINE) -"
 
 watch:
 	@echo ""
 	@echo "=== watch (windowed match at difficulty $(WATCH_DIFFICULTY), log: $(WATCH_LOG))"
-	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m rw_bot.harness.interactive_cli --mode watch --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(WATCH_LOG)" --map "$(WATCH_MAP)" --opponents $(WATCH_OPPONENTS) --difficulty $(WATCH_DIFFICULTY) --module $(PLAY_MODULE) --play-args "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -"
+	$(MAKETOOLS) env --draw PLAY_PORT=$(PLAY_PORT_LOW)-$(PLAY_PORT_HIGH) -- poetry run python -m scripts.interactive --mode watch --port @PLAY_PORT@ --game-dir "$(GAME_DIR)" --play-log "$(WATCH_LOG)" --map "$(WATCH_MAP)" --opponents $(WATCH_OPPONENTS) --difficulty $(WATCH_DIFFICULTY) --module $(PLAY_MODULE) --play-args "$(WATCH_SAMPLES) $(WATCH_DOCTRINE) -"
 
 # The match service's HTTP door, detached from the launching terminal.
 # Reads the database password from the platform-postgres container at

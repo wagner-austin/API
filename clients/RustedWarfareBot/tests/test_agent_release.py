@@ -18,7 +18,7 @@ refused to load it:
 Fatal, before the game starts, on every member of every campaign.
 
 Since 2026-10-21 (board task 0eae9619) the recipe calls
-:mod:`rw_bot.harness.agent_cli`, which builds through the module's own
+:mod:`scripts.agent`, which builds through the module's own
 compile, so there is one builder. These hold it that way: the Makefile names
 no compiler and no release of its own, and the one release loads on the depot.
 """
@@ -56,7 +56,7 @@ def test_the_makefile_composes_no_compile_of_its_own() -> None:
 
 def test_the_agent_recipe_is_the_modules_builder() -> None:
     recipe = (_ROOT / "Makefile").read_text(encoding="utf-8")
-    assert "poetry run python -m rw_bot.harness.agent_cli build" in recipe
+    assert "poetry run python -m scripts.agent build" in recipe
 
 
 def test_the_one_compile_passes_the_release() -> None:

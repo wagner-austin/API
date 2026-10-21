@@ -42,9 +42,10 @@ there rather than inside a live engine. It is kept out of `make check` because
 it patches the real pinned jar, which is never tracked, so only a machine that
 holds the game and a JDK can run it; run it after any agent or game change.
 
-Every recipe runs under `/bin/sh` through a Python module: `rw_bot.harness`'s
-`play_match_cli`, `agent_cli`, `probe_cli`, `interactive_cli` and
-`decompile_cli`, and `scripts.service_up` for the match service. The game runs
+Every recipe runs under `/bin/sh` through a Python entry point:
+`rw_bot.harness.play_match_cli` for a match, and `scripts.agent`,
+`scripts.probe`, `scripts.interactive`, `scripts.decompile` and
+`scripts.service_up` for the rest. The game runs
 on its Linux depot, whose `jvm-linux` is a Java 8 JRE with no compiler, so the
 agent is built with the host's own JDK at `--release 8`. Until 2026-10-21 these
 were PowerShell scripts for the Windows depot (board task 0eae9619).

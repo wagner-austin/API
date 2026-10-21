@@ -10,8 +10,7 @@ from __future__ import annotations
 import runpy
 
 import pytest
-
-from rw_bot.harness.decompile_cli import (
+from scripts.decompile import (
     CFR_OPTIONS,
     DECOMPILE_WALL_SECONDS,
     EXIT_DECOMPILE_FAILED,
@@ -20,6 +19,7 @@ from rw_bot.harness.decompile_cli import (
     decompile,
     main,
 )
+
 from rw_bot.harness.play_match import EXIT_OK
 from tests.harness_fakes import FakeHost
 
@@ -121,5 +121,5 @@ class TestTheCommandLine:
         with _host(fetched=True) as host:
             host.argv = ["--game-dir", ".game"]
             with pytest.raises(SystemExit) as caught:
-                runpy.run_module("rw_bot.harness.decompile_cli", run_name="__main__")
+                runpy.run_module("scripts.decompile", run_name="__main__")
             assert caught.value.code == EXIT_OK

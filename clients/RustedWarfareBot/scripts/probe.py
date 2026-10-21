@@ -28,7 +28,7 @@ THE ENGINE IS FELLED IF IT OUTLIVES THE PROBE. It leads its own session, so an
 interrupt reaches this process and not the engine; the felling in the
 ``finally`` is what stops a ^C from leaving a JVM holding the game directory.
 
-Run as ``python -m rw_bot.harness.probe_cli --kind wire --game-dir .game
+Run as ``python -m scripts.probe --kind wire --game-dir .game
 --log runs/wire-capture.log --at 16,17,18 --out runs/world-sample.ndjson``.
 """
 

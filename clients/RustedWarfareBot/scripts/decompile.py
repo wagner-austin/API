@@ -16,7 +16,7 @@ The output is DERIVED and gitignored; anything a wiki page cites is copied
 into ``wiki/sources/`` as an excerpt. The tree is removed before each run so
 it is this run's.
 
-Run as ``python -m rw_bot.harness.decompile_cli --game-dir .game
+Run as ``python -m scripts.decompile --game-dir .game
 [--cfr-version 0.152] [--out .decompiled]``.
 """
 
