@@ -18,9 +18,10 @@ these nodes a second check fits the core pool and still pushes both past the
   i5-5200U, 4 threads), so its pool of 2 is half of serendipity's 4, where
   two checks were measured over budget. It takes one check at a time from its
   first dispatch, and that holds until a check measured there says otherwise.
-  Its dispatch is held as well: its first job, MCPs/sms-gateway (fleet job
-  1b910743), took 307 s of 300 alone. The bound stays pinned for the day the
-  hold is lifted.
+  Its first job, MCPs/sms-gateway (fleet job 1b910743), took 307 s of 300
+  alone while its firmware's 65 C passive trip clamped the processor; with
+  that trip moved to 85 C the same check took 165 s (MCPs board task
+  5e59a3ae), and the bound stays.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
