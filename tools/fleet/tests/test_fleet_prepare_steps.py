@@ -13,7 +13,7 @@ failing inside make.
 
 from __future__ import annotations
 
-from fleet.contracts.source import InstallStep
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import export
@@ -151,15 +151,17 @@ def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() 
     }
 
     assert sorted(marking) == ["MCPs/execution-twin"]
-    assert [step["phase"] for step in marking["MCPs/execution-twin"]] == [
-        "install",
-        "workspace-build",
-        "twin-lane",
-    ]
     project = workspace["projects"]["MCPs/execution-twin"]
     assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX, NodeTag.DOCKER), None)
-    assert project["source"] is not None
-    assert project["source"]["path"] == "execution"
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=tuple(
+            InstallStep(phase=phase, argv=(*PREPARE, phase))
+            for phase in ("install", "workspace-build", "twin-lane")
+        ),
+        companions=(),
+    )
 
 
 def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:
