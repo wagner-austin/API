@@ -145,12 +145,15 @@ Describe 'Saving the modules the pinned harness imports' {
             '-ModuleRoot', "`"$modules`"", '-Repository', 'NoSuchRepository-test'
         ) -RedirectStandardOutput "$stderr.out" -RedirectStandardError $stderr -NoNewWindow -Wait -PassThru
         $child.ExitCode | Should -Be 1
-        # The child's console wraps its error record, so whitespace is collapsed.
-        $said = [System.IO.File]::ReadAllText($stderr) -replace '\s+', ' '
-        $said | Should -Match ([regex]::Escape(
-                "Unable to find repository 'NoSuchRepository-test'. Use Get-PSRepository to see all available repositories."))
-        $said | Should -Match ([regex]::Escape(
-                'FullyQualifiedErrorId : SourceNotFound,Microsoft.PowerShell.PackageManagement.Cmdlets.GetPackageSource'))
+        # The child's console wraps its error record at its own width, mid-word
+        # too ('...Cmdlets.GetPa ckageSource' on loki, fleet job c19dde32), so
+        # both sides are compared with every whitespace character removed.
+        $said = [System.IO.File]::ReadAllText($stderr) -replace '\s', ''
+        foreach ($expected in @(
+                "Unable to find repository 'NoSuchRepository-test'. Use Get-PSRepository to see all available repositories.",
+                'FullyQualifiedErrorId : SourceNotFound,Microsoft.PowerShell.PackageManagement.Cmdlets.GetPackageSource')) {
+            $said | Should -Match ([regex]::Escape(($expected -replace '\s', '')))
+        }
         # The installer created the root before it asked the gallery.
         [System.IO.Directory]::Exists($modules) | Should -BeTrue
     }
