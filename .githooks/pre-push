@@ -78,6 +78,39 @@ fi
 PUSH_INPUT="$(cat)"
 ZERO="0000000000000000000000000000000000000000"
 
+# A PUSH THAT ONLY STAGES A TIP FOR ITS FLEET RUN IS NOT A PUBLICATION (MCPs
+# board tasks 94d23062 and 703fec5a). pushed-tests below sends a push's
+# container suites to a fleet worker, which fetches the sha from GitHub, so
+# it pushes the tip as refs/heads/pushed-tests/<tip> and deletes that ref
+# once the job closes. Both pushes run this hook, and running pushed-tests
+# over them stages the tip again without end: on 2026-10-21 a push of
+# services/grandma-api's docker case nested about 45 processes deep, one
+# level every 4.5 s, until they were killed by pid. 94d23062 gave MCPs'
+# .husky/pre-push this exit and this hook none. maketools' push-staging
+# decides it exactly: the ref must be named after the very commit it
+# carries, so a push to any other ref, main included, goes through every
+# check below. 0 ends the hook, 3 means go on, and any other exit refuses
+# the push.
+STAGING_UPDATES=""
+while read -r _st_local_ref st_local_sha st_remote_ref _st_remote_sha; do
+    [ -z "$st_local_sha" ] && continue
+    STAGING_UPDATES="$STAGING_UPDATES $st_local_sha:$st_remote_ref"
+done <<EOF
+$PUSH_INPUT
+EOF
+if [ -n "$STAGING_UPDATES" ]; then
+    staging_status=0
+    # Unquoted on purpose: each update is one word, <sha>:<ref>.
+    "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" push-staging $STAGING_UPDATES < /dev/null || staging_status=$?
+    if [ "$staging_status" -eq 0 ]; then
+        exit 0
+    fi
+    if [ "$staging_status" -ne 3 ]; then
+        echo "=== PRE-PUSH BLOCKED: push-staging exited $staging_status, so whether this push only stages a tip is unknown ==="
+        exit 1
+    fi
+fi
+
 # EVERY COMMIT NAMES ITS TASK (MCPs board task 691b0067, b6eb30c8's R8).
 # Work nobody filed is refused rather than logged; the operator,
 # 2026-09-26: "no orphaned or unregistered tasks, no exemptions, no
