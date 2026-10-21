@@ -349,19 +349,18 @@ queues behind a check because no runner ever asks for both at once
 --config registry --node <alias>` is one tick for one node
 (`fleet.cli.node_agent`). Every tick is a job of the MCPs hub runner (MCPs
 board task b27bd34a): one resident loop, `session_audit.hub_runner`, kept
-alive by the `corvis-hub-runner` task, runs every row of MCPs
-`scripts/fleet/hub-jobs.json`, and its fleet rows expand to one job per node
-`registry/machines/` dispatches to, a second for one declaring `elevated`, and the
-hub's own. Each job runs `poetry.exe` running `python -m fleet.cli.tick`,
-never `powershell.exe`, which can stall before its engine loads under S4U on
-the hub (MCPs board task 94ac1c4f), under the operator's account at RunLevel
-Limited and priority 4, fires on the multiples of 180 s since the epoch, runs
-one at a time, and is ended with its whole process tree at 40 minutes; each
-writes one log per node per day under `%LOCALAPPDATA%\Temp\claude`, and the
-runner journals every tick's start, end and exit under
-`%LOCALAPPDATA%\MCPs\hub-runner`. `make install-hub-runner` in MCPs installs
-it and unregisters the `API-FleetAgent-3min` and `API-FleetNode-<alias>-3min`
-tasks that ran the ticks until then, whose registration scripts are gone.
+alive on diphtheria by the account's `corvis-hub-runner.service` user unit
+(MCPs `scripts/host/lib/hub-runner.sh`, board task c39ee056; austinpc's two
+Windows instances are retired, board task edaabb43), runs every row of MCPs
+`scripts/fleet/hub-jobs.json` its machine's duties name, and its fleet rows
+expand to one job per node `registry/machines/` dispatches to, a second for
+one declaring `elevated`, and the hub's own. Each job runs `poetry run --
+python -m fleet.cli.tick` in `tools/fleet` as a transient unit bound to the
+runner's, fires on the multiples of 180 s since the epoch, runs one at a
+time, and is ended at its row's 2400 s deadline; each writes its log under
+the directory the runner passes as `--log-directory`. MCPs `maketools
+ship-hub-runner` cuts and installs the runner's release, and its release-sync
+row keeps it current.
 The runners live on the hub and not on the nodes because the hub holds the
 git credentials and the ssh keys, and the tailnet policy lets a
 `tag:corvis-node` open no socket to it. Two checks submitted in one breath

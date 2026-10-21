@@ -39,22 +39,6 @@
       {
         "kind": "scheduled-task",
         "path": "\\",
-        "name": "corvis-hub-runner",
-        "expect": "running",
-        "okResults": [],
-        "purpose": "the hub runner at RunLevel Limited, the one loop that runs every row of scripts/fleet/hub-jobs.json not declaring elevated: the fleet arm's hub tick, which dispatches work and records remote sessions on the ledger, one tick per enabled node of the API node registry, the session and skills mirrors to diphtheria, the drift sweep, which files an owning task for each item that stands unowned and states no operator ask, and the supervisor's jobs: each supervised room's pass, review and health check, switched on and off with the room by the trigger listener's gates, the listener itself, the ends run and the overdue sweep (board task b27bd34a)"
-      },
-      {
-        "kind": "scheduled-task",
-        "path": "\\",
-        "name": "corvis-hub-runner-elevated",
-        "expect": "running",
-        "okResults": [],
-        "purpose": "the hub runner at RunLevel Highest, which runs the rows of scripts/fleet/hub-jobs.json declaring elevated, this audit and the session host watch among them; without it fleet_status serves a snapshot that stops aging honestly (board task b27bd34a)"
-      },
-      {
-        "kind": "scheduled-task",
-        "path": "\\",
         "name": "MCPsSessionHost",
         "expect": "running",
         "okResults": [],

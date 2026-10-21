@@ -110,11 +110,12 @@ def test_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub
     assert never == ["austinpc", "diphtheria", "loki"]
 
 
-def test_austinpc_runs_its_two_hub_runners_and_no_task_the_runner_replaced() -> None:
+def test_austinpc_declares_no_hub_runner_and_no_task_the_runner_replaced() -> None:
+    # The hub runner is diphtheria's user unit since MCPs board task c39ee056,
+    # and austinpc carries neither Windows instance (board task edaabb43).
     units = _units("austinpc")
     tasks = [unit for unit in units if unit["kind"] == "scheduled-task"]
-    running = {str(unit["name"]) for unit in tasks if unit["expect"] == "running"}
-    assert {"corvis-hub-runner", "corvis-hub-runner-elevated"} <= running
+    assert [unit for unit in tasks if str(unit["name"]).startswith("corvis-hub-runner")] == []
     assert [unit for unit in tasks if unit["name"] in REPLACED_TASKS] == []
     assert [unit for unit in units if unit["kind"] == "listener"] == []
 
