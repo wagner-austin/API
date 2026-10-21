@@ -13,6 +13,11 @@ these nodes a second check fits the core pool and still pushes both past the
   Ubuntu on 2026-10-20 (MCPs board task ac5e8a88) kept the same 4 physical
   cores, so the Linux worker it was provisioned as (MCPs board task 632b0802)
   keeps the bound until a check measured there says otherwise.
+- lenovold, MCPs board task 6747753b: no second check was run there. It was
+  provisioned as a Linux worker on 2026-10-21 with 2 physical cores (an
+  i5-5200U, 4 threads), so its pool of 2 is half of serendipity's 4, where
+  two checks were measured over budget. It takes one check at a time from its
+  first dispatch, and that holds until a check measured there says otherwise.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
@@ -49,9 +54,12 @@ from fleet.core.workspace_files import read_workspace_document
 #: operator, 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all
 #: workers"), and loki a core more for each of the four GitHub runners
 #: runners.json declares on it (MCPs board task 1e9ab738), so 10 and 6
-#: cores are left to the fleet.
+#: cores are left to the fleet. lenovold keeps the same 2 of its 4, and the
+#: suite's declared minimum of 2 workers, all the cores left, outranks half
+#: of them (MCPs board task 6747753b).
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
+    "lenovold": ("MCPs/mcp-shared", 2),
     "loki": ("MCPs/mcp-shared", 5),
     "serendipity": ("MCPs/mcp-shared", 3),
 }
@@ -111,7 +119,7 @@ def test_the_measured_nodes_are_the_bounded_ones() -> None:
         if node["budget"]["checks_at_once"] is not None
     }
 
-    assert bounds == {"diphtheria": 1, "loki": 1, "serendipity": 1}
+    assert bounds == {"diphtheria": 1, "lenovold": 1, "loki": 1, "serendipity": 1}
 
 
 @pytest.mark.parametrize(("name", "measured"), sorted(BOUNDED_GRANTS.items()))
