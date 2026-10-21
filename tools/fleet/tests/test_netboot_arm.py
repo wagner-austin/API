@@ -56,47 +56,79 @@ def outcome(result: _test_hooks.CommandResult) -> netboot_arm.ArmOutcome:
     return netboot_arm.arm_outcome(result, RELEASE, "lavender")
 
 
-class TestTheKey:
-    def test_the_one_key_line_is_read_among_the_files_others(self, tmp_path: pathlib.Path) -> None:
-        path = env_file(tmp_path, "A=1\nTAILSCALE_API_KEY=tskey-api-abc\r\nB=2\n")
+#: Both writer lines, as the netboot host's env file carries them.
+WRITER_LINES: Final = (
+    "TAILNET_WRITER_CLIENT_ID=kW\nTAILNET_WRITER_CLIENT_SECRET=tskey-client-kW-s\n"
+)
 
-        assert netboot_arm.read_tailnet_key(path) == netboot_arm.TailnetKey(value="tskey-api-abc")
+
+class TestTheWriterClient:
+    def test_the_two_writer_lines_are_read_among_the_files_others(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = env_file(
+            tmp_path,
+            "A=1\nTAILNET_WRITER_CLIENT_ID=kW\r\nTAILSCALE_API_KEY=tskey-api-retired\n"
+            "TAILNET_WRITER_CLIENT_SECRET=tskey-client-kW-s\nB=2\n",
+        )
+
+        assert netboot_arm.read_tailnet_writer(path) == netboot_arm.TailnetWriter(
+            client_id="kW", client_secret="tskey-client-kW-s"
+        )
+        assert netboot_arm.WRITER_NAMES == (
+            "TAILNET_WRITER_CLIENT_ID",
+            "TAILNET_WRITER_CLIENT_SECRET",
+        )
 
     def test_the_last_assignment_wins_as_in_the_files_one_reader(
         self, tmp_path: pathlib.Path
     ) -> None:
-        path = env_file(tmp_path, "TAILSCALE_API_KEY=tskey-api-a\nTAILSCALE_API_KEY=tskey-api-b\n")
+        path = env_file(tmp_path, WRITER_LINES + "TAILNET_WRITER_CLIENT_SECRET=tskey-client-kW-b\n")
 
-        assert netboot_arm.read_tailnet_key(path) == netboot_arm.TailnetKey(value="tskey-api-b")
+        assert netboot_arm.read_tailnet_writer(path) == netboot_arm.TailnetWriter(
+            client_id="kW", client_secret="tskey-client-kW-b"
+        )
 
     @pytest.mark.parametrize(
-        "text",
+        ("text", "missing"),
         [
-            "VM_HOST=lavender-wsl\n",
-            "TAILSCALE_API_KEY=\n",
-            # A commented or exported line does not set the key.
-            "# TAILSCALE_API_KEY=tskey-api-a\nexport TAILSCALE_API_KEY=tskey-api-b\n",
+            ("VM_HOST=lavender-wsl\n", "TAILNET_WRITER_CLIENT_ID or TAILNET_WRITER_CLIENT_SECRET"),
+            # The retired personal key alone is no credential.
+            (
+                "TAILSCALE_API_KEY=tskey-api-a\n",
+                "TAILNET_WRITER_CLIENT_ID or TAILNET_WRITER_CLIENT_SECRET",
+            ),
+            (
+                "TAILNET_WRITER_CLIENT_ID=kW\nTAILNET_WRITER_CLIENT_SECRET=\n",
+                "TAILNET_WRITER_CLIENT_SECRET",
+            ),
+            # A commented or exported line does not set the id.
+            (
+                "# TAILNET_WRITER_CLIENT_ID=kA\nexport TAILNET_WRITER_CLIENT_ID=kB\n"
+                "TAILNET_WRITER_CLIENT_SECRET=tskey-client-kW-s\n",
+                "TAILNET_WRITER_CLIENT_ID",
+            ),
         ],
     )
-    def test_a_file_that_sets_no_key_is_refused_without_echoing_a_line(
-        self, tmp_path: pathlib.Path, text: str
+    def test_a_file_that_sets_no_writer_line_is_refused_naming_it_without_echoing_a_line(
+        self, tmp_path: pathlib.Path, text: str, missing: str
     ) -> None:
         path = env_file(tmp_path, text)
 
-        detail = netboot_arm.read_tailnet_key(path)
+        detail = netboot_arm.read_tailnet_writer(path)
 
         assert detail == (
-            f"{netboot_arm.NO_KEY_CODE}: {path} sets no TAILSCALE_API_KEY, or sets it empty, "
-            "and the netboot duty's commands run with it; nothing ran"
+            f"{netboot_arm.NO_KEY_CODE}: {path} sets no {missing}, or sets it empty, and the "
+            "netboot duty's commands run with the tailnet writer client; nothing ran"
         )
         assert "tskey" not in detail
 
     def test_a_line_the_reader_cannot_split_is_refused_by_number_without_echoing_it(
         self, tmp_path: pathlib.Path
     ) -> None:
-        path = env_file(tmp_path, "A=1\ntskey-api-pasted-alone\n")
+        path = env_file(tmp_path, "A=1\ntskey-client-pasted-alone\n")
 
-        detail = netboot_arm.read_tailnet_key(path)
+        detail = netboot_arm.read_tailnet_writer(path)
 
         assert detail == (
             f"{netboot_arm.NO_KEY_CODE}: line 2 of {path} is not a KEY=VALUE line; only those, "
@@ -108,7 +140,7 @@ class TestTheKey:
     def test_an_absent_env_file_is_refused(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "missing.env"
 
-        assert netboot_arm.read_tailnet_key(path) == (
+        assert netboot_arm.read_tailnet_writer(path) == (
             f"{netboot_arm.NO_KEY_CODE}: {path} does not exist, so no key can be minted; "
             "nothing ran"
         )

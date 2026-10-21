@@ -126,7 +126,7 @@ def adopt_pass(place: netboot_arm.NetbootPlace) -> tuple[str, ...]:
         return (f"fleet-netboot adopt did not run: {ready}",)
     result = netboot_arm.run_cli(
         adopt_argv(place, ready["release"]),
-        ready["key"],
+        ready["writer"],
         timeout_seconds=ADOPT_TIMEOUT_SECONDS,
     )
     return adopt_report(result, ready["release"])

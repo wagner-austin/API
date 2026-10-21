@@ -303,7 +303,9 @@ node binary, the served root and the workspace env file. The agent claims the
 lane with no node filter, since the machine an arm names is its target and
 never where it runs. Before the job is reported started it checks the
 release's seal with that release's own verifier (`fleet.core.sealed_release`,
-the check the session verbs make too) and reads `TAILSCALE_API_KEY` from the
+the check the session verbs make too) and reads the tailnet writer OAuth
+client, `TAILNET_WRITER_CLIENT_ID` and `TAILNET_WRITER_CLIENT_SECRET` (MCPs
+board task 3b4c0931), from the
 env file through `platform_core.env_file`, the one reader of the stack's
 `.env`; then it runs the release's own `fleet-netboot arm --node <machine>
 --registry <the registry directory the tick loaded>`, whose `machines/` names
@@ -1296,9 +1298,9 @@ install through MCPs' `fleet-netboot`, which mints the VM its own tailnet
 key, and then reaches the VM over ssh at its tailnet address, which
 diphtheria's tailnet grant allows and a `tag:corvis-node` machine's does not.
 Its last install step, `netboot-lane ENV_FILE=/home/corvis/PROJECTS/MCPs/.env
-VM_HOST=lavender`, copies only `TAILSCALE_API_KEY` from that host's
+VM_HOST=lavender`, copies only the tailnet writer client's two lines from that host's
 workspace `.env` into the export, after the steps whose untracked files the
-node stores, so the key is never stored with the tree, and names the host
+node stores, so the client is never stored with the tree, and names the host
 whose KVM boots the VM. The VM is not diphtheria's: its 7.5 GB never fit
 beside the stack, which on 2026-10-18 left 3.6 GB after its capped
 containers' promises (job 86c7afcc sat queued three hours declared at

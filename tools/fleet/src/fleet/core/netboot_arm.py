@@ -21,12 +21,16 @@ rolled commit's ``tools/fleet/registry`` (MCPs board task e447de72); until
 then it was named as the release's ``fleet-mcp/fleet-nodes.json``, a file
 the netboot release never shipped.
 
-THE KEY STAYS WHERE IT IS. The arm mints with the tailnet API key the
-workspace env file already holds for the netboot execution lane. It is read
-here and handed to the arm's environment and to nothing else: no argv, no
-log, no detail. The arm prints the minted key's id and never the key; a
-line of output carrying a tailnet key (``tskey-``) means that contract
-broke, and then none of the output is copied into the job's detail.
+THE CREDENTIAL STAYS WHERE IT IS. The arm mints with the tailnet writer
+OAuth client the workspace env file already holds for the netboot execution
+lane, ``TAILNET_WRITER_CLIENT_ID`` and ``TAILNET_WRITER_CLIENT_SECRET``,
+which replaced the personal ``TAILSCALE_API_KEY`` (MCPs board task
+3b4c0931; fleet-mcp ``tailnet-oauth.ts`` exchanges them for a token). They
+are read here and handed to the arm's environment and to nothing else: no
+argv, no log, no detail. The arm prints the minted key's id and never the
+key; a line of output carrying a tailnet key or secret (``tskey-``) means
+that contract broke, and then none of the output is copied into the job's
+detail.
 
 SHARED WITH THE ADOPT PASS. :func:`ready`, :func:`cli_argv`,
 :func:`run_cli`, :func:`carries_key` and :func:`output_tail` are how every
@@ -69,11 +73,12 @@ DEFINITION: Final = pathlib.PurePosixPath("fleet-mcp/netboot")
 #: rename stays on one file system.
 CACHE: Final = "cache"
 
-#: The variable the duty's commands read the key from, and the env file
-#: line that carries it.
-KEY_NAME: Final = "TAILSCALE_API_KEY"
+#: The variables the duty's commands read the tailnet writer client from,
+#: id then secret, and the env file lines that carry them.
+WRITER_NAMES: Final[tuple[str, str]] = ("TAILNET_WRITER_CLIENT_ID", "TAILNET_WRITER_CLIENT_SECRET")
 
-#: What every tailnet key begins with: an API key and a minted auth key alike.
+#: What every tailnet credential begins with: a client secret, an access
+#: token and a minted auth key alike.
 KEY_MARK: Final = "tskey-"
 
 #: The line the arm prints once it has armed a machine.
@@ -121,7 +126,7 @@ class NetbootPlace(TypedDict):
         release: The installed sealed netboot release's checkout.
         nodejs: The node binary that runs its CLI.
         served_root: The tree ``netboot-serve`` answers from.
-        env_file: The workspace env file holding the tailnet API key.
+        env_file: The workspace env file holding the tailnet writer client.
         registry: The registry directory this tick loaded, whose
             ``machines`` roster names each machine's boot MAC (MCPs board
             task e447de72).
@@ -134,14 +139,17 @@ class NetbootPlace(TypedDict):
     registry: pathlib.Path
 
 
-class TailnetKey(TypedDict):
-    """The tailnet API key, read for one arm's environment.
+class TailnetWriter(TypedDict):
+    """The tailnet writer OAuth client, read for one command's environment.
 
     Attributes:
-        value: The key. Never logged, never in an argv or a detail.
+        client_id: The client's id.
+        client_secret: The client's secret. Never logged, never in an argv
+            or a detail.
     """
 
-    value: str
+    client_id: str
+    client_secret: str
 
 
 class ArmOutcome(TypedDict):
@@ -163,35 +171,36 @@ class Ready(TypedDict):
 
     Attributes:
         release: The installed release, its seal verified.
-        key: The tailnet API key.
+        writer: The tailnet writer client.
     """
 
     release: SealedRelease
-    key: TailnetKey
+    writer: TailnetWriter
 
 
 def ready(place: NetbootPlace) -> Ready | str:
-    """Verify the installed release's seal, then read the key.
+    """Verify the installed release's seal, then read the writer client.
 
     Args:
         place: Where the netboot duty's commands run from.
 
     Returns:
-        The verified release and the key, or the first refusal: the
-        verifier's when the seal does not hold, :func:`read_tailnet_key`'s
-        when the env file gives no key. Nothing in the release has run.
+        The verified release and the writer client, or the first refusal:
+        the verifier's when the seal does not hold,
+        :func:`read_tailnet_writer`'s when the env file gives no client.
+        Nothing in the release has run.
     """
     release = verify_release(place["release"], KIND)
     if isinstance(release, str):
         return release
-    key = read_tailnet_key(place["env_file"])
-    if isinstance(key, str):
-        return key
-    return Ready(release=release, key=key)
+    writer = read_tailnet_writer(place["env_file"])
+    if isinstance(writer, str):
+        return writer
+    return Ready(release=release, writer=writer)
 
 
-def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
-    """Read the tailnet API key from the workspace env file.
+def read_tailnet_writer(env_file: pathlib.Path) -> TailnetWriter | str:
+    """Read the tailnet writer client from the workspace env file.
 
     Args:
         env_file: The stack's ``.env``, read by
@@ -199,9 +208,10 @@ def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
             it, in the grammar its owner holds.
 
     Returns:
-        The key, or a ``CODE: message`` refusal naming the file and never a
-        line of it, when it is absent, holds a line that is not
-        ``KEY=VALUE``, or sets no key or an empty one.
+        The client, or a ``CODE: message`` refusal naming the file and
+        never a line of it, when it is absent, holds a line that is not
+        ``KEY=VALUE``, or sets no id or no secret or an empty one, naming
+        each line it lacks. The retired ``TAILSCALE_API_KEY`` is never read.
     """
     if not _test_hooks.file_exists(env_file):
         return f"{NO_KEY_CODE}: {env_file} does not exist, so no key can be minted; nothing ran"
@@ -209,13 +219,18 @@ def read_tailnet_key(env_file: pathlib.Path) -> TailnetKey | str:
         values = parse_env_file(_test_hooks.read_text(env_file), source=str(env_file))
     except AppError as unreadable:
         return f"{NO_KEY_CODE}: {unreadable.message}; nothing ran"
-    value = values.get(KEY_NAME, "")
-    if value == "":
+    client_id, client_secret = (values.get(name, "") for name in WRITER_NAMES)
+    missing = [
+        name
+        for name, value in zip(WRITER_NAMES, (client_id, client_secret), strict=True)
+        if value == ""
+    ]
+    if missing:
         return (
-            f"{NO_KEY_CODE}: {env_file} sets no {KEY_NAME}, or sets it empty, and the netboot "
-            "duty's commands run with it; nothing ran"
+            f"{NO_KEY_CODE}: {env_file} sets no {' or '.join(missing)}, or sets it empty, and the "
+            "netboot duty's commands run with the tailnet writer client; nothing ran"
         )
-    return TailnetKey(value=value)
+    return TailnetWriter(client_id=client_id, client_secret=client_secret)
 
 
 def cli_argv(place: NetbootPlace, release: SealedRelease, *arguments: str) -> tuple[str, ...]:
@@ -271,21 +286,27 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
 
 
 def run_cli(
-    argv: tuple[str, ...], key: TailnetKey, *, timeout_seconds: int
+    argv: tuple[str, ...], writer: TailnetWriter, *, timeout_seconds: int
 ) -> _test_hooks.CommandResult:
-    """Run one ``fleet-netboot`` command with the key in its environment alone.
+    """Run one ``fleet-netboot`` command with the writer client in its environment alone.
 
     Args:
         argv: What :func:`cli_argv` composed.
-        key: The tailnet API key.
+        writer: The tailnet writer client.
         timeout_seconds: The command's deadline.
 
     Returns:
         Its exit status and captured streams, or the timed-out result after
         ``timeout_seconds``.
     """
+    client_id_name, client_secret_name = WRITER_NAMES
     return _test_hooks.run(
-        argv, timeout_seconds=timeout_seconds, set_env=((KEY_NAME, key["value"]),)
+        argv,
+        timeout_seconds=timeout_seconds,
+        set_env=(
+            (client_id_name, writer["client_id"]),
+            (client_secret_name, writer["client_secret"]),
+        ),
     )
 
 
@@ -402,22 +423,22 @@ __all__ = [
     "DETAIL_TAIL_CHARS",
     "KEY_IN_OUTPUT_CODE",
     "KEY_MARK",
-    "KEY_NAME",
     "KIND",
     "NO_KEY_CODE",
     "NO_MACHINE_CODE",
     "NO_RELEASE_CODE",
+    "WRITER_NAMES",
     "ArmOutcome",
     "NetbootPlace",
     "Ready",
-    "TailnetKey",
+    "TailnetWriter",
     "arm_argv",
     "arm_outcome",
     "carries_key",
     "cli_argv",
     "cli_error",
     "output_tail",
-    "read_tailnet_key",
+    "read_tailnet_writer",
     "ready",
     "run_cli",
 ]

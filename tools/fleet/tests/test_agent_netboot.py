@@ -36,9 +36,10 @@ from tests._agent_cli import (
 )
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._netboot_tick import (
-    API_KEY,
     RELEASE_ID,
     REVISION,
+    WRITER_ENV,
+    WRITER_SECRET,
     adopt_calls,
     adopt_replies,
     netboot_place,
@@ -173,10 +174,10 @@ class TestTheNetbootLane:
             300,
             netboot_adopt.ADOPT_TIMEOUT_SECONDS,
         ]
-        # The key reaches the arm's and adopt's environments and nothing else.
-        key = (("TAILSCALE_API_KEY", API_KEY),)
-        assert runner.set_env == [(), key, (), key]
-        assert not any(API_KEY in token for call in runner.calls for token in call)
+        # The writer client reaches the arm's and adopt's environments and
+        # nothing else, and the retired personal key reaches neither.
+        assert runner.set_env == [(), WRITER_ENV, (), WRITER_ENV]
+        assert not any(WRITER_SECRET in token for call in runner.calls for token in call)
         started = endpoint.arguments[2]
         assert started["node"] == HUB_HOST
         assert started["runId"] == tick_run_id()
@@ -275,8 +276,9 @@ class TestNetbootRefusals:
         # The arm's verify and the adopt pass's, and neither command ran.
         assert len(runner.calls) == 2
         assert narrow_json_to_str(endpoint.arguments[2]["detail"]) == (
-            f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no TAILSCALE_API_KEY, "
-            "or sets it empty, and the netboot duty's commands run with it; nothing ran"
+            f"{netboot_arm.NO_KEY_CODE}: {paths[agent.ENV_FILE_FLAG]} sets no "
+            "TAILNET_WRITER_CLIENT_ID or TAILNET_WRITER_CLIENT_SECRET, or sets it empty, and the "
+            "netboot duty's commands run with the tailnet writer client; nothing ran"
         )
 
     def test_an_arm_naming_no_machine_is_refused_and_nothing_runs(

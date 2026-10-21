@@ -16,8 +16,15 @@ from tests.conftest import ok
 RELEASE_ID: Final = "7fcc96d6ca7f9057183df144ad8ea2bd"
 REVISION: Final = "bade610b3a91eba2a7bab589770754d61e63a0e5"
 
-#: The tailnet API key the workspace env file holds for the netboot lane.
-API_KEY: Final = "tskey-api-kTEST1234CNTRL-secret"
+#: The tailnet writer client the workspace env file holds for the netboot lane.
+WRITER_ID: Final = "kTEST1234CNTRL"
+WRITER_SECRET: Final = "tskey-client-kTEST1234CNTRL-secret"
+
+#: The environment every ``fleet-netboot`` command runs with, and nothing more.
+WRITER_ENV: Final = (
+    ("TAILNET_WRITER_CLIENT_ID", WRITER_ID),
+    ("TAILNET_WRITER_CLIENT_SECRET", WRITER_SECRET),
+)
 
 #: What ``adopt`` prints when no check-in waits.
 NOTHING_PENDING: Final = (
@@ -39,7 +46,9 @@ def place(tmp_path: pathlib.Path) -> dict[str, pathlib.Path]:
     env_file = tmp_path / "MCPs" / ".env"
     env_file.parent.mkdir()
     env_file.write_text(
-        f"POSTGRES_PASSWORD=unrelated\nTAILSCALE_API_KEY={API_KEY}\nVM_HOST=lavender-wsl\n",
+        "POSTGRES_PASSWORD=unrelated\nTAILSCALE_API_KEY=tskey-api-retired\n"
+        f"TAILNET_WRITER_CLIENT_ID={WRITER_ID}\nTAILNET_WRITER_CLIENT_SECRET={WRITER_SECRET}\n"
+        "VM_HOST=lavender-wsl\n",
         encoding="utf-8",
     )
     return {

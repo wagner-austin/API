@@ -2,7 +2,8 @@
 
 WHOSE FILE, WHOSE GRAMMAR. The MCPs repository's ``.env`` holds the
 stack's credentials: ``MCP_INTERNAL_KEY`` and ``OPERATOR_TENANT_ID`` for the
-board, ``TAILSCALE_API_KEY`` for the netboot arm. MCPs owns the file, and
+board, ``TAILNET_WRITER_CLIENT_ID`` and ``TAILNET_WRITER_CLIENT_SECRET`` for
+the netboot arm. MCPs owns the file, and
 its reader, ``packages/maketools`` ``with_env.read_env_file``, states the
 grammar: blank lines and ``#`` comments are skipped; every other line is
 ``KEY=VALUE``, split at the first ``=`` with the key stripped and the value

@@ -19,10 +19,10 @@ from fleet.cli import agent
 from fleet.core import _test_hooks, netboot_adopt, sealed_release
 from tests._agent_cli import NOTHING_HELD, bind_hub_tick, netboot_argv
 from tests._netboot_tick import (
-    API_KEY,
     NOTHING_PENDING,
     RELEASE_ID,
     REVISION,
+    WRITER_ENV,
     adopt_calls,
     adopt_replies,
     place,
@@ -91,7 +91,7 @@ class TestTheAdoptPass:
 
         assert runner.calls == adopt_calls(paths, config_path)
         assert runner.timeouts == [300, netboot_adopt.ADOPT_TIMEOUT_SECONDS]
-        assert runner.set_env == [(), (("TAILSCALE_API_KEY", API_KEY),)]
+        assert runner.set_env == [(), WRITER_ENV]
         assert logged == ["netboot lane empty", f"{OPENING}: {NOTHING_PENDING}"]
 
     def test_each_adoption_is_logged_with_the_release_it_ran_from(

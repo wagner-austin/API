@@ -257,7 +257,7 @@ def netboot_job(
     _start(credentials, job, identity, node=node, run_id=run_id)
     result = netboot_arm.run_cli(
         netboot_arm.arm_argv(place, ready["release"], machine),
-        ready["key"],
+        ready["writer"],
         timeout_seconds=netboot_arm.ARM_TIMEOUT_SECONDS,
     )
     outcome = netboot_arm.arm_outcome(result, ready["release"], machine)
