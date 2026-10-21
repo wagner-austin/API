@@ -53,6 +53,34 @@ def _no_auto_gc_command(target: str) -> tuple[str, ...]:
     return ("git", "-C", target, "config", "gc.auto", "0")
 
 
+def _keep_bytes_command(target: str) -> tuple[str, ...]:
+    """The setting that keeps git from converting a staged tree's line endings.
+
+    A STAGED TREE IS THE ARCHIVE'S BYTES (MCPs board task ee3d6cdc). It is
+    unpacked from the hub's ``git archive``, so every file has the line
+    endings its commit has, and nothing should rewrite them. A Windows node's
+    git has ``core.autocrlf`` true, and under it ``git add --all`` warns once
+    per LF file that git will write CRLF the next time it touches it: on loki
+    on 2026-10-21 the MCPs export's index step sent 7778 such lines, 1,101,220
+    characters, back through the Cloudflare tunnel that is the node's only
+    way in, and fleet job af6c4d99 broke mid-stream on
+    ``client_loop: send disconnect: Broken pipe``. With ``false`` git takes
+    the bytes as they are, which leaves the committed blobs unchanged (true
+    converts only CRLF on the way in), says nothing per file, and makes a
+    later checkout in the stage write what a Linux node writes. Like
+    :func:`_no_auto_gc_command` it is the repository's own setting, never the
+    node's.
+
+    Args:
+        target: Absolute remote directory holding the repository, just
+            initialised.
+
+    Returns:
+        The command, as an argument vector.
+    """
+    return ("git", "-C", target, "config", "core.autocrlf", "false")
+
+
 def _commit_command(target: str, message: str) -> tuple[str, ...]:
     """The one commit of a staged tree, under the export identity.
 
@@ -205,7 +233,10 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
     ``core.hooksPath``) exists yet to run on it.
 
     AUTOMATIC GC IS TURNED OFF before the commit (:func:`_no_auto_gc_command`),
-    so the commit leaves its loose objects where the build copies them.
+    so the commit leaves its loose objects where the build copies them, and
+    LINE ENDINGS ARE LEFT AS THEY ARE before the index is filled
+    (:func:`_keep_bytes_command`), so a Windows node's add warns per file
+    about nothing.
 
     Args:
         target: Absolute remote directory holding the staged tree.
@@ -213,12 +244,13 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
             node names the run it was staged for.
 
     Returns:
-        The four commands, in order, for a dialect's
+        The five commands, in order, for a dialect's
         :meth:`fleet.core.dialect.Dialect.checked_script`.
     """
     return (
         ("git", "-C", target, "init", "--quiet"),
         _no_auto_gc_command(target),
+        _keep_bytes_command(target),
         ("git", "-C", target, "add", "--all", "--force"),
         _commit_command(target, f"fleet export {run_id}"),
     )

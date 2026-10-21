@@ -40,6 +40,7 @@ Describe 'The staged tree''s repository' {
         Read-Record $git.Record | Should -Be @(
             "-C $($script:target) init --quiet",
             "-C $($script:target) config gc.auto 0",
+            "-C $($script:target) config core.autocrlf false",
             "-C $($script:target) add --all --force",
             "-C $($script:target) -c user.name=fleet -c user.email=fleet@corvis.invalid commit --quiet --message `"fleet export MCPs-packages-maketools-1790000000`""
         )

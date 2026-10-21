@@ -52,6 +52,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect
+from fleet.core.stderr_tail import stderr_tail
 
 
 class RemoteFailure(TypedDict):
@@ -100,7 +101,7 @@ def _failure_for(
     Returns:
         The failure, or None when the command succeeded.
     """
-    detail = result["stderr"].strip() or "<no stderr>"
+    detail = stderr_tail(result["stderr"])
     if result["timed_out"]:
         # A peer that stopped answering mid-command is the tailnet's fault,
         # not the work's: the same code as an ssh that never connected.
