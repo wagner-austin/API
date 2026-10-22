@@ -132,6 +132,44 @@ class TestTheRef:
         )
 
 
+class TestADeadFetchsPack:
+    def test_is_removed_inside_the_turn_and_a_young_one_is_kept(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A tmp_pack older than the turn's bound was left by a fetch that
+        died; a young one may be a detached git gc's, written outside the
+        turn, and is not this export's to remove."""
+        origin, first = _origin(tmp_path)
+        mirror = _mirror(tmp_path)
+        packs = mirror / "objects" / "pack"
+        dead = packs / "tmp_pack_dead01"
+        dead.write_bytes(b"PACK half a fetch")
+        died = time.time() - mirror_fetch.FETCH_TURN["stale_seconds"] - 5
+        os.utime(dead, (died, died))
+        young = packs / "tmp_pack_live01"
+        young.write_bytes(b"PACK a gc's")
+
+        with caplog.at_level("INFO"):
+            mirror_fetch.fetch_commit(mirror, str(origin), first)
+
+        assert not dead.exists()
+        assert young.exists()
+        assert git(mirror, "rev-parse", mirror_fetch.FETCHED_REF) == first
+        assert f"removed 1 dead fetch pack(s) from {mirror}: ['tmp_pack_dead01']" in [
+            record.getMessage() for record in caplog.records
+        ]
+
+    def test_a_mirror_with_none_removes_nothing(self, tmp_path: pathlib.Path) -> None:
+        mirror = _mirror(tmp_path)
+
+        assert mirror_fetch.remove_dead_packs(mirror) == ()
+
+    def test_a_pack_renamed_since_it_was_listed_has_no_age(self, tmp_path: pathlib.Path) -> None:
+        """git renames a whole pack into place, so a listed tmp_pack can be
+        gone by the time its age is read, and nothing is left to remove."""
+        assert mirror_fetch._age(tmp_path / "tmp_pack_renamed") is None
+
+
 class TestTheTurn:
     def test_a_second_export_of_one_commit_waits_then_finds_it_held(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture

@@ -41,18 +41,24 @@ objects for the same commit, the MCPs mirror held 3.5 GB with no ref and
 on 8 threads with its swap full. So the commit lands in :data:`FETCHED_REF`,
 whose history every later fetch offers, and the probe and the fetch run
 inside the mirror's :data:`FETCH_TURN`, so a second export of the same commit
-waits for the first and then finds it held.
+waits for the first and then finds it held. The turn is also where a dead
+fetch's ``tmp_pack`` is removed (:func:`remove_dead_packs`), and
+``tests/test_mirrors_hub.py`` reads the hub's own mirrors for both facts.
 """
 
 from __future__ import annotations
 
+import os
 import pathlib
 from collections.abc import Callable
 from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
+from platform_core.logging import get_logger
 
 from fleet.core import _test_hooks, file_turn
+
+_log = get_logger(__name__)
 
 #: The local ref a companion's declared ref is fetched into, inside that
 #: companion's own mirror.
@@ -240,6 +246,52 @@ def turn_lock(mirror: pathlib.Path) -> pathlib.Path:
     return mirror.with_name(f"{mirror.name}.fetch.lock")
 
 
+def _age(path: pathlib.Path) -> int | None:
+    """How long ago a file was last written.
+
+    Args:
+        path: The file.
+
+    Returns:
+        Its age in whole seconds, or None when it is gone since it was
+        listed, which a pack git renamed into place is.
+    """
+    try:
+        modified = os.stat(path).st_mtime
+    except FileNotFoundError:
+        return None
+    return _test_hooks.now() - int(modified)
+
+
+def remove_dead_packs(mirror: pathlib.Path) -> tuple[str, ...]:
+    """Remove the ``tmp_pack`` files a fetch that died left in the mirror.
+
+    ``git index-pack`` writes a fetch's pack as ``objects/pack/tmp_pack_*``
+    and renames it once it is whole, so a fetch killed at its deadline, or a
+    runner that died inside one, leaves the file for good: seven of them,
+    671512 KiB, in diphtheria's MCPs mirror on 2026-10-22. Asked inside the mirror's
+    :data:`FETCH_TURN`, where no other fetch writes, and only of files older
+    than the turn's stale bound, because ``git gc --auto`` detaches from the
+    fetch that starts it and writes young ``tmp_pack`` files of its own
+    outside the turn.
+
+    Args:
+        mirror: The mirror's path.
+
+    Returns:
+        The names of the files removed, in name order.
+    """
+    removed: list[str] = []
+    for path in sorted((mirror / "objects" / "pack").glob("tmp_pack_*")):
+        age = _age(path)
+        if age is not None and age >= FETCH_TURN["stale_seconds"]:
+            path.unlink(missing_ok=True)
+            removed.append(path.name)
+    if removed:
+        _log.info("removed %d dead fetch pack(s) from %s: %s", len(removed), mirror, removed)
+    return tuple(removed)
+
+
 def has_commit(mirror: pathlib.Path, sha: str) -> bool:
     """Whether the mirror already holds the commit.
 
@@ -289,6 +341,7 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
         )
 
     with file_turn.held(turn_lock(mirror), holder=f"the export of {sha}", bounds=FETCH_TURN):
+        remove_dead_packs(mirror)
         if has_commit(mirror, sha):
             return
         _fetched(
@@ -348,6 +401,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
         )
 
     with file_turn.held(turn_lock(mirror), holder=f"the fetch of {ref}", bounds=FETCH_TURN):
+        remove_dead_packs(mirror)
         _fetched(
             (
                 "git",
@@ -392,5 +446,6 @@ __all__ = [
     "fetch_ref",
     "git_failure",
     "has_commit",
+    "remove_dead_packs",
     "turn_lock",
 ]
