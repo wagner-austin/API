@@ -133,9 +133,6 @@ def run_benchmark(
         ValueError: If fewer than two arms are given, if two arms share a
             name, if ``seeds`` is empty, or if ``config["repeats"]`` is less
             than one.
-        RuntimeError: If the process cannot opt out of power throttling, which
-            would leave every fit time attributable to an unknown mix of two
-            power regimes.
     """
     if len(trainers) < 2:
         raise ValueError(
@@ -156,13 +153,6 @@ def run_benchmark(
 
     if len(seeds) == 0:
         raise ValueError(f"[{ERR_NO_SEEDS}] At least one seed is required, got none")
-
-    # Once, before the first fit. Windows otherwise demotes this process to a
-    # throttled power regime a few seconds in -- measured at up to 13x on this
-    # workload, arriving mid-run and never lifting. See `power` for the data;
-    # the short version is that rotation cannot cancel a one-way step change,
-    # so the opt-out has to happen before anything is timed.
-    _test_hooks.power_throttling_opt_out()
 
     results: list[SeedResult] = []
     for index, seed in enumerate(seeds):

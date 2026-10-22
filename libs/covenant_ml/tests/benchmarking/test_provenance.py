@@ -329,7 +329,6 @@ class TestTheProductionHooks:
             "host_probe",
             "installed_version",
             "monotonic_clock",
-            "power_throttling_opt_out",
         ]
 
 

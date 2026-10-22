@@ -23,7 +23,6 @@ from covenant_ml.benchmarking.types import (
     ERR_DUPLICATE_TRAINER,
     ERR_INVALID_REPEATS,
     ERR_NO_SEEDS,
-    ERR_POWER_THROTTLING,
     ERR_TOO_FEW_TRAINERS,
     MANIFEST_SCHEMA_VERSION,
     BenchmarkConfig,
@@ -232,34 +231,6 @@ def constant_split(seed: int) -> DataSplit:
     return make_split()
 
 
-class RecordingOptOut:
-    """Records power-throttling opt-out requests instead of making them."""
-
-    def __init__(self) -> None:
-        """Start with no recorded calls."""
-        self.calls = 0
-
-    def __call__(self) -> None:
-        """Record one opt-out request.
-
-        Returns:
-            None.
-        """
-        self.calls += 1
-
-
-class FailingOptOut:
-    """An opt-out that reports the platform refused the request."""
-
-    def __call__(self) -> None:
-        """Refuse.
-
-        Raises:
-            RuntimeError: Always, carrying the traceable code.
-        """
-        raise RuntimeError(f"[{ERR_POWER_THROTTLING}] refused")
-
-
 @pytest.fixture()
 def stepping_clock() -> Generator[SteppingClock, None, None]:
     """Install a stepping clock for the duration of a test.
@@ -272,92 +243,6 @@ def stepping_clock() -> Generator[SteppingClock, None, None]:
     _test_hooks.monotonic_clock = clock
     yield clock
     _test_hooks.monotonic_clock = previous
-
-
-@pytest.fixture()
-def recorded_opt_out() -> Generator[RecordingOptOut, None, None]:
-    """Install a recording power-throttling opt-out.
-
-    Keeps the suite from altering the host's power state while still letting a
-    test assert the request was made.
-
-    Yields:
-        The installed recorder.
-    """
-    previous = _test_hooks.power_throttling_opt_out
-    recorder = RecordingOptOut()
-    _test_hooks.power_throttling_opt_out = recorder
-    yield recorder
-    _test_hooks.power_throttling_opt_out = previous
-
-
-def test_power_throttling_is_disabled_once_per_run(
-    stepping_clock: SteppingClock,
-    recorded_opt_out: RecordingOptOut,
-) -> None:
-    """Once for the whole run, not once per seed or per arm.
-
-    Windows demotes this process to a throttled power regime a few seconds in,
-    and the demotion never lifts. Opting out after the first fit would leave
-    the earliest measurements in a different regime from the rest.
-    """
-    run_benchmark(
-        [
-            RecordingTrainer(BenchmarkModelName.CLEARGBM),
-            RecordingTrainer(BenchmarkModelName.LIGHTGBM),
-        ],
-        constant_split,
-        [42, 43, 44],
-        make_config(repeats=1, warmups=0),
-        make_dataset_info(),
-        _FINGERPRINT,
-    )
-    assert recorded_opt_out.calls == 1
-
-
-def test_a_refused_opt_out_aborts_the_run(stepping_clock: SteppingClock) -> None:
-    """No fallback: a run that cannot opt out must not report timings."""
-    previous = _test_hooks.power_throttling_opt_out
-    _test_hooks.power_throttling_opt_out = FailingOptOut()
-    try:
-        with pytest.raises(RuntimeError, match=ERR_POWER_THROTTLING):
-            run_benchmark(
-                [
-                    RecordingTrainer(BenchmarkModelName.CLEARGBM),
-                    RecordingTrainer(BenchmarkModelName.LIGHTGBM),
-                ],
-                constant_split,
-                [42],
-                make_config(repeats=1, warmups=0),
-                make_dataset_info(),
-                _FINGERPRINT,
-            )
-    finally:
-        _test_hooks.power_throttling_opt_out = previous
-
-
-def test_no_fit_runs_before_the_opt_out(stepping_clock: SteppingClock) -> None:
-    """The abort must happen before any learner is touched.
-
-    A run that fitted first and opted out afterwards would already have
-    produced measurements in the wrong regime.
-    """
-    trainer = RecordingTrainer(BenchmarkModelName.CLEARGBM)
-    previous = _test_hooks.power_throttling_opt_out
-    _test_hooks.power_throttling_opt_out = FailingOptOut()
-    try:
-        with pytest.raises(RuntimeError, match=ERR_POWER_THROTTLING):
-            run_benchmark(
-                [trainer, RecordingTrainer(BenchmarkModelName.LIGHTGBM)],
-                constant_split,
-                [42],
-                make_config(repeats=1, warmups=0),
-                make_dataset_info(),
-                _FINGERPRINT,
-            )
-    finally:
-        _test_hooks.power_throttling_opt_out = previous
-    assert trainer.fit_seeds == []
 
 
 def test_warmup_fits_run_but_are_not_timed(stepping_clock: SteppingClock) -> None:

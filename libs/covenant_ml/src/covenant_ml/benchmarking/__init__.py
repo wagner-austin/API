@@ -75,11 +75,8 @@ from .multiclass_quality import (
     make_synthetic_multiclass,
     run_multiclass_benchmark,
 )
-from .power import disable_power_throttling, opt_out_of_power_throttling
 from .protocols import (
     DataSplit,
-    PowerThrottlingOptOutProto,
-    ProcessInformationSetterProto,
     SplitFactoryProto,
     TrainedModelProto,
     TrainerProto,
@@ -136,8 +133,6 @@ __all__ = [
     "MulticlassBenchConfig",
     "MulticlassManifest",
     "MulticlassQuality",
-    "PowerThrottlingOptOutProto",
-    "ProcessInformationSetterProto",
     "QualityMetrics",
     "QuantizedArmResult",
     "QuantizedBenchConfig",
@@ -159,7 +154,6 @@ __all__ = [
     "company_disjoint_split",
     "compute_quality",
     "decode_benchmark_manifest",
-    "disable_power_throttling",
     "encode_benchmark_manifest",
     "encode_goss_manifest",
     "encode_multiclass_manifest",
@@ -175,7 +169,6 @@ __all__ = [
     "make_synthetic_ranking",
     "make_trainers",
     "measure_trainer",
-    "opt_out_of_power_throttling",
     "render_report",
     "run_benchmark",
     "run_goss_benchmark",

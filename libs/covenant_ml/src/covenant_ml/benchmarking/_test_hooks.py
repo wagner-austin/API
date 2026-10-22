@@ -32,20 +32,13 @@ from platform_core.environment_record import (
     installed_version as _installed_version,
 )
 
-from .power import opt_out_of_power_throttling
-from .protocols import HostProbeProto, MonotonicClockProto, PowerThrottlingOptOutProto
+from .protocols import HostProbeProto, MonotonicClockProto
 
 #: Clock used to bracket each timed fit. Bound to :func:`time.perf_counter`,
 #: the highest-resolution monotonic counter available, so timings are immune
 #: to wall-clock adjustments. Tests rebind this to drive the timing logic from
 #: a fixed sequence.
 monotonic_clock: MonotonicClockProto = time.perf_counter
-
-#: Opt-out from system-managed power throttling, requested once per run before
-#: any fit is timed. Bound to the real Win32 call; tests rebind it so the
-#: suite never alters the host's power state and can assert the request was
-#: made rather than inferring it from a wall-clock effect.
-power_throttling_opt_out: PowerThrottlingOptOutProto = opt_out_of_power_throttling
 
 
 def _default_host_probe() -> HostProbe:
@@ -75,5 +68,4 @@ __all__ = [
     "host_probe",
     "installed_version",
     "monotonic_clock",
-    "power_throttling_opt_out",
 ]
