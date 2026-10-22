@@ -9,6 +9,7 @@
   "tailnetIp": "100.86.243.5",
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII408kXbqK2ka+DZwYYvLfIXfmAQ1a6XlMgAuxdMfTiH corvis@ziggurat",
   "bootMac": null,
+  "netbootWifi": false,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,

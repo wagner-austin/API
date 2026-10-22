@@ -110,6 +110,18 @@ def test_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub
     assert never == ["austinpc", "diphtheria", "loki"]
 
 
+def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
+    # MCPs board task f78f7e33: pendragon's one USB-C port is also its
+    # charging port, so its netboot install must bring up Wi-Fi to lose the
+    # dock. fleet-mcp's decoder requires the key and refuses true without a
+    # bootMac.
+    machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
+    assert {name: type(m.get("netbootWifi")) for name, m in machines.items()} == dict.fromkeys(
+        machines, bool
+    )
+    assert sorted(name for name, m in machines.items() if m["netbootWifi"] is True) == ["pendragon"]
+
+
 def test_austinpc_declares_no_hub_runner_and_no_task_the_runner_replaced() -> None:
     # The hub runner is diphtheria's user unit since MCPs board task c39ee056,
     # and austinpc carries neither Windows instance (board task edaabb43).

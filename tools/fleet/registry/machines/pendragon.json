@@ -9,6 +9,7 @@
   "tailnetIp": "100.74.0.62",
   "reachKey": null,
   "bootMac": "d8:5e:d3:84:53:d4",
+  "netbootWifi": true,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,

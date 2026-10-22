@@ -9,6 +9,7 @@
   "tailnetIp": "100.120.151.28",
   "reachKey": null,
   "bootMac": null,
+  "netbootWifi": false,
   "tunnel": {
     "name": "loki-ssh",
     "id": "b6e09528-9df4-4c3a-a7a7-4da447d4a46a",
