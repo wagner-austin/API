@@ -33,7 +33,7 @@ another's WSL exactly when its ``guest`` names a host.
 
 THIS PACKAGE DECODES WHAT IT READS. The identity fields only MCPs reads
 (``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``installDisk``,
-``disabledUntil``, ``tunnel``, ``guest.sshPort``, ``duties``,
+``disabledUntil``, ``tunnel``, ``guest.sshPort``, ``duties``, ``standby``,
 ``ledger_observer``, ``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
 ``fleet-mcp``'s registry decoder, which every fleet audit runs over this
 directory; deciding their shapes twice, in two languages, would be the
