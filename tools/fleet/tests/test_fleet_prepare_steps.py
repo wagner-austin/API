@@ -65,10 +65,11 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # (MCPs board task d387271d); 63 since MCPs/execution-twin, the
     # execution suite's twin lane (MCPs board task 83b5c38f); 62 since
     # session-audit's Windows lane, MCPs/packages/session-audit, was dropped
-    # with the package's Windows code (MCPs board task c8cb0ac5). The
+    # with the package's Windows code (MCPs board task c8cb0ac5); 63 since
+    # MCPs/kvm-mcp, the hardware KVM tools (MCPs board task c8f09479). The
     # unprepared lose MCPs/execution-elevated, whose installer cases MCPs
     # board task 42fb4e26 deleted.
-    assert len(prepared) == 62
+    assert len(prepared) == 63
     assert unprepared == [
         "MCPs/execution",
         "MCPs/execution-deploy",
