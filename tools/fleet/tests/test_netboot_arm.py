@@ -14,7 +14,14 @@ from fleet.cli import agent
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks, netboot_arm
 from fleet.core.sealed_release import SealedRelease
-from tests._netboot_tick import netboot_place, place, verify_reply
+from tests._netboot_tick import (
+    WRITER_ID,
+    WRITER_SECRET,
+    netboot_place,
+    place,
+    sealed,
+    verify_reply,
+)
 from tests.conftest import FakeRun, failed, ok, timed_out
 
 RELEASE: Final = SealedRelease(
@@ -197,10 +204,11 @@ class TestTheFleetWifi:
             f"{netboot_arm.WIFI_UNUSABLE_CODE}: {absent} does not exist; nothing ran"
         )
         path = env_file(tmp_path, "A=1\nmade-up-passphrase-pasted-alone\n")
-        detail = netboot_arm.read_fleet_wifi(path)
-        assert isinstance(detail, str)
-        assert detail.startswith(f"{netboot_arm.WIFI_UNUSABLE_CODE}: line 2 of {path} is not")
-        assert "made-up" not in detail
+        assert netboot_arm.read_fleet_wifi(path) == (
+            f"{netboot_arm.WIFI_UNUSABLE_CODE}: line 2 of {path} is not a KEY=VALUE line; only "
+            "those, blank lines and # comments are read, and skipping one would drop whichever "
+            "key it sets; nothing ran"
+        )
 
     def test_ready_gives_the_wifi_and_refuses_half_a_network(self, tmp_path: pathlib.Path) -> None:
         paths = place(tmp_path)
@@ -210,17 +218,20 @@ class TestTheFleetWifi:
         env.write_text(env.read_text(encoding="utf-8") + WIFI_LINES, encoding="utf-8")
         _test_hooks.run = FakeRun([verify_reply(release)])
 
-        given = netboot_arm.ready(where)
-
-        assert not isinstance(given, str)
-        assert given["wifi"] == netboot_arm.FleetWifi(
-            ssid="corvis test net", passphrase="made-up-passphrase-0001"
+        assert netboot_arm.ready(where) == netboot_arm.Ready(
+            release=sealed(paths),
+            writer=netboot_arm.TailnetWriter(client_id=WRITER_ID, client_secret=WRITER_SECRET),
+            wifi=netboot_arm.FleetWifi(
+                ssid="corvis test net", passphrase="made-up-passphrase-0001"
+            ),
         )
         env.write_text(f"{WRITER_LINES}FLEET_WIFI_SSID=corvis test net\n", encoding="utf-8")
         _test_hooks.run = FakeRun([verify_reply(release)])
-        refused = netboot_arm.ready(where)
-        assert isinstance(refused, str)
-        assert refused.startswith(f"{netboot_arm.WIFI_UNUSABLE_CODE}: {env} sets one of")
+        assert netboot_arm.ready(where) == (
+            f"{netboot_arm.WIFI_UNUSABLE_CODE}: {env} sets one of FLEET_WIFI_SSID and "
+            "FLEET_WIFI_PASSPHRASE but no FLEET_WIFI_PASSPHRASE, or sets it empty, so no arm is "
+            "given half a network; nothing ran"
+        )
 
     def test_the_wifi_reaches_the_commands_environment_after_the_writer_client(self) -> None:
         runner = FakeRun([ok("ok\n"), ok("ok\n")])
