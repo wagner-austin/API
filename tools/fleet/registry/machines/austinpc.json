@@ -58,6 +58,6 @@
       }
     ]
   },
-  "notes": "The hub. Holds cert.pem, so tunnels and DNS routes are created from here. Its own key is deliberately ABSENT from its own administrators_authorized_keys.",
-  "dispatch": "The hub, and the machine the dispatcher itself runs on. A dispatch here would run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database -- the three-way contention this whole package exists to escape. Enabled because it must answer for tunnels and DNS, which is a different question from whether work may be sent to it."
+  "notes": "The hub until 2026-10-22, holding no duty since MCPs board task 49b6588b: diphtheria holds control, sessions, netboot and devices, runs the hub runner and deploy-hosts, and since MCPs board task 2d72a4da holds the cloudflared cert.pem in ~/.cloudflared, so tunnels and DNS routes are created there; austinpc runs no container of the MCPs stack and its MCPs .env names no compose file. Its role stays hub until its reimage to a Linux worker (MCPs board task e2ffed0d) because every node's sshd and firewall admit the hub role's addresses (fleet-mcp sshAdmittedNodes), and the plan keeps 100.77.206.124 admitted across the wipe. Its own key is deliberately ABSENT from its own administrators_authorized_keys.",
+  "dispatch": "Never dispatched: until 2026-10-18 the dispatcher itself ran here, and a dispatch would have run make check beside the runner against the same shared .venv, the same coverage directory and the same corvis_test database. The runner moved to diphtheria (MCPs board task c39ee056) and the machine is about to be reimaged (MCPs board task e2ffed0d), so it takes no work before it returns as a Linux worker."
 }
