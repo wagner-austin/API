@@ -8,9 +8,12 @@
   "ledger_observer": "pcsession",
   "tailnetIp": "100.77.206.124",
   "reachKey": null,
-  "bootMac": null,
+  "bootMac": "d8:43:ae:24:7c:04",
   "netbootWifi": false,
-  "installDisk": null,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
+  },
   "tunnel": {
     "name": "austinpc-ssh",
     "id": "d7ac1983-b844-4bf8-9877-d634f0e13de9",
