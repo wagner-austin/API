@@ -10,6 +10,7 @@
   "reachKey": null,
   "bootMac": null,
   "netbootWifi": false,
+  "installDisk": null,
   "tunnel": {
     "name": "loki-ssh",
     "id": "b6e09528-9df4-4c3a-a7a7-4da447d4a46a",

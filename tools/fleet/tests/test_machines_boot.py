@@ -30,6 +30,13 @@ LAVENDER_MAC = "1c:69:7a:fe:78:9a"
 #: pendragon's wired adapter, declared at ee52f9b22 (MCPs board task 1e9ab738).
 PENDRAGON_MAC = "d8:5e:d3:84:53:d4"
 
+#: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
+#: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
+#: SSD, and pendragon's NVMe, beside which it also carries a 512 GB SD card
+#: only 36 MB smaller, which a largest-disk rule would one day choose.
+LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
+PENDRAGON_INSTALL_DISK = "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
+
 #: The scheduled tasks hub runner jobs replaced: the audit's, the manager
 #: audit's, the hpc-wake pump's and the disk cleanup's since MCPs board task
 #: b27bd34a, and the device services' and the hub tunnel's since 49b6588b.
@@ -120,6 +127,22 @@ def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it
         machines, bool
     )
     assert sorted(name for name, m in machines.items() if m["netbootWifi"] is True) == ["pendragon"]
+
+
+def test_every_boot_mac_names_its_install_disk_by_serial_and_no_other_machine_names_one() -> None:
+    # MCPs board task c64006b9: a netboot install wipes only the disk the
+    # roster names, so each machine with a bootMac names its disk by serial
+    # and every other machine carries null. fleet-mcp's decoder requires the
+    # key and refuses a bootMac without a disk.
+    machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
+    named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
+    assert named == {
+        "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
+        "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
+    }
+    assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
+        name for name, m in machines.items() if m["bootMac"] is None
+    )
 
 
 def test_austinpc_declares_no_hub_runner_and_no_task_the_runner_replaced() -> None:

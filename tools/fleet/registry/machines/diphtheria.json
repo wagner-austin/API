@@ -15,6 +15,7 @@
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHoLsl1JQAe3FE/QsOfx8XpcOrEGI5NOtce5aADvRwnP corvis@diphtheria fleet hub",
   "bootMac": null,
   "netbootWifi": false,
+  "installDisk": null,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,

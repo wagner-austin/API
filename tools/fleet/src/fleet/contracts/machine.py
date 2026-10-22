@@ -32,9 +32,9 @@ machine's name, which is its ssh alias everywhere, and a node runs inside
 another's WSL exactly when its ``guest`` names a host.
 
 THIS PACKAGE DECODES WHAT IT READS. The identity fields only MCPs reads
-(``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``disabledUntil``,
-``tunnel``, ``guest.sshPort``, ``duties``, ``ledger_observer``,
-``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
+(``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``installDisk``,
+``disabledUntil``, ``tunnel``, ``guest.sshPort``, ``duties``,
+``ledger_observer``, ``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
 ``fleet-mcp``'s registry decoder, which every fleet audit runs over this
 directory; deciding their shapes twice, in two languages, would be the
 duplicate this file replaced.

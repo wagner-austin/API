@@ -10,6 +10,7 @@
   "reachKey": null,
   "bootMac": null,
   "netbootWifi": false,
+  "installDisk": null,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,

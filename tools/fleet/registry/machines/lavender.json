@@ -10,6 +10,10 @@
   "reachKey": null,
   "bootMac": "1c:69:7a:fe:78:9a",
   "netbootWifi": false,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
+  },
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": 2,

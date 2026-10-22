@@ -10,6 +10,7 @@
   "reachKey": null,
   "bootMac": null,
   "netbootWifi": false,
+  "installDisk": null,
   "tunnel": {
     "name": "austinpc-ssh",
     "id": "d7ac1983-b844-4bf8-9877-d634f0e13de9",

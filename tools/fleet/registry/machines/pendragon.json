@@ -10,6 +10,10 @@
   "reachKey": null,
   "bootMac": "d8:5e:d3:84:53:d4",
   "netbootWifi": true,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
+  },
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
