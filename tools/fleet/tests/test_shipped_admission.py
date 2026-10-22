@@ -25,7 +25,14 @@ these nodes a second check fits the core pool and still pushes both past the
   (MCPs board task c2f29d21): at the 2 workers its cores afford, that check
   took 354 s of 300 there with every test passing (fleet job 7912af42: lint
   80 s, vitest 271 s), against 140 s at 3 workers on serendipity (97af0de3),
-  so the suite declares a minimum of 3 workers and lenovold refuses it.
+  so the suite declares a minimum of 3 workers and lenovold refuses it. Nor
+  MCPs/execution-deploy (MCPs board task 21eda18b): fleet job f50bb675 ran it
+  425 s of 300 there with every test passing, 305 s of them in mcp-proxy's
+  Keycloak twin, whose two files run side by side, each with its own
+  Keycloak and chromium and up to 5 cases at once. The twin took 59 to 61 s
+  on lacrymal and sedona, 99 s on serendipity and 130 s on lavender, so the
+  suite declares the 3 cores it runs on as 3 workers of 1.5 GB, its 4.5 GB
+  unchanged, and lenovold's 2 refuse it.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
@@ -49,7 +56,7 @@ import pytest
 from platform_core.errors import FleetErrorCode
 
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
-from fleet.contracts.tags import node_tags
+from fleet.contracts.tags import missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core.capacity import assess
 from fleet.core.workspace_files import read_workspace_document
@@ -184,6 +191,45 @@ def test_lenovold_refuses_the_shared_library_suite_and_no_other_node_does() -> N
         name: verdict["code"]
         for name, node in workspace["nodes"].items()
         if node["enabled"]
+        for verdict in (assess(node, _idle(node), project, node_tags(node)),)
+        if verdict["code"] is not None
+    }
+    assert refused == {
+        "diphtheria": FleetErrorCode.NODE_NOT_PINNED,
+        "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+    }
+
+
+def test_lenovold_refuses_the_deploy_suite_and_no_other_docker_node_does() -> None:
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/execution-deploy"]
+    lenovold = workspace["nodes"]["lenovold"]
+
+    assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
+        "workers": 0,
+        "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
+        "reason": (
+            "lenovold affords 2 worker(s) for a suite that declares a minimum of 3: 4 cores "
+            "against 2 reserved, 24.0 GB free, 1.5 GB per worker, 1.5 GB reserved for the "
+            "node's owner. Dispatching anyway would run a suite at a fraction of its workers "
+            "until its own lease expired underneath it."
+        ),
+    }
+    # serendipity leaves the fewest cores of the nodes that admit it, 6, and
+    # the suite ran there in 141 to 158 s of the budget; 3 is the smallest
+    # minimum lenovold's 2 cores refuse, and half of serendipity's 6 grants it.
+    serendipity = workspace["nodes"]["serendipity"]
+    assert assess(serendipity, _idle(serendipity), project, node_tags(serendipity)) == {
+        "workers": 3,
+        "code": None,
+        "reason": "",
+    }
+    # By property, as for the shared library: of the enabled nodes carrying
+    # its tags, only lenovold and diphtheria refuse it.
+    refused = {
+        name: verdict["code"]
+        for name, node in workspace["nodes"].items()
+        if node["enabled"] and not missing_tags(node_tags(node), project["required_tags"])
         for verdict in (assess(node, _idle(node), project, node_tags(node)),)
         if verdict["code"] is not None
     }
