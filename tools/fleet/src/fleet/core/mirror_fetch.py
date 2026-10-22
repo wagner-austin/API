@@ -29,6 +29,19 @@ Each further attempt sends the same credential, so the first one git
 answers with a :data:`CREDENTIAL_REFUSED_MARKERS` spelling is refused at once
 as ``REMOTE_CREDENTIAL_REJECTED``, naming the control host's credential as
 what must change.
+
+A COMMIT IS FETCHED INTO A REF, ONE EXPORT AT A TIME PER MIRROR (MCPs board
+task 86f70457). Until then :func:`fetch_commit` fetched a bare sha with no
+destination, so a project mirror never held a ref: every fetch had nothing to
+offer the remote as common history and received the whole repository again,
+and nothing kept several node runners from fetching one commit into one mirror
+at once. On diphtheria on 2026-10-22 six runners each received MCPs' 133470
+objects for the same commit, the MCPs mirror held 3.5 GB with no ref and
+1.6 GB of ``tmp_pack`` left by fetches that died, and the host ran at load 40
+on 8 threads with its swap full. So the commit lands in :data:`FETCHED_REF`,
+whose history every later fetch offers, and the probe and the fetch run
+inside the mirror's :data:`FETCH_TURN`, so a second export of the same commit
+waits for the first and then finds it held.
 """
 
 from __future__ import annotations
@@ -39,7 +52,7 @@ from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, file_turn
 
 #: The local ref a companion's declared ref is fetched into, inside that
 #: companion's own mirror.
@@ -49,6 +62,16 @@ from fleet.core import _test_hooks
 #: exactly what ``git gc`` is entitled to remove, and the window would be
 #: rare enough to be undebuggable.
 COMPANION_REF: Final = "refs/fleet/companion"
+
+#: The local ref a project's commit is fetched into, inside its mirror.
+#:
+#: One ref, moved by each fetch, rather than one per commit: what a fetch
+#: needs is a tip whose history it can offer the remote, and the commits the
+#: fleet checks are on the remote's history, so the newest one carries nearly
+#: all of the next one's objects. A commit it moves off is still held, which
+#: is what :func:`has_commit` asks, until ``git gc`` prunes it; fetched again
+#: then, it costs only what this ref's history lacks.
+FETCHED_REF: Final = "refs/fleet/fetched"
 
 #: One fetch attempt's deadline, in seconds. A first fetch of a large
 #: repository over the operator's uplink is minutes; ten holds it and ends a
@@ -69,6 +92,18 @@ FETCH_PAUSE_SECONDS: Final = 10
 
 #: The deadline of a git command that reads only the local mirror, in seconds.
 INIT_TIMEOUT_SECONDS: Final = 60
+
+#: A mirror's fetch turn as :mod:`fleet.core.file_turn` holds it. Inside it
+#: an export probes the mirror and fetches at most one commit, which ends
+#: within one probe's deadline and the fetch's budget, so a lock older than
+#: both with a probe's deadline to spare was left by a process that died
+#: inside its turn.
+FETCH_TURN: Final = file_turn.TurnBounds(
+    what="mirror fetch turn",
+    waited_for="another export fetching into the same mirror",
+    stale_seconds=FETCH_BUDGET_SECONDS + 2 * INIT_TIMEOUT_SECONDS,
+    poll_seconds=FETCH_PAUSE_SECONDS,
+)
 
 #: What git says when the remote will not serve the object asked for: the
 #: three spellings across protocol versions and server settings. Any of
@@ -190,6 +225,21 @@ def _fetched(
     )
 
 
+def turn_lock(mirror: pathlib.Path) -> pathlib.Path:
+    """Where a mirror's fetch turn is held.
+
+    Beside the mirror rather than in it, so nothing git reads or repacks
+    holds a file git did not write.
+
+    Args:
+        mirror: The mirror's path.
+
+    Returns:
+        ``<mirror>.fetch.lock`` in the mirrors directory.
+    """
+    return mirror.with_name(f"{mirror.name}.fetch.lock")
+
+
 def has_commit(mirror: pathlib.Path, sha: str) -> bool:
     """Whether the mirror already holds the commit.
 
@@ -208,10 +258,12 @@ def has_commit(mirror: pathlib.Path, sha: str) -> bool:
 
 
 def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
-    """Fetch one commit from the remote into the mirror.
+    """Fetch one commit from the remote into the mirror's :data:`FETCHED_REF`.
 
     Skipped when the mirror already holds it: a second job for the same sha
-    (a re-run, or two packages of one commit) costs no round trip.
+    (a re-run, or two packages of one commit) costs no round trip. The probe
+    and the fetch share one :data:`FETCH_TURN`, so a job that asks while
+    another fetches the same commit waits for it and is then skipped.
 
     Args:
         mirror: The mirror's path, already initialised.
@@ -225,8 +277,6 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
             :data:`NOT_ON_REMOTE_MARKERS` in git's words), ``EXPORT_FAILED``
             when no attempt was done, every attempt's words verbatim.
     """
-    if has_commit(mirror, sha):
-        return
 
     def not_served(stderr: str) -> AppError[FleetErrorCode]:
         return AppError(
@@ -238,12 +288,25 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
             ),
         )
 
-    _fetched(
-        ("git", "-C", str(mirror), "fetch", "--quiet", "--no-tags", remote, sha),
-        remote=remote,
-        verb=f"git fetch {remote} {sha} into {mirror}",
-        not_served=not_served,
-    )
+    with file_turn.held(turn_lock(mirror), holder=f"the export of {sha}", bounds=FETCH_TURN):
+        if has_commit(mirror, sha):
+            return
+        _fetched(
+            (
+                "git",
+                "-C",
+                str(mirror),
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--force",
+                remote,
+                f"+{sha}:{FETCHED_REF}",
+            ),
+            remote=remote,
+            verb=f"git fetch {remote} {sha} into {mirror}",
+            not_served=not_served,
+        )
 
 
 def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
@@ -251,7 +314,9 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
 
     Never skipped the way :func:`fetch_commit` is: a sha the mirror holds is
     that sha forever, while a ref's tip is a moving answer and the question
-    a companion asks is what it points at NOW.
+    a companion asks is what it points at NOW. The fetch and the read of the
+    ref share one :data:`FETCH_TURN`, as :func:`fetch_commit`'s do, so two
+    jobs never write the one ref at once.
 
     Args:
         mirror: The companion's mirror, already initialised.
@@ -282,26 +347,27 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
             ),
         )
 
-    _fetched(
-        (
-            "git",
-            "-C",
-            str(mirror),
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            "--force",
-            remote,
-            f"+{ref}:{COMPANION_REF}",
-        ),
-        remote=remote,
-        verb=f"git fetch {remote} {ref} into {mirror}",
-        not_served=not_served,
-    )
-    resolved = _test_hooks.run(
-        ("git", "-C", str(mirror), "rev-parse", f"{COMPANION_REF}^{{commit}}"),
-        timeout_seconds=INIT_TIMEOUT_SECONDS,
-    )
+    with file_turn.held(turn_lock(mirror), holder=f"the fetch of {ref}", bounds=FETCH_TURN):
+        _fetched(
+            (
+                "git",
+                "-C",
+                str(mirror),
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                "--force",
+                remote,
+                f"+{ref}:{COMPANION_REF}",
+            ),
+            remote=remote,
+            verb=f"git fetch {remote} {ref} into {mirror}",
+            not_served=not_served,
+        )
+        resolved = _test_hooks.run(
+            ("git", "-C", str(mirror), "rev-parse", f"{COMPANION_REF}^{{commit}}"),
+            timeout_seconds=INIT_TIMEOUT_SECONDS,
+        )
     if resolved["returncode"] != 0:
         raise git_failure(
             FleetErrorCode.EXPORT_FAILED,
@@ -314,14 +380,17 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
 __all__ = [
     "COMPANION_REF",
     "CREDENTIAL_REFUSED_MARKERS",
+    "FETCHED_REF",
     "FETCH_ATTEMPTS",
     "FETCH_BUDGET_SECONDS",
     "FETCH_PAUSE_SECONDS",
     "FETCH_TIMEOUT_SECONDS",
+    "FETCH_TURN",
     "INIT_TIMEOUT_SECONDS",
     "NOT_ON_REMOTE_MARKERS",
     "fetch_commit",
     "fetch_ref",
     "git_failure",
     "has_commit",
+    "turn_lock",
 ]

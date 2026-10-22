@@ -187,8 +187,9 @@ class TestClaiming:
             "fetch",
             "--quiet",
             "--no-tags",
+            "--force",
             REMOTE,
-            DEFAULT_SHA,
+            f"+{DEFAULT_SHA}:refs/fleet/fetched",
         )
 
     def test_the_ledger_row_names_the_submitter_and_the_feed_names_the_commit(

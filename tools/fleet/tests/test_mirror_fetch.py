@@ -111,7 +111,11 @@ class TestFetchCommit:
 
         assert runner.calls == [("git", "-C", str(tmp_path), "cat-file", "-e", f"{SHA}^{{commit}}")]
 
-    def test_a_missing_commit_is_fetched_by_sha_without_tags(self, tmp_path: pathlib.Path) -> None:
+    def test_a_missing_commit_is_fetched_by_sha_into_the_mirror_s_ref_without_tags(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Into a ref, so the next fetch offers its history and receives only
+        what is new (MCPs board task 86f70457)."""
         runner = FakeRun([failed(128, "missing"), ok("")])
         _test_hooks.run = runner
 
@@ -124,8 +128,9 @@ class TestFetchCommit:
             "fetch",
             "--quiet",
             "--no-tags",
+            "--force",
             REMOTE,
-            SHA,
+            f"+{SHA}:refs/fleet/fetched",
         )
         assert runner.timeouts == [
             mirror_fetch.INIT_TIMEOUT_SECONDS,

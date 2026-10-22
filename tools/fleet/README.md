@@ -722,8 +722,11 @@ one) and the runner exports THAT commit:
    export needs before `make check` (argv lists under a grammar that admits
    no shell syntax, rendered into the node's script as spelled);
 2. the sha is fetched from the remote into a bare mirror on the hub
-   (`runs/mirrors/<key with / as ->.git`, `git fetch --no-tags <remote>
-   <sha>`) BEFORE any lease is taken, so a sha the remote has never seen is
+   (`runs/mirrors/<key with / as ->.git`, `git fetch --no-tags --force
+   <remote> +<sha>:refs/fleet/fetched`, so the next fetch offers that ref's
+   history and receives only new objects, inside the mirror's fetch turn,
+   so a second export of one commit waits and then finds it held: MCPs board
+   task 86f70457) BEFORE any lease is taken, so a sha the remote has never seen is
    refused `SHA_NOT_ON_REMOTE` with nothing held, and a project with no
    `source` is refused `PROJECT_REMOTE_MISSING` by name; a fetch git loses
    (a reset connection, a TLS drop, a timeout) is sent again, up to three
