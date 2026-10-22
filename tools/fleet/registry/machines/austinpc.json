@@ -1,5 +1,5 @@
 {
-  "role": "hub",
+  "role": "worker",
   "platform": "windows",
   "user": "Test",
   "enabled": true,
