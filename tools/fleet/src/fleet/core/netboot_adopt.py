@@ -127,6 +127,7 @@ def adopt_pass(place: netboot_arm.NetbootPlace) -> tuple[str, ...]:
     result = netboot_arm.run_cli(
         adopt_argv(place, ready["release"]),
         ready["writer"],
+        wifi=None,
         timeout_seconds=ADOPT_TIMEOUT_SECONDS,
     )
     return adopt_report(result, ready["release"])

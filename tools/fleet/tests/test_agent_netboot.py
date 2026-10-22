@@ -190,6 +190,38 @@ class TestTheNetbootLane:
         )
         assert "tskey-" not in dump_json_str(endpoint.arguments)
 
+    def test_the_fleets_wifi_reaches_the_arms_environment_and_no_other_command(
+        self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
+    ) -> None:
+        # MCPs board task f78f7e33; a made-up network, never the fleet's own.
+        paths = place(tmp_path)
+        env = paths[agent.ENV_FILE_FLAG]
+        env.write_text(
+            env.read_text(encoding="utf-8")
+            + "FLEET_WIFI_SSID=corvis test net\nFLEET_WIFI_PASSPHRASE=made-up-passphrase-0001\n",
+            encoding="utf-8",
+        )
+        runner = FakeRun(
+            [
+                verify_reply(paths[agent.NETBOOT_RELEASE_FLAG]),
+                ok(f"{ARMED}\n"),
+                *adopt_replies(paths),
+            ]
+        )
+        _test_hooks.run = runner
+        endpoint = ran_queue("passed")
+        _test_hooks.http_post = endpoint
+
+        assert agent.main(netboot_argv(config_path, repo, paths)) == 0
+
+        wifi_env = (
+            ("FLEET_WIFI_SSID", "corvis test net"),
+            ("FLEET_WIFI_PASSPHRASE", "made-up-passphrase-0001"),
+        )
+        assert runner.set_env == [(), (*WRITER_ENV, *wifi_env), (), WRITER_ENV]
+        assert not any("made-up" in token for call in runner.calls for token in call)
+        assert "made-up" not in dump_json_str(endpoint.arguments)
+
     def test_an_arm_the_cli_refuses_closes_refused_with_its_own_text(
         self, config_path: pathlib.Path, repo: pathlib.Path, tmp_path: pathlib.Path
     ) -> None:

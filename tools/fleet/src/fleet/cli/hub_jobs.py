@@ -275,6 +275,7 @@ def netboot_job(
         result = netboot_arm.run_cli(
             netboot_retire.retire_argv(place, release, machine, retirement),
             ready["writer"],
+            wifi=None,
             timeout_seconds=netboot_retire.RETIRE_TIMEOUT_SECONDS,
         )
         outcome = netboot_retire.retire_outcome(result, release, machine)
@@ -282,6 +283,7 @@ def netboot_job(
         result = netboot_arm.run_cli(
             netboot_arm.arm_argv(place, release, machine),
             ready["writer"],
+            wifi=ready["wifi"],
             timeout_seconds=netboot_arm.ARM_TIMEOUT_SECONDS,
         )
         outcome = netboot_arm.arm_outcome(result, release, machine)

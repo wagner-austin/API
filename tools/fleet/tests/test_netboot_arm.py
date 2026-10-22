@@ -10,10 +10,12 @@ from typing import Final
 
 import pytest
 
+from fleet.cli import agent
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.core import _test_hooks, netboot_arm
 from fleet.core.sealed_release import SealedRelease
-from tests.conftest import failed, ok, timed_out
+from tests._netboot_tick import netboot_place, place, verify_reply
+from tests.conftest import FakeRun, failed, ok, timed_out
 
 RELEASE: Final = SealedRelease(
     release="7fcc96d6ca7f9057183df144ad8ea2bd",
@@ -144,6 +146,104 @@ class TestTheWriterClient:
             f"{netboot_arm.NO_KEY_CODE}: {path} does not exist, so no key can be minted; "
             "nothing ran"
         )
+
+
+#: Both Wi-Fi lines, a made-up network that is never the fleet's own
+#: (MCPs board task f78f7e33).
+WIFI_LINES: Final = (
+    "FLEET_WIFI_SSID=corvis test net\nFLEET_WIFI_PASSPHRASE=made-up-passphrase-0001\n"
+)
+
+
+class TestTheFleetWifi:
+    def test_both_lines_are_read_among_the_files_others(self, tmp_path: pathlib.Path) -> None:
+        path = env_file(tmp_path, f"A=1\n{WRITER_LINES}{WIFI_LINES}B=2\n")
+
+        assert netboot_arm.read_fleet_wifi(path) == netboot_arm.FleetWifi(
+            ssid="corvis test net", passphrase="made-up-passphrase-0001"
+        )
+        assert netboot_arm.WIFI_NAMES == ("FLEET_WIFI_SSID", "FLEET_WIFI_PASSPHRASE")
+
+    def test_a_file_that_sets_neither_line_gives_no_wifi(self, tmp_path: pathlib.Path) -> None:
+        assert netboot_arm.read_fleet_wifi(env_file(tmp_path, WRITER_LINES)) is None
+        empty = env_file(tmp_path, f"{WRITER_LINES}FLEET_WIFI_SSID=\nFLEET_WIFI_PASSPHRASE=\n")
+        assert netboot_arm.read_fleet_wifi(empty) is None
+
+    @pytest.mark.parametrize(
+        ("text", "missing"),
+        [
+            ("FLEET_WIFI_SSID=corvis test net\n", "FLEET_WIFI_PASSPHRASE"),
+            ("FLEET_WIFI_PASSPHRASE=made-up-passphrase-0001\n", "FLEET_WIFI_SSID"),
+        ],
+    )
+    def test_one_line_without_the_other_is_refused_naming_it_without_echoing_a_line(
+        self, tmp_path: pathlib.Path, text: str, missing: str
+    ) -> None:
+        path = env_file(tmp_path, WRITER_LINES + text)
+
+        detail = netboot_arm.read_fleet_wifi(path)
+
+        assert detail == (
+            f"{netboot_arm.WIFI_UNUSABLE_CODE}: {path} sets one of FLEET_WIFI_SSID and "
+            f"FLEET_WIFI_PASSPHRASE but no {missing}, or sets it empty, so no arm is given half "
+            "a network; nothing ran"
+        )
+        assert "made-up" not in detail
+        assert "corvis test net" not in detail
+
+    def test_an_absent_or_unreadable_file_is_refused(self, tmp_path: pathlib.Path) -> None:
+        absent = tmp_path / "missing.env"
+        assert netboot_arm.read_fleet_wifi(absent) == (
+            f"{netboot_arm.WIFI_UNUSABLE_CODE}: {absent} does not exist; nothing ran"
+        )
+        path = env_file(tmp_path, "A=1\nmade-up-passphrase-pasted-alone\n")
+        detail = netboot_arm.read_fleet_wifi(path)
+        assert isinstance(detail, str)
+        assert detail.startswith(f"{netboot_arm.WIFI_UNUSABLE_CODE}: line 2 of {path} is not")
+        assert "made-up" not in detail
+
+    def test_ready_gives_the_wifi_and_refuses_half_a_network(self, tmp_path: pathlib.Path) -> None:
+        paths = place(tmp_path)
+        env = paths[agent.ENV_FILE_FLAG]
+        release = paths[agent.NETBOOT_RELEASE_FLAG]
+        where = netboot_place(paths, tmp_path / "registry")
+        env.write_text(env.read_text(encoding="utf-8") + WIFI_LINES, encoding="utf-8")
+        _test_hooks.run = FakeRun([verify_reply(release)])
+
+        given = netboot_arm.ready(where)
+
+        assert not isinstance(given, str)
+        assert given["wifi"] == netboot_arm.FleetWifi(
+            ssid="corvis test net", passphrase="made-up-passphrase-0001"
+        )
+        env.write_text(f"{WRITER_LINES}FLEET_WIFI_SSID=corvis test net\n", encoding="utf-8")
+        _test_hooks.run = FakeRun([verify_reply(release)])
+        refused = netboot_arm.ready(where)
+        assert isinstance(refused, str)
+        assert refused.startswith(f"{netboot_arm.WIFI_UNUSABLE_CODE}: {env} sets one of")
+
+    def test_the_wifi_reaches_the_commands_environment_after_the_writer_client(self) -> None:
+        runner = FakeRun([ok("ok\n"), ok("ok\n")])
+        _test_hooks.run = runner
+        writer = netboot_arm.TailnetWriter(client_id="kW", client_secret="tskey-client-kW-s")
+        wifi = netboot_arm.FleetWifi(ssid="corvis test net", passphrase="made-up-passphrase-0001")
+
+        netboot_arm.run_cli(("node",), writer, wifi=wifi, timeout_seconds=5)
+        netboot_arm.run_cli(("node",), writer, wifi=None, timeout_seconds=5)
+
+        writer_env = (
+            ("TAILNET_WRITER_CLIENT_ID", "kW"),
+            ("TAILNET_WRITER_CLIENT_SECRET", "tskey-client-kW-s"),
+        )
+        assert runner.set_env == [
+            (
+                *writer_env,
+                ("FLEET_WIFI_SSID", "corvis test net"),
+                ("FLEET_WIFI_PASSPHRASE", "made-up-passphrase-0001"),
+            ),
+            writer_env,
+        ]
+        assert runner.calls == [("node",), ("node",)]
 
 
 class TestTheCommandLine:

@@ -30,7 +30,10 @@ are read here and handed to the arm's environment and to nothing else: no
 argv, no log, no detail. The arm prints the minted key's id and never the
 key; a line of output carrying a tailnet key or secret (``tskey-``) means
 that contract broke, and then none of the output is copied into the job's
-detail.
+detail. The fleet's Wi-Fi (``FLEET_WIFI_SSID`` and ``FLEET_WIFI_PASSPHRASE``,
+MCPs board task f78f7e33) is read from the same file and handed to an
+arm's environment alone, for the arm of a machine whose roster file
+declares ``netbootWifi`` to give its first boot.
 
 SHARED WITH THE ADOPT PASS. :func:`ready`, :func:`cli_argv`,
 :func:`run_cli`, :func:`carries_key` and :func:`output_tail` are how every
@@ -77,6 +80,10 @@ CACHE: Final = "cache"
 #: id then secret, and the env file lines that carry them.
 WRITER_NAMES: Final[tuple[str, str]] = ("TAILNET_WRITER_CLIENT_ID", "TAILNET_WRITER_CLIENT_SECRET")
 
+#: The variables the arm reads the fleet's Wi-Fi from, SSID then passphrase,
+#: and the env file lines that carry them (MCPs board task f78f7e33).
+WIFI_NAMES: Final[tuple[str, str]] = ("FLEET_WIFI_SSID", "FLEET_WIFI_PASSPHRASE")
+
 #: What every tailnet credential begins with: a client secret, an access
 #: token and a minted auth key alike.
 KEY_MARK: Final = "tskey-"
@@ -93,6 +100,10 @@ ARM_REFUSALS: Final[tuple[str, ...]] = (
     "NETBOOT_ARM_MACHINE_UNKNOWN",
     "NETBOOT_ARM_MACHINE_NOT_ARMABLE",
     "NETBOOT_ARM_LIVE",
+    # A machine declaring netbootWifi whose arm was given none, or a Wi-Fi
+    # outside its shape, refused before the build (``netboot-wifi.ts``).
+    "NETBOOT_ARM_NO_WIFI",
+    "NETBOOT_WIFI_INVALID",
 )
 
 #: The arm's deadline. The first arm on a host fetches the installer ISO,
@@ -105,6 +116,10 @@ DETAIL_TAIL_CHARS: Final[int] = 600
 
 #: Detail prefix when the env file holds no usable key.
 NO_KEY_CODE: Final = "NETBOOT_ARM_NO_KEY"
+
+#: Detail prefix when the env file's Wi-Fi cannot be read, or it sets one
+#: Wi-Fi line without the other.
+WIFI_UNUSABLE_CODE: Final = "NETBOOT_ARM_WIFI_UNUSABLE"
 
 #: Detail prefix when the job names no machine to arm.
 NO_MACHINE_CODE: Final = "NETBOOT_ARM_NO_MACHINE"
@@ -152,6 +167,19 @@ class TailnetWriter(TypedDict):
     client_secret: str
 
 
+class FleetWifi(TypedDict):
+    """The fleet's Wi-Fi, read for one arm's environment (MCPs board task f78f7e33).
+
+    Attributes:
+        ssid: The network's name.
+        passphrase: Its passphrase. Never logged, never in an argv or a
+            detail; its shape is fleet-mcp's to judge.
+    """
+
+    ssid: str
+    passphrase: str
+
+
 class ArmOutcome(TypedDict):
     """How a finished arm closes its job.
 
@@ -172,23 +200,27 @@ class Ready(TypedDict):
     Attributes:
         release: The installed release, its seal verified.
         writer: The tailnet writer client.
+        wifi: The fleet's Wi-Fi, or None when the env file holds none,
+            which only an arm of a machine declaring ``netbootWifi`` needs.
     """
 
     release: SealedRelease
     writer: TailnetWriter
+    wifi: FleetWifi | None
 
 
 def ready(place: NetbootPlace) -> Ready | str:
-    """Verify the installed release's seal, then read the writer client.
+    """Verify the installed release's seal, then read the writer client and the Wi-Fi.
 
     Args:
         place: Where the netboot duty's commands run from.
 
     Returns:
-        The verified release and the writer client, or the first refusal:
-        the verifier's when the seal does not hold,
-        :func:`read_tailnet_writer`'s when the env file gives no client.
-        Nothing in the release has run.
+        The verified release, the writer client and the Wi-Fi, or the
+        first refusal: the verifier's when the seal does not hold,
+        :func:`read_tailnet_writer`'s when the env file gives no client,
+        :func:`read_fleet_wifi`'s when it sets half the Wi-Fi. Nothing in
+        the release has run.
     """
     release = verify_release(place["release"], KIND)
     if isinstance(release, str):
@@ -196,7 +228,42 @@ def ready(place: NetbootPlace) -> Ready | str:
     writer = read_tailnet_writer(place["env_file"])
     if isinstance(writer, str):
         return writer
-    return Ready(release=release, writer=writer)
+    wifi = read_fleet_wifi(place["env_file"])
+    if isinstance(wifi, str):
+        return wifi
+    return Ready(release=release, writer=writer, wifi=wifi)
+
+
+def read_fleet_wifi(env_file: pathlib.Path) -> FleetWifi | str | None:
+    """Read the fleet's Wi-Fi from the workspace env file (MCPs board task f78f7e33).
+
+    Args:
+        env_file: The stack's ``.env``, read by
+            :func:`platform_core.env_file.parse_env_file`.
+
+    Returns:
+        Both lines; None when it sets neither, since only a machine whose
+        roster file declares ``netbootWifi`` needs them and fleet-mcp's arm
+        refuses that machine without them; or a ``CODE: message`` refusal
+        naming the file and never a line of it when it is absent or
+        unreadable, or sets one line without the other.
+    """
+    if not _test_hooks.file_exists(env_file):
+        return f"{WIFI_UNUSABLE_CODE}: {env_file} does not exist; nothing ran"
+    try:
+        values = parse_env_file(_test_hooks.read_text(env_file), source=str(env_file))
+    except AppError as unreadable:
+        return f"{WIFI_UNUSABLE_CODE}: {unreadable.message}; nothing ran"
+    ssid, passphrase = (values.get(name, "") for name in WIFI_NAMES)
+    if ssid == "" and passphrase == "":
+        return None
+    if ssid == "" or passphrase == "":
+        missing = WIFI_NAMES[0] if ssid == "" else WIFI_NAMES[1]
+        return (
+            f"{WIFI_UNUSABLE_CODE}: {env_file} sets one of {' and '.join(WIFI_NAMES)} but no "
+            f"{missing}, or sets it empty, so no arm is given half a network; nothing ran"
+        )
+    return FleetWifi(ssid=ssid, passphrase=passphrase)
 
 
 def read_tailnet_writer(env_file: pathlib.Path) -> TailnetWriter | str:
@@ -286,13 +353,20 @@ def arm_argv(place: NetbootPlace, release: SealedRelease, machine: str) -> tuple
 
 
 def run_cli(
-    argv: tuple[str, ...], writer: TailnetWriter, *, timeout_seconds: int
+    argv: tuple[str, ...],
+    writer: TailnetWriter,
+    *,
+    wifi: FleetWifi | None,
+    timeout_seconds: int,
 ) -> _test_hooks.CommandResult:
     """Run one ``fleet-netboot`` command with the writer client in its environment alone.
 
     Args:
         argv: What :func:`cli_argv` composed.
         writer: The tailnet writer client.
+        wifi: The fleet's Wi-Fi for an arm, which hands it to the machine's
+            first boot; None for every other command, and for an arm when
+            the env file holds none.
         timeout_seconds: The command's deadline.
 
     Returns:
@@ -300,12 +374,17 @@ def run_cli(
         ``timeout_seconds``.
     """
     client_id_name, client_secret_name = WRITER_NAMES
+    ssid_name, passphrase_name = WIFI_NAMES
+    wifi_env = (
+        () if wifi is None else ((ssid_name, wifi["ssid"]), (passphrase_name, wifi["passphrase"]))
+    )
     return _test_hooks.run(
         argv,
         timeout_seconds=timeout_seconds,
         set_env=(
             (client_id_name, writer["client_id"]),
             (client_secret_name, writer["client_secret"]),
+            *wifi_env,
         ),
     )
 
@@ -427,8 +506,11 @@ __all__ = [
     "NO_KEY_CODE",
     "NO_MACHINE_CODE",
     "NO_RELEASE_CODE",
+    "WIFI_NAMES",
+    "WIFI_UNUSABLE_CODE",
     "WRITER_NAMES",
     "ArmOutcome",
+    "FleetWifi",
     "NetbootPlace",
     "Ready",
     "TailnetWriter",
@@ -438,6 +520,7 @@ __all__ = [
     "cli_argv",
     "cli_error",
     "output_tail",
+    "read_fleet_wifi",
     "read_tailnet_writer",
     "ready",
     "run_cli",
