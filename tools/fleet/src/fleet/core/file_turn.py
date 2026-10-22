@@ -12,6 +12,13 @@ the turn that created it removes it; a lock older than the turn's
 taken away; and a turn waits ``poll_seconds`` between looks at a lock another
 holds. The same on both platforms and every filesystem the hub has: no
 ``fcntl``, no ``msvcrt``, nothing a test cannot make the filesystem do.
+
+A LOCK WHOSE HOLDER IS GONE IS TAKEN AWAY BEFORE ITS AGE BOUND (MCPs board
+task 86f70457). A mirror's fetch turn may last 1020 s, so a runner killed
+inside one held every export of that mirror for 17 minutes. The text names
+the holder's pid and host, and a turn waiting on a lock held past
+:data:`HOLDER_PROBE_SECONDS` asks this host whether that pid still runs
+(:func:`runs`); one this host wrote whose process is gone is taken at once.
 """
 
 from __future__ import annotations
@@ -19,15 +26,34 @@ from __future__ import annotations
 import contextlib
 import os
 import pathlib
+import re
 import uuid
 from collections.abc import Generator
-from typing import TypedDict
+from typing import Final, TypedDict
 
 from platform_core.logging import get_logger
 
 from fleet.core import _test_hooks
 
 _log = get_logger(__name__)
+
+#: How long a lock is held before a waiting turn asks whether its holder
+#: still runs. A lease, claim or record turn is done well inside this, so
+#: only a long turn, a mirror's fetch, is ever probed.
+HOLDER_PROBE_SECONDS: Final = 30
+
+#: The deadline of one probe, in seconds.
+PROBE_TIMEOUT_SECONDS: Final = 15
+
+#: The command that lists one process, by whether this is Windows; each
+#: prints the pid when it runs and does not when it does not.
+_PROBES: Final = (
+    ("ps", "-p", "{pid}", "-o", "pid="),
+    ("tasklist", "/FI", "PID eq {pid}", "/FO", "CSV", "/NH"),
+)
+
+#: What a lock this module wrote says of its holder: the pid and the host.
+_HELD_BY: Final = re.compile(r" pid (?P<pid>\d+) on (?P<host>\S+) turn [0-9a-f]{32}$")
 
 
 class TurnBounds(TypedDict):
@@ -90,7 +116,7 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
         matches.
     """
     _test_hooks.make_directory(lock.parent)
-    token = f"{holder} pid {os.getpid()} turn {uuid.uuid4().hex}"
+    token = f"{holder} pid {os.getpid()} on {_test_hooks.hostname()} turn {uuid.uuid4().hex}"
     asked = _test_hooks.now()
     refused_since: int | None = None
     while True:
@@ -128,6 +154,8 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
             )
             lock.unlink(missing_ok=True)
             continue
+        if age is not None and age >= HOLDER_PROBE_SECONDS and _holder_gone(lock, holder, bounds):
+            continue
         _test_hooks.sleep(bounds["poll_seconds"])
     waited = _test_hooks.now() - asked
     if waited > 0:
@@ -139,6 +167,87 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
             bounds["waited_for"],
         )
     return token
+
+
+def _lock_text(lock: pathlib.Path) -> str | None:
+    """What a lock says, read once.
+
+    Args:
+        lock: The lock file.
+
+    Returns:
+        Its text, or None when it was given back since it was found.
+    """
+    try:
+        return lock.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return None
+
+
+def runs(pid: int) -> bool:
+    """Whether a process with this pid runs on this machine.
+
+    Args:
+        pid: The process id.
+
+    Returns:
+        False only when the probe answered and did not list the pid; a
+        probe that failed, timed out or wrote to stderr answers True, so a
+        turn whose holder cannot be asked about waits out its age bound as
+        it did before the probe existed.
+    """
+    argv = tuple(part.format(pid=pid) for part in _PROBES[os.name == "nt"])
+    probed = _test_hooks.run(argv, timeout_seconds=PROBE_TIMEOUT_SECONDS)
+    if probed["returncode"] not in (0, 1) or probed["stderr"].strip():
+        _log.info(
+            "could not ask whether pid %d runs: %s exited %d: %s",
+            pid,
+            argv[0],
+            probed["returncode"],
+            probed["stderr"].strip()[:300],
+        )
+        return True
+    return re.search(rf"(?<!\d){pid}(?!\d)", probed["stdout"]) is not None
+
+
+def _holder_gone(lock: pathlib.Path, holder: str, bounds: TurnBounds) -> bool:
+    """Take away a lock whose holder no longer runs on this machine.
+
+    A turn killed inside its block never gives its lock back: on diphtheria
+    on 2026-10-22 systemd stopped a node runner with SIGKILL at 06:18:01Z,
+    20 s after it took a mirror's fetch turn, and every export of that
+    mirror then waited out the turn's 1020 s bound (MCPs board task
+    86f70457). The lock names its holder's pid and host, so a lock this host
+    wrote whose process is gone is taken away at once. A lock another host
+    wrote, or one written before the host was named, is left to the age
+    bound, since this machine cannot see that process.
+
+    Args:
+        lock: The lock file.
+        holder: Who is waiting for the turn.
+        bounds: The turn's name and its time bounds.
+
+    Returns:
+        True when the lock was taken away.
+    """
+    text = _lock_text(lock)
+    held = _HELD_BY.search(text) if text is not None else None
+    if held is None:
+        return False
+    pid: str = held.group("pid")
+    host: str = held.group("host")
+    if host != _test_hooks.hostname() or runs(int(pid)) or _lock_text(lock) != text:
+        return False
+    _log.info(
+        "%s took away a %s whose holder, pid %s on %s, no longer runs: %r",
+        holder,
+        bounds["what"],
+        pid,
+        host,
+        text,
+    )
+    lock.unlink(missing_ok=True)
+    return True
 
 
 def _created(lock: pathlib.Path, *, token: str) -> bool:
@@ -204,4 +313,4 @@ def _give_back(lock: pathlib.Path, *, token: str, bounds: TurnBounds) -> None:
     lock.unlink()
 
 
-__all__ = ["TurnBounds", "held"]
+__all__ = ["HOLDER_PROBE_SECONDS", "PROBE_TIMEOUT_SECONDS", "TurnBounds", "held", "runs"]

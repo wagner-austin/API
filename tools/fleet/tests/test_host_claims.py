@@ -128,7 +128,7 @@ class TestTheTurn:
         with host_claims.claim_turn(tmp_path, alias=HOST, runner=ORDINARY):
             held = lock.read_text(encoding="utf-8")
 
-        assert held.startswith(f"{ORDINARY} pid {os.getpid()} turn ")
+        assert held.startswith(f"{ORDINARY} pid {os.getpid()} on {_test_hooks.hostname()} turn ")
         assert not lock.exists()
 
     def test_is_given_back_when_the_block_raises(self, tmp_path: pathlib.Path) -> None:
