@@ -5,6 +5,7 @@
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
+  "standby": [],
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.86.243.5",
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII408kXbqK2ka+DZwYYvLfIXfmAQ1a6XlMgAuxdMfTiH corvis@ziggurat",

@@ -5,6 +5,7 @@
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
+  "standby": ["sessions"],
   "ledger_observer": "pcsession",
   "tailnetIp": "100.77.206.124",
   "reachKey": null,

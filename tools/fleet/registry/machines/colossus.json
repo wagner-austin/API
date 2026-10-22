@@ -5,6 +5,7 @@
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
+  "standby": [],
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.111.149.33",
   "reachKey": null,
