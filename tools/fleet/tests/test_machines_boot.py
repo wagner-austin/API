@@ -30,12 +30,17 @@ LAVENDER_MAC = "1c:69:7a:fe:78:9a"
 #: pendragon's wired adapter, declared at ee52f9b22 (MCPs board task 1e9ab738).
 PENDRAGON_MAC = "d8:5e:d3:84:53:d4"
 
+#: austinpc's Intel I225-V Ethernet, declared at 493821b9f (MCPs board task e2ffed0d).
+AUSTINPC_MAC = "d8:43:ae:24:7c:04"
+
 #: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
 #: SSD, and pendragon's NVMe, beside which it also carries a 512 GB SD card
 #: only 36 MB smaller, which a largest-disk rule would one day choose.
+#: austinpc's one NVMe, whose netboot install accepted it on 2026-10-22 (arm b54008dd).
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
 PENDRAGON_INSTALL_DISK = "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
+AUSTINPC_INSTALL_DISK = "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
 
 #: The scheduled tasks hub runner jobs replaced: the audit's, the manager
 #: audit's, the hpc-wake pump's and the disk cleanup's since MCPs board task
@@ -109,12 +114,12 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub() -> None:
+def test_austinpc_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
-    assert declared == {"lavender": LAVENDER_MAC, "pendragon": PENDRAGON_MAC}
+    assert declared == {"austinpc": AUSTINPC_MAC, "lavender": LAVENDER_MAC, "pendragon": PENDRAGON_MAC}
     never = sorted(name for name, m in machines.items() if name == "loki" or m["role"] == "hub")
-    assert never == ["austinpc", "diphtheria", "loki"]
+    assert never == ["diphtheria", "loki"]
 
 
 def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
@@ -137,6 +142,7 @@ def test_every_boot_mac_names_its_install_disk_by_serial_and_no_other_machine_na
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
     assert named == {
+        "austinpc": {"rule": "serial", "serial": AUSTINPC_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
         "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
     }
