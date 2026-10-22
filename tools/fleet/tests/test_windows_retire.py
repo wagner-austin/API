@@ -62,7 +62,7 @@ def test_each_directory_goes_through_rd_verbatim_and_is_removed_again_while_held
         "foreach ($directory in @($Target, $Staging)) {"
     )
     assert lines[verbatim + 1 : verbatim + 14] == [
-        f"        $exited = {RD_FUNCTION} $verbatim",
+        f"        $exited = {RD_FUNCTION} $Cmd $verbatim",
         "        if (Test-Path -LiteralPath $directory) {",
         f'            Write-Output "{RETIRE_HELD}: rd exited $exited and left $directory, '
         f'$({DESCRIBE_FUNCTION} $verbatim); removing it again for up to $HeldSeconds s"',
@@ -70,7 +70,7 @@ def test_each_directory_goes_through_rd_verbatim_and_is_removed_again_while_held
         "        while ((Test-Path -LiteralPath $directory) -and "
         "$removing.Elapsed.TotalSeconds -lt $HeldSeconds) {",
         "            Start-Sleep -Seconds 1",
-        f"            $exited = {RD_FUNCTION} $verbatim",
+        f"            $exited = {RD_FUNCTION} $Cmd $verbatim",
         "        }",
         "        if (Test-Path -LiteralPath $directory) {",
         f'            throw "{RETIRE_INCOMPLETE}: rd exited $exited and left $directory '
@@ -85,18 +85,21 @@ def test_each_directory_goes_through_rd_verbatim_and_is_removed_again_while_held
 def test_rd_runs_in_one_function_that_reads_its_exit_beside_it() -> None:
     """MCPs' PowerShell harness refuses a native command whose exit is not read
     in its statement or the next (PS-NATIVE-EXIT-UNCHECKED), so the retire
-    has one call site and every message reports the code it answered."""
+    has one call site and every message reports the code it answered. $Cmd
+    is passed in, since PSScriptAnalyzer reads a parameter used only inside a
+    nested function as unused (fleet job f629ec98)."""
     lines = _script().splitlines()
     start = lines.index(f"function {RD_FUNCTION} {{")
 
     assert lines[start + 1 : start + 6] == [
-        "    param([string]$Verbatim)",
-        "    & $Cmd /d /c rd /s /q $Verbatim",
+        "    param([string]$Command, [string]$Verbatim)",
+        "    & $Command /d /c rd /s /q $Verbatim",
         "    return $LASTEXITCODE",
         "}",
         "$removing = [Diagnostics.Stopwatch]::StartNew()",
     ]
-    assert _script().count("& $Cmd") == 1
+    assert _script().count("& $Command") == 1
+    assert "& $Cmd" not in _script()
 
 
 def test_the_wait_leaves_most_of_the_ssh_deadline_to_the_rest_of_the_retire() -> None:

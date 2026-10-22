@@ -82,7 +82,10 @@ DESCRIBE_FUNCTION: Final = "Get-HolderDescription"
 #: The render's function running ``rd`` over one verbatim path and answering
 #: its exit code, which each message reports: its one call site keeps the
 #: exit read beside the native command, as MCPs' PowerShell harness requires
-#: (``PS-NATIVE-EXIT-UNCHECKED``), wherever the retire calls it.
+#: (``PS-NATIVE-EXIT-UNCHECKED``), wherever the retire calls it. ``$Cmd`` is
+#: passed to it rather than read from the script's scope, since
+#: PSScriptAnalyzer counts a parameter read only inside a nested function as
+#: unused (``PSReviewUnusedParameter``, fleet job f629ec98 on loki).
 RD_FUNCTION: Final = "Invoke-VerbatimRd"
 
 
@@ -188,15 +191,15 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
         "    Move-Item -Force -LiteralPath $Log -Destination $Retained",
         "}",
         f"function {RD_FUNCTION} {{",
-        "    param([string]$Verbatim)",
-        "    & $Cmd /d /c rd /s /q $Verbatim",
+        "    param([string]$Command, [string]$Verbatim)",
+        "    & $Command /d /c rd /s /q $Verbatim",
         "    return $LASTEXITCODE",
         "}",
         "$removing = [Diagnostics.Stopwatch]::StartNew()",
         "foreach ($directory in @($Target, $Staging)) {",
         "    if (Test-Path -LiteralPath $directory) {",
         f"        $verbatim = {VERBATIM_PREFIX_LITERAL} + [IO.Path]::GetFullPath($directory)",
-        f"        $exited = {RD_FUNCTION} $verbatim",
+        f"        $exited = {RD_FUNCTION} $Cmd $verbatim",
         "        if (Test-Path -LiteralPath $directory) {",
         f'            Write-Output "{RETIRE_HELD}: rd exited $exited and left $directory, '
         f'$({DESCRIBE_FUNCTION} $verbatim); removing it again for up to $HeldSeconds s"',
@@ -204,7 +207,7 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
         "        while ((Test-Path -LiteralPath $directory) -and "
         "$removing.Elapsed.TotalSeconds -lt $HeldSeconds) {",
         "            Start-Sleep -Seconds 1",
-        f"            $exited = {RD_FUNCTION} $verbatim",
+        f"            $exited = {RD_FUNCTION} $Cmd $verbatim",
         "        }",
         "        if (Test-Path -LiteralPath $directory) {",
         f'            throw "{RETIRE_INCOMPLETE}: rd exited $exited and left $directory '

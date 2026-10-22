@@ -185,21 +185,21 @@ if (Test-Path -LiteralPath $Log) {
     Move-Item -Force -LiteralPath $Log -Destination $Retained
 }
 function Invoke-VerbatimRd {
-    param([string]$Verbatim)
-    & $Cmd /d /c rd /s /q $Verbatim
+    param([string]$Command, [string]$Verbatim)
+    & $Command /d /c rd /s /q $Verbatim
     return $LASTEXITCODE
 }
 $removing = [Diagnostics.Stopwatch]::StartNew()
 foreach ($directory in @($Target, $Staging)) {
     if (Test-Path -LiteralPath $directory) {
         $verbatim = '\\?\' + [IO.Path]::GetFullPath($directory)
-        $exited = Invoke-VerbatimRd $verbatim
+        $exited = Invoke-VerbatimRd $Cmd $verbatim
         if (Test-Path -LiteralPath $directory) {
             Write-Output "FLEET_RETIRE_HELD: rd exited $exited and left $directory, $(Get-HolderDescription $verbatim); removing it again for up to $HeldSeconds s"
         }
         while ((Test-Path -LiteralPath $directory) -and $removing.Elapsed.TotalSeconds -lt $HeldSeconds) {
             Start-Sleep -Seconds 1
-            $exited = Invoke-VerbatimRd $verbatim
+            $exited = Invoke-VerbatimRd $Cmd $verbatim
         }
         if (Test-Path -LiteralPath $directory) {
             throw "FLEET_RETIRE_INCOMPLETE: rd exited $exited and left $directory after $HeldSeconds s, $(Get-HolderDescription $verbatim)"
