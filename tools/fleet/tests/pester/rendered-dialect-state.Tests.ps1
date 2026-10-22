@@ -336,7 +336,7 @@ Describe 'Retiring a settled dispatch' {
         $run.Cmd = $rd.Path
         $said = @(Invoke-Rendered 'dialect-retire.ps1' $run)
         $said | Should -HaveCount 1
-        $said[0] | Should -BeLike ([WildcardPattern]::Escape("FLEET_RETIRE_HELD: rd left $($run.Staging), 1 files left, 0 of them too long for Restart Manager to ask about, held by pid $($holder.Id) powershell.exe (") + '*' + [WildcardPattern]::Escape('); removing it again for up to 30 s'))
+        $said[0] | Should -BeLike ([WildcardPattern]::Escape("FLEET_RETIRE_HELD: rd exited 0 and left $($run.Staging), 1 files left, 0 of them too long for Restart Manager to ask about, held by pid $($holder.Id) powershell.exe (") + '*' + [WildcardPattern]::Escape('); removing it again for up to 30 s'))
         $holder.WaitForExit(10000) | Should -BeTrue
         [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse

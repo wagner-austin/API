@@ -25,6 +25,7 @@ from fleet.core.windows_holders import (
 from fleet.core.windows_retire import (
     DESCRIBE_FUNCTION,
     HELD_SECONDS,
+    RD_FUNCTION,
     RETIRE_HELD,
     RETIRE_INCOMPLETE,
     VERBATIM_PREFIX_LITERAL,
@@ -61,24 +62,41 @@ def test_each_directory_goes_through_rd_verbatim_and_is_removed_again_while_held
         "foreach ($directory in @($Target, $Staging)) {"
     )
     assert lines[verbatim + 1 : verbatim + 14] == [
-        "        & $Cmd /d /c rd /s /q $verbatim",
+        f"        $exited = {RD_FUNCTION} $verbatim",
         "        if (Test-Path -LiteralPath $directory) {",
-        f'            Write-Output "{RETIRE_HELD}: rd left $directory, '
+        f'            Write-Output "{RETIRE_HELD}: rd exited $exited and left $directory, '
         f'$({DESCRIBE_FUNCTION} $verbatim); removing it again for up to $HeldSeconds s"',
         "        }",
         "        while ((Test-Path -LiteralPath $directory) -and "
         "$removing.Elapsed.TotalSeconds -lt $HeldSeconds) {",
         "            Start-Sleep -Seconds 1",
-        "            & $Cmd /d /c rd /s /q $verbatim",
+        f"            $exited = {RD_FUNCTION} $verbatim",
         "        }",
         "        if (Test-Path -LiteralPath $directory) {",
-        f'            throw "{RETIRE_INCOMPLETE}: rd exited $LASTEXITCODE and left $directory '
+        f'            throw "{RETIRE_INCOMPLETE}: rd exited $exited and left $directory '
         f'after $HeldSeconds s, $({DESCRIBE_FUNCTION} $verbatim)"',
         "        }",
         "    }",
         "}",
     ]
     assert "Remove-Item -Recurse" not in _script()
+
+
+def test_rd_runs_in_one_function_that_reads_its_exit_beside_it() -> None:
+    """MCPs' PowerShell harness refuses a native command whose exit is not read
+    in its statement or the next (PS-NATIVE-EXIT-UNCHECKED), so the retire
+    has one call site and every message reports the code it answered."""
+    lines = _script().splitlines()
+    start = lines.index(f"function {RD_FUNCTION} {{")
+
+    assert lines[start + 1 : start + 6] == [
+        "    param([string]$Verbatim)",
+        "    & $Cmd /d /c rd /s /q $Verbatim",
+        "    return $LASTEXITCODE",
+        "}",
+        "$removing = [Diagnostics.Stopwatch]::StartNew()",
+    ]
+    assert _script().count("& $Cmd") == 1
 
 
 def test_the_wait_leaves_most_of_the_ssh_deadline_to_the_rest_of_the_retire() -> None:

@@ -79,6 +79,12 @@ HELD_SECONDS: Final = 30
 #: The render's function describing what ``rd`` left in one directory.
 DESCRIBE_FUNCTION: Final = "Get-HolderDescription"
 
+#: The render's function running ``rd`` over one verbatim path and answering
+#: its exit code, which each message reports: its one call site keeps the
+#: exit read beside the native command, as MCPs' PowerShell harness requires
+#: (``PS-NATIVE-EXIT-UNCHECKED``), wherever the retire calls it.
+RD_FUNCTION: Final = "Invoke-VerbatimRd"
+
 
 def _describe_function_lines() -> tuple[str, ...]:
     """The render's function saying what ``rd`` left in one directory and who holds it.
@@ -181,22 +187,27 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
         *indented(end_holders_lines(path_variable="$Log"), depth=1),
         "    Move-Item -Force -LiteralPath $Log -Destination $Retained",
         "}",
+        f"function {RD_FUNCTION} {{",
+        "    param([string]$Verbatim)",
+        "    & $Cmd /d /c rd /s /q $Verbatim",
+        "    return $LASTEXITCODE",
+        "}",
         "$removing = [Diagnostics.Stopwatch]::StartNew()",
         "foreach ($directory in @($Target, $Staging)) {",
         "    if (Test-Path -LiteralPath $directory) {",
         f"        $verbatim = {VERBATIM_PREFIX_LITERAL} + [IO.Path]::GetFullPath($directory)",
-        "        & $Cmd /d /c rd /s /q $verbatim",
+        f"        $exited = {RD_FUNCTION} $verbatim",
         "        if (Test-Path -LiteralPath $directory) {",
-        f'            Write-Output "{RETIRE_HELD}: rd left $directory, '
+        f'            Write-Output "{RETIRE_HELD}: rd exited $exited and left $directory, '
         f'$({DESCRIBE_FUNCTION} $verbatim); removing it again for up to $HeldSeconds s"',
         "        }",
         "        while ((Test-Path -LiteralPath $directory) -and "
         "$removing.Elapsed.TotalSeconds -lt $HeldSeconds) {",
         "            Start-Sleep -Seconds 1",
-        "            & $Cmd /d /c rd /s /q $verbatim",
+        f"            $exited = {RD_FUNCTION} $verbatim",
         "        }",
         "        if (Test-Path -LiteralPath $directory) {",
-        f'            throw "{RETIRE_INCOMPLETE}: rd exited $LASTEXITCODE and left $directory '
+        f'            throw "{RETIRE_INCOMPLETE}: rd exited $exited and left $directory '
         f'after $HeldSeconds s, $({DESCRIBE_FUNCTION} $verbatim)"',
         "        }",
         "    }",
@@ -219,6 +230,7 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], task:
 __all__ = [
     "DESCRIBE_FUNCTION",
     "HELD_SECONDS",
+    "RD_FUNCTION",
     "RETIRE_HELD",
     "RETIRE_INCOMPLETE",
     "VERBATIM_PREFIX_LITERAL",
