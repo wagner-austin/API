@@ -117,7 +117,11 @@ def _key(unit: JSONObject) -> str:
 def test_austinpc_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
-    assert declared == {"austinpc": AUSTINPC_MAC, "lavender": LAVENDER_MAC, "pendragon": PENDRAGON_MAC}
+    assert declared == {
+        "austinpc": AUSTINPC_MAC,
+        "lavender": LAVENDER_MAC,
+        "pendragon": PENDRAGON_MAC,
+    }
     never = sorted(name for name, m in machines.items() if name == "loki" or m["role"] == "hub")
     assert never == ["diphtheria", "loki"]
 
