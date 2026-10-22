@@ -121,8 +121,9 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
         platform=node["platform"],
     )
     # A Windows retire prints one line per leftover process it ended for
-    # holding the transcript (MCPs board task e40bca34); the tick log is
-    # where a reader looks for what a runner killed.
+    # holding the transcript (MCPs board task e40bca34), and one naming who
+    # held a directory rd left (MCPs board task a703ec42); the tick log is
+    # where a reader looks for what a runner killed or waited on.
     for line in outcome["output"].splitlines():
         _log.info("retire %s on %s: %s", run_id, node["host"], line)
     return outcome

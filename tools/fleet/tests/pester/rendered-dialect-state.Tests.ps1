@@ -164,21 +164,25 @@ Describe 'Retiring a settled dispatch' {
             $scheduler.Connect()
             return @($scheduler.GetFolder('\').GetTasks(1) | Where-Object { $_.Name -eq $Name }).Count -gt 0
         }
-        function Initialize-TranscriptHolder {
+        function Initialize-FileHolder {
             <#
             .SYNOPSIS
                 A process that holds a file open the way a build's leftover
                 holds its transcript: open for writing, shared for reading
                 and writing as cmd.exe's >> shares it, and not for delete,
-                so the file cannot be moved while it runs.
+                so the file can be neither moved nor removed while it runs.
             .PARAMETER Path
                 The file it holds.
+            .PARAMETER Release
+                A file whose appearance makes it exit, closing its handle;
+                without one it holds the file for ten minutes.
             .OUTPUTS
                 System.Diagnostics.Process, returned once it holds the file.
             #>
-            param([string]$Path)
+            param([string]$Path, [string]$Release)
             $ready = "$Path.holding"
-            $command = "`$held = [IO.File]::Open('$Path', 'Open', 'Write', 'ReadWrite'); [IO.File]::WriteAllText('$ready', 'held'); Start-Sleep 600"
+            $wait = @{ $true = 'Start-Sleep 600'; $false = "while (-not (Test-Path -LiteralPath '$Release')) { Start-Sleep -Milliseconds 100 }" }[$Release -eq '']
+            $command = "`$held = [IO.File]::Open('$Path', 'Open', 'Write', 'ReadWrite'); [IO.File]::WriteAllText('$ready', 'held'); $wait"
             $holder = Start-Process -FilePath "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" -ArgumentList '-NoProfile', '-Command', $command -PassThru -WindowStyle Hidden
             while (-not (Test-Path -LiteralPath $ready)) {
                 $holder.HasExited | Should -BeFalse
@@ -236,7 +240,7 @@ Describe 'Retiring a settled dispatch' {
         # IOException for 26 hours; the retire now ends the holder first.
         $root = Join-Path $TestDrive 'held'
         $run = Initialize-SettledRun -Root $root -Transcript
-        $holder = Initialize-TranscriptHolder $run.Log
+        $holder = Initialize-FileHolder $run.Log
         { Move-Item -LiteralPath $run.Log -Destination (Join-Path $root 'moved.log') } |
             Should -Throw -ExpectedMessage '*being used by another process*'
         $said = @(Invoke-Rendered 'dialect-retire.ps1' $run)
@@ -251,7 +255,7 @@ Describe 'Retiring a settled dispatch' {
         # kind allowed, an ordinary holder reads as one.
         $root = Join-Path $TestDrive 'protected'
         $run = Initialize-SettledRun -Root $root -Transcript
-        $holder = Initialize-TranscriptHolder $run.Log
+        $holder = Initialize-FileHolder $run.Log
         $run.EndableTypes = [int[]]@()
         { Invoke-Rendered 'dialect-retire.ps1' $run } |
             Should -Throw -ExpectedMessage ("FLEET_RETIRE_HOLDER_PROTECTED: pid $($holder.Id) powershell.exe (*), of Restart Manager type 5, holds " + [WildcardPattern]::Escape($run.Log))
@@ -291,15 +295,68 @@ Describe 'Retiring a settled dispatch' {
         [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
         [System.IO.File]::ReadAllText((Join-Path $outside 'keep.txt')) | Should -BeExactly 'keep'
     }
-    It 'stops by name when a directory survives its removal' {
+    It 'stops by name when a directory survives its removal, counting a file too long to ask Restart Manager about' {
+        # rd exits 0 whatever it leaves; this one removes nothing, so both
+        # files stay, one of them past the 259 characters Restart Manager
+        # registers, and no process holds either.
         $root = Join-Path $TestDrive 'survived'
         $run = Initialize-SettledRun -Root $root
+        $deep = '\\?\' + $run.Target + '\' + ((1..6 | ForEach-Object { 'd' * 40 }) -join '\')
+        & cmd.exe /d /c mkdir $deep
+        $LASTEXITCODE | Should -Be 0
+        & cmd.exe /d /c "echo x> `"$deep\f.txt`""
+        $LASTEXITCODE | Should -Be 0
         $inert = Join-Path $TestDrive 'inert.cmd'
         [System.IO.File]::WriteAllText($inert, "@echo off`r`nexit /b 0`r`n", [System.Text.Encoding]::ASCII)
         $run.Cmd = $inert
+        $run.HeldSeconds = 0
         { Invoke-Rendered 'dialect-retire.ps1' $run } |
-            Should -Throw -ExpectedMessage ([WildcardPattern]::Escape("FLEET_RETIRE_INCOMPLETE: rd exited 0 and left $($run.Target)"))
+            Should -Throw -ExpectedMessage ([WildcardPattern]::Escape("FLEET_RETIRE_INCOMPLETE: rd exited 0 and left $($run.Target) after 0 s, 2 files left, 1 of them too long for Restart Manager to ask about, held by no process Restart Manager names"))
         [System.IO.Directory]::Exists($run.Target) | Should -BeTrue
+    }
+    It 'removes a run directory again once another process lets go of a file in it, naming the holder it waited on (MCPs a703ec42)' {
+        # On loki on 2026-10-21 a process the failure never named held the
+        # staging directory's tree.tgz when the retire ran, and rd left the
+        # directory. The stand-in runs the real rd and, the second time rd
+        # leaves the directory, tells the holder to let go, so the retire
+        # meets the hold, names it, and waits it out.
+        $root = Join-Path $TestDrive 'held-briefly'
+        $run = Initialize-SettledRun -Root $root
+        $archive = Join-Path $run.Staging 'tree.tgz'
+        $release = Join-Path $TestDrive 'held-briefly.release'
+        $refused = Join-Path $TestDrive 'held-briefly.refused'
+        $holder = Initialize-FileHolder $archive -Release $release
+        { [System.IO.File]::Delete($archive) } | Should -Throw -ExpectedMessage '*being used by another process*'
+        $rd = Initialize-Batch -Name 'cmd' -Body @(
+            '"%SystemRoot%\System32\cmd.exe" %*',
+            "if exist `"%~6`" if exist `"$refused`" echo released> `"$release`"",
+            "if exist `"%~6`" echo refused> `"$refused`"",
+            'exit /b 0'
+        )
+        $run.Cmd = $rd.Path
+        $said = @(Invoke-Rendered 'dialect-retire.ps1' $run)
+        $said | Should -HaveCount 1
+        $said[0] | Should -BeLike ([WildcardPattern]::Escape("FLEET_RETIRE_HELD: rd left $($run.Staging), 1 files left, 0 of them too long for Restart Manager to ask about, held by pid $($holder.Id) powershell.exe (") + '*' + [WildcardPattern]::Escape('); removing it again for up to 30 s'))
+        $holder.WaitForExit(10000) | Should -BeTrue
+        [System.IO.Directory]::Exists($run.Staging) | Should -BeFalse
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+        @(Read-CallRecord $rd) | Should -HaveCount 4
+    }
+    It 'names the process still holding a run file when the wait runs out, leaving the directory (MCPs a703ec42)' {
+        $root = Join-Path $TestDrive 'held-on'
+        $run = Initialize-SettledRun -Root $root
+        $holder = Initialize-FileHolder (Join-Path $run.Staging 'tree.tgz')
+        $run.HeldSeconds = 2
+        try {
+            { Invoke-Rendered 'dialect-retire.ps1' $run } |
+                Should -Throw -ExpectedMessage ([WildcardPattern]::Escape("FLEET_RETIRE_INCOMPLETE: rd exited 0 and left $($run.Staging) after 2 s, 1 files left, 0 of them too long for Restart Manager to ask about, held by pid $($holder.Id) powershell.exe (") + '*Start-Sleep 600*)')
+            $holder.HasExited | Should -BeFalse
+        } finally {
+            Stop-Process -Id $holder.Id -Force
+            $holder.WaitForExit()
+        }
+        [System.IO.Directory]::Exists($run.Target) | Should -BeFalse
+        [System.IO.File]::ReadAllText((Join-Path $run.Staging 'tree.tgz')) | Should -BeExactly 'archive'
     }
     It 'deletes the run''s own scheduled task, which nothing else ever removed, and a second retire finds none' {
         # A real root-folder task under a name no fleet run can carry, the

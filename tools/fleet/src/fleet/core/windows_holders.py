@@ -19,9 +19,21 @@ which by pid, image and command line, and only then moves the file. A
 holder Restart Manager calls a service or a critical process is not the
 run's to end: the retire refuses by name, naming it, instead of killing it.
 
+A RUN DIRECTORY'S HOLDERS ARE NAMED, NOT ENDED (MCPs board task a703ec42).
+When ``rd`` leaves a run directory because another process holds a file in
+it, the retire names who holds what is left (:func:`named_holders_lines`)
+and waits rather than ending anyone: such a holder is not known to be the
+run's. On loki on 2026-10-21T10:15Z something held the staging directory's
+``tree.tgz`` about a minute after the archive was written, which fits an
+on-access scanner, and the retire's failure named no process.
+
 Restart Manager (``rstrtmgr.dll``) is how Windows itself answers "who has
 this file open" for an installer, without a handle-enumeration tool on the
 node. Its session is ended in a ``finally`` so a failed query leaks none.
+It registers no path longer than :data:`RESTART_MANAGER_PATH_LIMIT` and no
+``\\\\?\\`` path at all: measured on loki 2026-10-22,
+``RmRegisterResources`` took a plain path of 259 characters and refused one
+of 260, and refused a verbatim path however short.
 """
 
 from __future__ import annotations
@@ -44,8 +56,12 @@ HOLDER_PROTECTED: Final = "FLEET_RETIRE_HOLDER_PROTECTED"
 #: The prefix of the line the render prints for each holder it ends.
 HOLDER_ENDED: Final = "FLEET_RETIRE_HOLDER_ENDED"
 
-#: The C# the render compiles. ``List`` answers every process holding the
-#: file, with the start time Restart Manager identifies it by; ``StartTimeOf``
+#: The longest plain path Restart Manager registers, in characters: MAX_PATH
+#: less its terminating null, as measured on loki (module docstring).
+RESTART_MANAGER_PATH_LIMIT: Final = 259
+
+#: The C# the render compiles. ``List`` answers every process holding any of
+#: the files, with the start time Restart Manager identifies it by; ``StartTimeOf``
 #: reads a running process's start time the same way, 0 for an id no process
 #: holds. Each other Win32 failure is a ``Win32Exception`` with a named code.
 HOLDERS_SOURCE: Final = """\
@@ -116,14 +132,15 @@ namespace FleetNode {
         [DllImport("kernel32.dll")]
         static extern bool CloseHandle(IntPtr handle);
 
-        public static FileHolder[] List(string path) {
+        public static FileHolder[] List(string[] paths) {
             uint session;
             int code = RmStartSession(out session, 0, new StringBuilder(33));
             if (code != 0) {
                 throw new Win32Exception(code, "FLEET_HOLDERS_SESSION_FAILED");
             }
             try {
-                code = RmRegisterResources(session, 1, new string[] { path }, 0, null, 0, null);
+                code = RmRegisterResources(
+                    session, (uint)paths.Length, paths, 0, null, 0, null);
                 if (code != 0) {
                     throw new Win32Exception(code, "FLEET_HOLDERS_REGISTER_FAILED");
                 }
@@ -180,53 +197,108 @@ namespace FleetNode {
 """
 
 
-def end_holders_lines(*, path_variable: str) -> tuple[str, ...]:
-    """The lines that end every leftover process holding one file open.
+def compile_lines() -> tuple[str, ...]:
+    """The guarded compile of :data:`HOLDERS_SOURCE`, which a render runs once
+    before any of the lines below.
+
+    Returns:
+        :func:`fleet.core.powershell_text.add_type_lines` for :data:`HOLDERS_TYPE`.
+    """
+    return add_type_lines(HOLDERS_TYPE, HOLDERS_SOURCE)
+
+
+def _plain_variable(variable: str, *, role: str) -> str:
+    """One render variable, checked to embed as itself.
+
+    Args:
+        variable: The variable, ``$`` and all.
+        role: What it names, for the refusal.
+
+    Returns:
+        ``variable``.
+
+    Raises:
+        ValueError: When it is not ``$`` followed by letters and digits.
+    """
+    if not variable.startswith("$") or not variable[1:].isalnum():
+        raise ValueError(f"a holder's {role} must be a plain variable, not {variable!r}")
+    return variable
+
+
+def named_holders_lines(*, paths_variable: str) -> tuple[str, ...]:
+    """The lines that set ``$holders`` to every process holding any of some files.
 
     A holder whose id no longer names a process started when Restart
     Manager said it did (``StartTimeOf`` answers 0 for an id nothing holds)
     has already let go and is filtered out; each one left is looked up in
-    ``Win32_Process`` for its image and command line, then in the process
-    table to be ended, each lookup a collection the step runs over, so a
-    holder that exits after the filter has let go too and is neither
-    refused, printed nor ended. Until MCPs board task 3d9eec0d each lookup
-    was one value, and a holder gone by then made the retire fail on
-    ``$process.Name`` under strict mode: sedona's retire of
-    MCPs-fleet-mcp-sedona-1792355094 two seconds after its build ended, on
-    2026-10-18T20:29:43Z, left 75802 files. ``$EndableTypes`` is a
-    parameter of the render, defaulting to :data:`ENDABLE_APP_TYPES`, so the
-    Pester suite can make an ordinary holder read as protected.
+    ``Win32_Process`` for its image and command line, a collection the step
+    runs over, so a holder that exits after the filter has let go too and is
+    left out. Until MCPs board task 3d9eec0d the lookup was one value, and a
+    holder gone by then made the retire fail on ``$process.Name`` under
+    strict mode: sedona's retire of MCPs-fleet-mcp-sedona-1792355094 two
+    seconds after its build ended, on 2026-10-18T20:29:43Z, left 75802 files.
+
+    Args:
+        paths_variable: The render's variable holding the files, one path or
+            several, each at most :data:`RESTART_MANAGER_PATH_LIMIT`
+            characters and none verbatim.
+
+    Returns:
+        One statement, run after :func:`compile_lines`. Each holder is an
+        object carrying its ``Pid``, its Restart Manager ``AppType`` and
+        ``Named``, which reads ``pid <id> <image> (<command line>)``.
+
+    Raises:
+        ValueError: When ``paths_variable`` is not a plain PowerShell variable.
+    """
+    paths = _plain_variable(paths_variable, role="files")
+    return (
+        f"$holders = @([{HOLDERS_TYPE}]::List([string[]]{paths}) | Where-Object {{ "
+        f"[{HOLDERS_TYPE}]::StartTimeOf($_.Pid) -eq $_.StartTime }} | ForEach-Object {{",
+        "    $holder = $_",
+        "    foreach ($process in @(Get-CimInstance Win32_Process "
+        '-Filter "ProcessId=$($holder.Pid)")) {',
+        "        [pscustomobject]@{ Pid = $holder.Pid; AppType = $holder.AppType; "
+        'Named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))" }',
+        "    }",
+        "})",
+    )
+
+
+def end_holders_lines(*, path_variable: str) -> tuple[str, ...]:
+    """The lines that end every leftover process holding one file open.
+
+    Each holder :func:`named_holders_lines` names is looked up in the process
+    table to be ended, a collection the step runs over, so a holder that
+    exits after it was named has let go too and is neither printed nor
+    ended. ``$EndableTypes`` is a parameter of the render, defaulting to
+    :data:`ENDABLE_APP_TYPES`, so the Pester suite can make an ordinary
+    holder read as protected.
 
     Args:
         path_variable: The render's variable naming the file, ``$`` and all.
 
     Returns:
-        The guarded compile, then the loop. Each ended holder prints one
-        :data:`HOLDER_ENDED` line before it is stopped, and the loop waits
-        for it to exit, since its handles close only then.
+        The naming, then the loop, both run after :func:`compile_lines`.
+        Each ended holder prints one :data:`HOLDER_ENDED` line before it is
+        stopped, and the loop waits for it to exit, since its handles close
+        only then.
 
     Raises:
         ValueError: When ``path_variable`` is not a plain PowerShell variable.
     """
-    if not path_variable.startswith("$") or not path_variable[1:].isalnum():
-        raise ValueError(f"a holder's file must be a plain variable, not {path_variable!r}")
+    path = _plain_variable(path_variable, role="file")
     return (
-        *add_type_lines(HOLDERS_TYPE, HOLDERS_SOURCE),
-        f"$holders = @([{HOLDERS_TYPE}]::List({path_variable}) | Where-Object {{ "
-        f"[{HOLDERS_TYPE}]::StartTimeOf($_.Pid) -eq $_.StartTime }})",
+        *named_holders_lines(paths_variable=path),
         "foreach ($holder in $holders) {",
-        "    foreach ($process in @(Get-CimInstance Win32_Process "
-        '-Filter "ProcessId=$($holder.Pid)")) {',
-        '        $named = "pid $($holder.Pid) $($process.Name) ($($process.CommandLine))"',
-        "        if ($EndableTypes -notcontains $holder.AppType) {",
-        f'            throw "{HOLDER_PROTECTED}: $named, of Restart Manager type '
-        f'$($holder.AppType), holds {path_variable}"',
-        "        }",
-        "        foreach ($running in @(Get-Process | Where-Object { $_.Id -eq $holder.Pid })) {",
-        f'            Write-Output "{HOLDER_ENDED}: $named held {path_variable}"',
-        "            Stop-Process -InputObject $running -Force",
-        "            $running.WaitForExit()",
-        "        }",
+        "    if ($EndableTypes -notcontains $holder.AppType) {",
+        f'        throw "{HOLDER_PROTECTED}: $($holder.Named), of Restart Manager type '
+        f'$($holder.AppType), holds {path}"',
+        "    }",
+        "    foreach ($running in @(Get-Process | Where-Object { $_.Id -eq $holder.Pid })) {",
+        f'        Write-Output "{HOLDER_ENDED}: $($holder.Named) held {path}"',
+        "        Stop-Process -InputObject $running -Force",
+        "        $running.WaitForExit()",
         "    }",
         "}",
     )
@@ -238,5 +310,8 @@ __all__ = [
     "HOLDERS_TYPE",
     "HOLDER_ENDED",
     "HOLDER_PROTECTED",
+    "RESTART_MANAGER_PATH_LIMIT",
+    "compile_lines",
     "end_holders_lines",
+    "named_holders_lines",
 ]
