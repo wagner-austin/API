@@ -115,6 +115,7 @@ def kill_argv(
     requested_by: str,
     *,
     hard: bool,
+    exiting: bool = False,
 ) -> tuple[str, ...]:
     """Compose the session-audit invocation for one kill job.
 
@@ -127,16 +128,20 @@ def kill_argv(
         requested_by: The label that enqueued the kill (already
             grammar-checked), printed with session-audit's outcome.
         hard: Whether the queue row is ``kill-session-hard``.
+        exiting: Whether the queue row is ``exit-session``, a session's own
+            exit its supervisor approved, which a session already gone has
+            met (MCPs board task 7829e947); a kill otherwise.
 
     Returns:
         The argv: ``session-audit kill --session <uuid> --requested-by
         <label>`` through :func:`session_audit_argv`, with ``--hard`` after
-        the label for the hard verb and never otherwise.
+        the label for the hard verb and ``--exit`` for an exit, and neither
+        otherwise.
     """
     base = ("kill", "--session", session_target, "--requested-by", requested_by)
-    return session_audit_argv(
-        release_root, registry_dir, host, *base, *(("--hard",) if hard else ())
-    )
+    hard_flag: tuple[str, ...] = ("--hard",) if hard else ()
+    exit_flag: tuple[str, ...] = ("--exit",) if exiting else ()
+    return session_audit_argv(release_root, registry_dir, host, *base, *hard_flag, *exit_flag)
 
 
 def compact_argv(

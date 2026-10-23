@@ -300,13 +300,17 @@ def session_invocation(
             revision=revision,
         )
     if command is DispatchCommand.EXIT_SESSION:
-        # The graceful kill's keystrokes, idle re-read and pane close, with
-        # nothing of its own: an approved self-exit is the same act, and the
-        # queue's verb is what the ledger records it by (MCPs 5aa8ed06).
+        # The graceful kill's keystrokes, idle re-read and pane close: an
+        # approved self-exit is the same act, and the queue's verb is what
+        # the ledger records it by (MCPs 5aa8ed06). Its one difference is
+        # --exit: a headless run that already ended has met its exit, where
+        # a kill of it ends nothing (MCPs board task 7829e947).
         return SessionInvocation(
             verb="exit",
             mode="kill",
-            argv=kill_argv(root, registry_dir, host, session_target, requested_by, hard=False),
+            argv=kill_argv(
+                root, registry_dir, host, session_target, requested_by, hard=False, exiting=True
+            ),
             types_requester=True,
             release=release_id,
             revision=revision,
