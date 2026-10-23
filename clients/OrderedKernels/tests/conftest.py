@@ -42,5 +42,6 @@ def pytest_sessionstart(session: pytest.Session) -> None:
         raise RuntimeError(
             "ordered_kernels' suite REQUIRES a CUDA device: every kernel line "
             "is real GPU work, and skipping would report green on nothing. "
-            "Run make check on a GPU machine (austinpc, sedona)."
+            "Queue it with dispatch_submit (project clients/OrderedKernels), which "
+            "sends it to a node the fleet roster tags gpu."
         )
