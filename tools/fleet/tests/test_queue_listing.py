@@ -24,12 +24,12 @@ class TestHeldBy:
         )
         _test_hooks.http_post = endpoint
 
-        jobs = queue_listing.held_by(QUEUE_CREDENTIALS, agent="fleet-runner-austinpc")
+        jobs = queue_listing.held_by(QUEUE_CREDENTIALS, agent="fleet-node-loki")
 
         assert len(jobs) == 1
         assert endpoint.tools == ["dispatch_list"]
         assert endpoint.arguments[0] == {
-            "claimedBy": "fleet-runner-austinpc",
+            "claimedBy": "fleet-node-loki",
             "status": "live",
             "full": True,
         }
@@ -37,7 +37,7 @@ class TestHeldBy:
     def test_holding_nothing_is_an_empty_tuple(self) -> None:
         _test_hooks.http_post = FakeQueue([dump_json_str({"jobs": []})])
 
-        assert queue_listing.held_by(QUEUE_CREDENTIALS, agent="fleet-runner-austinpc") == ()
+        assert queue_listing.held_by(QUEUE_CREDENTIALS, agent="fleet-node-loki") == ()
 
 
 class TestQueuedFor:

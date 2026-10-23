@@ -82,7 +82,7 @@ class TestAnEmptyHubLane:
         agent.main(agent_argv(config_path, repo))
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
-        assert endpoint.arguments[0]["claimedBy"] == "fleet-hub-austinpc"
+        assert endpoint.arguments[0]["claimedBy"] == "fleet-hub-diphtheria"
         assert endpoint.arguments[0]["status"] == "live"
         assert endpoint.arguments[1]["lane"] == "hub"
         assert endpoint.arguments[1]["tags"] == []
@@ -218,9 +218,9 @@ class TestCredentialsAndEntryPoint:
         endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
-        agent.main([*agent_argv(config_path, repo), agent.NODE_FLAG, "austinpc"])
+        agent.main([*agent_argv(config_path, repo), agent.NODE_FLAG, "diphtheria"])
 
-        assert endpoint.arguments[1]["node"] == "austinpc"
+        assert endpoint.arguments[1]["node"] == "diphtheria"
 
     def test_the_console_entry_point_exits_zero(
         self, config_path: pathlib.Path, repo: pathlib.Path
@@ -271,7 +271,7 @@ class TestAnnounce:
     ) -> None:
         board_watch_hooks.env = FakeEnv(BOARD_ENV)
         _test_hooks.env = FakeEnv({})
-        _test_hooks.hostname = lambda: "austinpc"
+        _test_hooks.hostname = lambda: "diphtheria"
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
 
@@ -283,12 +283,12 @@ class TestAnnounce:
         checkin = endpoint.arguments[0]
         assert checkin["kind"] == "checkin"
         assert checkin["harness"] == "fleet-agent"
-        assert checkin["machine"] == f"{sys.platform}:austinpc"
+        assert checkin["machine"] == f"{sys.platform}:diphtheria"
         assert checkin["room"] == "fleet"
-        assert checkin["agent"] == "fleet-hub-austinpc"
+        assert checkin["agent"] == "fleet-hub-diphtheria"
         assert checkin["sessionId"] == "33333333-cccc-4ccc-8ccc-333333333333"
         assert checkin["body"] == (
-            "fleet-hub-austinpc: claims the queue's hub lane (build-bases) and closes each "
+            "fleet-hub-diphtheria: claims the queue's hub lane (build-bases) and closes each "
             "job it claims, which posts the outcome to the job's task thread under this label"
         )
 
@@ -340,7 +340,7 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
     """
     document = workspace_document()
     machines = machines_of(document)
-    machines["austinpc"] = machine_document(
+    machines["diphtheria"] = machine_document(
         role="hub", ledger_observer="pcsession", dispatch="the hub"
     )
     machines["serendipity"] = machine_document(
@@ -418,7 +418,7 @@ class TestObservingSessions:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "task_session_observe"]
         assert endpoint.arguments[2]["machine"] == "win32:serendipity"
-        assert endpoint.arguments[2]["agent"] == "fleet-hub-austinpc"
+        assert endpoint.arguments[2]["agent"] == "fleet-hub-diphtheria"
 
     def test_a_roster_with_nothing_to_observe_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture

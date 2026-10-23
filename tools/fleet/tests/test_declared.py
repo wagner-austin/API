@@ -87,7 +87,7 @@ REGISTRY_FILES = {
     ),
     "tools/fleet/registry/projects/tools/fleet.json": project_file(["linux"]),
     "tools/fleet/registry/projects/README.md": "not a project\n",
-    "tools/fleet/registry/machines/austinpc.json": dump_json_str(
+    "tools/fleet/registry/machines/diphtheria.json": dump_json_str(
         machine_document(dispatch="the hub runs no dispatched work")
     )
     + "\n",
@@ -301,7 +301,7 @@ class TestPublishRegistry:
         checked_at="2026-10-14T23:00:00+00:00",
     )
     IDENTITY: Final[JSONObject] = {
-        "agent": "fleet-runner-austinpc",
+        "agent": "fleet-node-loki",
         "sessionId": "s",
         "cwd": "C:/fleet",
     }

@@ -24,7 +24,7 @@ from tests.conftest import FakeRun, failed, ok, timed_out
 
 BOARD = McpCredentials(url="http://127.0.0.1:8033/mcp", api_key="k", tenant_id="t")
 IDENTITY: JSONObject = {
-    "agent": "fleet-runner-austinpc",
+    "agent": "fleet-node-loki",
     "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
     "cwd": "C:/Users/Test/PROJECTS/API",
 }
@@ -243,10 +243,10 @@ def test_to_observation_accepts_a_record_without_pid_domain() -> None:
 
 def test_to_observation_refuses_a_record_from_another_machine() -> None:
     with pytest.raises(AppError) as caught:
-        observe.to_observation("serendipity", MACHINE, harness_record(pidDomain="win32:austinpc"))
+        observe.to_observation("serendipity", MACHINE, harness_record(pidDomain="win32:loki"))
     assert caught.value.code is FleetErrorCode.SESSION_MACHINE_MISMATCH
     assert caught.value.message == (
-        f"serendipity: record for session {SESSION} names pidDomain 'win32:austinpc' "
+        f"serendipity: record for session {SESSION} names pidDomain 'win32:loki' "
         f"but its node reports 'win32:serendipity'"
     )
 
@@ -494,7 +494,7 @@ def test_observe_node_reports_a_node_without_a_provisioned_user() -> None:
 
 
 def test_observe_node_raises_on_a_record_from_another_machine() -> None:
-    _test_hooks.run = FakeRun([ok(""), ok(document(harness_record(pidDomain="win32:austinpc")))])
+    _test_hooks.run = FakeRun([ok(""), ok(document(harness_record(pidDomain="win32:loki")))])
     board = FakeQueue([])
     _test_hooks.http_post = board
     with pytest.raises(AppError) as caught:
@@ -522,7 +522,7 @@ def test_observe_pass_visits_enabled_fleet_arm_machines_in_name_order() -> None:
     _test_hooks.http_post = board
     registry = {
         "viper": node("viper", "vpn-jump", user="viper"),
-        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
+        "winhub": node("winhub", "hub", observer=LedgerObserver.PCSESSION),
         "serendipity": node("serendipity", "worker"),
         "phone": node("phone", "client", user=None, observer=LedgerObserver.NONE),
         "lavender": node("lavender", "worker", enabled=False),
@@ -544,7 +544,7 @@ def test_observe_pass_visits_a_session_host() -> None:
 
     registry = {
         "ziggurat": node("ziggurat", "session-host", user="corvis"),
-        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
+        "winhub": node("winhub", "hub", observer=LedgerObserver.PCSESSION),
     }
 
     outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
@@ -558,7 +558,7 @@ def test_observable_follows_the_declared_observer_not_the_role() -> None:
     # still declaring fleet-arm, and a role filter dropped it from every pass.
     registry = {
         "diphtheria": node("diphtheria", "hub", user="corvis", platform=NodePlatform.LINUX),
-        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
+        "winhub": node("winhub", "hub", observer=LedgerObserver.PCSESSION),
         "relative": node("relative", "worker", observer=LedgerObserver.NONE),
         "ziggurat": node("ziggurat", "session-host", user="corvis"),
     }

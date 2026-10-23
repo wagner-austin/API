@@ -21,7 +21,7 @@ from tests._queue_fakes import queue_env
 #: The machine a hub tick runs on, as the hostname hook reports it: a hub
 #: lane job is reported started there, wherever the control duty is held
 #: (MCPs board task c39ee056).
-HUB_HOST = "austinpc"
+HUB_HOST = "diphtheria"
 
 #: The unit every agent tick of these suites runs in, as the hub runner
 #: names a tick's unit (MCPs board task 05dd6588).
@@ -82,7 +82,7 @@ def hub_host() -> str:
     """Report :data:`HUB_HOST`, bound as the hostname hook.
 
     Returns:
-        ``austinpc``.
+        ``diphtheria``.
     """
     return HUB_HOST
 

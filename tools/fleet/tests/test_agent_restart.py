@@ -83,7 +83,7 @@ def restart_row(**overrides: JSONValue) -> JSONObject:
         "status": "claimed",
         "command": "restart-session",
         "project": "MCPs",
-        "requestedNode": "austinpc",
+        "requestedNode": HUB_HOST,
         "sessionTarget": TARGET,
         "submittedBy": SUBMITTER,
         # A session verb acts on the hub, not on a commit (MCPs mig 532).
@@ -107,8 +107,8 @@ def ran_queue(command: str, closed: str) -> FakeQueue:
         [
             NOTHING_HELD,
             dump_json_str({"claimed": restart_row(command=command)}),
-            dump_json_str({"job": restart_row(command=command, status="running", node="austinpc")}),
-            dump_json_str({"job": restart_row(command=command, status=closed, node="austinpc")}),
+            dump_json_str({"job": restart_row(command=command, status="running", node=HUB_HOST)}),
+            dump_json_str({"job": restart_row(command=command, status=closed, node=HUB_HOST)}),
         ]
     )
 
@@ -196,7 +196,7 @@ class TestRestartLane:
         )
         started = endpoint.arguments[2]
         assert started["action"] == "start"
-        assert started["node"] == "austinpc"
+        assert started["node"] == HUB_HOST
         assert started["runId"] == tick_run_id()
         closed = endpoint.arguments[3]
         assert closed["action"] == "close"
@@ -420,8 +420,8 @@ class TestRestartLane:
             [
                 NOTHING_HELD,
                 dump_json_str({"claimed": restart_row(**row)}),
-                dump_json_str({"job": restart_row(**row, status="running", node="austinpc")}),
-                dump_json_str({"job": restart_row(**row, status="passed", node="austinpc")}),
+                dump_json_str({"job": restart_row(**row, status="running", node=HUB_HOST)}),
+                dump_json_str({"job": restart_row(**row, status="passed", node=HUB_HOST)}),
             ]
         )
         _test_hooks.http_post = endpoint

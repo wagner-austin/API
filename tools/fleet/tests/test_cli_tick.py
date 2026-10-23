@@ -165,23 +165,30 @@ class TestTheLanes:
         )
 
     # The sessions already bound on the board, pinned so that naming every
-    # duty by one function moved none of them (MCPs board task af8b5662).
+    # duty by one function moved none of them (MCPs board task af8b5662):
+    # fleet-sessions-diphtheria checked in as 4a0ac47d at 2026-10-23T15:44:35Z
+    # (board post 88fe24e8), and ziggurat's pair is the plan's above.
     def test_each_machine_has_its_own_sessions_runner_identity(self) -> None:
-        assert tick.runner_identity(DispatchLane.SESSIONS, "austinpc") == (
-            "fleet-sessions-austinpc",
-            "bf75d02e-27a3-5752-8d96-07819e29af54",
+        assert tick.runner_identity(DispatchLane.SESSIONS, "diphtheria") == (
+            "fleet-sessions-diphtheria",
+            "4a0ac47d-022f-5621-ac1e-858cb5b9f879",
+        )
+        assert tick.runner_identity(DispatchLane.SESSIONS, "ziggurat") == (
+            "fleet-sessions-ziggurat",
+            "87816ad3-d019-5005-81e9-3036f89a50ab",
         )
 
     # Neither is austinpc's retired pair, fleet-runner-austinpc and session
-    # a850f688, which stays bound to the runner that used it.
+    # a850f688, which stays bound to the runner that used it. demure holds no
+    # hub duty; its pair is the one the duty would take there.
     def test_each_machine_has_its_own_hub_runner_identity(self) -> None:
         assert tick.runner_identity(DispatchLane.HUB, "diphtheria") == (
             "fleet-hub-diphtheria",
             "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
         )
-        assert tick.runner_identity(DispatchLane.HUB, "austinpc") == (
-            "fleet-hub-austinpc",
-            "6f531d60-5c82-5b23-b2a3-c523f13c9490",
+        assert tick.runner_identity(DispatchLane.HUB, "demure") == (
+            "fleet-hub-demure",
+            "9d9576dc-5209-5a65-9238-1450a4994896",
         )
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:

@@ -237,7 +237,7 @@ class TestRefusalsAndAnnounce:
     def test_announce_registers_the_elevated_label_with_its_tags(
         self, elevated_config: pathlib.Path
     ) -> None:
-        _test_hooks.hostname = lambda: "austinpc"
+        _test_hooks.hostname = lambda: "demure"
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
 
@@ -246,7 +246,7 @@ class TestRefusalsAndAnnounce:
 
         checkin = endpoint.arguments[0]
         assert checkin["agent"] == "fleet-node-lavender-elevated"
-        assert checkin["machine"] == f"{sys.platform}:austinpc"
+        assert checkin["machine"] == f"{sys.platform}:demure"
         assert narrow_json_to_str(checkin["body"]) == (
             "fleet-node-lavender-elevated for lavender: claims the queue's node lane for jobs "
             "naming lavender or no node, carrying elevated, windows"

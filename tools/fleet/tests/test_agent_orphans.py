@@ -21,7 +21,7 @@ from platform_core.json_utils import JSONValue, dump_json_str
 
 from fleet.cli import agent
 from fleet.core import _test_hooks, tick_run
-from tests._agent_cli import agent_argv, bind_hub_tick, tick_run_id
+from tests._agent_cli import HUB_HOST, agent_argv, bind_hub_tick, tick_run_id
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests.conftest import FakeRun, failed, ok
@@ -30,7 +30,7 @@ from tests.conftest import FakeRun, failed, ok
 STOPPED_UNIT = "session-audit-job-df261b2fda99482cb3d130e721072c91.service"
 
 #: That run's id, as the earlier tick reported its job started.
-STOPPED_RUN_ID = f"{STOPPED_UNIT} on austinpc"
+STOPPED_RUN_ID = f"{STOPPED_UNIT} on {HUB_HOST}"
 
 #: The stopped unit as the manager reads it once collected.
 GONE = ok("ActiveState=inactive\nControlGroup=\n")
@@ -62,8 +62,8 @@ def held(**overrides: JSONValue) -> str:
         "command": "build-bases",
         "project": "MCPs",
         "sha": None,
-        "claimedBy": "fleet-hub-austinpc",
-        "node": "austinpc",
+        "claimedBy": f"fleet-hub-{HUB_HOST}",
+        "node": HUB_HOST,
         "runId": STOPPED_RUN_ID,
     }
     fields.update(overrides)
@@ -111,12 +111,12 @@ class TestAStoppedRunIsGivenBack:
             assert tick(repo, config_path) == 0
 
         assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
-        assert endpoint.arguments[0]["claimedBy"] == "fleet-hub-austinpc"
+        assert endpoint.arguments[0]["claimedBy"] == f"fleet-hub-{HUB_HOST}"
         reported = endpoint.arguments[1]
         assert reported["action"] == "lost"
         assert reported["jobId"] == DEFAULT_JOB_ID
         assert reported["detail"] == LOST_DETAIL
-        assert reported["agent"] == "fleet-hub-austinpc"
+        assert reported["agent"] == f"fleet-hub-{HUB_HOST}"
         assert run.calls == [
             (*tick_run.SYSTEMCTL, *tick_run.SHOWN, STOPPED_UNIT),
             *unrolled_calls(repo),
@@ -138,8 +138,8 @@ class TestAStoppedRunIsGivenBack:
                 held(),
                 lost_answer("queued"),
                 dump_json_str({"claimed": claimed}),
-                dump_json_str({"job": queue_job(status="running", node="austinpc")}),
-                dump_json_str({"job": queue_job(status="passed", node="austinpc")}),
+                dump_json_str({"job": queue_job(status="running", node=HUB_HOST)}),
+                dump_json_str({"job": queue_job(status="passed", node=HUB_HOST)}),
             ]
         )
         _test_hooks.http_post = endpoint
@@ -201,9 +201,9 @@ class TestARunNotProvenGoneIsLeftToItsLease:
         ("overrides", "logged"),
         [
             (
-                {"runId": f"{STOPPED_UNIT} on diphtheria"},
-                f"job {DEFAULT_JOB_ID} runs as {STOPPED_UNIT}, on diphtheria rather than this "
-                "machine, austinpc, so it is left to its lease",
+                {"runId": f"{STOPPED_UNIT} on demure"},
+                f"job {DEFAULT_JOB_ID} runs as {STOPPED_UNIT}, on demure rather than this "
+                f"machine, {HUB_HOST}, so it is left to its lease",
             ),
             (
                 {"runId": f"bases-{DEFAULT_JOB_ID}"},

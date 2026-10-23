@@ -53,13 +53,13 @@ def _counted(ticks: int) -> str:
     return dump_json_str({"tick": {"ticks": ticks}})
 
 
-def _austinpc() -> str:
+def _hub_hostname() -> str:
     """The hub's hostname, as the hook reports it.
 
     Returns:
-        ``austinpc``.
+        ``diphtheria``.
     """
-    return "austinpc"
+    return "diphtheria"
 
 
 class TestParseRan:
@@ -102,20 +102,20 @@ class TestMain:
         endpoint = FakeQueue([_counted(4), _counted(1)])
         _test_hooks.http_post = endpoint
         _test_hooks.env = queue_env()
-        _test_hooks.hostname = _austinpc
+        _test_hooks.hostname = _hub_hostname
 
         code = publisher_ticks.main([f"hpc-wake=0={hpc_wake}", f"lock-wake=3={lock_wake}"])
 
         assert code == 0
         assert endpoint.tools == ["dispatch_publisher_tick", "dispatch_publisher_tick"]
         identity = {
-            "agent": "fleet-hub-austinpc",
-            "sessionId": "6f531d60-5c82-5b23-b2a3-c523f13c9490",
+            "agent": "fleet-hub-diphtheria",
+            "sessionId": "a8f33e7c-eaa8-5715-a18d-f4f2e5786d7d",
             "cwd": str(pathlib.Path.cwd()),
         }
         assert endpoint.arguments == [
             {
-                "host": "austinpc",
+                "host": "diphtheria",
                 "publisher": "hpc-wake",
                 "repo": "API",
                 "headSha": api_head,
@@ -124,7 +124,7 @@ class TestMain:
                 **identity,
             },
             {
-                "host": "austinpc",
+                "host": "diphtheria",
                 "publisher": "lock-wake",
                 "repo": "MCPs",
                 "headSha": mcps_head,
@@ -160,7 +160,7 @@ class TestMain:
         endpoint = FakeQueue([])
         _test_hooks.http_post = endpoint
         _test_hooks.env = queue_env()
-        _test_hooks.hostname = _austinpc
+        _test_hooks.hostname = _hub_hostname
 
         with pytest.raises(AppError) as raised:
             publisher_ticks.main([f"hpc-wake=0={tmp_path}"])
@@ -175,7 +175,7 @@ class TestEntryPoint:
         endpoint = FakeQueue([_counted(1)])
         _test_hooks.http_post = endpoint
         _test_hooks.env = queue_env()
-        _test_hooks.hostname = _austinpc
+        _test_hooks.hostname = _hub_hostname
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.publisher_ticks")
         sys.argv = ["publisher_ticks", f"hpc-wake=0={hpc_wake}"]

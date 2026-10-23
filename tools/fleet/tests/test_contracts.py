@@ -208,7 +208,7 @@ class TestWorkspace:
 
     def test_a_roster_where_no_machine_declares_capacity_is_refused(self) -> None:
         original = _workspace()
-        original["machines"] = {"austinpc": machine("austinpc", None, held="the hub")}
+        original["machines"] = {"diphtheria": machine("diphtheria", None, held="the hub")}
 
         with pytest.raises(JSONTypeError, match="no machine declares what dispatch may take"):
             decode_fleet_workspace(encode_fleet_workspace(original))
@@ -232,14 +232,14 @@ class TestWorkspace:
         hub = "the hub the dispatcher itself runs on; it shares the .venv"
         retired = "its WSL VM holds the memory the Windows lane measures"
         original = _workspace()
-        original["machines"]["austinpc"] = machine("austinpc", None, held=hub)
+        original["machines"]["diphtheria"] = machine("diphtheria", None, held=hub)
         original["machines"]["loki"] = machine("loki", node(gpu=None, host="loki"), held=retired)
 
         decoded = decode_fleet_workspace(
             load_json_str(dump_json_str(encode_fleet_workspace(original)))
         )
 
-        assert decoded["not_dispatchable"] == {"austinpc": hub, "loki": retired}
+        assert decoded["not_dispatchable"] == {"diphtheria": hub, "loki": retired}
         assert sorted(decoded["nodes"]) == ["lavender", "loki"]
         assert decoded["nodes"]["loki"]["enabled"] is False
         assert decoded["machines"]["loki"]["held"] == retired
@@ -249,8 +249,8 @@ class TestWorkspace:
         exactly the ambiguity the field was added to remove."""
         original = _workspace()
         encoded = encode_fleet_workspace(original)
-        machines_of(encoded)["austinpc"] = {
-            **encode_machine(machine("austinpc", None, held="x")),
+        machines_of(encoded)["diphtheria"] = {
+            **encode_machine(machine("diphtheria", None, held="x")),
             "dispatch": "",
         }
 

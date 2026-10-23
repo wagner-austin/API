@@ -13,7 +13,7 @@ import pytest
 from platform_core.errors import AppError
 
 from fleet.core import _test_hooks, tick_run
-from tests._agent_cli import TICK_CGROUP, TICK_UNIT, bind_hub_tick
+from tests._agent_cli import HUB_HOST, TICK_CGROUP, TICK_UNIT, bind_hub_tick
 from tests.conftest import FakeRun, failed, ok
 
 #: A running tick's unit as ``systemctl --user show`` read it.
@@ -58,7 +58,7 @@ class TestTheTicksOwnRun:
     def test_the_run_is_read_from_this_processs_cgroup_on_this_machine(self) -> None:
         bind_hub_tick()
 
-        assert tick_run.read_own_run() == tick_run.TickRun(unit=TICK_UNIT, machine="austinpc")
+        assert tick_run.read_own_run() == tick_run.TickRun(unit=TICK_UNIT, machine=HUB_HOST)
 
     def test_a_machine_with_no_proc_is_refused_as_a_tick_in_no_unit(self) -> None:
         asked: list[pathlib.Path] = []

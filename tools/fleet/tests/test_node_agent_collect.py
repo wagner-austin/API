@@ -255,7 +255,7 @@ class TestAnnounceAndEntryPoints:
     def test_announce_registers_the_runner_on_the_ledger_and_claims_nothing(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _test_hooks.hostname = lambda: "austinpc"
+        _test_hooks.hostname = lambda: "demure"
         endpoint = FakeQueue(["checked in"])
         _test_hooks.http_post = endpoint
 
@@ -265,7 +265,7 @@ class TestAnnounceAndEntryPoints:
         checkin = endpoint.arguments[0]
         assert checkin["kind"] == "checkin"
         assert checkin["harness"] == "fleet-agent"
-        assert checkin["machine"] == f"{sys.platform}:austinpc"
+        assert checkin["machine"] == f"{sys.platform}:demure"
         assert checkin["room"] == "fleet"
         assert checkin["agent"] == "fleet-node-lavender"
         assert "carrying windows" in narrow_json_to_str(checkin["body"])

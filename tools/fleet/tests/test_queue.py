@@ -162,7 +162,7 @@ class TestClaim:
             "lane": "node",
             "tags": ["windows", "gpu"],
             "leaseSeconds": 900,
-            "agent": "fleet-runner-austinpc",
+            "agent": "fleet-node-loki",
             "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
             "cwd": "C:/fleet",
         }

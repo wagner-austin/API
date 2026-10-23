@@ -224,7 +224,7 @@ class TestMachine:
             _file(role="client", user=None, guest=None, ledger_observer="none", dispatch="never"),
         )
         pcsession = decode_machine(
-            "austinpc", _file(role="hub", guest=None, ledger_observer="pcsession", dispatch="hub")
+            "diphtheria", _file(role="hub", guest=None, ledger_observer="pcsession", dispatch="hub")
         )
 
         assert (hub["role"], hub["ledger_observer"]) == (MachineRole.HUB, LedgerObserver.FLEET_ARM)
@@ -272,8 +272,8 @@ class TestMachine:
         original = decode_machine("lavender-wsl", _file())
 
         assert decode_machine("lavender-wsl", encode_machine(original)) == original
-        held = machine("austinpc", None, held="the hub")
-        assert decode_machine("austinpc", encode_machine(held)) == held
+        held = machine("diphtheria", None, held="the hub")
+        assert decode_machine("diphtheria", encode_machine(held)) == held
 
     @pytest.mark.parametrize(
         ("value", "message"),

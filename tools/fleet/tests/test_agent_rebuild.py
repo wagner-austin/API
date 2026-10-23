@@ -16,7 +16,7 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 
 from fleet.cli import agent, hub_jobs
 from fleet.core import _test_hooks, rebuild
-from tests._agent_cli import NOTHING_HELD, agent_argv, bind_hub_tick, tick_run_id
+from tests._agent_cli import HUB_HOST, NOTHING_HELD, agent_argv, bind_hub_tick, tick_run_id
 from tests._hub_tick import UNROLLED_TICK, unrolled_calls
 from tests._queue_fakes import FakeQueue, queue_job
 from tests.conftest import FakeRun
@@ -69,13 +69,13 @@ class TestRebuildLane:
                             status="claimed",
                             command="build-bases",
                             project="MCPs",
-                            requestedNode="austinpc",
+                            requestedNode=HUB_HOST,
                             submittedBy="opus-phone-0911",
                         )
                     }
                 ),
-                dump_json_str({"job": queue_job(status="running", node="austinpc")}),
-                dump_json_str({"job": queue_job(status="passed", node="austinpc")}),
+                dump_json_str({"job": queue_job(status="running", node=HUB_HOST)}),
+                dump_json_str({"job": queue_job(status="passed", node=HUB_HOST)}),
             ]
         )
         _test_hooks.http_post = endpoint
@@ -103,7 +103,7 @@ class TestRebuildLane:
         assert runner.timeouts[0] == rebuild.BUILD_BASES_TIMEOUT_SECONDS == 1800
         started = endpoint.arguments[2]
         assert started["action"] == "start"
-        assert started["node"] == "austinpc"
+        assert started["node"] == HUB_HOST
         # The run is the tick's own unit, which a later tick asks about if
         # the bake ends without closing the job (MCPs board task 05dd6588).
         assert started["runId"] == tick_run_id()
@@ -136,8 +136,8 @@ class TestRebuildLane:
                 dump_json_str(
                     {"claimed": queue_job(status="claimed", command="build-bases", project="MCPs")}
                 ),
-                dump_json_str({"job": queue_job(status="running", node="austinpc")}),
-                dump_json_str({"job": queue_job(status="failed", node="austinpc")}),
+                dump_json_str({"job": queue_job(status="running", node=HUB_HOST)}),
+                dump_json_str({"job": queue_job(status="failed", node=HUB_HOST)}),
             ]
         )
         _test_hooks.http_post = endpoint

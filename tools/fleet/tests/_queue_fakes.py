@@ -216,7 +216,7 @@ QUEUE_CREDENTIALS = McpCredentials(
 
 #: The runner identity every queue test acts under.
 RUNNER_IDENTITY: JSONObject = {
-    "agent": "fleet-runner-austinpc",
+    "agent": "fleet-node-loki",
     "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
     "cwd": "C:/fleet",
 }

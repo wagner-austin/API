@@ -108,6 +108,18 @@ PROJECTS: Final[dict[str, str]] = {
 #: which the run's summary prints so a passed row carries the reading.
 READING_PROPERTY: Final[str] = "host_reading"
 
+#: The user property a case records a report of what it read under, which
+#: the run's summary prints the same way: the retired machine name scan's
+#: count (test_retired_machine_names.py, MCPs board task 3f37b2a7) reaches
+#: the log of a run whose cases ran on xdist workers only through it.
+REPORT_PROPERTY: Final[str] = "suite_report"
+
+#: The label each printed property's lines carry.
+PRINTED_PROPERTIES: Final[dict[str, str]] = {
+    READING_PROPERTY: "host reading",
+    REPORT_PROPERTY: "suite report",
+}
+
 
 def command_output(argv: list[str], *, timeout: int = 60) -> str:
     """Run a command on the host and return its standard output.
@@ -173,7 +185,7 @@ def _fleet_hub(request: pytest.FixtureRequest) -> pathlib.Path:
 
 
 class HostReadings:
-    """Prints each passed case's host readings, on the process that reports the run.
+    """Prints each passed case's host readings and reports, on the process that reports the run.
 
     Attributes:
         lines: Every reading recorded so far, in report order.
@@ -184,16 +196,17 @@ class HostReadings:
         self.lines: list[str] = []
 
     def pytest_runtest_logreport(self, report: pytest.TestReport) -> None:
-        """Keep the readings a passed case recorded.
+        """Keep the readings and reports a passed case recorded.
 
         Args:
             report: One phase's report.
         """
         if report.passed and report.when == "call":
             self.lines.extend(
-                f"host reading: {value}"
+                f"{PRINTED_PROPERTIES[name]}: {line}"
                 for name, value in report.user_properties
-                if name == READING_PROPERTY
+                if name in PRINTED_PROPERTIES
+                for line in str(value).splitlines()
             )
 
     def pytest_terminal_summary(self, terminalreporter: pytest.TerminalReporter) -> None:

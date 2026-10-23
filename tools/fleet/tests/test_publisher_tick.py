@@ -14,9 +14,10 @@ from fleet.contracts.publisher_tick import (
 from fleet.core import _test_hooks, tick_report
 from tests._queue_fakes import QUEUE_CREDENTIALS, RUNNER_IDENTITY, FakeQueue, FakeRefusingQueue
 
-#: hpc-wake's tick on the hub after the 2026-10-16 09:38Z align.
+#: hpc-wake's tick on the hub, modelled on the one after the 2026-10-16
+#: 09:38Z align, with the host that holds the hub now.
 HPC_WAKE = PublisherTick(
-    host="austinpc",
+    host="diphtheria",
     publisher="hpc-wake",
     repo="API",
     head_sha="e164f17a74852359b8c84370b5c5216cfe89f10e",
@@ -28,7 +29,7 @@ HPC_WAKE = PublisherTick(
 class TestTheWireShape:
     def test_it_names_each_field_as_the_tool_does(self) -> None:
         assert encode_publisher_tick(HPC_WAKE) == {
-            "host": "austinpc",
+            "host": "diphtheria",
             "publisher": "hpc-wake",
             "repo": "API",
             "headSha": "e164f17a74852359b8c84370b5c5216cfe89f10e",
@@ -39,7 +40,7 @@ class TestTheWireShape:
     def test_a_dirty_failing_tick_keeps_both_facts(self) -> None:
         encoded = encode_publisher_tick(
             PublisherTick(
-                host="austinpc",
+                host="diphtheria",
                 publisher="ci-wake",
                 repo="API",
                 head_sha="27df272f01d076ad18c1c5c0152879dfa069e048",

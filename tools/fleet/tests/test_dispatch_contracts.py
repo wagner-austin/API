@@ -74,7 +74,7 @@ class TestDecodeClaim:
                     "claimed": queue_job(
                         status="claimed",
                         requestedNode="lavender",
-                        claimedBy="fleet-runner-austinpc",
+                        claimedBy="fleet-node-sedona",
                     )
                 }
             )
@@ -87,7 +87,7 @@ class TestDecodeClaim:
         assert job["requested_node"] == "lavender"
         assert job["node"] is None
         assert job["run_id"] == ""
-        assert job["claimed_by"] == "fleet-runner-austinpc"
+        assert job["claimed_by"] == "fleet-node-sedona"
         assert job["submitted_by"] == "opus-dispatch-0905"
         assert job["session_id"] == "11111111-aaaa-4aaa-8aaa-111111111111"
         assert job["session_target"] is None
@@ -101,7 +101,7 @@ class TestDecodeClaim:
                     "claimed": queue_job(
                         command="restart-session",
                         project="MCPs",
-                        requestedNode="austinpc",
+                        requestedNode="diphtheria",
                         sessionTarget="934d9975-0d65-4e68-83de-b74f8c4df0c4",
                     )
                 }
@@ -434,7 +434,7 @@ class TestRendering:
                         "claimed": queue_job(
                             command="build-bases",
                             project="MCPs",
-                            requestedNode="austinpc",
+                            requestedNode="diphtheria",
                             sha=None,
                         )
                     }
@@ -443,7 +443,7 @@ class TestRendering:
         )
 
         assert line == (
-            "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa queued make build-bases MCPs @austinpc"
+            "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa queued make build-bases MCPs @diphtheria"
         )
 
     def test_a_queued_job_names_the_node_it_asked_for(self) -> None:
@@ -465,7 +465,7 @@ class TestRendering:
                         "claimed": queue_job(
                             command="restart-session",
                             project="MCPs",
-                            requestedNode="austinpc",
+                            requestedNode="diphtheria",
                             sessionTarget="934d9975-0d65-4e68-83de-b74f8c4df0c4",
                         )
                     }
@@ -473,5 +473,5 @@ class TestRendering:
             )
         )
 
-        assert "restart session 934d9975-0d65-4e68-83de-b74f8c4df0c4 @austinpc" in line
+        assert "restart session 934d9975-0d65-4e68-83de-b74f8c4df0c4 @diphtheria" in line
         assert "make" not in line
