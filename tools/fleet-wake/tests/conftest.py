@@ -28,7 +28,7 @@ from typing import Final
 
 import pytest
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.machine import Machine, MachineRole, encode_machine
+from fleet.contracts.machine import LedgerObserver, Machine, MachineRole, encode_machine
 from fleet.contracts.node import NodeConfig, NodePlatform
 from fleet.contracts.project import ProjectConfig, encode_project_config
 from fleet.core.workspace_files import (
@@ -95,6 +95,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             user="austi",
             platform=NodePlatform.WINDOWS,
             enabled=True,
+            ledger_observer=LedgerObserver.FLEET_ARM,
             guest_host=None,
             dispatch=NodeConfig(
                 host="lavender",
