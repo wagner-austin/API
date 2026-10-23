@@ -45,11 +45,12 @@ CONFIGURED_ENV: Final[dict[str, str]] = {
     TASK_ID_VARIABLE: TASK_ID,
 }
 
-#: The body of the 06:14Z run's line, as fleet-mcp renders it.
+#: The body of a run's line as fleet-mcp renders it, modelled on the 06:14Z
+#: run's with the hub and the Windows node the roster holds now.
 TRANSITIONS_BODY: Final = (
-    "FLEET HEALTH at 2026-09-26T06:14:13.504Z (audit on AustinPC, 2 node(s) compared "
+    "FLEET HEALTH at 2026-09-26T06:14:13.504Z (audit on diphtheria, 2 node(s) compared "
     "with the run before): 1 newly failing, 1 recovered.\n"
-    "FAILING  austinpc boot.up.task:\\API-FleetNode-sedona-3min — Ready, S4U, last run "
+    "FAILING  loki boot.up.task:\\API-FleetNode-sedona-3min — Ready, S4U, last run "
     "2026-09-25T23:12:01-07:00 result 0x1 (runs if 0x0 / 0x41303)\n"
     "RECOVERED  sedona boot.up.service:cloudflared — Running, starts Auto"
 )
@@ -57,8 +58,8 @@ TRANSITIONS_BODY: Final = (
 #: That line, byte for byte as ``encodeHealthEvent`` writes it.
 TRANSITIONS_LINE: Final = (
     '{"at":"2026-09-26T06:14:13.504Z","kind":"transitions","key":"2026-09-26T06:14:13.504Z",'
-    '"body":"FLEET HEALTH at 2026-09-26T06:14:13.504Z (audit on AustinPC, 2 node(s) compared '
-    "with the run before): 1 newly failing, 1 recovered.\\nFAILING  austinpc "
+    '"body":"FLEET HEALTH at 2026-09-26T06:14:13.504Z (audit on diphtheria, 2 node(s) compared '
+    "with the run before): 1 newly failing, 1 recovered.\\nFAILING  loki "
     "boot.up.task:\\\\API-FleetNode-sedona-3min — Ready, S4U, last run "
     "2026-09-25T23:12:01-07:00 result 0x1 (runs if 0x0 / 0x41303)\\nRECOVERED  sedona "
     'boot.up.service:cloudflared — Running, starts Auto"}\n'
