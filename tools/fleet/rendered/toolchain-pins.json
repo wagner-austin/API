@@ -1,5 +1,24 @@
 {
   "poetry": {
     "version": "2.4.2"
+  },
+  "rust": {
+    "version": "1.98.1",
+    "components": [
+      "rustfmt",
+      "clippy",
+      "llvm-tools-preview"
+    ]
+  },
+  "rustup": {
+    "version": "1.29.1",
+    "target": "x86_64-unknown-linux-gnu",
+    "sha256": "dda7234360b7f578ca8b0ddcb80145646fa61a67c1720a5abc7051b35c9fcb71"
+  },
+  "cargo-llvm-cov": {
+    "version": "0.9.1"
+  },
+  "uv": {
+    "version": "0.13.0"
   }
 }
