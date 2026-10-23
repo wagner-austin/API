@@ -146,6 +146,9 @@ class TestRestartArgv:
             "--hard",
             *SUFFIX,
         )
+        assert session_argv.kill_argv(
+            ROOT, REGISTRY, HOST, TARGET, label, hard=False, exiting=True
+        ) == (*graceful, "--exit", *SUFFIX)
 
     def test_maps_every_session_verb_to_exactly_one_invocation_of_the_release(self) -> None:
         label = "opus-mcps-0917-e7b5"
@@ -194,13 +197,16 @@ class TestRestartArgv:
             **sealed,
         }
         # MCPs board task 5aa8ed06: an approved self-exit is the graceful
-        # kill's one invocation, never the hard one, under its own run verb.
+        # kill's one invocation, never the hard one, under its own run verb,
+        # marked --exit so a run already gone has met it (MCPs 7829e947).
         assert restart.session_invocation(
             RELEASE, DispatchCommand.EXIT_SESSION, TARGET, label, HOST, None
         ) == {
             "verb": "exit",
             "mode": "kill",
-            "argv": session_argv.kill_argv(ROOT, REGISTRY, HOST, TARGET, label, hard=False),
+            "argv": session_argv.kill_argv(
+                ROOT, REGISTRY, HOST, TARGET, label, hard=False, exiting=True
+            ),
             "types_requester": True,
             **sealed,
         }

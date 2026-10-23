@@ -454,8 +454,9 @@ class TestRestartLane:
 
         assert agent.main(agent_argv(config_path, repo)) == 0
 
+        root, registry = release["root"], release["registry_dir"]
         assert runner.calls[1] == session_argv.kill_argv(
-            release["root"], release["registry_dir"], HUB_HOST, TARGET, SUBMITTER, hard=False
+            root, registry, HUB_HOST, TARGET, SUBMITTER, hard=False, exiting=True
         )
         assert endpoint.arguments[2]["runId"] == tick_run_id()
         assert narrow_json_to_str(endpoint.arguments[3]["detail"]) == (
