@@ -8,7 +8,7 @@
   "standby": ["sessions"],
   "ledger_observer": "pcsession",
   "tailnetIp": "100.77.206.124",
-  "reachKey": null,
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN7vdFI7kxS138lB8qPVqgM3YPkiDCoK3mp/OdEA8a3F corvis@austinpc sessions standby",
   "bootMac": "d8:43:ae:24:7c:04",
   "netbootWifi": false,
   "installDisk": {
