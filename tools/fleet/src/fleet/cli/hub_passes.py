@@ -65,7 +65,7 @@ def publish_pass(
 
 
 def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
-    """Record every enabled worker's Claude Code sessions in the board's ledger.
+    """Record the Claude Code sessions of every enabled machine the arm observes.
 
     The board's credentials are read HERE, not at the top of the tick, and
     only when the roster names a machine to observe: they are the
@@ -85,8 +85,8 @@ def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
     observed = observe.observable(machines)
     if not observed:
         _log.info(
-            "observed no session: none of the roster's %d machine(s) is an enabled worker, "
-            "vpn-jump or session host",
+            "observed no session: none of the roster's %d machine(s) is enabled and declares "
+            "ledger_observer fleet-arm",
             len(machines),
         )
         return

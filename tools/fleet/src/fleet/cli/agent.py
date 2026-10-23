@@ -62,7 +62,8 @@ and address (MCPs board task 49d366ac, :mod:`fleet.core.netboot_adopt`):
        claim such a job, since each claims only the registry projects it
        fits. Here, once a tick for the whole fleet, rather than in every
        node runner.
-    3. OBSERVE. Read every enabled worker's Claude Code session records over
+    3. OBSERVE. Read the Claude Code session records of every enabled
+       machine whose roster file declares ``ledger_observer`` fleet-arm over
        ssh and hand them to the board's session ledger (MCPs board task
        5a3865bf; :mod:`fleet.core.observe` carries the why). Last, because
        it is the pass that touches every node, and a node asleep costs a

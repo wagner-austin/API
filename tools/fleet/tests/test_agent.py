@@ -340,8 +340,12 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
     """
     document = workspace_document()
     machines = machines_of(document)
-    machines["austinpc"] = machine_document(role="hub", dispatch="the hub")
-    machines["serendipity"] = machine_document(role="worker", dispatch="observed only")
+    machines["austinpc"] = machine_document(
+        role="hub", ledger_observer="pcsession", dispatch="the hub"
+    )
+    machines["serendipity"] = machine_document(
+        role="worker", ledger_observer="fleet-arm", dispatch="observed only"
+    )
     machine_of(document, "lavender")["enabled"] = False
     return write_registry(tmp_path / "observed", document)
 
@@ -419,9 +423,9 @@ class TestObservingSessions:
     def test_a_roster_with_nothing_to_observe_says_so_and_touches_no_node(
         self, config_path: pathlib.Path, repo: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """The shared roster's one machine is a hub, which pcsession-mcp
-        observes on its own mount, so no node is asked and the board's key,
-        unset here, is never read."""
+        """The shared roster's one machine declares no fleet-arm observer,
+        so no node is asked and the board's key, unset here, is never
+        read."""
         run = FakeRun([*UNROLLED_TICK])
         _test_hooks.run = run
         endpoint = FakeQueue([NOTHING_HELD, dump_json_str({"claimed": None})])
@@ -437,8 +441,8 @@ class TestObservingSessions:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert (
-            "observed no session: none of the roster's 1 machine(s) is an enabled worker, "
-            "vpn-jump or session host"
+            "observed no session: none of the roster's 1 machine(s) is enabled and declares "
+            "ledger_observer fleet-arm"
         ) in messages
         assert "hub lane empty" in messages
         assert any(

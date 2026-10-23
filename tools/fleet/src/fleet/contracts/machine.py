@@ -34,10 +34,20 @@ another's WSL exactly when its ``guest`` names a host.
 THIS PACKAGE DECODES WHAT IT READS. The identity fields only MCPs reads
 (``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``installDisk``,
 ``disabledUntil``, ``tunnel``, ``guest.sshPort``, ``duties``, ``standby``,
-``ledger_observer``, ``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
+``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
 ``fleet-mcp``'s registry decoder, which every fleet audit runs over this
 directory; deciding their shapes twice, in two languages, would be the
 duplicate this file replaced.
+
+``ledger_observer`` IS READ HERE TOO, because the hub tick's observe pass
+acts on it (MCPs board task 911b0303). It names the arm that stamps the
+machine's watermark in ``agent_session_observer_passes``, and the fleet
+audit holds each machine to the arm it names. The pass used to choose its
+machines by role instead, on the premise that a hub is observed by
+``pcsession-mcp``; on 2026-10-18 MCPs d48341e6f made diphtheria a hub while
+its file still named ``fleet-arm``, and the arm last passed over it at
+07:12:06Z. Reading the one declaration both sides grade by keeps the arm
+and the audit from disagreeing again.
 """
 
 from __future__ import annotations
@@ -78,6 +88,21 @@ class MachineRole(StrEnum):
     UNTRUSTED_MANAGED = "untrusted-managed"
 
 
+class LedgerObserver(StrEnum):
+    """Which arm records a machine's Claude Code sessions in the board's ledger.
+
+    MCPs fleet-mcp's SessionObserver names the same three, the words the
+    ledger's observer column admits.
+    """
+
+    #: The hub tick's observe pass, over ssh (:mod:`fleet.core.observe`).
+    FLEET_ARM = "fleet-arm"
+    #: ``pcsession-mcp``, over its read-only mount of one machine's sessions.
+    PCSESSION = "pcsession"
+    #: Nothing: a client, or a machine the operator does not own.
+    NONE = "none"
+
+
 class Machine(TypedDict):
     """One machine as the roster declares it, as far as this package reads it.
 
@@ -89,6 +114,7 @@ class Machine(TypedDict):
         platform: Its operating-system family, the dialect every script to
             it is rendered in.
         enabled: Whether it is expected to answer at all.
+        ledger_observer: The arm that records its sessions in the ledger.
         guest_host: The machine it runs inside and is reached through, or
             None for one on the tailnet in its own right.
         dispatch: What dispatch may take from it, or None when it declares
@@ -103,6 +129,7 @@ class Machine(TypedDict):
     user: str | None
     platform: NodePlatform
     enabled: bool
+    ledger_observer: LedgerObserver
     guest_host: str | None
     dispatch: NodeConfig | None
     held: str | None
@@ -120,8 +147,9 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
 
     Raises:
         JSONTypeError: If the value is not an object, a field this package
-            reads is missing or mistyped, ``role`` or ``platform`` is outside
-            its closed set, ``guest`` is neither null nor an object naming a
+            reads is missing or mistyped, ``role``, ``platform`` or
+            ``ledger_observer`` is outside its closed set, ``guest`` is
+            neither null nor an object naming a
             host, ``dispatch`` is neither a non-empty reason nor an object,
             ``held`` is neither null nor a non-empty reason, or a node held
             out of dispatch is not enabled (a machine that is off is held by
@@ -132,6 +160,7 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
     role = _decode_role(name, require_str(value, "role"))
     platform = decode_node_platform(require_str(value, "platform"))
     enabled = require_bool(value, "enabled")
+    ledger_observer = _decode_ledger_observer(name, require_str(value, "ledger_observer"))
     raw_user = value.get("user")
     guest_host = _decode_guest_host(name, value)
     dispatch = value.get("dispatch")
@@ -142,6 +171,7 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
             user=None if raw_user is None else narrow_json_to_str(raw_user),
             platform=platform,
             enabled=enabled,
+            ledger_observer=ledger_observer,
             guest_host=guest_host,
             dispatch=None,
             held=_reason(name, dispatch, "dispatch"),
@@ -158,6 +188,7 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
         user=None if raw_user is None else narrow_json_to_str(raw_user),
         platform=platform,
         enabled=enabled,
+        ledger_observer=ledger_observer,
         guest_host=guest_host,
         dispatch=decode_node_config(
             dispatch,
@@ -177,9 +208,10 @@ def encode_machine(machine: Machine) -> JSONObject:
         machine: The machine.
 
     Returns:
-        Its ``role``, ``user``, ``platform``, ``enabled``, ``guest`` (as
-        ``{host}`` or null) and ``dispatch``: its held reason when it
-        declares no capacity, else its capacity with ``held``.
+        Its ``role``, ``user``, ``platform``, ``enabled``,
+        ``ledger_observer``, ``guest`` (as ``{host}`` or null) and
+        ``dispatch``: its held reason when it declares no capacity, else its
+        capacity with ``held``.
     """
     node = machine["dispatch"]
     dispatch: JSONValue = (
@@ -191,6 +223,7 @@ def encode_machine(machine: Machine) -> JSONObject:
         "user": machine["user"],
         "platform": machine["platform"].value,
         "enabled": machine["enabled"],
+        "ledger_observer": machine["ledger_observer"].value,
         "guest": None if guest_host is None else {"host": guest_host},
         "dispatch": dispatch,
     }
@@ -214,6 +247,28 @@ def _decode_role(name: str, value: str) -> MachineRole:
         return role
     raise JSONTypeError(
         f"machine {name!r} role must be one of {', '.join(MachineRole)}, got {value!r}"
+    )
+
+
+def _decode_ledger_observer(name: str, value: str) -> LedgerObserver:
+    """Read a machine's ledger observer into the closed set.
+
+    Args:
+        name: The machine, for the message.
+        value: The declared observer.
+
+    Returns:
+        The observer.
+
+    Raises:
+        JSONTypeError: If it is not one of :class:`LedgerObserver`'s words.
+    """
+    observer = find_member(value, LedgerObserver)
+    if observer is not None:
+        return observer
+    raise JSONTypeError(
+        f"machine {name!r} ledger_observer must be one of {', '.join(LedgerObserver)}, "
+        f"got {value!r}"
     )
 
 
@@ -295,4 +350,4 @@ def _reason(name: str, value: JSONValue, field: str) -> str:
     return value
 
 
-__all__ = ["Machine", "MachineRole", "decode_machine", "encode_machine"]
+__all__ = ["LedgerObserver", "Machine", "MachineRole", "decode_machine", "encode_machine"]

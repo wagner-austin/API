@@ -44,17 +44,21 @@ def machine_document(
     role: str = "hub",
     platform: str = "windows",
     enabled: bool = True,
+    ledger_observer: str = "none",
     guest: str | None = None,
     dispatch: JSONValue = None,
 ) -> JSONObject:
     """One machine file of the roster, as this package reads it.
 
     Args:
-        role: Its role. A hub by default, as diphtheria is both a hub and a
-            dispatch node: a hub tick's observe pass never visits one, so a
-            test of anything else is asked no ssh it did not script.
+        role: Its role, a hub by default, as diphtheria is both a hub and a
+            dispatch node.
         platform: Its platform.
         enabled: Whether it is expected to answer.
+        ledger_observer: The arm that records its sessions. None observes
+            it by default: a hub tick's observe pass visits only a machine
+            declaring ``fleet-arm``, so a test of anything else is asked no
+            ssh it did not script.
         guest: The machine it runs inside, or None.
         dispatch: Its ``dispatch``; None gives :func:`dispatch_document`.
 
@@ -66,6 +70,7 @@ def machine_document(
         "user": "austi",
         "platform": platform,
         "enabled": enabled,
+        "ledger_observer": ledger_observer,
         "guest": None if guest is None else {"host": guest, "sshPort": 2222},
         "dispatch": dispatch_document() if dispatch is None else dispatch,
     }

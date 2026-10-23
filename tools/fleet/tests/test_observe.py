@@ -15,7 +15,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
-from fleet.contracts.machine import Machine, MachineRole
+from fleet.contracts.machine import LedgerObserver, Machine, MachineRole
 from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect_linux, dialect_windows, observe, remote
 from fleet.core.ssh_options import SSH_OPTIONS
@@ -72,6 +72,7 @@ def node(
     enabled: bool = True,
     user: str | None = "austin",
     platform: NodePlatform = NodePlatform.WINDOWS,
+    observer: LedgerObserver = LedgerObserver.FLEET_ARM,
 ) -> Machine:
     """Build one roster machine that declares no dispatch capacity.
 
@@ -81,6 +82,7 @@ def node(
         enabled: Whether the roster says it should answer.
         user: The provisioned account, or None.
         platform: What the roster says it runs.
+        observer: The arm the roster says records its sessions.
 
     Returns:
         The machine.
@@ -91,6 +93,7 @@ def node(
         user=user,
         platform=platform,
         enabled=enabled,
+        ledger_observer=observer,
         guest_host=None,
         dispatch=None,
         held="observed, never dispatched to",
@@ -500,7 +503,7 @@ def test_observe_node_raises_on_a_record_from_another_machine() -> None:
     assert board.tools == []
 
 
-def test_observe_pass_visits_enabled_workers_and_jump_hosts_in_name_order() -> None:
+def test_observe_pass_visits_enabled_fleet_arm_machines_in_name_order() -> None:
     _test_hooks.run = FakeRun(
         [
             failed(255, "loki is off"),
@@ -519,9 +522,9 @@ def test_observe_pass_visits_enabled_workers_and_jump_hosts_in_name_order() -> N
     _test_hooks.http_post = board
     registry = {
         "viper": node("viper", "vpn-jump", user="viper"),
-        "austinpc": node("austinpc", "hub"),
+        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
         "serendipity": node("serendipity", "worker"),
-        "phone": node("phone", "client", user=None),
+        "phone": node("phone", "client", user=None, observer=LedgerObserver.NONE),
         "lavender": node("lavender", "worker", enabled=False),
         "loki": node("loki", "worker", user="loki"),
     }
@@ -541,13 +544,26 @@ def test_observe_pass_visits_a_session_host() -> None:
 
     registry = {
         "ziggurat": node("ziggurat", "session-host", user="corvis"),
-        "austinpc": node("austinpc", "hub"),
+        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
     }
 
     outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
 
     assert [(o["node"], o["recorded"]) for o in outcomes] == [("ziggurat", True)]
     assert [a["machine"] for a in board.arguments] == ["win32:ziggurat"]
+
+
+def test_observable_follows_the_declared_observer_not_the_role() -> None:
+    # MCPs board task 911b0303: diphtheria became a hub on 2026-10-18 while
+    # still declaring fleet-arm, and a role filter dropped it from every pass.
+    registry = {
+        "diphtheria": node("diphtheria", "hub", user="corvis", platform=NodePlatform.LINUX),
+        "austinpc": node("austinpc", "hub", observer=LedgerObserver.PCSESSION),
+        "relative": node("relative", "worker", observer=LedgerObserver.NONE),
+        "ziggurat": node("ziggurat", "session-host", user="corvis"),
+    }
+
+    assert [m["name"] for m in observe.observable(registry)] == ["diphtheria", "ziggurat"]
 
 
 def test_render_outcome_distinguishes_a_quiet_node_from_a_recorded_one() -> None:

@@ -17,7 +17,7 @@ from platform_core.json_utils import (
     load_json_str,
 )
 
-from fleet.contracts.machine import MachineRole, decode_machine, encode_machine
+from fleet.contracts.machine import LedgerObserver, MachineRole, decode_machine, encode_machine
 from fleet.contracts.node import (
     NodeConfig,
     NodePlatform,
@@ -57,6 +57,7 @@ def _file(**changes: JSONValue) -> JSONObject:
         "user": "corvis",
         "platform": "linux",
         "enabled": True,
+        "ledger_observer": "fleet-arm",
         "guest": {"host": "lavender", "sshPort": 2222},
         "dispatch": {**encode_node_config(node()), "held": None},
         "tailnetIp": "100.65.161.27",
@@ -209,7 +210,26 @@ class TestMachine:
             "lavender",
             None,
         )
+        assert decoded["ledger_observer"] is LedgerObserver.FLEET_ARM
         assert decoded["dispatch"] == _guest_node(enabled=True)
+
+    def test_a_machine_names_the_arm_that_observes_it_whatever_its_role(self) -> None:
+        """MCPs board task 911b0303: the observe pass chooses by this field,
+        so a hub the fleet arm observes reads as one."""
+        hub = decode_machine(
+            "diphtheria", _file(role="hub", guest=None, dispatch="the hub runs no dispatched work")
+        )
+        phone = decode_machine(
+            "phone",
+            _file(role="client", user=None, guest=None, ledger_observer="none", dispatch="never"),
+        )
+        pcsession = decode_machine(
+            "austinpc", _file(role="hub", guest=None, ledger_observer="pcsession", dispatch="hub")
+        )
+
+        assert (hub["role"], hub["ledger_observer"]) == (MachineRole.HUB, LedgerObserver.FLEET_ARM)
+        assert phone["ledger_observer"] is LedgerObserver.NONE
+        assert pcsession["ledger_observer"] is LedgerObserver.PCSESSION
 
     def test_a_machine_that_declares_no_capacity_carries_its_reason(self) -> None:
         decoded = decode_machine(
@@ -261,6 +281,12 @@ class TestMachine:
             ("lavender", "machine 'm' must be a JSON object, got str"),
             (_file(role="desktop"), "machine 'm' role must be one of hub, vpn-jump, worker"),
             (_file(platform="solaris"), "platform must be one of windows, linux"),
+            (
+                _file(ledger_observer="watcher"),
+                "machine 'm' ledger_observer must be one of fleet-arm, pcsession, none, "
+                "got 'watcher'",
+            ),
+            (_file(ledger_observer=None), "Missing required field 'ledger_observer'"),
             (_file(guest="lavender"), "machine 'm' guest must be an object or null"),
             (_file(guest={"sshPort": 2222}), "machine 'm' guest.host must be a non-empty string"),
             (_file(dispatch=7), "machine 'm' must declare 'dispatch': the reason it takes"),

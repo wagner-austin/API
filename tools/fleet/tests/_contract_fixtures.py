@@ -7,7 +7,7 @@ from typing import Final
 from platform_core.json_utils import JSONValue
 
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.machine import Machine, MachineRole
+from fleet.contracts.machine import LedgerObserver, Machine, MachineRole
 from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, decode_node_config
 
 BUDGET: Final = NodeBudget(
@@ -78,7 +78,7 @@ def decode_like(value: JSONValue, declared: NodeConfig) -> NodeConfig:
 
 
 def machine(name: str, declared: NodeConfig | None, *, held: str | None = None) -> Machine:
-    """Build one roster machine, a Windows worker that answers.
+    """Build one roster machine, a Windows worker that answers, observed by the fleet arm.
 
     Args:
         name: Its name.
@@ -94,6 +94,7 @@ def machine(name: str, declared: NodeConfig | None, *, held: str | None = None) 
         user="austi",
         platform=NodePlatform.WINDOWS,
         enabled=True,
+        ledger_observer=LedgerObserver.FLEET_ARM,
         guest_host=None,
         dispatch=declared,
         held=held,

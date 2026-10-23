@@ -63,7 +63,7 @@ from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
-from fleet.contracts.machine import Machine, MachineRole
+from fleet.contracts.machine import LedgerObserver, Machine
 from fleet.contracts.node import NodePlatform
 from fleet.core import dialect, queue, remote
 
@@ -72,15 +72,6 @@ from fleet.core import dialect, queue, remote
 #: place-by-path convention the probe and dispatch scripts use, and a name
 #: that cannot collide with either.
 OBSERVE_STEM: Final = "observe-sessions"
-
-#: Roles whose sessions this pass records. The hub is observed by
-#: ``pcsession-mcp`` on its own mount; a client (the phone) is never
-#: provisioned and has no account of ours to ssh in as. A session host is
-#: where the operator's Claude Code sessions run (MCPs board task 701151b4),
-#: so it is the node this pass most has to see.
-OBSERVABLE_ROLES: Final = frozenset(
-    {MachineRole.WORKER, MachineRole.VPN_JUMP, MachineRole.SESSION_HOST}
-)
 
 
 class NodeSessions(TypedDict):
@@ -383,18 +374,26 @@ def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> 
 def observable(machines: Mapping[str, Machine]) -> tuple[Machine, ...]:
     """The machines the roster says are live and whose sessions this pass records.
 
+    The roster's ``ledger_observer`` decides, not the role: it is what the
+    fleet audit holds each machine's watermark to. Until MCPs board task
+    911b0303 the pass took workers, jump hosts and session hosts, and when
+    diphtheria became a hub on 2026-10-18 while still declaring
+    ``fleet-arm`` it dropped out of every pass.
+
     Args:
         machines: The roster's machines, by name.
 
     Returns:
-        Each enabled machine whose role is in :data:`OBSERVABLE_ROLES`, in
-        name order. Disabled machines, the hub and clients are left out:
-        they are never asked, which is a different fact from not answering.
+        Each enabled machine that declares ``fleet-arm``, in name order.
+        Disabled machines, a machine ``pcsession-mcp`` reads on its own
+        mount and one nobody observes (a client) are left out: they are
+        never asked, which is a different fact from not answering.
     """
     return tuple(
         machines[name]
         for name in sorted(machines)
-        if machines[name]["enabled"] and machines[name]["role"] in OBSERVABLE_ROLES
+        if machines[name]["enabled"]
+        and machines[name]["ledger_observer"] is LedgerObserver.FLEET_ARM
     )
 
 
@@ -433,7 +432,6 @@ def render_outcome(outcome: NodeOutcome) -> str:
 
 
 __all__ = [
-    "OBSERVABLE_ROLES",
     "OBSERVE_STEM",
     "NodeOutcome",
     "NodeSessions",
