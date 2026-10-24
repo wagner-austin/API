@@ -98,16 +98,21 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_demure_lavender_and_pendragon_alone_declare_a_boot_mac_and_never_loki_or_a_hub() -> None:
+def test_measured_boot_macs_stay_pinned_and_only_linux_workers_declare_one() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
-    assert declared == {
+    # Automatic admission adds a disabled worker before its first install.
+    # Pin measured identities without making each admission a test-code edit.
+    assert {name: declared[name] for name in ("demure", "lavender", "pendragon")} == {
         "demure": DEMURE_MAC,
         "lavender": LAVENDER_MAC,
         "pendragon": PENDRAGON_MAC,
     }
-    never = sorted(name for name, m in machines.items() if name == "loki" or m["role"] == "hub")
-    assert never == ["diphtheria", "loki"]
+    for name in declared:
+        assert machines[name]["role"] == "worker"
+        assert machines[name]["platform"] == "linux"
+    assert machines["loki"]["bootMac"] is None
+    assert machines["diphtheria"]["bootMac"] is None
 
 
 def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
@@ -122,14 +127,15 @@ def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it
     assert sorted(name for name, m in machines.items() if m["netbootWifi"] is True) == ["pendragon"]
 
 
-def test_every_boot_mac_names_its_install_disk_by_serial_and_no_other_machine_names_one() -> None:
+def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() -> None:
     # MCPs board task c64006b9: a netboot install wipes only the disk the
-    # roster names, so each machine with a bootMac names its disk by serial
-    # and every other machine carries null. fleet-mcp's decoder requires the
-    # key and refuses a bootMac without a disk.
+    # roster selects. Keep the measured serials pinned; newly admitted
+    # workers use only-disk, which refuses zero or multiple candidate disks.
+    # fleet-mcp's decoder validates both rules and refuses a bootMac without
+    # a disk. Every other machine still carries null.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
-    assert named == {
+    assert {name: named[name] for name in ("demure", "lavender", "pendragon")} == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
         "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
