@@ -43,6 +43,7 @@ from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
+from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
 from fleet.core.names import (
@@ -135,53 +136,10 @@ CAPACITY_PROBE_SCRIPT = (
 TOOLCHAIN_PROBE_SCRIPT = PROLOGUE + TOOLCHAIN_PROBE_BODY
 
 
-#: The body of the session-observer script: what python3 runs, verbatim.
-#:
-#: THE DOCUMENT IS BUILT BY python3, NOT BY sh. The records go out verbatim
-#: inside one JSON array, and ``sh`` has no way to join files into one that
-#: survives an empty directory, a record without a trailing newline or a
-#: field with a quote in it; ``python3`` is on every Linux node by the
-#: toolchain contract (``report python python3`` above), on the PATH the
-#: prologue prepends. ``sys.platform`` is ``linux``, the same word Node's
-#: ``process.platform`` writes into the harness's ``pidDomain``; the
-#: hostname is lowercased as the harness spells it (measured on diphtheria
-#: 2026-09-21: ``hostname`` prints ``Diphtheria``). Those two spell the
-#: ledger's machine key. ``pidDomain`` is computed apart, as Claude Code
-#: 2.1.294 writes it on Linux (board task 5cee2f65): ``linux:``, the
-#: ``/etc/machine-id``, then the pid namespace ``/proc/self/ns/pid`` links
-#: to, measured on ziggurat 2026-10-16 as
-#: ``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``. The script
-#: runs in the namespace the node's sessions run in, so its link is theirs.
-#: Records are read in file name order so two runs over one directory agree,
-#: and an absent directory is an empty array rather than an error. Kept apart
-#: from the ``sh`` that feeds it so a test can run exactly this text under the
-#: interpreter it has.
-OBSERVE_SESSIONS_PYTHON = (
-    "import json\n"
-    "import os\n"
-    "import socket\n"
-    "import sys\n"
-    "directory = os.path.join(os.path.expanduser('~'), '.claude', 'sessions')\n"
-    "records = []\n"
-    "if os.path.isdir(directory):\n"
-    "    for name in sorted(os.listdir(directory)):\n"
-    "        if name.endswith('.json'):\n"
-    "            with open(os.path.join(directory, name), encoding='utf-8') as handle:\n"
-    "                records.append(json.load(handle))\n"
-    "with open('/etc/machine-id', encoding='utf-8') as handle:\n"
-    "    machine_id = handle.read().strip()\n"
-    "document = {\n"
-    "    'platform': sys.platform,\n"
-    "    'hostname': socket.gethostname().lower(),\n"
-    "    'pidDomain': 'linux:' + machine_id + ':' + os.readlink('/proc/self/ns/pid'),\n"
-    "    'records': records,\n"
-    "}\n"
-    "print(json.dumps(document, separators=(',', ':')))\n"
-)
-
 #: The session-observer script, verbatim: the prologue, then
-#: :data:`OBSERVE_SESSIONS_PYTHON` fed to ``python3`` through a quoted
-#: heredoc, so nothing in the body is expanded by ``sh`` on the way.
+#: :data:`fleet.core.linux_observe_sessions.OBSERVE_SESSIONS_PYTHON` fed to
+#: ``python3`` through a quoted heredoc, so nothing in the body is expanded
+#: by ``sh`` on the way.
 OBSERVE_SESSIONS_SCRIPT = f"{PROLOGUE}python3 - <<'PY'\n{OBSERVE_SESSIONS_PYTHON}PY\n"
 
 
@@ -318,12 +276,25 @@ class LinuxDialect:
             before its build started wrote no transcript; ``rm -rf`` and
             ``rm -f`` need no guard for what is already gone, and ``-f``
             removes the read-only objects of the repository staged there.
+            ``-f`` does not remove an entry of a directory without its write
+            bit, so each of the run's own directories lacking it gets it back
+            first (MCPs board task 05dd6588): since MCPs f27b4822e seals
+            release payloads read-only, every MCPs packages/maketools run
+            leaves fixture releases sealed under its ``.pytest-tmp``, and
+            from 2026-10-23T23:26Z to 2026-10-24T03:51Z the retires of 15
+            such runs on six nodes stopped at ``rm -rf``, stranding them.
+            ``find`` follows no link, so nothing outside the two trees is
+            unlocked.
         """
         log = shlex.quote(names.log_path(target))
+        trees = f"{shlex.quote(target)} {shlex.quote(names.staging_directory(target))}"
         lines = [
             f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
             f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
-            f"rm -rf {shlex.quote(target)} {shlex.quote(names.staging_directory(target))}",
+            f"for tree in {trees}; do",
+            '  if [ -d "$tree" ]; then find "$tree" -type d ! -perm -u=w -exec chmod u+w {} +; fi',
+            "done",
+            f"rm -rf {trees}",
             "rm -f " + " ".join(shlex.quote(script) for script in scripts),
         ]
         if isolated:
@@ -589,7 +560,6 @@ class LinuxDialect:
 
 __all__ = [
     "CAPACITY_PROBE_SCRIPT",
-    "OBSERVE_SESSIONS_PYTHON",
     "OBSERVE_SESSIONS_SCRIPT",
     "PROLOGUE",
     "SH_INVOCATION",

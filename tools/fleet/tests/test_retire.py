@@ -11,6 +11,7 @@ committed copy.
 from __future__ import annotations
 
 import pathlib
+import stat
 import subprocess
 
 import pytest
@@ -190,8 +191,41 @@ def test_each_holder_the_retire_ended_is_logged_by_its_line(
     ]
 
 
+def seal(release: pathlib.Path) -> None:
+    """A release whose payload directory and checkout carry no write bit.
+
+    Args:
+        release: The checkout to make and lock.
+    """
+    payload = release / "scripts"
+    payload.mkdir(parents=True)
+    (payload / "release-kinds.json").write_text("{}\n", encoding="utf-8")
+    for directory in (payload, release):
+        directory.chmod(0o555)
+
+
 class TestTheShScriptRunsForReal:
     """The ``sh`` retire against a real stage root, under this host's bash."""
+
+    def outside_modes(self, root: pathlib.Path) -> list[int]:
+        """The permission bits of the sealed release outside the run's trees.
+
+        It gets its write bits back after they are read, so no case leaves
+        a locked directory under ``tmp_path`` for the stage root this suite
+        runs in to strand.
+
+        Args:
+            root: The stage root.
+
+        Returns:
+            The release's and its payload directory's bits, in that order.
+        """
+        release = root / "cache" / "MCPs"
+        locked = (release, release / "scripts")
+        modes = [stat.S_IMODE(path.stat().st_mode) for path in locked]
+        for path in locked:
+            path.chmod(0o755)
+        return modes
 
     def lay_out(self, root: pathlib.Path, *, transcript: bool) -> pathlib.Path:
         """A finished run's directory and its root scripts, as a node leaves them.
@@ -222,6 +256,13 @@ class TestTheShScriptRunsForReal:
         (staged / "extract.sh").write_text(PROLOGUE, encoding="utf-8")
         (root / "cache").mkdir()
         (root / "libs-other-1757000001").mkdir()
+        # Releases sealed read-only, the way MCPs f27b4822e seals them: one
+        # where a maketools run's tests leave their fixtures, one staged, and
+        # one outside both trees that a link inside the run names.
+        seal(target / "packages" / "maketools" / ".pytest-tmp" / "store" / "MCPs")
+        seal(staged / "MCPs")
+        seal(root / "cache" / "MCPs")
+        (target / "linked").symlink_to(root / "cache" / "MCPs", target_is_directory=True)
         return target
 
     def retire(self, root: pathlib.Path) -> None:
@@ -265,12 +306,15 @@ class TestTheShScriptRunsForReal:
         assert (tmp_path / "logs" / f"{DEMO_RUN_ID}.log").read_text(encoding="utf-8") == (
             "887 passed\n"
         )
-        # The cache and another run's directory are not this run's to remove.
+        # The cache and another run's directory are not this run's to remove;
+        # the release the run's link named is left whole and still locked.
         assert sorted(entry.name for entry in tmp_path.iterdir()) == [
             "cache",
             "libs-other-1757000001",
             "logs",
         ]
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]
+        assert (tmp_path / "cache" / "MCPs" / "scripts" / "release-kinds.json").is_file()
 
     def test_a_run_that_wrote_no_transcript_is_retired_all_the_same_and_twice(
         self, tmp_path: pathlib.Path
@@ -285,3 +329,4 @@ class TestTheShScriptRunsForReal:
         assert list((tmp_path / "logs").iterdir()) == []
         assert not (tmp_path / DEMO_RUN_ID).exists()
         assert not (tmp_path / f"{DEMO_RUN_ID}.stage").exists()
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]

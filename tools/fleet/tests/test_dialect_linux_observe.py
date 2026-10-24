@@ -23,12 +23,12 @@ from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
 from fleet.core.dialect_linux import (
-    OBSERVE_SESSIONS_PYTHON,
     OBSERVE_SESSIONS_SCRIPT,
     PROLOGUE,
     SH_INVOCATION,
     LinuxDialect,
 )
+from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
 
 DIALECT = LinuxDialect()
 
