@@ -8,16 +8,17 @@ status, which :mod:`fleet.core.remote` turns into ``DISPATCH_FAILED``
 carrying the node's own stderr, and an unset variable is a fault rather than
 an empty string.
 
-HOW THE BUILD OUTLIVES THE CONNECTION. sshd on Linux does not put a session
-in a job object, but it does send SIGHUP to the session's process group when
-the connection closes, and a user's systemd manager stops with the user's
-last session unless lingering is enabled. The build is therefore started as
-a TRANSIENT USER UNIT (``systemd-run --user``), which is to the user manager
-what a scheduled task is to Task Scheduler: owned by the machine, not by the
-connection, stoppable by name, and started or refused synchronously. The
-launch script refuses first when lingering is off, naming the one command
-that turns it on, because a unit started without it would be killed the
-moment the ssh session that started it ended -- and would report nothing.
+HOW THE BUILD OUTLIVES THE CONNECTION, INSIDE DISPATCH'S SHARE. sshd on Linux
+sends SIGHUP to the session's process group when the connection closes, so
+the build is started as a TRANSIENT SYSTEM UNIT, which is to systemd what a
+scheduled task is to Task Scheduler: owned by the machine, not by the
+connection, stoppable by name, and started or refused synchronously. It
+starts through MCPs' fleet-check-unit (:mod:`fleet.contracts.check_unit`,
+MCPs board task bc8c445c), as the login account, in the checks' slice inside
+``system-dispatch.slice``, so the roster's dispatch share holds its CPU and
+its disk against the owner's production. Until then it was a unit of the
+account's own manager (``systemd-run --user``) under ``user.slice``, which
+neither share reached.
 
 WHERE POETRY LIVES. pipx and poetry's own installer both put the executable
 under ``~/.local/bin``, which a login shell adds to PATH and a non-interactive
@@ -36,6 +37,7 @@ import posixpath
 import shlex
 
 from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
+from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
@@ -62,14 +64,6 @@ SH_INVOCATION = ("/bin/sh",)
 #: The quoted heredoc's delimiter that carries the unit-end script inside the
 #: launch script; the unit-end script never holds a line equal to it.
 UNIT_END_DELIMITER = "FLEET_UNIT_END_SCRIPT"
-
-#: A check unit's ``CPUWeight=``, ten times the default 100 of the hub
-#: runner's duty jobs beside it (MCPs board task 78484fa0): fleet job 40704279
-#: lost 11 s of budget on diphtheria when prove-head cut seven releases beside
-#: it. Measured there on 2026-10-18, an 8-process job beside five 4-loop
-#: units ran 36.8 and 41.1 s at 100, 12.9 and 11.1 s at 1000, 6.8 s alone.
-#: It divides only the user manager's share; system.slice keeps its own.
-CHECK_CPU_WEIGHT = 1000
 
 #: How a script's body is written on the far side.
 #:
@@ -429,17 +423,17 @@ class LinuxDialect:
         return f"{PROLOGUE}if [ -f '{log}' ]; then tail -n {lines} '{log}'; fi\n"
 
     def launch_script(self, *, target: str, run_id: str, elevated: bool) -> str:
-        """Start the build as a transient user unit, and prove it began.
+        """Start the build as a transient system unit in dispatch's share, and prove it began.
 
-        ``systemd-run`` returns once the manager has accepted and started the
-        unit, and exits non-zero when it refuses, so the ``launched`` line
-        after it is the same proof the Windows dialect waits for. ``--collect``
-        lets a unit that failed be forgotten rather than sit in the failed
-        state where the next dispatch of the same run id could not start;
-        ``--quiet`` keeps the "Running as unit" line off the transcript that
-        the sender compares to ``launched``. The lingering check comes first
-        and names the fix, because a unit started without it dies with the
-        ssh session and reports nothing.
+        The helper's ``start`` (:mod:`fleet.contracts.check_unit`) runs
+        ``systemd-run --collect --quiet`` and returns once systemd has
+        accepted and started the unit, exiting non-zero when either refuses,
+        so the ``launched`` line after it is the same proof the Windows
+        dialect waits for. The lingering check comes first and names the fix:
+        the unit is given the account's runtime directory and session bus,
+        which the account's own manager keeps only while it lingers, and a
+        check that asks ``systemctl --user`` would otherwise lose them with
+        this ssh session.
 
         The unit's ``ExecStopPost=`` runs the unit-end script, which records
         how the unit ended whenever the build did not write its own status
@@ -474,17 +468,15 @@ class LinuxDialect:
         return (
             f'{PROLOGUE}user="$(id -un)"\n'
             f'if [ "$(loginctl show-user "$user" -p Linger --value)" != yes ]; then\n'
-            f"  printf '%s\\n' \"lingering is off for $user, so a user unit would die with this "
-            f'ssh session; enable it once with: sudo loginctl enable-linger $user" >&2\n'
+            f"  printf '%s\\n' \"lingering is off for $user, so the runtime directory and bus "
+            f"a check is given would end with this ssh session; enable it once with: "
+            f'sudo loginctl enable-linger $user" >&2\n'
             f"  exit 1\n"
             f"fi\n"
             f"cat > '{ended}' <<'{UNIT_END_DELIMITER}'\n"
             f"{unit_end_script(target=target, unit=unit, prologue=PROLOGUE)}"
             f"{UNIT_END_DELIMITER}\n"
-            f"systemd-run --user --unit='{unit}' --collect --quiet "
-            f"--property=WorkingDirectory='{target}' "
-            f"--property=CPUWeight={CHECK_CPU_WEIGHT} "
-            f"--property=ExecStopPost='/bin/sh {ended}' /bin/sh '{build}'\n"
+            f"{CHECK_UNIT} start '{unit}' '{target}' '{build}' '{ended}'\n"
             f"printf 'launched\\n'\n"
         )
 
@@ -528,18 +520,14 @@ class LinuxDialect:
             run_id: The dispatch.
 
         Returns:
-            The script's text. Guarded by ``is-active`` rather than stopping
-            unconditionally, because ``systemctl stop`` of a unit that has
-            already been collected exits 5 (not loaded) and the cancel must
-            close the row whether the build was still going or not.
+            The script's text. The helper's ``stop``
+            (:mod:`fleet.contracts.check_unit`) stops the unit only while it
+            is active and exits 0 otherwise, because ``systemctl stop`` of a
+            unit that has already been collected exits 5 (not loaded) and the
+            cancel must close the row whether the build was still going or not.
         """
         unit = names.task_name(run_id)
-        return (
-            f"{PROLOGUE}if systemctl --user is-active --quiet '{unit}'; then\n"
-            f"  systemctl --user stop '{unit}'\n"
-            f"fi\n"
-            f"printf 'stopped {unit}\\n'\n"
-        )
+        return f"{PROLOGUE}{CHECK_UNIT} stop '{unit}'\nprintf 'stopped {unit}\\n'\n"
 
     def capacity_probe_script(self) -> str:
         """The constant capacity probe.
