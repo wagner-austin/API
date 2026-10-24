@@ -41,6 +41,14 @@ execdocker's npm, poetry and playwright caches are one generation at a time, as 
 node's are (:mod:`fleet.core.tool_caches`); the generation's marker is in the
 copy, so the generation stays while the copy does.
 
+The recipe runs under ``flock --shared`` on :data:`EXEC_LANE_LOCK` (MCPs
+board task 86186077). MCPs' ``fleet-exec-docker.sh`` installs an hourly
+prune of the lane's daemon, which takes that file exclusively, so it never
+runs while a check is between listing the images it needs and using them:
+an image removed in that gap fails a check with every test green. A check
+waits only while a prune runs, since Linux flock lets a new shared holder in
+while an exclusive one waits.
+
 What this does not stop: containers the suite leaves running belong to
 execdocker's daemon, not to the build's unit, so stopping the unit does not
 stop them. A suite that starts containers removes them itself, as the deploy
@@ -80,6 +88,11 @@ EXEC_CACHE = "$exec_home/fleet/cache"
 #: The PATH the isolated build starts from: the system's tools only, since
 #: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
 EXEC_PATH = "/usr/local/bin:/usr/bin:/bin"
+
+#: The lock every check on the lane holds shared and the lane's prune holds
+#: exclusively, in that user's runtime directory, over ``$exec_uid``. MCPs'
+#: scripts/host/lib/fleet-exec-docker.sh names the same file, EXEC_LANE_LOCK.
+EXEC_LANE_LOCK = "/run/user/$exec_uid/fleet-exec-docker.lock"
 
 
 def exec_root(run: str) -> str:
@@ -177,9 +190,12 @@ def isolated_build_lines(
         lines.append("  exit 0")
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
+    shared = f"flock --shared '{EXEC_LANE_LOCK}'"
     lines.extend(
         sh_phase_lines(
-            phase=MAKE_TARGET, command=f"as_exec \"cd '{recipe}' && make {MAKE_TARGET}\"", log=log
+            phase=MAKE_TARGET,
+            command=f"as_exec \"cd '{recipe}' && {shared} make {MAKE_TARGET}\"",
+            log=log,
         )
     )
     lines.append('sudo -n rm -rf "$exec_root"')
@@ -190,6 +206,7 @@ def isolated_build_lines(
 __all__ = [
     "EXEC_CACHE",
     "EXEC_HOME_LINE",
+    "EXEC_LANE_LOCK",
     "EXEC_PATH",
     "EXEC_STAGE",
     "EXEC_USER",

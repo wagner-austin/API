@@ -23,7 +23,7 @@ from fleet.contracts.tags import NodeTag
 from fleet.core import dispatch, names, tool_caches
 from fleet.core.dialect_linux import PROLOGUE, LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
-from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_PATH, EXEC_USER
+from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
 from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT
 
@@ -152,7 +152,8 @@ class TestIsolatedText:
         first = lines.index(f"as_exec \"cd '$exec_root' && npm ci\" >> '{log}' 2>&1")
         second = lines.index(f"as_exec \"cd '$exec_root' && npm rebuild\" >> '{log}' 2>&1")
         recipe = lines.index(
-            f"as_exec \"cd '$exec_root/{DEMO_PROJECT}' && make check\" >> '{log}' 2>&1"
+            f"as_exec \"cd '$exec_root/{DEMO_PROJECT}' && "
+            f"flock --shared '{EXEC_LANE_LOCK}' make check\" >> '{log}' 2>&1"
         )
         assert first < second < recipe
         assert lines[first - 4] == f"printf '$ %s\\n' 'npm ci' >> '{log}'"
@@ -187,7 +188,8 @@ class TestIsolatedText:
         lines = _isolated(path="").splitlines()
 
         assert (
-            f"as_exec \"cd '$exec_root' && make check\" >> '{names.log_path(TARGET)}' 2>&1"
+            f"as_exec \"cd '$exec_root' && flock --shared '{EXEC_LANE_LOCK}' make check\""
+            f" >> '{names.log_path(TARGET)}' 2>&1"
         ) in lines
 
 
