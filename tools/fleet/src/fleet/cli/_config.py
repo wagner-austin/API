@@ -19,7 +19,7 @@ import pathlib
 from platform_core import cli_args
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
-from fleet.core import _test_hooks, export, host_claims, retire_owed
+from fleet.core import export, host_claims, retire_owed, scratch
 from fleet.core.workspace_files import read_workspace_document
 
 CONFIG_FLAG = "--config"
@@ -126,11 +126,18 @@ class LoadedWorkspace:
         excluding a directory to compensate is how a fix becomes a second bug.
         Out of the repository, nothing needs excluding.
 
+        AND IN MEMORY ON LINUX (MCPs board task fb505198): under the scratch
+        root, which is ``/dev/shm`` there. In ``/tmp`` these archives were
+        written to the hub's SSD at about 370 GiB a day, measured on
+        diphtheria on 2026-10-24, each read back once to be sent. A file a
+        killed runner leaves is removed by the rolled launcher's reaper
+        (:mod:`fleet.core.scratch`).
+
         Returns:
             The scratch directory, named so a person who finds it knows what
             left it there.
         """
-        return _test_hooks.temp_root() / "fleet-archives"
+        return scratch.directory(scratch.ARCHIVES_DIR)
 
     @property
     def mirrors(self) -> pathlib.Path:

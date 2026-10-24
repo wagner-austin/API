@@ -13,15 +13,16 @@ from __future__ import annotations
 import os
 import pathlib
 import runpy
+import shutil
 import subprocess
 import sys
 
 import pytest
 
 from fleet.cli import rolled as rolled_cli
-from fleet.core import _test_hooks, rolled
+from fleet.core import _test_hooks, rolled, scratch
 from tests._git_fixtures import committed_repository
-from tests.conftest import FakeRun, FakeTempRoot, failed, ok
+from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
 #: A stand-in agent: it names itself, echoes its argv, writes to both
 #: streams and exits with a status no real agent uses.
@@ -104,14 +105,20 @@ class TestLaunch:
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         commit = "0" * 40
-        scratch = tmp_path / "scratch"
-        _test_hooks.temp_root = FakeTempRoot(scratch)
-        destination = scratch / "fleet-rolled" / commit / f"pid-{os.getpid()}"
+        scratch_root = tmp_path / "scratch"
+        _test_hooks.temp_root = FakeTempRoot(scratch_root)
+        _test_hooks.now = FakeClock(DEMO_NOW)
+        destination = scratch_root / "fleet-rolled" / commit
         for required in rolled.REQUIRED_FILES:
             path = destination / pathlib.PurePosixPath(required)
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("", encoding="utf-8")
-        runner = FakeRun([ok(f"{commit}\n"), ok(""), ok(""), ok("")])
+        left = scratch_root / "fleet-archives" / "dead-run.tgz"
+        left.parent.mkdir()
+        left.write_bytes(b"left by a failed stage")
+        then = DEMO_NOW - scratch.STALE_SECONDS - 1
+        os.utime(left, (then, then))
+        runner = FakeRun([ok(f"{commit}\n"), ok("")])
         _test_hooks.run = runner
 
         with caplog.at_level("INFO"):
@@ -135,13 +142,16 @@ class TestLaunch:
         [(name, python_path)] = runner.set_env[-1]
         assert name == "PYTHONPATH"
         assert python_path.split(os.pathsep)[0] == str(destination / "tools" / "fleet" / "src")
-        # An agent that printed nothing is relayed as nothing.
+        # An agent that printed nothing is relayed as nothing; what the turn
+        # reaped is named.
         assert [record.getMessage() for record in caplog.records] == [
-            f"fleet-roll: fleet.cli.agent runs from refs/fleet/rolled at {commit}"
+            f"fleet-roll: fleet.cli.agent runs from refs/fleet/rolled at {commit}",
+            "fleet-roll: removed what was left behind: fleet-archives/dead-run.tgz",
         ]
-        # This launch's extraction is gone once its agent has exited.
-        assert not destination.exists()
-        assert (scratch / "fleet-rolled" / commit).is_dir()
+        # The commit's tree outlives the agent: the next tick runs from it
+        # (MCPs board task fb505198).
+        assert destination.is_dir()
+        assert not left.exists()
 
     def test_the_rolled_package_shadows_the_checkouts_for_real(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -149,7 +159,7 @@ class TestLaunch:
         api = tmp_path / "api"
         commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-        launch = tmp_path / "scratch" / "fleet-rolled" / commit / f"pid-{os.getpid()}"
+        launch = tmp_path / "scratch" / "fleet-rolled" / commit
         config = launch / "tools" / "fleet" / "registry"
 
         with caplog.at_level("INFO"):
@@ -164,18 +174,24 @@ class TestLaunch:
             "--node sedona",
             "stand-in stderr",
         ]
-        assert not launch.exists()
+        assert launch.is_dir()
 
-    def test_ticks_launched_together_each_reach_their_agent(self, tmp_path: pathlib.Path) -> None:
-        """The 10:24Z collision, re-run: the hub starts five ticks in one second.
+    def test_ticks_launched_together_each_reach_their_agent_from_one_tree(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The 10:24Z collision, re-run: the hub starts its ticks in one second.
 
-        Each launch is a real process with its own id, as each tick is, so
-        each extracts into a directory of its own. Extracting into one per
-        commit, two of five ticks were refused FLEET_ROLL_EXTRACT_FAILED on
-        a file another tick's tar was writing.
+        Each launch is a real process with its own id, as each tick is, and
+        the scratch root is the real one. Extracting into one directory per
+        commit with no turn, two of five ticks were refused
+        FLEET_ROLL_EXTRACT_FAILED on a file another tick's tar was writing;
+        in the extraction turn one launch extracts and the rest reuse its
+        tree (MCPs board task fb505198).
         """
         api = tmp_path / "api"
-        committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
+        commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
+        tree = _test_hooks._default_temp_root() / "fleet-rolled" / commit
+        config = tree / "tools" / "fleet" / "registry"
         command = (
             sys.executable,
             "-m",
@@ -188,15 +204,26 @@ class TestLaunch:
             "--node",
             "sedona",
         )
-        launches = [
-            subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-            for _ in range(6)
-        ]
-        outputs = [launch.communicate(timeout=120)[0] for launch in launches]
-        outcomes = list(zip([launch.returncode for launch in launches], outputs, strict=True))
-
-        assert [status for status, _ in outcomes] == [5] * 6, outcomes
-        assert all("rolled stand-in --config" in output for _, output in outcomes), outcomes
+        try:
+            launches = [
+                subprocess.Popen(
+                    command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+                )
+                for _ in range(6)
+            ]
+            outputs = [launch.communicate(timeout=120)[0] for launch in launches]
+            outcomes = list(zip([launch.returncode for launch in launches], outputs, strict=True))
+            assert [status for status, _ in outcomes] == [5] * 6, outcomes
+            assert all(f"rolled stand-in --config {config} " in output for _, output in outcomes), (
+                outcomes
+            )
+            assert sorted(path.name for path in tree.parent.iterdir() if commit in path.name) == [
+                commit
+            ]
+        finally:
+            # The real scratch root outlives the test; its tree is this
+            # test's alone, named for a commit made in its tmp_path.
+            shutil.rmtree(tree)
 
 
 class TestInvocationForms:

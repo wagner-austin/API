@@ -41,6 +41,7 @@ from __future__ import annotations
 import pathlib
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 from collections.abc import Sequence
@@ -52,6 +53,7 @@ from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 from fleet.core._command import CHILD_IO_ENCODING, TIMED_OUT_RETURNCODE, CommandResult, _awaited
 from fleet.core.queue_transport import answering
+from fleet.core.scratch_root import scratch_root_for
 
 
 class EnvProtocol(Protocol):
@@ -248,15 +250,16 @@ class DirectoryExistsProtocol(Protocol):
 
 
 class TempRootProtocol(Protocol):
-    """Reports the system's directory for scratch files."""
+    """Reports the directory the fleet's scratch files go in."""
 
     def __call__(self) -> pathlib.Path:
-        """Locate the temporary directory.
+        """Locate the scratch root.
 
-        A hook because it reads the environment, and this package routes
-        every impure act through the seam. The one caller is the staging
-        archive, which is scratch by construction: tar writes it, its bytes
-        are read once and sent, and nothing opens it again.
+        A hook because it reads the platform and the environment, and this
+        package routes every impure act through the seam. Its two callers
+        are scratch by construction: the staging archives, which tar writes,
+        whose bytes are read once and sent, and the rolled extractions a
+        tick runs from (:mod:`fleet.core.scratch`).
 
         Returns:
             The directory scratch files belong in.
@@ -464,12 +467,12 @@ def _default_directory_exists(path: pathlib.Path) -> bool:
 
 
 def _default_temp_root() -> pathlib.Path:
-    """Locate the real temporary directory.
+    """Locate the real scratch root.
 
     Returns:
-        The system scratch directory.
+        :func:`fleet.core.scratch_root.scratch_root_for` this platform.
     """
-    return pathlib.Path(tempfile.gettempdir())
+    return scratch_root_for(sys.platform, tempfile.gettempdir())
 
 
 def _default_hostname() -> str:

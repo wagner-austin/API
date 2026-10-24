@@ -406,23 +406,23 @@ def launch(
     node_name = lease["node"]
     project = lease["project"]
     payload = build_payload(run_id)
-    target = staging.stage(
-        node["host"],
-        platform=node["platform"],
-        run_id=run_id,
-        stage_root=node["stage_root"],
-        source=payload["path"],
-        payload=payload["data"],
-    )
+    # The stage is the archive's one reader, so the file goes however it ends: 245 kept after
+    # successes filled the hub (bfca20e6), failures left 3.6 GB in its memory root (fb505198).
+    try:
+        target = staging.stage(
+            node["host"],
+            platform=node["platform"],
+            run_id=run_id,
+            stage_root=node["stage_root"],
+            source=payload["path"],
+            payload=payload["data"],
+        )
+    finally:
+        payload["path"].unlink()
     local = payload["path"].with_name(f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz")
     staging.stage_registry(
         node["host"], platform=node["platform"], target=target, registry=registry, local=local
     )
-    # The node has verified the archive's digest and unpacked it, and the
-    # bytes the feed counts are held here, so the local file has no reader
-    # left. Kept, one per run, it filled the hub's temp directory: 245 of
-    # them, about 33 MB each, measured 2026-09-27 (MCPs board task bfca20e6).
-    payload["path"].unlink()
     run_lease.emit(
         loaded_feed,
         run_id=run_id,

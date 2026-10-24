@@ -18,9 +18,12 @@ run pinned code against an unpinned configuration, and one that named
 other records would run the fleet on state no other tick sees.
 
 THIS MODULE IS THE ONE PIECE THAT RUNS FROM THE CHECKOUT, because something
-has to read the ref before anything pinned exists. It resolves, extracts
-and launches, and nothing else; the agent it launches, every module that
-agent imports and the registry it reads come from the roll.
+has to read the ref before anything pinned exists. It resolves, finds or
+extracts the commit's one tree (removing what earlier ticks left behind in
+the same turn, :mod:`fleet.core.scratch`) and launches, and nothing else;
+the agent it launches, every module that agent imports and the registry it
+reads come from the roll. The tree outlives the agent, because the next
+tick of the same roll runs from it (MCPs board task fb505198).
 
 The exit status is the agent's, 2 when no rolled tree could be extracted,
 and the child's own timeout status when it outlives
@@ -164,6 +167,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         _log.error("%s", tree)
         return REFUSED_EXIT
     _log.info("fleet-roll: %s runs from %s at %s", module, rolled.ROLLED_REF, tree["commit"])
+    if tree["reaped"]:
+        _log.info("fleet-roll: removed what was left behind: %s", ", ".join(tree["reaped"]))
     records = repo_root / pathlib.PurePosixPath(rolled.RECORDS_DIR)
     result = _test_hooks.run(
         (
@@ -179,7 +184,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         timeout_seconds=AGENT_WALL_SECONDS,
         set_env=(("PYTHONPATH", tree["python_path"]),),
     )
-    rolled.discard_rolled_tree(tree)
     if result["stdout"]:
         _log.info("%s", result["stdout"].rstrip())
     if result["stderr"]:

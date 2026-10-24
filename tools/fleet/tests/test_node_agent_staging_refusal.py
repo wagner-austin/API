@@ -110,6 +110,11 @@ class TestAStagingFaultIsReported:
         # only "it failed" would send the reader to the node.
         assert f"timed out after {SSH_DEADLINE_SECONDS} s" in detail
         assert detail.endswith("; nothing ran on lavender, so the job is given back")
+        # The archive's one reader was this stage, so the failed stage
+        # removes it too: kept, failed stages left 3.6 GB of exports on the
+        # hub, whose scratch root is memory now (MCPs board task fb505198).
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        assert not (loaded.archives / f"{DEMO_RUN_ID}.tgz").exists()
 
     def test_a_job_given_back_before_is_failed_by_the_queue_and_the_log_says_so(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
