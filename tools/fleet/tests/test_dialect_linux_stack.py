@@ -11,11 +11,13 @@ ask after the stack line, whatever the stack line found (MCPs board task
 939ec5c7), so each case's call log ends with that ask and the fake, holding
 no such container, answers ``testdb=no=``.
 
-Every docker ask goes through ``systemd-run --user``, where builds run (MCPs
-board task 28c43011): the fake ``systemd-run`` logs its own argument line
-and runs what follows its options, or, standing for colossus's user manager
-on 2026-10-09, refuses, and then both lines answer ``no`` without the probe's
-own process ever asking docker.
+Every docker ask goes through MCPs' fleet-check-unit's ``run``, where builds
+run (MCPs board tasks 28c43011 and bc8c445c): the fake ``sudo`` logs the
+helper's argument line and runs the command after ``run``, or, standing for
+colossus's user manager on 2026-10-09 or a node without the helper, refuses,
+and then both lines answer ``no`` without the probe's own process ever asking
+docker. Any other sudo, the docker line's asks as execdocker, goes to the
+real one.
 """
 
 from __future__ import annotations
@@ -26,14 +28,15 @@ import subprocess
 import pytest
 
 from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
+from fleet.contracts.check_unit import CHECK_UNIT, CHECK_UNIT_HELPER
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
 from tests.test_dialect_linux import fields_of
 
 DIALECT = LinuxDialect()
 
-#: The options every docker ask is started inside a user unit with.
-UNIT = "systemd-run --user --wait --pipe --quiet --collect"
+#: How every docker ask is started inside a check's unit.
+UNIT = f"{CHECK_UNIT} run"
 
 #: The ``testdb`` line's ask of the daemon, made on every run.
 TESTDB_ASK = f"container inspect --format {{{{.Config.Image}}}} {TESTDB_CONTAINER}"
@@ -41,7 +44,7 @@ TESTDB_ASK = f"container inspect --format {{{{.Config.Image}}}} {TESTDB_CONTAINE
 
 def test_the_stack_line_asks_for_the_network_every_image_and_the_version_inside_a_unit() -> None:
     body = DIALECT.toolchain_probe_script()
-    unit = 'unit() {\n  systemd-run --user --wait --pipe --quiet --collect "$@"\n}\n'
+    unit = f'unit() {{\n  sudo -n {CHECK_UNIT_HELPER} run "$@"\n}}\n'
     condition = (
         f"if unit docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
         f" unit docker image inspect {' '.join(STACK_IMAGES)} > /dev/null 2>&1 &&"
@@ -66,13 +69,13 @@ def test_the_testdb_line_asks_inside_a_unit() -> None:
 def _run_with_docker(
     tmp_path: pathlib.Path, network_status: int, image_status: int, *, unit_starts: bool = True
 ) -> str:
-    """Run the toolchain probe with a fake ``systemd-run`` and ``docker`` first on PATH.
+    """Run the toolchain probe with a fake ``sudo`` and ``docker`` first on PATH.
 
     Args:
         tmp_path: Where the fakes, their call log and the script go.
         network_status: What ``docker network inspect`` exits with.
         image_status: What ``docker image inspect`` exits with.
-        unit_starts: False for a ``systemd-run`` that refuses every unit.
+        unit_starts: False for a helper that refuses every unit.
 
     Returns:
         The probe's standard output.
@@ -80,13 +83,12 @@ def _run_with_docker(
     tools = tmp_path / "tools"
     tools.mkdir()
     calls = (tmp_path / "calls").as_posix()
-    runner = tools / "systemd-run"
+    runner = tools / "sudo"
     runner.write_bytes(
         (
             "#!/bin/sh\n"
-            f"echo \"systemd-run $*\" >> '{calls}'\n"
-            + ("" if unit_starts else "exit 1\n")
-            + 'while [ "${1#--}" != "$1" ]; do shift; done\n'
+            f'if [ "$1 $2 $3" != "-n {CHECK_UNIT_HELPER} run" ]; then exec /usr/bin/sudo "$@"; fi\n'
+            f"echo \"sudo $*\" >> '{calls}'\n" + ("" if unit_starts else "exit 1\n") + "shift 3\n"
             'exec "$@"\n'
         ).encode()
     )
@@ -142,7 +144,7 @@ def _in_unit(ask: str) -> list[str]:
         ask: The docker arguments.
 
     Returns:
-        ``systemd-run``'s line, then docker's.
+        The helper's line, then docker's.
     """
     return [f"{UNIT} docker {ask}", ask]
 

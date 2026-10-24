@@ -8,7 +8,8 @@ environment systemd hands it. The values are the ones systemd 255 gave on
 diphtheria on 2026-10-07: ``signal killed KILL`` for a SIGKILLed cgroup and
 ``exit-code exited 3`` for a build that exited 3, plus ``oom-kill`` as the
 journal recorded it for 859e7ab3. The launch itself runs for real too, with
-``loginctl`` and ``systemd-run`` answered by scripts ahead on PATH, so the
+``loginctl`` and the ``sudo`` that runs MCPs' fleet-check-unit (MCPs board
+task bc8c445c) answered by scripts ahead on PATH, so the
 script it writes to the disk is read back byte for byte.
 """
 
@@ -20,9 +21,9 @@ import subprocess
 import pytest
 from platform_core.config import config_test_hooks
 
+from fleet.contracts.check_unit import CHECK_UNIT, CHECK_UNIT_HELPER
 from fleet.core import names
 from fleet.core.dialect_linux import (
-    CHECK_CPU_WEIGHT,
     PROLOGUE,
     SH_INVOCATION,
     UNIT_END_DELIMITER,
@@ -56,8 +57,9 @@ class TestTheLaunchWiresTheUnitEnd:
         )
 
         assert heredoc in body
-        assert body.index(heredoc) < body.index("systemd-run ")
-        assert f"--property=ExecStopPost='/bin/sh {TARGET}/unit-end.sh' " in body
+        assert body.index(heredoc) < body.index(f"{CHECK_UNIT} start ")
+        # The helper's start names the fourth argument as the unit's ExecStopPost=.
+        assert f" '{TARGET}/unit-end.sh'\n" in body[body.index(f"{CHECK_UNIT} start ") :]
         assert UNIT_END_DELIMITER not in script.splitlines()
 
     def test_the_script_is_fail_fast_and_writes_the_result_last(self) -> None:
@@ -233,22 +235,20 @@ class TestTheScriptUnderSh:
 
 @pytest.mark.host_linux
 class TestTheLaunchUnderSh:
-    """The real launch script, with the user manager answered from PATH."""
+    """The real launch script, with lingering and the helper's sudo answered from PATH."""
 
     def test_it_writes_the_unit_end_script_and_starts_the_unit_with_it(
         self, tmp_path: pathlib.Path
     ) -> None:
         tools = tmp_path / "tools"
         tools.mkdir()
-        argv_file = tmp_path / "systemd-run.argv"
+        argv_file = tmp_path / "sudo.argv"
         loginctl = tools / "loginctl"
         loginctl.write_bytes(b"#!/bin/sh\necho yes\n")
         loginctl.chmod(0o755)
-        systemd_run = tools / "systemd-run"
-        systemd_run.write_bytes(
-            f"#!/bin/sh\nprintf '%s\\n' \"$@\" > '{argv_file.as_posix()}'\n".encode()
-        )
-        systemd_run.chmod(0o755)
+        sudo = tools / "sudo"
+        sudo.write_bytes(f"#!/bin/sh\nprintf '%s\\n' \"$@\" > '{argv_file.as_posix()}'\n".encode())
+        sudo.chmod(0o755)
         target = tmp_path / "run-1"
         target.mkdir()
         body = DIALECT.launch_script(
@@ -271,13 +271,11 @@ class TestTheLaunchUnderSh:
             target=target.as_posix(), unit=UNIT, prologue=PROLOGUE
         )
         assert argv_file.read_text(encoding="utf-8").splitlines() == [
-            "--user",
-            f"--unit={UNIT}",
-            "--collect",
-            "--quiet",
-            f"--property=WorkingDirectory={target.as_posix()}",
-            f"--property=CPUWeight={CHECK_CPU_WEIGHT}",
-            f"--property=ExecStopPost=/bin/sh {target.as_posix()}/unit-end.sh",
-            "/bin/sh",
+            "-n",
+            CHECK_UNIT_HELPER,
+            "start",
+            UNIT,
+            target.as_posix(),
             f"{target.as_posix()}/{names.BUILD_STEM}.sh",
+            f"{target.as_posix()}/unit-end.sh",
         ]

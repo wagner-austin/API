@@ -1,11 +1,12 @@
 """The ``sh`` scripts a Linux node is handed.
 
 TEXT ASSERTIONS, WITH ONE REAL EXECUTION WHERE THE MACHINE ALLOWS. The build,
-launch, result and stop scripts need a node with a user systemd manager and
-are exercised by a real dispatch to diphtheria (board task 33bb86ce); here
-their text is pinned to the properties that made them correct -- fail-fast
-prologue, the PATH that finds pipx's poetry, the lingering refusal, the
-guarded stop -- so a rewording that loses one fails a test. The two probes
+launch, result and stop scripts need a node with MCPs' fleet-check-unit and
+are exercised by a real dispatch to diphtheria (board tasks 33bb86ce and MCPs
+bc8c445c); here their text is pinned to the properties that made them correct
+-- fail-fast prologue, the PATH that finds pipx's poetry, the lingering
+refusal, the helper's start and stop -- so a rewording that loses one fails a
+test. The two probes
 and the reassembly are plain POSIX tools and are RUN when this suite runs
 under ``sh``, which is every Linux node and never the Windows hub.
 """
@@ -18,14 +19,15 @@ import subprocess
 
 import pytest
 
+from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.source import InstallStep
 from fleet.core import names, tool_caches
 from fleet.core.dialect_linux import (
-    CHECK_CPU_WEIGHT,
     PROLOGUE,
     SH_INVOCATION,
     LinuxDialect,
 )
+from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.names import CACHE_VARIABLE
 from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
@@ -242,35 +244,34 @@ class TestLogTailScript:
 
 class TestLaunchScript:
     def test_it_refuses_before_starting_when_lingering_is_off(self) -> None:
-        """A --user unit dies with the session that started it unless the
-        user lingers, so the script checks first and names the fix."""
+        """The unit is given the account's runtime directory and bus, which
+        end with the session that started it unless the user lingers, so the
+        script checks first and names the fix."""
         body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         lines = body.splitlines()
 
         check = next(index for index, line in enumerate(lines) if "loginctl show-user" in line)
-        start = next(index for index, line in enumerate(lines) if "systemd-run" in line)
+        start = next(index for index, line in enumerate(lines) if line.startswith(CHECK_UNIT))
         assert check < start
         assert "sudo loginctl enable-linger $user" in body
         assert "exit 1" in body
 
-    def test_it_starts_a_transient_user_unit_named_for_the_run_and_proves_it(self) -> None:
+    def test_it_starts_the_build_through_the_helper_in_dispatchs_share_and_proves_it(
+        self,
+    ) -> None:
+        """MCPs board task bc8c445c: a --user unit sat under user.slice, which
+        neither the owner's nor dispatch's slice reached; the helper starts a
+        system unit in the checks' slice inside system-dispatch.slice."""
         body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         unit = names.task_name(DEMO_RUN_ID)
+        build = DIALECT.script_path(TARGET, names.BUILD_STEM)
+        start = f"\n{CHECK_UNIT} start '{unit}' '{TARGET}' '{build}' '{unit_end_path(TARGET)}'\n"
 
-        assert f"systemd-run --user --unit='{unit}' --collect --quiet" in body
-        assert f"--property=WorkingDirectory='{TARGET}'" in body
-        assert f"/bin/sh '{DIALECT.script_path(TARGET, names.BUILD_STEM)}'" in body
+        assert start in body
+        assert CHECK_UNIT == "sudo -n /usr/local/sbin/fleet-check-unit"
+        assert "--user" not in body
         assert body.rstrip().endswith("printf 'launched\\n'")
         assert "make check" not in body
-
-    def test_the_check_unit_outweighs_every_default_weighted_unit_beside_it(self) -> None:
-        """systemd gives every unit CPUWeight 100; the hub runner's duty jobs
-        took a check's CPU at that weight (MCPs board task 78484fa0)."""
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
-        start = next(line for line in body.splitlines() if line.startswith("systemd-run"))
-
-        assert f"--property=CPUWeight={CHECK_CPU_WEIGHT} " in start
-        assert CHECK_CPU_WEIGHT > 100
 
     def test_an_elevated_launch_or_build_is_refused_rather_than_rendered(self) -> None:
         """No linux node declares an elevated runner (MCPs board task
@@ -296,8 +297,7 @@ class TestLaunchScript:
         assert unit in DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
         stopped = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
 
-        assert f"systemctl --user is-active --quiet '{unit}'" in stopped
-        assert f"systemctl --user stop '{unit}'" in stopped
+        assert f"{CHECK_UNIT} stop '{unit}'\n" in stopped
 
 
 class TestResultAndStopScripts:
@@ -309,14 +309,14 @@ class TestResultAndStopScripts:
         assert f"stat -c %Y '{result}'" in body
         assert 'printf \'%s %s\\n\' "$code" "$written"' in body
 
-    def test_the_stop_script_is_guarded_and_always_reports(self) -> None:
+    def test_the_stop_script_stops_through_the_helper_and_always_reports(self) -> None:
         """systemctl stop of a collected unit exits 5; the cancel must still
-        close the row, so the stop is guarded by is-active."""
+        close the row, so the helper's stop, which exits 0 for a unit no
+        longer active, is the script's one stop."""
         body = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
         unit = names.task_name(DEMO_RUN_ID)
 
-        assert body.count("systemctl --user stop") == 1
-        assert body.rstrip().endswith(f"printf 'stopped {unit}\\n'")
+        assert body == f"{PROLOGUE}{CHECK_UNIT} stop '{unit}'\nprintf 'stopped {unit}\\n'\n"
 
     def test_the_stop_reads_no_process_id(self) -> None:
         """Stopping a unit stops its control group, the whole tree the build
