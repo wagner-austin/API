@@ -28,6 +28,11 @@ htmlcov/
 # make check-powershell: MCPs' harness writes its Pester results here, one
 # directory per PowerShell edition (MCPs board task d69786fa).
 /coverage/powershell/
+# make test's per-package lock stamps, one file per package, written at the
+# repository root by MCPs' maketools check lock (packages/maketools,
+# repo.LOCK_DIRECTORY_NAME), which MCPs' own .gitignore already ignores
+# (MCPs board task ae522e15).
+/.check-locks/
 
 # Virtual environments
 env/
