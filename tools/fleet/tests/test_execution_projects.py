@@ -263,6 +263,35 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     )
 
 
+def test_the_deployed_lane_runs_on_the_database_host_alone() -> None:
+    """MCPs/execution-deployed-diphtheria reads that host's newest deploy.
+
+    Its last install step writes the marker that makes the execution
+    workspace collect tests/deployed alone (MCPs board task 03b683d2), whose
+    case runs maketools deploy-kept against the database host's own
+    checkout: its deploy record and journal, its postgres and every
+    container of its stack, which only that host's fleet user reads. So the
+    project names diphtheria, the database's host, and every other node
+    refuses it. It holds no test database and no companion.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/execution-deployed-diphtheria")
+    assert project["node"] == "diphtheria"
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.CXX)
+    assert project["exclusive_resources"] == ()
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(phase="deployed-lane", argv=(*prepare, "deployed-lane")),
+        ),
+        companions=(),
+    )
+
+
 def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender() -> None:
     """MCPs/execution-netboot-diphtheria installs a clean VM by network boot.
 

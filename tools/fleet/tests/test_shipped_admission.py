@@ -83,6 +83,7 @@ BOUNDED_GRANTS = {
 #: holds, each pinned there, so it checks them and nothing else.
 DIPHTHERIA_PINNED = (
     "MCPs/doc-extract-api",
+    "MCPs/execution-deployed-diphtheria",
     "MCPs/execution-netboot-diphtheria",
     "MCPs/execution-served-diphtheria",
     "MCPs/pg-backup-sidecar",

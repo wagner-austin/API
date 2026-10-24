@@ -67,10 +67,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # session-audit's Windows lane, MCPs/packages/session-audit, was dropped
     # with the package's Windows code (MCPs board task c8cb0ac5); 63 since
     # MCPs/kvm-mcp, the hardware KVM tools (MCPs board task c8f09479); 64
-    # since MCPs/instagram-mcp, the creator tools (MCPs board task f986db61). The
-    # unprepared lose MCPs/execution-elevated, whose installer cases MCPs
-    # board task 42fb4e26 deleted.
-    assert len(prepared) == 64
+    # since MCPs/instagram-mcp, the creator tools (MCPs board task f986db61);
+    # 65 since MCPs/execution-deployed-diphtheria, the execution suite's
+    # deployed lane (MCPs board task 03b683d2). The unprepared lose
+    # MCPs/execution-elevated, whose installer cases MCPs board task 42fb4e26
+    # deleted.
+    assert len(prepared) == 65
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
@@ -172,6 +174,24 @@ def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() 
         ),
         companions=(),
     )
+
+
+def test_a_deployed_lane_step_runs_last_and_only_for_the_deployed_project() -> None:
+    """MCPs fleet-prepare's deployed-lane phase writes the marker that makes
+    the execution workspace collect tests/deployed alone (MCPs board task
+    03b683d2). That case reads the database host's newest deploy against
+    what it runs, so no project a deploy waits on may carry the step, and it
+    follows install and workspace-build, which store the tree's untracked
+    files for the node's next row."""
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:] == ("deployed-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-deployed-diphtheria"]
+    for steps in marking.values():
+        assert [step["phase"] for step in steps] == ["install", "workspace-build", "deployed-lane"]
 
 
 def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:
