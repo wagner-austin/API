@@ -258,6 +258,12 @@ def test_this_suite_itself_runs_as_execdocker_and_cannot_reach_the_stack() -> No
     options = _run(["docker", "info", "--format", "{{range .SecurityOptions}}{{println .}}{{end}}"])
     stack = _run(["docker", "-H", "unix:///var/run/docker.sock", "info"])
     escalate = _run(["sudo", "-n", "true"])
+    # The recipe holds the lane's lock shared (MCPs board task 86186077), so
+    # the lane's prune, which takes it exclusively, cannot start while this
+    # check runs, and another check still can.
+    lane_lock = EXEC_LANE_LOCK.replace("$exec_uid", uid.stdout.strip())
+    prune = _run(["flock", "--exclusive", "--nonblock", lane_lock, "true"])
+    beside = _run(["flock", "--shared", "--nonblock", lane_lock, "true"])
 
     assert user.stdout.strip() == EXEC_USER, user.stderr
     assert "SSH_AUTH_SOCK" not in inherited
@@ -265,3 +271,4 @@ def test_this_suite_itself_runs_as_execdocker_and_cannot_reach_the_stack() -> No
     assert "name=rootless" in options.stdout.splitlines(), options.stderr
     assert stack.returncode != 0, stack.stdout
     assert escalate.returncode != 0, escalate.stdout
+    assert (prune.returncode, beside.returncode) == (1, 0), prune.stderr + beside.stderr
