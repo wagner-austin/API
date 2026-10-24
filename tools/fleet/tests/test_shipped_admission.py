@@ -38,7 +38,14 @@ these nodes a second check fits the core pool and still pushes both past the
   all 5560 tests passing, against 92 to 139 s at 3 workers on serendipity and
   at most 166 s on every other node, so the suite declares a minimum of 3
   workers at the 0.5 GB each it ran with at that minimum from 2026-10-18's
-  0da4b008e to cc032e9a9, and lenovold refuses it.
+  0da4b008e to cc032e9a9, and lenovold refuses it. Nor MCPs/execution-linux
+  (MCPs board task 3828dbf5): at the minimum of 1 it declared, lenovold
+  granted it 1 worker, and its five checks there from 2026-10-24T17:07Z
+  took 316 to 331 s of 300 with every test passing (fleet job 2e64be23: lint
+  and setup 30 s, vitest 297 s), against 129 to 200 s on every other node,
+  168 s at serendipity's 3 workers, so the suite declares a minimum of 3
+  workers at its 0.5 GB each, which every other linux node already granted
+  it, and lenovold refuses it.
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
@@ -174,9 +181,23 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
     }
 
 
-def test_lenovold_refuses_the_shared_library_suite_and_no_other_node_does() -> None:
+#: The suites lenovold refuses, each measured over the budget there with
+#: every test passing (the module docstring), and each declaring the minimum
+#: of 3 workers its 2 spare cores cannot afford.
+LENOVOLD_REFUSED = (
+    "MCPs/execution-deploy",
+    "MCPs/execution-linux",
+    "MCPs/mcp-shared",
+    "MCPs/packages/db",
+)
+
+
+@pytest.mark.parametrize("project_name", LENOVOLD_REFUSED)
+def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
+    project_name: str,
+) -> None:
     workspace = _shipped()
-    project = workspace["projects"]["MCPs/mcp-shared"]
+    project = workspace["projects"][project_name]
     lenovold = workspace["nodes"]["lenovold"]
 
     assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
@@ -184,85 +205,13 @@ def test_lenovold_refuses_the_shared_library_suite_and_no_other_node_does() -> N
         "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
         "reason": (
             "lenovold affords 2 worker(s) for a suite that declares a minimum of 3: 4 cores "
-            "against 2 reserved, 24.0 GB free, 0.5 GB per worker, 1.5 GB reserved for the "
-            "node's owner. Dispatching anyway would run a suite at a fraction of its workers "
-            "until its own lease expired underneath it."
+            f"against 2 reserved, 24.0 GB free, {project['worker_ram_gb']} GB per worker, "
+            "1.5 GB reserved for the node's owner. Dispatching anyway would run a suite at a "
+            "fraction of its workers until its own lease expired underneath it."
         ),
     }
-    # Every other node that claims work admits it, read by property rather
-    # than by each node's worker count: a netboot reimage rewrites a
-    # worker's roster file with what its provision measured (MCPs board
-    # task 9fa23d42), and it should fail here only if it makes that node
-    # refuse. diphtheria refuses because it checks only its pinned suites.
-    refused = {
-        name: verdict["code"]
-        for name, node in workspace["nodes"].items()
-        if node["enabled"]
-        for verdict in (assess(node, _idle(node), project, node_tags(node)),)
-        if verdict["code"] is not None
-    }
-    assert refused == {
-        "diphtheria": FleetErrorCode.NODE_NOT_PINNED,
-        "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
-    }
-
-
-def test_lenovold_refuses_the_deploy_suite_and_no_other_docker_node_does() -> None:
-    workspace = _shipped()
-    project = workspace["projects"]["MCPs/execution-deploy"]
-    lenovold = workspace["nodes"]["lenovold"]
-
-    assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
-        "workers": 0,
-        "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
-        "reason": (
-            "lenovold affords 2 worker(s) for a suite that declares a minimum of 3: 4 cores "
-            "against 2 reserved, 24.0 GB free, 1.5 GB per worker, 1.5 GB reserved for the "
-            "node's owner. Dispatching anyway would run a suite at a fraction of its workers "
-            "until its own lease expired underneath it."
-        ),
-    }
-    # serendipity leaves the fewest cores of the nodes that admit it, 6, and
-    # the suite ran there in 141 to 158 s of the budget; 3 is the smallest
-    # minimum lenovold's 2 cores refuse, and half of serendipity's 6 grants it.
-    serendipity = workspace["nodes"]["serendipity"]
-    assert assess(serendipity, _idle(serendipity), project, node_tags(serendipity)) == {
-        "workers": 3,
-        "code": None,
-        "reason": "",
-    }
-    # By property, as for the shared library: of the enabled nodes carrying
-    # its tags, only lenovold and diphtheria refuse it.
-    refused = {
-        name: verdict["code"]
-        for name, node in workspace["nodes"].items()
-        if node["enabled"] and not missing_tags(node_tags(node), project["required_tags"])
-        for verdict in (assess(node, _idle(node), project, node_tags(node)),)
-        if verdict["code"] is not None
-    }
-    assert refused == {
-        "diphtheria": FleetErrorCode.NODE_NOT_PINNED,
-        "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
-    }
-
-
-def test_lenovold_refuses_the_database_suite_and_no_other_testdb_node_does() -> None:
-    workspace = _shipped()
-    project = workspace["projects"]["MCPs/packages/db"]
-    lenovold = workspace["nodes"]["lenovold"]
-
-    assert assess(lenovold, _idle(lenovold), project, node_tags(lenovold)) == {
-        "workers": 0,
-        "code": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
-        "reason": (
-            "lenovold affords 2 worker(s) for a suite that declares a minimum of 3: 4 cores "
-            "against 2 reserved, 24.0 GB free, 0.5 GB per worker, 1.5 GB reserved for the "
-            "node's owner. Dispatching anyway would run a suite at a fraction of its workers "
-            "until its own lease expired underneath it."
-        ),
-    }
-    # serendipity leaves the fewest cores of the nodes that admit it, 6, and
-    # its 3 workers ran the suite in 92 to 139 s of the budget; 3 is the
+    # serendipity leaves the fewest cores of the nodes that admit these
+    # suites, 6, and ran each in at most 168 s of the budget; 3 is the
     # smallest minimum lenovold's 2 cores refuse, and half of serendipity's 6
     # grants it.
     serendipity = workspace["nodes"]["serendipity"]
@@ -271,8 +220,12 @@ def test_lenovold_refuses_the_database_suite_and_no_other_testdb_node_does() -> 
         "code": None,
         "reason": "",
     }
-    # By property, as for the shared library: of the enabled nodes carrying
-    # its testdb and cxx tags, only lenovold and diphtheria refuse it.
+    # Every other enabled node carrying the suite's tags admits it, read by
+    # property rather than by each node's worker count: a netboot reimage
+    # rewrites a worker's roster file with what its provision measured (MCPs
+    # board task 9fa23d42), and it should fail here only if it makes that
+    # node refuse. diphtheria refuses because it checks only its pinned
+    # suites.
     refused = {
         name: verdict["code"]
         for name, node in workspace["nodes"].items()

@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 0.5,
-  "minimum_workers": 1,
+  "minimum_workers": 3,
   "expected_minutes": 10,
   "required_tags": [
     "linux"
