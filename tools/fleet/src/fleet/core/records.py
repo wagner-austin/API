@@ -2,7 +2,8 @@
 
 The ledger, the feed and the retire record (:mod:`fleet.contracts.retire_record`,
 MCPs board task 8776b828) share every mechanical property -- one JSON object
-per line, appended and never rewritten, read whole -- and differ only in what
+per line, appended and never rewritten, each line decoded once per process
+(:mod:`fleet.core.record_tail`, MCPs board task a1f9d16d) -- and differ only in what
 a line means and who reads it. So the mechanics live here once and the
 contracts stay separate, which is the DRY split: shared plumbing, distinct
 vocabulary.
@@ -46,7 +47,7 @@ from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry, encode_ledg
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.retire_record import RetireRecord, decode_retire_record, encode_retire_record
-from fleet.core import _test_hooks, file_turn
+from fleet.core import _test_hooks, file_turn, record_tail
 
 #: The turn one append to a record file is made in. Inside it a process
 #: appends one line to one local file and nothing else, so a lock half a
@@ -84,38 +85,98 @@ def _append_line(path: pathlib.Path, line: str) -> None:
         _test_hooks.append_text(path, line)
 
 
-def _read_lines(path: pathlib.Path) -> tuple[tuple[int, JSONValue], ...]:
-    """Read a JSONL file into numbered, parsed lines.
+def _parse_line(path: pathlib.Path, number: int, line: str) -> JSONValue:
+    """Parse one complete, non-blank line of a record file.
 
     Args:
-        path: The file to read.
+        path: The file, for the refusal.
+        number: The line's 1-based number in the file.
+        line: The line, without its newline.
 
     Returns:
-        ``(line_number, value)`` for every non-blank line, one-indexed. An
-        absent file reads as empty rather than raising: no dispatch has run in
-        this workspace yet, and refusing the first one for having no history
-        would make the package impossible to start using.
+        Its JSON value.
 
     Raises:
-        InvalidJsonError: If a line is not valid JSON, naming the file, the
+        InvalidJsonError: If the line is not valid JSON, naming the file, the
             line number and the line's start, its cause the parser's own
-            error. Blank lines are skipped because a trailing newline is
-            normal; nothing else is. Until 2026-10-14 this said only
-            "Invalid JSON payload", and a torn ledger line took every node
-            runner down with nothing in its log saying which file or line.
+            error. Until 2026-10-14 this said only "Invalid JSON payload",
+            and a torn ledger line took every node runner down with nothing
+            in its log saying which file or line.
     """
-    if not _test_hooks.file_exists(path):
-        return ()
-    numbered: list[tuple[int, JSONValue]] = []
-    for index, line in enumerate(_test_hooks.read_text(path).splitlines(), start=1):
-        if not line.strip():
-            continue
-        try:
-            value = load_json_str(line)
-        except InvalidJsonError as fault:
-            raise InvalidJsonError(f"{path} line {index} is not JSON: {line[:120]!r}") from fault
-        numbered.append((index, value))
-    return tuple(numbered)
+    try:
+        return load_json_str(line)
+    except InvalidJsonError as fault:
+        raise InvalidJsonError(f"{path} line {number} is not JSON: {line[:120]!r}") from fault
+
+
+def _ledger_row(path: pathlib.Path, number: int, line: str) -> LedgerEntry:
+    """Decode one ledger line.
+
+    Args:
+        path: The ledger file.
+        number: The line's 1-based number in it.
+        line: The line.
+
+    Returns:
+        The row.
+
+    Raises:
+        AppError: With ``LEDGER_ROW_UNPARSABLE`` if the line is not an
+            object. See the module docstring for why this is fatal.
+    """
+    value = _parse_line(path, number, line)
+    if not isinstance(value, dict):
+        raise AppError(
+            FleetErrorCode.LEDGER_ROW_UNPARSABLE,
+            f"{path} line {number} is a {type(value).__name__}, not an object; a "
+            "line that cannot be read is a running dispatch made invisible, and the next "
+            "capacity check would admit work onto a node that is already full",
+        )
+    return decode_ledger_entry(value)
+
+
+def _feed_event(path: pathlib.Path, number: int, line: str) -> FeedEvent:
+    """Decode one feed line.
+
+    Args:
+        path: The feed file.
+        number: The line's 1-based number in it.
+        line: The line.
+
+    Returns:
+        The event.
+
+    Raises:
+        AppError: With ``FEED_EVENT_UNPARSABLE`` if the line is not an object.
+    """
+    value = _parse_line(path, number, line)
+    if not isinstance(value, dict):
+        raise AppError(
+            FleetErrorCode.FEED_EVENT_UNPARSABLE,
+            f"{path} line {number} is a {type(value).__name__}, not an object",
+        )
+    return decode_feed_event(value)
+
+
+def _retire_record(path: pathlib.Path, number: int, line: str) -> RetireRecord:
+    """Decode one retire record line.
+
+    Args:
+        path: The retire record file.
+        number: The line's 1-based number in it.
+        line: The line.
+
+    Returns:
+        The record.
+    """
+    return decode_retire_record(_parse_line(path, number, line))
+
+
+#: The three files' readers, each decoding a line once per process
+#: (:mod:`fleet.core.record_tail`, MCPs board task a1f9d16d).
+_LEDGER: Final = record_tail.RecordTail(_ledger_row)
+_FEED: Final = record_tail.RecordTail(_feed_event)
+_RETIRES: Final = record_tail.RecordTail(_retire_record)
 
 
 def read_ledger(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
@@ -125,23 +186,20 @@ def read_ledger(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
         path: The ledger file.
 
     Returns:
-        Every row, in the order it was appended.
+        Every row, in the order it was appended. An absent file reads as
+        empty rather than raising: no dispatch has run in this workspace
+        yet, and refusing the first one for having no history would make the
+        package impossible to start using. Blank lines are skipped, because
+        a trailing newline is normal, and a last line with no newline yet is
+        one still being appended, read once it ends.
 
     Raises:
         AppError: With ``LEDGER_ROW_UNPARSABLE`` if a line does not decode,
             naming the line. See the module docstring for why this is fatal.
+        InvalidJsonError: If a complete line is not JSON, naming its file
+            and line.
     """
-    rows: list[LedgerEntry] = []
-    for line_number, value in _read_lines(path):
-        if not isinstance(value, dict):
-            raise AppError(
-                FleetErrorCode.LEDGER_ROW_UNPARSABLE,
-                f"{path} line {line_number} is a {type(value).__name__}, not an object; a "
-                "line that cannot be read is a running dispatch made invisible, and the next "
-                "capacity check would admit work onto a node that is already full",
-            )
-        rows.append(decode_ledger_entry(value))
-    return tuple(rows)
+    return _LEDGER.read(path)
 
 
 def latest_rows(path: pathlib.Path) -> tuple[LedgerEntry, ...]:
@@ -228,15 +286,7 @@ def read_feed(path: pathlib.Path) -> tuple[FeedEvent, ...]:
         AppError: With ``FEED_EVENT_UNPARSABLE`` if a line is not an object.
         JSONTypeError: If a line is an object that does not decode.
     """
-    events: list[FeedEvent] = []
-    for line_number, value in _read_lines(path):
-        if not isinstance(value, dict):
-            raise AppError(
-                FleetErrorCode.FEED_EVENT_UNPARSABLE,
-                f"{path} line {line_number} is a {type(value).__name__}, not an object",
-            )
-        events.append(decode_feed_event(value))
-    return tuple(events)
+    return _FEED.read(path)
 
 
 def append_feed(path: pathlib.Path, event: FeedEvent) -> None:
@@ -263,7 +313,7 @@ def read_retires(path: pathlib.Path) -> tuple[RetireRecord, ...]:
             fatal for the reason the module docstring gives: a line skipped
             is a run's directory nothing retires.
     """
-    return tuple(decode_retire_record(value) for _, value in _read_lines(path))
+    return _RETIRES.read(path)
 
 
 def append_retire(path: pathlib.Path, record: RetireRecord) -> None:
