@@ -119,7 +119,6 @@ def _pass(loaded: _config.LoadedWorkspace) -> RecordingHolder:
         {},
         agent=LAVENDER,
         alias="lavender",
-        elevated=False,
         holder=holder,
         launching=frozenset(),
     )
