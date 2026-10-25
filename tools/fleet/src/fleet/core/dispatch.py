@@ -27,7 +27,8 @@ there.
 The scripts that do the launching live in :mod:`fleet.core.dialect`, one set
 per platform, split out of here by role when this file crossed the 600-line
 ceiling. This module owns the ORDER; the dialect owns what the node is asked
-to run, and :mod:`fleet.core.names` owns what each file is called.
+to run, :mod:`fleet.core.recipe` what a project's declaration asks of its
+build, and :mod:`fleet.core.names` what each file is called.
 
 NOTHING HERE CATCHES. A failure to stage or launch propagates with its own
 code, and the lease goes back by an explicit act at a call site that knows the
@@ -49,8 +50,6 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig
-from fleet.contracts.source import InstallStep
-from fleet.contracts.tags import NodeTag
 from fleet.core import (
     _test_hooks,
     dialect,
@@ -63,6 +62,7 @@ from fleet.core import (
     run_lease,
     staging,
 )
+from fleet.core.recipe import Recipe, loopback_unit
 
 
 def started_row(
@@ -179,32 +179,6 @@ class PayloadBuilder(Protocol):
         ...
 
 
-class Recipe(TypedDict):
-    """What the node runs once the tree is staged.
-
-    Attributes:
-        path: The project's directory inside the staged tree, ``""`` for the
-            root; the recipe's working directory.
-        install: The steps run at the tree's root before the recipe, each an
-            argv in the source grammar with the phase it is timed as; empty
-            when the recipe installs its own dependencies.
-        isolated_docker: True when the project declares the ``docker`` tag,
-            so its build runs as the node's execdocker user against that
-            user's rootless daemon, never as the runner, whose own daemon on
-            diphtheria is the production stack's
-            (:mod:`fleet.core.linux_isolated_build`).
-        elevated: True when the project declares the ``elevated`` tag, so its
-            build launches at RunLevel Highest with the ssh account's full
-            administrator token (:mod:`fleet.contracts.elevation`); only a
-            node's elevated runner ever claims such a job.
-    """
-
-    path: str
-    install: tuple[InstallStep, ...]
-    isolated_docker: bool
-    elevated: bool
-
-
 def working_tree_payload(
     project_root: pathlib.Path,
     *,
@@ -240,46 +214,6 @@ def working_tree_payload(
         )
 
     return build
-
-
-def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ...]) -> Recipe:
-    """The recipe for one project, isolated when it declares the docker tag
-    and elevated when it declares the elevated tag.
-
-    The one place each tag becomes what the build does, so the queue's lane
-    and the working-tree lane cannot disagree about which builds run as
-    execdocker or as an administrator.
-
-    Args:
-        plan: The project's declaration, whose ``required_tags`` decide.
-        path: The project's directory inside the staged tree.
-        install: The steps run at the tree's root before the recipe.
-
-    Returns:
-        The recipe.
-    """
-    return Recipe(
-        path=path,
-        install=install,
-        isolated_docker=NodeTag.DOCKER in plan["required_tags"],
-        elevated=NodeTag.ELEVATED in plan["required_tags"],
-    )
-
-
-def working_tree_recipe(project: str, plan: ProjectConfig) -> Recipe:
-    """The recipe a working-tree dispatch runs: ``make check`` in the
-    project's own directory, whose key IS its repo-relative path, with no
-    install steps because every poetry project here installs inside its
-    recipe.
-
-    Args:
-        project: Repo-relative project path.
-        plan: The project's declaration.
-
-    Returns:
-        The recipe.
-    """
-    return recipe_for(plan, path=project, install=())
 
 
 def start(
@@ -487,6 +421,7 @@ def launch(
             isolated_docker=recipe["isolated_docker"],
             elevated=recipe["elevated"],
             agent=lease["agent"],
+            loopback_unit=loopback_unit(recipe, run_id),
         ),
         platform=node["platform"],
     )
@@ -588,13 +523,10 @@ _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
 __all__ = [
     "Payload",
     "PayloadBuilder",
-    "Recipe",
     "closed_row",
     "finish",
     "launch",
-    "recipe_for",
     "start",
     "started_row",
     "working_tree_payload",
-    "working_tree_recipe",
 ]

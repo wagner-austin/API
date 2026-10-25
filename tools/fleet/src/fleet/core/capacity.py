@@ -36,7 +36,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, admissible_workers
-from fleet.contracts.node import NodeConfig, NodeState
+from fleet.contracts.node import NodeConfig, NodePlatform, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag, missing_tags
 
@@ -137,6 +137,52 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
     return "somebody is on this machine"
 
 
+def _wrong_node(node: NodeConfig, project: ProjectConfig) -> DispatchVerdict | None:
+    """The refusal of a node that is the wrong one whatever its load.
+
+    Args:
+        node: The node's declaration.
+        project: The work being dispatched.
+
+    Returns:
+        The refusal :func:`assess` gives first for a pin, a node that checks
+        only its pinned projects, or a loopback-only project on a node other
+        than Linux, in that order; None when the node may be weighed.
+    """
+    pinned = project["node"]
+    if pinned is not None and pinned != node["host"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_NOT_PINNED,
+            reason=(
+                f"{node['host']} is not {pinned}: the project runs on {pinned} alone, because "
+                "it reads what only that host holds, so the answer is that node and never "
+                "this one."
+            ),
+        )
+    if pinned is None and node["budget"]["pinned_checks_only"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_NOT_PINNED,
+            reason=(
+                f"{node['host']} checks only the projects pinned to it: its own work leaves a "
+                "check no margin under the 300 s budget, so the answer is any other node "
+                "this project's tags fit."
+            ),
+        )
+    if project["loopback_only"] and node["platform"] != NodePlatform.LINUX:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_LACKS_TAG,
+            reason=(
+                f"{node['host']} is a {node['platform']} node, and the project declares "
+                "loopback_only: its check runs in a network namespace holding only lo, which "
+                "only a Linux node's fleet-check-unit gives, so the answer is a Linux node."
+            ),
+        )
+    return None
+
+
 def assess(
     node: NodeConfig, state: NodeState, project: ProjectConfig, carried: frozenset[NodeTag]
 ) -> DispatchVerdict:
@@ -203,30 +249,18 @@ def assess(
     leaves a check no margin under the budget, and nothing about the node
     changes that, so a project any other node can run is that node's.
 
+    A PROJECT WHOSE CHECK RUNS WITH ONLY LO IS REFUSED BY A WINDOWS NODE,
+    before its tags, because only a Linux node's ``fleet-check-unit`` gives a
+    check a network namespace of its own and the Windows dialect refuses to
+    render one (MCPs board task 649fcc7a). It answers ``NODE_LACKS_TAG``,
+    whose meaning, another node, is this refusal's.
+
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
-    pinned = project["node"]
-    if pinned is not None and pinned != node["host"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_NOT_PINNED,
-            reason=(
-                f"{node['host']} is not {pinned}: the project runs on {pinned} alone, because "
-                "it reads what only that host holds, so the answer is that node and never "
-                "this one."
-            ),
-        )
-    if pinned is None and node["budget"]["pinned_checks_only"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_NOT_PINNED,
-            reason=(
-                f"{node['host']} checks only the projects pinned to it: its own work leaves a "
-                "check no margin under the 300 s budget, so the answer is any other node "
-                "this project's tags fit."
-            ),
-        )
+    wrong_node = _wrong_node(node, project)
+    if wrong_node is not None:
+        return wrong_node
     missing = missing_tags(carried, project["required_tags"])
     if missing:
         return DispatchVerdict(
@@ -454,6 +488,7 @@ def room_for_any(
         required_tags=(),
         source=None,
         node=node["host"],
+        loopback_only=False,
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:

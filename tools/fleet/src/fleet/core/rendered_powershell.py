@@ -170,6 +170,7 @@ def render_all() -> list[RenderedScript]:
                 isolated_docker=False,
                 elevated=False,
                 agent=EXAMPLE_AGENT,
+                loopback_unit=None,
             ),
         ),
         RenderedScript(

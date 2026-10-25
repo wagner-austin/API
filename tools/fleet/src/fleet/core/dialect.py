@@ -253,6 +253,7 @@ class Dialect(Protocol):
         isolated_docker: bool,
         elevated: bool,
         agent: str,
+        loopback_unit: str | None,
     ) -> str:
         """The script that readies the tree, runs the suite and records its
         status last.
@@ -280,6 +281,11 @@ class Dialect(Protocol):
                 as ``BOARD_AGENT_LABEL`` so a hold the suite takes is
                 attributed to whoever asked for the run
                 (:mod:`fleet.core.agent_label`).
+            loopback_unit: The check's own unit, ``fleet-<run id>``, for a
+                project that declares ``loopback_only``, whose ``make check``
+                then runs through ``fleet-check-unit loopback`` in a network
+                namespace holding only lo (:mod:`fleet.contracts.check_unit`);
+                None for every other project.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
@@ -287,9 +293,11 @@ class Dialect(Protocol):
 
         Raises:
             ValueError: From a dialect whose nodes carry no rootless daemon,
-                when ``isolated_docker`` is True, or no elevated runner, when
-                ``elevated`` is True; and from every dialect when ``agent``
-                is outside the board's label grammar.
+                when ``isolated_docker`` is True, no elevated runner, when
+                ``elevated`` is True, or no loopback helper, when
+                ``loopback_unit`` is set; from the Linux dialect when both
+                ``isolated_docker`` and ``loopback_unit`` are; and from every
+                dialect when ``agent`` is outside the board's label grammar.
         """
         ...
 

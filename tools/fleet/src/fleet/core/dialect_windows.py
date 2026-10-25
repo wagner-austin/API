@@ -436,6 +436,7 @@ class WindowsDialect:
         isolated_docker: bool,
         elevated: bool,
         agent: str,
+        loopback_unit: str | None,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -452,6 +453,8 @@ class WindowsDialect:
                 launched at RunLevel Highest.
             agent: The job's submitting agent label, exported as
                 ``BOARD_AGENT_LABEL``.
+            loopback_unit: Set for a project that declares
+                ``loopback_only``, which no Windows node can honour.
 
         Returns:
             :func:`fleet.core.windows_build.build_script`'s text, which says
@@ -463,13 +466,23 @@ class WindowsDialect:
                 ``docker=yes``), so the capacity check places no docker
                 project here; a build rendered for one anyway would run its
                 containers as the runner, which is what the isolation exists
-                to prevent, so it is refused rather than rendered.
+                to prevent, so it is refused rather than rendered. And when
+                ``loopback_unit`` is set: a Windows node has no
+                fleet-check-unit to give a check a network of its own, and a
+                build that ran in the host's anyway would fail on every
+                address change the declaration exists to keep out.
         """
         if isolated_docker:
             raise ValueError(
                 f"the project at {path!r} declares the docker tag, and a Windows node has no "
                 "rootless daemon to isolate its build on; it runs only on a node whose "
                 "execdocker user carries one"
+            )
+        if loopback_unit is not None:
+            raise ValueError(
+                f"the project at {path!r} declares loopback_only, and a Windows node has no "
+                "fleet-check-unit to run its check in a network namespace holding only lo; it "
+                "runs only on a Linux node"
             )
         return windows_build.build_script(
             target=target,

@@ -45,6 +45,7 @@ from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
+from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
 from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
 from fleet.core.linux_unit_end import unit_end_path, unit_end_script
@@ -321,6 +322,7 @@ class LinuxDialect:
         isolated_docker: bool,
         elevated: bool,
         agent: str,
+        loopback_unit: str | None,
     ) -> str:
         """Ready the tree, run the recipe in the project, write its status last.
 
@@ -335,6 +337,10 @@ class LinuxDialect:
         A docker project's build is :mod:`fleet.core.linux_isolated_build`'s
         instead: the same steps in the same order, run as execdocker against
         its rootless daemon, with that user's caches rather than the node's.
+
+        A loopback-only project's install steps run as every project's do,
+        in the host's network, and its recipe through
+        :func:`recipe_command`, in a network namespace holding only lo.
 
         Args:
             target: Absolute remote directory holding the export, its root.
@@ -351,6 +357,8 @@ class LinuxDialect:
                 which no linux node carries.
             agent: The job's submitting agent label, exported as
                 ``BOARD_AGENT_LABEL``.
+            loopback_unit: The check's own unit for a project that declares
+                ``loopback_only``, else None.
 
         Returns:
             The script's text. Its last act writes the recipe's exit status
@@ -358,13 +366,22 @@ class LinuxDialect:
 
         Raises:
             ValueError: When ``elevated`` is True, refused for the reason
-                :meth:`launch_script` gives, or ``agent`` is outside the
+                :meth:`launch_script` gives; when ``isolated_docker`` and
+                ``loopback_unit`` are both set, because a docker project's
+                build runs as execdocker, which holds no sudo to call
+                ``fleet-check-unit``; or when ``agent`` is outside the
                 board's label grammar.
         """
         if elevated:
             raise ValueError(
                 f"the project at {path!r} requires the elevated tag, and a linux node has no "
                 "elevated runner; it runs only on a Windows node that declares one"
+            )
+        if isolated_docker and loopback_unit is not None:
+            raise ValueError(
+                f"the project at {path!r} declares both the docker tag and loopback_only, and "
+                "its build runs as execdocker, which holds no sudo to start a check in a "
+                "network namespace of its own; declare one or the other"
             )
         label = require_agent_label(agent)
         if isolated_docker:
@@ -392,11 +409,7 @@ class LinuxDialect:
             f"{CACHE_VARIABLE}='{cache_root}'",
             f"{WORKSPACE_VARIABLE}={shlex.quote(path or '.')}",
             f"{REGISTRY_VARIABLE}='{names.registry_directory(target)}'",
-            f"export npm_config_cache POETRY_CACHE_DIR {POETRY_IN_PROJECT[0]} "
-            f"{POETRY_KEYRING_OFF[0]} "
-            "PLAYWRIGHT_BROWSERS_PATH PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
-            f"{AGENT_LABEL_VARIABLE} "
-            f"{CACHE_VARIABLE} {WORKSPACE_VARIABLE} {REGISTRY_VARIABLE}",
+            f"export {' '.join(BUILD_EXPORTS)}",
             f"cd '{target}'",
         ]
         for step in install:
@@ -405,7 +418,9 @@ class LinuxDialect:
             lines.extend(sh_phase_lines(phase=step["phase"], command=command, log=log))
             lines.append(f'if [ "$status" -ne 0 ]; then {written}; exit 0; fi')
         lines.append(f"cd '{names.recipe_directory(target, path)}'")
-        lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=f"make {MAKE_TARGET}", log=log))
+        lines.extend(
+            sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log)
+        )
         lines.append(written)
         return PROLOGUE + "\n".join(lines) + "\n"
 
