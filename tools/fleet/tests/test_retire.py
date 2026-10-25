@@ -1,11 +1,9 @@
 """Retiring a settled dispatch's directory (MCPs board task bfca20e6).
 
-:func:`fleet.core.retire.attempt_retire_on_node` is asked, per platform, which script
-it sends where; the ``sh`` rendering is then executed for real under this
-host's bash against a stage root laid out under ``tmp_path``, run twice to
-show a retire that already happened is not an error. The PowerShell rendering
-is executed by ``tests/pester/rendered-dialect-state.Tests.ps1`` from its
-committed copy.
+:func:`fleet.core.retire.attempt_retire_on_node` is asked which script it
+sends where; the ``sh`` rendering is then executed for real under this host's
+bash against a stage root laid out under ``tmp_path``, run twice to show a
+retire that already happened is not an error.
 """
 
 from __future__ import annotations
@@ -17,33 +15,26 @@ import subprocess
 import pytest
 from platform_core.errors import FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, dialect, names, retire
-from fleet.core.dialect_linux import PROLOGUE
+from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE
 from tests._host_bash import host_bash
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
-#: Each platform's stage root, as the roster declares them.
-STAGE_ROOTS = {
-    NodePlatform.WINDOWS: "C:/fleet/stage",
-    NodePlatform.LINUX: "/home/corvis/fleet/stage",
-}
+#: The stage root, as the roster declares it.
+STAGE_ROOT = "/home/corvis/fleet/stage"
 
 
-def _node(platform: NodePlatform) -> NodeConfig:
-    """A node of the given platform.
-
-    Args:
-        platform: Its declared platform.
+def _node() -> NodeConfig:
+    """A node with no rootless daemon.
 
     Returns:
         Its declaration.
     """
     return NodeConfig(
         host="node-1",
-        platform=platform,
-        stage_root=STAGE_ROOTS[platform],
+        stage_root=STAGE_ROOT,
         logical_cores=8,
         ram_gb=16.0,
         gpu=None,
@@ -53,8 +44,6 @@ def _node(platform: NodePlatform) -> NodeConfig:
         cxx=None,
         docker=None,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget={
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,
@@ -63,6 +52,25 @@ def _node(platform: NodePlatform) -> NodeConfig:
             "checks_at_once": None,
             "pinned_checks_only": False,
         },
+    )
+
+
+def _retire_script(*, isolated: bool) -> str:
+    """The retire the node is sent for the demo run.
+
+    Args:
+        isolated: Whether the node runs docker projects as execdocker.
+
+    Returns:
+        The script's text.
+    """
+    return dialect.retire_script(
+        target=f"{STAGE_ROOT}/{DEMO_RUN_ID}",
+        retained=names.retained_log_path(STAGE_ROOT, DEMO_RUN_ID),
+        scripts=tuple(
+            dialect.script_path(STAGE_ROOT, stem) for stem in names.root_script_stems(DEMO_RUN_ID)
+        ),
+        isolated=isolated,
     )
 
 
@@ -77,37 +85,21 @@ def test_the_names_are_one_spelling() -> None:
     )
 
 
-@pytest.mark.parametrize("platform", list(NodePlatform))
-def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transcript(
-    platform: NodePlatform,
-) -> None:
-    node = _node(platform)
-    spoken = dialect.for_platform(platform)
-    root = STAGE_ROOTS[platform]
+def test_it_sends_the_retire_to_the_stage_root_runs_it_and_names_the_kept_transcript() -> None:
     runner = FakeRun(retire_replies()[:2])
     _test_hooks.run = runner
 
-    outcome = retire.attempt_retire_on_node(node, run_id=DEMO_RUN_ID)
+    outcome = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)
 
     assert outcome["failure"] is None
-    kept = names.retained_log_path(root, DEMO_RUN_ID)
-    assert kept == f"{root}/logs/{DEMO_RUN_ID}.log"
+    kept = names.retained_log_path(STAGE_ROOT, DEMO_RUN_ID)
+    assert kept == f"{STAGE_ROOT}/logs/{DEMO_RUN_ID}.log"
     # The script sent and run, and no generations' removal: each caller
     # sends that once its row is closed (MCPs board task 8993c306).
     assert len(runner.calls) == 2
-    script_path = spoken.script_path(root, f"retire-{DEMO_RUN_ID}")
-    assert runner.stdin[0] == spoken.retire_script(
-        target=f"{root}/{DEMO_RUN_ID}",
-        retained=kept,
-        scripts=(
-            spoken.script_path(root, f"mkdir-{DEMO_RUN_ID}"),
-            spoken.script_path(root, f"mkdir-{DEMO_RUN_ID}.stage"),
-            spoken.script_path(root, f"stop-{DEMO_RUN_ID}"),
-            script_path,
-        ),
-        task=f"fleet-{DEMO_RUN_ID}",
-        isolated=False,
-    ).encode("utf-8")
+    script_path = dialect.script_path(STAGE_ROOT, f"retire-{DEMO_RUN_ID}")
+    assert runner.stdin[0] == _retire_script(isolated=False).encode("utf-8")
+    assert f"{STAGE_ROOT}/stop-{DEMO_RUN_ID}.sh" in _retire_script(isolated=False)
     assert script_path in " ".join(runner.calls[0])
     assert runner.calls[1][-1].endswith(script_path)
 
@@ -116,7 +108,7 @@ def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() 
     """A docker project's build removes its copy only when it runs to its
     end: measured 2026-10-18, lavender-wsl held eight stopped builds'
     copies, 11 GB (MCPs board task 346abc45)."""
-    node = _node(NodePlatform.LINUX)
+    node = _node()
     node["docker"] = "29.8.1"
     runner = FakeRun(retire_replies()[:2])
     _test_hooks.run = runner
@@ -124,25 +116,13 @@ def test_a_node_running_isolated_builds_retires_the_run_s_execdocker_copy_too() 
     assert retire.attempt_retire_on_node(node, run_id=DEMO_RUN_ID)["failure"] is None
 
     assert retire.runs_isolated(node)
-    assert not retire.runs_isolated(_node(NodePlatform.LINUX))
-    sent = retire.script_for(
-        NodePlatform.LINUX,
-        stage_root=STAGE_ROOTS[NodePlatform.LINUX],
-        run_id=DEMO_RUN_ID,
-        isolated=True,
-    )
+    assert not retire.runs_isolated(_node())
+    sent = _retire_script(isolated=True)
     assert runner.stdin[0] == sent.encode("utf-8")
     assert sent.endswith(
         f'{EXEC_HOME_LINE}\nsudo -n rm -rf "$exec_home/fleet/stage/{DEMO_RUN_ID}" '
         f'"$exec_home/fleet/stage/{DEMO_RUN_ID}.stage"\n'
     )
-
-
-def test_a_windows_node_has_no_isolated_copy_to_retire() -> None:
-    with pytest.raises(ValueError, match="runs no build as execdocker"):
-        retire.script_for(
-            NodePlatform.WINDOWS, stage_root="C:/fleet/stage", run_id=DEMO_RUN_ID, isolated=True
-        )
 
 
 @pytest.mark.parametrize(
@@ -152,7 +132,7 @@ def test_a_windows_node_has_no_isolated_copy_to_retire() -> None:
             failed(255, "Connection timed out during banner exchange"),
             FleetErrorCode.NODE_UNREACHABLE,
         ),
-        (failed(1, "Remove-Item: access denied"), FleetErrorCode.DISPATCH_FAILED),
+        (failed(1, "rm: cannot remove: Permission denied"), FleetErrorCode.DISPATCH_FAILED),
     ],
 )
 def test_a_retire_that_fails_reports_its_transport_code(
@@ -162,33 +142,10 @@ def test_a_retire_that_fails_reports_its_transport_code(
     that answered and failed (fleet.core.retire_owed), so both are values."""
     _test_hooks.run = FakeRun([ok(""), result])
 
-    failure = retire.attempt_retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)[
-        "failure"
-    ]
+    failure = retire.attempt_retire_on_node(_node(), run_id=DEMO_RUN_ID)["failure"]
 
     codes = [failure["code"]] if failure is not None else []
     assert codes == [code]
-
-
-def test_each_holder_the_retire_ended_is_logged_by_its_line(
-    caplog: pytest.LogCaptureFixture,
-) -> None:
-    ended = (
-        "FLEET_RETIRE_HOLDER_ENDED: pid 8728 bash.exe "
-        "(bash /c/fleet/stage/run/scripts/ci-bootstrap-testdb.sh) "
-        "held C:/fleet/stage/run/result.txt.log"
-    )
-    replies = retire_replies()
-    replies[1] = ok(f"{ended}\n")
-    _test_hooks.run = FakeRun(replies)
-
-    with caplog.at_level("INFO"):
-        retire.attempt_retire_on_node(_node(NodePlatform.WINDOWS), run_id=DEMO_RUN_ID)
-
-    messages = [record.getMessage() for record in caplog.records]
-    assert [message for message in messages if message.startswith("retire ")] == [
-        f"retire {DEMO_RUN_ID} on node-1: {ended}"
-    ]
 
 
 def seal(release: pathlib.Path) -> None:
@@ -272,17 +229,15 @@ class TestTheShScriptRunsForReal:
             root: The stage root.
         """
         stage_root = root.as_posix()
-        spoken = dialect.for_platform(NodePlatform.LINUX)
         script = pathlib.Path(root / f"{names.retire_stem(DEMO_RUN_ID)}.sh")
         script.write_text(
-            spoken.retire_script(
+            dialect.retire_script(
                 target=names.dispatch_directory(stage_root, DEMO_RUN_ID),
                 retained=names.retained_log_path(stage_root, DEMO_RUN_ID),
                 scripts=tuple(
-                    spoken.script_path(stage_root, stem)
+                    dialect.script_path(stage_root, stem)
                     for stem in names.root_script_stems(DEMO_RUN_ID)
                 ),
-                task=names.task_name(DEMO_RUN_ID),
                 isolated=False,
             ),
             encoding="utf-8",

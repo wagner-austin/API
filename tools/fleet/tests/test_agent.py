@@ -381,7 +381,7 @@ class TestObservingSessions:
         ]
         assert lines == [
             "serendipity: not observed -- ssh to serendipity failed while sending "
-            "C:/Users/austi/.fleet/observe-sessions.ps1: ssh: serendipity is asleep"
+            "/home/corvis/.fleet/observe-sessions.sh: ssh: serendipity is asleep"
         ]
 
     def test_a_worker_that_answers_is_recorded_on_the_board(

@@ -192,7 +192,7 @@ class TestTheLanes:
         )
 
     def test_a_node_lane_runs_the_node_agent_for_its_node(self) -> None:
-        root = pathlib.Path("C:/api")
+        root = pathlib.Path("/home/corvis/PROJECTS/API")
         assert tick.plan_tick(root, tick.Lane.NODE, "sedona", {}) == tick.TickPlan(
             arguments=(
                 "--repo-root",
@@ -208,35 +208,12 @@ class TestTheLanes:
         )
 
     def test_the_announce_lane_checks_in_and_shares_its_nodes_log(self) -> None:
-        plan = tick.plan_tick(pathlib.Path("C:/api"), tick.Lane.ANNOUNCE, "sedona", {})
+        plan = tick.plan_tick(
+            pathlib.Path("/home/corvis/PROJECTS/API"), tick.Lane.ANNOUNCE, "sedona", {}
+        )
         assert plan["arguments"][-3:] == ("--node", "sedona", "--announce")
         assert plan["stem"] == "fleet-node-sedona"
         assert plan["header"] == "announce sedona"
-
-    # MCPs board task a98d7083: a node declaring elevated has a second
-    # runner, with its own identity (the agent's --elevated) and its own log.
-    @pytest.mark.parametrize(
-        ("lane", "tail", "header"),
-        [
-            (
-                tick.Lane.ELEVATED,
-                ("--node", "serendipity", "--elevated"),
-                "elevated serendipity-elevated",
-            ),
-            (
-                tick.Lane.ELEVATED_ANNOUNCE,
-                ("--node", "serendipity", "--elevated", "--announce"),
-                "elevated-announce serendipity-elevated",
-            ),
-        ],
-    )
-    def test_the_elevated_lanes_run_the_nodes_elevated_runner_into_its_own_log(
-        self, lane: tick.Lane, tail: tuple[str, ...], header: str
-    ) -> None:
-        plan = tick.plan_tick(pathlib.Path("C:/api"), lane, "serendipity", {})
-        assert plan["arguments"][3:] == ("fleet-node-agent", "--", *tail)
-        assert plan["stem"] == "fleet-node-serendipity-elevated"
-        assert plan["header"] == header
 
     @pytest.mark.parametrize(
         ("lane", "word"),
@@ -248,7 +225,7 @@ class TestTheLanes:
     )
     def test_a_duty_lane_naming_a_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
-            tick.plan_tick(pathlib.Path("C:/api"), lane, "sedona", {})
+            tick.plan_tick(pathlib.Path("/home/corvis/PROJECTS/API"), lane, "sedona", {})
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane takes no --node"
 
     @pytest.mark.parametrize(
@@ -258,13 +235,11 @@ class TestTheLanes:
             (tick.Lane.SESSIONS_ANNOUNCE, "sessions-announce"),
             (tick.Lane.NODE, "node"),
             (tick.Lane.ANNOUNCE, "announce"),
-            (tick.Lane.ELEVATED, "elevated"),
-            (tick.Lane.ELEVATED_ANNOUNCE, "elevated-announce"),
         ],
     )
     def test_a_machine_lane_naming_no_node_is_refused(self, lane: tick.Lane, word: str) -> None:
         with pytest.raises(ValueError) as refused:
-            tick.plan_tick(pathlib.Path("C:/api"), lane, None, {})
+            tick.plan_tick(pathlib.Path("/home/corvis/PROJECTS/API"), lane, None, {})
         assert str(refused.value) == f"FLEET_TICK_USAGE: the {word} lane needs --node"
 
     def test_each_lane_word_narrows_to_its_member_and_nothing_else_does(self) -> None:
@@ -277,8 +252,6 @@ class TestTheLanes:
             "netboot-announce",
             "node",
             "announce",
-            "elevated",
-            "elevated-announce",
         )
         assert [tick.require_lane(name) for name in names] == [
             tick.Lane.HUB,
@@ -289,16 +262,16 @@ class TestTheLanes:
             tick.Lane.NETBOOT_ANNOUNCE,
             tick.Lane.NODE,
             tick.Lane.ANNOUNCE,
-            tick.Lane.ELEVATED,
-            tick.Lane.ELEVATED_ANNOUNCE,
         ]
         assert all(type(tick.require_lane(name)) is tick.Lane for name in names)
         with pytest.raises(ValueError) as refused:
-            tick.require_lane("agent")
+            tick.require_lane("elevated")
+        # The elevated lanes left with the last Windows node (board task
+        # e705f08c), so a hub still naming one is refused by the word.
         assert str(refused.value) == (
             "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
-            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce', "
-            "'elevated', 'elevated-announce'], not 'agent'"
+            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce'], "
+            "not 'elevated'"
         )
 
     def test_the_ticks_deadline_is_half_a_minute_past_the_agents(self) -> None:

@@ -28,7 +28,6 @@ from typing import Final
 
 from platform_core.json_utils import require_dict, require_str
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.workspace_files import JSON_SUFFIX, MACHINES_DIRECTORY
 from tests._registry import SHIPPED_REGISTRY, shipped_document
@@ -60,7 +59,7 @@ def test_lenovold_decodes_as_the_linux_worker_it_was_reimaged_to() -> None:
     lenovold = decode_fleet_workspace(document)["machines"]["lenovold"]
     declared = require_dict(require_dict(document, "machines"), "lenovold")
 
-    assert lenovold["platform"] is NodePlatform.LINUX
+    assert require_str(declared, "platform") == "linux"
     assert lenovold["user"] == "corvis"
     assert lenovold["enabled"] is True
     assert require_str(declared, "tailnetIp") == TAILNET_IP

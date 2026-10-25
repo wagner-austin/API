@@ -11,14 +11,16 @@ from platform_core.json_utils import JSONObject, JSONValue
 
 
 def dispatch_document() -> JSONObject:
-    """The ``dispatch`` object of a Windows worker that claims work.
+    """The ``dispatch`` object of a worker that claims work.
 
     Returns:
-        Its capacity, with ``held`` null.
+        Its capacity, with ``held`` null, and ``elevated`` false as every
+        machine file still carries it for MCPs' readers (MCPs board task
+        5b040fdb), which this package does not read.
     """
     return {
         "held": None,
-        "stage_root": "C:/fleet/stage",
+        "stage_root": "/home/corvis/fleet/stage",
         "logical_cores": 16,
         "ram_gb": 32.0,
         "gpu": None,
@@ -42,10 +44,8 @@ def dispatch_document() -> JSONObject:
 def machine_document(
     *,
     role: str = "hub",
-    platform: str = "windows",
     enabled: bool = True,
     ledger_observer: str = "none",
-    guest: str | None = None,
     dispatch: JSONValue = None,
 ) -> JSONObject:
     """One machine file of the roster, as this package reads it.
@@ -53,13 +53,11 @@ def machine_document(
     Args:
         role: Its role, a hub by default, as diphtheria is both a hub and a
             dispatch node.
-        platform: Its platform.
         enabled: Whether it is expected to answer.
         ledger_observer: The arm that records its sessions. None observes
             it by default: a hub tick's observe pass visits only a machine
             declaring ``fleet-arm``, so a test of anything else is asked no
             ssh it did not script.
-        guest: The machine it runs inside, or None.
         dispatch: Its ``dispatch``; None gives :func:`dispatch_document`.
 
     Returns:
@@ -67,11 +65,10 @@ def machine_document(
     """
     return {
         "role": role,
-        "user": "austi",
-        "platform": platform,
+        "user": "corvis",
+        "platform": "linux",
         "enabled": enabled,
         "ledger_observer": ledger_observer,
-        "guest": None if guest is None else {"host": guest, "sshPort": 2222},
         "dispatch": dispatch_document() if dispatch is None else dispatch,
     }
 

@@ -168,8 +168,8 @@ class TestANodeThatMissesTheTailRead:
         assert collected["line"].endswith(
             f"run={DEMO_RUN_ID}: did not answer the read of its transcript's tail: ssh to "
             "lavender failed while sending "
-            f"C:/fleet/stage/{DEMO_RUN_ID}/log-tail.ps1: Connection timed out during banner "
-            "exchange"
+            f"/home/corvis/fleet/stage/{DEMO_RUN_ID}/log-tail.sh: Connection timed out during "
+            "banner exchange"
         )
         assert endpoint.tools == []
         assert loaded.ledger.read_text(encoding="utf-8") == ledger
@@ -195,7 +195,6 @@ class TestTheCollectPass:
             {},
             agent=LAVENDER,
             alias="lavender",
-            elevated=False,
             holder=holder,
             launching=frozenset(),
         )
@@ -230,7 +229,6 @@ class TestTheCollectPass:
             {},
             agent=LAVENDER,
             alias="lavender",
-            elevated=False,
             holder=holder,
             launching=frozenset(),
         )

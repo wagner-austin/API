@@ -22,13 +22,8 @@ import pytest
 from platform_core.config import config_test_hooks
 
 from fleet.contracts.check_unit import CHECK_UNIT, CHECK_UNIT_HELPER
-from fleet.core import names
-from fleet.core.dialect_linux import (
-    PROLOGUE,
-    SH_INVOCATION,
-    UNIT_END_DELIMITER,
-    LinuxDialect,
-)
+from fleet.core import dialect, names
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, UNIT_END_DELIMITER
 from fleet.core.linux_unit_end import (
     UNEXPLAINED_EXIT_CODE,
     UNIT_ENDED_MARKER,
@@ -38,8 +33,6 @@ from fleet.core.linux_unit_end import (
 )
 from fleet.core.verdict import read_unit_end
 from tests.conftest import DEMO_RUN_ID
-
-DIALECT = LinuxDialect()
 
 TARGET = "/home/corvis/fleet/stage/run-1"
 
@@ -51,7 +44,7 @@ class TestTheLaunchWiresTheUnitEnd:
         assert unit_end_path(TARGET) == f"{TARGET}/unit-end.sh"
 
     def test_the_launch_writes_the_script_then_names_it_as_exec_stop_post(self) -> None:
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
+        body = dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
         script = unit_end_script(target=TARGET, unit=UNIT, prologue=PROLOGUE)
         heredoc = (
             f"cat > '{TARGET}/unit-end.sh' <<'{UNIT_END_DELIMITER}'\n{script}{UNIT_END_DELIMITER}\n"
@@ -290,9 +283,9 @@ class TestTheLaunchUnderSh:
         sudo.chmod(0o755)
         target = tmp_path / "run-1"
         target.mkdir()
-        body = DIALECT.launch_script(
-            target=target.as_posix(), run_id=DEMO_RUN_ID, elevated=False
-        ).replace(PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1)
+        body = dialect.launch_script(target=target.as_posix(), run_id=DEMO_RUN_ID).replace(
+            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
+        )
         script = tmp_path / "launch.sh"
         script.write_text(body, encoding="utf-8")
 

@@ -194,11 +194,11 @@ class TestDecodeCapability:
         ):
             decode_capability(RUST, value)
 
-    def test_the_cxx_refusal_names_both_platforms_sources(self) -> None:
+    def test_the_cxx_refusal_names_the_compiler_it_reads(self) -> None:
         with pytest.raises(
             JSONTypeError,
-            match=r"^cxx must be null or the version vswhere reports for the VC tools on "
-            r"Windows or g\+\+ -dumpfullversion prints on Linux, e\.g\. '13\.3\.0', got 'msvc'",
+            match=r"^cxx must be null or the version g\+\+ -dumpfullversion prints, "
+            r"e\.g\. '13\.3\.0', got 'msvc'",
         ):
             decode_capability(CXX, "msvc")
 

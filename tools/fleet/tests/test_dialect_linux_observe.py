@@ -22,15 +22,12 @@ import pytest
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, load_json_str
 
-from fleet.core.dialect_linux import (
+from fleet.core.dialect import (
     OBSERVE_SESSIONS_SCRIPT,
     PROLOGUE,
     SH_INVOCATION,
-    LinuxDialect,
 )
 from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
-
-DIALECT = LinuxDialect()
 
 #: The shape of the pidDomain 2.1.294 wrote on ziggurat on 2026-10-16,
 #: ``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``.
@@ -90,7 +87,7 @@ def test_the_observe_script_feeds_python3_through_a_quoted_heredoc() -> None:
     """sh cannot join files into one JSON array that survives an empty
     directory or a quote in a field; python3 can, and it is on every
     Linux node by the toolchain contract (board task cd5010c4)."""
-    body = DIALECT.observe_sessions_script()
+    body = OBSERVE_SESSIONS_SCRIPT
 
     assert body == OBSERVE_SESSIONS_SCRIPT
     assert body == f"{PROLOGUE}python3 - <<'PY'\n{OBSERVE_SESSIONS_PYTHON}PY\n"
@@ -179,7 +176,7 @@ def test_the_whole_observe_script_under_sh_reports_the_records_under_the_home(
     home = tmp_path / "home"
     home.mkdir()
     script = tmp_path / "observe-sessions.sh"
-    script.write_text(DIALECT.observe_sessions_script(), encoding="utf-8")
+    script.write_text(OBSERVE_SESSIONS_SCRIPT, encoding="utf-8")
 
     completed = subprocess.run(
         [*SH_INVOCATION, str(script)],

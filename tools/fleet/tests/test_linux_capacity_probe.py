@@ -16,7 +16,7 @@ import pytest
 
 from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.core import probe
-from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
     IO_PRESSURE_LINE,
@@ -47,7 +47,6 @@ IO_PRESSURE = (
 
 def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
-    assert LinuxDialect().capacity_probe_script() == CAPACITY_PROBE_SCRIPT
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
     assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + RESERVATIONS_PART)
@@ -83,7 +82,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "logical_cores", *probe.PRESSURE_FIELDS}
+    reported = {*probe.REQUIRED_FIELDS, "logical_cores"}
     assert set(fields) == reported | counted | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
@@ -289,8 +288,8 @@ class TestTheReservationsUnderSh:
         """diphtheria, 2026-10-14: a 4-vCPU clean-VM smoke, beside one that ended."""
         held = tmp_path / "reservations"
         _reserve(held, "vm.reservation", "holder=vm smoke\ncores=4\nuntil_unix=99999999999\n")
-        _reserve(held, "old.reservation", "holder=old\r\ncores=2\r\nuntil_unix=1\r\n")
-        _reserve(held, "build.reservation", "holder=build\r\ncores=3\r\nuntil_unix=99999999999\r\n")
+        _reserve(held, "old.reservation", "holder=old\ncores=2\nuntil_unix=1\n")
+        _reserve(held, "build.reservation", "holder=build\ncores=3\nuntil_unix=99999999999\n")
         _reserve(held, "notes.txt", "cores=9\nuntil_unix=99999999999\n")
 
         fields = _run(tmp_path, held)

@@ -13,6 +13,7 @@ import pathlib
 
 from platform_core.json_utils import load_json_str
 
+from fleet.cli.render_documents import RENDERED_DIRECTORY
 from fleet.contracts.capability import RUST_CHECK_SUBCOMMANDS, RUST_CHECK_TOOLS
 from fleet.contracts.rust_toolchain import (
     PINNED_CARGO_LLVM_COV,
@@ -21,7 +22,6 @@ from fleet.contracts.rust_toolchain import (
     RUST_COMPONENTS,
 )
 from fleet.contracts.toolchain import PINNED_POETRY
-from fleet.core.rendered_powershell import RENDERED_DIRECTORY
 from fleet.core.toolchain_document import TOOLCHAIN_DOCUMENT, render_toolchain_document
 
 #: tools/fleet.

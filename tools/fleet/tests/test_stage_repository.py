@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from fleet.core import _test_hooks, names, stage_repository
+from fleet.core import names, stage_repository
 
 #: The loose-object directory ``git gc --auto`` samples to estimate how many
 #: loose objects a repository holds: past ``ceil(gc.auto / 256)`` objects in
@@ -24,12 +24,10 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
     fleet verdict, fd5cabfa), the commit is what gives packages/db's migrator
     the HEAD its test admission reads (MCPs board task 6bbfd171), and gc.auto
     0 keeps that commit's loose objects where the build copies them (MCPs
-    board task 939ec5c7), and core.autocrlf false keeps a Windows node's add
-    from warning once per file (MCPs board task ee3d6cdc)."""
+    board task 939ec5c7)."""
     assert stage_repository.init_repository_commands("/s/run", "MCPs-packages-db-1790400000") == (
         ("git", "-C", "/s/run", "init", "--quiet"),
         ("git", "-C", "/s/run", "config", "gc.auto", "0"),
-        ("git", "-C", "/s/run", "config", "core.autocrlf", "false"),
         ("git", "-C", "/s/run", "add", "--all", "--force"),
         (
             "git",
@@ -156,11 +154,9 @@ def test_a_staged_companion_is_its_ref_with_history_and_serves_origin_main(
         timeout=60,
     )
 
-    # The node's own core.autocrlf decides the archive's line endings (CRLF
-    # on a Windows node), which is the checkout's business, not the ref's.
     with zipfile.ZipFile(io.BytesIO(archived.stdout)) as archive:
         content = archive.read("packages/maketools/run.py")
-    assert content.replace(b"\r\n", b"\n") == b"print(2)\n"
+    assert content == b"print(2)\n"
 
 
 def test_a_bundle_whose_ref_is_not_the_bundled_commit_stops_the_stage(
@@ -217,82 +213,6 @@ def test_a_staged_export_tracks_every_file_its_commit_tracks(tmp_path: pathlib.P
     tracked = _git("-C", str(target), "ls-files")
     assert tracked.splitlines() == _git("-C", str(source), "ls-files").splitlines()
     assert "runs/sweep.json" in tracked.splitlines()
-
-
-class TestKeepBytes:
-    """MCPs board task ee3d6cdc: under a Windows node's core.autocrlf true the
-    MCPs export's index step warned once per file, 7778 lines sent back
-    through loki's tunnel, and fleet job af6c4d99 broke mid-stream. Run for
-    real under a global configuration that sets it, as the node's does."""
-
-    LINE_ENDING_WARNING = "LF will be replaced by CRLF"
-
-    def _node_like(
-        self, tmp_path: pathlib.Path
-    ) -> tuple[pathlib.Path, tuple[tuple[str, str], ...]]:
-        """Three LF files to stage, and the variables that make git convert line endings.
-
-        Args:
-            tmp_path: Where the tree and the global configuration are made.
-
-        Returns:
-            The tree, and the variables naming that configuration as git's
-            global one and leaving out the system's.
-        """
-        tree = tmp_path / "run"
-        tree.mkdir()
-        for index in range(3):
-            (tree / f"file{index}.txt").write_bytes(b"line one\nline two\n")
-        configuration = tmp_path / "node.gitconfig"
-        configuration.write_text("[core]\n\tautocrlf = true\n", encoding="utf-8")
-        return tree, (("GIT_CONFIG_GLOBAL", str(configuration)), ("GIT_CONFIG_NOSYSTEM", "1"))
-
-    def _stderr_of(
-        self, commands: tuple[tuple[str, ...], ...], variables: tuple[tuple[str, str], ...]
-    ) -> str:
-        """Run commands for real through the package's own runner and answer their stderr.
-
-        Args:
-            commands: The argument vectors, in order.
-            variables: The variables each runs with.
-
-        Returns:
-            Their standard error, joined.
-        """
-        said: list[str] = []
-        for command in commands:
-            result = _test_hooks.run(command, timeout_seconds=60, set_env=variables)
-            assert result["returncode"] == 0, result["stderr"]
-            said.append(result["stderr"])
-        return "".join(said)
-
-    def test_without_the_setting_the_index_step_warns_once_per_file(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """The control: the same commands less the setting are what flooded
-        the tunnel, so the configuration above does make git warn here."""
-        tree, environment = self._node_like(tmp_path)
-        initialise, no_auto_gc, keep_bytes, *index_and_commit = (
-            stage_repository.init_repository_commands(tree.as_posix(), "run-1")
-        )
-        assert keep_bytes == ("git", "-C", tree.as_posix(), "config", "core.autocrlf", "false")
-
-        said = self._stderr_of((initialise, no_auto_gc, *index_and_commit), environment)
-
-        assert said.count(self.LINE_ENDING_WARNING) == 3
-
-    def test_with_it_the_index_step_says_nothing_and_commits_the_bytes_as_sent(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        tree, environment = self._node_like(tmp_path)
-
-        said = self._stderr_of(
-            stage_repository.init_repository_commands(tree.as_posix(), "run-1"), environment
-        )
-
-        assert self.LINE_ENDING_WARNING not in said
-        assert _git("-C", str(tree), "config", "--local", "core.autocrlf") == "false"
-        assert _git("-C", str(tree), "show", "HEAD:file0.txt") == "line one\nline two"
 
 
 def _sampled_blobs(count: int) -> list[tuple[bytes, str]]:

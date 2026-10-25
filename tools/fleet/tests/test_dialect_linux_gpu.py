@@ -16,10 +16,8 @@ import subprocess
 
 import pytest
 
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: colossus's nvidia-smi on 2026-10-09, read over ssh: stdout, then exit 9.
 COLOSSUS_REFUSAL = (
@@ -46,7 +44,7 @@ def _probe_fields(tmp_path: pathlib.Path, answer: str, status: int) -> dict[str,
     fake.chmod(0o755)
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
+        TOOLCHAIN_PROBE_SCRIPT.replace(
             PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
         ),
         encoding="utf-8",
@@ -65,8 +63,7 @@ def _probe_fields(tmp_path: pathlib.Path, answer: str, status: int) -> dict[str,
 def test_the_gpu_line_takes_the_first_device_only_after_nvidia_smi_succeeded() -> None:
     assert (
         ' g="$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>/dev/null)" &&'
-        ' g="$(printf \'%s\\n\' "$g" | head -n 1)" && [ -n "$g" ]; then\n'
-        in DIALECT.toolchain_probe_script()
+        ' g="$(printf \'%s\\n\' "$g" | head -n 1)" && [ -n "$g" ]; then\n' in TOOLCHAIN_PROBE_SCRIPT
     )
 
 

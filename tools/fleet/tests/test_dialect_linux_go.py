@@ -17,10 +17,8 @@ import subprocess
 import pytest
 
 from fleet.contracts.tagged_tools import GO_VERSION_ARGUMENT
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: What the fake answers ``go version`` with, as go1.27.1 does on Linux.
 GO_ANSWER = "go version go1.27.1 linux/amd64"
@@ -72,9 +70,7 @@ def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
         fake.chmod(0o755)
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
-            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}'\n", 1
-        ),
+        TOOLCHAIN_PROBE_SCRIPT.replace(PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}'\n", 1),
         encoding="utf-8",
     )
     completed = subprocess.run(
@@ -89,7 +85,7 @@ def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
 
 
 def test_go_is_asked_its_version_argument_and_every_other_tool_its_flag() -> None:
-    body = DIALECT.toolchain_probe_script()
+    body = TOOLCHAIN_PROBE_SCRIPT
 
     assert GO_VERSION_ARGUMENT == "version"
     assert f"report go go {GO_VERSION_ARGUMENT}\n" in body

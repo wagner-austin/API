@@ -33,8 +33,7 @@ from tests._queue_fakes import (
 #: sedona's tick when its runner could claim two projects.
 SEDONA = RunnerTick(
     node="sedona",
-    elevated=False,
-    tags=(NodeTag.CXX, NodeTag.GPU, NodeTag.WINDOWS),
+    tags=(NodeTag.CXX, NodeTag.GPU, NodeTag.LINUX),
     fits=("libs/platform_core", "tools/fleet"),
     load=TickLoad(runs=1, workers=8, free_ram_gb=9.5, free_disk_gb=412.5, action_cache=None),
     claiming=True,
@@ -44,7 +43,6 @@ SEDONA = RunnerTick(
 #: lavender-wsl's tick on 2026-10-15, its eight runners reading the cache.
 LAVENDER = RunnerTick(
     node="lavender-wsl",
-    elevated=False,
     tags=(NodeTag.LINUX, NodeTag.DOCKER),
     fits=("tools/fleet-execution-linux",),
     load=TickLoad(
@@ -83,7 +81,6 @@ def _sedona_load(action_cache: JSONValue) -> JSONObject:
 #: A node that did not answer its probe.
 SILENT = RunnerTick(
     node="sedona",
-    elevated=True,
     tags=(),
     fits=(),
     load=None,
@@ -94,10 +91,13 @@ SILENT = RunnerTick(
 
 class TestTheWireShape:
     def test_a_tick_encodes_to_dispatch_tick_s_arguments(self) -> None:
+        """``elevated`` is always false on the wire: MCPs' dispatch_tick still
+        requires the field until MCPs board task 5b040fdb drops it, and no
+        runner is elevated since board task e705f08c."""
         assert encode_runner_tick(SEDONA) == {
             "node": "sedona",
             "elevated": False,
-            "tags": ["cxx", "gpu", "windows"],
+            "tags": ["cxx", "gpu", "linux"],
             "fits": ["libs/platform_core", "tools/fleet"],
             "claiming": True,
             "verdict": SEDONA["verdict"],
@@ -133,7 +133,8 @@ class TestTheWireShape:
         [
             ([], "runner tick must be a JSON object, got list"),
             ({**encode_runner_tick(SEDONA), "load": 3}, "load must be a JSON object, got int"),
-            ({**encode_runner_tick(SEDONA), "tags": ["windows", "windows"]}, "repeats 'windows'"),
+            ({**encode_runner_tick(SEDONA), "tags": ["linux", "linux"]}, "repeats 'linux'"),
+            ({**encode_runner_tick(SEDONA), "tags": ["windows"]}, "tags[0] must be one of"),
             ({**encode_runner_tick(SEDONA), "tags": ["quantum"]}, "tags[0] must be one of"),
             (
                 {
@@ -155,6 +156,7 @@ class TestTheWireShape:
             "not an object",
             "load not an object",
             "a repeated tag",
+            "the retired windows tag",
             "a tag outside the set",
             "no action cache key",
             "action cache not an object",

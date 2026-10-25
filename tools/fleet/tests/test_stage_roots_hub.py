@@ -26,7 +26,7 @@ import pytest
 from platform_core.errors import AppError
 
 from fleet.cli import _config
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import names, remote, retire_owed, rolled
 from tests._host import READING_PROPERTY
 
@@ -46,7 +46,7 @@ _RUN_ENTRY: Final = re.compile(
     + "|".join(re.escape(prefix) for prefix in _SCRIPT_PREFIXES)
     + r")?(?P<run>.+-\d{10})(?:"
     + re.escape(names.STAGE_SUFFIX)
-    + r")?(?:\.ps1|\.sh)?$"
+    + r")?(?:\.sh)?$"
 )
 
 
@@ -62,13 +62,7 @@ def _listing(node: NodeConfig) -> tuple[str, ...]:
     Raises:
         AppError: When the node did not answer or the listing failed there.
     """
-    root = node["stage_root"]
-    argv = (
-        ("powershell", "-NoProfile", "-Command", f"Get-ChildItem -Name '{root}'")
-        if node["platform"] is NodePlatform.WINDOWS
-        else ("ls", "-1", root)
-    )
-    return tuple(remote.run_ssh(node["host"], argv).split())
+    return tuple(remote.run_ssh(node["host"], ("ls", "-1", node["stage_root"])).split())
 
 
 def run_entries(entries: tuple[str, ...]) -> dict[str, list[str]]:
@@ -90,12 +84,12 @@ def run_entries(entries: tuple[str, ...]) -> dict[str, list[str]]:
 
 
 def test_a_run_s_entries_are_told_from_a_companion_s() -> None:
-    run = "MCPs-mcp-shared-loki-1792134587"
+    run = "MCPs-mcp-shared-colossus-1792134587"
     owned = [
         run,
         f"{run}.stage",
-        f"mkdir-{run}.ps1",
-        f"mkdir-{run}.stage.ps1",
+        f"mkdir-{run}.sh",
+        f"mkdir-{run}.stage.sh",
         f"stop-{run}.sh",
         f"retire-{run}.sh",
     ]
@@ -105,7 +99,7 @@ def test_a_run_s_entries_are_told_from_a_companion_s() -> None:
         "mkdir-MCPs.stage.sh",
         "reset-MCPs.sh",
         "logs",
-        "fleet-capacity-loki.ps1",
+        "fleet-capacity-colossus.sh",
     ]
 
     assert run_entries((*owned, *companions)) == {run: owned}

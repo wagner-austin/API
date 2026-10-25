@@ -11,7 +11,6 @@ from __future__ import annotations
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, fitting_projects
 from fleet.core.node_choice import first_fit
@@ -20,41 +19,37 @@ from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
 def test_a_pinned_project_is_refused_by_every_other_node_first() -> None:
     """Before its tags or capacity are weighed, even on a node short of both."""
-    project = _project(required_tags=(NodeTag.LINUX,), node="colossus")
+    project = _project(required_tags=(NodeTag.GPU,), node="colossus")
 
     verdict = assess(
-        _node(host="lavender-wsl", platform=NodePlatform.LINUX),
-        _state(host="lavender-wsl", free_ram_gb=1.0),
-        project,
-        frozenset({NodeTag.WINDOWS}),
+        _node(host="lacrymal"), _state(host="lacrymal", free_ram_gb=1.0), project, LINUX_TAGS
     )
 
     assert verdict["code"] is FleetErrorCode.NODE_NOT_PINNED
     assert verdict["workers"] == 0
     assert verdict["reason"] == (
-        "lavender-wsl is not colossus: the project runs on colossus alone, because it reads "
+        "lacrymal is not colossus: the project runs on colossus alone, because it reads "
         "what only that host holds, so the answer is that node and never this one."
     )
 
 
 def test_the_named_node_weighs_a_pinned_project_like_any_other() -> None:
     project = _project(required_tags=(NodeTag.LINUX,), node="colossus")
-    node = _node(host="colossus", platform=NodePlatform.LINUX)
+    node = _node(host="colossus")
 
     assert assess(node, _state(host="colossus"), project, LINUX_TAGS)["workers"] == 7
-    lacking = assess(node, _state(host="colossus"), project, frozenset({NodeTag.WINDOWS}))
+    lacking = assess(node, _state(host="colossus"), project, frozenset())
     assert lacking["code"] is FleetErrorCode.NODE_LACKS_TAG
 
 
 def test_a_runner_is_offered_a_pinned_project_only_on_its_node() -> None:
     projects = {"MCPs/served": _project(node="colossus"), "MCPs/any": _project()}
-    linux = NodePlatform.LINUX
 
     on_colossus = fitting_projects(
-        _node(host="colossus", platform=linux), _state(host="colossus"), projects, LINUX_TAGS
+        _node(host="colossus"), _state(host="colossus"), projects, LINUX_TAGS
     )
     elsewhere = fitting_projects(
-        _node(host="diphtheria", platform=linux), _state(host="diphtheria"), projects, LINUX_TAGS
+        _node(host="diphtheria"), _state(host="diphtheria"), projects, LINUX_TAGS
     )
 
     assert on_colossus == ("MCPs/any", "MCPs/served")
@@ -64,7 +59,7 @@ def test_a_runner_is_offered_a_pinned_project_only_on_its_node() -> None:
 def test_a_fleet_without_the_pinned_node_answering_names_the_pin() -> None:
     """Every node that answered is not the named one, which did not."""
     candidates = (
-        ("loki", _node(host="loki"), _state(host="loki")),
+        ("pendragon", _node(host="pendragon"), _state(host="pendragon")),
         ("lavender", _node(), _state()),
     )
 
@@ -72,14 +67,14 @@ def test_a_fleet_without_the_pinned_node_answering_names_the_pin() -> None:
         first_fit(candidates, _project(node="colossus"))
 
     assert excinfo.value.code is FleetErrorCode.NODE_NOT_PINNED
-    assert "loki is not colossus:" in excinfo.value.message
+    assert "pendragon is not colossus:" in excinfo.value.message
     assert "lavender is not colossus:" in excinfo.value.message
 
 
 def test_a_pinned_node_of_the_wrong_kind_is_a_tag_answer() -> None:
     """The named node answered and lacks a tag; every other is not it."""
     candidates = (
-        ("loki", _node(host="loki"), _state(host="loki")),
+        ("pendragon", _node(host="pendragon"), _state(host="pendragon")),
         ("colossus", _node(host="colossus"), _state(host="colossus")),
     )
 
@@ -87,5 +82,5 @@ def test_a_pinned_node_of_the_wrong_kind_is_a_tag_answer() -> None:
         first_fit(candidates, _project(required_tags=(NodeTag.GPU,), node="colossus"))
 
     assert excinfo.value.code is FleetErrorCode.NODE_LACKS_TAG
-    assert "loki is not colossus:" in excinfo.value.message
+    assert "pendragon is not colossus:" in excinfo.value.message
     assert "colossus lacks gpu:" in excinfo.value.message

@@ -1,8 +1,8 @@
 """The toolchain's value forms, the ones a node runner reads without raising
 (MCPs board task bad56f65): :func:`fleet.core.toolchain.attempt_toolchain`
-and :func:`fleet.core.toolchain.readiness_gap`, against what lavender,
-sedona and diphtheria answered on 2026-09-23 and serendipity on
-2026-09-25, and the Node.js floor that serendipity's answer added.
+and :func:`fleet.core.toolchain.readiness_gap`, against what diphtheria
+answered on 2026-09-23 and the answers derived from it, and the Node.js floor
+that serendipity's 2026-09-25 answer added.
 """
 
 from __future__ import annotations
@@ -13,32 +13,32 @@ from fleet.contracts.toolchain import ToolReport, describe_gap, is_ready, node_i
 from fleet.core import _test_hooks, toolchain
 from tests._toolchain_fixtures import (
     DIPHTHERIA_2026_09_23,
-    LAVENDER_2026_09_23,
-    LAVENDER_STORE_STUB,
-    SEDONA_2026_09_23,
-    SERENDIPITY_2026_09_25,
+    NO_PYTHON,
+    OLD_NODE,
     node,
 )
 from tests.conftest import FakeRun, failed, ok
 
+#: What every summary of :data:`DIPHTHERIA_2026_09_23` begins with.
+READY_HEAD = "python 3.11.15; node v24.21.0; poetry, git, make, tar present; "
+
 
 class TestAttemptToolchain:
     def test_a_ready_answer_comes_back_as_its_reports(self) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER_2026_09_23)])
+        _test_hooks.run = FakeRun([ok(""), ok(DIPHTHERIA_2026_09_23)])
 
         answered = toolchain.attempt_toolchain(node(), writer="lavender")
 
-        assert answered == toolchain.read_reports(LAVENDER_2026_09_23)
-        assert [report["name"] for report in toolchain.read_reports(LAVENDER_2026_09_23)] == [
+        assert answered == toolchain.read_reports(DIPHTHERIA_2026_09_23)
+        assert [report["name"] for report in toolchain.read_reports(DIPHTHERIA_2026_09_23)] == [
             "python",
             "poetry",
             "git",
             "make",
             "node",
             "tar",
-            "winget",
-            "choco",
-            "pip",
+            "apt-get",
+            "pipx",
         ]
 
     def test_a_node_that_cannot_be_reached_is_a_value_with_the_transport_code(self) -> None:
@@ -65,46 +65,38 @@ class TestAttemptToolchain:
 
 class TestReadySummary:
     def test_it_names_what_a_ready_node_was_judged_on(self) -> None:
-        assert (
-            toolchain.ready_summary(toolchain.read_reports(LAVENDER_2026_09_23))
-            == "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome absent; pdftotext absent"
-        )
-        assert (
-            toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23))
-            == "python 3.11.15; node v24.21.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome absent; pdftotext absent"
+        assert toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
+            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
-        """pendragon after its winget install, 2026-10-02 02:4xZ (MCPs board
-        task 939ec5c7): the tag its runner claims with is on the same line."""
-        found = toolchain.read_reports(LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 7.1.1\n")
+        """A node once ffmpeg is installed (MCPs board task 939ec5c7): the
+        tag its runner claims with is on the same line."""
+        found = toolchain.read_reports(
+            DIPHTHERIA_2026_09_23 + "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"
+        )
         assert toolchain.ready_summary(found) == (
-            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg present; "
-            "hooks absent; go absent; chrome absent; pdftotext absent"
+            READY_HEAD + "ffmpeg present; hooks absent; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_the_hooks_environment_the_probe_found(self) -> None:
-        """sedona once its interpreter carries the claude-hooks check's tools
+        """A node once its interpreter carries the claude-hooks check's tools
         (MCPs board task ec895824)."""
         found = toolchain.read_reports(
-            LAVENDER_2026_09_23 + "hooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
+            DIPHTHERIA_2026_09_23 + "hooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
         )
         assert toolchain.ready_summary(found) == (
-            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks present; go absent; chrome absent; pdftotext absent"
+            READY_HEAD + "ffmpeg absent; hooks present; go absent; chrome absent; pdftotext absent"
         )
 
     def test_it_names_go_the_probe_found(self) -> None:
         """A node once go is installed (MCPs board task 1da15750): its runner
         claims with go, and the summary says so on the same line."""
         found = toolchain.read_reports(
-            LAVENDER_2026_09_23 + "go=yes=go version go1.27.1 windows/amd64\n"
+            DIPHTHERIA_2026_09_23 + "go=yes=go version go1.27.1 linux/amd64\n"
         )
         assert toolchain.ready_summary(found) == (
-            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go present; chrome absent; pdftotext absent"
+            READY_HEAD + "ffmpeg absent; hooks absent; go present; chrome absent; pdftotext absent"
         )
 
     def test_it_names_chrome_the_probe_found(self) -> None:
@@ -112,11 +104,10 @@ class TestReadySummary:
         its runner claims with chrome, and the summary says so on the same
         line, so the tag web-scraper's check waits for is visible each tick."""
         found = toolchain.read_reports(
-            LAVENDER_2026_09_23 + "chrome=yes=Google Chrome 155.0.8059.39\n"
+            DIPHTHERIA_2026_09_23 + "chrome=yes=Google Chrome 155.0.8059.39\n"
         )
         assert toolchain.ready_summary(found) == (
-            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome present; pdftotext absent"
+            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome present; pdftotext absent"
         )
 
     def test_it_names_pdftotext_the_probe_found(self) -> None:
@@ -124,27 +115,21 @@ class TestReadySummary:
         claims with pdftotext, and the summary says so on the same line, so
         the tag wiki-check's check waits for is visible each tick."""
         found = toolchain.read_reports(
-            LAVENDER_2026_09_23 + "pdftotext=yes=pdftotext version 24.02.0\n"
+            DIPHTHERIA_2026_09_23 + "pdftotext=yes=pdftotext version 24.02.0\n"
         )
         assert toolchain.ready_summary(found) == (
-            "python 3.11.9; node v24.20.0; poetry, git, make, tar present; ffmpeg absent; "
-            "hooks absent; go absent; chrome absent; pdftotext present"
+            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext present"
         )
 
 
 class TestReadinessGap:
-    def test_the_three_nodes_that_answered_ready_have_no_gap(self) -> None:
-        for name, answer in (
-            ("lavender", LAVENDER_2026_09_23),
-            ("sedona", SEDONA_2026_09_23),
-            ("diphtheria", DIPHTHERIA_2026_09_23),
-        ):
-            assert toolchain.readiness_gap(name, node(name), toolchain.read_reports(answer)) is None
+    def test_the_node_that_answered_ready_has_no_gap(self) -> None:
+        reports = toolchain.read_reports(DIPHTHERIA_2026_09_23)
 
-    def test_the_store_alias_is_a_gap_returned_not_raised(self) -> None:
-        gap = toolchain.readiness_gap(
-            "lavender", node(), toolchain.read_reports(LAVENDER_STORE_STUB)
-        )
+        assert toolchain.readiness_gap("diphtheria", node("diphtheria"), reports) is None
+
+    def test_an_absent_interpreter_is_a_gap_returned_not_raised(self) -> None:
+        gap = toolchain.readiness_gap("lavender", node(), toolchain.read_reports(NO_PYTHON))
 
         stated = ("", "") if gap is None else (gap.code.value, gap.message.split(" -- ")[0])
         assert stated == (
@@ -152,13 +137,12 @@ class TestReadinessGap:
             "lavender (lavender) cannot run a build: python",
         )
 
-    def test_serendipitys_node_18_is_its_own_code_naming_what_was_found(self) -> None:
-        """The node that claimed MCPs/packages/wiki-search on 2026-09-25 and
-        failed at node-gyp: every tool present, Python right, Node.js 18."""
+    def test_node_18_is_its_own_code_naming_what_was_found(self) -> None:
+        """serendipity's Node.js, which claimed MCPs/packages/wiki-search on
+        2026-09-25 and failed at node-gyp: every tool present, Python right,
+        Node.js 18."""
         gap = toolchain.readiness_gap(
-            "serendipity",
-            node("serendipity"),
-            toolchain.read_reports(SERENDIPITY_2026_09_25),
+            "serendipity", node("serendipity"), toolchain.read_reports(OLD_NODE)
         )
 
         stated = ("", "") if gap is None else (gap.code.value, gap.message)
@@ -185,18 +169,18 @@ class TestNodeIsRight:
         assert not node_is_right((ToolReport(name="node", present=False, version=""),))
         assert not node_is_right(())
 
-    def test_serendipity_is_named_with_the_floor_and_what_it_found(self) -> None:
-        described = describe_gap("serendipity", toolchain.read_reports(SERENDIPITY_2026_09_25))
+    def test_an_old_node_is_named_with_the_floor_and_what_it_found(self) -> None:
+        described = describe_gap("serendipity", toolchain.read_reports(OLD_NODE))
 
         assert described == "serendipity: missing node 24+ (found v18.13.0)"
-        assert not is_ready(toolchain.read_reports(SERENDIPITY_2026_09_25))
+        assert not is_ready(toolchain.read_reports(OLD_NODE))
 
     def test_an_absent_node_is_named_once_by_its_install_not_again_by_the_floor(self) -> None:
         reports = toolchain.read_reports(
-            LAVENDER_2026_09_23.replace("node=yes=v24.20.0", "node=no=")
+            DIPHTHERIA_2026_09_23.replace("node=yes=v24.21.0", "node=no=")
         )
 
         described = describe_gap("lavender", reports)
 
-        assert described.startswith("lavender: missing node (winget install --id OpenJS.NodeJS.LTS")
+        assert described == "lavender: missing node (install by hand)"
         assert "node 24+" not in described

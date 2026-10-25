@@ -13,9 +13,9 @@ import pathlib
 
 from platform_core.json_utils import load_json_str
 
+from fleet.cli.render_documents import RENDERED_DIRECTORY
 from fleet.contracts.tagged_tools import HOOKS_CHECK_PACKAGES
 from fleet.core.hooks_check_document import HOOKS_CHECK_DOCUMENT, render_hooks_check_document
-from fleet.core.rendered_powershell import RENDERED_DIRECTORY
 
 #: tools/fleet.
 _PACKAGE = pathlib.Path(__file__).resolve().parent.parent

@@ -8,7 +8,7 @@ from platform_core.json_utils import JSONValue
 
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.machine import LedgerObserver, Machine, MachineRole
-from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform, decode_node_config
+from fleet.contracts.node import NodeConfig, NodeGpu, decode_node_config
 
 BUDGET: Final = NodeBudget(
     reserved_cores=2,
@@ -40,8 +40,7 @@ def node(*, gpu: NodeGpu | None = GPU, cores: int = 16, host: str = "lavender") 
     """
     return NodeConfig(
         host=host,
-        platform=NodePlatform.WINDOWS,
-        stage_root="C:/fleet/stage",
+        stage_root="/home/corvis/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,
         gpu=gpu,
@@ -51,8 +50,6 @@ def node(*, gpu: NodeGpu | None = GPU, cores: int = 16, host: str = "lavender") 
         cxx=None,
         docker=None,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget=BUDGET,
     )
 
@@ -62,23 +59,17 @@ def decode_like(value: JSONValue, declared: NodeConfig) -> NodeConfig:
 
     Args:
         value: The ``dispatch`` object.
-        declared: The node whose ``host``, ``platform``, ``enabled`` and
-            ``wsl_host`` the machine's file would hand the decoder.
+        declared: The node whose ``host`` and ``enabled`` the machine's file
+            would hand the decoder.
 
     Returns:
         The decoded node.
     """
-    return decode_node_config(
-        value,
-        host=declared["host"],
-        platform=declared["platform"],
-        enabled=declared["enabled"],
-        wsl_host=declared["wsl_host"],
-    )
+    return decode_node_config(value, host=declared["host"], enabled=declared["enabled"])
 
 
 def machine(name: str, declared: NodeConfig | None, *, held: str | None = None) -> Machine:
-    """Build one roster machine, a Windows worker that answers, observed by the fleet arm.
+    """Build one roster machine, a worker that answers, observed by the fleet arm.
 
     Args:
         name: Its name.
@@ -91,11 +82,9 @@ def machine(name: str, declared: NodeConfig | None, *, held: str | None = None) 
     return Machine(
         name=name,
         role=MachineRole.WORKER,
-        user="austi",
-        platform=NodePlatform.WINDOWS,
+        user="corvis",
         enabled=True,
         ledger_observer=LedgerObserver.FLEET_ARM,
-        guest_host=None,
         dispatch=declared,
         held=held,
     )

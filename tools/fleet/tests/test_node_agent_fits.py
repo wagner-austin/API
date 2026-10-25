@@ -30,8 +30,8 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue, tick_body
 from tests._registry import write_registry
-from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_NOW, DEMO_PROJECT, FakeRun, ok
+from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
+from tests.conftest import CALM, DEMO_NOW, DEMO_PROJECT, FakeRun, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -110,9 +110,9 @@ def test_a_node_with_room_for_one_worker_but_no_project_s_minimum_claims_nothing
     _test_hooks.run = FakeRun(
         [
             ok(""),
-            ok("free_ram_gb=6.0\nfree_disk_gb=860.0\nreserved_cores=0\n"),
+            ok(f"free_ram_gb=6.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"),
             ok(""),
-            ok(LAVENDER_2026_09_23),
+            ok(DIPHTHERIA_2026_09_23),
         ]
     )
     endpoint = FakeQueue([dump_json_str({"jobs": []})])

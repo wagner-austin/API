@@ -4,8 +4,6 @@ The ``sh`` lines are executed for real under this host's bash against a
 cache root under ``tmp_path``: the first build on a node starts a
 generation, a later one reads it while it is young, and one that finds it
 :data:`~fleet.core.tool_caches.GENERATION_DAYS` days old starts the next.
-The PowerShell lines run inside the build script, executed from its
-committed render by ``tests/pester/rendered-dialect-build.Tests.ps1``.
 """
 
 from __future__ import annotations
@@ -123,12 +121,3 @@ def test_a_generation_two_weeks_old_is_followed_by_a_new_one_and_kept(
     # The old one stays for the builds that read it; the removal judges it.
     assert (tools / old).is_dir()
     assert not (tools / generation / ".pending").exists()
-
-
-def test_the_powershell_lines_read_the_build_s_own_parameters() -> None:
-    lines = tool_caches.powershell_build_lines()
-
-    assert lines[0] == '$tools = "$CacheRoot/tools"'
-    assert f"-ge {tool_caches.GENERATION_SECONDS}) {{" in lines[4]
-    assert lines[-2] == ('[System.IO.File]::WriteAllText("$Target/cache-generation", $generation)')
-    assert lines[-1] == '$toolCache = "$tools/$generation"'

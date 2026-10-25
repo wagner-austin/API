@@ -206,29 +206,24 @@ def test_a_lock_rewritten_while_its_holder_was_probed_is_left(tmp_path: pathlib.
 
 
 class TestRuns:
-    def test_asks_this_platform_s_process_list_for_the_pid(self) -> None:
+    def test_asks_ps_for_the_pid(self) -> None:
         runner = FakeRun([ok("   4242\n")])
         _test_hooks.run = runner
 
         assert file_turn.runs(4242) is True
-        assert runner.calls == [
-            tuple(part.format(pid=4242) for part in file_turn._PROBES[os.name == "nt"])
-        ]
+        assert runner.calls == [("ps", "-p", "4242", "-o", "pid=")]
         assert runner.timeouts == [file_turn.PROBE_TIMEOUT_SECONDS]
 
     @pytest.mark.parametrize(
         ("answer", "running"),
         [
-            (ok('"python.exe","4242","Services","0","12,345 K"\n'), True),
-            (ok("INFO: No tasks are running which match the specified criteria.\n"), False),
+            (ok("   4242\n"), True),
             (failed(1, ""), False),
             (ok("  14242\n"), False),
         ],
-        ids=["tasklist lists it", "tasklist lists none", "ps lists none", "another pid"],
+        ids=["ps lists it", "ps lists none", "another pid"],
     )
-    def test_reads_either_platform_s_answer(
-        self, answer: _test_hooks.CommandResult, running: bool
-    ) -> None:
+    def test_reads_the_answer(self, answer: _test_hooks.CommandResult, running: bool) -> None:
         _test_hooks.run = FakeRun([answer])
 
         assert file_turn.runs(4242) is running

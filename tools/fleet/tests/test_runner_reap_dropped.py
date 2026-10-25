@@ -41,7 +41,7 @@ def _roster() -> RunnerSpec:
     Returns:
         The roster.
     """
-    return RunnerSpec(hosts=[_host()], windows_hosts=[])
+    return RunnerSpec(hosts=[_host()])
 
 
 def _reading(answer: str, github: str = API_ONE_OFFLINE) -> list[_test_hooks.CommandResult]:
@@ -186,7 +186,7 @@ def _blob(text: str) -> str:
 
 class TestTheRolledRoster:
     def test_the_roster_is_read_at_the_rolled_commit(self, tmp_path: pathlib.Path) -> None:
-        roster = RunnerSpec(hosts=[_host()], windows_hosts=[])
+        roster = RunnerSpec(hosts=[_host()])
         runner = FakeRun([ok(f"{COMMIT}\n"), ok(_blob(dump_json_str(encode_runner_spec(roster))))])
         _test_hooks.run = runner
         assert runner_reap_dropped.read_rolled_roster(tmp_path) == roster

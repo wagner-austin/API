@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from platform_core.errors import FleetErrorCode
 
-from fleet.contracts.node import LiveLoad, NodeConfig, NodePlatform
+from fleet.contracts.node import LiveLoad, NodeConfig
 from fleet.core.capacity import assess, room_for_any
 from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
@@ -22,13 +22,7 @@ def _diphtheria() -> NodeConfig:
     Returns:
         The node.
     """
-    return _node(
-        host="diphtheria",
-        cores=8,
-        reserved_cores=2,
-        platform=NodePlatform.LINUX,
-        checks_at_once=1,
-    )
+    return _node(host="diphtheria", cores=8, reserved_cores=2, checks_at_once=1)
 
 
 class TestCpuPressure:
@@ -69,19 +63,8 @@ class TestCpuPressure:
         assert at["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert under == {"workers": 3, "code": None, "reason": ""}
 
-    def test_a_node_with_no_reading_is_weighed_on_the_pools(self) -> None:
-        """A Windows node's kernel keeps no such account, so its probe prints none."""
-        verdict = assess(
-            _node(host="loki", cores=16, reserved_cores=2),
-            _state(host="loki", cpu_pressure_pct=None),
-            _project(minimum_workers=1),
-            frozenset(),
-        )
-
-        assert verdict == {"workers": 7, "code": None, "reason": ""}
-
     def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
-        node = _node(host="colossus", cores=12, reserved_cores=2, platform=NodePlatform.LINUX)
+        node = _node(host="colossus", cores=12, reserved_cores=2)
         live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
 
         verdict = assess(
@@ -178,7 +161,7 @@ class TestIoPressure:
         assert verdict["reason"].startswith("diphtheria's CPUs are saturated")
 
     def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
-        node = _node(host="colossus", cores=12, reserved_cores=2, platform=NodePlatform.LINUX)
+        node = _node(host="colossus", cores=12, reserved_cores=2)
         live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
 
         verdict = assess(

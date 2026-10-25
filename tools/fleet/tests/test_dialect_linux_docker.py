@@ -17,10 +17,8 @@ import subprocess
 
 import pytest
 
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: What execdocker's daemon answered on diphtheria, 2026-09-29.
 ROOTLESS_ANSWER = '29.8.1 ["name=seccomp,profile=builtin","name=rootless","name=cgroupns"]'
@@ -46,7 +44,7 @@ def _run_with_sudo(tmp_path: pathlib.Path, sudo_body: str) -> dict[str, str]:
     fake_sudo.chmod(0o755)
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
+        TOOLCHAIN_PROBE_SCRIPT.replace(
             PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
         ),
         encoding="utf-8",

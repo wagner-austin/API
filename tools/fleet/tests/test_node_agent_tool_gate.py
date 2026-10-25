@@ -26,8 +26,8 @@ from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_docu
 from tests._queue_fakes import FakeQueue
 from tests._registry import shipped_document, write_registry
 from tests._roster_fixtures import dispatch_document, machine_document
-from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, FakeRun, ok
+from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
+from tests.conftest import CALM, DEMO_PROJECT, FakeRun, ok
 
 __all__ = ["_credentials_in_env"]
 
@@ -38,20 +38,21 @@ WAITING = ("libs/platform_core", "tools/fleet", "tools/maketools")
 
 #: pendragon with room for a run: 9.0 GB free of its 11.7 against its 1.5 GB
 #: owner reservation.
-PENDRAGON_ROOM = "free_ram_gb=9.0\nfree_disk_gb=400.0\nreserved_cores=0\n"
+PENDRAGON_ROOM = f"free_ram_gb=9.0\nfree_disk_gb=400.0\nreserved_cores=0\n{CALM}"
 
 
 def pendragon_2026_10_02() -> JSONObject:
-    """pendragon's machine file as the replayed tick read it: the Windows worker it was then.
+    """pendragon's capacity as the replayed tick read it.
 
     Written out rather than read from the shipped roster, because a netboot
-    reimage rewrites that file (MCPs board task 9fa23d42): on 2026-10-21 it
-    became a Linux install, and a replay of the Windows tick must not change
-    with it.
+    reimage rewrites that file (MCPs board task 9fa23d42): on 2026-10-21 the
+    Windows worker it was then became a Linux install, and a replay of the
+    tick's capacity must not change with it. The replay runs it as the one
+    platform the fleet renders since board task e705f08c.
 
     Returns:
-        The machine's object: a Windows worker with 16 logical cores and
-        11.7 GB, its owner's 2 cores and 1.5 GB reserved.
+        The machine's object: a worker with 16 logical cores and 11.7 GB, its
+        owner's 2 cores and 1.5 GB reserved.
     """
     dispatch = dispatch_document()
     dispatch["ram_gb"] = 11.7
@@ -63,7 +64,7 @@ def pendragon_2026_10_02() -> JSONObject:
         "checks_at_once": None,
         "pinned_checks_only": False,
     }
-    return machine_document(role="worker", platform="windows", dispatch=dispatch)
+    return machine_document(role="worker", dispatch=dispatch)
 
 
 @pytest.fixture(name="pendragon_config")
@@ -91,7 +92,7 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
 def test_pendragon_without_ffmpeg_asks_the_queue_for_every_project_but_grandma_api(
     pendragon_config: pathlib.Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    runner = FakeRun([ok(""), ok(PENDRAGON_ROOM), ok(""), ok(LAVENDER_2026_09_23)])
+    runner = FakeRun([ok(""), ok(PENDRAGON_ROOM), ok(""), ok(DIPHTHERIA_2026_09_23)])
     _test_hooks.run = runner
     endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
@@ -102,7 +103,7 @@ def test_pendragon_without_ffmpeg_asks_the_queue_for_every_project_but_grandma_a
 
     assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
     claim = endpoint.arguments[1]
-    assert claim["tags"] == ["windows"]
+    assert claim["tags"] == ["linux"]
     assert claim["projects"] == [DEMO_PROJECT, *WAITING]
     messages = [record.getMessage() for record in caplog.records]
     assert not any("NODE_TOOL_MISSING" in message for message in messages)
@@ -117,7 +118,7 @@ def test_the_same_pendragon_with_ffmpeg_found_also_asks_for_grandma_api(
 ) -> None:
     """The control: the only difference is the ffmpeg line, so it is what
     kept grandma-api out of the pass above."""
-    found = LAVENDER_2026_09_23 + "ffmpeg=yes=ffmpeg version 8.0\n"
+    found = DIPHTHERIA_2026_09_23 + "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"
     _test_hooks.run = FakeRun([ok(""), ok(PENDRAGON_ROOM), ok(""), ok(found)])
     endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
@@ -126,7 +127,7 @@ def test_the_same_pendragon_with_ffmpeg_found_also_asks_for_grandma_api(
     assert node_agent.main(argv) == 0
 
     claim = endpoint.arguments[1]
-    assert claim["tags"] == ["ffmpeg", "windows"]
+    assert claim["tags"] == ["ffmpeg", "linux"]
     assert claim["projects"] == [
         DEMO_PROJECT,
         "libs/platform_core",

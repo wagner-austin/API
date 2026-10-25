@@ -67,11 +67,11 @@ class TestCollecting:
             f"FLEET-CHECK {DEFAULT_JOB_ID[:8]} {DEMO_PROJECT} sha={DEFAULT_SHA} node=lavender "
             "exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% "
             "budget=unread ended=2025-09-04T15:34:20Z "
-            f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
+            f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
         )
         # Retired after the tail was read and the job closed (fleet.cli.node_settle):
         # the fifth and sixth calls send the retire to the stage root and run it.
-        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+        retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
         assert [retire_path in " ".join(call) for call in node.calls[:6]] == [
             False,
             False,
@@ -268,7 +268,7 @@ class TestAnnounceAndEntryPoints:
         assert checkin["machine"] == f"{sys.platform}:demure"
         assert checkin["room"] == "fleet"
         assert checkin["agent"] == "fleet-node-lavender"
-        assert "carrying windows" in narrow_json_to_str(checkin["body"])
+        assert narrow_json_to_str(checkin["body"]).endswith("carrying linux")
 
     def test_an_undeclared_node_is_refused_before_any_call(
         self, sourced_config: pathlib.Path

@@ -29,7 +29,7 @@ def _roster() -> RunnerSpec:
     sedona_install = an_install("wagner-austin/API")
     sedona_install["runner_name"] = "sedona"
     sedona["installs"] = [sedona_install]
-    return RunnerSpec(hosts=[lavender, sedona], windows_hosts=[])
+    return RunnerSpec(hosts=[lavender, sedona])
 
 
 class TestTheReading:

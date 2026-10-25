@@ -27,7 +27,7 @@ from fleet.contracts.runners import (
 from fleet.contracts.tagged_tools import CHROME_LINUX_PATH, TAGGED_TOOLS
 from fleet.contracts.workspace import decode_fleet_workspace
 from tests._registry import shipped_document
-from tests._runner_fixtures import base_json, ci_slice_json, raw_windows_host
+from tests._runner_fixtures import base_json, ci_slice_json
 
 #: The shipped roster, resolved from this file so the test runs from any cwd.
 SHIPPED_ROSTER = pathlib.Path(__file__).resolve().parent.parent / "runners.json"
@@ -287,25 +287,15 @@ class TestRunnerSpec:
 
     def test_an_empty_roster_is_refused_because_it_reads_as_healthy(self) -> None:
         with pytest.raises(JSONTypeError, match="reads exactly like a healthy fleet"):
-            decode_runner_spec({"hosts": [], "windows_hosts": []})
+            decode_runner_spec({"hosts": []})
 
     def test_duplicate_host_names_are_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be unique, got duplicates: lavender"):
-            decode_runner_spec({"hosts": [_host(), _host()], "windows_hosts": []})
-
-    def test_a_windows_host_may_not_share_a_linux_host_s_name(self) -> None:
-        windows = raw_windows_host()
-        windows["name"] = "lavender"
-        with pytest.raises(JSONTypeError, match="must be unique, got duplicates: lavender"):
-            decode_runner_spec({"hosts": [_host()], "windows_hosts": [windows]})
-
-    def test_a_roster_that_names_no_windows_hosts_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="windows_hosts"):
-            decode_runner_spec({"hosts": [_host()]})
+            decode_runner_spec({"hosts": [_host(), _host()]})
 
     def test_encode_then_decode_is_the_identity(self) -> None:
-        spec = decode_runner_spec({"hosts": [_host()], "windows_hosts": [raw_windows_host()]})
-        assert spec["windows_hosts"][0]["name"] == "loki"
+        spec = decode_runner_spec({"hosts": [_host()]})
+        assert dict(encode_runner_spec(spec)).keys() == {"hosts"}
         assert decode_runner_spec(dict(encode_runner_spec(spec))) == spec
 
     def test_the_shipped_roster_decodes_and_round_trips(self) -> None:
@@ -322,17 +312,19 @@ class TestRunnerSpec:
         # The Linux runners lavender's WSL guest carried until its reimage to
         # Ubuntu on 2026-10-19 (MCPs board task 1e9ab738), now on the host
         # itself: 2 API, 4 MCPs, corvis-stick and tree-bot, every one
-        # answering the host's own label. The four Windows runners went with
-        # Windows; Windows CI moves to a runner on loki. corvis-stick was
-        # portable-claude until its rename, and registering against the old
-        # URL 404s.
+        # answering the host's own label, and chat's since its CI left loki
+        # with the rest of the Windows runners (board task e705f08c).
+        # corvis-stick was portable-claude until its rename, and registering
+        # against the old URL 404s.
         per_repo = [install["repo"] for install in lavender["installs"]]
         assert {repo: per_repo.count(repo) for repo in per_repo} == {
             "wagner-austin/API": 2,
             "wagner-austin/MCPs": 4,
             "wagner-austin/corvis-stick": 1,
             "wagner-austin/tree-bot": 1,
+            "wagner-austin/chat": 1,
         }
+        assert len(spec["hosts"]) == 1
         assert {label for install in lavender["installs"] for label in install["labels"]} == {
             "lavender"
         }

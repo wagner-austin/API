@@ -73,7 +73,7 @@ class TestOweAgain:
         answered = FakeRun(retire_replies())
         _test_hooks.run = answered
         _pass(path)
-        assert any(f"retire-{DEMO_RUN_ID}.ps1" in " ".join(call) for call in answered.calls)
+        assert any(f"retire-{DEMO_RUN_ID}.sh" in " ".join(call) for call in answered.calls)
         assert records.read_retires(path)[-1]["state"] is RetireState.RETIRED
 
     @pytest.mark.parametrize(

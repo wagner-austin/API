@@ -20,7 +20,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.ledger import LedgerEntry
-from fleet.core import _test_hooks, claim_window, dialect, leases, names, records
+from fleet.core import _test_hooks, claim_window, dialect, leases, records
 from tests._node_agent_fixtures import (
     PROBED,
     _credentials_in_env,
@@ -70,11 +70,11 @@ def _stop_body(config_path: pathlib.Path) -> str:
     Returns:
         The script's text, as the dialect renders it.
     """
-    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    node = loaded.workspace["nodes"]["lavender"]
-    return dialect.for_platform(node["platform"]).stop_script(
-        target=names.dispatch_directory(node["stage_root"], DEMO_RUN_ID), run_id=DEMO_RUN_ID
+    assert (
+        "lavender"
+        in _config.load_workspace({_config.CONFIG_FLAG: str(config_path)}).workspace["nodes"]
     )
+    return dialect.stop_script(DEMO_RUN_ID)
 
 
 def _last_row(config_path: pathlib.Path) -> LedgerEntry:

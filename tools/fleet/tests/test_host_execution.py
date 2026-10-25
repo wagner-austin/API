@@ -1,8 +1,8 @@
-"""The execution run fails unless every host case of this platform ran.
+"""The execution run fails unless every host case ran.
 
 Board task 465689f5. ``tests/_host.py`` is what makes a passed
-tools/fleet-execution run mean the host cases executed: it keeps only this
-platform's cases and turns a skip, or a run of none, into a failure. A
+tools/fleet-execution-linux run mean the host cases executed: it keeps only
+the host cases and turns a skip, or a run of none, into a failure. A
 plugin that quietly passed a run of zero would make the deploy gate vouch
 for nothing, so each case here runs a real pytest session in a subprocess
 with that module's own bytes as its plugin, and reads the exit status and
@@ -26,9 +26,6 @@ from tests._host import (
     RUNNER_HOST_MARKER,
 )
 
-#: The platform this machine is not.
-OTHER_PLATFORM: Final[str] = "linux" if HOST_PLATFORM == "windows" else "windows"
-
 #: The plugin's source, loaded into each session under its own name.
 PLUGIN: Final[str] = (Path(__file__).resolve().parent / "_host.py").read_text(encoding="utf-8")
 
@@ -50,12 +47,11 @@ def _session(pytester: pytest.Pytester, body: str, *arguments: str) -> pytest.Ru
     )
 
 
-def _cases(this: str, other: str) -> str:
-    """A module with one case bound to each platform.
+def _cases(this: str) -> str:
+    """A module with one host case and one that is not.
 
     Args:
-        this: The body of the case bound to this platform.
-        other: The body of the case bound to the other one.
+        this: The body of the host case.
 
     Returns:
         The module's source.
@@ -64,26 +60,24 @@ def _cases(this: str, other: str) -> str:
         "import pytest\n"
         f"@pytest.mark.{MARKERS[HOST_PLATFORM]}\n"
         f"def test_here():\n    {this}\n"
-        f"@pytest.mark.{MARKERS[OTHER_PLATFORM]}\n"
-        f"def test_there():\n    {other}\n"
         "def test_unbound():\n    pass\n"
     )
 
 
-def test_a_complete_run_keeps_only_this_platform_and_passes(pytester: pytest.Pytester) -> None:
-    result = _session(pytester, _cases("pass", "raise AssertionError"), "--host-execution")
+def test_a_complete_run_keeps_only_the_host_cases_and_passes(pytester: pytest.Pytester) -> None:
+    result = _session(pytester, _cases("pass"), "--host-execution")
 
     assert result.ret == pytest.ExitCode.OK
-    result.assert_outcomes(passed=1, deselected=2)
+    result.assert_outcomes(passed=1, deselected=1)
     assert f"host execution on {HOST_PLATFORM}: 1 case(s) ran, 0 skipped" in result.outlines
     assert not any("HOST_EXECUTION_INCOMPLETE" in line for line in result.outlines)
 
 
 def test_a_skipped_host_case_fails_the_run(pytester: pytest.Pytester) -> None:
-    result = _session(pytester, _cases("pytest.skip('absent')", "pass"), "--host-execution")
+    result = _session(pytester, _cases("pytest.skip('absent')"), "--host-execution")
 
     assert result.ret == pytest.ExitCode.TESTS_FAILED
-    result.assert_outcomes(skipped=1, deselected=2)
+    result.assert_outcomes(skipped=1, deselected=1)
     assert f"host execution on {HOST_PLATFORM}: 0 case(s) ran, 1 skipped" in result.outlines
     assert (
         "HOST_EXECUTION_INCOMPLETE: an execution run must run every host case "
@@ -92,7 +86,7 @@ def test_a_skipped_host_case_fails_the_run(pytester: pytest.Pytester) -> None:
 
 
 def test_a_run_of_no_host_case_fails(pytester: pytest.Pytester) -> None:
-    body = f"import pytest\n@pytest.mark.{MARKERS[OTHER_PLATFORM]}\ndef test_there():\n    pass\n"
+    body = "def test_unbound():\n    pass\n"
     result = _session(pytester, body, "--host-execution")
 
     assert result.ret == pytest.ExitCode.TESTS_FAILED
@@ -100,17 +94,11 @@ def test_a_run_of_no_host_case_fails(pytester: pytest.Pytester) -> None:
     assert f"host execution on {HOST_PLATFORM}: 0 case(s) ran, 0 skipped" in result.outlines
 
 
-def test_the_ordinary_run_skips_the_other_platform_naming_its_project(
-    pytester: pytest.Pytester,
-) -> None:
-    result = _session(pytester, _cases("pass", "raise AssertionError"), "-rs")
+def test_the_ordinary_run_runs_a_host_case_like_any_other(pytester: pytest.Pytester) -> None:
+    result = _session(pytester, _cases("pass"), "-rs")
 
     assert result.ret == pytest.ExitCode.OK
-    result.assert_outcomes(passed=2, skipped=1)
-    reason = f"executes on a {OTHER_PLATFORM} host; {PROJECTS[OTHER_PLATFORM]} runs it there"
-    assert [line for line in result.outlines if line.startswith("SKIPPED")] == [
-        f"SKIPPED [1] test_cases.py:5: {reason}"
-    ]
+    result.assert_outcomes(passed=2)
     assert not any(line.startswith("host execution on") for line in result.outlines)
 
 
@@ -137,11 +125,10 @@ def test_the_ordinary_run_skips_a_docker_case_on_every_platform(
     ]
 
 
-def test_the_execution_run_keeps_a_docker_case_only_on_linux(pytester: pytest.Pytester) -> None:
+def test_the_execution_run_keeps_a_docker_case(pytester: pytest.Pytester) -> None:
     result = _session(pytester, DOCKER_CASE, "--host-execution")
 
-    kept = {"linux": {"passed": 1}, "windows": {"deselected": 1}}[HOST_PLATFORM]
-    result.assert_outcomes(**kept)
+    result.assert_outcomes(passed=1)
 
 
 #: A module with one case that reads a runner host's units, recording a
@@ -204,7 +191,7 @@ def test_a_failed_case_s_reading_is_not_printed(pytester: pytest.Pytester) -> No
 
 
 def test_the_tally_counts_on_the_controller_under_xdist(pytester: pytest.Pytester) -> None:
-    body = _cases("pass", "pass") + "".join(
+    body = _cases("pass") + "".join(
         f"@pytest.mark.{MARKERS[HOST_PLATFORM]}\ndef test_more_{index}():\n    pass\n"
         for index in range(3)
     )

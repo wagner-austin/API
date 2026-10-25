@@ -1,14 +1,14 @@
-"""The fleet runs tools/fleet's host cases once per platform (board task 465689f5).
+"""The fleet runs tools/fleet's host cases on a node (board task 465689f5).
 
 API's deploy refuses a commit unless the fleet queue records a passed run of
-tools/fleet-execution and of tools/fleet-execution-linux at it (the root
-Makefile's ``executed``, pinned in tools/maketools' execution-gate wiring
-test). Those verdicts mean both halves ran only if the registry sends each
-project to a node of its platform and both stage the one directory whose
-check runs the host cases, which is what this decodes the real registry to
-require.
+tools/fleet-execution-linux at it (the root Makefile's ``executed``, pinned
+in tools/maketools' execution-gate wiring test). That verdict means the host
+cases ran only if the registry stages the one directory whose check runs
+them, which is what this decodes the real registry to require. Its Windows
+twin, tools/fleet-execution, left with the Windows dialect (board task
+e705f08c).
 
-The Linux half also requires ``docker``: its host cases include one that runs
+The project requires ``docker``: its host cases include one that runs
 a docker project's build as the node's execdocker user against that user's
 rootless daemon (MCPs board task a8ee9b21), which only a node carrying the
 tag has. slime/execution and idle/execution require it for the same
@@ -83,19 +83,11 @@ def test_phone_lanes_use_the_declared_usb_route_and_serialize_device_access(
 PACKAGE: Final[pathlib.Path] = pathlib.Path(__file__).resolve().parent.parent
 
 
-@pytest.mark.parametrize(
-    ("name", "tags"),
-    [
-        ("tools/fleet-execution", (NodeTag.WINDOWS,)),
-        ("tools/fleet-execution-linux", (NodeTag.LINUX, NodeTag.DOCKER)),
-    ],
-)
-def test_each_half_runs_the_execution_directory_on_its_platform(
-    name: str, tags: tuple[NodeTag, ...]
-) -> None:
+def test_the_execution_directory_runs_isolated_on_a_rootless_daemon() -> None:
     workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, name)
-    assert project["required_tags"] == tags
+    project = require_project(workspace, "tools/fleet-execution-linux")
+    assert "tools/fleet-execution" not in workspace["projects"]
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
         path="tools/fleet-execution",
@@ -125,7 +117,7 @@ def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
         install=(),
         companions=(),
     )
-    assert require_node(workspace, "lavender")["platform"] == NodeTag.LINUX.value
+    assert require_node(workspace, "lavender")["enabled"]
     recipe = (PACKAGE / "Makefile").read_text(encoding="utf-8")
     given = f"{RUNNER_HOST_OPTION}="
     named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]
@@ -401,16 +393,15 @@ def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender() -> None:
 
 
 def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
-    """clients/TankpitBot's live demo case lands on a Windows node with ffmpeg.
+    """clients/TankpitBot's live demo case lands on a node with ffmpeg.
 
     The case reads a segment the public demo served with ``ffprobe`` to
     require its AAC audio stream (MCPs board task 46934cd6), so a node
-    without the ``ffmpeg`` tag could only fail it; ``windows`` is the
-    platform the package's own check is registered for.
+    without the ``ffmpeg`` tag could only fail it.
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "clients/TankpitBot-execution")
-    assert project["required_tags"] == (NodeTag.WINDOWS, NodeTag.FFMPEG)
+    assert project["required_tags"] == (NodeTag.FFMPEG,)
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
         path="clients/TankpitBot-execution",
@@ -437,31 +428,26 @@ def test_tankpits_move_is_measured_on_colossus_alone() -> None:
         install=(),
         companions=(),
     )
-    assert require_node(workspace, "colossus")["platform"] == NodeTag.LINUX.value
+    assert require_node(workspace, "colossus")["enabled"]
     assert "clients/TankpitBot-sedona-execution" not in workspace["projects"]
 
 
-def test_tankpitbot_runs_its_ordinary_check_on_each_platform() -> None:
-    """clients/TankpitBot checks on a Windows node and clients/TankpitBot-linux on a Linux one.
+def test_tankpitbot_runs_its_ordinary_check_on_a_node_alone() -> None:
+    """clients/TankpitBot-linux is the package's one ordinary check.
 
-    The package binds the cases where the two operating systems differ to
-    ``host_windows`` and ``host_linux`` (board task 8c6874a3), and the
-    ordinary run runs the half bound to its own platform, so the two
-    projects stage the same directory with the same install and differ
-    only in where they land.
+    Its Windows twin, clients/TankpitBot, staged the same directory and ran
+    the cases bound to ``host_windows`` (board task 8c6874a3); it left with
+    loki (board task e705f08c), and the workspace declares no project for it.
     """
     workspace = decode_fleet_workspace(shipped_document())
     install = ("make", "-s", "-C", "clients/TankpitBot", "install")
-    source = ProjectSource(
+    linux = require_project(workspace, "clients/TankpitBot-linux")
+
+    assert "clients/TankpitBot" not in workspace["projects"]
+    assert linux["required_tags"] == (NodeTag.LINUX,)
+    assert linux["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
         path="clients/TankpitBot",
         install=(InstallStep(phase="install", argv=install),),
         companions=(),
     )
-    windows = require_project(workspace, "clients/TankpitBot")
-    linux = require_project(workspace, "clients/TankpitBot-linux")
-
-    assert windows["required_tags"] == (NodeTag.WINDOWS,)
-    assert linux["required_tags"] == (NodeTag.LINUX,)
-    assert windows["source"] == source
-    assert linux["source"] == source

@@ -18,10 +18,8 @@ import subprocess
 import pytest
 
 from fleet.contracts.capability import RUST_CHECK_SUBCOMMANDS, RUST_CHECK_TOOLS
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: What the fake answers ``cargo --version`` with, as diphtheria's did.
 CARGO_ANSWER = "cargo 1.98.1 (797e8a9bc 2026-08-05)"
@@ -90,9 +88,7 @@ def _probe_fields(
         _executable(tools / name, f'#!/bin/sh\necho "{name} 0.13.0"\n')
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
-            PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}'\n", 1
-        ),
+        TOOLCHAIN_PROBE_SCRIPT.replace(PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}'\n", 1),
         encoding="utf-8",
     )
     completed = subprocess.run(
@@ -107,7 +103,7 @@ def _probe_fields(
 
 
 def test_the_line_asks_every_check_subcommand_and_tool() -> None:
-    body = DIALECT.toolchain_probe_script()
+    body = TOOLCHAIN_PROBE_SCRIPT
 
     assert RUST_CHECK_SUBCOMMANDS == ("fmt", "clippy", "llvm-cov")
     assert RUST_CHECK_TOOLS == ("uv",)

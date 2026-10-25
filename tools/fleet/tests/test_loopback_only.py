@@ -29,9 +29,7 @@ from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.project import decode_loopback_only, decode_project_config
 from fleet.contracts.source import InstallStep
 from fleet.contracts.workspace import decode_fleet_workspace
-from fleet.core import names, recipe
-from fleet.core.dialect_linux import LinuxDialect
-from fleet.core.dialect_windows import WindowsDialect
+from fleet.core import dialect, names, recipe
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
 from tests._registry import shipped_document
 
@@ -80,14 +78,13 @@ def _build(loopback_unit: str | None) -> str:
     Returns:
         The script's text.
     """
-    return LinuxDialect().build_script(
+    return dialect.build_script(
         target=TARGET,
         path="",
         workers=4,
         install=INSTALL,
         cache_root="/home/corvis/fleet/stage/cache",
         isolated_docker=False,
-        elevated=False,
         agent="opus-mcps-1024-a771",
         loopback_unit=loopback_unit,
     )
@@ -175,17 +172,3 @@ class TestTheBuild:
         )
 
         assert ran.stdout.splitlines() == [f"value-of-{name}" for name in BUILD_EXPORTS]
-
-    def test_a_windows_node_refuses_to_render_it(self) -> None:
-        with pytest.raises(ValueError, match="declares loopback_only, and a Windows node has no"):
-            WindowsDialect().build_script(
-                target="C:/fleet/stage/run-1",
-                path="",
-                workers=4,
-                install=INSTALL,
-                cache_root="C:/fleet/stage/cache",
-                isolated_docker=False,
-                elevated=False,
-                agent="opus-mcps-1024-a771",
-                loopback_unit=UNIT,
-            )

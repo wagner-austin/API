@@ -17,10 +17,15 @@ from platform_core.json_utils import (
     load_json_str,
 )
 
-from fleet.contracts.machine import LedgerObserver, MachineRole, decode_machine, encode_machine
+from fleet.contracts.machine import (
+    PLATFORM,
+    LedgerObserver,
+    MachineRole,
+    decode_machine,
+    encode_machine,
+)
 from fleet.contracts.node import (
     NodeConfig,
-    NodePlatform,
     decode_node_config,
     decode_node_gpu,
     encode_node_config,
@@ -30,7 +35,7 @@ from tests._contract_fixtures import GPU, machine, node
 
 
 def _decode(value: JSONValue) -> NodeConfig:
-    """Decode a ``dispatch`` object as lavender's, a Windows machine of its own that answers.
+    """Decode a ``dispatch`` object as lavender's, a machine that answers.
 
     Args:
         value: The object.
@@ -38,13 +43,11 @@ def _decode(value: JSONValue) -> NodeConfig:
     Returns:
         The node.
     """
-    return decode_node_config(
-        value, host="lavender", platform=NodePlatform.WINDOWS, enabled=True, wsl_host=None
-    )
+    return decode_node_config(value, host="lavender", enabled=True)
 
 
 def _file(**changes: JSONValue) -> JSONObject:
-    """lavender-wsl's machine file as this package reads it, with fields changed.
+    """lavender's machine file as this package reads it, with fields changed.
 
     Args:
         **changes: Fields to replace.
@@ -58,28 +61,12 @@ def _file(**changes: JSONValue) -> JSONObject:
         "platform": "linux",
         "enabled": True,
         "ledger_observer": "fleet-arm",
-        "guest": {"host": "lavender", "sshPort": 2222},
-        "dispatch": {**encode_node_config(node()), "held": None},
+        "guest": None,
+        "dispatch": {**encode_node_config(node()), "elevated": False, "held": None},
         "tailnetIp": "100.65.161.27",
         "notes": "read by MCPs' decoder, carried here untouched",
     }
     return {**base, **changes}
-
-
-def _guest_node(*, enabled: bool) -> NodeConfig:
-    """The node :func:`_file` declares, with its machine's facts.
-
-    Args:
-        enabled: Whether it dispatches.
-
-    Returns:
-        lavender-wsl, a linux node inside lavender.
-    """
-    declared = node(host="lavender-wsl")
-    declared["platform"] = NodePlatform.LINUX
-    declared["enabled"] = enabled
-    declared["wsl_host"] = "lavender"
-    return declared
 
 
 class TestNodeGpu:
@@ -121,36 +108,22 @@ class TestNodeConfig:
         assert _decode(load_json_str(dump_json_str(encode_node_config(original)))) == original
 
     def test_the_machines_own_facts_are_the_ones_handed_in(self) -> None:
-        """``host``, ``platform``, ``enabled`` and ``wsl_host`` are said once,
-        in the machine's file, so the capacity carries none of them and the
-        decoder takes them as given."""
+        """``host`` and ``enabled`` are said once, in the machine's file, so
+        the capacity carries neither and the decoder takes them as given."""
         encoded = encode_node_config(node())
-        assert not {"host", "platform", "enabled", "wsl_host"} & set(encoded)
+        assert not {"host", "platform", "enabled", "wsl_host", "elevated"} & set(encoded)
 
-        decoded = decode_node_config(
-            encoded,
-            host="lavender-wsl",
-            platform=NodePlatform.LINUX,
-            enabled=False,
-            wsl_host="lavender",
-        )
+        decoded = decode_node_config(encoded, host="colossus", enabled=False)
 
-        assert (
-            decoded["host"],
-            decoded["platform"],
-            decoded["enabled"],
-            decoded["wsl_host"],
-        ) == ("lavender-wsl", NodePlatform.LINUX, False, "lavender")
+        assert (decoded["host"], decoded["enabled"]) == ("colossus", False)
 
-    def test_a_windows_node_inside_another_machine_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="only a linux node runs inside another"):
-            decode_node_config(
-                encode_node_config(node()),
-                host="lavender",
-                platform=NodePlatform.WINDOWS,
-                enabled=True,
-                wsl_host="sedona",
-            )
+    def test_the_elevated_flag_mcps_still_reads_is_not_read_here(self) -> None:
+        """Every machine file carries ``elevated: false`` until MCPs' readers
+        drop it (MCPs board task 5b040fdb); no node runs an elevated runner
+        since board task e705f08c, so this package reads nothing from it."""
+        encoded = encode_node_config(node())
+
+        assert _decode({**encoded, "elevated": False}) == _decode({**encoded, "elevated": True})
 
     def test_an_absent_gpu_key_is_refused(self) -> None:
         """Absence is indistinguishable from unfilled.
@@ -201,30 +174,26 @@ class TestNodeConfig:
 
 
 class TestMachine:
-    def test_a_guest_node_takes_its_name_platform_and_host_from_the_machine(self) -> None:
-        decoded = decode_machine("lavender-wsl", _file())
+    def test_a_node_takes_its_name_and_enablement_from_the_machine(self) -> None:
+        decoded = decode_machine("lavender", _file())
 
-        assert (decoded["role"], decoded["user"], decoded["guest_host"], decoded["held"]) == (
+        assert (decoded["role"], decoded["user"], decoded["held"]) == (
             MachineRole.WORKER,
             "corvis",
-            "lavender",
             None,
         )
         assert decoded["ledger_observer"] is LedgerObserver.FLEET_ARM
-        assert decoded["dispatch"] == _guest_node(enabled=True)
+        assert decoded["dispatch"] == node()
 
     def test_a_machine_names_the_arm_that_observes_it_whatever_its_role(self) -> None:
         """MCPs board task 911b0303: the observe pass chooses by this field,
         so a hub the fleet arm observes reads as one."""
-        hub = decode_machine(
-            "diphtheria", _file(role="hub", guest=None, dispatch="the hub runs no dispatched work")
-        )
+        hub = decode_machine("diphtheria", _file(role="hub", dispatch="the hub runs no work"))
         phone = decode_machine(
-            "phone",
-            _file(role="client", user=None, guest=None, ledger_observer="none", dispatch="never"),
+            "phone", _file(role="client", user=None, ledger_observer="none", dispatch="never")
         )
         pcsession = decode_machine(
-            "diphtheria", _file(role="hub", guest=None, ledger_observer="pcsession", dispatch="hub")
+            "diphtheria", _file(role="hub", ledger_observer="pcsession", dispatch="hub")
         )
 
         assert (hub["role"], hub["ledger_observer"]) == (MachineRole.HUB, LedgerObserver.FLEET_ARM)
@@ -233,7 +202,7 @@ class TestMachine:
 
     def test_a_machine_that_declares_no_capacity_carries_its_reason(self) -> None:
         decoded = decode_machine(
-            "phone", _file(role="client", user=None, guest=None, dispatch="never dispatched to")
+            "phone", _file(role="client", user=None, dispatch="never dispatched to")
         )
 
         assert (decoded["dispatch"], decoded["held"], decoded["user"]) == (
@@ -244,8 +213,7 @@ class TestMachine:
 
     def test_a_machine_the_operator_reaches_but_does_not_own_is_read(self) -> None:
         decoded = decode_machine(
-            "relative",
-            _file(role="untrusted-managed", guest=None, dispatch="not the operator's machine"),
+            "relative", _file(role="untrusted-managed", dispatch="not the operator's machine")
         )
 
         assert (decoded["role"], decoded["held"]) == (
@@ -257,12 +225,11 @@ class TestMachine:
         """MCPs board task 4ec65b8f: the stack host is offered none of the
         fleet's pool, so a server reads only with pinned_checks_only."""
         declared = node(host="demure")
-        declared["platform"] = NodePlatform.LINUX
         declared["budget"] = {**declared["budget"], "pinned_checks_only": True}
         dispatch = {**encode_node_config(declared), "held": None}
 
-        decoded = decode_machine("demure", _file(role="server", guest=None, dispatch=dispatch))
-        reasoned = decode_machine("demure", _file(role="server", guest=None, dispatch="the stack"))
+        decoded = decode_machine("demure", _file(role="server", dispatch=dispatch))
+        reasoned = decode_machine("demure", _file(role="server", dispatch="the stack"))
 
         assert (decoded["role"], decoded["dispatch"]) == (MachineRole.SERVER, declared)
         assert (reasoned["role"], reasoned["dispatch"], reasoned["held"]) == (
@@ -275,27 +242,27 @@ class TestMachine:
         dispatch = {**encode_node_config(node(host="demure")), "held": None}
 
         with pytest.raises(JSONTypeError, match="machine 'demure' is a server, which takes no"):
-            decode_machine("demure", _file(role="server", guest=None, dispatch=dispatch))
+            decode_machine("demure", _file(role="server", dispatch=dispatch))
 
     def test_a_held_node_dispatches_nothing_and_says_why(self) -> None:
-        dispatch = {**encode_node_config(node()), "held": "its WSL VM holds the memory"}
+        dispatch = {**encode_node_config(node()), "held": "reinstalling as NixOS"}
 
-        held = _file(platform="windows", guest=None, dispatch=dispatch)
+        decoded = decode_machine("lavender", _file(dispatch=dispatch))
 
-        decoded = decode_machine("lavender", held)
-
-        assert decoded["held"] == "its WSL VM holds the memory"
+        assert decoded["held"] == "reinstalling as NixOS"
         assert decoded["dispatch"] == {**node(), "enabled": False}
 
     def test_a_machine_that_is_off_does_not_dispatch(self) -> None:
-        decoded = decode_machine("lavender-wsl", _file(enabled=False))
+        decoded = decode_machine("lavender", _file(enabled=False))
 
-        assert (decoded["dispatch"], decoded["held"]) == (_guest_node(enabled=False), None)
+        assert (decoded["dispatch"], decoded["held"]) == ({**node(), "enabled": False}, None)
 
     def test_a_machine_survives_encoding_in_what_this_package_reads(self) -> None:
-        original = decode_machine("lavender-wsl", _file())
+        original = decode_machine("lavender", _file())
 
-        assert decode_machine("lavender-wsl", encode_machine(original)) == original
+        encoded = encode_machine(original)
+        assert encoded["platform"] == PLATFORM == "linux"
+        assert decode_machine("lavender", encoded) == original
         held = machine("diphtheria", None, held="the hub")
         assert decode_machine("diphtheria", encode_machine(held)) == held
 
@@ -304,15 +271,17 @@ class TestMachine:
         [
             ("lavender", "machine 'm' must be a JSON object, got str"),
             (_file(role="desktop"), "machine 'm' role must be one of hub, vpn-jump, worker"),
-            (_file(platform="solaris"), "platform must be one of windows, linux"),
+            (
+                _file(platform="windows"),
+                "machine 'm' platform must be 'linux', got 'windows'; the fleet renders every "
+                "script in sh",
+            ),
             (
                 _file(ledger_observer="watcher"),
                 "machine 'm' ledger_observer must be one of fleet-arm, pcsession, none, "
                 "got 'watcher'",
             ),
             (_file(ledger_observer=None), "Missing required field 'ledger_observer'"),
-            (_file(guest="lavender"), "machine 'm' guest must be an object or null"),
-            (_file(guest={"sshPort": 2222}), "machine 'm' guest.host must be a non-empty string"),
             (_file(dispatch=7), "machine 'm' must declare 'dispatch': the reason it takes"),
             (_file(dispatch="  "), "machine 'm' dispatch must be a non-empty string"),
             (
@@ -327,15 +296,6 @@ class TestMachine:
     )
     def test_a_malformed_machine_is_refused_by_field(self, value: JSONValue, message: str) -> None:
         with pytest.raises(JSONTypeError, match=message):
-            decode_machine("m", value)
-
-    def test_an_absent_guest_is_refused(self) -> None:
-        """Null says the machine is on the tailnet in its own right; absent
-        says nobody wrote it down, which a WSL guest's file once did."""
-        value = _file()
-        del value["guest"]
-
-        with pytest.raises(JSONTypeError, match="machine 'm' must declare 'guest'"):
             decode_machine("m", value)
 
     def test_a_reason_on_a_machine_that_is_off_is_refused(self) -> None:

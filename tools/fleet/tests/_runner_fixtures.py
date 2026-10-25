@@ -14,7 +14,6 @@ from platform_core.json_utils import JSONValue
 
 from fleet.contracts.runner_base import DiskCeiling, HostBase
 from fleet.contracts.runner_slice import CiSlice
-from fleet.contracts.runner_windows import WindowsRunnerHost, decode_windows_runner_host
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks
 from tests.conftest import ok
@@ -138,68 +137,6 @@ def no_dropped_jobs(spec: HostRunnerSpec) -> list[_test_hooks.CommandResult]:
     ]
 
 
-def raw_windows_install(repo: str = "wagner-austin/chat") -> dict[str, JSONValue]:
-    """One of loki's runners as the roster's JSON spells it.
-
-    Args:
-        repo: The repository; its name names the install's directory.
-
-    Returns:
-        The raw install.
-    """
-    labels: list[JSONValue] = ["loki"]
-    toolcache: list[JSONValue] = ["3.11.9"]
-    return {
-        "repo": repo,
-        "runner_name": "loki",
-        "service": f"actions.runner.{repo.replace('/', '-')}.loki",
-        "root": f"C:/actions-runner/{repo.split('/')[1]}",
-        "labels": labels,
-        "python_toolcache": toolcache,
-    }
-
-
-def raw_windows_host() -> dict[str, JSONValue]:
-    """loki with one runner, as the roster's JSON spells it.
-
-    Returns:
-        The raw host.
-    """
-    installs: list[JSONValue] = [raw_windows_install()]
-    return {
-        "name": "loki",
-        "host": "loki",
-        "payload_dir": "C:/fleet/runner-payloads",
-        "base": raw_windows_base(),
-        "installs": installs,
-    }
-
-
-def raw_windows_base() -> dict[str, JSONValue]:
-    """loki's base with one machine variable, as the roster's JSON spells it.
-
-    Returns:
-        The raw base.
-    """
-    variables: list[JSONValue] = [
-        {
-            "name": "POETRY_CACHE_DIR",
-            "value": "C:\\fleet\\poetry",
-            "reason": "the runners run as SYSTEM",
-        }
-    ]
-    return {"execution_policy": "RemoteSigned", "machine_environment": variables}
-
-
-def a_windows_host() -> WindowsRunnerHost:
-    """loki with one runner, decoded.
-
-    Returns:
-        The host.
-    """
-    return decode_windows_runner_host(raw_windows_host())
-
-
 def all_declared(hosts: Sequence[HostRunnerSpec]) -> list[_test_hooks.CommandResult]:
     """The registrations rows' reads where GitHub lists exactly what the hosts declare.
 
@@ -293,13 +230,10 @@ __all__ = [
     "a_base",
     "a_ci_slice",
     "a_host",
-    "a_windows_host",
     "all_declared",
     "an_install",
     "base_json",
     "ci_slice_json",
     "no_dropped_jobs",
     "quiet_rebuild_answers",
-    "raw_windows_host",
-    "raw_windows_install",
 ]

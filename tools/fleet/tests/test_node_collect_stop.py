@@ -21,7 +21,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_collect
 from fleet.contracts.ledger import LedgerEntry
-from fleet.core import _test_hooks, dialect, leases, names, queue_listing, records
+from fleet.core import _test_hooks, dialect, leases, queue_listing, records
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
     PROBED,
@@ -55,11 +55,11 @@ def _stop_body(config_path: pathlib.Path) -> str:
     Returns:
         The script's text, as the dialect renders it.
     """
-    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    node = loaded.workspace["nodes"]["lavender"]
-    return dialect.for_platform(node["platform"]).stop_script(
-        target=names.dispatch_directory(node["stage_root"], DEMO_RUN_ID), run_id=DEMO_RUN_ID
+    assert (
+        "lavender"
+        in _config.load_workspace({_config.CONFIG_FLAG: str(config_path)}).workspace["nodes"]
     )
+    return dialect.stop_script(DEMO_RUN_ID)
 
 
 def _cancelled_page(jobs: list[JSONObject], next_offset: int | None) -> str:
@@ -206,7 +206,7 @@ class TestCancelledUnderIt:
         }
         assert runner.stdin[0] == _stop_body(sourced_config).encode("utf-8")
         # Stopped first, then retired, before the row closed.
-        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+        retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
         assert [retire_path in " ".join(call) for call in runner.calls[:4]] == [
             False,
             False,

@@ -30,7 +30,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, run
 from fleet.contracts.budget import NodeBudget
-from fleet.contracts.node import LiveLoad, NodeConfig, NodePlatform, NodeState
+from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.core import _test_hooks, probe, staging
 from fleet.core.node_choice import Unassessed, first_fit
@@ -63,8 +63,7 @@ def _node(host: str) -> NodeConfig:
     """
     return NodeConfig(
         host=host,
-        platform=NodePlatform.WINDOWS,
-        stage_root="C:/fleet/stage",
+        stage_root="/home/corvis/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,
         gpu=None,
@@ -74,8 +73,6 @@ def _node(host: str) -> NodeConfig:
         cxx=None,
         docker=None,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,
@@ -105,8 +102,8 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,
-        cpu_pressure_pct=None,
-        io_pressure_pct=None,
+        cpu_pressure_pct=0.0,
+        io_pressure_pct=0.0,
     )
 
 

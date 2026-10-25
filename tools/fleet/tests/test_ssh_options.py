@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import pathlib
 
-from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, remote
 from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import FakeRun, ok
@@ -46,9 +45,11 @@ class TestTheCallSites:
         runner = FakeRun([ok(""), ok(""), ok("")])
         _test_hooks.run = runner
 
-        remote.run_ssh("loki", ("hostname",))
-        remote.send_script("loki", "C:/fleet/probe.ps1", "Get-Date", platform=NodePlatform.WINDOWS)
-        remote.send_file("loki", pathlib.Path("/hub/a.tgz"), "C:/fleet/a.tgz", size_bytes=13)
+        remote.run_ssh("colossus", ("hostname",))
+        remote.send_script("colossus", "/home/corvis/fleet/probe.sh", "date")
+        remote.send_file(
+            "colossus", pathlib.Path("/hub/a.tgz"), "/home/corvis/fleet/a.tgz", size_bytes=13
+        )
 
         assert [call[0] for call in runner.calls] == ["ssh", "ssh", "scp"]
         for call in runner.calls:

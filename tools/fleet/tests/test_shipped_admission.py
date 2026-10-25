@@ -4,8 +4,6 @@ A check runs wider than its test workers (lint, type checks, a build), so on
 these nodes a second check fits the core pool and still pushes both past the
 300 s budget. Each node's ``checks_at_once`` was set after that was measured:
 
-- loki, MCPs board task f6c2451a: MCPs/packages/session-audit (350 s) and
-  corvis-stick both crossed the budget, run side by side on 2026-10-09.
 - diphtheria, MCPs board task 18816b8f: the shared-library suite took 188 s
   alone and 410 s beside another check.
 - serendipity, MCPs board task a85ef09e: two checks inside the pool's 4 cores
@@ -49,7 +47,10 @@ these nodes a second check fits the core pool and still pushes both past the
 lavender-wsl carried a fourth bound (MCPs board task 30dba6d7: MCPs/mcp-shared
 took 130 s alone and 305 s beside two other checks on 2026-10-16) until it
 went with lavender's reimage to Ubuntu on 2026-10-19 (MCPs board task
-1e9ab738).
+1e9ab738), and loki a fifth (MCPs board task f6c2451a:
+MCPs/packages/session-audit at 350 s and corvis-stick both crossed the
+budget, run side by side on 2026-10-09) until it left the roster on
+2026-10-25 to be reinstalled as NixOS (board task e705f08c).
 
 diphtheria also checks only the projects pinned to it (MCPs board task
 d577036f): one check at a time, it still ran 10 of its 341 checks in the 7
@@ -90,18 +91,15 @@ from fleet.core.workspace_files import read_workspace_document
 #: Each bounded node, a project it checks, and the workers it grants that
 #: project alone: half the cores its owner leaves, rounded up, with memory to
 #: spare at 24 GB free. diphtheria is weighed with a suite pinned to it,
-#: because it checks no other. loki and serendipity leave their owner only
-#: the operating system's 2 cores since MCPs board task e447de72 (the
-#: operator, 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all
-#: workers"), and loki a core more for each of the four GitHub runners
-#: runners.json declares on it (MCPs board task 1e9ab738), so 10 and 6
-#: cores are left to the fleet. lenovold keeps the same 2 of its 4, and
+#: because it checks no other. serendipity leaves its owner only the
+#: operating system's 2 cores since MCPs board task e447de72 (the operator,
+#: 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all workers"),
+#: so 6 cores are left to the fleet. lenovold keeps the same 2 of its 4, and
 #: MCPs/sms-gateway's declared minimum of 2 workers, all the cores left,
 #: outranks half of them (MCPs board task 6747753b).
 BOUNDED_GRANTS = {
     "diphtheria": ("MCPs/doc-extract-api", 2),
     "lenovold": ("MCPs/sms-gateway", 2),
-    "loki": ("MCPs/mcp-shared", 5),
     "serendipity": ("MCPs/mcp-shared", 3),
 }
 
@@ -140,7 +138,7 @@ def _idle(node: NodeConfig) -> NodeState:
 
     Returns:
         Its state with 24 GB free, no live run, no reservation and no
-        pressure read.
+        pressure.
     """
     return NodeState(
         host=node["host"],
@@ -150,8 +148,8 @@ def _idle(node: NodeConfig) -> NodeState:
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,
-        cpu_pressure_pct=None,
-        io_pressure_pct=None,
+        cpu_pressure_pct=0.0,
+        io_pressure_pct=0.0,
     )
 
 
@@ -162,7 +160,7 @@ def test_the_measured_nodes_are_the_bounded_ones() -> None:
         if node["budget"]["checks_at_once"] is not None
     }
 
-    assert bounds == {"demure": 1, "diphtheria": 1, "lenovold": 1, "loki": 1, "serendipity": 1}
+    assert bounds == {"demure": 1, "diphtheria": 1, "lenovold": 1, "serendipity": 1}
 
 
 @pytest.mark.parametrize(("name", "measured"), sorted(BOUNDED_GRANTS.items()))

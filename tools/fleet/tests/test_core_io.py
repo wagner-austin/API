@@ -26,9 +26,9 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
-from fleet.contracts.node import LiveLoad, NodePlatform
+from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, dialect_windows, records, remote
+from fleet.core import _test_hooks, records, remote
 from tests.conftest import FakeRun, failed, ok, timed_out
 
 #: The one project the ledger rows below run, at a worker cost that sums exactly.
@@ -426,9 +426,7 @@ class TestRemote:
         _test_hooks.run = runner
 
         remote.run_ssh("pendragon", ("hostname",))
-        remote.send_script(
-            "pendragon", "C:/tmp/probe.ps1", "Get-Date", platform=NodePlatform.WINDOWS
-        )
+        remote.send_script("pendragon", "/s/probe.sh", "date")
 
         for call in runner.calls:
             # Every `-o Key=Value` pair the invocation carries, by key.
@@ -460,12 +458,11 @@ class TestRemote:
         _test_hooks.run = FakeRun([timed_out(120)])
 
         with pytest.raises(AppError) as excinfo:
-            remote.run_ssh("pendragon", ("powershell", "-File", "observe.ps1"))
+            remote.run_ssh("pendragon", ("/bin/sh", "observe.sh"))
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert excinfo.value.message == (
-            "ssh to pendragon timed out while running `powershell -File observe.ps1`: "
-            "timed out after 120 s"
+            "ssh to pendragon timed out while running `/bin/sh observe.sh`: timed out after 120 s"
         )
 
     def test_ssh_failing_to_reach_the_node_is_its_own_code(self) -> None:
@@ -493,28 +490,14 @@ class TestRemote:
         with pytest.raises(AppError, match="<no stderr>"):
             remote.run_ssh("lavender", ("make", "check"))
 
-    def test_a_script_body_is_streamed_over_stdin(self) -> None:
-        """Never an argument, so no shell between here and the disk sees it."""
+    def test_a_script_body_is_streamed_over_stdin_through_mkdir_and_cat(self) -> None:
+        """Never an argument, so no shell between here and the disk sees it:
+        one argument for the remote login shell, the parent made in the same
+        round trip."""
         runner = FakeRun([ok("")])
         _test_hooks.run = runner
 
-        remote.send_script(
-            "lavender", "C:/tmp/probe.ps1", "Write-Host 'hi'", platform=NodePlatform.WINDOWS
-        )
-
-        assert runner.stdin[0] == b"Write-Host 'hi'"
-        assert "Set-Content" in runner.calls[0][-1]
-        assert "C:/tmp/probe.ps1" in runner.calls[0][-1]
-
-    def test_a_linux_node_is_written_through_mkdir_and_cat(self) -> None:
-        """The same act in the other dialect: one argument for the remote
-        login shell, the parent made in the same round trip."""
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        remote.send_script(
-            "diphtheria", "/home/c/stage/probe.sh", "echo hi", platform=NodePlatform.LINUX
-        )
+        remote.send_script("diphtheria", "/home/c/stage/probe.sh", "echo hi")
 
         assert runner.stdin[0] == b"echo hi"
         assert runner.calls[0][-1] == (
@@ -525,57 +508,36 @@ class TestRemote:
         _test_hooks.run = FakeRun([failed(255, "no route to host")])
 
         with pytest.raises(AppError) as excinfo:
-            remote.send_script("pendragon", "C:/tmp/probe.ps1", "x", platform=NodePlatform.WINDOWS)
+            remote.send_script("pendragon", "/s/probe.sh", "x")
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
 
     def test_a_write_that_fails_is_a_dispatch_failure(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "access denied")])
+        _test_hooks.run = FakeRun([failed(1, "cat: /s/probe.sh: Permission denied")])
 
         with pytest.raises(AppError) as excinfo:
-            remote.send_script("lavender", "C:/tmp/probe.ps1", "x", platform=NodePlatform.WINDOWS)
+            remote.send_script("lavender", "/s/probe.sh", "x")
 
         assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
-        assert "access denied" in excinfo.value.message
+        assert "Permission denied" in excinfo.value.message
 
-    def test_run_script_sends_then_runs_by_path(self) -> None:
+    def test_run_script_sends_then_runs_by_path_through_bin_sh(self) -> None:
         """The bytes that run are the bytes that were sent."""
         runner = FakeRun([ok(""), ok("output")])
         _test_hooks.run = runner
 
-        assert (
-            remote.run_script("lavender", "C:/tmp/p.ps1", "body", platform=NodePlatform.WINDOWS)
-            == "output"
-        )
+        assert remote.run_script("diphtheria", "/s/p.sh", "body") == "output"
         assert runner.stdin[0] == b"body"
-        assert runner.calls[1][-6:-1] == dialect_windows.POWERSHELL_INVOCATION
-        assert runner.calls[1][-1] == "C:/tmp/p.ps1"
-
-    def test_run_script_on_a_linux_node_runs_through_bin_sh(self) -> None:
-        runner = FakeRun([ok(""), ok("output")])
-        _test_hooks.run = runner
-
-        assert (
-            remote.run_script("diphtheria", "/s/p.sh", "body", platform=NodePlatform.LINUX)
-            == "output"
-        )
         assert runner.calls[1][-2:] == ("/bin/sh", "/s/p.sh")
 
-    def test_a_windows_root_payload_runs_in_the_elevated_session_under_its_deadline(
-        self,
-    ) -> None:
-        """loki's ssh session holds High Mandatory Level, so no sudo stands
-        between it and the payload; only the run takes the caller's deadline."""
+    def test_a_root_payload_runs_under_sudo_bash_under_its_deadline(self) -> None:
+        """Only the run takes the caller's deadline; the send is a short
+        command like any other."""
         runner = FakeRun([ok(""), ok("installed")])
         _test_hooks.run = runner
 
-        output = remote.run_root_script(
-            "loki", "C:/fleet/p.ps1", "body", platform=NodePlatform.WINDOWS, timeout_seconds=900
-        )
+        output = remote.run_root_script("colossus", "/s/p.sh", "body", timeout_seconds=900)
 
         assert output == "installed"
-        assert remote.root_invocation(NodePlatform.WINDOWS) == (
-            dialect_windows.POWERSHELL_INVOCATION
-        )
-        assert runner.calls[1][-6:] == (*dialect_windows.POWERSHELL_INVOCATION, "C:/fleet/p.ps1")
+        assert runner.calls[1][-len(remote.ROOT_BASH) - 1 :] == (*remote.ROOT_BASH, "/s/p.sh")
         assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS, 900]

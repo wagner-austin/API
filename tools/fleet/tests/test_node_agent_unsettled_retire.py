@@ -45,7 +45,7 @@ from tests.conftest import (
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
 #: Where the runner's retire script goes on the demo node.
-RETIRE_PATH = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+RETIRE_PATH = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
 
 
 def _loaded(config_path: pathlib.Path) -> _config.LoadedWorkspace:

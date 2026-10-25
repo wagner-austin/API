@@ -1,11 +1,10 @@
 """Whether a node can run a build, and the command that says so.
 
-THE FIXTURES ARE THE REAL MEASUREMENT (:mod:`tests._toolchain_fixtures`).
-``sedona``, ``lavender`` and ``loki`` answered those exact shapes on
-2026-09-04, and one node of the three could have run a ``make check``. A test
-written against an invented "node with everything" would have proved the happy
-path and nothing about the fleet that actually exists. Installing is tested in
-``test_toolchain_install.py``.
+THE FIXTURES ARE THE REAL MEASUREMENT (:mod:`tests._toolchain_fixtures`):
+diphtheria's answers, and the answers derived from them, each saying so. A
+test written against an invented "node with everything" would have proved the
+happy path and nothing about the fleet that actually exists. Installing is
+tested in ``test_toolchain_install.py``.
 """
 
 from __future__ import annotations
@@ -19,7 +18,6 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str, load_json_str
 
 from fleet.cli import _config, bootstrap
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.toolchain import (
     REQUIRED_TOOLS,
     ToolReport,
@@ -31,32 +29,36 @@ from fleet.contracts.toolchain import (
     python_is_right,
     version_number,
 )
-from fleet.core import _test_hooks, dialect_linux, toolchain, windows_toolchain_probe
+from fleet.core import _test_hooks, dialect, toolchain
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document
 from tests._toolchain_fixtures import (
     CHROME_APT,
     CHROME_NO_INSTALL,
     CHROME_REASON,
-    CHROME_WINGET,
     DIPHTHERIA,
+    DIPHTHERIA_2026_09_23,
+    GO_APT,
     GO_NO_INSTALL,
     GO_REASON,
-    GO_WINGET,
     HOOKS_INSTALL,
     HOOKS_REASON,
-    LAVENDER,
-    LOKI,
+    NO_MAKE,
     PDFTOTEXT_APT,
     PDFTOTEXT_NO_INSTALL,
     PDFTOTEXT_REASON,
-    PDFTOTEXT_WINGET,
-    SEDONA,
-    SEDONA_2026_09_23,
     WRONG_PYTHON,
     node,
 )
 from tests.conftest import FakeRun, failed, ok
+
+#: DERIVED from :data:`DIPHTHERIA_2026_09_23`: poetry, git and make absent,
+#: three tools two managers install.
+MISSING_THREE = (
+    DIPHTHERIA_2026_09_23.replace("poetry=yes=Poetry (version 2.5.1)\n", "poetry=no=\n")
+    .replace("git=yes=git version 2.43.0\n", "git=no=\n")
+    .replace("make=yes=GNU Make 4.3\n", "make=no=\n")
+)
 
 
 def _workspace_document() -> JSONObject:
@@ -66,7 +68,7 @@ def _workspace_document() -> JSONObject:
         The document, ready to serialise.
     """
     return {
-        "machines": {"lavender": machine_document(), "loki": machine_document()},
+        "machines": {"lavender": machine_document(), "colossus": machine_document()},
         "data_paths": {},
         "node_local_resources": [],
         "projects": {
@@ -101,21 +103,6 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
 
 class TestParseProbe:
     def test_it_reads_every_tool_a_node_reports(self) -> None:
-        reports = toolchain.parse_probe(LOKI)
-
-        assert [report["name"] for report in reports] == [
-            "python",
-            "poetry",
-            "git",
-            "make",
-            "tar",
-            "winget",
-            "choco",
-            "pip",
-        ]
-        assert reports[1]["version"] == "Poetry (version 2.1.3)"
-
-    def test_a_linux_answer_reads_the_same_way(self) -> None:
         reports = toolchain.parse_probe(DIPHTHERIA)
 
         assert [report["name"] for report in reports] == [
@@ -128,83 +115,75 @@ class TestParseProbe:
             "pipx",
         ]
         assert reports[0]["version"] == "Python 3.12.3"
+        assert reports[1]["version"] == "Poetry (version 2.5.1)"
         assert available_managers(reports) == ("pipx", "apt-get")
         assert missing(reports) == ()
         assert python_is_right(reports) is False
 
     def test_an_absent_tool_carries_no_version(self) -> None:
-        reports = toolchain.parse_probe(LAVENDER)
+        reports = toolchain.parse_probe(MISSING_THREE)
 
         absent = [report for report in reports if report["name"] == "make"]
         assert absent == [ToolReport(name="make", present=False, version="")]
 
     def test_a_line_that_is_not_a_tool_is_ignored(self) -> None:
-        """PowerShell writes warnings to the same stream."""
-        reports = toolchain.parse_probe("WARNING: something\n" + LOKI)
+        """A login banner can reach the same stream."""
+        reports = toolchain.parse_probe("WARNING: something\n" + DIPHTHERIA)
 
-        assert len(reports) == 8
+        assert len(reports) == 7
 
     def test_an_unrecognisable_answer_is_a_probe_that_did_not_run(self) -> None:
         """Reporting five absent tools would send the reader to install
         five things that are already there."""
         with pytest.raises(AppError) as excinfo:
-            toolchain.parse_probe("The term 'foreach' is not recognized")
+            toolchain.parse_probe("sh: 1: report: not found")
 
         assert excinfo.value.code is FleetErrorCode.NODE_TOOL_MISSING
         assert "never asked" in excinfo.value.message
 
 
 class TestReadiness:
-    def test_loki_has_every_tool_it_was_asked_for_and_the_right_python(self) -> None:
-        """Not READY: its 2026-09-04 probe predates the node question, and an
-        unanswered floor is not a met one (test_toolchain_readiness)."""
-        assert missing(toolchain.parse_probe(LOKI)) == ()
-        assert python_is_right(toolchain.parse_probe(LOKI))
+    def test_a_probe_without_the_node_question_has_every_tool_it_was_asked_for(self) -> None:
+        """Not READY: diphtheria's 2026-09-20 probe predates the node question,
+        and an unanswered floor is not a met one (test_toolchain_readiness)."""
+        assert missing(toolchain.parse_probe(DIPHTHERIA)) == ()
 
-    def test_lavender_is_missing_three_tools(self) -> None:
-        assert missing(toolchain.parse_probe(LAVENDER)) == ("poetry", "git", "make")
+    def test_three_absent_tools_are_named_in_the_contract_s_order(self) -> None:
+        assert missing(toolchain.parse_probe(MISSING_THREE)) == ("poetry", "git", "make")
 
-    def test_sedona_is_missing_only_make(self) -> None:
-        """MEASURED: make was on one node of three."""
-        assert missing(toolchain.parse_probe(SEDONA)) == ("make",)
+    def test_one_absent_tool_is_named_alone(self) -> None:
+        assert missing(toolchain.parse_probe(NO_MAKE)) == ("make",)
 
     def test_a_node_without_ffmpeg_can_build_and_is_told_what_it_misses(self) -> None:
-        """serendipity's answer of 2026-10-01 (MCPs board task 512e7bf8), every
-        other tool and winget present and 'where ffmpeg' empty. ffmpeg is a
-        tag now (MCPs board task 939ec5c7), so the node is ready, and the
-        tagged gap names the tool, who needs it and the install here."""
-        reports = toolchain.parse_probe(
-            "python=yes=Python 3.11.9\npoetry=yes=Poetry (version 2.4.2)\n"
-            "git=yes=git version 2.55.0.windows.5\nmake=yes=GNU Make 4.4.1\n"
-            "node=yes=v24.21.0\nffmpeg=no=\ntar=yes=bsdtar 3.8.8\nwinget=yes=v1.12\n"
-        )
+        """ffmpeg is a tag (MCPs board task 939ec5c7), so a node without it is
+        ready, and the tagged gap names the tool, who needs it and the
+        install here."""
+        reports = toolchain.parse_probe(DIPHTHERIA_2026_09_23 + "ffmpeg=no=\n")
 
         assert missing(reports) == ()
-        assert describe_gap("serendipity", reports) == "serendipity: ready"
+        assert describe_gap("diphtheria", reports) == "diphtheria: ready"
         assert toolchain.absent_tagged(reports) == ("ffmpeg", "hooks", "go", "chrome", "pdftotext")
-        assert toolchain.tagged_gap("serendipity", reports) == (
-            "serendipity claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
+        assert toolchain.tagged_gap("diphtheria", reports) == (
+            "diphtheria claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
-            "it -- winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-            "--accept-package-agreements --accept-source-agreements --disable-interactivity; "
-            f"hooks -- {HOOKS_REASON}, so those jobs go to a node that has it -- no automatic "
-            f"install on this node; go -- {GO_REASON}, so those jobs go to a node that has it "
-            f"-- {GO_WINGET}; chrome -- {CHROME_REASON}, so those jobs go to a node that has it "
-            f"-- {CHROME_WINGET}; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node "
-            f"that has it -- {PDFTOTEXT_WINGET}"
+            f"it -- sudo apt-get install -y ffmpeg; hooks -- {HOOKS_REASON}, so those jobs go to "
+            f"a node that has it -- no automatic install on this node; go -- {GO_REASON}, so "
+            f"those jobs go to a node that has it -- {GO_APT}; chrome -- {CHROME_REASON}, so "
+            f"those jobs go to a node that has it -- {CHROME_APT}; pdftotext -- "
+            f"{PDFTOTEXT_REASON}, so those jobs go to a node that has it -- {PDFTOTEXT_APT}"
         )
 
     def test_a_node_with_every_tagged_tool_has_no_tagged_gap(self) -> None:
         reports = toolchain.parse_probe(
-            "ffmpeg=yes=ffmpeg version 7.1.1-essentials\n"
-            "hooks=yes=C:\\Users\\austi\\.claude\\corvis-hooks.json\n"
-            "go=yes=go version go1.27.1 windows/amd64\n"
+            "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"
+            "hooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
+            "go=yes=go version go1.27.1 linux/amd64\n"
             "chrome=yes=155.0.8059.39\n"
-            "pdftotext=yes=pdftotext version 4.00\n"
+            "pdftotext=yes=pdftotext version 24.02.0\n"
         )
 
         assert toolchain.absent_tagged(reports) == ()
-        assert toolchain.tagged_gap("sedona", reports) is None
+        assert toolchain.tagged_gap("colossus", reports) is None
 
     def test_a_tagged_tool_with_no_install_here_says_so(self) -> None:
         """A node whose only manager is pip has no command for ffmpeg, go,
@@ -222,7 +201,7 @@ class TestReadiness:
             f"{PDFTOTEXT_NO_INSTALL}"
         )
 
-    def test_a_linux_node_is_offered_go_and_poppler_from_apt_get_and_chrome_as_the_deb(
+    def test_a_node_is_offered_go_and_poppler_from_apt_get_and_chrome_as_the_deb(
         self,
     ) -> None:
         """diphtheria and lavender-wsl answered go=no= on 2026-10-05 (MCPs board
@@ -240,7 +219,7 @@ class TestReadiness:
         assert toolchain.absent_tagged(reports) == ("go", "chrome", "pdftotext")
         assert toolchain.tagged_gap("diphtheria", reports) == (
             f"diphtheria claims without the tag of every tool it lacks: go -- {GO_REASON}, so "
-            "those jobs go to a node that has it -- sudo apt-get install -y golang-go; chrome -- "
+            f"those jobs go to a node that has it -- {GO_APT}; chrome -- "
             f"{CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_APT}; "
             f"pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- "
             f"{PDFTOTEXT_APT}"
@@ -269,7 +248,7 @@ class TestVersionNumber:
     def test_it_unwraps_a_parenthesised_version(self) -> None:
         assert version_number("Poetry (version 2.1.3)") == "2.1.3"
 
-    def test_a_trailing_platform_suffix_survives(self) -> None:
+    def test_a_trailing_suffix_survives(self) -> None:
         assert version_number("git version 2.50.1.windows.1") == "2.50.1.windows.1"
 
     def test_a_bare_number_is_unchanged(self) -> None:
@@ -281,17 +260,17 @@ class TestVersionNumber:
 
 class TestDescribeGap:
     def test_a_ready_node_says_so(self) -> None:
-        assert describe_gap("sedona", toolchain.parse_probe(SEDONA_2026_09_23)) == "sedona: ready"
+        assert describe_gap("diphtheria", toolchain.parse_probe(DIPHTHERIA_2026_09_23)) == (
+            "diphtheria: ready"
+        )
 
     def test_it_names_the_install_command(self) -> None:
         """The reader's next question is always how to fix it."""
-        described = describe_gap("lavender", toolchain.parse_probe(LAVENDER))
+        described = describe_gap("lavender", toolchain.parse_probe(MISSING_THREE))
 
-        assert "poetry (python -m pip install --user poetry==2.4.2)" in described
-        # lavender has winget and no choco, so the command it is told to run
-        # is the winget one. loki, missing the same tool, would be told choco.
-        assert "make (winget install --id GnuWin32.Make" in described
-        assert "choco" not in described
+        assert "poetry (pipx install poetry==2.4.2)" in described
+        assert "git (sudo apt-get install -y git)" in described
+        assert "make (sudo apt-get install -y make)" in described
 
     def test_a_tool_with_no_automatic_install_says_so(self) -> None:
         described = describe_gap("odd", (ToolReport(name="tar", present=False, version=""),))
@@ -299,9 +278,9 @@ class TestDescribeGap:
         assert "tar (install by hand)" in described
 
     def test_the_wrong_python_is_named_with_what_was_found(self) -> None:
-        described = describe_gap("loki", toolchain.parse_probe(WRONG_PYTHON))
+        described = describe_gap("colossus", toolchain.parse_probe(WRONG_PYTHON))
 
-        assert "python 3.11 (found Python 3.12.4)" in described
+        assert "python 3.11 (found Python 3.12.3)" in described
 
     def test_an_unreported_python_reads_as_unknown(self) -> None:
         described = describe_gap("odd", (ToolReport(name="git", present=True, version="x"),))
@@ -311,27 +290,33 @@ class TestDescribeGap:
 
 class TestRequireReady:
     def test_a_ready_node_passes(self) -> None:
-        toolchain.require_ready("sedona", node("sedona"), toolchain.parse_probe(SEDONA_2026_09_23))
+        toolchain.require_ready(
+            "diphtheria", node("diphtheria"), toolchain.parse_probe(DIPHTHERIA_2026_09_23)
+        )
 
     def test_a_missing_tool_names_every_one_and_why(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            toolchain.require_ready("lavender", node(), toolchain.parse_probe(LAVENDER))
+            toolchain.require_ready("lavender", node(), toolchain.parse_probe(MISSING_THREE))
 
         assert excinfo.value.code is FleetErrorCode.NODE_TOOL_MISSING
         assert "make check is the entry point" in excinfo.value.message
-        assert "winget install --id GnuWin32.Make" in excinfo.value.message
+        assert "sudo apt-get install -y make" in excinfo.value.message
 
     def test_the_wrong_python_is_its_own_code(self) -> None:
         """The fixes differ: a package manager versus a decision."""
         with pytest.raises(AppError) as excinfo:
-            toolchain.require_ready("loki", node("loki"), toolchain.parse_probe(WRONG_PYTHON))
+            toolchain.require_ready(
+                "colossus", node("colossus"), toolchain.parse_probe(WRONG_PYTHON)
+            )
 
         assert excinfo.value.code is FleetErrorCode.NODE_PYTHON_MISMATCH
-        assert "3.12.4" in excinfo.value.message
+        assert "3.12.3" in excinfo.value.message
 
     def test_a_node_that_reported_no_python_says_unknown(self) -> None:
         reports = tuple(
-            report for report in toolchain.parse_probe(LOKI) if report["name"] != "python"
+            report
+            for report in toolchain.parse_probe(DIPHTHERIA_2026_09_23)
+            if report["name"] != "python"
         )
 
         with pytest.raises(AppError, match="unknown"):
@@ -339,29 +324,14 @@ class TestRequireReady:
 
 
 class TestProbeToolchain:
-    def test_it_sends_the_constant_script_and_parses_the_answer(self) -> None:
-        runner = FakeRun([ok(""), ok(LOKI)])
-        _test_hooks.run = runner
-
-        reports = toolchain.probe_toolchain(node("loki"), writer="fleet-bootstrap")
-
-        assert len(reports) == 8
-        assert runner.stdin[0] == windows_toolchain_probe.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
-        assert runner.calls[0][-1].endswith(
-            "C:/fleet/stage/fleet-toolchain-fleet-bootstrap.ps1' -Encoding utf8\""
-        )
-
-    def test_a_linux_node_is_asked_in_sh(self) -> None:
+    def test_it_sends_the_constant_script_in_sh_and_parses_the_answer(self) -> None:
         runner = FakeRun([ok(""), ok(DIPHTHERIA)])
         _test_hooks.run = runner
-        linux = node("diphtheria")
-        linux["platform"] = NodePlatform.LINUX
-        linux["stage_root"] = "/home/corvis/fleet/stage"
 
-        reports = toolchain.probe_toolchain(linux, writer="diphtheria")
+        reports = toolchain.probe_toolchain(node("diphtheria"), writer="diphtheria")
 
         assert len(reports) == 7
-        assert runner.stdin[0] == dialect_linux.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
+        assert runner.stdin[0] == dialect.TOOLCHAIN_PROBE_SCRIPT.encode("utf-8")
         assert runner.calls[1][-2:] == (
             "/bin/sh",
             "/home/corvis/fleet/stage/fleet-toolchain-diphtheria.sh",
@@ -401,22 +371,24 @@ class TestToolReportCodec:
 
 class TestBootstrapCommand:
     def test_a_ready_fleet_exits_zero(self, config_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok(SEDONA_2026_09_23), ok(""), ok(SEDONA_2026_09_23)])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok(DIPHTHERIA_2026_09_23), ok(""), ok(DIPHTHERIA_2026_09_23)]
+        )
 
         assert bootstrap.main([_config.CONFIG_FLAG, str(config_path)]) == 0
 
     def test_an_unready_node_exits_one(self, config_path: pathlib.Path) -> None:
         """Usable as a gate in front of a dispatch, not something to read."""
-        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER), ok(""), ok(SEDONA_2026_09_23)])
+        _test_hooks.run = FakeRun([ok(""), ok(DIPHTHERIA_2026_09_23), ok(""), ok(MISSING_THREE)])
 
         assert bootstrap.main([_config.CONFIG_FLAG, str(config_path)]) == 1
 
     def test_a_named_node_is_asked_alone(self, config_path: pathlib.Path) -> None:
-        runner = FakeRun([ok(""), ok(SEDONA_2026_09_23)])
+        runner = FakeRun([ok(""), ok(DIPHTHERIA_2026_09_23)])
         _test_hooks.run = runner
 
         assert (
-            bootstrap.main([_config.CONFIG_FLAG, str(config_path), bootstrap.NODE_FLAG, "loki"])
+            bootstrap.main([_config.CONFIG_FLAG, str(config_path), bootstrap.NODE_FLAG, "colossus"])
             == 0
         )
         assert len(runner.calls) == 2
@@ -429,14 +401,14 @@ class TestBootstrapCommand:
 
     def test_without_the_install_flag_nothing_is_installed(self, config_path: pathlib.Path) -> None:
         """Reporting is the default because these are other people's machines."""
-        runner = FakeRun([ok(""), ok(SEDONA)])
+        runner = FakeRun([ok(""), ok(NO_MAKE)])
         _test_hooks.run = runner
 
         assert (
             bootstrap.main([_config.CONFIG_FLAG, str(config_path), bootstrap.NODE_FLAG, "lavender"])
             == 1
         )
-        # The probe script itself names both managers, so the absence to
+        # The probe script itself names the managers, so the absence to
         # assert is an INSTALL command, not the word.
         assert not any(b"installing " in (sent or b"") for sent in runner.stdin)
 
@@ -446,7 +418,7 @@ class TestBootstrapCommand:
         """Re-probed rather than assumed: an install that ran is not an
         install that worked."""
         _test_hooks.run = FakeRun(
-            [ok(""), ok(SEDONA), ok(""), ok("installing make"), ok(""), ok(SEDONA_2026_09_23)]
+            [ok(""), ok(NO_MAKE), ok(""), ok("installing make"), ok(""), ok(DIPHTHERIA_2026_09_23)]
         )
 
         assert (
@@ -474,7 +446,7 @@ class TestBootstrapCommand:
                     _config.CONFIG_FLAG,
                     str(config_path),
                     bootstrap.NODE_FLAG,
-                    "loki",
+                    "colossus",
                     bootstrap.INSTALL_FLAG,
                 ]
             )
@@ -483,7 +455,7 @@ class TestBootstrapCommand:
         assert len(runner.calls) == 2
 
     def test_the_entrypoint_exits_with_the_gate_s_status(self, config_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER)])
+        _test_hooks.run = FakeRun([ok(""), ok(MISSING_THREE)])
         saved = sys.argv
         sys.argv = [
             "fleet-bootstrap",
@@ -504,7 +476,7 @@ class TestBootstrapCommand:
         """Without an `if __name__` block it exits 0 having asked nothing,
         which reads as "every node is ready" -- the worst false answer a gate
         can give."""
-        _test_hooks.run = FakeRun([ok(""), ok(LAVENDER)])
+        _test_hooks.run = FakeRun([ok(""), ok(MISSING_THREE)])
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.bootstrap", None)
         sys.argv = [

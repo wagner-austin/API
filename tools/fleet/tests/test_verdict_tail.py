@@ -5,19 +5,16 @@ source file, so the totals sit further from the transcript's end the larger
 the package. On colossus on 2026-10-11 they sat 826 lines from the end of
 MCPs/mcp-shared's log, and the 200-line tail of the time posted
 ``tests=unread coverage=unread`` for a run of 10401 passing tests. The
-transcript here has that shape, row for row; the Linux dialect prints the
-last :data:`fleet.core.verdict.LOG_TAIL_LINES` lines with ``tail -n``, which
-these cases take the same way, and the Windows dialect's bounded read of the
-same shape in both encodings is executed by
-``tests/pester/rendered-dialect-tail.Tests.ps1``.
+transcript here has that shape, row for row; the dialect prints the last
+:data:`fleet.core.verdict.LOG_TAIL_LINES` lines with ``tail -n``, which these
+cases take the same way.
 """
 
 from __future__ import annotations
 
 from typing import Final
 
-from fleet.core import verdict
-from fleet.core.dialect_linux import LinuxDialect
+from fleet.core import dialect, verdict
 
 #: One file's row of vitest's coverage table.
 ROW: Final = "  file-{index:04d}.ts     |     100 |      100 |     100 |     100 |"
@@ -78,7 +75,7 @@ def test_the_two_hundred_line_tail_it_replaces_read_neither_count() -> None:
 
 
 def test_the_linux_dialect_prints_that_many_lines() -> None:
-    script = LinuxDialect().log_tail_script("/s/run-1", verdict.LOG_TAIL_LINES)
+    script = dialect.log_tail_script("/s/run-1", verdict.LOG_TAIL_LINES)
 
     assert f"tail -n {verdict.LOG_TAIL_LINES} '/s/run-1/" in script
     assert verdict.LOG_TAIL_LINES == 1500

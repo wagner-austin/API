@@ -154,10 +154,10 @@ class TestProject:
 
     def test_required_tags_survive_encoding_in_order(self) -> None:
         encoded = encode_project_config(_project())
-        decoded = decode_project_config({**encoded, "required_tags": ["gpu", "windows"]})
+        decoded = decode_project_config({**encoded, "required_tags": ["gpu", "linux"]})
 
-        assert decoded["required_tags"] == ("gpu", "windows")
-        assert encode_project_config(decoded)["required_tags"] == ["gpu", "windows"]
+        assert decoded["required_tags"] == ("gpu", "linux")
+        assert encode_project_config(decoded)["required_tags"] == ["gpu", "linux"]
 
     def test_a_project_without_required_tags_is_refused(self) -> None:
         """Absent is not empty: a GPU suite that forgot would land on a CPU box."""

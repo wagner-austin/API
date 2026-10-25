@@ -19,7 +19,7 @@ import time
 import pytest
 
 from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
-from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, SH_INVOCATION
+from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, SH_INVOCATION
 from fleet.core.linux_capacity_probe import MEMINFO_LINE, RESERVATIONS_LINE
 from tests.test_dialect_linux import fields_of
 

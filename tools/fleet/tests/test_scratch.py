@@ -1,17 +1,14 @@
 """The fleet's scratch root and its reaper (MCPs board task fb505198).
 
-The root is memory on Linux and the temporary directory elsewhere, read
-for both platforms through the pure function the default hook calls. The
-reaper is run over real directories with a pinned clock and real
-modification times.
+The root is memory, ``/dev/shm``, which the default hook answers. The reaper
+is run over real directories with a pinned clock and real modification
+times.
 """
 
 from __future__ import annotations
 
 import os
 import pathlib
-import sys
-import tempfile
 
 from fleet.cli import rolled as rolled_cli
 from fleet.cli import tick
@@ -31,18 +28,11 @@ def age(path: pathlib.Path, seconds: int) -> None:
 
 
 class TestScratchRoot:
-    def test_linux_keeps_scratch_in_memory(self) -> None:
-        assert scratch_root.scratch_root_for("linux", "/tmp") == pathlib.Path("/dev/shm")
-        assert scratch_root.LINUX_SCRATCH_ROOT == "/dev/shm"
+    def test_scratch_is_kept_in_memory(self) -> None:
+        assert pathlib.Path("/dev/shm") == scratch_root.SCRATCH_ROOT
 
-    def test_windows_has_no_memory_directory_and_uses_its_temporary_one(self) -> None:
-        temp = "C:\\Users\\corvis\\AppData\\Local\\Temp"
-        assert scratch_root.scratch_root_for("win32", temp) == pathlib.Path(temp)
-
-    def test_the_default_hook_answers_for_this_platform(self) -> None:
-        assert _test_hooks._default_temp_root() == scratch_root.scratch_root_for(
-            sys.platform, tempfile.gettempdir()
-        )
+    def test_the_default_hook_answers_the_memory_root(self) -> None:
+        assert _test_hooks._default_temp_root() == scratch_root.SCRATCH_ROOT
 
     def test_both_directories_hang_off_the_hooked_root(self, tmp_path: pathlib.Path) -> None:
         _test_hooks.temp_root = FakeTempRoot(tmp_path)

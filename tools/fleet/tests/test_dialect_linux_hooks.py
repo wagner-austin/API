@@ -25,10 +25,8 @@ from fleet.contracts.tagged_tools import (
     HOOKS_CHECK_PACKAGES,
     HOOKS_CHECK_PROGRAM,
 )
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: The pins as the line passes them, each name then its version.
 PINS = (
@@ -61,7 +59,7 @@ def _hooks_line(tmp_path: pathlib.Path, home: pathlib.Path, check_exit: int) -> 
     fake.chmod(0o755)
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
+        TOOLCHAIN_PROBE_SCRIPT.replace(
             PROLOGUE,
             PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\nHOME='{home.as_posix()}'\n",
             1,
@@ -112,9 +110,7 @@ def test_the_line_asks_exactly_the_contract_pins() -> None:
     """The arguments the host cases record are the contract's pins, name then version."""
     assert HOOKS_CHECK_ARGUMENTS == PINS
     assert PINS.split() == [part for pin in HOOKS_CHECK_PACKAGES for part in pin.split("==")]
-    assert f'python3 -c "{HOOKS_CHECK_PROGRAM}" {PINS} > /dev/null 2>&1' in (
-        DIALECT.toolchain_probe_script()
-    )
+    assert f'python3 -c "{HOOKS_CHECK_PROGRAM}" {PINS} > /dev/null 2>&1' in (TOOLCHAIN_PROBE_SCRIPT)
 
 
 def test_the_program_holds_no_quote_a_shell_would_read() -> None:

@@ -49,11 +49,11 @@ OTHER_RUN_ID = "libs-demo-lavender-1757000100"
 #: What ssh said when lavender-wsl missed its reads on 2026-10-07.
 BANNER_TIMEOUT = "Connection timed out during banner exchange"
 
-#: What a Windows retire says when a file it moves is held open.
-HELD_OPEN = "Move-Item: The process cannot access the file because it is being used"
+#: What a retire says when a directory it removes is a mount still in use.
+HELD_OPEN = "rm: cannot remove '/home/corvis/fleet/stage/run': Device or resource busy"
 
 #: Where the demo node keeps the demo run's transcript once it is retired.
-KEPT = f"C:/fleet/stage/logs/{DEMO_RUN_ID}.log"
+KEPT = f"/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log"
 
 
 def _path(tmp_path: pathlib.Path) -> pathlib.Path:
@@ -367,7 +367,7 @@ class TestTheOwedRetires:
         _pass(path, tmp_path)
 
         assert [
-            any(f"retire-{run_id}.ps1" in " ".join(call) for call in answered.calls)
+            any(f"retire-{run_id}.sh" in " ".join(call) for call in answered.calls)
             for run_id in (DEMO_RUN_ID, OTHER_RUN_ID)
         ] == [True, True]
         assert sum("fleet-cache-generations" in " ".join(call) for call in answered.calls) == 2

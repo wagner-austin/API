@@ -1,25 +1,22 @@
 """Cases that execute this package's rendered scripts on a real host.
 
 Board task 465689f5, rule R3 of b6eb30c8. A handful of cases here run the
-PowerShell or sh this package renders on the machine running the suite,
-which is the only place a defect between the code and the machine can
-show. Each is bound to one platform, and until this module each carried a
-``skipif`` on ``sys.platform``: API's CI runs on Linux, so every Windows
-case was skipped there, and the hub is Windows, so every Linux case was
-skipped at home. No run recorded both halves green at one commit.
+sh this package renders on the machine running the suite, which is the only
+place a defect between the code and the machine can show. Until this module
+each carried a ``skipif`` on ``sys.platform``, and no run recorded every
+host case green at one commit.
 
-So the binding is a marker, ``host_windows`` or ``host_linux``, and the two
-ways to run the suite are platform_core's :mod:`~platform_core.host_execution`
-(lifted from this module so tools/hpc3 binds its cluster case the same way):
+So the binding is a marker, ``host_linux``, the one platform since the
+Windows dialect left (board task e705f08c), and the two ways to run the
+suite are platform_core's :mod:`~platform_core.host_execution` (lifted from
+this module so tools/hpc3 binds its cluster case the same way):
 
-- The ORDINARY run (``make check``) behaves as the ``skipif`` did: a host
-  case bound to the other platform is skipped, naming the node that runs it.
+- The ORDINARY run (``make check``) runs a ``host_linux`` case like any
+  other.
 - The EXECUTION run (``--host-execution``, ``make execution``) selects only
-  the host cases bound to this machine's platform and FAILS when any of them
-  skips or when none ran. It is what the fleet projects
-  ``tools/fleet-execution`` (a Windows node) and
-  ``tools/fleet-execution-linux`` (a Linux node) run, and a deploy refuses a
-  commit without a passed run of each (MCPs' ``publish-executed``).
+  the host cases and FAILS when any of them skips or when none ran. It is
+  what the fleet project ``tools/fleet-execution-linux`` runs, and a deploy
+  refuses a commit without a passed run of it (MCPs' ``publish-executed``).
 
 A THIRD marker, ``host_linux_docker``, binds a case to Linux like
 ``host_linux`` but runs it ONLY in the execution run: it asserts, from inside
@@ -49,7 +46,6 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import sys
 from typing import Final
 
 import pytest
@@ -58,11 +54,12 @@ from platform_core import host_execution
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runners import HostRunnerSpec
 
-#: This machine's platform, as the markers and the fleet's tags name it.
-HOST_PLATFORM: Final[str] = "windows" if sys.platform == "win32" else "linux"
+#: This machine's platform, as the markers and the fleet's tags name it: the
+#: suite runs only on Linux.
+HOST_PLATFORM: Final[str] = "linux"
 
-#: The marker binding a case to each platform.
-MARKERS: Final[dict[str, str]] = {"windows": "host_windows", "linux": "host_linux"}
+#: The marker binding a case to the platform.
+MARKERS: Final[dict[str, str]] = {"linux": "host_linux"}
 
 #: The marker for a Linux host case that needs the node's rootless daemon,
 #: run only by the execution run.
@@ -98,7 +95,6 @@ FLEET_HUB_OPTION: Final[str] = "--fleet-hub"
 
 #: The fleet project that runs each capability's host cases.
 PROJECTS: Final[dict[str, str]] = {
-    "windows": "tools/fleet-execution",
     "linux": "tools/fleet-execution-linux",
     RUNNER_HOST: "tools/fleet-execution-runners",
     FLEET_HUB: "tools/fleet-execution-hub",

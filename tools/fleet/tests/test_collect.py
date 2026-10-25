@@ -24,7 +24,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, collect, run, watch
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, leases, records, staging
 from fleet.core import collect as core_collect
 from tests.conftest import (
@@ -54,8 +54,7 @@ def _node() -> NodeConfig:
     """
     return NodeConfig(
         host="lavender",
-        platform=NodePlatform.WINDOWS,
-        stage_root="C:/fleet/stage",
+        stage_root="/home/corvis/fleet/stage",
         logical_cores=16,
         ram_gb=32.0,
         gpu=None,
@@ -65,8 +64,6 @@ def _node() -> NodeConfig:
         cxx=None,
         docker=None,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget={
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,
@@ -121,31 +118,32 @@ class TestPollResult:
         }
 
     def test_a_failing_status_is_read(self) -> None:
-        _test_hooks.run = FakeRun([ok(""), ok(f"2 {DEMO_FINISHED}\r\n")])
+        _test_hooks.run = FakeRun([ok(""), ok(f"2 {DEMO_FINISHED}\n")])
 
         assert core_collect.poll_result(_node(), run_id=DEMO_RUN_ID) == {
             "exit_code": 2,
             "finished_unix": DEMO_FINISHED,
         }
 
-    def test_a_negative_status_is_read(self) -> None:
-        """PowerShell reports an unhandled exception as a large negative."""
+    def test_a_negative_status_is_written_by_something_else(self) -> None:
+        """sh writes ``$?``, 0 to 255; a negative was a PowerShell exception's
+        status, and no node renders one since board task e705f08c."""
         _test_hooks.run = FakeRun([ok(""), ok(f"-1073741819 {DEMO_FINISHED}\n")])
 
-        assert core_collect.poll_result(_node(), run_id=DEMO_RUN_ID) == {
-            "exit_code": -1073741819,
-            "finished_unix": DEMO_FINISHED,
-        }
+        with pytest.raises(AppError) as refusal:
+            core_collect.poll_result(_node(), run_id=DEMO_RUN_ID)
+
+        assert "where an exit status and a timestamp were expected" in refusal.value.message
 
     def test_an_unreadable_answer_is_refused_rather_than_called_unfinished(self) -> None:
         """Treating it as running would hold the node's budget forever."""
-        _test_hooks.run = FakeRun([ok(""), ok("Access is denied.\n")])
+        _test_hooks.run = FakeRun([ok(""), ok("cat: result.txt: Permission denied\n")])
 
         with pytest.raises(AppError) as refusal:
             core_collect.poll_result(_node(), run_id=DEMO_RUN_ID)
 
         assert refusal.value.code is FleetErrorCode.RUN_RESULT_UNREADABLE
-        assert "Access is denied." in refusal.value.message
+        assert "cat: result.txt: Permission denied" in refusal.value.message
 
     def test_a_status_without_a_timestamp_is_refused(self) -> None:
         """The old single-field answer, which a stale node could still give."""
@@ -203,7 +201,7 @@ class TestOutcome:
 
         # The retained transcript, which outlives the run's directory.
         assert detail == (
-            f"make check exited 2; log at lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log"
+            f"make check exited 2; log at lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log"
         )
 
 
@@ -230,8 +228,8 @@ class TestTheWiring:
         # The run's directory is retired, by a script sent to the stage root
         # and run there, then the unread cache generations are removed by a
         # second (MCPs board task 346abc45) once the row is closed.
-        retire_path = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
-        sweep_path = "C:/fleet/stage/fleet-cache-generations.ps1"
+        retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
+        sweep_path = "/home/corvis/fleet/stage/fleet-cache-generations.sh"
         touched = [
             (retire_path in " ".join(call), sweep_path in " ".join(call)) for call in node.calls
         ]

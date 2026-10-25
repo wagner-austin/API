@@ -10,12 +10,11 @@ diphtheria, which has no such cgroup, printed neither.
 
 from __future__ import annotations
 
-from fleet.core.dialect_linux import LinuxDialect
+from fleet.core.dialect import CAPACITY_PROBE_SCRIPT
 
 
 def test_the_capacity_probe_reads_runners_slice_only_where_it_has_a_numeric_high() -> None:
-    body = LinuxDialect().capacity_probe_script()
-    lines = body.splitlines()
+    lines = CAPACITY_PROBE_SCRIPT.splitlines()
     start = lines.index("s=/sys/fs/cgroup/runners.slice")
 
     # The action cache lines follow (tests/test_dialect_linux_action_cache.py).

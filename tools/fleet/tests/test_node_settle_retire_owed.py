@@ -38,7 +38,7 @@ __all__ = ["_credentials_in_env", "_sourced_config"]
 BANNER_TIMEOUT = "Connection timed out during banner exchange"
 
 #: Where the runner's retire script goes on the demo node.
-RETIRE_PATH = f"C:/fleet/stage/retire-{DEMO_RUN_ID}.ps1"
+RETIRE_PATH = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
 
 
 def _retires(config_path: pathlib.Path) -> list[tuple[str, str, str]]:

@@ -13,7 +13,6 @@ import pathlib
 from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_agent
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.source import ProjectCompanion
 from fleet.core import _test_hooks, dialect, records, stage_repository, staging
 from tests._node_agent_fixtures import (
@@ -62,11 +61,14 @@ def _companion_commit_script() -> str:
     """The script that clones lavender's staged companion from its bundle.
 
     Returns:
-        Its text, as the dialect renders it for a Windows node.
+        Its text, as the dialect renders it.
     """
-    return dialect.for_platform(NodePlatform.WINDOWS).checked_script(
+    return dialect.checked_script(
         stage_repository.companion_repository_commands(
-            "C:/fleet/stage/MCPs", "C:/fleet/stage/MCPs.stage/tree.tgz", COMPANION_SHA, "main"
+            "/home/corvis/fleet/stage/MCPs",
+            "/home/corvis/fleet/stage/MCPs.stage/tree.tgz",
+            COMPANION_SHA,
+            "main",
         )
     )
 
@@ -199,7 +201,9 @@ class TestCompanions:
 
         sent = [body or b"" for body in runner.stdin]
         committed = sent.index(_companion_commit_script().encode())
-        built = next(index for index, body in enumerate(sent) if b"[string[]]$Install" in body)
+        built = next(
+            index for index, body in enumerate(sent) if b"POETRY_KEYRING_ENABLED='false'" in body
+        )
         assert committed < built
 
     def test_the_feed_names_the_commit_the_companion_was_measured_with(
@@ -232,5 +236,5 @@ class TestCompanions:
         assert len(staged) == 2
         assert staged[1] == (
             f"{len(companion_payload)} bytes, the MCPs companion at {COMPANION_SHA}, "
-            "to C:/fleet/stage/MCPs"
+            "to /home/corvis/fleet/stage/MCPs"
         )

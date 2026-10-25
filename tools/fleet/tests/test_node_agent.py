@@ -22,7 +22,6 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
-from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect, mirror_fetch, records, staging
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
@@ -37,8 +36,8 @@ from tests._node_agent_fixtures import (
     prebuilt_export,
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
-from tests._toolchain_fixtures import LAVENDER_2026_09_23
-from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
+from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
+from tests.conftest import CALM, DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -83,13 +82,13 @@ def _mirror(config_path: pathlib.Path) -> str:
 
 class TestIdentity:
     def test_the_label_and_session_are_derived_from_the_node(self) -> None:
-        label, session = node_agent.node_identity("sedona", elevated=False)
+        label, session = node_agent.node_identity("sedona")
 
         assert label == "fleet-node-sedona"
         assert session == str(uuid.uuid5(uuid.NAMESPACE_URL, "fleet-node-agent/sedona"))
         assert uuid.UUID(session).version == 5
         # Stable across calls, so every tick is one session on the ledger.
-        assert node_agent.node_identity("sedona", elevated=False) == (label, session)
+        assert node_agent.node_identity("sedona") == (label, session)
 
 
 class TestClaiming:
@@ -115,7 +114,7 @@ class TestClaiming:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
         claim = endpoint.arguments[1]
         assert claim["lane"] == "node"
-        assert claim["tags"] == ["windows"]
+        assert claim["tags"] == ["linux"]
         assert claim["node"] == "lavender"
         assert claim["agent"] == "fleet-node-lavender"
         started = endpoint.arguments[2]
@@ -156,24 +155,24 @@ class TestClaiming:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         rows = records.read_ledger(loaded.ledger)
         assert len(rows) == 1
-        expected = dialect.for_platform(NodePlatform.WINDOWS).build_script(
-            target=f"C:/fleet/stage/{DEMO_RUN_ID}",
+        target = f"/home/corvis/fleet/stage/{DEMO_RUN_ID}"
+        expected = dialect.build_script(
+            target=target,
             path=DEMO_PROJECT,
             workers=rows[0]["workers"],
             install=(NPM_CI,),
-            cache_root="C:/fleet/stage/cache",
+            cache_root="/home/corvis/fleet/stage/cache",
             isolated_docker=False,
-            elevated=False,
             agent="opus-dispatch-0905",
             loopback_unit=None,
         )
         assert runner.stdin[-3 - len(PROBED)] == expected.encode("utf-8")
         # The claimed job's submitter, exported so a hold the suite takes is
         # attributed to that session (MCPs board task 6c4516af A4).
-        assert "$env:BOARD_AGENT_LABEL = 'opus-dispatch-0905'" in expected
-        assert "[string[]]$Install = @('npm ci')," in expected
-        assert "[string]$CacheRoot = 'C:/fleet/stage/cache'," in expected
-        assert f"[string]$Recipe = 'C:/fleet/stage/{DEMO_RUN_ID}/{DEMO_PROJECT}'," in expected
+        assert "BOARD_AGENT_LABEL='opus-dispatch-0905'\n" in expected
+        assert f"npm ci >> '{target}/result.txt.log' 2>&1\n" in expected
+        assert "CORVIS_FLEET_CACHE='/home/corvis/fleet/stage/cache'\n" in expected
+        assert f"cd '{target}/{DEMO_PROJECT}'\n" in expected
 
     def test_a_commit_the_mirror_lacks_is_fetched_from_the_declared_remote(
         self, sourced_config: pathlib.Path
@@ -255,9 +254,9 @@ class TestClaimingNothing:
         _test_hooks.run = FakeRun(
             [
                 ok(""),
-                ok("free_ram_gb=2.2\nfree_disk_gb=243.0\nreserved_cores=0\n"),
+                ok(f"free_ram_gb=2.2\nfree_disk_gb=243.0\nreserved_cores=0\n{CALM}"),
                 ok(""),
-                ok(LAVENDER_2026_09_23),
+                ok(DIPHTHERIA_2026_09_23),
             ]
         )
         endpoint = FakeQueue([dump_json_str({"jobs": []})])
@@ -334,10 +333,10 @@ class TestRefusals:
     def test_a_job_naming_fewer_tags_than_its_project_passes_the_gate(self) -> None:
         """What it needs is the declaration, which the claim's fits already
         assessed against this runner (MCPs board task 939ec5c7, job 7c16305c)."""
-        row = queue_job(status="claimed", requiredTags=["windows"])
+        row = queue_job(status="claimed", requiredTags=["linux"])
         job = decode_job(row, answer=dump_json_str(row))
 
-        assert node_prepare.tags_refusal(job, ("elevated", "windows")) is None
+        assert node_prepare.tags_refusal(job, ("gpu", "linux")) is None
 
     def test_a_project_with_no_remote_is_refused_by_name(self, config_path: pathlib.Path) -> None:
         """The shared fixture's project declares ``source: null``."""

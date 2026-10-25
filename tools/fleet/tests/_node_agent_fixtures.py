@@ -37,7 +37,7 @@ from tests._queue_fakes import (
 )
 from tests._registry import write_registry
 from tests._thread_fakes import in_order_executor
-from tests._toolchain_fixtures import LAVENDER_2026_09_23
+from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import (
     DEMO_PROJECT,
     DEMO_RUN_ID,
@@ -85,7 +85,7 @@ PROBED: tuple[_test_hooks.CommandResult, ...] = (
     ok(""),
     ok(PROBE_OK),
     ok(""),
-    ok(LAVENDER_2026_09_23),
+    ok(DIPHTHERIA_2026_09_23),
 )
 
 #: A vitest transcript tail with the banner, as the collect pass reads it.

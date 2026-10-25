@@ -1,4 +1,4 @@
-"""The ``sh`` scripts a Linux node is handed.
+"""The ``sh`` scripts a node is handed.
 
 TEXT ASSERTIONS, WITH ONE REAL EXECUTION WHERE THE MACHINE ALLOWS. The build,
 launch, result and stop scripts need a node with MCPs' fleet-check-unit and
@@ -8,7 +8,7 @@ bc8c445c); here their text is pinned to the properties that made them correct
 refusal, the helper's start and stop -- so a rewording that loses one fails a
 test. The two probes
 and the reassembly are plain POSIX tools and are RUN when this suite runs
-under ``sh``, which is every Linux node and never the Windows hub.
+under ``sh``, which is every fleet node.
 """
 
 from __future__ import annotations
@@ -21,18 +21,12 @@ import pytest
 
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.source import InstallStep
-from fleet.core import names, tool_caches
-from fleet.core.dialect_linux import (
-    PROLOGUE,
-    SH_INVOCATION,
-    LinuxDialect,
-)
+from fleet.core import dialect, names, tool_caches
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION
 from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.names import CACHE_VARIABLE
 from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
-
-DIALECT = LinuxDialect()
 
 TARGET = "/home/corvis/fleet/stage/run-1"
 
@@ -58,16 +52,16 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
     ``~/.local/bin`` first because that is where pipx puts poetry and a
     non-interactive ssh command does not read the profile that adds it."""
     scripts = [
-        DIALECT.make_directory_script(TARGET),
-        DIALECT.digest_script(TARGET),
+        dialect.make_directory_script(TARGET),
+        dialect.digest_script(TARGET),
         _build(workers=4),
-        DIALECT.log_tail_script(TARGET, 200),
-        DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False),
-        DIALECT.result_script(target=TARGET, run_id=DEMO_RUN_ID),
-        DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID),
-        DIALECT.capacity_probe_script(),
-        DIALECT.toolchain_probe_script(),
-        DIALECT.observe_sessions_script(),
+        dialect.log_tail_script(TARGET, 200),
+        dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
+        dialect.result_script(TARGET),
+        dialect.stop_script(DEMO_RUN_ID),
+        dialect.CAPACITY_PROBE_SCRIPT,
+        dialect.TOOLCHAIN_PROBE_SCRIPT,
+        dialect.OBSERVE_SESSIONS_SCRIPT,
     ]
     assert PROLOGUE.startswith("set -eu\n")
     assert 'PATH="$HOME/.local/bin:$HOME/.cargo/bin:$PATH"' in PROLOGUE
@@ -87,7 +81,7 @@ def _build(
     workers: int = 6,
     loopback_unit: str | None = None,
 ) -> str:
-    """Render the Linux build script for one run under the fixture's roots.
+    """Render the build script for one run under the fixture's roots.
 
     Args:
         path: The recipe's directory inside the export.
@@ -98,14 +92,13 @@ def _build(
     Returns:
         The script's text.
     """
-    return DIALECT.build_script(
+    return dialect.build_script(
         target=TARGET,
         path=path,
         workers=workers,
         install=install,
         cache_root="/s/cache",
         isolated_docker=False,
-        elevated=False,
         agent="opus-demo-0929",
         loopback_unit=loopback_unit,
     )
@@ -139,14 +132,13 @@ class TestBuildScript:
 
         assert "BOARD_AGENT_LABEL='opus-demo-0929'\n" in body
         with pytest.raises(ValueError, match="'Opus Demo' is outside the board's kebab-case"):
-            DIALECT.build_script(
+            dialect.build_script(
                 target=TARGET,
                 path=DEMO_PROJECT,
                 workers=1,
                 install=(),
                 cache_root="/s/cache",
                 isolated_docker=False,
-                elevated=False,
                 agent="Opus Demo",
                 loopback_unit=None,
             )
@@ -241,7 +233,7 @@ class TestBuildScript:
 
 class TestLogTailScript:
     def test_it_reads_the_last_lines_of_the_transcript_or_nothing(self) -> None:
-        body = DIALECT.log_tail_script(TARGET, 200)
+        body = dialect.log_tail_script(TARGET, 200)
 
         assert body == (
             f"{PROLOGUE}if [ -f '{TARGET}/{names.RESULT_NAME}.log' ]; then "
@@ -254,7 +246,7 @@ class TestLaunchScript:
         """The unit is given the account's runtime directory and bus, which
         end with the session that started it unless the user lingers, so the
         script checks first and names the fix."""
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
+        body = dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
         lines = body.splitlines()
 
         check = next(index for index, line in enumerate(lines) if "loginctl show-user" in line)
@@ -269,9 +261,9 @@ class TestLaunchScript:
         """MCPs board task bc8c445c: a --user unit sat under user.slice, which
         neither the owner's nor dispatch's slice reached; the helper starts a
         system unit in the checks' slice inside system-dispatch.slice."""
-        body = DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
+        body = dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
         unit = names.task_name(DEMO_RUN_ID)
-        build = DIALECT.script_path(TARGET, names.BUILD_STEM)
+        build = dialect.script_path(TARGET, names.BUILD_STEM)
         start = f"\n{CHECK_UNIT} start '{unit}' '{TARGET}' '{build}' '{unit_end_path(TARGET)}'\n"
 
         assert start in body
@@ -280,37 +272,18 @@ class TestLaunchScript:
         assert body.rstrip().endswith("printf 'launched\\n'")
         assert "make check" not in body
 
-    def test_an_elevated_launch_or_build_is_refused_rather_than_rendered(self) -> None:
-        """No linux node declares an elevated runner (MCPs board task
-        a98d7083), and a build rendered anyway would lack the rights its
-        suite was written for."""
-        with pytest.raises(ValueError, match=r"requires the elevated tag, and a linux node has no"):
-            DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=True)
-        with pytest.raises(ValueError, match=r"requires the elevated tag, and a linux node has no"):
-            DIALECT.build_script(
-                target=TARGET,
-                path="execution",
-                workers=1,
-                install=(),
-                cache_root="/s/cache",
-                isolated_docker=False,
-                elevated=True,
-                agent="opus-demo-0929",
-                loopback_unit=None,
-            )
-
     def test_the_unit_name_is_the_one_the_stop_script_stops(self) -> None:
         unit = names.task_name(DEMO_RUN_ID)
 
-        assert unit in DIALECT.launch_script(target=TARGET, run_id=DEMO_RUN_ID, elevated=False)
-        stopped = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
+        assert unit in dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
+        stopped = dialect.stop_script(DEMO_RUN_ID)
 
         assert f"{CHECK_UNIT} stop '{unit}'\n" in stopped
 
 
 class TestResultAndStopScripts:
     def test_the_result_script_prints_status_and_mtime_or_nothing(self) -> None:
-        body = DIALECT.result_script(target=TARGET, run_id=DEMO_RUN_ID)
+        body = dialect.result_script(TARGET)
         result = f"{TARGET}/{names.RESULT_NAME}"
 
         assert f"if [ -f '{result}' ]; then" in body
@@ -321,45 +294,38 @@ class TestResultAndStopScripts:
         """systemctl stop of a collected unit exits 5; the cancel must still
         close the row, so the helper's stop, which exits 0 for a unit no
         longer active, is the script's one stop."""
-        body = DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
+        body = dialect.stop_script(DEMO_RUN_ID)
         unit = names.task_name(DEMO_RUN_ID)
 
         assert body == f"{PROLOGUE}{CHECK_UNIT} stop '{unit}'\nprintf 'stopped {unit}\\n'\n"
 
-    def test_the_stop_reads_no_process_id(self) -> None:
-        """Stopping a unit stops its control group, the whole tree the build
-        started, so the id the Windows build records is neither written nor
-        read here, and the build script writes no such file."""
-        assert names.PID_NAME not in DIALECT.stop_script(target=TARGET, run_id=DEMO_RUN_ID)
-        assert names.PID_NAME not in _build(workers=4)
-
 
 class TestTransportShape:
     def test_scripts_are_sh_and_run_through_bin_sh_by_path(self) -> None:
-        assert DIALECT.script_path("/s", "build") == "/s/build.sh"
-        assert DIALECT.invocation() == SH_INVOCATION == ("/bin/sh",)
+        assert dialect.script_path("/s", "build") == "/s/build.sh"
+        assert SH_INVOCATION == ("/bin/sh",)
 
     def test_the_write_command_creates_the_parent_and_streams_stdin(self) -> None:
-        command = DIALECT.write_command("/s/run-1/x.sh")
+        command = dialect.write_command("/s/run-1/x.sh")
 
         assert command == "mkdir -p \"$(dirname '/s/run-1/x.sh')\" && cat > '/s/run-1/x.sh'"
 
     def test_the_directory_script_is_mkdir_p(self) -> None:
-        assert DIALECT.make_directory_script("/s/run-1").endswith("mkdir -p /s/run-1\n")
-        assert DIALECT.make_directory_script("/s/run 1").endswith("mkdir -p '/s/run 1'\n")
+        assert dialect.make_directory_script("/s/run-1").endswith("mkdir -p /s/run-1\n")
+        assert dialect.make_directory_script("/s/run 1").endswith("mkdir -p '/s/run 1'\n")
 
     def test_the_digest_script_digests_the_landed_archive_and_does_not_extract(self) -> None:
-        body = DIALECT.digest_script(TARGET)
+        body = dialect.digest_script(TARGET)
 
         assert body == (f"{PROLOGUE}sha256sum '{TARGET}/{names.ARCHIVE_NAME}' | cut -d ' ' -f 1\n")
 
     def test_echo_is_printf_of_a_quoted_literal(self) -> None:
-        assert DIALECT.echo_command("installing make") == "printf '%s\\n' 'installing make'"
+        assert dialect.echo_command("installing make") == "printf '%s\\n' 'installing make'"
 
     def test_the_toolchain_probe_asks_python3_and_reports_it_as_python(self) -> None:
         """The contract names the interpreter ``python``; the Makefile prologue
-        calls ``python3`` on Linux, so that is what is asked."""
-        body = DIALECT.toolchain_probe_script()
+        calls ``python3``, so that is what is asked."""
+        body = dialect.TOOLCHAIN_PROBE_SCRIPT
 
         assert "report python python3\n" in body
         assert "report go go version\n" in body
@@ -373,14 +339,12 @@ class TestTransportShape:
         assert "*name=rootless*)\n" in body
         assert "sudo -n -u execdocker docker compose version" in body
         assert "sudo -n -u execdocker docker buildx version" in body
-        assert "winget" not in body
-        assert "choco" not in body
 
     def test_the_fleet_directory_is_the_literal_home_path(self) -> None:
         """The write command single-quotes the path, so ``~`` would be a
         directory called ``~``; the account's home is spelled out."""
-        assert DIALECT.fleet_directory("corvis") == "/home/corvis/.fleet"
-        assert DIALECT.script_path(DIALECT.fleet_directory("corvis"), "observe-sessions") == (
+        assert dialect.fleet_directory("corvis") == "/home/corvis/.fleet"
+        assert dialect.script_path(dialect.fleet_directory("corvis"), "observe-sessions") == (
             "/home/corvis/.fleet/observe-sessions.sh"
         )
 
@@ -412,7 +376,7 @@ class TestForRealUnderSh:
         return completed.stdout
 
     def test_the_toolchain_probe_reports_every_tool(self, tmp_path: pathlib.Path) -> None:
-        fields = fields_of(self.run_script(tmp_path, DIALECT.toolchain_probe_script()))
+        fields = fields_of(self.run_script(tmp_path, dialect.TOOLCHAIN_PROBE_SCRIPT))
 
         assert set(fields) == {
             "python",
@@ -448,7 +412,7 @@ class TestForRealUnderSh:
         fake = tools / "g++"
         fake.write_bytes(b'#!/bin/sh\n[ "$1" = "-dumpfullversion" ] && echo 13.3.0\n')
         fake.chmod(0o755)
-        body = DIALECT.toolchain_probe_script().replace(
+        body = dialect.TOOLCHAIN_PROBE_SCRIPT.replace(
             PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
         )
         fields = fields_of(self.run_script(tmp_path, body))
@@ -463,7 +427,7 @@ class TestForRealUnderSh:
         target.mkdir()
         (target / names.ARCHIVE_NAME).write_bytes(payload)
 
-        output = self.run_script(tmp_path, DIALECT.digest_script(str(target)))
+        output = self.run_script(tmp_path, dialect.digest_script(str(target)))
 
         assert output == f"{hashlib.sha256(payload).hexdigest()}\n"
         assert (target / names.ARCHIVE_NAME).read_bytes() == payload

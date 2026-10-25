@@ -25,8 +25,8 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue, tick_body
-from tests._toolchain_fixtures import LAVENDER_2026_09_23, LAVENDER_STORE_STUB
-from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok
+from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23, NO_PYTHON
+from tests.conftest import CALM, DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -72,7 +72,8 @@ class TestATickThatClaimsNothing:
             "fits": [],
             "claiming": False,
             "verdict": "did not answer; claiming nothing: ssh to lavender failed while sending "
-            "C:/fleet/stage/fleet-capacity-lavender.ps1: ssh: connect to host lavender: timed out",
+            "/home/corvis/fleet/stage/fleet-capacity-lavender.sh: ssh: connect to host lavender: "
+            "timed out",
         }
 
     def test_a_toolchain_that_did_not_answer_records_the_load_but_no_tags(
@@ -94,7 +95,7 @@ class TestATickThatClaimsNothing:
     def test_a_node_that_cannot_build_records_why(self, sourced_config: pathlib.Path) -> None:
         _, tick = _ticked(
             sourced_config,
-            [ok(""), ok(PROBE_OK), ok(""), ok(LAVENDER_STORE_STUB)],
+            [ok(""), ok(PROBE_OK), ok(""), ok(NO_PYTHON)],
             [dump_json_str({"jobs": []})],
         )
 
@@ -125,15 +126,15 @@ class TestATickThatClaimsNothing:
             sourced_config,
             [
                 ok(""),
-                ok(f"free_ram_gb={free}\nfree_disk_gb=860.0\nreserved_cores=0\n"),
+                ok(f"free_ram_gb={free}\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"),
                 ok(""),
-                ok(LAVENDER_2026_09_23),
+                ok(DIPHTHERIA_2026_09_23),
             ],
             [dump_json_str({"jobs": []})],
         )
 
         assert endpoint.tools == ["dispatch_list"]
-        assert (tick["tags"], tick["fits"], tick["claiming"]) == (["windows"], [], False)
+        assert (tick["tags"], tick["fits"], tick["claiming"]) == (["linux"], [], False)
         assert tick["load"] == {
             "runs": 0,
             "workers": 0,
@@ -158,7 +159,7 @@ class TestATickThatAsksTheQueue:
         assert tick == {
             "node": "lavender",
             "elevated": False,
-            "tags": ["windows"],
+            "tags": ["linux"],
             "fits": [DEMO_PROJECT],
             "load": ROOMY,
             "claiming": True,

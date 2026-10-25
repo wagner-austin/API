@@ -32,7 +32,6 @@ from typing import Final
 
 from platform_core.json_utils import require_dict, require_str
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.workspace_files import JSON_SUFFIX, MACHINES_DIRECTORY
 from tests._host import ROSTER
@@ -95,10 +94,10 @@ def test_lavender_decodes_as_the_linux_worker_it_was_reimaged_to() -> None:
     lavender = decode_fleet_workspace(document)["machines"]["lavender"]
     declared = require_dict(require_dict(document, "machines"), "lavender")
 
-    assert lavender["platform"] is NodePlatform.LINUX
+    assert require_str(declared, "platform") == "linux"
     assert lavender["user"] == "corvis"
     assert lavender["enabled"] is True
-    assert lavender["guest_host"] is None
+    assert declared["guest"] is None
     assert require_str(declared, "tailnetIp") == TAILNET_IP
     assert require_str(declared, "bootMac") == BOOT_MAC
 

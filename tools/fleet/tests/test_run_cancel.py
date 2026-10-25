@@ -35,6 +35,7 @@ from fleet.core import (
     staging,
 )
 from tests.conftest import (
+    CALM,
     DEMO_NOW,
     DEMO_PROJECT,
     DEMO_RUN_ID,
@@ -223,7 +224,7 @@ class TestRun:
         self, config_path: pathlib.Path, repo: pathlib.Path
     ) -> None:
         _test_hooks.run = FakeRun(
-            [ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n")]
+            [ok(""), ok(f"free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}")]
         )
 
         with pytest.raises(AppError) as excinfo:
@@ -327,14 +328,15 @@ class TestCancel:
         )
 
         node = loaded.workspace["nodes"][records.read_ledger(loaded.ledger)[0]["node"]]
-        stop_body = dialect.for_platform(node["platform"]).stop_script(
-            target=names.dispatch_directory(node["stage_root"], DEMO_RUN_ID), run_id=DEMO_RUN_ID
-        )
-        assert runner.stdin[0] == stop_body.encode("utf-8")
-        retire_body = retire.script_for(
-            node["platform"],
-            stage_root=node["stage_root"],
-            run_id=DEMO_RUN_ID,
+        assert runner.stdin[0] == dialect.stop_script(DEMO_RUN_ID).encode("utf-8")
+        stage_root = node["stage_root"]
+        retire_body = dialect.retire_script(
+            target=names.dispatch_directory(stage_root, DEMO_RUN_ID),
+            retained=names.retained_log_path(stage_root, DEMO_RUN_ID),
+            scripts=tuple(
+                dialect.script_path(stage_root, stem)
+                for stem in names.root_script_stems(DEMO_RUN_ID)
+            ),
             isolated=retire.runs_isolated(node),
         )
         assert runner.stdin[2] == retire_body.encode("utf-8")

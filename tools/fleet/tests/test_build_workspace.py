@@ -3,16 +3,14 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 from fleet.contracts.source import InstallStep
-from fleet.core.dialect_linux import LinuxDialect
+from fleet.core import dialect
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="The rendered build uses POSIX sh and make")
 @pytest.mark.parametrize("workspace", ["", "packages/demo"])
 @pytest.mark.parametrize("workers", [1, 3, 6])
 def test_preparation_and_recipe_receive_the_same_workspace(
@@ -26,7 +24,7 @@ def test_preparation_and_recipe_receive_the_same_workspace(
         "CORVIS_TEST_MAX_WORKERS\n",
         encoding="utf-8",
     )
-    body = LinuxDialect().build_script(
+    body = dialect.build_script(
         target=tmp_path.as_posix(),
         path=workspace,
         workers=workers,
@@ -43,7 +41,6 @@ def test_preparation_and_recipe_receive_the_same_workspace(
         ),
         cache_root=(tmp_path / "cache").as_posix(),
         isolated_docker=False,
-        elevated=False,
         agent="gpt6-deploy-1005",
         loopback_unit=None,
     )

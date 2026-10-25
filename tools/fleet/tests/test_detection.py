@@ -1,9 +1,7 @@
 """The tags a runner claims with, read from its node's probe (MCPs 939ec5c7).
 
-The answers are the nodes' own, read with the probe this package sends on
-2026-10-02: diphtheria and lavender-wsl through the sh probe, sedona and
-pendragon through the PowerShell one. Every one of them matched fleet.json
-that day, so the drift cases change one side at a time.
+diphtheria's answer is its own, read with the sh probe on 2026-10-02, when
+it matched fleet.json, so the drift cases change one side at a time.
 """
 
 from __future__ import annotations
@@ -15,7 +13,7 @@ from fleet.contracts.detection import (
     detected_tags,
     tag_drift,
 )
-from fleet.contracts.node import NodeConfig, NodeGpu, NodePlatform
+from fleet.contracts.node import NodeConfig, NodeGpu
 from fleet.contracts.tags import NodeTag, node_tags
 from fleet.core import toolchain
 from tests._toolchain_fixtures import node
@@ -31,8 +29,10 @@ DIPHTHERIA_2026_10_02 = (
     "testdb=yes=pgvector/pgvector:pg16-bookworm\n"
 )
 
-#: pendragon's, the same day: no compiler, no card, no test database.
-PENDRAGON_2026_10_02 = "ffmpeg=yes=ffmpeg version 8.0\ncxx=no=\ngpu=no=\ntestdb=no=\ndocker=no=\n"
+#: DERIVED from :data:`DIPHTHERIA_2026_10_02`: a node with ffmpeg and no
+#: compiler, card, test database or daemon, the shape pendragon answered
+#: that day.
+BARE = "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\ncxx=no=\ngpu=no=\ntestdb=no=\ndocker=no=\n"
 
 #: diphtheria's card as the registry declares it.
 A2000 = NodeGpu(
@@ -50,7 +50,6 @@ def _diphtheria() -> NodeConfig:
         The node.
     """
     declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1", stack="29.8.1")
-    declared["platform"] = NodePlatform.LINUX
     declared["gpu"] = A2000
     declared["test_database"] = True
     return declared
@@ -71,19 +70,19 @@ class TestTheProbeLines:
 
 class TestDetectedTags:
     def test_diphtheria_answers_every_tag_it_declares_and_ffmpeg(self) -> None:
-        detected = detected_tags(_diphtheria(), toolchain.read_reports(DIPHTHERIA_2026_10_02))
+        detected = detected_tags(toolchain.read_reports(DIPHTHERIA_2026_10_02))
 
         assert detected == node_tags(_diphtheria()) | {NodeTag.FFMPEG}
 
-    def test_pendragon_answers_its_platform_and_ffmpeg_only(self) -> None:
-        detected = detected_tags(node("pendragon"), toolchain.read_reports(PENDRAGON_2026_10_02))
+    def test_a_bare_node_answers_linux_and_ffmpeg_only(self) -> None:
+        detected = detected_tags(toolchain.read_reports(BARE))
 
-        assert detected == {NodeTag.WINDOWS, NodeTag.FFMPEG}
+        assert detected == {NodeTag.LINUX, NodeTag.FFMPEG}
 
     def test_installing_a_compiler_adds_its_tag_with_no_declaration(self) -> None:
-        installed = PENDRAGON_2026_10_02.replace("cxx=no=", "cxx=yes=17.14.37710.0")
+        installed = BARE.replace("cxx=no=", "cxx=yes=13.3.0")
 
-        assert NodeTag.CXX in detected_tags(node("pendragon"), toolchain.read_reports(installed))
+        assert NodeTag.CXX in detected_tags(toolchain.read_reports(installed))
 
 
 class TestTagDrift:

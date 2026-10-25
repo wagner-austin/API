@@ -30,10 +30,8 @@ import pytest
 from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.check_unit import CHECK_UNIT, CHECK_UNIT_HELPER
 from fleet.contracts.detection import TESTDB_CONTAINER
-from fleet.core.dialect_linux import PROLOGUE, SH_INVOCATION, LinuxDialect
+from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
 from tests.test_dialect_linux import fields_of
-
-DIALECT = LinuxDialect()
 
 #: How every docker ask is started inside a check's unit.
 UNIT = f"{CHECK_UNIT} run"
@@ -43,7 +41,7 @@ TESTDB_ASK = f"container inspect --format {{{{.Config.Image}}}} {TESTDB_CONTAINE
 
 
 def test_the_stack_line_asks_for_the_network_every_image_and_the_version_inside_a_unit() -> None:
-    body = DIALECT.toolchain_probe_script()
+    body = TOOLCHAIN_PROBE_SCRIPT
     unit = f'unit() {{\n  sudo -n {CHECK_UNIT_HELPER} run "$@"\n}}\n'
     condition = (
         f"if unit docker network inspect {STACK_NETWORK} > /dev/null 2>&1 &&"
@@ -62,7 +60,7 @@ def test_the_stack_line_asks_for_the_network_every_image_and_the_version_inside_
 def test_the_testdb_line_asks_inside_a_unit() -> None:
     assert (
         'if t="$(unit docker container inspect'
-        f" --format '{{{{.Config.Image}}}}' {TESTDB_CONTAINER}" in DIALECT.toolchain_probe_script()
+        f" --format '{{{{.Config.Image}}}}' {TESTDB_CONTAINER}" in TOOLCHAIN_PROBE_SCRIPT
     )
 
 
@@ -109,7 +107,7 @@ def _run_with_docker(
     fake.chmod(0o755)
     script = tmp_path / "probe.sh"
     script.write_text(
-        DIALECT.toolchain_probe_script().replace(
+        TOOLCHAIN_PROBE_SCRIPT.replace(
             PROLOGUE, PROLOGUE + f"PATH='{tools.as_posix()}':$PATH\n", 1
         ),
         encoding="utf-8",

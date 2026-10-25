@@ -15,7 +15,6 @@ from fleet.contracts.node import (
     LiveLoad,
     NodeConfig,
     NodeGpu,
-    NodePlatform,
     NodeState,
     SliceMemory,
 )
@@ -24,8 +23,7 @@ from fleet.contracts.tags import NodeTag
 from fleet.core.capacity import assess, job_ceiling, plan_dispatch, room_for_any
 from tests.conftest import IDLE
 
-#: What a windows node with no other declaration carries, and a linux one.
-WINDOWS_TAGS = frozenset({NodeTag.WINDOWS})
+#: What a node with no other declaration carries.
 LINUX_TAGS = frozenset({NodeTag.LINUX})
 
 #: lavender's card as the registry declares it, for the nodes that carry one.
@@ -44,7 +42,6 @@ def _node(
     reserved_cores: int = 2,
     reserved_ram_gb: float = 4.0,
     max_disk_gb: float = 20.0,
-    platform: NodePlatform = NodePlatform.WINDOWS,
     gpu: NodeGpu | None = None,
     checks_at_once: int | None = None,
     pinned_checks_only: bool = False,
@@ -57,7 +54,6 @@ def _node(
         reserved_cores: Cores left for the owner.
         reserved_ram_gb: Memory left for the owner.
         max_disk_gb: Disk reserved for staged trees.
-        platform: The node's dialect.
         gpu: Its CUDA device, or None for a CPU-only node.
         checks_at_once: Budgeted checks its CPUs carry at once, or None.
         pinned_checks_only: Whether it checks only the projects pinned to it.
@@ -67,8 +63,7 @@ def _node(
     """
     return NodeConfig(
         host=host,
-        platform=platform,
-        stage_root="C:/fleet/stage",
+        stage_root="/home/corvis/fleet/stage",
         logical_cores=cores,
         ram_gb=32.0,
         gpu=gpu,
@@ -78,8 +73,6 @@ def _node(
         cxx=None,
         docker=None,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget=NodeBudget(
             reserved_cores=reserved_cores,
             reserved_ram_gb=reserved_ram_gb,
@@ -99,8 +92,8 @@ def _state(
     live: LiveLoad = IDLE,
     ci_slice: SliceMemory | None = None,
     reserved_cores: int = 0,
-    cpu_pressure_pct: float | None = None,
-    io_pressure_pct: float | None = None,
+    cpu_pressure_pct: float = 0.0,
+    io_pressure_pct: float = 0.0,
 ) -> NodeState:
     """Build a probed state.
 
@@ -111,8 +104,8 @@ def _state(
         live: What the node's live fleet runs hold.
         ci_slice: Its runners.slice reading, or None for a node with none.
         reserved_cores: The cores its reservations hold.
-        cpu_pressure_pct: Its CPU pressure, or None for a Windows node.
-        io_pressure_pct: Its I/O pressure, or None for a Windows node.
+        cpu_pressure_pct: Its CPU pressure.
+        io_pressure_pct: Its I/O pressure.
 
     Returns:
         The state.
@@ -165,22 +158,20 @@ def _project(
 
 class TestAssess:
     def test_a_healthy_node_accepts_and_names_no_code(self) -> None:
-        verdict = assess(_node(), _state(), _project(), WINDOWS_TAGS)
+        verdict = assess(_node(), _state(), _project(), LINUX_TAGS)
 
         assert verdict["code"] is None
         assert verdict["reason"] == ""
         assert verdict["workers"] == 7
 
     def test_a_node_without_room_to_stage_is_refused(self) -> None:
-        verdict = assess(
-            _node(max_disk_gb=20.0), _state(free_disk_gb=5.0), _project(), WINDOWS_TAGS
-        )
+        verdict = assess(_node(max_disk_gb=20.0), _state(free_disk_gb=5.0), _project(), LINUX_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_DISK_EXHAUSTED
         assert "reserves 20 GB" in verdict["reason"]
 
     def test_a_node_whose_owner_is_using_it_is_refused(self) -> None:
-        verdict = assess(_node(), _state(free_ram_gb=3.0), _project(), WINDOWS_TAGS)
+        verdict = assess(_node(), _state(free_ram_gb=3.0), _project(), LINUX_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert "somebody is on this machine" in verdict["reason"]
@@ -194,8 +185,8 @@ class TestAssess:
         below = SliceMemory(current_gb=12.0, high_gb=16.0)
         node = _node(reserved_ram_gb=12.0)
 
-        held = assess(node, _state(free_ram_gb=8.2, ci_slice=at_high), _project(), WINDOWS_TAGS)
-        light = assess(node, _state(free_ram_gb=8.2, ci_slice=below), _project(), WINDOWS_TAGS)
+        held = assess(node, _state(free_ram_gb=8.2, ci_slice=at_high), _project(), LINUX_TAGS)
+        light = assess(node, _state(free_ram_gb=8.2, ci_slice=below), _project(), LINUX_TAGS)
 
         assert held["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert held["reason"].endswith(
@@ -213,8 +204,8 @@ class TestAssess:
         runs = LiveLoad(runs=2, workers=7, ram_gb=15.5)
         node = _node(reserved_cores=8, reserved_ram_gb=6.0)
 
-        own = assess(node, _state(free_ram_gb=18.8, live=runs), _project(), WINDOWS_TAGS)
-        owner = assess(node, _state(free_ram_gb=5.0, live=runs), _project(), WINDOWS_TAGS)
+        own = assess(node, _state(free_ram_gb=18.8, live=runs), _project(), LINUX_TAGS)
+        owner = assess(node, _state(free_ram_gb=5.0, live=runs), _project(), LINUX_TAGS)
 
         assert own["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert own["reason"].endswith(
@@ -231,7 +222,7 @@ class TestAssess:
         its own lease expires underneath it.
         """
         verdict = assess(
-            _node(cores=20), _state(free_ram_gb=11.4), _project(minimum_workers=8), WINDOWS_TAGS
+            _node(cores=20), _state(free_ram_gb=11.4), _project(minimum_workers=8), LINUX_TAGS
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
@@ -241,39 +232,38 @@ class TestAssess:
     def test_a_node_missing_a_required_tag_is_refused_before_capacity(self) -> None:
         """A CPU-only linux box with every byte free is still the wrong machine."""
         verdict = assess(
-            _node(host="diphtheria", platform=NodePlatform.LINUX),
+            _node(host="diphtheria"),
             _state(host="diphtheria"),
-            _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS)),
+            _project(required_tags=(NodeTag.GPU, NodeTag.TESTDB)),
             LINUX_TAGS,
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert verdict["workers"] == 0
-        assert verdict["reason"].startswith("diphtheria lacks gpu, windows: ")
-        assert "requires gpu, windows and this node carries linux" in verdict["reason"]
+        assert verdict["reason"].startswith("diphtheria lacks gpu, testdb: ")
+        assert "requires gpu, testdb and this node carries linux" in verdict["reason"]
         assert "or this one once the missing tool is installed" in verdict["reason"]
 
     def test_the_tag_refusal_names_only_the_tags_missing(self) -> None:
         verdict = assess(
-            _node(host="loki"),
-            _state(host="loki"),
-            _project(required_tags=(NodeTag.WINDOWS, NodeTag.GPU)),
-            WINDOWS_TAGS,
+            _node(host="colossus"),
+            _state(host="colossus"),
+            _project(required_tags=(NodeTag.LINUX, NodeTag.GPU)),
+            LINUX_TAGS,
         )
 
         assert verdict["code"] is FleetErrorCode.NODE_LACKS_TAG
-        assert verdict["reason"].startswith("loki lacks gpu: ")
+        assert verdict["reason"].startswith("colossus lacks gpu: ")
 
     def test_a_tool_tag_is_judged_on_what_the_runner_carries(self) -> None:
-        """pendragon on 2026-10-02 (MCPs board task 939ec5c7): grandma-api
-        needs ffmpeg, so a runner whose probe did not find it is refused that
-        one project, and the same node with ffmpeg found is weighed on its
-        capacity like any other."""
-        grandma = _project(required_tags=(NodeTag.WINDOWS, NodeTag.FFMPEG))
+        """MCPs board task 939ec5c7: an audio suite needs ffmpeg, so a runner
+        whose probe did not find it is refused that one project, and the same
+        node with ffmpeg found is weighed on its capacity like any other."""
+        audio = _project(required_tags=(NodeTag.FFMPEG,))
         node = _node(host="pendragon")
 
-        lacking = assess(node, _state(host="pendragon"), grandma, WINDOWS_TAGS)
-        found = assess(node, _state(host="pendragon"), grandma, WINDOWS_TAGS | {NodeTag.FFMPEG})
+        lacking = assess(node, _state(host="pendragon"), audio, LINUX_TAGS)
+        found = assess(node, _state(host="pendragon"), audio, LINUX_TAGS | {NodeTag.FFMPEG})
 
         assert lacking["code"] is FleetErrorCode.NODE_LACKS_TAG
         assert lacking["reason"].startswith("pendragon lacks ffmpeg: ")
@@ -281,38 +271,28 @@ class TestAssess:
         assert found["workers"] == 7
 
     def test_a_node_carrying_every_required_tag_is_weighed_on_capacity(self) -> None:
-        project = _project(required_tags=(NodeTag.GPU, NodeTag.WINDOWS))
-        carried = frozenset({NodeTag.WINDOWS, NodeTag.GPU})
+        project = _project(required_tags=(NodeTag.GPU, NodeTag.LINUX))
+        carried = frozenset({NodeTag.LINUX, NodeTag.GPU})
 
         assert assess(_node(gpu=GTX_1630), _state(), project, carried)["workers"] == 7
         full = assess(_node(gpu=GTX_1630), _state(free_ram_gb=3.0), project, carried)
         assert full["code"] is FleetErrorCode.NODE_OWNER_RESERVED
 
-    def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
-        linux = _node(platform=NodePlatform.LINUX)
-        assert assess(linux, _state(), _project(), LINUX_TAGS)["workers"] == 7
+    def test_a_project_requiring_nothing_takes_any_node(self) -> None:
+        assert assess(_node(), _state(), _project(), LINUX_TAGS)["workers"] == 7
 
-    def test_a_loopback_only_project_runs_on_linux_and_a_windows_node_refuses_it(self) -> None:
-        """Only a Linux node's fleet-check-unit gives a check a network of
-        its own (MCPs board task 649fcc7a)."""
+    def test_a_loopback_only_project_is_weighed_like_any_other(self) -> None:
+        """Every node's fleet-check-unit gives a check a network of its own
+        (MCPs board task 649fcc7a), so the declaration costs no node."""
         project = _project(loopback_only=True)
-        linux = assess(_node(platform=NodePlatform.LINUX), _state(), project, LINUX_TAGS)
-        windows = assess(_node(host="loki"), _state(), project, WINDOWS_TAGS)
 
-        assert linux["workers"] == 7
-        assert windows["workers"] == 0
-        assert windows["code"] is FleetErrorCode.NODE_LACKS_TAG
-        assert windows["reason"] == (
-            "loki is a windows node, and the project declares loopback_only: its check runs "
-            "in a network namespace holding only lo, which only a Linux node's "
-            "fleet-check-unit gives, so the answer is a Linux node."
-        )
+        assert assess(_node(), _state(), project, LINUX_TAGS)["workers"] == 7
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
         """What a worker costs is a property of the suite, not the machine:
         at 0.2 GB a worker, 23 GB affords 115, under 198 spare cores."""
-        heavy = assess(_node(cores=400), _state(), _project(), WINDOWS_TAGS)
-        light = assess(_node(cores=400), _state(), _project(worker_ram_gb=0.2), WINDOWS_TAGS)
+        heavy = assess(_node(cores=400), _state(), _project(), LINUX_TAGS)
+        light = assess(_node(cores=400), _state(), _project(worker_ram_gb=0.2), LINUX_TAGS)
 
         assert heavy["workers"] == 20
         assert light["workers"] == 115
@@ -328,7 +308,7 @@ class TestLivePools:
         """16 cores, 2 reserved: memory affords 20 workers, the cores 14, the
         ceiling 7, which leaves the other 7 for a second job."""
         assert job_ceiling(_node(), _project()) == 7
-        assert assess(_node(), _state(), _project(), WINDOWS_TAGS)["workers"] == 7
+        assert assess(_node(), _state(), _project(), LINUX_TAGS)["workers"] == 7
 
     def test_an_odd_spare_rounds_the_ceiling_up(self) -> None:
         assert job_ceiling(_node(cores=17), _project(minimum_workers=1)) == 8
@@ -336,7 +316,7 @@ class TestLivePools:
     def test_a_minimum_above_the_ceiling_raises_it(self) -> None:
         """A suite that cannot run on fewer than 10 workers is granted 10,
         and the cores pool still bounds the sum."""
-        verdict = assess(_node(), _state(), _project(minimum_workers=10), WINDOWS_TAGS)
+        verdict = assess(_node(), _state(), _project(minimum_workers=10), LINUX_TAGS)
 
         assert job_ceiling(_node(), _project(minimum_workers=10)) == 10
         assert verdict["workers"] == 10
@@ -346,7 +326,7 @@ class TestLivePools:
         27.0 - 7.7 - 4.0 = 15.3 GB (13 workers) are left, so 7 again."""
         live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
 
-        assert assess(_node(), _state(live=live), _project(), WINDOWS_TAGS)["workers"] == 7
+        assert assess(_node(), _state(live=live), _project(), LINUX_TAGS)["workers"] == 7
 
     def test_live_memory_shrinks_the_grant(self) -> None:
         """16.0 - 7.7 - 4.0 = 4.3 GB: three 1.1 GB workers, under the 7
@@ -354,7 +334,7 @@ class TestLivePools:
         live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
 
         verdict = assess(
-            _node(), _state(free_ram_gb=16.0, live=live), _project(minimum_workers=2), WINDOWS_TAGS
+            _node(), _state(free_ram_gb=16.0, live=live), _project(minimum_workers=2), LINUX_TAGS
         )
 
         assert verdict["code"] is None
@@ -363,7 +343,7 @@ class TestLivePools:
     def test_a_short_grant_names_what_the_live_runs_hold(self) -> None:
         live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
 
-        verdict = assess(_node(), _state(free_ram_gb=16.0, live=live), _project(), WINDOWS_TAGS)
+        verdict = assess(_node(), _state(free_ram_gb=16.0, live=live), _project(), LINUX_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_MEMORY_EXHAUSTED
         assert verdict["reason"] == (
@@ -377,7 +357,7 @@ class TestLivePools:
     def test_live_runs_holding_every_spare_core_leave_nothing(self) -> None:
         live = LiveLoad(runs=2, workers=14, ram_gb=15.4)
 
-        verdict = assess(_node(), _state(free_ram_gb=60.0, live=live), _project(), WINDOWS_TAGS)
+        verdict = assess(_node(), _state(free_ram_gb=60.0, live=live), _project(), LINUX_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert verdict["workers"] == 0
@@ -401,7 +381,7 @@ class TestChecksAtOnce:
             node,
             _state(host="serendipity", free_ram_gb=11.6, live=live),
             _project(minimum_workers=1),
-            WINDOWS_TAGS,
+            LINUX_TAGS,
         )
 
         assert verdict == {
@@ -422,7 +402,7 @@ class TestChecksAtOnce:
             node,
             _state(host="serendipity", free_ram_gb=11.6),
             _project(minimum_workers=1),
-            WINDOWS_TAGS,
+            LINUX_TAGS,
         )
 
         assert verdict == {"workers": 2, "code": None, "reason": ""}
@@ -435,7 +415,7 @@ class TestChecksAtOnce:
             node,
             _state(host="serendipity", free_ram_gb=11.6, live=live),
             _project(minimum_workers=1),
-            WINDOWS_TAGS,
+            LINUX_TAGS,
         )
 
         assert verdict == {"workers": 2, "code": None, "reason": ""}
@@ -443,11 +423,11 @@ class TestChecksAtOnce:
 
 class TestPlanDispatch:
     def test_it_returns_the_worker_count_when_the_node_accepts(self) -> None:
-        assert plan_dispatch(_node(), _state(), _project(), WINDOWS_TAGS) == 7
+        assert plan_dispatch(_node(), _state(), _project(), LINUX_TAGS) == 7
 
     def test_it_raises_the_verdict_s_own_code(self) -> None:
         with pytest.raises(AppError) as excinfo:
-            plan_dispatch(_node(), _state(free_ram_gb=3.0), _project(), WINDOWS_TAGS)
+            plan_dispatch(_node(), _state(free_ram_gb=3.0), _project(), LINUX_TAGS)
 
         assert excinfo.value.code is FleetErrorCode.NODE_OWNER_RESERVED
 
@@ -487,7 +467,7 @@ class TestRoomForAny:
     def test_diphtheria_takes_the_small_roll_gate_it_used_to_refuse(self) -> None:
         """16.6 GB free against 16.0 reserved: no room for a 1.1 GB worker,
         room for the 0.25 GB gate, which the runner's tags can serve."""
-        node = _node(gpu=None, platform=NodePlatform.LINUX, reserved_ram_gb=16.0)
+        node = _node(gpu=None, reserved_ram_gb=16.0)
         state = _state(free_ram_gb=16.6)
         gate = _project(worker_ram_gb=0.25, required_tags=(NodeTag.LINUX, NodeTag.DOCKER))
 
@@ -496,7 +476,7 @@ class TestRoomForAny:
         assert refused.startswith("NODE_OWNER_RESERVED: lavender has 16.6 GB free against a reserv")
 
     def test_a_small_project_the_runner_cannot_serve_does_not_lower_the_bound(self) -> None:
-        node = _node(gpu=None, platform=NodePlatform.LINUX, reserved_ram_gb=16.0)
+        node = _node(gpu=None, reserved_ram_gb=16.0)
         gate = _project(worker_ram_gb=0.25, required_tags=(NodeTag.LINUX, NodeTag.DOCKER))
 
         line = str(
@@ -510,8 +490,8 @@ class TestRoomForAny:
     def test_a_runner_no_registered_project_fits_is_refused_by_name(self) -> None:
         gpu_only = _project(required_tags=(NodeTag.GPU,))
 
-        assert room_for_any(_node(), _state(), (gpu_only,), frozenset({NodeTag.WINDOWS})) == (
-            "NODE_LACKS_TAG: this runner carries windows, and no registered project's "
+        assert room_for_any(_node(), _state(), (gpu_only,), LINUX_TAGS) == (
+            "NODE_LACKS_TAG: this runner carries linux, and no registered project's "
             "required tags fit it"
         )
         assert room_for_any(_node(), _state(), (gpu_only,), frozenset()) == (

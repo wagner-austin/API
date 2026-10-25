@@ -131,7 +131,7 @@ class TestClaim:
         job = queue.claim_next(
             QUEUE_CREDENTIALS,
             lane=DispatchLane.NODE,
-            tags=(NodeTag.WINDOWS, NodeTag.GPU),
+            tags=(NodeTag.LINUX, NodeTag.GPU),
             node=None,
             projects=None,
             lease_seconds=900,
@@ -160,11 +160,9 @@ class TestClaim:
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0] == {
             "lane": "node",
-            "tags": ["windows", "gpu"],
+            "tags": ["linux", "gpu"],
             "leaseSeconds": 900,
-            "agent": "fleet-node-loki",
-            "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
-            "cwd": "C:/fleet",
+            **RUNNER_IDENTITY,
         }
 
     def test_a_node_scoped_runner_sends_its_node_and_the_projects_it_fits(self) -> None:
@@ -175,7 +173,7 @@ class TestClaim:
         queue.claim_next(
             QUEUE_CREDENTIALS,
             lane=DispatchLane.NODE,
-            tags=(NodeTag.WINDOWS,),
+            tags=(NodeTag.LINUX,),
             node="lavender",
             projects=("libs/demo", "tools/fleet"),
             lease_seconds=900,

@@ -41,7 +41,7 @@ CHECK_TARGET: Final = re.compile(r"^check:", re.MULTILINE)
 NOT_ON_FLEET: Final[dict[str, str]] = {
     "tools/hpc3-execution": (
         "its check is a real sbatch --test-only preflight over ssh to HPC3, which this "
-        "workstation reaches through sedona or loki with its own key (ProxyJump "
+        "workstation reaches through sedona with its own key (ProxyJump "
         "authenticates end to end), so no fleet node holds the route; the hpc3 "
         "capability tag its Makefile names was never built"
     ),
@@ -104,9 +104,10 @@ def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None
     ]
 
     assert missing == []
-    # Not a pass over nothing: the registry's 62 projects sourced from this
-    # repository ran in 60 distinct paths on 2026-10-20.
-    assert len(declared) >= 60
+    # Not a pass over nothing: the registry's projects sourced from this
+    # repository ran in 59 distinct paths on 2026-10-25, after board task
+    # e705f08c removed tools/ps-harness and the Windows TankpitBot twin.
+    assert len(declared) >= 59
 
 
 def test_every_excuse_names_a_package_that_still_needs_one() -> None:

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from platform_core.errors import FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core.capacity import assess, fitting_projects, room_for_any
 from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
@@ -29,7 +29,6 @@ def _diphtheria(*, pinned_checks_only: bool = True) -> NodeConfig:
         host="diphtheria",
         cores=8,
         reserved_cores=4,
-        platform=NodePlatform.LINUX,
         checks_at_once=1,
         pinned_checks_only=pinned_checks_only,
     )

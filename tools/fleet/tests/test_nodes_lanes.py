@@ -3,9 +3,8 @@
 On 2026-09-29 thirty checks sat queued with one running, and why each node
 took nothing was only in its runner's daily log on the hub. These drive
 ``fleet-nodes`` through the fake ssh runner and assert the lines it prints:
-the runner's own pre-claim verdict for each lane on the same probe, the
-reason a retired node gives, and what a WSL node's host reports when the
-node does not answer.
+the runner's own pre-claim verdict on the same probe, the reason a retired
+node gives, and what a node that does not answer says.
 """
 
 from __future__ import annotations
@@ -18,16 +17,19 @@ from fleet.cli import _config, nodes
 from fleet.contracts.ledger import decode_ledger_entry
 from fleet.core import _test_hooks, records
 from tests._registry import write_registry
-from tests._roster_fixtures import dispatch_of, machine_document, machines_of
-from tests.conftest import DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok, workspace_document
+from tests._roster_fixtures import dispatch_of
+from tests.conftest import (
+    CALM,
+    DEMO_PROJECT,
+    PROBE_OK,
+    FakeRun,
+    failed,
+    ok,
+    workspace_document,
+)
 
 #: sedona's reading at 10:51Z scaled to the fixture: under the reservation.
-STARVED = "free_ram_gb=2.9\nfree_disk_gb=860.0\nreserved_cores=0\n"
-
-#: lavender's listing, UTF-16LE as wsl.exe prints it (test_host_report.py).
-LAVENDER_LIST = "  NAME      STATE           VERSION\r\n* Ubuntu    Running         2\r\n".encode(
-    "utf-16-le"
-).decode("utf-8", errors="replace")
+STARVED = f"free_ram_gb=2.9\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"
 
 
 def _config_with(tmp_path: pathlib.Path, document: JSONObject) -> pathlib.Path:
@@ -65,21 +67,14 @@ def test_a_node_with_room_says_its_lane_can_claim(tmp_path: pathlib.Path) -> Non
 
 
 def test_a_node_under_its_reservation_names_the_reservation(tmp_path: pathlib.Path) -> None:
-    """sedona's cause that morning, and with an elevated runner both lanes
-    say it, since they share the node."""
-    document = workspace_document()
-    dispatch_of(document, "lavender")["elevated"] = True
+    """sedona's cause that morning."""
     _test_hooks.run = FakeRun([ok(""), ok(STARVED)])
 
-    reserved = (
-        "NODE_OWNER_RESERVED: lavender has 2.9 GB free against a reservation of 4.0 GB for "
-        "whoever is using it, and 16 cores against 2 reserved. Nothing is left for a dispatch; "
-        "somebody is on this machine."
-    )
-    assert _lines(_config_with(tmp_path, document)) == [
+    assert _lines(_config_with(tmp_path, workspace_document())) == [
         "lavender: lavender: cpu-only, 2.9/32.0 GB RAM free, 860 GB disk free, 0 live run(s) "
-        f"holding 0 worker(s); node lane claims nothing: {reserved}; "
-        f"elevated lane claims nothing: {reserved}"
+        "holding 0 worker(s); node lane claims nothing: NODE_OWNER_RESERVED: lavender has 2.9 "
+        "GB free against a reservation of 4.0 GB for whoever is using it, and 16 cores against "
+        "2 reserved. Nothing is left for a dispatch; somebody is on this machine."
     ]
 
 
@@ -122,7 +117,7 @@ def test_a_node_whose_live_runs_fill_it_names_the_held_runs(tmp_path: pathlib.Pa
 
 def test_a_retired_node_points_at_its_reason(tmp_path: pathlib.Path) -> None:
     document = workspace_document()
-    dispatch_of(document, "lavender")["held"] = "its WSL VM holds the memory this lane measures"
+    dispatch_of(document, "lavender")["held"] = "reinstalling as NixOS"
     _test_hooks.run = FakeRun([])
 
     assert _lines(_config_with(tmp_path, document)) == [
@@ -131,24 +126,10 @@ def test_a_retired_node_points_at_its_reason(tmp_path: pathlib.Path) -> None:
     ]
 
 
-def test_an_unreachable_wsl_node_adds_what_its_host_reports(tmp_path: pathlib.Path) -> None:
-    document = workspace_document()
-    machines_of(document)["lavender-wsl"] = machine_document(platform="linux", guest="lavender")
-    _test_hooks.run = FakeRun(
-        [
-            ok(""),
-            ok(PROBE_OK),
-            failed(255, "Connection timed out during banner exchange"),
-            ok(""),
-            ok("free_ram_gb=0.3\nfree_disk_gb=612.4\nreserved_cores=0\n"),
-            ok(LAVENDER_LIST),
-        ]
-    )
+def test_an_unreachable_node_says_so_with_the_transport_s_words(tmp_path: pathlib.Path) -> None:
+    _test_hooks.run = FakeRun([failed(255, "Connection timed out during banner exchange")])
 
-    lines = _lines(_config_with(tmp_path, document))
+    (line,) = _lines(_config_with(tmp_path, workspace_document()))
 
-    assert lines[1].startswith("lavender-wsl: UNREACHABLE -- ")
-    assert lines[1].endswith(
-        "; its host lavender answers with 0.3 GB of 32.0 GB RAM and 612.4 GB disk free; "
-        "wsl: Ubuntu Running"
-    )
+    assert line.startswith("lavender: UNREACHABLE -- ")
+    assert line.endswith("Connection timed out during banner exchange")

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from platform_core.errors import FleetErrorCode
 
-from fleet.contracts.node import LiveLoad, NodePlatform
+from fleet.contracts.node import LiveLoad
 from fleet.core.capacity import assess
 from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
@@ -26,7 +26,7 @@ def _diphtheria(*, reserved_cores: int, live: LiveLoad | None = None) -> tuple[i
     Returns:
         The workers granted and the refusal's reason.
     """
-    node = _node(host="diphtheria", cores=8, reserved_cores=1, platform=NodePlatform.LINUX)
+    node = _node(host="diphtheria", cores=8, reserved_cores=1)
     state = _state(host="diphtheria", free_ram_gb=20.0, reserved_cores=reserved_cores)
     if live is not None:
         state["live"] = live
@@ -71,7 +71,7 @@ class TestReservedCores:
         )
 
     def test_a_node_its_owner_fills_names_the_owner_whatever_is_reserved(self) -> None:
-        node = _node(host="diphtheria", cores=8, reserved_cores=1, platform=NodePlatform.LINUX)
+        node = _node(host="diphtheria", cores=8, reserved_cores=1)
         state = _state(host="diphtheria", free_ram_gb=3.0, reserved_cores=2)
 
         verdict = assess(node, state, _project(), LINUX_TAGS)

@@ -20,9 +20,8 @@ import pytest
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
-from fleet.core import names, recipe, tool_caches
-from fleet.core.dialect_linux import PROLOGUE, LinuxDialect
-from fleet.core.dialect_windows import WindowsDialect
+from fleet.core import dialect, names, recipe, tool_caches
+from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
 from fleet.core.phase_markers import SH_UTC_STAMP
 from tests.conftest import DEMO_PROJECT
@@ -46,14 +45,13 @@ def _isolated(
     Returns:
         The script's text.
     """
-    return LinuxDialect().build_script(
+    return dialect.build_script(
         target=target,
         path=path,
         workers=3,
         install=install,
         cache_root="/s/cache",
         isolated_docker=True,
-        elevated=False,
         agent="opus-demo-0929",
         loopback_unit=None,
     )
@@ -195,33 +193,17 @@ class TestIsolatedText:
         ) in lines
 
 
-def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
-    with pytest.raises(ValueError, match="a Windows node has no rootless daemon"):
-        WindowsDialect().build_script(
-            target="C:/s/run-1",
-            path="slime",
-            workers=2,
-            install=(),
-            cache_root="C:/s/cache",
-            isolated_docker=True,
-            elevated=False,
-            agent="opus-demo-0929",
-            loopback_unit=None,
-        )
-
-
 def test_a_docker_project_that_declares_loopback_only_is_refused_by_name() -> None:
     # Its build runs as execdocker, which holds no sudo to call
     # fleet-check-unit (MCPs board task 649fcc7a).
     with pytest.raises(ValueError, match="declares both the docker tag and loopback_only"):
-        LinuxDialect().build_script(
+        dialect.build_script(
             target=TARGET,
             path="slime",
             workers=2,
             install=(),
             cache_root="/s/cache",
             isolated_docker=True,
-            elevated=False,
             agent="opus-demo-0929",
             loopback_unit="fleet-slime-lavender-1792900000",
         )
@@ -244,7 +226,6 @@ def test_the_recipe_is_isolated_exactly_when_the_project_declares_docker(
         path="slime",
         install=(NPM_CI,),
         isolated_docker=isolated,
-        elevated=False,
         loopback_only=False,
     )
     assert recipe.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated

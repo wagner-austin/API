@@ -1,11 +1,9 @@
 """Removing the cache generations no run reads (MCPs board task 346abc45).
 
-Which script each platform is sent and how a node is asked to run it, then
-the ``sh`` removal executed for real under this host's bash against a stage
-root under ``tmp_path``: a generation goes only when it is not current, no
-run directory names it, and it stopped being current over an hour ago. The
-Windows script is executed by ``tests/pester/rendered-cache-generations.Tests.ps1``
-from its committed render.
+Which script a node is sent and how it is asked to run it, then the ``sh``
+removal executed for real under this host's bash against a stage root under
+``tmp_path``: a generation goes only when it is not current, no run
+directory names it, and it stopped being current over an hour ago.
 """
 
 from __future__ import annotations
@@ -18,7 +16,7 @@ from typing import Final
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks, cache_generations, names
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE
 from tests._host_bash import host_bash
@@ -31,12 +29,14 @@ DAY: Final = 86400
 MIB: Final = 1024 * 1024
 
 
-def _node(platform: NodePlatform, stage_root: str, docker: str | None) -> NodeConfig:
+#: The stage root every node declares.
+STAGE_ROOT: Final = "/home/corvis/fleet/stage"
+
+
+def _node(docker: str | None) -> NodeConfig:
     """A node whose cache generations are judged.
 
     Args:
-        platform: Its platform.
-        stage_root: Its stage root.
         docker: Its execdocker daemon's version, or None.
 
     Returns:
@@ -44,8 +44,7 @@ def _node(platform: NodePlatform, stage_root: str, docker: str | None) -> NodeCo
     """
     return NodeConfig(
         host="lavender-wsl",
-        platform=platform,
-        stage_root=stage_root,
+        stage_root=STAGE_ROOT,
         logical_cores=16,
         ram_gb=25.4,
         gpu=None,
@@ -55,8 +54,6 @@ def _node(platform: NodePlatform, stage_root: str, docker: str | None) -> NodeCo
         cxx=None,
         docker=docker,
         stack=None,
-        elevated=False,
-        wsl_host=None,
         budget={
             "reserved_cores": 8,
             "reserved_ram_gb": 6.0,
@@ -68,25 +65,15 @@ def _node(platform: NodePlatform, stage_root: str, docker: str | None) -> NodeCo
     )
 
 
-def test_each_platform_is_sent_its_own_script() -> None:
-    linux = cache_generations.script_for(
-        NodePlatform.LINUX, stage_root="/home/corvis/fleet/stage", isolated=False
-    )
-    windows = cache_generations.script_for(
-        NodePlatform.WINDOWS, stage_root="C:/fleet/stage", isolated=False
-    )
+def test_a_node_without_isolated_builds_judges_its_own_generations_alone() -> None:
+    script = cache_generations.removal_script(STAGE_ROOT, isolated=False)
 
-    assert linux == cache_generations.linux_script("/home/corvis/fleet/stage", isolated=False)
-    assert "remove_unused /home/corvis/fleet/stage/cache/tools /home/corvis/fleet/stage\n" in linux
-    assert "sudo" not in linux
-    assert windows == cache_generations.windows_script("C:/fleet/stage")
-    assert "[string]$StageRoot = 'C:/fleet/stage'" in windows
+    assert f"remove_unused {STAGE_ROOT}/cache/tools {STAGE_ROOT}\n" in script
+    assert "sudo" not in script
 
 
 def test_a_node_running_isolated_builds_judges_execdocker_s_generations_too() -> None:
-    script = cache_generations.script_for(
-        NodePlatform.LINUX, stage_root="/home/corvis/fleet/stage", isolated=True
-    )
+    script = cache_generations.removal_script(STAGE_ROOT, isolated=True)
 
     assert script.endswith(
         f"{EXEC_HOME_LINE}\nas='sudo -n'\n"
@@ -94,46 +81,20 @@ def test_a_node_running_isolated_builds_judges_execdocker_s_generations_too() ->
     )
 
 
-def test_a_windows_node_is_never_said_to_run_isolated_builds() -> None:
-    with pytest.raises(ValueError, match="no Windows node runs a build as execdocker"):
-        cache_generations.script_for(NodePlatform.WINDOWS, stage_root="C:/s", isolated=True)
-
-
-def test_a_stage_root_a_rendered_script_cannot_carry_is_refused() -> None:
-    with pytest.raises(ValueError, match="stage root"):
-        cache_generations.windows_script("C:/it's/stage")
-
-
-@pytest.mark.parametrize(
-    ("platform", "stage_root", "docker", "script_path"),
-    [
-        (
-            NodePlatform.LINUX,
-            "/home/corvis/fleet/stage",
-            "29.1.3",
-            "/home/corvis/fleet/stage/fleet-cache-generations.sh",
-        ),
-        (
-            NodePlatform.WINDOWS,
-            "C:/fleet/stage",
-            None,
-            "C:/fleet/stage/fleet-cache-generations.ps1",
-        ),
-    ],
-)
+@pytest.mark.parametrize("docker", ["29.1.3", None])
 def test_a_node_is_sent_the_removal_under_its_stage_root_and_its_report_returned(
-    platform: NodePlatform, stage_root: str, docker: str | None, script_path: str
+    docker: str | None,
 ) -> None:
     line = "cache-generations: /c: generation 1790000000 current, removed 1 of 2 (17000 MB)"
     runner = FakeRun([ok(""), ok(f"{line}\n")])
     _test_hooks.run = runner
 
-    report = cache_generations.remove_unused_on_node(_node(platform, stage_root, docker))
+    report = cache_generations.remove_unused_on_node(_node(docker))
 
     assert report == line
-    assert script_path in " ".join(runner.calls[0])
-    assert runner.stdin[0] == cache_generations.script_for(
-        platform, stage_root=stage_root, isolated=docker is not None
+    assert f"{STAGE_ROOT}/fleet-cache-generations.sh" in " ".join(runner.calls[0])
+    assert runner.stdin[0] == cache_generations.removal_script(
+        STAGE_ROOT, isolated=docker is not None
     ).encode("utf-8")
 
 
@@ -141,9 +102,7 @@ def test_a_node_that_does_not_answer_is_left_to_the_next_removal() -> None:
     runner = FakeRun([failed(255, "Connection timed out during banner exchange")])
     _test_hooks.run = runner
 
-    report = cache_generations.remove_unused_on_node(
-        _node(NodePlatform.LINUX, "/home/corvis/fleet/stage", None)
-    )
+    report = cache_generations.remove_unused_on_node(_node(None))
 
     assert report == (
         "cache-generations: lavender-wsl did not answer; the next removal judges its "
@@ -158,9 +117,7 @@ def test_a_node_that_answers_with_a_failed_removal_raises_it() -> None:
     _test_hooks.run = FakeRun([ok(""), failed(1, "rm: cannot remove: Permission denied")])
 
     with pytest.raises(AppError) as raised:
-        cache_generations.remove_unused_on_node(
-            _node(NodePlatform.LINUX, "/home/corvis/fleet/stage", None)
-        )
+        cache_generations.remove_unused_on_node(_node(None))
 
     assert raised.value.code is FleetErrorCode.DISPATCH_FAILED
 
@@ -195,7 +152,7 @@ def _remove(stage: pathlib.Path, current: str) -> subprocess.CompletedProcess[st
     tools = stage / names.CACHE_DIRECTORY / names.TOOL_CACHES_DIRECTORY
     (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
     script = stage / f"{cache_generations.REMOVAL_STEM}.sh"
-    script.write_text(cache_generations.linux_script(stage.as_posix(), isolated=False), "utf-8")
+    script.write_text(cache_generations.removal_script(stage.as_posix(), isolated=False), "utf-8")
     return subprocess.run(
         [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
     )
@@ -257,7 +214,9 @@ def test_a_node_whose_builds_have_not_started_a_generation_says_so(
     tmp_path: pathlib.Path,
 ) -> None:
     script = tmp_path / "removal.sh"
-    script.write_text(cache_generations.linux_script(tmp_path.as_posix(), isolated=False), "utf-8")
+    script.write_text(
+        cache_generations.removal_script(tmp_path.as_posix(), isolated=False), "utf-8"
+    )
 
     ran = subprocess.run(
         [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60

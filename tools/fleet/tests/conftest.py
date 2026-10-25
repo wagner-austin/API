@@ -277,8 +277,13 @@ DEMO_DEPENDENCY = "libs/base"
 #: lavender, the node every demo dispatch lands on.
 DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 
+#: The pressure lines of a node nothing stalls on, which every capacity
+#: probe answers since the last node without ``/proc/pressure`` left the
+#: fleet (board task e705f08c).
+CALM = "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\n"
+
 #: What a healthy capacity probe answers.
-PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
+PROBE_OK = f"free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"
 
 #: A node holding no live fleet run.
 IDLE = LiveLoad(runs=0, workers=0, ram_gb=0.0)
@@ -386,7 +391,9 @@ def retire_replies() -> list[_test_hooks.CommandResult]:
         ok(""),  # retire: send the script
         ok(""),  # retire: run it
         ok(""),  # generations: send the script (MCPs board task 346abc45)
-        ok("cache-generations: C:/fleet/stage/cache/tools: none yet\n"),  # generations: run it
+        ok(
+            "cache-generations: /home/corvis/fleet/stage/cache/tools: none yet\n"
+        ),  # generations: run it
     ]
 
 

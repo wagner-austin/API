@@ -56,29 +56,30 @@ def project_file(tags: list[JSONValue], *, note: str = "") -> str:
     return dump_json_str(body) + "\n"
 
 
-def machine_file(*, enabled: bool = True, held: str | None = None, elevated: bool = False) -> str:
+def machine_file(*, enabled: bool = True, held: str | None = None) -> str:
     """A roster machine file the machine contract decodes.
 
     Args:
         enabled: Whether the machine is expected to answer.
         held: Why its dispatch is held, or None.
-        elevated: Whether its dispatch declares an elevated runner.
 
     Returns:
         The file's JSON text.
     """
     dispatch = dispatch_document()
     dispatch["held"] = held
-    dispatch["elevated"] = elevated
     return dump_json_str(machine_document(role="worker", enabled=enabled, dispatch=dispatch)) + "\n"
 
 
-#: The node runners :data:`REGISTRY_FILES`' roster declares, in machine order.
-RUNNERS: Final = ("fleet-node-sedona", "fleet-node-serendipity", "fleet-node-serendipity-elevated")
+#: The node runners :data:`REGISTRY_FILES`' roster declares, in machine order:
+#: one per worker, since no node runs an elevated runner beside its node
+#: runner (board task e705f08c).
+RUNNERS: Final = ("fleet-node-sedona", "fleet-node-serendipity")
 
 #: The registry a rolled commit declares in these cases: a hub whose
 #: dispatch is a reason, a machine that is off, one held out of dispatch,
-#: a worker, and one with an elevated runner beside its node runner.
+#: and two workers, one of whose files still carries ``elevated: true``,
+#: which no reader here reads.
 REGISTRY_FILES = {
     "tools/fleet/registry/settings.json": "{}\n",
     "tools/fleet/registry/projects/MCPs.json": project_file([]),
@@ -91,10 +92,12 @@ REGISTRY_FILES = {
         machine_document(dispatch="the hub runs no dispatched work")
     )
     + "\n",
-    "tools/fleet/registry/machines/loki.json": machine_file(enabled=False),
+    "tools/fleet/registry/machines/lacrymal.json": machine_file(enabled=False),
     "tools/fleet/registry/machines/pendragon.json": machine_file(held="armed for netboot"),
     "tools/fleet/registry/machines/sedona.json": machine_file(),
-    "tools/fleet/registry/machines/serendipity.json": machine_file(elevated=True),
+    "tools/fleet/registry/machines/serendipity.json": machine_file().replace(
+        '"elevated": false', '"elevated": true'
+    ),
 }
 
 
@@ -111,7 +114,7 @@ def _rolled_repo(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
     repo = tmp_path / "api"
     commit = committed_repository(repo, REGISTRY_FILES, rolled.ROLLED_REF)
     unrolled = repo / "tools/fleet/registry/projects/chat.json"
-    unrolled.write_text(project_file(["windows"]), encoding="utf-8")
+    unrolled.write_text(project_file(["gpu"]), encoding="utf-8")
     return repo, commit
 
 
@@ -172,7 +175,7 @@ class TestReadDeclared:
             repo,
             {
                 "tools/fleet/registry/projects/MCPs.json": project_file([]),
-                "tools/fleet/registry/machines/loki.json": machine_file(enabled=False),
+                "tools/fleet/registry/machines/lacrymal.json": machine_file(enabled=False),
             },
             rolled.ROLLED_REF,
         )
@@ -301,9 +304,9 @@ class TestPublishRegistry:
         checked_at="2026-10-14T23:00:00+00:00",
     )
     IDENTITY: Final[JSONObject] = {
-        "agent": "fleet-node-loki",
+        "agent": "fleet-node-colossus",
         "sessionId": "s",
-        "cwd": "C:/fleet",
+        "cwd": "/home/corvis/fleet",
     }
 
     def test_sends_every_project_and_runner_and_answers_the_counts_and_the_retired(self) -> None:
@@ -386,7 +389,7 @@ class TestTheHubTickPublishes:
         assert (
             f"published 3 project(s) from the registry at {commit} (0 dropped since the last "
             "publication) and refused 1 queued job(s) naming a project it does not declare; "
-            "3 node runner(s) declared, retired: fleet-node-lavender-wsl"
+            "2 node runner(s) declared, retired: fleet-node-lavender-wsl"
         ) in [record.getMessage() for record in caplog.records]
 
     def test_a_publication_that_retires_nothing_says_none(
@@ -414,5 +417,5 @@ class TestTheHubTickPublishes:
         assert (
             f"published 3 project(s) from the registry at {commit} (0 dropped since the last "
             "publication) and refused 0 queued job(s) naming a project it does not declare; "
-            "3 node runner(s) declared, retired: none"
+            "2 node runner(s) declared, retired: none"
         ) in [record.getMessage() for record in caplog.records]

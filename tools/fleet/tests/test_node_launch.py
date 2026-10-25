@@ -72,7 +72,7 @@ def _launcher(
         The workspace and the launcher.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    agent, session_id = node_agent.node_identity("lavender", elevated=False)
+    agent, session_id = node_agent.node_identity("lavender")
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     launcher = Launcher(
         loaded,
@@ -96,14 +96,13 @@ def _fill(loaded: _config.LoadedWorkspace, launcher: Launcher) -> tuple[str, ...
     Returns:
         The jobs it claimed and handed to a launch.
     """
-    agent, session_id = node_agent.node_identity("lavender", elevated=False)
+    agent, session_id = node_agent.node_identity("lavender")
     return node_agent.fill_pass(
         loaded,
         queue.load_credentials(),
         queue.identity_arguments(agent, session_id, str(loaded.directory)),
         alias="lavender",
         node=loaded.workspace["nodes"]["lavender"],
-        elevated=False,
         launcher=launcher,
     )
 
@@ -265,7 +264,6 @@ class TestTheCollectPass:
                 {},
                 agent=LAVENDER,
                 alias="lavender",
-                elevated=False,
                 holder=holder,
                 launching=frozenset({DEFAULT_JOB_ID}),
             )

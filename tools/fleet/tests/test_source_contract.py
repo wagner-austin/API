@@ -384,12 +384,10 @@ class TestQueueRowCheckoutFields:
 
     def test_a_tag_outside_the_derived_vocabulary_is_refused_by_index(self) -> None:
         with pytest.raises(
-            AppError, match=r"requiredTags\[1\] 'macos' is not one of windows, linux, gpu, testdb"
+            AppError, match=r"requiredTags\[1\] 'windows' is not one of linux, gpu, testdb"
         ):
-            decode_claim(dump_json_str({"claimed": queue_job(requiredTags=["windows", "macos"])}))
+            decode_claim(dump_json_str({"claimed": queue_job(requiredTags=["linux", "windows"])}))
 
     def test_a_tag_that_is_not_a_string_is_refused_by_index(self) -> None:
-        with pytest.raises(
-            AppError, match=r"requiredTags\[0\] 7 is not one of windows, linux, gpu, testdb"
-        ):
+        with pytest.raises(AppError, match=r"requiredTags\[0\] 7 is not one of linux, gpu, testdb"):
             decode_claim(dump_json_str({"claimed": queue_job(requiredTags=[7])}))

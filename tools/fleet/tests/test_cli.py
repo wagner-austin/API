@@ -30,12 +30,12 @@ from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.core import _test_hooks, records
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document
-from tests.conftest import FakeClock, FakeRun, failed, ok
+from tests.conftest import CALM, FakeClock, FakeRun, failed, ok
 
 _NOW = 1_757_000_000
 
-_PROBE_OK = "free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
-_PROBE_SMALL = "free_ram_gb=5.0\nfree_disk_gb=860.0\nreserved_cores=0\n"
+_PROBE_OK = f"free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"
+_PROBE_SMALL = f"free_ram_gb=5.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"
 
 
 def _workspace_document() -> JSONObject:
@@ -58,7 +58,7 @@ def _workspace_document() -> JSONObject:
     }
     dispatch: JSONObject = {
         "held": None,
-        "stage_root": "C:/fleet/stage",
+        "stage_root": "/home/corvis/fleet/stage",
         "logical_cores": 16,
         "ram_gb": 32.0,
         "gpu": {
@@ -78,7 +78,7 @@ def _workspace_document() -> JSONObject:
     return {
         "machines": {
             "lavender": machine_document(dispatch=dispatch),
-            "loki": machine_document(dispatch={**dispatch, "gpu": None}),
+            "colossus": machine_document(dispatch={**dispatch, "gpu": None}),
         },
         "data_paths": {},
         "node_local_resources": [],
@@ -156,15 +156,15 @@ class TestNodes:
         self, config_path: pathlib.Path
     ) -> None:
         """A dead node must not hide the live ones, and must not read as fine."""
-        _test_hooks.run = FakeRun([failed(255, "timed out"), ok(""), ok(_PROBE_OK)])
+        _test_hooks.run = FakeRun([ok(""), ok(_PROBE_OK), failed(255, "timed out")])
 
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
         lines, unreachable = nodes.describe_fleet(loaded)
 
         assert unreachable == 1
         assert any("UNREACHABLE" in line and "timed out" in line for line in lines)
-        # lavender is the one that failed, so the surviving line is loki's --
-        # and loki is the CPU-only node. The point is that a dead node did not
+        # lavender is the one that failed, so the surviving line is colossus's --
+        # and colossus is the CPU-only node. The point is that a dead node did not
         # take the live one's description down with it.
         assert any("cpu-only" in line and "GB RAM free" in line for line in lines)
 
@@ -248,7 +248,7 @@ class TestPreflight:
     def test_a_named_node_that_refuses_says_why(self, config_path: pathlib.Path) -> None:
         """5 GB free against a 4 GB reservation affords no workers."""
         _test_hooks.run = FakeRun(
-            [ok(""), ok("free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n")]
+            [ok(""), ok(f"free_ram_gb=4.5\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}")]
         )
 
         with pytest.raises(AppError) as excinfo:
