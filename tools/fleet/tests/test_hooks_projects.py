@@ -15,23 +15,26 @@ from __future__ import annotations
 
 from fleet.contracts.source import ProjectSource
 from fleet.contracts.tags import NodeTag
-from fleet.contracts.workspace import decode_fleet_workspace
+from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
+
+MCPS_REMOTE = "https://github.com/wagner-austin/MCPs.git"
 
 
 def test_linux_alone_checks_the_hooks_package() -> None:
     workspace = decode_fleet_workspace(shipped_document())
-    hooks = {
-        name: project
+    hooks = sorted(
+        name
         for name, project in workspace["projects"].items()
-        if project["source"]["path"] == "packages/claude-hooks"
-        and project["source"]["remote"] == "https://github.com/wagner-austin/MCPs.git"
-    }
-    assert sorted(hooks) == ["MCPs/packages/claude-hooks-linux"]
-    project = hooks["MCPs/packages/claude-hooks-linux"]
+        if (source := project["source"]) is not None
+        and source["path"] == "packages/claude-hooks"
+        and source["remote"] == MCPS_REMOTE
+    )
+    assert hooks == ["MCPs/packages/claude-hooks-linux"]
+    project = require_project(workspace, "MCPs/packages/claude-hooks-linux")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.HOOKS)
     assert project["source"] == ProjectSource(
-        remote="https://github.com/wagner-austin/MCPs.git",
+        remote=MCPS_REMOTE,
         path="packages/claude-hooks",
         install=(),
         companions=(),
