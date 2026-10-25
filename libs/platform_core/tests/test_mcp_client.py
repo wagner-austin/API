@@ -37,12 +37,12 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.mcp_client import (
-    DEFAULT_MCP_TIMEOUT_SECONDS,
     McpCredentials,
     McpHttpResponse,
     call_mcp_tool,
     urllib_mcp_post,
 )
+from platform_core.mcp_exchange import DEFAULT_MCP_TIMEOUT_SECONDS
 from platform_core.mcp_testing import (
     FakeHttpPost,
     sent_arguments,

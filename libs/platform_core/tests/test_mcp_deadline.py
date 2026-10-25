@@ -25,7 +25,8 @@ import pytest
 
 from platform_core.error_codes_tooling import McpClientErrorCode
 from platform_core.errors import AppError
-from platform_core.mcp_client import ExchangeDeadline, urllib_mcp_post
+from platform_core.mcp_client import urllib_mcp_post
+from platform_core.mcp_exchange import ExchangeDeadline
 
 #: The deadline every case posts with.
 DEADLINE_SECONDS: Final = 1
