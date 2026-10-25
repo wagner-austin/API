@@ -41,6 +41,7 @@ from rw_bot.harness._hook_defaults import (
     _sleep_impl,
     _spawn_game_impl,
     _spawn_match_impl,
+    _working_dir_impl,
     _write_line_impl,
     _write_text_lines_impl,
 )
@@ -72,6 +73,7 @@ from rw_bot.harness._hook_protocols import (
     SpawnedMatchProto,
     SpawnGameProto,
     SpawnMatchProto,
+    WorkingDirProto,
     WriteLineProto,
     WriteTextLinesProto,
 )
@@ -101,6 +103,12 @@ run_capture: RunCaptureProto = _run_capture_impl
 run_inherited: RunInheritedProto = _run_inherited_impl
 sleep: SleepProto = _sleep_impl
 serve_forever: ServeForeverProto = _serve_forever_impl
+# Two bindings of one directory, because a test can need them apart: the
+# freeze reads the sources through the hooks above, which the in-memory host
+# replaces, while the batch fingerprint reads the pinned game straight off the
+# disk, so a sweep driven against that host plants its game in a real one.
+source_root: WorkingDirProto = _working_dir_impl
+game_root: WorkingDirProto = _working_dir_impl
 write_line: WriteLineProto = _write_line_impl
 write_text_lines: WriteTextLinesProto = _write_text_lines_impl
 
@@ -133,12 +141,14 @@ __all__ = [
     "SpawnGameProto",
     "SpawnMatchProto",
     "SpawnedMatchProto",
+    "WorkingDirProto",
     "WriteLineProto",
     "WriteTextLinesProto",
     "copy_entry",
     "count_cores",
     "file_mtime",
     "file_size",
+    "game_root",
     "get_env",
     "kill_tree",
     "list_names",
@@ -158,6 +168,7 @@ __all__ = [
     "run_inherited",
     "serve_forever",
     "sleep",
+    "source_root",
     "spawn_game",
     "spawn_match",
     "write_line",

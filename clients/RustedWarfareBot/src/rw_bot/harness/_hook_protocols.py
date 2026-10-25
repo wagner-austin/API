@@ -265,6 +265,21 @@ class ResolveRootProto(Protocol):
         ...
 
 
+class WorkingDirProto(Protocol):
+    """Name the directory a repository-relative path is read against."""
+
+    def __call__(self) -> Path:
+        """Return the directory.
+
+        Returns:
+            ``Path()``, the working directory, which a join drops: a relative
+            path joined to it is the same relative path, so every path read
+            through it and through the in-memory host keeps the spelling it
+            had. A test hands a real directory instead of entering one.
+        """
+        ...
+
+
 class NewStampProto(Protocol):
     """Mint an identifier unique to one launch."""
 
@@ -552,6 +567,7 @@ __all__ = [
     "SpawnGameProto",
     "SpawnMatchProto",
     "SpawnedMatchProto",
+    "WorkingDirProto",
     "WriteLineProto",
     "WriteTextLinesProto",
 ]

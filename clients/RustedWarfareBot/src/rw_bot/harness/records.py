@@ -143,7 +143,9 @@ def batch_fingerprint(source_game_dir: str) -> RunFingerprint:
         determinism_record(DETERMINISM_DEVICE, {}),
         _test_hooks.get_env,
         stdlib_host_probe(_test_hooks.count_cores),
-        Path(source_game_dir),
+        # Joined to the directory the hooks name, since the hashing reads the
+        # disk itself rather than through them.
+        _test_hooks.game_root() / source_game_dir,
     )
 
 

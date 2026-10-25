@@ -118,7 +118,8 @@ def check_agent_jar_fresh() -> None:
             same way: run ``make agent``, then freeze.
         OSError: When the agent source directory or manifest cannot be read.
     """
-    jar = Path(BUILT_AGENT_JAR)
+    root = _test_hooks.source_root()
+    jar = root / BUILT_AGENT_JAR
     if not _test_hooks.path_exists(jar):
         raise SweepError(
             _JAR_STALE,
@@ -126,9 +127,9 @@ def check_agent_jar_fresh() -> None:
             "and a compute node cannot build one -- run `make agent`, then freeze",
         )
     jar_mtime = _test_hooks.file_mtime(jar)
-    sources = [Path(AGENT_MANIFEST)] + [
-        Path(AGENT_SOURCE_DIR) / name
-        for name in _test_hooks.list_names(Path(AGENT_SOURCE_DIR))
+    sources = [root / AGENT_MANIFEST] + [
+        root / AGENT_SOURCE_DIR / name
+        for name in _test_hooks.list_names(root / AGENT_SOURCE_DIR)
         if name.endswith(AGENT_SOURCE_SUFFIX)
     ]
     stale = [source.as_posix() for source in sources if _test_hooks.file_mtime(source) > jar_mtime]
@@ -177,10 +178,14 @@ def prepare_tree(config: SweepConfig) -> None:
         _test_hooks.write_line(f"[sweep] reusing the frozen tree at {config['tree']}")
         return
     check_agent_jar_fresh()
+    # Read against the checkout the hooks name rather than the process's own
+    # directory, so a freeze of a miniature repository is driven by handing
+    # its directory over, never by changing where the process stands.
+    root = _test_hooks.source_root()
     _test_hooks.make_dirs(tree / "src")
-    _test_hooks.copy_entry(Path("src/rw_bot"), tree / "src")
+    _test_hooks.copy_entry(root / "src" / "rw_bot", tree / "src")
     for entry in TREE_SOURCES:
-        _test_hooks.copy_entry(Path(entry), tree)
+        _test_hooks.copy_entry(root / entry, tree)
     _test_hooks.write_text_lines(tree / TREE_MARKER, ("frozen",))
     _test_hooks.write_line(f"[sweep] tree frozen at {config['tree']}")
 

@@ -18,6 +18,7 @@ import hashlib
 import re
 import runpy
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
@@ -37,6 +38,7 @@ from scripts.stage_payload import (
     main,
 )
 
+from rw_bot.harness import _test_hooks
 from rw_bot.harness.agent_build import AGENT_MANIFEST, AGENT_SOURCE_DIR, JAVA_RELEASE
 from rw_bot.harness.frozen_tree import FROZEN_ENTRIES, TREE_MARKER, TREE_SOURCES
 from rw_bot.harness.launch import (
@@ -120,19 +122,37 @@ def _argv(root: Path, tree: str = "frozen") -> list[str]:
     ]
 
 
-def _planted(root: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Build the miniature repository and enter it.
+@pytest.fixture(autouse=True)
+def _checkout(tmp_path: Path) -> Generator[None, None, None]:
+    """Name each case's directory as the checkout the freeze reads from.
 
-    Entering is load-bearing: the freeze reads its sources from paths relative
-    to the process, which is precisely the property that makes it impossible
-    on a compute node and the reason this staging exists at all.
+    Load-bearing: the freeze reads its sources from repository-relative
+    paths, which is precisely the property that makes it impossible on a
+    compute node and the reason this staging exists at all. The directory is
+    handed over through the hook and restored after, so no case changes
+    where the process stands.
+
+    Args:
+        tmp_path: The case's own directory.
+
+    Yields:
+        Nothing; the case runs while the hook names the directory.
+    """
+    original = _test_hooks.source_root
+    _test_hooks.source_root = lambda: tmp_path
+    try:
+        yield
+    finally:
+        _test_hooks.source_root = original
+
+
+def _planted(root: Path) -> None:
+    """Build the miniature repository the checkout hook names.
 
     Args:
         root: Where to build it.
-        monkeypatch: Used to change directory.
     """
     _repository(root)
-    monkeypatch.chdir(root)
 
 
 def _document(root: Path) -> dict[str, JSONValue]:
@@ -152,15 +172,13 @@ def _document(root: Path) -> dict[str, JSONValue]:
 
 
 class TestTheStageManifestItWrites:
-    def test_it_names_the_archive_this_run_actually_wrote(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_it_names_the_archive_this_run_actually_wrote(self, tmp_path: Path) -> None:
         """Composed, never typed. The manifest here was hand-written and went
         stale the moment the tree gained a file: the payload grew from 407
         entries to 409, the archive changed digest and length, and the
         manifest went on naming the old ones -- which stages either the wrong
         tree or nothing at all, and reads as correct either way."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         manifest = decode_stage_manifest(
             load_json_str(
@@ -177,12 +195,10 @@ class TestTheStageManifestItWrites:
             )
         ]
 
-    def test_its_provenance_carries_the_tree_the_document_describes(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_its_provenance_carries_the_tree_the_document_describes(self, tmp_path: Path) -> None:
         """The digests prove the bytes on the cluster are the bytes named
         here; only the provenance says what "here" is."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         manifest = decode_stage_manifest(
             load_json_str(
@@ -217,28 +233,22 @@ class TestTheConfigItFreezesFrom:
 
 
 class TestTheFrozenTree:
-    def test_it_carries_everything_a_match_reads(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_it_carries_everything_a_match_reads(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         assert main(_argv(tmp_path)) == EXIT_OK
         for name in (TREE_MARKER, *FROZEN_ENTRIES):
             assert (tmp_path / "frozen" / name).exists(), name
 
-    def test_the_agent_jar_lands_flat(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_agent_jar_lands_flat(self, tmp_path: Path) -> None:
         """A copy lands under its own basename, so ``agent/build/rw-agent.jar``
         arrives as ``rw-agent.jar`` -- which is where the launcher looks."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         landed = tmp_path / "frozen" / "rw-agent.jar"
         assert landed.read_bytes() == b"agent/build/rw-agent.jar"
         assert not (tmp_path / "frozen" / "agent").exists()
 
-    def test_the_registry_dumps_the_planner_reads_land_flat_too(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_registry_dumps_the_planner_reads_land_flat_too(self, tmp_path: Path) -> None:
         """The planner reads the catalogue and the type dump by path at
         startup, and the launcher's defaults for both are repository-relative
         -- true only where a repository is. A compute node starts in a home
@@ -246,52 +256,46 @@ class TestTheFrozenTree:
         ``FileNotFoundError: 'wiki/sources/m0-probe/printunits.log'`` having
         already patched the engine, seeded it and held the world at frame
         one (job 55663569, 2026-08-30)."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         frozen = tmp_path / "frozen"
         assert (frozen / FROZEN_CATALOGUE).read_bytes() == CATALOGUE.encode("utf-8")
         assert (frozen / FROZEN_TYPE_DUMP).read_bytes() == TYPE_DUMP.encode("utf-8")
         assert not (frozen / "wiki").exists()
 
-    def test_the_job_files_travel_with_the_doctrines(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_job_files_travel_with_the_doctrines(self, tmp_path: Path) -> None:
         """A compute node reads its job file out of the payload, and the file
         naming which arms and seeds a batch played is as much the experiment
         as the doctrines are."""
         assert "sweeps" in TREE_SOURCES
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         assert (tmp_path / "frozen" / "sweeps" / "a.sweeps").exists()
 
-    def test_no_bytecode_is_carried(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_no_bytecode_is_carried(self, tmp_path: Path) -> None:
         """A ``.pyc`` embeds the source's timestamp, so carrying one would
         make two freezes of identical source digest differently."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         assert list((tmp_path / "frozen").rglob("__pycache__")) == []
 
-    def test_an_absent_source_stops_the_freeze_naming_the_file(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_an_absent_source_stops_the_freeze_naming_the_file(self, tmp_path: Path) -> None:
         """The agent jar is built by ``make agent`` and is not in the
         repository, so a clean checkout has no jar to freeze. The freshness
         check refuses before the first copy, naming the path and the fix --
         nothing is packed and nothing is staged."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         (tmp_path / "agent" / "build" / "rw-agent.jar").unlink()
         with pytest.raises(SweepError, match=re.escape("rw-agent.jar")) as caught:
             main(_argv(tmp_path))
         assert caught.value.code == "RW-SWEEP-007"
         assert not (tmp_path / "out" / "rw-payload.tar").exists()
 
-    def test_a_tree_frozen_without_the_jar_is_refused_before_packing(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_a_tree_frozen_without_the_jar_is_refused_before_packing(self, tmp_path: Path) -> None:
         """The other half, and the one that matters on a node: a tree whose
         marker says the freeze finished but which is missing something a match
         reads. The marker certifies the copies BEFORE it and nothing else."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         (tmp_path / "frozen" / "rw-agent.jar").unlink()
         (tmp_path / "out" / "rw-payload.tar").unlink()
@@ -303,85 +307,67 @@ class TestTheFrozenTree:
 
 
 class TestTheDocumentItWrites:
-    def test_it_pins_the_commit_it_was_told(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_it_pins_the_commit_it_was_told(self, tmp_path: Path) -> None:
         """Given rather than read from git: the tree frozen is the WORKING
         one, and a command that stamped HEAD onto a dirty tree would print a
         reassuring lie."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         assert _document(tmp_path)["git_commit"] == _COMMIT
 
-    def test_the_identity_is_the_tree_it_packed(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_the_identity_is_the_tree_it_packed(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         main(_argv(tmp_path))
         assert _document(tmp_path)["tree_sha256"] == tree_digest(tree_entries(tmp_path / "frozen"))
 
-    def test_the_archive_it_names_is_the_one_it_wrote(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_the_archive_it_names_is_the_one_it_wrote(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         main(_argv(tmp_path))
         packed = tmp_path / "out" / "rw-payload.tar"
         assert _document(tmp_path)["archive_size_bytes"] == packed.stat().st_size
 
-    def test_the_output_directory_is_created(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_output_directory_is_created(self, tmp_path: Path) -> None:
         """The archive's parent did not exist, and a tool that made the caller
         create it first would be one more thing to get right."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         assert (tmp_path / "out" / "rw-payload.tar").exists()
 
-    def test_the_record_names_the_archive_digest(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_the_record_names_the_archive_digest(self, tmp_path: Path) -> None:
         """It is what ``hpc3-stage --expect-from`` is actually checked
         against."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path))
         record = (tmp_path / "provenance" / "payload-tree-digests.txt").read_text(encoding="utf-8")
         assert str(_document(tmp_path)["archive_sha256"]) in record
 
-    def test_the_record_names_the_commit_for_a_reader(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_the_record_names_the_commit_for_a_reader(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         main(_argv(tmp_path))
         record = (tmp_path / "provenance" / "payload-tree-digests.txt").read_text(encoding="utf-8")
         assert _COMMIT in record
 
 
 class TestTheEntryPoint:
-    def test_two_freezes_of_one_source_pack_alike(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_two_freezes_of_one_source_pack_alike(self, tmp_path: Path) -> None:
         """The property that makes the payload a pinned artifact rather than
         a directory each run assembled for itself."""
-        _planted(tmp_path, monkeypatch)
+        _planted(tmp_path)
         main(_argv(tmp_path, tree="first"))
         main(_argv(tmp_path, tree="second"))
         assert tree_digest(tree_entries(tmp_path / "first")) == tree_digest(
             tree_entries(tmp_path / "second")
         )
 
-    def test_a_missing_flag_is_refused(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_a_missing_flag_is_refused(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         # Named from the flag table rather than written out, so adding a
         # required flag does not leave this asserting about the old last one.
         with pytest.raises(ValueError, match=f"{REQUIRED_FLAGS[-1]} is required"):
             main(_argv(tmp_path)[:-2])
 
-    def test_it_reads_the_process_arguments_when_given_none(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_it_reads_the_process_arguments_when_given_none(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         # Swapped and restored rather than patched: ``monkeypatch.setattr``
         # is banned here, and this hook is the one seam the file cannot drive
         # through the in-memory host -- everything else about it is real
@@ -393,10 +379,8 @@ class TestTheEntryPoint:
         finally:
             sys.argv = before
 
-    def test_the_module_guard_runs_main(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        _planted(tmp_path, monkeypatch)
+    def test_the_module_guard_runs_main(self, tmp_path: Path) -> None:
+        _planted(tmp_path)
         before = sys.argv
         sys.argv = ["stage_payload", *_argv(tmp_path)]
         try:

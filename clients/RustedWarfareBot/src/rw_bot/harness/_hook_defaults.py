@@ -543,6 +543,15 @@ def _path_exists_impl(path: Path) -> bool:
     return path.exists()
 
 
+def _working_dir_impl() -> Path:
+    """Production implementation of :class:`WorkingDirProto`.
+
+    Returns:
+        ``Path()``, which names the working directory and which a join drops.
+    """
+    return Path()
+
+
 def _write_line_impl(text: str) -> None:
     """Production implementation of :class:`WriteLineProto`.
 
@@ -578,6 +587,7 @@ __all__ = [
     "_sleep_impl",
     "_spawn_game_impl",
     "_spawn_match_impl",
+    "_working_dir_impl",
     "_write_line_impl",
     "_write_text_lines_impl",
 ]

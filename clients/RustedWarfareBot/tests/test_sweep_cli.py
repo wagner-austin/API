@@ -8,11 +8,13 @@ from __future__ import annotations
 
 import runpy
 import sys
+from collections.abc import Generator
 from pathlib import Path
 
 import pytest
 from scripts.sweep import EXIT_BAD_USAGE, EXIT_INCOMPLETE, EXIT_OK, SOURCE_GAME_DIR, main
 
+from rw_bot.harness import _test_hooks
 from rw_bot.harness.sweep import SweepError
 from tests.harness_fakes import FakeHost
 from tests.sample_game import write_sample_game
@@ -21,7 +23,7 @@ _JOBS = "sweeps/demo.txt"
 
 
 @pytest.fixture(autouse=True)
-def _pinned_game_on_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def _pinned_game_on_disk(tmp_path: Path) -> Generator[None, None, None]:
     """Run every case beside a real, miniature pinned game directory.
 
     A finished batch records its arms with the fingerprint of the game it
@@ -32,12 +34,20 @@ def _pinned_game_on_disk(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Non
     FileNotFoundError on ``.game\\game-lib.jar`` (MCPs board task d69786fa).
 
     Args:
-        tmp_path: Where the game directory is built and the case runs.
-        monkeypatch: Used to enter that directory, since the sweep names the
-            game by a path relative to the process.
+        tmp_path: Where the game directory is built, which the hook the
+            fingerprint reads against names for the case and then restores,
+            since the sweep names the game by a repository-relative path.
+
+    Yields:
+        Nothing; the case runs while the hook names the directory.
     """
     write_sample_game(tmp_path / SOURCE_GAME_DIR)
-    monkeypatch.chdir(tmp_path)
+    original = _test_hooks.game_root
+    _test_hooks.game_root = lambda: tmp_path
+    try:
+        yield
+    finally:
+        _test_hooks.game_root = original
 
 
 def _plant(host: FakeHost, *lines: str) -> None:

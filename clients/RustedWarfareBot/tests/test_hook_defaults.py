@@ -42,6 +42,7 @@ from rw_bot.harness._hook_defaults import (
     _run_inherited_impl,
     _sleep_impl,
     _spawn_game_impl,
+    _working_dir_impl,
 )
 from rw_bot.harness._hook_protocols import CAPTURE_TIMEOUT_STATUS, SpawnedMatchProto
 
@@ -79,6 +80,12 @@ class TestReadingTheMachine:
         so every path handed to it is made absolute against this first."""
         root = _resolve_root_impl()
         assert Path(str(root)).is_absolute()
+
+    def test_the_working_dir_leaves_a_relative_path_as_it_was(self) -> None:
+        """The freeze and the fingerprint join every repository-relative path
+        to this, so anything but the empty path would respell each one, and
+        the in-memory host keys its files by the spelling."""
+        assert (_working_dir_impl() / "agent" / "build").as_posix() == "agent/build"
 
     def test_the_environment_carries_what_a_child_needs(self) -> None:
         assert "PATH" in _read_environment_impl()
