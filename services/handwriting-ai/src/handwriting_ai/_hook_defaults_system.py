@@ -60,6 +60,11 @@ def _default_read_text_file(path: Path) -> str:
     return path.read_text(encoding="utf-8").strip()
 
 
+def _default_working_dir() -> Path:
+    """Production implementation - returns real Path.cwd()."""
+    return Path.cwd()
+
+
 def _default_os_cpu_count() -> int | None:
     """Production implementation - returns real os.cpu_count()."""
     import os as _os

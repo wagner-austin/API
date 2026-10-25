@@ -28,12 +28,14 @@ from platform_core.config.handwriting_ai import limits_from_settings as limits_f
 from platform_core.config.handwriting_ai import load_settings as _load_platform_settings
 from platform_core.logging import get_logger
 
+from handwriting_ai import _test_hooks
+
 MNIST_N_CLASSES: Final[int] = 10
 
 
 def _default_settings(*, create_dirs: bool) -> Settings:
     """Build a local default settings object when required env vars are absent."""
-    base_dir = (Path.cwd() / ".handwriting-ai").resolve()
+    base_dir = (_test_hooks.working_dir() / ".handwriting-ai").resolve()
     data_root = base_dir / "data"
     artifacts_root = base_dir / "artifacts"
     logs_root = base_dir / "logs"
@@ -74,13 +76,14 @@ def ensure_settings(settings: Settings, *, create_dirs: bool) -> Settings:
     digits_cfg = settings["digits"].copy()
     security_cfg = settings["security"].copy()
 
-    app_cfg.setdefault("data_root", (Path.cwd() / ".handwriting-ai" / "data").resolve())
-    app_cfg.setdefault("artifacts_root", (Path.cwd() / ".handwriting-ai" / "artifacts").resolve())
-    app_cfg.setdefault("logs_root", (Path.cwd() / ".handwriting-ai" / "logs").resolve())
+    base_dir = _test_hooks.working_dir() / ".handwriting-ai"
+    app_cfg.setdefault("data_root", (base_dir / "data").resolve())
+    app_cfg.setdefault("artifacts_root", (base_dir / "artifacts").resolve())
+    app_cfg.setdefault("logs_root", (base_dir / "logs").resolve())
     app_cfg.setdefault("threads", DEFAULT_THREADS)
     app_cfg.setdefault("port", DEFAULT_PORT)
 
-    digits_cfg.setdefault("model_dir", (Path.cwd() / ".handwriting-ai" / "models").resolve())
+    digits_cfg.setdefault("model_dir", (base_dir / "models").resolve())
     digits_cfg.setdefault("seed_root", Path("/app/seed/digits/models"))
     digits_cfg.setdefault("active_model", "default")
     digits_cfg.setdefault("tta", False)

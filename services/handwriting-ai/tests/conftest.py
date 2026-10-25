@@ -129,6 +129,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
 
     # Store original values - resource detection hooks
     original_read_text_file = _test_hooks.read_text_file
+    original_working_dir = _test_hooks.working_dir
     original_cgroup_cpu_max = _test_hooks.cgroup_cpu_max
     original_os_cpu_count = _test_hooks.os_cpu_count
     original_detect_resource_limits = _test_hooks.detect_resource_limits
@@ -270,6 +271,7 @@ def _reset_test_hooks() -> Generator[None, None, None]:
 
     # Restore original values - resource detection hooks
     _test_hooks.read_text_file = original_read_text_file
+    _test_hooks.working_dir = original_working_dir
     _test_hooks.cgroup_cpu_max = original_cgroup_cpu_max
     _test_hooks.os_cpu_count = original_os_cpu_count
     _test_hooks.detect_resource_limits = original_detect_resource_limits

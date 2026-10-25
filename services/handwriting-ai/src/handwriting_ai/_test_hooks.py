@@ -83,6 +83,7 @@ from handwriting_ai._hook_defaults_system import (
     _default_torch_get_num_interop_threads,
     _default_torch_has_get_num_interop_threads,
     _default_torch_has_set_num_interop_threads,
+    _default_working_dir,
 )
 from handwriting_ai._hook_defaults_training import (
     _default_build_dataset_from_spec,
@@ -303,6 +304,10 @@ cgroup_mem_max: Path = Path("/sys/fs/cgroup/memory.max")
 cgroup_mem_stat: Path = Path("/sys/fs/cgroup/memory.stat")
 
 read_text_file: ReadTextFileProtocol = _default_read_text_file
+
+# The directory the local .handwriting-ai defaults are placed under; a test
+# hands its own instead of changing the process's.
+working_dir: Callable[[], Path] = _default_working_dir
 
 cgroup_cpu_max: Path = Path("/sys/fs/cgroup/cpu.max")
 
