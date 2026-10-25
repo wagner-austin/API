@@ -64,6 +64,7 @@ def _plan() -> ProjectConfig:
         required_tags=(),
         source=None,
         node=None,
+        loopback_only=False,
     )
 
 

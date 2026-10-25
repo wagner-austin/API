@@ -51,6 +51,7 @@ class TestTheBuildRecordsItself:
             isolated_docker=False,
             elevated=False,
             agent="opus-demo-0929",
+            loopback_unit=None,
         )
 
         lines = body.splitlines()

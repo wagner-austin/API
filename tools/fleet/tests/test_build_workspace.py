@@ -45,6 +45,7 @@ def test_preparation_and_recipe_receive_the_same_workspace(
         isolated_docker=False,
         elevated=False,
         agent="gpt6-deploy-1005",
+        loopback_unit=None,
     )
     result = subprocess.run(["/bin/sh"], input=body, text=True, capture_output=True, check=True)
     assert result.returncode == 0

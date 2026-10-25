@@ -81,7 +81,11 @@ def _step(*argv: str) -> InstallStep:
 
 
 def _build(
-    *, path: str = DEMO_PROJECT, install: tuple[InstallStep, ...] = (), workers: int = 6
+    *,
+    path: str = DEMO_PROJECT,
+    install: tuple[InstallStep, ...] = (),
+    workers: int = 6,
+    loopback_unit: str | None = None,
 ) -> str:
     """Render the Linux build script for one run under the fixture's roots.
 
@@ -89,6 +93,7 @@ def _build(
         path: The recipe's directory inside the export.
         install: The install steps.
         workers: The worker count.
+        loopback_unit: The check's unit for a loopback-only project.
 
     Returns:
         The script's text.
@@ -102,6 +107,7 @@ def _build(
         isolated_docker=False,
         elevated=False,
         agent="opus-demo-0929",
+        loopback_unit=loopback_unit,
     )
 
 
@@ -142,6 +148,7 @@ class TestBuildScript:
                 isolated_docker=False,
                 elevated=False,
                 agent="Opus Demo",
+                loopback_unit=None,
             )
 
     def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:
@@ -289,6 +296,7 @@ class TestLaunchScript:
                 isolated_docker=False,
                 elevated=True,
                 agent="opus-demo-0929",
+                loopback_unit=None,
             )
 
     def test_the_unit_name_is_the_one_the_stop_script_stops(self) -> None:

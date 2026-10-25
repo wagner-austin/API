@@ -23,7 +23,7 @@ from fleet.contracts.node import NodePlatform, encode_node_config
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.toolchain import ToolReport
-from fleet.core import dispatch
+from fleet.core import recipe
 from fleet.core.toolchain import read_reports
 from tests._contract_fixtures import decode_like
 from tests._toolchain_fixtures import LAVENDER_2026_09_23, node
@@ -64,10 +64,11 @@ def test_the_recipe_is_elevated_exactly_when_the_project_requires_it(
         required_tags=tags,
         source=None,
         node=None,
+        loopback_only=False,
     )
 
-    assert dispatch.recipe_for(plan, path="execution/elevated", install=())["elevated"] is elevated
-    assert dispatch.working_tree_recipe("execution/elevated", plan)["elevated"] is elevated
+    assert recipe.recipe_for(plan, path="execution/elevated", install=())["elevated"] is elevated
+    assert recipe.working_tree_recipe("execution/elevated", plan)["elevated"] is elevated
 
 
 class TestTheDeclaration:

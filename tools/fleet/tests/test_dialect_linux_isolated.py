@@ -20,7 +20,7 @@ import pytest
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
-from fleet.core import dispatch, names, tool_caches
+from fleet.core import names, recipe, tool_caches
 from fleet.core.dialect_linux import PROLOGUE, LinuxDialect
 from fleet.core.dialect_windows import WindowsDialect
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
@@ -55,6 +55,7 @@ def _isolated(
         isolated_docker=True,
         elevated=False,
         agent="opus-demo-0929",
+        loopback_unit=None,
     )
 
 
@@ -76,6 +77,7 @@ def _plan(required_tags: tuple[NodeTag, ...]) -> ProjectConfig:
         required_tags=required_tags,
         source=None,
         node=None,
+        loopback_only=False,
     )
 
 
@@ -204,6 +206,24 @@ def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
             isolated_docker=True,
             elevated=False,
             agent="opus-demo-0929",
+            loopback_unit=None,
+        )
+
+
+def test_a_docker_project_that_declares_loopback_only_is_refused_by_name() -> None:
+    # Its build runs as execdocker, which holds no sudo to call
+    # fleet-check-unit (MCPs board task 649fcc7a).
+    with pytest.raises(ValueError, match="declares both the docker tag and loopback_only"):
+        LinuxDialect().build_script(
+            target=TARGET,
+            path="slime",
+            workers=2,
+            install=(),
+            cache_root="/s/cache",
+            isolated_docker=True,
+            elevated=False,
+            agent="opus-demo-0929",
+            loopback_unit="fleet-slime-lavender-1792900000",
         )
 
 
@@ -218,12 +238,16 @@ def test_a_windows_node_refuses_to_render_a_docker_project_s_build() -> None:
 def test_the_recipe_is_isolated_exactly_when_the_project_declares_docker(
     tags: tuple[NodeTag, ...], isolated: bool
 ) -> None:
-    recipe = dispatch.recipe_for(_plan(tags), path="slime", install=(NPM_CI,))
+    built = recipe.recipe_for(_plan(tags), path="slime", install=(NPM_CI,))
 
-    assert recipe == dispatch.Recipe(
-        path="slime", install=(NPM_CI,), isolated_docker=isolated, elevated=False
+    assert built == recipe.Recipe(
+        path="slime",
+        install=(NPM_CI,),
+        isolated_docker=isolated,
+        elevated=False,
+        loopback_only=False,
     )
-    assert dispatch.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated
+    assert recipe.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated
 
 
 def _run(argv: list[str]) -> subprocess.CompletedProcess[str]:

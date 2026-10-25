@@ -136,6 +136,7 @@ def _project(
     worker_ram_gb: float = 1.1,
     required_tags: tuple[NodeTag, ...] = (),
     node: str | None = None,
+    loopback_only: bool = False,
 ) -> ProjectConfig:
     """Build a project declaration.
 
@@ -144,6 +145,7 @@ def _project(
         worker_ram_gb: Memory one worker of this suite holds.
         required_tags: What the suite requires of a node.
         node: The one node the project runs on, or None for any.
+        loopback_only: Whether its check runs with only lo.
 
     Returns:
         The project.
@@ -157,6 +159,7 @@ def _project(
         required_tags=required_tags,
         source=None,
         node=node,
+        loopback_only=loopback_only,
     )
 
 
@@ -288,6 +291,22 @@ class TestAssess:
     def test_a_project_requiring_nothing_takes_any_platform(self) -> None:
         linux = _node(platform=NodePlatform.LINUX)
         assert assess(linux, _state(), _project(), LINUX_TAGS)["workers"] == 7
+
+    def test_a_loopback_only_project_runs_on_linux_and_a_windows_node_refuses_it(self) -> None:
+        """Only a Linux node's fleet-check-unit gives a check a network of
+        its own (MCPs board task 649fcc7a)."""
+        project = _project(loopback_only=True)
+        linux = assess(_node(platform=NodePlatform.LINUX), _state(), project, LINUX_TAGS)
+        windows = assess(_node(host="loki"), _state(), project, WINDOWS_TAGS)
+
+        assert linux["workers"] == 7
+        assert windows["workers"] == 0
+        assert windows["code"] is FleetErrorCode.NODE_LACKS_TAG
+        assert windows["reason"] == (
+            "loki is a windows node, and the project declares loopback_only: its check runs "
+            "in a network namespace holding only lo, which only a Linux node's "
+            "fleet-check-unit gives, so the answer is a Linux node."
+        )
 
     def test_the_project_cost_overrides_the_node_default(self) -> None:
         """What a worker costs is a property of the suite, not the machine:

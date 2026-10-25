@@ -107,6 +107,7 @@ def _build(
         isolated_docker=False,
         elevated=elevated,
         agent="opus-demo-0929",
+        loopback_unit=None,
     )
 
 
@@ -159,6 +160,7 @@ class TestBuildScript:
                 isolated_docker=False,
                 elevated=False,
                 agent="o'brien-0929",
+                loopback_unit=None,
             )
 
     def test_it_puts_git_for_windows_bash_first_on_the_path(self) -> None:

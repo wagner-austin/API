@@ -66,6 +66,7 @@ def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectC
         required_tags=(),
         source=None,
         node=None,
+        loopback_only=False,
     )
 
 
