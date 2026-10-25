@@ -23,8 +23,8 @@ identity and, under ``dispatch``, what dispatch may take from it:
   told from an oversight;
 * or an object, the capacity :func:`fleet.contracts.node.decode_node_config`
   reads, with ``held``: null when its runners claim work, or the reason they
-  do not (lavender's Windows lane, retired on 2026-09-29 while lavender-wsl
-  still names lavender as the machine it runs inside).
+  do not (emerald, a NixOS storage machine with no Docker, compiler or test
+  database for a check to run on).
 
 So ``enabled`` is said once, whether the machine is expected to answer, and
 a node dispatches exactly when it is enabled and not held. ``host`` is the
