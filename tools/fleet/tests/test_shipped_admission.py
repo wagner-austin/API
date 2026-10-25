@@ -62,7 +62,11 @@ stack moves onto it from diphtheria, and the operator, 2026-10-24, "cuz
 diptheria is too small. so demure*will be dedicated as the server pc. not a
 worker." One project is pinned to it, MCPs/execution-served-demure, whose
 case reads its provisioning as the stack host, so it checks that and none
-other.
+other. Its role is server since MCPs board task 4ec65b8f (the operator,
+2026-10-25: "isnt demute supposed to br msrked as a server node? not a
+worker snymore."), and the machine contract refuses a server whose budget
+would take the fleet's pool, so every server the roster ships is offered
+only what is pinned to it.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -76,6 +80,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import FleetErrorCode
 
+from fleet.contracts.machine import MachineRole
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.tags import missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
@@ -272,6 +277,31 @@ def test_demure_checks_its_served_lane_and_no_other_project() -> None:
         **dict.fromkeys(workspace["projects"], FleetErrorCode.NODE_NOT_PINNED),
         "MCPs/execution-served-demure": None,
     }
+
+
+def test_no_server_is_offered_a_check_not_pinned_to_it() -> None:
+    workspace = _shipped()
+    servers = sorted(
+        name
+        for name, machine in workspace["machines"].items()
+        if machine["role"] is MachineRole.SERVER
+    )
+    offered = {
+        (server, name)
+        for server in servers
+        for name, project in workspace["projects"].items()
+        if project["node"] != server
+        and assess(
+            workspace["nodes"][server],
+            _idle(workspace["nodes"][server]),
+            project,
+            node_tags(workspace["nodes"][server]),
+        )["code"]
+        is not FleetErrorCode.NODE_NOT_PINNED
+    }
+
+    assert servers == ["demure"]
+    assert offered == set()
 
 
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
