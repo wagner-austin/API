@@ -15,7 +15,14 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = []
-extension-module = ["pyo3/extension-module"]
+# `python` compiles the bindings (`src/pyo3_module`) and nothing else, so the
+# Makefile's clippy, tests and coverage build them with libpython linked.
+# `extension-module` is maturin's alone (pyproject.toml): it also tells pyo3
+# to leave libpython unlinked, which an importable wheel needs and a test
+# binary that embeds Python cannot link with on Linux (fleet job e8a8b1e9,
+# API board task 38cabb1b).
+python = []
+extension-module = ["python", "pyo3/extension-module"]
 
 [dependencies]
 pyo3 = { version = "0.27.2" }

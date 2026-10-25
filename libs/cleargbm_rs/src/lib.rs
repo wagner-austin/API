@@ -46,7 +46,7 @@ pub mod hooks;
 pub mod losses;
 pub mod narrow;
 pub mod predict;
-#[cfg(feature = "extension-module")]
+#[cfg(feature = "python")]
 pub mod pyo3_module;
 pub mod split;
 pub mod training;

@@ -17,23 +17,29 @@ setup:
 # links pyo3 against the venv's interpreter and puts its site-packages on
 # PYTHONPATH. Clippy goes through it too, so all three steps share one pyo3
 # configuration and none of them rebuilds the crate for another.
+#
+# All three name ``--features python``, never ``--all-features``: that would
+# turn on ``extension-module``, which leaves libpython unlinked for maturin's
+# wheel, and on Linux the test binary then fails to link pyo3's symbols
+# (fleet job e8a8b1e9, API board task 38cabb1b; Windows links the python DLL
+# either way, which is why only Windows nodes passed before).
 
 # Rust linting: fmt + clippy
 rust-lint:
 	$(MAKETOOLS) uv-venv-check
 	cargo fmt
-	$(MAKETOOLS) venv-embed cargo clippy --all-targets --all-features -- -D warnings
+	$(MAKETOOLS) venv-embed cargo clippy --all-targets --features python -- -D warnings
 
 # Rust tests
 rust-test:
 	$(MAKETOOLS) uv-venv-check
-	$(MAKETOOLS) venv-embed cargo test --all-features
+	$(MAKETOOLS) venv-embed cargo test --features python
 
 # Rust coverage (requires cargo-llvm-cov) - 100% segment coverage
 # Uses segment-based check to avoid false negatives from generic instantiations
 rust-cov:
 	$(MAKETOOLS) uv-venv-check
-	$(MAKETOOLS) venv-embed cargo llvm-cov --all-features --json --output-path coverage.json
+	$(MAKETOOLS) venv-embed cargo llvm-cov --features python --json --output-path coverage.json
 	$(MAKETOOLS) venv-embed cargo run --bin check_segment_coverage -- --threshold 100
 
 # Python linting: ruff + mypy + guard, through the uv venv's own executables

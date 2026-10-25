@@ -3,7 +3,7 @@
 //! Usage:
 //!
 //! ```text
-//! cargo llvm-cov --all-features --json --output-path coverage.json
+//! cargo llvm-cov --features python --json --output-path coverage.json
 //! cargo run --bin check_segment_coverage -- --threshold 100
 //! ```
 //!

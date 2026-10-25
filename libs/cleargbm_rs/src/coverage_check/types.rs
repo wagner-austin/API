@@ -85,7 +85,7 @@ pub struct Options {
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum CoverageCheckError {
     /// The coverage export file does not exist.
-    #[error("coverage export not found at {path}; generate it with: cargo llvm-cov --all-features --json --output-path {path}")]
+    #[error("coverage export not found at {path}; generate it with: cargo llvm-cov --features python --json --output-path {path}")]
     ExportNotFound {
         /// Path that was checked.
         path: String,
