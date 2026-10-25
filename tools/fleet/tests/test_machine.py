@@ -253,6 +253,30 @@ class TestMachine:
             "not the operator's machine",
         )
 
+    def test_a_server_takes_only_the_checks_pinned_to_it(self) -> None:
+        """MCPs board task 4ec65b8f: the stack host is offered none of the
+        fleet's pool, so a server reads only with pinned_checks_only."""
+        declared = node(host="demure")
+        declared["platform"] = NodePlatform.LINUX
+        declared["budget"] = {**declared["budget"], "pinned_checks_only": True}
+        dispatch = {**encode_node_config(declared), "held": None}
+
+        decoded = decode_machine("demure", _file(role="server", guest=None, dispatch=dispatch))
+        reasoned = decode_machine("demure", _file(role="server", guest=None, dispatch="the stack"))
+
+        assert (decoded["role"], decoded["dispatch"]) == (MachineRole.SERVER, declared)
+        assert (reasoned["role"], reasoned["dispatch"], reasoned["held"]) == (
+            MachineRole.SERVER,
+            None,
+            "the stack",
+        )
+
+    def test_a_server_whose_dispatch_would_take_the_pool_is_refused(self) -> None:
+        dispatch = {**encode_node_config(node(host="demure")), "held": None}
+
+        with pytest.raises(JSONTypeError, match="machine 'demure' is a server, which takes no"):
+            decode_machine("demure", _file(role="server", guest=None, dispatch=dispatch))
+
     def test_a_held_node_dispatches_nothing_and_says_why(self) -> None:
         dispatch = {**encode_node_config(node()), "held": "its WSL VM holds the memory"}
 
