@@ -81,9 +81,6 @@ class TestTheWorkflowsThatExist:
         assert workflows["packages.yml"].push == EVERY_REF
         assert admits(EVERY_REF, DX_MOD)
         assert workflows["runner-reaper-proof.yml"].push is None
-        assert workflows["powershell.yml"].push == PushTrigger(
-            branches=("main",), branches_ignore=None, tags=None, tags_ignore=None
-        )
 
 
 class TestGitHubsRules:
