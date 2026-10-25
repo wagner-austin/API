@@ -20,7 +20,7 @@ import pytest
 
 from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
 from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, SH_INVOCATION
-from fleet.core.linux_capacity_probe import CGROUPS_LINE, MEMINFO_LINE, RESERVATIONS_LINE
+from fleet.core.linux_capacity_probe import MEMINFO_LINE, RESERVATIONS_LINE
 from tests.test_dialect_linux import fields_of
 
 #: What the fake meminfo's 16014192 kB MemAvailable reads as, with nothing capped.
@@ -58,8 +58,6 @@ def _run(tmp_path: pathlib.Path, status: str | None, age_minutes: int = 0) -> di
     """
     meminfo = tmp_path / "meminfo"
     meminfo.write_text("MemAvailable:   16014192 kB\n", encoding="utf-8")
-    cgroups = tmp_path / "system.slice"
-    cgroups.mkdir()
     path = tmp_path / "status"
     if status is not None:
         path.write_text(status, encoding="utf-8")
@@ -68,7 +66,6 @@ def _run(tmp_path: pathlib.Path, status: str | None, age_minutes: int = 0) -> di
     script = tmp_path / "probe.sh"
     script.write_text(
         CAPACITY_PROBE_SCRIPT.replace(MEMINFO_LINE, f"meminfo='{meminfo.as_posix()}'\n", 1)
-        .replace(CGROUPS_LINE, f"cgroups='{cgroups.as_posix()}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{(tmp_path / 'none').as_posix()}'\n", 1)
         .replace(f"c={STATUS_PATH}\n", f"c='{path.as_posix()}'\n", 1),
         encoding="utf-8",

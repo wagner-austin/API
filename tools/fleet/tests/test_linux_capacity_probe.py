@@ -1,9 +1,9 @@
-"""The Linux capacity probe nets out what capped containers are promised (MCPs board task a282400d).
+"""The Linux capacity probe reads free memory as ``MemAvailable`` (MCPs board task d111690a).
 
 The text is pinned everywhere; the script is RUN under ``sh`` against a fake
-``meminfo`` and cgroup tree shaped like diphtheria's on 2026-09-29 22:1xZ:
-four containers capped at 4 GiB, the rest uncapped, and one that exited
-between the listing and the read.
+``meminfo``, pressure files and reservations, shaped like diphtheria's. No
+capped container's headroom is charged: a check yields memory to the stack
+by its ``OOMScoreAdjust`` instead (:mod:`fleet.core.linux_capacity_probe`).
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ from fleet.core import probe
 from fleet.core.dialect_linux import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION, LinuxDialect
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
-    CGROUPS_LINE,
     IO_PRESSURE_LINE,
     MEMINFO_LINE,
     PRESSURE_LINE,
@@ -29,9 +28,7 @@ from fleet.core.linux_capacity_probe import (
 )
 from tests.test_dialect_linux import fields_of
 
-GIB = 1073741824
-CAP = 4 * GIB
-#: diphtheria's MemAvailable at 22:1xZ, in kB as /proc/meminfo prints it.
+#: diphtheria's MemAvailable at 22:1xZ on 2026-09-29, in kB as /proc/meminfo prints it.
 AVAILABLE_KB = 16014192
 
 #: diphtheria's /proc/pressure/cpu at 14:4xZ on 2026-10-16.
@@ -51,9 +48,8 @@ IO_PRESSURE = (
 def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
     assert LinuxDialect().capacity_probe_script() == CAPACITY_PROBE_SCRIPT
-    assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE + CGROUPS_LINE)
+    assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
-    assert CGROUPS_LINE == "cgroups=/sys/fs/cgroup/system.slice\n"
     assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + RESERVATIONS_PART)
     assert PRESSURE_PART.startswith(PRESSURE_LINE)
     assert PRESSURE_LINE == "pressure=/proc/pressure/cpu\n"
@@ -61,6 +57,13 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert IO_PRESSURE_LINE == "io_pressure=/proc/pressure/io\n"
     assert RESERVATIONS_PART.startswith(RESERVATIONS_LINE)
     assert RESERVATIONS_LINE == 'reservations="$HOME/.fleet/reservations"\n'
+
+
+def test_the_body_reads_no_container_s_memory_cap() -> None:
+    """The charge of every capped container's headroom is gone, not moved."""
+    assert "memory.max" not in CAPACITY_PROBE_SCRIPT
+    assert "memory.stat" not in CAPACITY_PROBE_SCRIPT
+    assert "promised" not in CAPACITY_PROBE_SCRIPT
 
 
 @pytest.mark.host_linux
@@ -75,19 +78,17 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     fields = fields_of(completed.stdout)
     sliced = {"ci_slice_current_gb", "ci_slice_high_gb"} <= set(fields)
     # A runner host whose root timer counted its runners in the last five
-    # minutes prints all four counts, lavender-wsl since 2026-10-15 (MCPs
-    # board task ce2b92e0); every other node prints none.
+    # minutes prints all four counts (MCPs board task ce2b92e0); every other
+    # node prints none.
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "promised_ram_gb", "logical_cores", *probe.PRESSURE_FIELDS}
+    reported = {*probe.REQUIRED_FIELDS, "logical_cores", *probe.PRESSURE_FIELDS}
     assert set(fields) == reported | counted | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
-    # Any sign: on the stack host it is MemAvailable net of what capped
-    # containers may still grow into (fleet.core.linux_capacity_probe),
-    # which diphtheria read as -1.513 at 10:24Z on 2026-10-05.
-    assert re.fullmatch(r"-?\d+\.\d{3}", fields["free_ram_gb"])
+    # MemAvailable, which the kernel never reports below zero.
+    assert re.fullmatch(r"\d+\.\d{3}", fields["free_ram_gb"])
     assert float(fields["free_disk_gb"]) > 0.0
     assert int(fields["logical_cores"]) >= 1
     # None on a CI runner, a VM smoke's cores on diphtheria (84a2b690).
@@ -96,31 +97,8 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     assert re.fullmatch(r"\d+\.\d{2}", fields["io_pressure_pct"])
 
 
-def _scope(root: pathlib.Path, name: str, limit: str, anon: int | None, shmem: int = 0) -> None:
-    """Write one fake container cgroup.
-
-    Args:
-        root: The fake ``system.slice``.
-        name: The scope's directory name.
-        limit: What its ``memory.max`` reads.
-        anon: Its ``memory.stat`` ``anon`` line, or None for a scope whose
-            ``memory.stat`` is already gone.
-        shmem: Its ``memory.stat`` ``shmem`` line, which the kernel also
-            counts in ``file``.
-    """
-    scope = root / name
-    scope.mkdir()
-    (scope / "memory.max").write_text(f"{limit}\n", encoding="utf-8")
-    if anon is not None:
-        (scope / "memory.stat").write_text(
-            f"anon {anon}\nfile {734003200 + shmem}\nkernel 1048576\nshmem {shmem}\n",
-            encoding="utf-8",
-        )
-
-
 def _probe(
     tmp_path: pathlib.Path,
-    cgroups: pathlib.Path,
     held: pathlib.Path | None,
     pressure: str | None,
     io_pressure: str | None,
@@ -130,7 +108,6 @@ def _probe(
     Args:
         tmp_path: Where the fake meminfo, the fake pressure files and the
             script go.
-        cgroups: The fake ``system.slice``.
         held: The fake reservations directory, or None for one that does
             not exist, as on every node nothing has reserved.
         pressure: What the fake ``/proc/pressure/cpu`` holds, or None for
@@ -157,7 +134,6 @@ def _probe(
     script = tmp_path / "probe.sh"
     script.write_text(
         CAPACITY_PROBE_SCRIPT.replace(MEMINFO_LINE, f"meminfo='{meminfo.as_posix()}'\n", 1)
-        .replace(CGROUPS_LINE, f"cgroups='{cgroups.as_posix()}'\n", 1)
         .replace(PRESSURE_LINE, f"pressure='{cpu.as_posix()}'\n", 1)
         .replace(IO_PRESSURE_LINE, f"io_pressure='{io.as_posix()}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{reservations.as_posix()}'\n", 1),
@@ -174,7 +150,6 @@ def _probe(
 
 def _run(
     tmp_path: pathlib.Path,
-    cgroups: pathlib.Path,
     held: pathlib.Path | None = None,
     pressure: str = PRESSURE,
     io_pressure: str = IO_PRESSURE,
@@ -183,7 +158,6 @@ def _run(
 
     Args:
         tmp_path: Where the fakes and the script go.
-        cgroups: The fake ``system.slice``.
         held: The fake reservations directory, or None for none.
         pressure: What the fake ``/proc/pressure/cpu`` holds.
         io_pressure: What the fake ``/proc/pressure/io`` holds.
@@ -191,44 +165,48 @@ def _run(
     Returns:
         The probe's key=value fields.
     """
-    completed = _probe(tmp_path, cgroups, held, pressure, io_pressure)
+    completed = _probe(tmp_path, held, pressure, io_pressure)
     assert completed.returncode == 0, completed.stderr
     return fields_of(completed.stdout)
 
 
 @pytest.mark.host_linux
 class TestTheProbeUnderSh:
-    def test_capped_containers_are_charged_their_cap_less_their_anonymous_memory(
+    def test_free_memory_is_the_whole_memavailable_in_gibibytes(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """diphtheria, 2026-09-29: four capped workers, uncapped services beside them."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-        anons = (1_300_000_000, 2_000_000_000, 2_800_000_000, 20_000_000)
-        for index, anon in enumerate(anons):
-            _scope(cgroups, f"docker-capped{index}.scope", str(CAP), anon)
-        _scope(cgroups, "docker-uncapped.scope", "max", 2_500_000_000)
-        _scope(cgroups, "docker-exited.scope", str(CAP), None)
-        _scope(cgroups, "user-1002.slice", str(CAP), 0)
+        """diphtheria, 2026-09-29: whatever its capped workers could still grow into."""
+        fields = _run(tmp_path)
 
-        fields = _run(tmp_path, cgroups)
-
-        promised = 4 * CAP - sum(anons)
-        assert promised == 11_059_869_184
-        assert fields["promised_ram_gb"] == f"{promised / GIB:.3f}"
-        assert fields["free_ram_gb"] == f"{(AVAILABLE_KB * 1024 - promised) / GIB:.3f}"
-        assert fields["free_ram_gb"] == "4.972"
-        first = ["free_ram_gb", "promised_ram_gb", "free_disk_gb", "logical_cores"]
+        assert fields["free_ram_gb"] == f"{AVAILABLE_KB / 1048576:.3f}"
+        assert fields["free_ram_gb"] == "15.272"
+        first = ["free_ram_gb", "free_disk_gb", "logical_cores"]
         assert list(fields)[: len(first)] == first
+        assert fields["reserved_cores"] == "0"
+
+    def test_a_meminfo_without_memavailable_prints_no_free_memory(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Which :mod:`fleet.core.probe` refuses as a missing field, never as an empty node."""
+        # Write the script and its fakes, then take MemAvailable out of meminfo.
+        assert _probe(tmp_path, None, PRESSURE, IO_PRESSURE).returncode == 0
+        (tmp_path / "meminfo").write_text("MemTotal:       32745488 kB\n", encoding="utf-8")
+        completed = subprocess.run(
+            [*SH_INVOCATION, str(tmp_path / "probe.sh")],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+
+        assert completed.returncode == 0, completed.stderr
+        assert "free_ram_gb" not in fields_of(completed.stdout)
 
     def test_cpu_pressure_is_the_some_line_s_one_minute_average(
         self, tmp_path: pathlib.Path
     ) -> None:
         """diphtheria, 2026-10-16 (MCPs board task 2ce5dc13): avg60, never avg10 or full."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        fields = _run(tmp_path, cgroups)
+        fields = _run(tmp_path)
 
         assert fields["cpu_pressure_pct"] == "9.33"
         keys = list(fields)
@@ -238,10 +216,7 @@ class TestTheProbeUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """diphtheria, 2026-10-18 (MCPs board task 814c4555): avg60 of some, not full."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        fields = _run(tmp_path, cgroups)
+        fields = _run(tmp_path)
 
         assert fields["io_pressure_pct"] == "68.81"
         keys = list(fields)
@@ -251,12 +226,7 @@ class TestTheProbeUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """Which the parser refuses as not a number, as it does the CPU reading."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        fields = _run(
-            tmp_path, cgroups, io_pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
-        )
+        fields = _run(tmp_path, io_pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
 
         assert (fields["cpu_pressure_pct"], fields["io_pressure_pct"]) == ("9.33", "")
 
@@ -264,15 +234,11 @@ class TestTheProbeUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """``awk`` cannot open it, and ``set -e`` stops the script on that line."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        completed = _probe(tmp_path, cgroups, None, PRESSURE, None)
+        completed = _probe(tmp_path, None, PRESSURE, None)
 
         assert completed.returncode != 0
         assert list(fields_of(completed.stdout)) == [
             "free_ram_gb",
-            "promised_ram_gb",
             "free_disk_gb",
             "logical_cores",
             "cpu_pressure_pct",
@@ -282,12 +248,7 @@ class TestTheProbeUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """Which the parser refuses as not a number, so it never reads as calm."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        fields = _run(
-            tmp_path, cgroups, pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n"
-        )
+        fields = _run(tmp_path, pressure="full avg10=0.00 avg60=0.00 avg300=0.00 total=0\n")
 
         assert fields["cpu_pressure_pct"] == ""
         assert fields["reserved_cores"] == "0"
@@ -296,62 +257,14 @@ class TestTheProbeUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """``awk`` cannot open it, and ``set -e`` stops the script on that line."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        completed = _probe(tmp_path, cgroups, None, None, IO_PRESSURE)
+        completed = _probe(tmp_path, None, None, IO_PRESSURE)
 
         assert completed.returncode != 0
         assert list(fields_of(completed.stdout)) == [
             "free_ram_gb",
-            "promised_ram_gb",
             "free_disk_gb",
             "logical_cores",
         ]
-
-    def test_shared_memory_is_resident_and_is_not_charged_again(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """colossus, 2026-10-14 04:33Z: the search copy's shared buffers under its 8 GiB cap."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-        anon, shmem = 96_636_928, 2_190_381_056
-        _scope(cgroups, "docker-postgres-search.scope", str(8 * GIB), anon, shmem)
-        _scope(cgroups, "docker-exited.scope", str(CAP), None)
-
-        fields = _run(tmp_path, cgroups)
-
-        promised = 8 * GIB - anon - shmem
-        assert promised == 6_302_916_608
-        assert fields["promised_ram_gb"] == f"{promised / GIB:.3f}"
-        assert fields["promised_ram_gb"] == "5.870"
-
-    def test_a_stat_with_no_anonymous_line_promises_nothing(self, tmp_path: pathlib.Path) -> None:
-        """A cap whose ``memory.stat`` carries no ``anon`` line is not charged."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-        scope = cgroups / "docker-tearing.scope"
-        scope.mkdir()
-        (scope / "memory.max").write_text(f"{CAP}\n", encoding="utf-8")
-        (scope / "memory.stat").write_text("shmem 1048576\n", encoding="utf-8")
-
-        fields = _run(tmp_path, cgroups)
-
-        assert fields["promised_ram_gb"] == "0.000"
-
-    def test_a_node_with_no_capped_container_reads_its_whole_memavailable(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """Every node but the stack host: nothing promised, the same reading as before."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
-
-        fields = _run(tmp_path, cgroups)
-
-        assert fields["promised_ram_gb"] == "0.000"
-        assert fields["free_ram_gb"] == f"{AVAILABLE_KB / 1048576:.3f}"
-        assert fields["free_ram_gb"] == "15.272"
-        assert fields["reserved_cores"] == "0"
 
 
 def _reserve(held: pathlib.Path, name: str, text: str) -> None:
@@ -374,15 +287,13 @@ class TestTheReservationsUnderSh:
         self, tmp_path: pathlib.Path
     ) -> None:
         """diphtheria, 2026-10-14: a 4-vCPU clean-VM smoke, beside one that ended."""
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
         held = tmp_path / "reservations"
         _reserve(held, "vm.reservation", "holder=vm smoke\ncores=4\nuntil_unix=99999999999\n")
         _reserve(held, "old.reservation", "holder=old\r\ncores=2\r\nuntil_unix=1\r\n")
         _reserve(held, "build.reservation", "holder=build\r\ncores=3\r\nuntil_unix=99999999999\r\n")
         _reserve(held, "notes.txt", "cores=9\nuntil_unix=99999999999\n")
 
-        fields = _run(tmp_path, cgroups, held)
+        fields = _run(tmp_path, held)
 
         assert fields["reserved_cores"] == "7"
         # Read after the body's other fields; the dialect's CI-slice lines,
@@ -391,12 +302,10 @@ class TestTheReservationsUnderSh:
         assert keys.index("reserved_cores") == keys.index("io_pressure_pct") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
         held = tmp_path / "reservations"
         held.mkdir()
 
-        assert _run(tmp_path, cgroups, held)["reserved_cores"] == "0"
+        assert _run(tmp_path, held)["reserved_cores"] == "0"
 
     @pytest.mark.parametrize(
         "text",
@@ -410,12 +319,10 @@ class TestTheReservationsUnderSh:
     def test_a_file_it_cannot_read_is_named_and_ends_the_probe(
         self, tmp_path: pathlib.Path, text: str
     ) -> None:
-        cgroups = tmp_path / "system.slice"
-        cgroups.mkdir()
         held = tmp_path / "reservations"
         _reserve(held, "bad.reservation", text)
 
-        fields = _run(tmp_path, cgroups, held)
+        fields = _run(tmp_path, held)
 
         assert fields["reservation_unreadable"] == (held / "bad.reservation").as_posix()
         assert "reserved_cores" not in fields

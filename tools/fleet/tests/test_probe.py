@@ -80,7 +80,7 @@ class TestProbe:
     def test_a_linux_node_reports_its_cpu_and_io_pressure(self) -> None:
         """diphtheria's readings at 17:43Z on 2026-10-18 (MCPs 2ce5dc13, 814c4555)."""
         output = (
-            "free_ram_gb=4.073\npromised_ram_gb=10.895\nfree_disk_gb=206.206\n"
+            "free_ram_gb=4.073\nfree_disk_gb=206.206\n"
             "logical_cores=8\ncpu_pressure_pct=14.06\nio_pressure_pct=68.81\nreserved_cores=0\n"
         )
 

@@ -163,44 +163,132 @@ class TestASettleLogsEachFactOnce:
         assert len(followed_lines) == 1
 
 
-#: The tail of a build the unit-end script closed (MCPs board task
-#: c8585623): 859e7ab3's transcript as it stopped, then the line systemd's
-#: ``ExecStopPost=`` appends for an oom-kill.
-KILLED_TAIL = (
-    "fleet-prepare: no stored install for tree key e7fd2baa9e87; running npm ci\n"
-    "npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException\n"
+#: The line systemd's ``ExecStopPost=`` appends for a unit ended for memory
+#: (MCPs board tasks c8585623 and d111690a): the ending lavender's helper
+#: gave a unit filled past its cap on 2026-10-25T14:50:49Z.
+MEMORY_ENDED = (
+    "FLEET_UNIT_ENDED: unit fleet-MCPs-mcp-shared-colossus-1792939198 ended with systemd "
+    "result oom-kill (killed TERM) before the build wrote its status; recorded exit 143"
+)
+
+#: The line for a unit a signal ended, which says nothing about memory.
+SIGNAL_ENDED = (
     "FLEET_UNIT_ENDED: unit fleet-MCPs-mcp-shared-diphtheria-1791171734 ended with systemd "
-    "result oom-kill (killed KILL) before the build wrote its status; recorded exit 137\n"
+    "result signal (killed KILL) before the build wrote its status; recorded exit 137"
 )
 
 
+def _killed_tail(ending: str) -> str:
+    """The tail of a build the unit-end script closed: 859e7ab3's transcript, then the line.
+
+    Args:
+        ending: The unit-end line.
+
+    Returns:
+        The tail.
+    """
+    return (
+        "fleet-prepare: no stored install for tree key e7fd2baa9e87; running npm ci\n"
+        "npm warn deprecated node-domexception@1.0.0: Use your platform's native DOMException\n"
+        f"{ending}\n"
+    )
+
+
+def _settle_killed(
+    sourced_config: pathlib.Path, *, ending: str, recorded: int, answered: str
+) -> FakeQueue:
+    """Settle a launched run whose unit ended with ``ending``, the queue answering ``answered``.
+
+    Args:
+        sourced_config: The workspace document.
+        ending: The unit-end line the tail carries.
+        recorded: The exit the unit-end script recorded.
+        answered: The queue's answer to the report.
+
+    Returns:
+        The queue, holding every call the runner made.
+    """
+    launch(sourced_config)
+    _test_hooks.run = FakeRun(
+        [
+            ok(""),
+            ok(f"{recorded} 1757000060"),
+            ok(""),
+            ok(_killed_tail(ending)),
+            *retire_replies(),
+            *PROBED,
+        ]
+    )
+    answering_queue = FakeQueue(
+        [held_answer(taskId=VERDICT_TASK), answered, dump_json_str({"claimed": None})]
+    )
+    _test_hooks.http_post = answering(answering_queue)
+    assert node_agent.main(node_argv(sourced_config)) == 0
+    return answering_queue
+
+
+#: Where every verdict line here ends, before the unit's ending.
+VERDICT_END = f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
+
+
 class TestABuildItsUnitClosed:
-    def test_closes_failed_with_the_unit_s_ending_on_the_line(
+    def test_a_signal_s_kill_closes_failed_with_the_unit_s_ending_on_the_line(
         self, sourced_config: pathlib.Path
     ) -> None:
-        launch(sourced_config)
-        _test_hooks.run = FakeRun(
-            [ok(""), ok("137 1757000060"), ok(""), ok(KILLED_TAIL), *retire_replies(), *PROBED]
+        answered = dump_json_str({"job": queue_job(status="failed", exitCode=137)})
+        answering_queue = _settle_killed(
+            sourced_config, ending=SIGNAL_ENDED, recorded=137, answered=answered
         )
-        answering_queue = FakeQueue(
-            [
-                held_answer(taskId=VERDICT_TASK),
-                dump_json_str({"job": queue_job(status="failed", exitCode=137)}),
-                dump_json_str({"claimed": None}),
-            ]
-        )
-        _test_hooks.http_post = answering(answering_queue)
-
-        assert node_agent.main(node_argv(sourced_config)) == 0
 
         close = answering_queue.arguments[1]
         assert close["action"] == "close"
         assert close["status"] == "failed"
         assert close["exitCode"] == 137
-        assert narrow_json_to_str(close["detail"]).endswith(
-            f"log=lavender:C:/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
-            "FLEET_UNIT_ENDED: unit fleet-MCPs-mcp-shared-diphtheria-1791171734 ended with "
-            "systemd result oom-kill (killed KILL) before the build wrote its status; "
-            "recorded exit 137"
-        )
+        assert narrow_json_to_str(close["detail"]).endswith(f"{VERDICT_END} {SIGNAL_ENDED}")
         assert "failed" in _ledger(sourced_config)
+
+
+class TestABuildEndedForMemory:
+    """A check yields memory to the stack (MCPs board task d111690a), so a unit
+    the kernel or systemd-oomd ended for memory is reported lost: the queue
+    requeues it the first time and fails it the second."""
+
+    def test_the_first_kill_is_given_back_and_the_queue_requeues_it(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        answered = dump_json_str({"job": queue_job(status="queued")})
+        with caplog.at_level("INFO"):
+            answering_queue = _settle_killed(
+                sourced_config, ending=MEMORY_ENDED, recorded=143, answered=answered
+            )
+
+        assert answering_queue.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
+        report = answering_queue.arguments[1]
+        assert report["action"] == "lost"
+        assert "status" not in report
+        assert "exitCode" not in report
+        detail = narrow_json_to_str(report["detail"])
+        assert detail.startswith("FLEET-CHECK ")
+        assert " exit=143 " in detail
+        assert detail.endswith(f"{VERDICT_END} {MEMORY_ENDED}")
+        # The run itself ended: this machine's row for it is finished.
+        assert "failed" in _ledger(sourced_config)
+        assert any(
+            record.getMessage().endswith(f": ended for memory, the queue answered queued: {detail}")
+            for record in caplog.records
+        )
+
+    def test_a_job_given_back_before_is_failed_by_the_queue(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        answered = dump_json_str({"job": queue_job(status="failed")})
+        with caplog.at_level("INFO"):
+            answering_queue = _settle_killed(
+                sourced_config, ending=MEMORY_ENDED, recorded=143, answered=answered
+            )
+
+        assert answering_queue.arguments[1]["action"] == "lost"
+        assert any(
+            ": ended for memory, the queue answered failed: " in record.getMessage()
+            for record in caplog.records
+        )

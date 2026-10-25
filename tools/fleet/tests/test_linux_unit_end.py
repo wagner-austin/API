@@ -32,6 +32,7 @@ from fleet.core.dialect_linux import (
 from fleet.core.linux_unit_end import (
     UNEXPLAINED_EXIT_CODE,
     UNIT_ENDED_MARKER,
+    killed_for_memory,
     unit_end_path,
     unit_end_script,
 )
@@ -87,6 +88,13 @@ class TestTheVerdictReadsTheEnding:
         assert read_unit_end(tail) == (
             f"{UNIT_ENDED_MARKER}: unit b ended with systemd result oom-kill (killed KILL) "
             "before the build wrote its status; recorded exit 137"
+        )
+
+    def test_a_windows_task_s_line_never_reads_as_ended_for_memory(self) -> None:
+        # The line a Windows node's result script appends (fleet.core.windows_result).
+        assert not killed_for_memory(
+            f"{UNIT_ENDED_MARKER}: task fleet-run ended with Task Scheduler state 3 (Ready) and "
+            "last result 0x00000001 before the build wrote its status; recorded exit 1"
         )
 
 
@@ -191,6 +199,37 @@ class TestTheScriptUnderSh:
 
         assert (tmp_path / names.RESULT_NAME).read_text(encoding="utf-8") == "0\n"
         assert log.read_text(encoding="utf-8") == "=== ALL CHECKS PASSED ===\n"
+
+    @pytest.mark.parametrize(
+        ("result", "exit_code", "exit_status", "code", "for_memory"),
+        [
+            # lavender's helper, a unit filled past its cap, 2026-10-25T14:50:49Z.
+            ("oom-kill", "killed", "TERM", 143, True),
+            # 859e7ab3's systemd-oomd kill on diphtheria, 2026-10-05.
+            ("oom-kill", "killed", "KILL", 137, True),
+            ("signal", "killed", "KILL", 137, False),
+            ("exit-code", "exited", "3", 3, False),
+            ("resources", "", "", UNEXPLAINED_EXIT_CODE, False),
+        ],
+    )
+    def test_the_line_the_script_writes_says_whether_memory_ended_the_unit(
+        self,
+        tmp_path: pathlib.Path,
+        result: str,
+        exit_code: str,
+        exit_status: str,
+        code: int,
+        for_memory: bool,
+    ) -> None:
+        _run_end(
+            tmp_path,
+            _environment(SERVICE_RESULT=result, EXIT_CODE=exit_code, EXIT_STATUS=exit_status),
+        )
+
+        line = _line(result, exit_code, exit_status, code).rstrip("\n")
+        log = (tmp_path / f"{names.RESULT_NAME}.log").read_text(encoding="utf-8")
+        assert read_unit_end(log) == line
+        assert killed_for_memory(line) is for_memory
 
     def test_an_exit_0_without_a_status_is_never_recorded_as_a_pass(
         self, tmp_path: pathlib.Path
