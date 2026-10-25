@@ -274,7 +274,7 @@ class TestABuildEndedForMemory:
         # The run itself ended: this machine's row for it is finished.
         assert "failed" in _ledger(sourced_config)
         assert any(
-            record.getMessage().endswith(f": ended for memory, the queue answered queued: {detail}")
+            record.getMessage().endswith(f": given back, the queue answered queued: {detail}")
             for record in caplog.records
         )
 
@@ -289,6 +289,6 @@ class TestABuildEndedForMemory:
 
         assert answering_queue.arguments[1]["action"] == "lost"
         assert any(
-            ": ended for memory, the queue answered failed: " in record.getMessage()
+            ": given back, the queue answered failed: " in record.getMessage()
             for record in caplog.records
         )
