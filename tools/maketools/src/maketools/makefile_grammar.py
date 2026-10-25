@@ -95,9 +95,9 @@ DIVERGENT: Final[Sequence[tuple[str, str]]] = (
 
 #: make functions that run the shell, banned anywhere in the file, and
 #: ``$(file ...)``, which GNU make added in 4.0: serendipity's GnuWin32 make
-#: 3.81 expands it to nothing, so ``--ref $(file <.githooks/mcps-harness.sha)``
-#: handed tools/ps-harness's first fleet run (job 2d949933, MCPs board task
-#: 939ec5c7) an empty ref. A recipe that reads a file calls a script.
+#: 3.81 expanded it to nothing, so ``--ref $(file <.githooks/mcps-harness.sha)``
+#: handed the PowerShell harness's first fleet run (job 2d949933, MCPs board
+#: task 939ec5c7) an empty ref. A recipe that reads a file calls a script.
 MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
     (r"\$\(shell\b", "$(shell ...) runs the platform shell"),
     (r"\$\(file\b", "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"),
@@ -111,9 +111,7 @@ MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
 #: that has no meaning off Windows (Task Scheduler registration) lives in
 #: such a block with an ``else`` arm that says so.
 #:
-#: Kept while loki stays a Windows node: its runner runs this lint on every
-#: tracked Makefile (tools/fleet-execution's and tools/ps-harness's
-#: ``lint``), and two of them still fence a Windows arm,
+#: Kept while two tracked Makefiles still fence a Windows arm,
 #: clients/RustedWarfareBot and services/grandma-api, whose own board tasks
 #: (0eae9619, 703fec5a) decide whether those arms run on loki. The last of
 #: the two to drop its arm deletes this fence and its cases (board task

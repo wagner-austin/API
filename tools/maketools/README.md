@@ -56,13 +56,16 @@ says why. Only `clients/RustedWarfareBot` and `services/grandma-api` still
 fence an arm, and their board tasks (`0eae9619`, `703fec5a`) decide whether
 it runs on loki; the last of the two to drop its arm deletes the fence.
 
-## The Windows arms are loki's
+## The Windows arms were loki's
 
-loki is the one Windows fleet node the operator keeps (2026-10-21), and its
-runner runs this package for the projects that require `windows`:
-`tools/fleet-execution`'s `test --host-execution` and `tools/ps-harness`'s
-`lint-makefiles` and `ps-harness`. So the launcher's job object, the CIM
-process table and the SIGTERM kill stay, each commented as loki's. This
+loki was the last Windows fleet node, and its runner ran this package for
+the projects that required `windows`: `tools/fleet-execution`'s
+`test --host-execution` and `tools/ps-harness`'s `lint-makefiles` and
+`ps-harness`. Both projects, the `ps-harness` command and loki's place in
+dispatch left on 2026-10-25 (board task `e705f08c`; the operator: "so no
+windows shit then ok"). The launcher's job object, the CIM process table
+and the SIGTERM kill, each commented as loki's, now run on no node, and
+their removal is filed as board task `11a47bc4`. This
 package's own check requires no tag, and `windows` is an exclusive dispatch
 tag, so the check runs on Linux nodes only and its suite carries no `win32`
 arm: it walks loki's arms through the seams. Every other Windows arm went

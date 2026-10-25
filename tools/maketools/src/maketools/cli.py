@@ -25,7 +25,6 @@ from maketools.lift import drifted_lifts, read_lift_lock, refresh_lifts
 from maketools.makefile_banner_rule import lint_banners
 from maketools.makefile_budget_rule import lint_budgets
 from maketools.makefile_grammar import lint_grammar, render_violation
-from maketools.ps_harness import run_pinned_harness
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
 from maketools.test_run import Runner, run_tests
 from maketools.venv_check import check_venv
@@ -245,19 +244,6 @@ def command_lift_refresh(arguments: Sequence[str]) -> int:
         f"{refreshed['revision']} and pinned"
     )
     return 0
-
-
-def command_ps_harness(arguments: Sequence[str]) -> int:
-    """``ps-harness``: MCPs' PowerShell harness over this repository at API's pin.
-
-    Args:
-        arguments: None expected.
-
-    Returns:
-        The harness's exit status (:func:`maketools.ps_harness.run_pinned_harness`).
-    """
-    require_no_arguments("ps-harness", arguments)
-    return run_pinned_harness(repository_root())
 
 
 def command_env(arguments: Sequence[str]) -> int:
@@ -497,7 +483,6 @@ COMMANDS: Final[Mapping[str, Callable[[Sequence[str]], int]]] = {
     "concurrent": command_concurrent,
     "lift-check": command_lift_check,
     "lift-refresh": command_lift_refresh,
-    "ps-harness": command_ps_harness,
     "env": command_env,
     "fan-out": command_fan_out,
     "compose-up": command_compose_up,
@@ -578,7 +563,6 @@ __all__ = [
     "command_lint_makefiles",
     "command_native_wheel",
     "command_poetry_build",
-    "command_ps_harness",
     "command_reap_stale",
     "command_require_tool",
     "command_test",

@@ -1,12 +1,14 @@
-"""A deploy ships only a commit its host code ran at, on both platforms.
+"""A deploy ships only a commit its host code ran at, on a Linux node.
 
 MCPs board task 465689f5, b6eb30c8's R3. MCPs' maketools publish-executed
 is tested there against the fleet queue's answers. What only this
 repository can pin is the chain that makes its answer mean something here:
-the deploy asks it for both execution projects, and each project's check
-runs tools/fleet's host cases rather than something that passes without
-them. That the fleet declares the two projects on their platforms is pinned
-beside the registry's decoder, in tools/fleet's test_execution_projects. A
+the deploy asks it for the execution project, and that project's check runs
+tools/fleet's host cases rather than something that passes without them.
+Until board task e705f08c it asked for a Windows node's project as well,
+which left with the fleet's last Windows node. That the fleet declares the
+project on Linux is pinned beside the registry's decoder, in tools/fleet's
+test_execution_projects. A
 service deploy also asks for tools/maketools-execution, whose check runs the
 real compose deploy of each covered service. A link lost from that chain
 passes every other check and stops the gate.
@@ -48,18 +50,16 @@ def _recipe(path: str, target: str) -> list[str]:
     return recipe
 
 
-def test_every_deploy_runs_the_gate_for_both_platforms() -> None:
+def test_every_deploy_runs_the_gate_for_the_linux_execution_project() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "\ninfra: commit-tasks executed services-executed\n" in makefile
     assert _recipe("Makefile", "executed") == [
-        "$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs "
-        "tools/fleet-execution .",
         "$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs "
         "tools/fleet-execution-linux .",
     ]
 
 
-def test_a_fleet_roll_moves_the_ref_only_after_both_suites_passed_at_head() -> None:
+def test_a_fleet_roll_moves_the_ref_only_after_the_suite_passed_at_head() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "\nfleet-roll: commit-tasks executed\n" in makefile
     # The ref is pushed once moved, forced since a roll may move it back, so a
