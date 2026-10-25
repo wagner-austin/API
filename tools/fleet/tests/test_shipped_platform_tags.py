@@ -10,8 +10,8 @@ barely any windows code."
 
 services/Model-Trainer, libs/cleargbm_rs and libs/covenant_nn held no
 Windows code (6c89be43). Of the 23 projects still requiring windows on
-2026-10-25 (e35812cc), eight held none either: services/procart-api and
-clients/TankpitBot/web passed make check on demure as they stood; Dashboards, Dashboards/rabbit,
+2026-10-25 (e35812cc), seven held none either: clients/TankpitBot/web
+passed make check on Linux as it stood; Dashboards, Dashboards/rabbit,
 metabolomics-dashboard and LSTM needed only their Makefiles ported from
 SHELL := powershell.exe to the two-shell form of API scripts/make/shell.mk
 (Dashboards 3418f26, metabolomics-dashboard aa6ad90, LSTM 2532210), with
@@ -99,6 +99,12 @@ WINDOWS_REASONS = {
         "PowerShell, and only its real cases cover it under the 100 percent gate; on Linux "
         "they fail spawnSync powershell.exe ENOENT"
     ),
+    "services/procart-api": (
+        "tests/test_scripts_live_preview.py opens a real pygame window to exercise the display "
+        "adapter, and a Linux fleet build has no display (fleet job a08291f3 on colossus: 'The "
+        "video driver did not add any displays'); it leaves windows when board task 5e5c6116 "
+        "gives Linux builds one"
+    ),
     "tools/fleet-execution": (
         "the Windows lane of tools/fleet's host cases, which run rendered PowerShell for "
         "real; tools/fleet-execution-linux is the Linux lane"
@@ -121,7 +127,6 @@ LINUX_PROJECTS = (
     "metabolomics-dashboard",
     "services/Model-Trainer",
     "services/grandma-api",
-    "services/procart-api",
 )
 
 
