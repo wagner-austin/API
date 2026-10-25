@@ -34,7 +34,7 @@ structural — a shared mutable environment with no lock — not a rogue killer.
 ```
 registry/         the workspace, split by concern (MCPs board task 4a78c916)
   machines/       the fleet's one roster, one file per machine, named by it
-                  (machines/loki.json is loki): who it is, how it is
+                  (machines/colossus.json is colossus): who it is, how it is
                   reached, and what dispatch may take from it (MCPs board
                   task e447de72; see "The roster" below)
   settings.json   fleet-wide settings: data paths, serve and poll seconds,
@@ -103,9 +103,9 @@ whether a tracked file differed and the exit code through MCPs
 audit's query learns which commit the hub ran.
 
 `fleet-run` returns as soon as the suite is running and does **not** wait for
-it. The build outlives the command because it is launched through the node's
-task scheduler rather than as a child of the ssh call — Windows OpenSSH puts
-that child in a job object that dies with the connection.
+it. The build outlives the command because it is launched as a transient
+systemd user unit, owned by the node's user manager rather than by the ssh
+call (see "One dialect: `sh`" below).
 
 **Something therefore has to go back and ask, and that is `fleet-collect`.**
 For every dispatch the ledger still calls running it reads the node's recorded
@@ -233,9 +233,9 @@ therefore four passes, in this order:
 3. **observe** — read every enabled worker's Claude Code session records
    (`~/.claude/sessions/<pid>.json`) over ssh and hand them to the board's
    session ledger through `task_session_observe`, keyed by the machine they
-   came from (MCPs board task `5a3865bf`). The script goes out in the
-   node's dialect, PowerShell or `sh`, chosen from the registry's
-   `platform` like every other remote act (board task `cd5010c4`). The hub
+   came from (MCPs board task `5a3865bf`). The script goes out as `sh`,
+   like every other remote act, the one dialect since the fleet's last
+   Windows node left it (board tasks `cd5010c4` and `e705f08c`). The hub
    is not visited: its own directory is recorded by `pcsession-mcp`. The
    machines visited are the roster's enabled workers, vpn-jumps and session
    hosts (`fleet.core.observe.observable`); with none, the tick logs that
@@ -353,8 +353,8 @@ alive on diphtheria by the account's `corvis-hub-runner.service` user unit
 (MCPs `scripts/host/lib/hub-runner.sh`, board task c39ee056; austinpc's two
 Windows instances are retired, board task edaabb43), runs every row of MCPs
 `scripts/fleet/hub-jobs.json` its machine's duties name, and its fleet rows
-expand to one job per node `registry/machines/` dispatches to, a second for
-one declaring `elevated`, and the hub's own. Each job runs `poetry run --
+expand to one job per node `registry/machines/` dispatches to and the hub's
+own. Each job runs `poetry run --
 python -m fleet.cli.tick` in `tools/fleet` as a transient unit bound to the
 runner's, fires on the multiples of 180 s since the epoch, runs one at a
 time, and is ended at its row's 2400 s deadline; each writes its log under
@@ -396,8 +396,8 @@ under one lock so a run is settled once. At the same pace the main thread
 lists the queued jobs (one `dispatch_list`) and runs the fill pass again
 when a job naming this node or no node has arrived since its last fill, or
 the watch has settled a run since then: the same fill pass, so a claim still
-goes through the probe, the tags, the leases, the owner reservation and the
-elevated yield. At each fire boundary, a multiple of 180 s since the epoch
+goes through the probe, the tags, the leases and the owner reservation. At
+each fire boundary, a multiple of 180 s since the epoch
 because the MCPs hub runner fires each tick there, as the scheduled tasks it
 replaced did from local midnight every 3 minutes, it runs the collect pass again, which renews every running
 job's queue lease as each start did. It hands over only 10 s before a
@@ -486,14 +486,7 @@ declaration: every claim names the projects the runner fits, each assessed
 against that declaration and the runner's tags, so the job's own tags only
 route it. The runner refuses `PROJECT_TAGS_MISMATCH` on claim only when a job
 requires a tag its project does not declare; a job naming fewer runs under
-the declaration. One routing gap needed its own ask (MCPs board task
-939ec5c7): the queue hands a runner carrying `elevated` only jobs requiring
-it, and no ordinary runner fits a project declaring it, so
-MCPs/scripts/ps-harness job 7c16305c, submitted with `[windows]` on
-2026-10-03, reached no runner for hours. An elevated runner whose lane
-matched nothing asks once more with its tags less `elevated`, for only the
-elevated projects it fits (`fleet.cli.node_claim.claim_untagged`), and its
-tick log names the missing tag. This workspace's declared `gpu` is held to
+the declaration. This workspace's declared `gpu` is held to
 the CUDA devices the fleet audit's inventory measures through `nvidia-smi`
 on every pass (its `roster.gpu` row, MCPs board task e447de72), so the
 tags the hub plans by are the devices the nodes have.
@@ -514,27 +507,12 @@ the setup can succeed. No node is pointed at the production cluster's
 `corvis_test` (measured 2026-09-26: sedona and serendipity both refuse the
 cluster's 6432 anyway), which would put the `corvis_app` credential on it.
 
-**sedona is the Windows testdb node** (MCPs board task daae17f2). On
-2026-10-02 eleven testdb jobs queued behind lavender-wsl, the one testdb lane
-diphtheria's production reservation left free, and every closure on the board
-waited on it. sedona's build account reaches Docker Desktop, so
-`scripts/install-windows-testdb.ps1` (pester-tested beside the renders) gives
-it the same container: it pulls `pgvector/pgvector:pg16-bookworm` under an
-empty docker config with only System32 on the PATH (Docker Desktop's
-credential helper refuses an ssh logon: "A specified logon session does not
-exist"), creates `corvis-fleet-testdb` on a loopback port with its data on
-tmpfs, and unpacks EDB's PostgreSQL 16.15 client `bin` (sha256-pinned) into
-`C:\fleet\pgsql-16.15\bin` on the account's PATH, for the `pg_isready` and
-`psql` the MCPs scripts call. Two Windows differences the lane needed: the
-Windows build puts Git for Windows' `bin` first on the PATH
-(`fleet.core.windows_build`), because `System32\bash.exe` is WSL's launcher
-and would run `bash scripts/testdb-setup.sh` in Docker Desktop's own distro;
-and Windows psql ignores every option after a positional argument, so MCPs'
-`ci-bootstrap-testdb.sh` names each database with `-d`. The Windows probe asks
-Docker Desktop for the container's image as the Linux probe asks its daemon
-(`fleet.core.windows_toolchain_probe`). If Docker Desktop is down (it starts
-at the account's logon), the probe answers `testdb=no=` and sedona simply
-claims no testdb job until it is back.
+**Every testdb node is a Linux one.** From 2026-10-02 (MCPs board task
+daae17f2) until board task e705f08c a Windows node could hold the same
+container through Docker Desktop, installed by `install-windows-testdb.ps1`;
+that installer, the Windows build and the Windows probe left with the
+fleet's last Windows node, so the container exists only where a Linux
+provisioner put it.
 
 **A testdb node also carries the gte-small model directory** (MCPs board
 tasks 1d8e2e0e, f7085447 and f28396f8). MCPs `packages/embed` and
@@ -545,13 +523,7 @@ huggingface.co. Every node's directory was filled by hand on 2026-10-07, and
 the two nodes that joined after it, colossus and loki, each failed their
 first mcp-proxy check with no directory at all on 2026-10-09. The linux
 provisioners fill it (MCPs `scripts/host/lib/fleet-node.sh`,
-`step_fleet_model_cache`); on a Windows node
-`scripts/install-windows-model-cache.ps1`, run over ssh as the build account
-beside the testdb installer, fetches the four files a feature-extraction
-pipeline opens into `C:\fleet\stage\cache\models\Xenova\gte-small` where the
-directory lacks them, through a `.partial` rename so an interrupted run
-leaves no half file, and refuses weights under 100 MB as a truncated copy; a
-rerun on a filled directory fetches nothing and measures the same.
+`step_fleet_model_cache`).
 
 **`corvis-fleet-testdb` is node-local** (MCPs board task c4fc4f3e). The
 workspace's `node_local_resources` lists the exclusive resources each node
@@ -619,9 +591,8 @@ that Windows code is converted to Linux.
 3f19c136). Every MCPs TypeScript project installs with a root `npm ci`, which
 rebuilds `hnswlib-node` under node-gyp, so every project in the registry
 whose install runs a plain `npm ci` requires `cxx` (`MCPs/execution`, which
-installs with `--ignore-scripts`, does not). A node's `cxx` is the VC tools
-component's `installationVersion` from vswhere on Windows, or
-`g++ -dumpfullversion` on Linux. Measured 2026-09-27: diphtheria has g++
+installs with `--ignore-scripts`, does not). A node's `cxx` is what
+`g++ -dumpfullversion` prints. Measured 2026-09-27: diphtheria has g++
 13.3.0, and no Windows node had the VC tools then, so those projects queued
 for diphtheria instead of failing in `npm ci` on a Windows node.
 
@@ -636,11 +607,10 @@ ruff, mypy, pytest, xdist and pytest_cov in one `-c` (MCPs board task
 ec895824). `hooks` routes MCPs `packages/claude-hooks`, whose check runs on
 the system interpreter as Claude Code runs the hooks and whose live suites
 reach the board through that route file; measured 2026-10-02, sedona carried
-the file and pendragon and serendipity did not. The package is two projects,
-`MCPs/packages/claude-hooks` (windows) and `MCPs/packages/claude-hooks-linux`
-(linux), because its suites keep a real arm per platform (MCPs board task
-c1832d51); diphtheria is the linux node carrying the tag, its pins installed
-by MCPs `scripts/host/lib/hooks-tools.sh`. A node with pip but without
+the file and pendragon and serendipity did not. The package is one project,
+`MCPs/packages/claude-hooks-linux`, since its Windows twin left the registry
+(MCPs board tasks c1832d51 and 5b040fdb); diphtheria is the node carrying
+the tag, its pins installed by MCPs `scripts/host/lib/hooks-tools.sh`. A node with pip but without
 the tools is offered `python -m pip install --user` at the versions the hub
 ran that check with; the route file only `install-hooks-node.py` writes.
 `go` is found the same way, asked `go version` because go has no `--version`
@@ -648,28 +618,22 @@ flag (MCPs board task 1da15750). It routes MCPs `rcs-bridge`, the Go half of
 the SMS gateway, which became a fleet project with `MCPs/sms-gateway` once an
 outage on 2026-10-05 showed a host process needed a check a closure could
 cite; no fleet node had go that day, and a node without it is offered
-`winget install --id GoLang.Go`, `choco install golang` or
 `sudo apt-get install -y golang-go` (any go from 1.21 fetches the 1.27.1
 toolchain the module names). `chrome` is Google Chrome at the path
-Playwright's channel `chrome` launches, `/opt/google/chrome/chrome` on Linux
-and `Google\Chrome\Application\chrome.exe` under a Program Files root on
-Windows, never looked for on a PATH it is not on (MCPs board task 2f596185).
+Playwright's channel `chrome` launches, `/opt/google/chrome/chrome`, never
+looked for on a PATH it is not on (MCPs board task 2f596185).
 It routes MCPs `web-scraper`, whose check launches that channel in three
 real-browser cases: diphtheria, a `cxx` node without Chrome, failed exactly
 those three on 2026-10-04 (fleet job 874c160c) and 2026-10-09 (56d7fbb5)
 and passed the other 490, so the verdict depended on which node claimed the
-suite. A node without it is offered `winget install --id Google.Chrome`,
-`choco install googlechrome` or the .deb Google ships, the same command
+suite. A node without it is offered the .deb Google ships, the same command
 `runners.json` provisions the asset with. `pdftotext` routes MCPs
 `packages/wiki-check`, whose audit rules read PDF sources through poppler's
-pdftotext and depend on its exact page breaks (MCPs board task 6dd73ada). On
-Linux it is found on the PATH and asked `-v`; on Windows the probe asks first
-for `C:\Program Files\Git\mingw64\bin\pdftotext.exe`, the Git for Windows
-build the package's Makefile puts first on PATH, and then the PATH. Every
-live runner had it on 2026-10-11, but nothing declared it and the roster's
-apt packages lacked poppler-utils; a node without it is offered
-`sudo apt-get install -y poppler-utils`, or Git for Windows through winget or
-choco. lavender, the runner host since its reimage to Ubuntu, gets go, ffmpeg and
+pdftotext and depend on its exact page breaks (MCPs board task 6dd73ada). It
+is found on the PATH and asked `-v`. Every live runner had it on 2026-10-11,
+but nothing declared it and the roster's apt packages lacked poppler-utils;
+a node without it is offered `sudo apt-get install -y poppler-utils`.
+lavender, the runner host since its reimage to Ubuntu, gets go, ffmpeg and
 pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
 `assets`, so a `--rebuild` keeps all four tags, and
 `test_runner_contracts.py` fails if a tagged tool apt can supply is missing
@@ -688,7 +652,7 @@ matched its declaration.
 939ec5c7). The capacity and toolchain probes are written to the node's stage
 root and run there, as `fleet-capacity-<writer>` and `fleet-toolchain-<writer>`
 (`fleet.core.names.capacity_probe_stem`): a runner writes as its runner name
-(`serendipity`, `serendipity-elevated`), and `fleet-run`, `fleet-nodes`,
+(`serendipity`), and `fleet-run`, `fleet-nodes`,
 `fleet-preflight` and `fleet-bootstrap` each as their own command name. Until
 2026-10-03 every caller wrote one `fleet-capacity.ps1` and one
 `fleet-toolchain.ps1` per node, and serendipity's two runners, which tick on
@@ -766,14 +730,12 @@ reads is the export of one commit and nothing else. Every project declares
 integrity lock offline instead of reading a second checkout (20e977b6).
 The companion transport remains available for projects that genuinely need it.
 
-**Every remote script ends at the first command that failed**, which one
-shell does by default and the other has to be asked to
-(`Dialect.checked_script`). Measured on sedona 2026-09-22: `powershell -File`
-exits 0 even when a native command in the script exited non-zero, so a `tar`
+**Every remote script ends at the first command that failed**
+(`fleet.core.dialect.checked_script`): `sh` scripts carry `set -e`. Measured
+on sedona 2026-09-22, when the fleet still sent PowerShell: `powershell -File`
+exited 0 even when a native command in the script exited non-zero, so a `tar`
 that unpacked nothing and a `git init` that never ran were both reported as a
-staged tree. PowerShell scripts now set `$ErrorActionPreference = 'Stop'` and
-check `$LASTEXITCODE` after every command; `sh` scripts carry `set -e`, which
-was always that rule.
+staged tree.
 
 `fleet-run` still dispatches the working tree (its own tarball, no sha) for
 the interactive case; the queue path never does.
@@ -794,7 +756,7 @@ task gets this runner's own post, in the `fleet` room addressed
 `@<submitter>`:
 
 ```
-FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% budget=within:41s/300s ended=2026-09-21T10:04:12Z log=lavender:C:/fleet/stage/<run>/result.txt.log run=<run>
+FLEET-CHECK 3f2a9c1e MCPs/packages/wiki-search sha=<40 hex> node=lavender exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% budget=within:41s/300s ended=2026-09-21T10:04:12Z log=lavender:/home/corvis/fleet/stage/logs/<run>.log run=<run>
 ```
 
 `banner` is whether `=== ALL CHECKS PASSED ===` appeared; `tests` and
@@ -847,17 +809,19 @@ the owner's reservation — never the other way round.
 never has to leave a core for the person sitting at the node.
 
 **The limit is the host's, not each runner's, and a node may say how many
-checks its CPUs carry** (MCPs board task a85ef09e). A node declaring
-`elevated` has two runner identities, two processes on the hub, and each
-used to charge the launches it had under way from its own memory, for the
-40 to 80 s before a run reaches the ledger. On 2026-10-07 serendipity (8
+checks its CPUs carry** (MCPs board task a85ef09e). A node that declared
+`elevated` had two runner identities, two processes on the hub, until the
+fleet's last Windows node left it (board task e705f08c), and each used to
+charge the launches it had under way from its own memory, for the 40 to 80
+s before a run reaches the ledger. On 2026-10-07 serendipity (8
 cores, 4 reserved) held three runs and 6 workers that way, and fleet job
 c858b46b's sms-gateway check ran 321 s of its 300 s budget. Now every claim
 under way is written to `runs/host-claims/<node>/<job>.json` until its
 launch ends (`fleet.core.host_claims`), every runner of the host charges all
 of them, and a claim pass runs inside the host's claim turn
-(`runs/host-claims/<node>.lock`), so the two runners claim one at a time and
-never both read the room one claim is about to take. The pool alone was
+(`runs/host-claims/<node>.lock`), so two processes claiming for one host,
+one runner's overlapping ticks included, claim one at a time and never both
+read the room one claim is about to take. The pool alone was
 still too generous there: fleet job 25d07c7c's sms-gateway check, granted
 2 of the 4 spare cores beside an execution-elevated run granted the other 2,
 took 306 s (build 73.7 s, suite 195.6 s) where it takes 162 s alone (build
@@ -913,8 +877,9 @@ its free memory, whether or not those workers have spawned yet, and what is left
 is granted. One grant is capped at `capacity.job_ceiling`, half the cores the
 owner leaves rounded up and never below the project's `minimum_workers`, so the
 first job leaves room for a second. On the fleet as declared on 2026-10-20 the
-ceiling is sedona and lacrymal 9, pendragon 7, loki 5, colossus and lavender 4,
-serendipity 3 and diphtheria 2, unless a project's minimum is higher.
+ceiling was sedona and lacrymal 9, pendragon 7, loki 5, colossus and lavender
+4, serendipity 3 and diphtheria 2, unless a project's minimum is higher;
+loki left the roster on 2026-10-25 (board task e705f08c).
 
 **A node running several jobs is never offered one its own lease file would
 refuse.** The projects a runner hands `dispatch_claim` are the ones that fit by
@@ -958,7 +923,7 @@ reads the roster the runner that launched it read.
 | field | what it says |
 |---|---|
 | `role` | `hub` (reaches everything else, runs the docker fleet), `vpn-jump` (holds the UCI VPN and proxies to hpc3; MUST have a Cloudflare tunnel, because a node holding the VPN loses its tailnet endpoint), `worker`, `session-host` (runs the operator's Claude Code sessions), or `client` (reaches the fleet, never provisioned by us: the phone) |
-| `platform`, `user` | the dialect every script to it is rendered in, and the account the fleet provisioned (null for a client) |
+| `platform`, `user` | `linux`, the one platform this package decodes since board task e705f08c, and the account the fleet provisioned (null for a client) |
 | `enabled`, `disabledUntil` | whether it is expected to answer at all, and the date a time-bound disable ends |
 | `tailnetIp`, `tunnel`, `reachKey`, `bootMac`, `duties`, `ciWorkersPerRunner` | how it is reached and what it holds, read by MCPs `fleet-mcp` |
 | `ledger_observer` | which arm records its sessions in the agent session ledger |
@@ -1012,9 +977,9 @@ guest now: the hub's ssh config reached it through lavender's sshd, which ran
 `nc` to `127.0.0.1:<sshPort>` inside the distro, and its sshd bound that
 loopback address alone. A guest has no tailnet device, so its `tailnetIp` is its
 host's, the tailnet policy owes it no hosts entry, and the audit judges its
-sshd bind and AllowUsers against 127.0.0.1. Here the guest's host is the
-node's `wsl_host`, which the decoder refuses unless it is a Windows node of
-the roster, and which the host report reads when the guest does not answer.
+sshd bind and AllowUsers against 127.0.0.1. This package read the guest's
+host as the node's `wsl_host` until board task e705f08c, which removed the
+field with the Windows platform; MCPs `fleet-mcp` still decodes `guest`.
 
 **`boot` is what a machine must bring back after a reboot** beyond sshd and
 Tailscale, which the audit holds every owned machine to without a
@@ -1178,17 +1143,21 @@ over Direct3D 11, refuses every other platform by name
 a frame every few seconds, so on a CPU-only or linux node it would not fail —
 it would time out, in a way that reads as a regression in the change under
 test. So a project declares what it needs, and the declaration is REQUIRED,
-`[]` for the ordinary suite any node may run:
+`[]` for the ordinary suite any node may run. slime required `gpu` and
+`windows` until board task e705f08c; with no Windows node left it requires
+`gpu`, and whether its check passes on a Linux node's card is that check's
+own answer, a Windows dependency it finds removed from slime, never answered
+with the tag:
 
 ```json
 "slime": {
-  "worker_ram_gb": 0.5, "minimum_workers": 4, "expected_minutes": 12,
-  "required_tags": ["gpu", "windows"]
+  "worker_ram_gb": 0.5, "minimum_workers": 4, "expected_minutes": 15,
+  "required_tags": ["gpu"]
 }
 ```
 
 **A node never declares tags.** Its tags are DERIVED from the two measured
-fields it already carries: `platform` gives `windows` or `linux`, and a `gpu`
+fields it already carries: `platform` gives `linux`, and a `gpu`
 that is a device rather than `null` gives `gpu` (`fleet.contracts.tags`). A
 declared `tags` column would be a second copy of those facts, and the copy is
 the one that drifts: a box whose card was pulled would keep its `gpu` tag
@@ -1204,17 +1173,18 @@ The planner checks tags **first**, before disk, cores and memory, and
 refuses with `NODE_LACKS_TAG` naming the tags missing:
 
 ```
-diphtheria lacks windows: the project requires gpu, windows and this node
-carries gpu, linux. Tags are derived from the node's declared platform and
-gpu, so the answer is another node, never this one later.
+colossus lacks gpu: the project requires gpu and this node carries linux.
+Tags come from the node's declaration and from the tools its toolchain probe
+found, so the answer is another node, or this one once the missing tool is
+installed.
 ```
 
 Auto-select skips such nodes, and when EVERY node that answered refused on
 its tags the fleet-wide refusal is `NODE_LACKS_TAG` too — nothing is full and
 waiting fixes nothing — while one tagged node that is merely busy keeps the
 capacity answer, because that node will take the work later. A project
-naming both platforms is refused at decode: no node is both, and the way to
-say "either" is to name neither.
+naming `windows` or `elevated` is refused at decode, since no node carries
+either after board task e705f08c.
 
 **`slime` is a project of another repository**, `github.com/wagner-austin/slime`
 (private, the same account as this one), not a path under `--repo-root`, so
@@ -1242,8 +1212,8 @@ which needs a C++ toolchain, and no Windows node carries Visual Studio's:
 dispatch job dd0b2ab3 failed on sedona with node v24.20.0 at `gyp ERR!
 find VS`, and de32d61e on serendipity the same way under node 18. Its only
 passes, 6c81f413 among them, ran on diphtheria, whose linux toolchain builds
-it. The tag says so rather than letting a Windows node claim a check it
-cannot install.
+it. The tag said so rather than letting a Windows node claim a check it
+could not install, until no Windows node was left (board task e705f08c).
 
 **`MCPs/execution-twin` requires `docker`** (MCPs board task 83b5c38f,
 2026-10-21). It is the execution workspace again, ending with MCPs
@@ -1476,34 +1446,13 @@ It **will** cancel a run whose lease has already lapsed. That is precisely the
 wedge case, and refusing because the lease is gone would leave the only tool
 that can stop it unable to.
 
-**A stop ends the build's whole process tree, not only its task.** Stopping a
-scheduled task ends the process the task started and leaves its children
-running: measured on sedona 2026-09-23, a probe whose `build.ps1` ran a native
-child read parent alive=False, child alive=True after `Stop-ScheduledTask`.
-So a Windows build writes its own `$PID` to `build.pid` as its first act, and
-the stop runs `taskkill /PID <pid> /T /F` on it, but only when the process
-holding that id is still running this dispatch's own `build.ps1`, read off
-its command line, because ids are reused. A Linux unit needs none of this:
-stopping it stops its control group.
-
-**`taskkill /T` walks parent links, so the build also contains itself**
-(MCPs board task e40bca34). A process whose parent has already exited is not
-in the tree `/T` walks. On sedona, run `MCPs-mcp-proxy-sedona-1791080670`
-hung in its test-database install step; the runner stopped it past its lease
-at 2026-10-04T02:57Z, and two `bash.exe` of `ci-bootstrap-testdb.sh` (pids
-8728 and 14792, parent 19568 gone) lived on holding the transcript cmd.exe's
-`>>` had handed them. Every retire after that stopped on `Move-Item`'s
-"being used by another process", and every tick of sedona's runner exited 1
-until the pair was ended by hand at 2026-10-05T04:44Z. So `build.ps1`, right
-after recording its `$PID`, puts itself in a kill-on-close job object
-(`fleet.core.windows_job`): every process the build starts is in the job
-whatever becomes of its parent, and when the build ends, by finishing or by
-the stop's `taskkill`, the kernel ends every process still in it. And the
-retire, before it moves the transcript, asks Restart Manager which processes
-hold it (`fleet.core.windows_holders`), logs each as
-`FLEET_RETIRE_HOLDER_ENDED: pid <n> <image> (<command line>)`, and ends it by
-pid after reading its start time again; a service or critical process is
-refused as `FLEET_RETIRE_HOLDER_PROTECTED`, by name, and never killed.
+**A stop ends the build's whole process tree, not only its task.** The
+build is a transient systemd user unit, and stopping it stops its control
+group, every process the build started whatever became of its parent. A
+Windows build needed a recorded `$PID`, `taskkill /T` and a kill-on-close
+job object for the same (measured on sedona 2026-09-23 and in MCPs board
+task e40bca34); all three left with the fleet's last Windows node (board
+task e705f08c).
 
 **The node runner stops two kinds of run by itself**, through the same
 `fleet.core.stop` path (MCPs board task fd5cabfa):
@@ -1545,49 +1494,33 @@ and `cmd` into `powershell`, and the second attempt arrived as
 side. `fleet.core.remote` renders the script, sends it over stdin, and runs it
 by path, so the bytes that run are the bytes that were sent.
 
-**And the rule applies one layer further in.** The first version passed the
-whole build to `New-ScheduledTaskAction -Argument '-Command "cd ''{path}''…"'`.
-PowerShell ended that single-quoted argument at the first inner quote, so the
-registered task carried `-Command "cd` as its arguments and the remaining two
-hundred characters as its **working directory** — a path that does not exist,
-so the task could not be started at all. Nothing failed loudly:
-`Start-ScheduledTask` reports a refusal as a *non-terminating* error,
-PowerShell exited 0, and the ledger recorded a run that did not exist.
+**And the rule applies one layer further in.** The first Windows version
+passed the whole build inside a scheduled task's `-Argument` string, and
+PowerShell ended it at the first inner quote, so the task could not start
+and the ledger recorded a run that did not exist. So the build is its own
+script file, sent and named by path, and the launch interpolates one path
+and no code.
 
-So the build is its own script file, sent and named by path, and the
-registration interpolates one path and no code. It then waits for the build
-to record its own process id, which `build.ps1` writes as its first act,
-before reporting a launch, because a registration that cannot start is not a
-dispatch. It waited for the task to leave `SCHED_S_TASK_HAS_NOT_RUN` until
-2026-09-27, which a task that fails to *start* also leaves, with its launch
-error, and so read as launched (MCPs board task d69786fa).
+## One dialect: `sh`
 
-`-AllowStartIfOnBatteries` and `-DontStopIfGoingOnBatteries` are on the
-settings for the same reason: `New-ScheduledTaskSettingsSet` defaults both to
-refusing, and two of the three nodes are laptops.
-
-## Two dialects, chosen by the node's declared `platform`
-
-Every node declares `platform` (`windows` or `linux`), and the identity
-registry declares the same field; the fleet audit's `roster.agrees` row
-fails a node the two disagree on, because every script goes out in the declared platform's dialect
-and the wrong one is a parse error on the far side that reads as the node's
-fault. `fleet.core.dialect` names the acts once as a protocol and
-`dialect_windows` / `dialect_linux` render each: how a file is written over
-ssh (`Set-Content` behind cmd's quoting, or `mkdir -p … && cat >`), how a
-script is run by path (`powershell -File` or `/bin/sh`), how the archive scp
-landed is digested (`Get-FileHash`, or `sha256sum`), how capacity is read (`Win32_OperatingSystem`, or
-`/proc/meminfo` and `df`), and how the suite is detached from the connection.
-On Linux that last one is a **transient systemd user unit**
+Every node declares `platform` `linux`, and the decoder refuses any other
+since board task e705f08c (the operator, 2026-10-25: "so no windows shit
+then ok"). The identity registry declares the same field; the fleet audit's
+`roster.agrees` row fails a node the two disagree on. `fleet.core.dialect`
+renders every act as `sh`: how a file is written over ssh (`mkdir -p … &&
+cat >`), how a script is run by path (`/bin/sh`), how the archive scp landed
+is digested (`sha256sum`), how capacity is read (`/proc/meminfo` and `df`),
+and how the suite is detached from the connection. Until that task it was
+one of two dialects behind a protocol, the other PowerShell. The detach is a
+**transient systemd user unit**
 (`systemd-run --user --unit=fleet-<run>`), the user manager's equivalent of a
 scheduled task: owned by the machine rather than the connection, stoppable by
 name, started or refused synchronously. It needs the account to **linger**
 (`sudo loginctl enable-linger <user>`), because a user manager stops with the
 user's last session otherwise and the unit would die with the ssh that started
-it; the launch script checks first and names that command. `tar -xzmf` and
-`git init` are the same on both and are spelled once. The Linux toolchain
-probe asks `python3` (what `scripts/make/shell.mk` calls there) and reports it
-under `python`, so the 3.11 requirement reads one report on every platform.
+it; the launch script checks first and names that command. The toolchain
+probe asks `python3` (what `scripts/make/shell.mk` calls) and reports it
+under `python`, the name the toolchain contract requires.
 
 ## What a lease can and cannot tell you
 
