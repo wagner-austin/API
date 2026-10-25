@@ -57,6 +57,6 @@ def test_without_its_line_the_stamp_is_listed(tmp_path: Path) -> None:
     kept = [line for line in rules.splitlines() if LOCK_DIRECTORY not in line]
     assert len(kept) < len(rules.splitlines())
     assert untracked("\n".join(kept) + "\n", tmp_path) == [
-        "?? .gitignore",
         f"?? {LOCK_DIRECTORY}/{STAMP}",
+        "?? .gitignore",
     ]
