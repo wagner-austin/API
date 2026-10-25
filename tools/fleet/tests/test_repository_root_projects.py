@@ -8,13 +8,15 @@ at ``origin/main``, so each
 carries MCPs as a companion at ``main``: the fleet clones it beside the export
 with ``origin/main`` at its real commit (fleet.core.dialect,
 companion_repository_commands). idle's check reads nothing beside it, and its
-browser project draws with WebGL in Chromium, so it takes slime's tags.
-tree-bot's and Dashboards/rabbit's checks read nothing beside them and run
-their recipes in PowerShell, so each takes a Windows node and installs
-through its own make check (MCPs board task ddd25310). LSTM's check is the
-same shape: PowerShell recipes, a poetry install inside make check, and no
+browser project draws with WebGL in Chromium, so it takes the gpu tag.
+tree-bot's and Dashboards/rabbit's checks read nothing beside them and
+install through their own make check (MCPs board task ddd25310); tree-bot's
+recipes are PowerShell, so it takes a Windows node, while rabbit's, like
+the Dashboards root's, metabolomics-dashboard's and LSTM's, run under
+either platform's shell since MCPs board task e35812cc, so none of those
+takes windows. LSTM's check is a poetry install inside make check with no
 repository beside it, since platform_core arrives as a git dependency
-(board task bc12f18b). It also takes the gpu tag, because its resume test
+(board task bc12f18b). It takes the gpu tag, because its resume test
 restores CUDA RNG states on the card, the only place the bug it guards
 reproduces; on serendipity, with no card, that left train.py at 99.67% and
 the check under its 100% floor (fleet job 1b48e90e). The Dashboards root's
@@ -47,7 +49,7 @@ MCPS_COMPANION = ProjectCompanion(
     [
         (
             "idle",
-            (NodeTag.GPU, NodeTag.WINDOWS),
+            (NodeTag.GPU,),
             (
                 NPM_CI,
                 InstallStep(phase="install", argv=("npx", "playwright", "install", "chromium")),
@@ -56,10 +58,10 @@ MCPS_COMPANION = ProjectCompanion(
         ),
         ("chat", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
         ("hardware-wiki", (), (), (MCPS_COMPANION,)),
-        ("metabolomics-dashboard", (NodeTag.WINDOWS,), (), (MCPS_COMPANION,)),
+        ("metabolomics-dashboard", (), (), (MCPS_COMPANION,)),
         ("corvis-stick", (NodeTag.WINDOWS,), (NPM_CI,), (MCPS_COMPANION,)),
         ("tree-bot", (NodeTag.WINDOWS,), (), ()),
-        ("LSTM", (NodeTag.GPU, NodeTag.WINDOWS), (), ()),
+        ("LSTM", (NodeTag.GPU,), (), ()),
     ],
 )
 def test_each_repository_s_root_check_is_declared_with_what_it_reads(
@@ -82,7 +84,7 @@ def test_each_repository_s_root_check_is_declared_with_what_it_reads(
 def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "Dashboards/rabbit")
-    assert project["required_tags"] == (NodeTag.WINDOWS,)
+    assert project["required_tags"] == ()
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/Dashboards.git",
         path="rabbit",
@@ -94,7 +96,7 @@ def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
 def test_the_dashboards_root_carries_the_validator_and_the_wikis_it_reads() -> None:
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "Dashboards")
-    assert project["required_tags"] == (NodeTag.WINDOWS,)
+    assert project["required_tags"] == ()
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/Dashboards.git",
         path="",
