@@ -20,8 +20,8 @@ be claimed. A reservation is attributable by construction: the work that
 holds the cores writes it, names itself, and says until when.
 
 THE FILE. One ``<id>.reservation`` per reservation in :data:`DIRECTORY`
-under the node account's home (``$HOME/.fleet/reservations`` on Linux,
-``%USERPROFILE%\\.fleet\\reservations`` on Windows), as ``key=value`` lines,
+under the node account's home (``$HOME/.fleet/reservations``), as
+``key=value`` lines,
 the shape the probe itself prints:
 
 * ``holder=`` who holds it, for the refusal a runner logs;

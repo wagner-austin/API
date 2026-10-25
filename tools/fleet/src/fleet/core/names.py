@@ -1,16 +1,15 @@
 """What a dispatch's directory on a node is called, file by file.
 
-ONE SPELLING, SHARED BY EVERY DIALECT AND EVERY LIFECYCLE STEP. The build
-writes the result file, the collector reads it, the stager lands the archive
-and the digest script reads it; the dispatch registers a task or unit
-by name and the cancel stops it by the same name. Each of those pairs used to
-spell its name in two places, and the task name in particular was separately
-spelled by the launch and the cancel -- one rename away from a cancel that
-reported success having stopped nothing. These are the names, once.
+ONE SPELLING, SHARED BY EVERY LIFECYCLE STEP. The build writes the result
+file, the collector reads it, the stager lands the archive and the digest
+script reads it; the dispatch starts a unit by name and the cancel stops it
+by the same name. Each of those pairs used to spell its name in two places,
+and the task name in particular was separately spelled by the launch and the
+cancel -- one rename away from a cancel that reported success having stopped
+nothing. These are the names, once.
 
-Extensions are NOT here: a script is ``.ps1`` on one platform and ``.sh`` on
-the other, and :meth:`fleet.core.dialect.Dialect.script_path` adds the right
-one to a stem. The names below that are scripts are therefore stems.
+Extensions are NOT here: :func:`fleet.core.dialect.script_path` adds ``.sh``
+to a stem. The names below that are scripts are therefore stems.
 """
 
 from __future__ import annotations
@@ -23,23 +22,11 @@ from __future__ import annotations
 #: it as ``<RESULT_NAME>.log``.
 RESULT_NAME = "result.txt"
 
-#: Where a Windows build records its own process id, under its directory.
-#:
-#: THE STOP NEEDS THE BUILD'S PROCESS, NOT ONLY ITS TASK. Stopping the
-#: scheduled task ends the process the task started and nothing below it:
-#: measured on sedona 2026-09-23, a task whose ``build.ps1`` ran a native
-#: child read parent alive=False, child alive=True after
-#: ``Stop-ScheduledTask``, which is how a cancelled slime run's vitest held
-#: sedona for four hours. The build writes ``$PID`` here as its first act so
-#: the stop can end that tree by id. A Linux unit needs no such file: stopping
-#: it stops its whole control group.
-PID_NAME = "build.pid"
-
 #: The payload as scp lands it, under a dispatch's directory or a companion's
 #: staging directory: an export's ``git archive``, or since MCPs board task
-#: 2026dfbc a companion's ``git bundle``. One name for both because both
-#: dialects' digest scripts read it; git reads a bundle by its contents, so
-#: the ``.tgz`` spelling misleads a reader but no tool.
+#: 2026dfbc a companion's ``git bundle``. One name for both because the
+#: digest script reads it; git reads a bundle by its contents, so the
+#: ``.tgz`` spelling misleads a reader but no tool.
 ARCHIVE_NAME = "tree.tgz"
 
 #: The script that runs the suite, which is all it does.
@@ -87,10 +74,6 @@ COMPANION_REPOSITORY_STEM = "companion-repo"
 #: ``init-repo.sh`` as tracked host scripts the repository does not have
 #: (FLEET-CHECK 8c1abde3, MCPs board task a8ee9b21).
 STAGE_SUFFIX = ".stage"
-
-#: The directory under a dispatch's staging directory that a Windows build's
-#: ``TEMP`` and ``TMP`` name (:func:`temp_directory`).
-TEMP_DIRECTORY = "temp"
 
 #: The install script, under a node's stage root.
 INSTALL_STEM = "fleet-install"
@@ -159,24 +142,15 @@ REGISTRY_DIRECTORY = "registry"
 REGISTRY_ARCHIVE_DIRECTORY = "registry-archive"
 
 #: The variable, and its value, that turn poetry's keyring off in every build,
-#: Linux and Windows, the runner's own and the isolated one alike. Every
-#: project the fleet builds installs from PyPI with no private index, so
-#: nothing needs a stored credential, and on a node's runner the keyring is
-#: either never answered or not there:
-#:
-#: - Linux (MCPs board task c837fd8d): poetry asks the SecretService over
-#:   D-Bus before it installs anything, and a headless node never answers.
-#:   Measured on diphtheria on 2026-09-30, ``poetry install --with dev`` sat
-#:   at ``Using keyring backend 'SecretService Keyring'`` for over ten minutes
-#:   at 0.1 percent CPU, so two doc-extract-api checks timed out before any
-#:   test ran; with this set the install finished in 144 s.
-#: - Windows (MCPs board task 65bb90c3): the runner's task has no logon
-#:   session, so the Credential Manager read in poetry's install preflight
-#:   fails with ``(1312, 'CredRead', 'A specified logon session does not
-#:   exist.')`` and the install exits 1 whenever poetry has a package to
-#:   download. Measured on serendipity from 2026-10-17T00:04Z, when
-#:   ast-serialize 0.13.1 reached PyPI: MCPs' execution-elevated suite failed
-#:   at every head after 3c1f26273, so no head was proven.
+#: the runner's own and the isolated one alike. Every project the fleet
+#: builds installs from PyPI with no private index, so nothing needs a stored
+#: credential, and on a node's runner the keyring is never answered (MCPs
+#: board task c837fd8d): poetry asks the SecretService over D-Bus before it
+#: installs anything, and a headless node never answers. Measured on
+#: diphtheria on 2026-09-30, ``poetry install --with dev`` sat at ``Using
+#: keyring backend 'SecretService Keyring'`` for over ten minutes at 0.1
+#: percent CPU, so two doc-extract-api checks timed out before any test ran;
+#: with this set the install finished in 144 s.
 POETRY_KEYRING_OFF = ("POETRY_KEYRING_ENABLED", "false")
 
 #: The variable, and its value, that put every build's poetry virtualenv in
@@ -326,26 +300,6 @@ def reset_directory_stem(directory: str) -> str:
     return f"reset-{directory}"
 
 
-def temp_directory(target: str) -> str:
-    """Where a Windows build points ``TEMP`` and ``TMP``, beside its export.
-
-    THE RUN'S OWN, NOT THE ACCOUNT'S (MCPs board task c5fbb546). Git for
-    Windows mounts ``/tmp`` on the process's ``TEMP``, and a build inherited
-    the account's one Temp, shared with every other build and session on the
-    node: fleet job adf3995a on pendragon (2026-10-18) failed 21 cases because
-    Git Bash could not find ``/tmp`` for part of the run while that directory
-    stood. Under the staging directory, not the export, because the export is
-    read as a commit and suites walk it; the retire removes both.
-
-    Args:
-        target: The dispatch's absolute remote directory, the export root.
-
-    Returns:
-        ``<target>.stage/<TEMP_DIRECTORY>``.
-    """
-    return f"{staging_directory(target)}/{TEMP_DIRECTORY}"
-
-
 def recipe_directory(target: str, path: str) -> str:
     """Where a project's recipe runs inside its export.
 
@@ -361,20 +315,19 @@ def recipe_directory(target: str, path: str) -> str:
 
 
 def task_name(run_id: str) -> str:
-    """Name the scheduled task or transient unit a dispatch owns.
+    """Name the transient unit a dispatch owns.
 
     Derived from the run id rather than from the stage path, so the name a
-    dispatch registers and the name the cancel stops are the same string
+    dispatch starts and the name the cancel stops are the same string
     produced by the same function.
 
     Args:
         run_id: The dispatch.
 
     Returns:
-        The name, valid as a Task Scheduler task name and as a systemd unit
-        name (a run id is a project path with its slashes replaced, a node
-        name and an epoch second, so it carries only word characters and
-        hyphens).
+        The name, valid as a systemd unit name (a run id is a project path
+        with its slashes replaced, a node name and an epoch second, so it
+        carries only word characters and hyphens).
     """
     return f"fleet-{run_id}"
 
@@ -396,25 +349,8 @@ def make_directory_stem(name: str) -> str:
     return f"mkdir-{name}"
 
 
-def runner_name(alias: str, *, elevated: bool) -> str:
-    """Name one of a node's runners: the node itself, or its elevated lane.
-
-    The name a runner's tick log, its scheduled task's stem and its probe
-    scripts carry, so the two runners of a node that declares ``elevated``
-    never share one of them.
-
-    Args:
-        alias: The node's workspace name.
-        elevated: Whether this is the node's elevated runner.
-
-    Returns:
-        ``<alias>`` or ``<alias>-elevated``.
-    """
-    return f"{alias}-elevated" if elevated else alias
-
-
-def node_runner_label(alias: str, *, elevated: bool) -> str:
-    """The board label one of a node's runners acts as.
+def node_runner_label(alias: str) -> str:
+    """The board label a node's runner acts as.
 
     The one spelling of it: the runner checks in and ticks under it
     (:func:`fleet.cli.node_agent.node_identity`), and the hub's registry
@@ -423,12 +359,11 @@ def node_runner_label(alias: str, *, elevated: bool) -> str:
 
     Args:
         alias: The node's workspace name.
-        elevated: Whether this is the node's elevated runner.
 
     Returns:
-        ``fleet-node-<alias>`` or ``fleet-node-<alias>-elevated``.
+        ``fleet-node-<alias>``.
     """
-    return f"fleet-node-{runner_name(alias, elevated=elevated)}"
+    return f"fleet-node-{alias}"
 
 
 def capacity_probe_stem(writer: str) -> str:
@@ -437,15 +372,13 @@ def capacity_probe_stem(writer: str) -> str:
     ONE PATH PER WRITER, never one per node. Every caller that asks a node
     what it has free writes the same constant script and runs it, and two
     callers asking the same node at once both wrote one file: on 2026-10-03
-    serendipity's node and elevated runners, scheduled on the same minute,
-    collided on it every tick (``The process cannot access the file ...
-    because it is being used by another process``; ``Set-Content : Stream
-    was not readable``), so neither read the node and it claimed nothing
-    with 11.5 GB free (MCPs board task 939ec5c7).
+    serendipity's two runners, scheduled on the same minute, collided on it
+    every tick, so neither read the node and it claimed nothing with 11.5 GB
+    free (MCPs board task 939ec5c7).
 
     Args:
-        writer: Who sends it: a runner's :func:`runner_name`, or the command
-            that probes (``fleet-run``, ``fleet-nodes``, ``fleet-preflight``).
+        writer: Who sends it: a runner's node, or the command that probes
+            (``fleet-run``, ``fleet-nodes``, ``fleet-preflight``).
 
     Returns:
         The stem.
@@ -461,8 +394,8 @@ def toolchain_probe_stem(writer: str) -> str:
     colliding on.
 
     Args:
-        writer: Who sends it: a runner's :func:`runner_name`, or the command
-            that probes (``fleet-bootstrap``).
+        writer: Who sends it: a runner's node, or the command that probes
+            (``fleet-bootstrap``).
 
     Returns:
         The stem.
@@ -535,11 +468,9 @@ __all__ = [
     "LAUNCH_STEM",
     "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
-    "PID_NAME",
     "POETRY_IN_PROJECT",
     "RESULT_NAME",
     "STAGE_SUFFIX",
-    "TEMP_DIRECTORY",
     "TOOL_CACHES_DIRECTORY",
     "UNINSTALL_STEM",
     "cache_root",
@@ -555,11 +486,9 @@ __all__ = [
     "retained_log_path",
     "retire_stem",
     "root_script_stems",
-    "runner_name",
     "stage_name",
     "staging_directory",
     "stop_stem",
     "task_name",
-    "temp_directory",
     "toolchain_probe_stem",
 ]

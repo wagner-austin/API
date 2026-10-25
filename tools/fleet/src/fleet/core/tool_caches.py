@@ -141,37 +141,11 @@ def sh_build_lines(*, tools: str, marker: str, run_as: str) -> tuple[str, ...]:
     )
 
 
-def powershell_build_lines() -> tuple[str, ...]:
-    """The lines a Windows build runs before its first install step.
-
-    Returns:
-        The lines, over the build script's ``$CacheRoot`` and ``$Target``.
-        They leave ``$toolCache`` naming the generation the build reads.
-    """
-    return (
-        f'$tools = "$CacheRoot/{names.TOOL_CACHES_DIRECTORY}"',
-        f'$currentFile = "$tools/{names.CURRENT_GENERATION_NAME}"',
-        "[void][System.IO.Directory]::CreateDirectory($tools)",
-        "$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()",
-        "if (-not (Test-Path -LiteralPath $currentFile) -or "
-        "($now - [long](Get-Content -LiteralPath $currentFile -Raw).Trim()) "
-        f"-ge {GENERATION_SECONDS}) {{",
-        '    [void][System.IO.Directory]::CreateDirectory("$tools/$now")',
-        '    [System.IO.File]::WriteAllText("$tools/$now/.pending", "$now")',
-        '    Move-Item -LiteralPath "$tools/$now/.pending" -Destination $currentFile -Force',
-        "}",
-        "$generation = (Get-Content -LiteralPath $currentFile -Raw).Trim()",
-        f'[System.IO.File]::WriteAllText("$Target/{names.GENERATION_MARKER_NAME}", $generation)',
-        '$toolCache = "$tools/$generation"',
-    )
-
-
 __all__ = [
     "GENERATION_DAYS",
     "GENERATION_SECONDS",
     "REMOVAL_GRACE_SECONDS",
     "SH_REMOVE_UNUSED",
-    "powershell_build_lines",
     "sh_build_lines",
     "tool_caches_directory",
 ]

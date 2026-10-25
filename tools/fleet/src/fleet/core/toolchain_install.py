@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.toolchain import (
     ToolReport,
     available_managers,
@@ -30,9 +30,7 @@ from fleet.core import dialect, names, remote
 from fleet.core.toolchain import probe_toolchain
 
 
-def install_script(
-    tools: tuple[str, ...], managers: tuple[str, ...], *, platform: NodePlatform
-) -> str:
+def install_script(tools: tuple[str, ...], managers: tuple[str, ...]) -> str:
     """Render the script that installs the named tools on one node.
 
     Args:
@@ -40,12 +38,9 @@ def install_script(
             one of ``managers`` -- :func:`installable` is what guarantees
             that, and calling this with anything else is a caller error.
         managers: That node's available package managers, in preference
-            order. Taken as an argument rather than looked up, because the
-            same missing ``make`` is a winget command on lavender and a choco
-            one on loki, and this function must not guess which node it is
-            rendering for.
-        platform: The node's declared platform, for the echo that precedes
-            each command.
+            order. Taken as an argument rather than looked up, because nodes
+            carry different managers, and this function must not guess which
+            node it is rendering for.
 
     Returns:
         The script's text, one command per tool, each preceded by an echo so
@@ -59,12 +54,10 @@ def install_script(
             with no explanation.
     """
     commands = tuple((name, install_command(name, managers)) for name in tools)
-    return _manager_script(commands, managers, verb="install", platform=platform)
+    return _manager_script(commands, managers, verb="install")
 
 
-def uninstall_script(
-    tools: tuple[str, ...], managers: tuple[str, ...], *, platform: NodePlatform
-) -> str:
+def uninstall_script(tools: tuple[str, ...], managers: tuple[str, ...]) -> str:
     """Render the script that removes tools :func:`install_script` installed.
 
     Args:
@@ -72,7 +65,6 @@ def uninstall_script(
         managers: The node's available package managers, in preference
             order: the same tuple the install was rendered with, so each
             removal goes through the manager that installed the tool.
-        platform: The node's declared platform.
 
     Returns:
         The script's text, one echo and one command per tool.
@@ -82,15 +74,11 @@ def uninstall_script(
             as :func:`install_script` refuses it.
     """
     commands = tuple((name, uninstall_command(name, managers)) for name in tools)
-    return _manager_script(commands, managers, verb="uninstall", platform=platform)
+    return _manager_script(commands, managers, verb="uninstall")
 
 
 def _manager_script(
-    commands: tuple[tuple[str, str], ...],
-    managers: tuple[str, ...],
-    *,
-    verb: str,
-    platform: NodePlatform,
+    commands: tuple[tuple[str, str], ...], managers: tuple[str, ...], *, verb: str
 ) -> str:
     """Render one package-manager command per tool, each after an echo.
 
@@ -98,7 +86,6 @@ def _manager_script(
         commands: Each tool's name and its command, empty when it has none.
         managers: The managers the commands were chosen from, for the refusal.
         verb: ``install`` or ``uninstall``, for the echo and the refusal.
-        platform: The node's declared platform.
 
     Returns:
         The script's text.
@@ -106,7 +93,6 @@ def _manager_script(
     Raises:
         ValueError: If a tool's command is empty.
     """
-    spoken = dialect.for_platform(platform)
     lines: list[str] = []
     for name, command in commands:
         if not command:
@@ -114,7 +100,7 @@ def _manager_script(
                 f"{name!r} has no {verb} command for managers {managers}; "
                 "installable() is what filters these and it was not consulted"
             )
-        lines.append(spoken.echo_command(f"{verb}ing {name}"))
+        lines.append(dialect.echo_command(f"{verb}ing {name}"))
         lines.append(command)
     return "\n".join(lines) + "\n"
 
@@ -123,9 +109,8 @@ def installable(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
     """Name the absent tools this node can have installed automatically.
 
     Node-specific in two ways at once: which tools are absent, and which
-    managers are present to install them. Measured 2026-09-04, lavender had
-    only winget and loki only choco, so a fleet-wide answer to this question
-    does not exist.
+    managers are present to install them, so a fleet-wide answer to this
+    question does not exist.
 
     Args:
         reports: What a node answered, covering both the required tools and
@@ -134,9 +119,9 @@ def installable(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
     Returns:
         The absent tools with a command for a manager this node has. A tool
         is left out when the package knows no command for it on this node's
-        managers -- tar carries none, and python and node none for apt-get
-        -- and also when the node lacks the manager that command needs,
-        which is a gap to report rather than a failure to raise.
+        managers -- tar, python and node carry none -- and also when the
+        node lacks the manager that command needs, which is a gap to report
+        rather than a failure to raise.
     """
     managers = available_managers(reports)
     return tuple(name for name in missing(reports) if install_command(name, managers))
@@ -179,12 +164,10 @@ def install_missing(
     if not tools:
         return reports
     managers = available_managers(reports)
-    spoken = dialect.for_platform(node["platform"])
     outcome = remote.attempt_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.INSTALL_STEM),
-        install_script(tools, managers, platform=node["platform"]),
-        platform=node["platform"],
+        dialect.script_path(node["stage_root"], names.INSTALL_STEM),
+        install_script(tools, managers),
     )
     failure = outcome["failure"]
     if failure is not None:
@@ -231,12 +214,10 @@ def rollback_install(
     landed = tuple(name for name in tools if name in present)
     if not landed:
         return ()
-    spoken = dialect.for_platform(node["platform"])
     remote.run_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.UNINSTALL_STEM),
-        uninstall_script(landed, managers, platform=node["platform"]),
-        platform=node["platform"],
+        dialect.script_path(node["stage_root"], names.UNINSTALL_STEM),
+        uninstall_script(landed, managers),
     )
     remaining = _present_names(probe_toolchain(node, writer=writer))
     stuck = tuple(name for name in landed if name in remaining)

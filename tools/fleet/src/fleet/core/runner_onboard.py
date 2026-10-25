@@ -38,8 +38,7 @@ from __future__ import annotations
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import NodePlatform
-from fleet.contracts.runner_registration import LINUX_UNIT_SUFFIX, runner_service_name
+from fleet.contracts.runner_registration import runner_service_name
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
@@ -107,7 +106,7 @@ def plan_onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
     install = RunnerInstall(
         repo=repo,
         runner_name=name,
-        service=runner_service_name(repo, name, unit_suffix=LINUX_UNIT_SUFFIX),
+        service=runner_service_name(repo, name),
         workdir=f"/home/{RUNNER_ACCOUNT}/actions-runner-{_repo_slug(repo)}-1/_work",
         labels=[name],
     )
@@ -144,7 +143,6 @@ def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFin
         spec["host"],
         payload_path(spec, f"fleet-onboard-{_repo_slug(repo)}"),
         runner_render.render_provision_script(spec, {repo: token}),
-        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     outcome = runner_audit.attempt_audit_host(spec)

@@ -2,14 +2,12 @@
 
 THE SCRIPT IS SENT AND RUN BY PATH, never interpolated into a command line --
 see :mod:`fleet.core.remote` for the two failed attempts that established the
-rule. The body is the node's dialect's CONSTANT (:mod:`fleet.core.dialect`):
+rule. The body is a CONSTANT (:data:`fleet.core.dialect.CAPACITY_PROBE_SCRIPT`):
 nothing is substituted into it by this package, so there is no value that
-could carry a quote into a shell. The braces the PowerShell one contains are
-its own format operator, evaluated on the far side after the bytes have
-arrived, and are never seen by Python.
+could carry a quote into a shell.
 
 WHAT IT REPORTS AND WHAT IT DOES NOT. Free memory and free disk, and nothing
-about processes. It would be easy to count the node's ``python.exe`` instances
+about processes. It would be easy to count the node's ``python`` instances
 and call that its load; that number is unattributable -- some are the owner's
 editor, some are another tool's -- and acting on it would make the fleet's
 behaviour depend on software it does not manage. Live fleet runs come from the
@@ -18,8 +16,7 @@ fleet does not run is charged only when it declares itself in a reservation
 file, which names its holder (:mod:`fleet.core.reservations`, MCPs board task
 84a2b690), so what the probe reports is still attributable.
 
-THE OUTPUT FORMAT IS KEY=VALUE LINES, one per field, parsed strictly, and it is
-the same shape from both dialects so this module parses one thing. Not JSON,
+THE OUTPUT FORMAT IS KEY=VALUE LINES, one per field, parsed strictly. Not JSON,
 because the node renders it with shell string formatting and a malformed
 number would produce malformed JSON that fails with a parser message instead of
 a field name. Not positional, because a reordered script would silently swap
@@ -41,27 +38,30 @@ from fleet.contracts.action_cache import PROBE_FIELDS, ActionCacheCounts, incons
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote, reservations
 
+#: The share of the last minute a runnable task waited for a CPU (MCPs board
+#: task 2ce5dc13).
+PRESSURE_FIELD = "cpu_pressure_pct"
+
+#: The share of the last minute a task stalled on I/O (MCPs board task
+#: 814c4555).
+IO_PRESSURE_FIELD = "io_pressure_pct"
+
 #: The numeric fields a node must report before anything can be decided about
 #: it; ``reserved_cores`` since MCPs board task 84a2b690, the cores its
-#: reservations hold (:mod:`fleet.core.reservations`).
-REQUIRED_FIELDS = ("free_ram_gb", "free_disk_gb", reservations.RESERVED_CORES_FIELD)
+#: reservations hold (:mod:`fleet.core.reservations`), and the two pressure
+#: readings, which every probe has printed since the fleet's last Windows
+#: node, whose kernel kept no such account, left it (board task e705f08c).
+REQUIRED_FIELDS = (
+    "free_ram_gb",
+    "free_disk_gb",
+    reservations.RESERVED_CORES_FIELD,
+    PRESSURE_FIELD,
+    IO_PRESSURE_FIELD,
+)
 
 #: The pair a node reports only when it runs a ``runners.slice`` (MCPs board
 #: task 5d6e57e7): both or neither, since one script line prints both.
 SLICE_FIELDS = ("ci_slice_current_gb", "ci_slice_high_gb")
-
-#: The CPU pressure every linux probe prints and no Windows one does (MCPs
-#: board task 2ce5dc13): absent means the dialect keeps no such account, and
-#: present but not a number refuses the node like any other field.
-PRESSURE_FIELD = "cpu_pressure_pct"
-
-#: The I/O pressure every linux probe prints beside it (MCPs board task
-#: 814c4555). The two are one account, both or neither: one without the
-#: other is a probe that did not run as written, and refuses the node.
-IO_PRESSURE_FIELD = "io_pressure_pct"
-
-#: Both pressure readings, in the order the probe prints them.
-PRESSURE_FIELDS = (PRESSURE_FIELD, IO_PRESSURE_FIELD)
 
 
 class ProbeOutcome(TypedDict):
@@ -111,10 +111,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         )
     readings: dict[str, float] = {}
     sliced = any(key in fields for key in SLICE_FIELDS)
-    pressured = any(key in fields for key in PRESSURE_FIELDS)
-    for key in (
-        REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()) + (PRESSURE_FIELDS if pressured else ())
-    ):
+    for key in REQUIRED_FIELDS + (SLICE_FIELDS if sliced else ()):
         value = _read_number(fields, key)
         if value is None:
             return ProbeOutcome(state=None, reason=_unreadable(host, fields, key, output))
@@ -147,8 +144,8 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             ci_slice=ci_slice,
             reserved_cores=int(reserved_cores),
             action_cache=action_cache,
-            cpu_pressure_pct=readings[PRESSURE_FIELD] if pressured else None,
-            io_pressure_pct=readings[IO_PRESSURE_FIELD] if pressured else None,
+            cpu_pressure_pct=readings[PRESSURE_FIELD],
+            io_pressure_pct=readings[IO_PRESSURE_FIELD],
         ),
         reason="",
     )
@@ -160,7 +157,7 @@ def _read_action_cache(
     """Read a runner host's action cache counts, all four or none.
 
     A node prints them only when it publishes fresh counts
-    (:data:`fleet.core.dialect_linux.CAPACITY_PROBE_SCRIPT`), and its root
+    (:data:`fleet.core.dialect.CAPACITY_PROBE_SCRIPT`), and its root
     timer writes all four in one file, so one without the others means the
     file or the probe did not run as written.
 
@@ -210,7 +207,7 @@ def parse_probe(host: str, output: str, *, live: LiveLoad) -> NodeState:
             "unparsable" because that is what it means operationally: the
             node answered, but not with its state, so nothing can be decided
             about it. The message names the field and shows the output, since
-            the usual cause is a PowerShell error printed where a number was
+            the usual cause is a shell error printed where a number was
             expected.
     """
     outcome = read_state(host, output, live=live)
@@ -223,9 +220,9 @@ def parse_probe(host: str, output: str, *, live: LiveLoad) -> NodeState:
 def _read_fields(output: str) -> dict[str, str]:
     """Split key=value lines into a mapping.
 
-    A line without an ``=`` is skipped rather than refused: PowerShell writes
-    warnings to the same stream, and a warning that does not displace a field
-    has not broken anything. A line whose key is absent IS refused, by
+    A line without an ``=`` is skipped rather than refused: a login banner or
+    a warning can reach the same stream, and one that does not displace a
+    field has not broken anything. A line whose key is absent IS refused, by
     :func:`read_state`, which is where the failure belongs.
 
     Args:
@@ -253,12 +250,9 @@ def _read_number(fields: dict[str, str], key: str) -> float | None:
         The value, or None when the field is missing or is not a number.
     """
     raw = fields.get(key)
-    if raw is None:
+    if raw is None or not _is_number(raw):
         return None
-    cleaned = raw.replace(",", "")
-    if not _is_number(cleaned):
-        return None
-    return float(cleaned)
+    return float(raw)
 
 
 def _unreadable(host: str, fields: dict[str, str], key: str, output: str) -> str:
@@ -266,7 +260,7 @@ def _unreadable(host: str, fields: dict[str, str], key: str, output: str) -> str
 
     Two messages rather than one, because they send a reader different ways: a
     MISSING field means the script did not run as written, while a field
-    holding something that is not a number usually means PowerShell printed an
+    holding something that is not a number usually means a command printed an
     error where the value should have been. The node's whole answer is quoted
     either way, since that is what tells them apart.
 
@@ -324,18 +318,13 @@ def attempt_probe(node: NodeConfig, *, live: LiveLoad, writer: str) -> ProbeOutc
     Returns:
         Its live state, or why nothing could be read from it.
     """
-    # The probe lives under the stage root rather than the node's TEMP:
-    # ``$env:TEMP`` would not be expanded inside the single-quoted literal
-    # the writer uses, so the node would grow a directory of that name. The
-    # writer creates the parent, so nothing has to exist before the first
-    # probe. The script is the platform's constant; nothing is substituted
-    # into it, so nothing can be injected.
-    spoken = dialect.for_platform(node["platform"])
+    # The probe lives under the stage root, which the writer creates, so
+    # nothing has to exist before the first probe. The script is a constant;
+    # nothing is substituted into it, so nothing can be injected.
     outcome = remote.attempt_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.capacity_probe_stem(writer)),
-        spoken.capacity_probe_script(),
-        platform=node["platform"],
+        dialect.script_path(node["stage_root"], names.capacity_probe_stem(writer)),
+        dialect.CAPACITY_PROBE_SCRIPT,
     )
     failure = outcome["failure"]
     if failure is not None:

@@ -2,8 +2,8 @@
 
 THIS FILE CLOSES A HOLE THE TESTS COULD NOT SEE. Before it existed,
 :func:`fleet.core.dispatch.finish` and
-the result script (then ``fleet.core.launch.result_script``, now a dialect
-method) were written, covered and reachable
+the result script (then ``fleet.core.launch.result_script``, now
+:func:`fleet.core.dialect.result_script`) were written, covered and reachable
 only from the test suite: NO command ever called them. So a dispatch could be
 leased, staged, started and recorded, and then had no path at all from the
 node's exit status back to the ledger -- every run stayed ``running`` until
@@ -24,16 +24,14 @@ merely slow and a run that is wedged look identical from here, and the thing
 that tells them apart is the lease expiring, which
 :func:`fleet.cli.watch.lost_runs` already reports.
 
-A BUILD THAT IS KILLED IS NOT STILL GOING, and its task or unit says so. A
-killed build cannot write its own status, and before MCPs board task
-c8585623 such a build read as running until its lease lapsed. Fleet job
-859e7ab3 was killed by systemd-oomd 2 min 8 s into its install on
-diphtheria and was closed 22 minutes later as ``LEASE_NOT_HELD``. A Linux
-unit's ``ExecStopPost=`` now writes the result for a build that did not
-(:mod:`fleet.core.linux_unit_end`), and a Windows node's result script
-writes it when the build's scheduled task has ended without one
-(:mod:`fleet.core.windows_result`, MCPs board task 4e3afe4f), so on either
-platform absence means the build's process is still alive.
+A BUILD THAT IS KILLED IS NOT STILL GOING, and its unit says so. A killed
+build cannot write its own status, and before MCPs board task c8585623 such
+a build read as running until its lease lapsed. Fleet job 859e7ab3 was
+killed by systemd-oomd 2 min 8 s into its install on diphtheria and was
+closed 22 minutes later as ``LEASE_NOT_HELD``. The unit's ``ExecStopPost=``
+now writes the result for a build that did not
+(:mod:`fleet.core.linux_unit_end`), so absence means the build's process is
+still alive.
 """
 
 from __future__ import annotations
@@ -108,15 +106,13 @@ def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
             forever, holding a node's budget against work that stopped.
     """
     target = names.dispatch_directory(node["stage_root"], run_id)
-    spoken = dialect.for_platform(node["platform"])
     # A distinct script name from the build's own, so that reading a result
     # cannot overwrite the thing that produced it -- collection runs
     # repeatedly against a directory a build is still writing to.
     read = remote.read_script(
         node["host"],
-        spoken.script_path(target, names.COLLECT_STEM),
-        spoken.result_script(target=target, run_id=run_id),
-        platform=node["platform"],
+        dialect.script_path(target, names.COLLECT_STEM),
+        dialect.result_script(target),
     )
     output = read["output"]
     if output is None:
@@ -164,34 +160,15 @@ def _read_result(node: NodeConfig, *, run_id: str, answer: str) -> RunResult | N
     if not answer:
         return None
     fields = answer.split()
-    if len(fields) != 2 or not _is_exit_code(fields[0]) or not fields[1].isdigit():
+    if len(fields) != 2 or not fields[0].isdigit() or not fields[1].isdigit():
         raise AppError(
             FleetErrorCode.RUN_RESULT_UNREADABLE,
             f"{run_id} on {node['host']} recorded {answer!r} where an exit status and a "
-            f"timestamp were expected; only the build's last act, or its task or unit ending "
+            f"timestamp were expected; only the build's last act, or its unit ending "
             f"without it, writes {names.RESULT_NAME}, so this is a node that was written to by "
             "something else",
         )
     return RunResult(exit_code=int(fields[0]), finished_unix=int(fields[1]))
-
-
-def _is_exit_code(answer: str) -> bool:
-    """Whether a node's answer is a whole number.
-
-    Written rather than reached for via an exception, because the codebase
-    does not use ``try``/``except`` to ask a question. A leading sign is
-    accepted: PowerShell reports a process killed by an unhandled exception
-    with a large negative status, and that is a result rather than a fault in
-    the reading of it.
-
-    Args:
-        answer: What the node printed, already stripped.
-
-    Returns:
-        True when it is one optional sign followed by digits.
-    """
-    body = answer[1:] if answer[:1] in {"-", "+"} else answer
-    return body.isdigit()
 
 
 def outcome_for(exit_code: int) -> LedgerOutcome:

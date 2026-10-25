@@ -41,7 +41,6 @@ from __future__ import annotations
 import pathlib
 import socket
 import subprocess
-import sys
 import tempfile
 import time
 from collections.abc import Sequence
@@ -53,7 +52,7 @@ from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 from fleet.core._command import CHILD_IO_ENCODING, TIMED_OUT_RETURNCODE, CommandResult, _awaited
 from fleet.core.queue_transport import answering
-from fleet.core.scratch_root import scratch_root_for
+from fleet.core.scratch_root import SCRATCH_ROOT
 
 
 class EnvProtocol(Protocol):
@@ -470,9 +469,9 @@ def _default_temp_root() -> pathlib.Path:
     """Locate the real scratch root.
 
     Returns:
-        :func:`fleet.core.scratch_root.scratch_root_for` this platform.
+        :data:`fleet.core.scratch_root.SCRATCH_ROOT`.
     """
-    return scratch_root_for(sys.platform, tempfile.gettempdir())
+    return SCRATCH_ROOT
 
 
 def _default_hostname() -> str:

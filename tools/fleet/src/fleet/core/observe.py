@@ -10,16 +10,14 @@ the server deliberately does not hold, so it reads the same records there and
 hands them to ``task_session_observe``, which records them through the same
 canonical writer, keyed by the machine they came from.
 
-THE SCRIPT IS SENT AND RUN BY PATH, IN THE NODE'S DIALECT. Like every remote
-command in this package (:mod:`fleet.core.remote` carries the measured
-reason) it is a file the node runs by path, and like every other script it
-is rendered by :func:`fleet.core.dialect.for_platform` from the platform the
-roster declares for the node (:mod:`fleet.contracts.machine`): PowerShell to a Windows node, ``sh``
-to a Linux one. Until board task cd5010c4 the PowerShell text went to every
-node, and diphtheria answered ``powershell: command not found`` on every
-tick, logged as a node that did not answer. Both renderings emit ONE JSON
-document: the node's platform and lowercased hostname (which together spell
-the ledger's machine key, ``win32:serendipity``, ``linux:diphtheria``), the
+THE SCRIPT IS SENT AND RUN BY PATH. Like every remote command in this
+package (:mod:`fleet.core.remote` carries the measured reason) it is a file
+the node runs by path, :data:`fleet.core.dialect.OBSERVE_SESSIONS_SCRIPT`.
+Until board task cd5010c4 a PowerShell text went to every node, and
+diphtheria answered ``powershell: command not found`` on every tick, logged
+as a node that did not answer. The script emits ONE JSON document: the
+node's platform and lowercased hostname (which together spell the ledger's
+machine key, ``linux:diphtheria``), the
 ``pidDomain`` the node's harness writes, and every record in the directory,
 verbatim. An absent directory is a node that has never run Claude Code,
 reported as zero records rather than as a fault.
@@ -32,8 +30,8 @@ Until Claude Code 2.1.294 the harness wrote ``pidDomain`` as
 ``linux:f191c99155c14a719632bdc88e77f914:pid:[4026531836]``, its
 ``/etc/machine-id`` and ``readlink /proc/self/ns/pid``) and still
 ``win32:<hostname>`` on Windows (all 8 records on austinpc), and every hub
-tick from 06:30Z failed on the comparison. So each dialect's script computes
-the node's own ``pidDomain`` the way its harness does, and a record is
+tick from 06:30Z failed on the comparison. So the script computes the
+node's own ``pidDomain`` the way its harness does, and a record is
 compared against THAT, while the ledger keeps its ``<platform>:<hostname>``
 key.
 
@@ -64,7 +62,6 @@ from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
 from fleet.contracts.machine import LedgerObserver, Machine
-from fleet.contracts.node import NodePlatform
 from fleet.core import dialect, queue, remote
 
 #: What the script is called on the node, before the dialect's extension,
@@ -78,7 +75,8 @@ class NodeSessions(TypedDict):
     """What the script reported from one node.
 
     Attributes:
-        platform: The harness platform tag, ``win32`` or ``linux``.
+        platform: The harness platform tag the node's own interpreter
+            reports, ``linux`` on every node since board task e705f08c.
         hostname: The node's hostname, lowercased.
         pid_domain: The ``pidDomain`` the node's harness writes, computed on
             the node the way the harness computes it.
@@ -126,22 +124,18 @@ class NodeOutcome(TypedDict):
     detail: str
 
 
-def script_path(user: str, platform: NodePlatform) -> str:
+def script_path(user: str) -> str:
     """Where the script lands on a node.
 
     Args:
-        user: The provisioned account.
-        platform: The node's declared platform, which spells the account's
-            home and the script's extension.
+        user: The provisioned account, which spells its home.
 
     Returns:
-        An absolute, literal path in the platform's dialect
-        (``C:/Users/austi/.fleet/observe-sessions.ps1``,
-        ``/home/corvis/.fleet/observe-sessions.sh``) -- the write command on
-        the far side expands nothing, so this must be spelled out.
+        An absolute, literal path (``/home/corvis/.fleet/observe-sessions.sh``)
+        -- the write command on the far side expands nothing, so this must
+        be spelled out.
     """
-    spoken = dialect.for_platform(platform)
-    return spoken.script_path(spoken.fleet_directory(user), OBSERVE_STEM)
+    return dialect.script_path(dialect.fleet_directory(user), OBSERVE_STEM)
 
 
 def _unreadable(host: str, detail: str) -> AppError[FleetErrorCode]:
@@ -349,12 +343,8 @@ def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> 
         return NodeOutcome(
             node=node["name"], recorded=False, detail="no provisioned user in the registry"
         )
-    platform = node["platform"]
     outcome = remote.attempt_script(
-        node["name"],
-        script_path(user, platform),
-        dialect.for_platform(platform).observe_sessions_script(),
-        platform=platform,
+        node["name"], script_path(user), dialect.OBSERVE_SESSIONS_SCRIPT
     )
     failure = outcome["failure"]
     if failure is not None:

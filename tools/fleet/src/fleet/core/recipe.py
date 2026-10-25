@@ -30,10 +30,6 @@ class Recipe(TypedDict):
             user's rootless daemon, never as the runner, whose own daemon on
             diphtheria is the production stack's
             (:mod:`fleet.core.linux_isolated_build`).
-        elevated: True when the project declares the ``elevated`` tag, so its
-            build launches at RunLevel Highest with the ssh account's full
-            administrator token (:mod:`fleet.contracts.elevation`); only a
-            node's elevated runner ever claims such a job.
         loopback_only: True when the project declares ``loopback_only``, so
             its ``make check`` runs in a network namespace holding only lo
             once its install steps have run in the host's
@@ -43,18 +39,16 @@ class Recipe(TypedDict):
     path: str
     install: tuple[InstallStep, ...]
     isolated_docker: bool
-    elevated: bool
     loopback_only: bool
 
 
 def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ...]) -> Recipe:
-    """The recipe for one project, isolated when it declares the docker tag,
-    elevated when it declares the elevated tag, and in a loopback-only
-    network when it declares ``loopback_only``.
+    """The recipe for one project, isolated when it declares the docker tag
+    and in a loopback-only network when it declares ``loopback_only``.
 
     The one place each declaration becomes what the build does, so the
     queue's lane and the working-tree lane cannot disagree about which builds
-    run as execdocker, as an administrator or with only lo.
+    run as execdocker or with only lo.
 
     Args:
         plan: The project's declaration, whose ``required_tags`` and
@@ -69,7 +63,6 @@ def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ..
         path=path,
         install=install,
         isolated_docker=NodeTag.DOCKER in plan["required_tags"],
-        elevated=NodeTag.ELEVATED in plan["required_tags"],
         loopback_only=plan["loopback_only"],
     )
 

@@ -5,8 +5,8 @@ that label into things a parser reads: the hub's ``build-bases`` make line
 (:mod:`fleet.core.rebuild`) and, since MCPs board task 6c4516af A4, every
 build script, which exports it as ``BOARD_AGENT_LABEL`` so a hold the suite
 takes (MCPs' disposable deploy) is attributed to whoever asked for the run.
-A label outside the board's kebab alphabet cannot be embedded in a shell or
-PowerShell script verbatim, so it is refused before any script is rendered.
+A label outside the board's kebab alphabet cannot be embedded in a shell
+script verbatim, so it is refused before any script is rendered.
 """
 
 from __future__ import annotations

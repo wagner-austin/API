@@ -13,20 +13,17 @@ leave the one before it half-done:
   first had already filled.
 
 WHY THE SUITE IS DETACHED FROM THE CONNECTION AND NOT RUN AS AN SSH CHILD.
-Windows OpenSSH assigns the session's process tree to a job object precisely
-so the tree dies when the connection ends. A suite started as a child of the
-dispatching ssh call therefore dies when that call returns -- which is
-immediately, since the whole point is not to hold the connection for the
-duration of a build. Measured on this fleet's own hardware and written up in
-``memory/reference_long_runs_need_task_scheduler.md``: a ten-hour job launched
-that way is leashed to a connection, and a process cannot be moved out of a
-job object once it is in one. Linux sshd sends the session's process group
-SIGHUP for the same effect, so the build is a transient systemd user unit
-there.
+sshd sends the session's process group SIGHUP when the connection ends, so a
+suite started as a child of the dispatching ssh call dies when that call
+returns -- which is immediately, since the whole point is not to hold the
+connection for the duration of a build. The Windows nodes taught it first,
+whose OpenSSH put the session's tree in a job object for the same effect
+(``memory/reference_long_runs_need_task_scheduler.md``). So the build is a
+transient systemd unit.
 
-The scripts that do the launching live in :mod:`fleet.core.dialect`, one set
-per platform, split out of here by role when this file crossed the 600-line
-ceiling. This module owns the ORDER; the dialect owns what the node is asked
+The scripts that do the launching live in :mod:`fleet.core.dialect`, split
+out of here by role when this file crossed the 600-line ceiling. This module
+owns the ORDER; the dialect owns what the node is asked
 to run, :mod:`fleet.core.recipe` what a project's declaration asks of its
 build, and :mod:`fleet.core.names` what each file is called.
 
@@ -345,7 +342,6 @@ def launch(
     try:
         target = staging.stage(
             node["host"],
-            platform=node["platform"],
             run_id=run_id,
             stage_root=node["stage_root"],
             source=payload["path"],
@@ -354,9 +350,7 @@ def launch(
     finally:
         payload["path"].unlink()
     local = payload["path"].with_name(f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz")
-    staging.stage_registry(
-        node["host"], platform=node["platform"], target=target, registry=registry, local=local
-    )
+    staging.stage_registry(node["host"], target=target, registry=registry, local=local)
     run_lease.emit(
         loaded_feed,
         run_id=run_id,
@@ -381,7 +375,6 @@ def launch(
     for companion in companions:
         beside = staging.stage_companion(
             node["host"],
-            platform=node["platform"],
             stage_root=node["stage_root"],
             directory=companion["directory"],
             ref=companion["ref"],
@@ -408,28 +401,24 @@ def launch(
     for bundles in {companion["path"].parent for companion in companions}:
         bundles.rmdir()
 
-    spoken = dialect.for_platform(node["platform"])
     remote.send_script(
         node["host"],
-        spoken.script_path(target, names.BUILD_STEM),
-        spoken.build_script(
+        dialect.script_path(target, names.BUILD_STEM),
+        dialect.build_script(
             target=target,
             path=recipe["path"],
             workers=workers,
             install=recipe["install"],
             cache_root=names.cache_root(node["stage_root"]),
             isolated_docker=recipe["isolated_docker"],
-            elevated=recipe["elevated"],
             agent=lease["agent"],
             loopback_unit=loopback_unit(recipe, run_id),
         ),
-        platform=node["platform"],
     )
     remote.run_script(
         node["host"],
-        spoken.script_path(target, names.LAUNCH_STEM),
-        spoken.launch_script(target=target, run_id=run_id, elevated=recipe["elevated"]),
-        platform=node["platform"],
+        dialect.script_path(target, names.LAUNCH_STEM),
+        dialect.launch_script(target=target, run_id=run_id),
     )
     row = started_row(lease=lease, host=node["host"], workers=workers, detail=f"staged to {target}")
     records.append_ledger(loaded_ledger, row)

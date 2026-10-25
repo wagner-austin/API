@@ -36,7 +36,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, admissible_workers
-from fleet.contracts.node import NodeConfig, NodePlatform, NodeState
+from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag, missing_tags
 
@@ -145,9 +145,9 @@ def _wrong_node(node: NodeConfig, project: ProjectConfig) -> DispatchVerdict | N
         project: The work being dispatched.
 
     Returns:
-        The refusal :func:`assess` gives first for a pin, a node that checks
-        only its pinned projects, or a loopback-only project on a node other
-        than Linux, in that order; None when the node may be weighed.
+        The refusal :func:`assess` gives first for a pin or a node that
+        checks only its pinned projects, in that order; None when the node
+        may be weighed.
     """
     pinned = project["node"]
     if pinned is not None and pinned != node["host"]:
@@ -168,16 +168,6 @@ def _wrong_node(node: NodeConfig, project: ProjectConfig) -> DispatchVerdict | N
                 f"{node['host']} checks only the projects pinned to it: its own work leaves a "
                 "check no margin under the 300 s budget, so the answer is any other node "
                 "this project's tags fit."
-            ),
-        )
-    if project["loopback_only"] and node["platform"] != NodePlatform.LINUX:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_LACKS_TAG,
-            reason=(
-                f"{node['host']} is a {node['platform']} node, and the project declares "
-                "loopback_only: its check runs in a network namespace holding only lo, which "
-                "only a Linux node's fleet-check-unit gives, so the answer is a Linux node."
             ),
         )
     return None
@@ -249,12 +239,6 @@ def assess(
     leaves a check no margin under the budget, and nothing about the node
     changes that, so a project any other node can run is that node's.
 
-    A PROJECT WHOSE CHECK RUNS WITH ONLY LO IS REFUSED BY A WINDOWS NODE,
-    before its tags, because only a Linux node's ``fleet-check-unit`` gives a
-    check a network namespace of its own and the Windows dialect refuses to
-    render one (MCPs board task 649fcc7a). It answers ``NODE_LACKS_TAG``,
-    whose meaning, another node, is this refusal's.
-
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
@@ -299,7 +283,7 @@ def assess(
             ),
         )
     pressure = state["cpu_pressure_pct"]
-    if pressure is not None and pressure >= CPU_PRESSURE_BOUND_PCT:
+    if pressure >= CPU_PRESSURE_BOUND_PCT:
         return DispatchVerdict(
             workers=0,
             code=FleetErrorCode.NODE_OWNER_RESERVED,
@@ -312,7 +296,7 @@ def assess(
             ),
         )
     io_pressure = state["io_pressure_pct"]
-    if io_pressure is not None and io_pressure >= IO_PRESSURE_BOUND_PCT:
+    if io_pressure >= IO_PRESSURE_BOUND_PCT:
         return DispatchVerdict(
             workers=0,
             code=FleetErrorCode.NODE_OWNER_RESERVED,

@@ -1,11 +1,11 @@
 """The ``sh`` session observer's body: what python3 runs on a Linux node.
 
-Split out of :mod:`fleet.core.dialect_linux` when the retire's unlock of a
-run's read-only directories took that module past the 600-line ceiling (MCPs
-board task 05dd6588), the shape :mod:`fleet.core.linux_toolchain_probe` and
+Split out of the dialect when the retire's unlock of a run's read-only
+directories took that module past the 600-line ceiling (MCPs board task
+05dd6588), the shape :mod:`fleet.core.linux_toolchain_probe` and
 :mod:`fleet.core.linux_capacity_probe` already have. It is the body without
 the dialect's prologue, which
-:data:`fleet.core.dialect_linux.OBSERVE_SESSIONS_SCRIPT` prepends.
+:data:`fleet.core.dialect.OBSERVE_SESSIONS_SCRIPT` prepends.
 """
 
 from __future__ import annotations

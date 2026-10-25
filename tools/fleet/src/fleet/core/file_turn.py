@@ -10,8 +10,8 @@ THE LOCK IS THE FILE'S EXCLUSIVE CREATION. Its text names the turn, so only
 the turn that created it removes it; a lock older than the turn's
 ``stale_seconds`` was left by a process that died inside its turn and is
 taken away; and a turn waits ``poll_seconds`` between looks at a lock another
-holds. The same on both platforms and every filesystem the hub has: no
-``fcntl``, no ``msvcrt``, nothing a test cannot make the filesystem do.
+holds. The same on every filesystem the hub has: no ``fcntl``, nothing a
+test cannot make the filesystem do.
 
 A LOCK WHOSE HOLDER IS GONE IS TAKEN AWAY BEFORE ITS AGE BOUND (MCPs board
 task 86f70457). A mirror's fetch turn may last 1020 s, so a runner killed
@@ -45,12 +45,9 @@ HOLDER_PROBE_SECONDS: Final = 30
 #: The deadline of one probe, in seconds.
 PROBE_TIMEOUT_SECONDS: Final = 15
 
-#: The command that lists one process, by whether this is Windows; each
-#: prints the pid when it runs and does not when it does not.
-_PROBES: Final = (
-    ("ps", "-p", "{pid}", "-o", "pid="),
-    ("tasklist", "/FI", "PID eq {pid}", "/FO", "CSV", "/NH"),
-)
+#: The command that lists one process: it prints the pid when it runs and
+#: does not when it does not.
+_PROBE: Final = ("ps", "-p", "{pid}", "-o", "pid=")
 
 #: What a lock this module wrote says of its holder: the pid and the host.
 _HELD_BY: Final = re.compile(r" pid (?P<pid>\d+) on (?P<host>\S+) turn [0-9a-f]{32}$")
@@ -61,7 +58,7 @@ class TurnBounds(TypedDict):
 
     Attributes:
         what: The turn's name in a log line, e.g. ``claim turn``.
-        waited_for: Who a wait was for, e.g. ``its host's other runner``.
+        waited_for: Who a wait was for, e.g. ``another process claiming for its host``.
         stale_seconds: How old a lock is when its holder is taken to have
             died inside its turn.
         poll_seconds: How long a turn waits between looks at a held lock.
@@ -91,8 +88,6 @@ def held(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> Generator[No
         Nothing; the turn is held while the block runs.
 
     Raises:
-        PermissionError: When creating the lock is refused for longer than a
-            turn may last, which no other turn's give-back takes.
         OSError: When the lock can be neither created nor read for a reason
             other than another turn holding it.
     """
@@ -118,30 +113,7 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
     _test_hooks.make_directory(lock.parent)
     token = f"{holder} pid {os.getpid()} on {_test_hooks.hostname()} turn {uuid.uuid4().hex}"
     asked = _test_hooks.now()
-    refused_since: int | None = None
-    while True:
-        try:
-            created = _created(lock, token=token)
-        except PermissionError:
-            # Windows refuses an exclusive create with access denied, not
-            # "exists", while another turn's give-back is still removing the
-            # lock: measured on austinpc, Python 3.11.9, 2026-10-16 (MCPs
-            # board task e14815d3), six processes taking 400 turns each saw
-            # Win32 error 5 on 7 to 22 of each one's roughly 900 refused
-            # creates, every other one error 80, and the record append case
-            # died of it under a loaded suite. So a refusal is looked at
-            # again a poll apart for as long as a turn may last, as
-            # host_claims.discharge asks again a removal Windows refuses; one
-            # that outlasts that is no give-back, and raises.
-            now = _test_hooks.now()
-            refused_since = now if refused_since is None else refused_since
-            if now - refused_since >= bounds["stale_seconds"]:
-                raise
-            _test_hooks.sleep(bounds["poll_seconds"])
-            continue
-        if created:
-            break
-        refused_since = None
+    while not _created(lock, token=token):
         age = _age(lock)
         if age is not None and age >= bounds["stale_seconds"]:
             _log.info(
@@ -196,7 +168,7 @@ def runs(pid: int) -> bool:
         turn whose holder cannot be asked about waits out its age bound as
         it did before the probe existed.
     """
-    argv = tuple(part.format(pid=pid) for part in _PROBES[os.name == "nt"])
+    argv = tuple(part.format(pid=pid) for part in _PROBE)
     probed = _test_hooks.run(argv, timeout_seconds=PROBE_TIMEOUT_SECONDS)
     if probed["returncode"] not in (0, 1) or probed["stderr"].strip():
         _log.info(

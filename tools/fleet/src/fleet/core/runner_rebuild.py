@@ -41,7 +41,6 @@ from typing import Final
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import _test_hooks, remote, runner_audit, runner_render
 from fleet.core.runner_audit_types import AuditFinding
@@ -156,7 +155,6 @@ def _base(spec: HostRunnerSpec, steps: list[str]) -> None:
         spec["host"],
         path,
         script,
-        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     if runner_render.REBOOT_MARKER not in output:
@@ -168,7 +166,6 @@ def _base(spec: HostRunnerSpec, steps: list[str]) -> None:
         spec["host"],
         path,
         script,
-        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     if runner_render.REBOOT_MARKER in again:
@@ -197,7 +194,6 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> None:
         spec["host"],
         payload_path(spec, "fleet-rebuild-provision"),
         runner_render.render_provision_script(spec, tokens),
-        platform=NodePlatform.LINUX,
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     steps.append(f"provision: ran for {len(spec['installs'])} runners")

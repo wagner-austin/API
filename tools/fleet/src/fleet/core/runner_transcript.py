@@ -1,10 +1,9 @@
 """Scoring a runner audit's transcript: one ``CHECK`` line per expected check, in order.
 
 Lifted from :func:`fleet.core.runner_audit.parse_audit_transcript` on
-2026-10-20 (MCPs board task 1e9ab738), when loki's Windows audit
-(:mod:`fleet.core.runner_windows_host`) came to print the same lines: a
-Linux host's bash audit and a Windows host's PowerShell one are scored by
-this one reader.
+2026-10-20 (MCPs board task 1e9ab738), when loki's Windows audit came to
+print the same lines; that audit left with loki (board task e705f08c), and
+the bash audit is scored here.
 
 A transcript is ``CHECK <id> OK`` or ``CHECK <id> DRIFT <detail>`` lines,
 blank lines aside, whose ids are exactly the expected ones in order. A

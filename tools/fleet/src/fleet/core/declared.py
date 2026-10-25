@@ -31,8 +31,7 @@ would spawn 144 processes a tick.
 AND EVERY NODE RUNNER THE ROSTER DECLARES (MCPs board task 1e9ab738). The
 same read takes the machine files and names each runner the hub runs:
 ``fleet-node-<machine>`` for a machine whose dispatch is enabled and not
-held, and its ``-elevated`` runner beside it where the dispatch declares
-one, the rule MCPs session-audit's ``fleet_lanes`` lays the hub's lanes by.
+held, the rule MCPs session-audit's ``fleet_lanes`` lays the hub's lanes by.
 The queue deletes the tick of every runner the publication does not name
 (MCPs mig 824): until then fleet-node-lavender-wsl stayed on
 ``fleet_status`` a day after lavender's reimage took its machine.
@@ -183,10 +182,8 @@ def declared_runners(machines: Sequence[Machine]) -> tuple[str, ...]:
     """Every node runner a roster declares, in the machines' order.
 
     A machine runs its node runner when its dispatch is enabled and not held
-    (the node's ``enabled``), and its elevated runner beside it when that
-    dispatch declares ``elevated``: the rule MCPs session-audit's
-    ``fleet_lanes`` lays the hub's lanes by, so a label here is a runner
-    the hub ticks.
+    (the node's ``enabled``): the rule MCPs session-audit's ``fleet_lanes``
+    lays the hub's lanes by, so a label here is a runner the hub ticks.
 
     Args:
         machines: The roster's machines.
@@ -194,15 +191,11 @@ def declared_runners(machines: Sequence[Machine]) -> tuple[str, ...]:
     Returns:
         Each runner's board label (:func:`fleet.core.names.node_runner_label`).
     """
-    labels: list[str] = []
-    for machine in machines:
-        node = machine["dispatch"]
-        if node is None or not node["enabled"]:
-            continue
-        labels.append(names.node_runner_label(machine["name"], elevated=False))
-        if node["elevated"]:
-            labels.append(names.node_runner_label(machine["name"], elevated=True))
-    return tuple(labels)
+    return tuple(
+        names.node_runner_label(machine["name"])
+        for machine in machines
+        if (node := machine["dispatch"]) is not None and node["enabled"]
+    )
 
 
 def split_batch(output: bytes, paths: Sequence[str]) -> tuple[str, ...] | str:

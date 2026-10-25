@@ -18,9 +18,10 @@ prevent. The reader raises and names the line number.
 
 AN APPEND IS MADE IN A TURN (MCPs board task 8d96f89a). Every node runner is
 its own process on the hub and they all append to one ledger, one feed and
-one retire record, ticking in the same second. Appending mode on Windows
-seeks to the end and then writes, two calls, so two processes appending at
-once can both write at the same offset, the longer row's tail surviving
+one retire record, ticking in the same second. Appending mode on the
+Windows hub of the time sought to the end and then wrote, two calls, so two
+processes appending at once could both write at the same offset, the
+longer row's tail surviving
 after the shorter row's newline. On 2026-10-14 at 09:48:30Z the finish rows
 of MCPs-packages-maketools-lavender-wsl-1791971182 and
 MCPs-mcp-shared-py-lavender-wsl-1791971191 landed together: the ledger kept

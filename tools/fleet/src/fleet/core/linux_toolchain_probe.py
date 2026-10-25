@@ -1,10 +1,9 @@
 """The ``sh`` toolchain probe: what a Linux node has installed.
 
-Split out of :mod:`fleet.core.dialect_linux` when the ``gpu`` and ``testdb``
-lines took that module past the 600-line ceiling (MCPs board task 939ec5c7),
-as :mod:`fleet.core.windows_toolchain_probe` was split from its dialect. It
-is the probe's body without the dialect's prologue, which
-:data:`fleet.core.dialect_linux.TOOLCHAIN_PROBE_SCRIPT` prepends, the shape
+Split out of the dialect when the ``gpu`` and ``testdb`` lines took that
+module past the 600-line ceiling (MCPs board task 939ec5c7). It is the
+probe's body without the dialect's prologue, which
+:data:`fleet.core.dialect.TOOLCHAIN_PROBE_SCRIPT` prepends, the shape
 :mod:`fleet.core.linux_capacity_probe` already has.
 """
 
@@ -102,7 +101,7 @@ from fleet.contracts.tagged_tools import (
 #:
 #: THE ``stack`` AND ``testdb`` LINES ASK FROM INSIDE A CHECK'S UNIT (``unit``,
 #: the helper's ``run``, :mod:`fleet.contracts.check_unit`), the place every
-#: build runs (:mod:`fleet.core.dialect_linux`), never from the probe's own
+#: build runs (:mod:`fleet.core.dialect`), never from the probe's own
 #: ssh process. A unit's supplementary groups are read when it starts and an
 #: ssh login's at login, so the two can differ: colossus's user manager,
 #: where builds ran until MCPs board task bc8c445c, predated its account's

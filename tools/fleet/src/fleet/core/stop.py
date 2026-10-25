@@ -8,7 +8,7 @@ and the ledger no longer counts the run against that node's capacity. Those
 used to be spelled once, inside the cancel command, where a runner could not
 reach them; a runner that re-spelled them would be one edit away from a stop
 that ended the task but not the suite, which is the defect this module's
-dialect half exists to close (:meth:`fleet.core.dialect.Dialect.stop_script`).
+dialect half exists to close (:func:`fleet.core.dialect.stop_script`).
 
 THE NODE IS STOPPED BEFORE THE ROW IS CLOSED. A row closed first and a stop
 that then failed would free the node's budget while the suite still held it,
@@ -29,9 +29,9 @@ from fleet.core import cache_generations, dialect, dispatch, names, remote, reti
 def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
     """End one dispatch's build on its node, every process of it.
 
-    The task or unit is named by :func:`fleet.core.names.task_name`, the
-    same function the dispatch launched it with, and the script is named
-    after the run so two stops at once cannot overwrite each other's.
+    The unit is named by :func:`fleet.core.names.task_name`, the same
+    function the dispatch launched it with, and the script is named after
+    the run so two stops at once cannot overwrite each other's.
 
     Args:
         node: The node it was dispatched to.
@@ -39,17 +39,12 @@ def stop_on_node(node: NodeConfig, *, run_id: str) -> None:
 
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the
-            transport, the latter including a verified build process that
-            ``taskkill`` failed to end.
+            transport.
     """
-    spoken = dialect.for_platform(node["platform"])
     remote.run_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.stop_stem(run_id)),
-        spoken.stop_script(
-            target=names.dispatch_directory(node["stage_root"], run_id), run_id=run_id
-        ),
-        platform=node["platform"],
+        dialect.script_path(node["stage_root"], names.stop_stem(run_id)),
+        dialect.stop_script(run_id),
     )
 
 

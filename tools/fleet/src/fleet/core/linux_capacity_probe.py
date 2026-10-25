@@ -28,8 +28,8 @@ none: measured on colossus on 2026-10-25, it read 0 scopes there and 8 under
 THE ROOTS ARE VARIABLES ON THEIR OWN LINES so a test can point the script at a
 fake ``meminfo``, pressure files and reservations and run it for real under
 ``sh``; nothing is substituted into it in production. The division to
-gibibytes with three decimals happens in ``awk``, so the parser sees the
-shape the Windows dialect prints.
+gibibytes with three decimals happens in ``awk``, the one shape the parser
+reads.
 
 THE NODE'S CPU PRESSURE IS READ, NOT INFERRED FROM ITS LOAD (MCPs board task
 2ce5dc13). ``cpu_pressure_pct`` is the ``some avg60`` of
@@ -56,8 +56,7 @@ THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 the capacity check takes off the node's cores; an expired one counts
 nothing. A file the probe cannot read prints ``reservation_unreadable=`` with
 its path and ends the probe, so the node's reading is refused by name rather
-than read as holding nothing. A carriage return a Windows-written file
-carries is stripped before the fields are read.
+than read as holding nothing.
 """
 
 from __future__ import annotations
@@ -114,8 +113,8 @@ RESERVATIONS_PART = (
     + "reserved=0\n"
     + f'for reservation in "$reservations"/*{reservations.SUFFIX}; do\n'
     + '  [ -e "$reservation" ] || continue\n'
-    + '  if ! held=$(awk -F= -v now="$now" \'{ sub(/\\r$/, "") }'
-    + ' $1 == "cores" { cores = $2 } $1 == "until_unix" { ends = $2 }'
+    + '  if ! held=$(awk -F= -v now="$now" \''
+    + '$1 == "cores" { cores = $2 } $1 == "until_unix" { ends = $2 }'
     + " END { if (cores !~ /^[0-9]+$/ || ends !~ /^[0-9]+$/) exit 1;"
     + ' if (ends + 0 > now + 0) print cores + 0; else print 0 }\' "$reservation"); then\n'
     + f"    printf '{reservations.UNREADABLE_FIELD}=%s\\n' \"$reservation\"\n"

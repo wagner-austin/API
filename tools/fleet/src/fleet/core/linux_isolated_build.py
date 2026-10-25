@@ -34,7 +34,7 @@ because a rootless container writes files under subordinate ids its user
 cannot delete; a failure to remove it ends the script before the result is
 written, which the collector reads as a crashed build rather than a pass. A
 build stopped before that line leaves its copy, so the retire removes it too
-(:meth:`fleet.core.dialect_linux.LinuxDialect.retire_script`): measured
+(:func:`fleet.core.dialect.retire_script`): measured
 2026-10-18, lavender-wsl held eight such copies, 11 GB, from 2026-10-01 on.
 
 execdocker's npm, poetry and playwright caches are one generation at a time, as the

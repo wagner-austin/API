@@ -41,41 +41,8 @@ judges every generation, not the run's alone.
 
 from __future__ import annotations
 
-from platform_core.logging import get_logger
-
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, names, remote
-
-_log = get_logger(__name__)
-
-
-def script_for(platform: NodePlatform, *, stage_root: str, run_id: str, isolated: bool) -> str:
-    """The retire script one dispatch's node is sent.
-
-    The one place its arguments are derived from the run, so the script a
-    node runs and the committed render the Pester suite executes
-    (:mod:`fleet.core.rendered_powershell`) cannot be built two ways.
-
-    Args:
-        platform: The node's declared platform.
-        stage_root: The node's declared stage root.
-        run_id: The dispatch.
-        isolated: Whether the node declares execdocker's rootless daemon
-            (:func:`runs_isolated`).
-
-    Returns:
-        The script's text.
-    """
-    spoken = dialect.for_platform(platform)
-    return spoken.retire_script(
-        target=names.dispatch_directory(stage_root, run_id),
-        retained=names.retained_log_path(stage_root, run_id),
-        scripts=tuple(
-            spoken.script_path(stage_root, stem) for stem in names.root_script_stems(run_id)
-        ),
-        task=names.task_name(run_id),
-        isolated=isolated,
-    )
 
 
 def runs_isolated(node: NodeConfig) -> bool:
@@ -112,21 +79,18 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
         the node's own error when a file could not be moved or removed.
     """
     stage_root = node["stage_root"]
-    outcome = remote.attempt_script(
+    return remote.attempt_script(
         node["host"],
-        dialect.for_platform(node["platform"]).script_path(stage_root, names.retire_stem(run_id)),
-        script_for(
-            node["platform"], stage_root=stage_root, run_id=run_id, isolated=runs_isolated(node)
+        dialect.script_path(stage_root, names.retire_stem(run_id)),
+        dialect.retire_script(
+            target=names.dispatch_directory(stage_root, run_id),
+            retained=names.retained_log_path(stage_root, run_id),
+            scripts=tuple(
+                dialect.script_path(stage_root, stem) for stem in names.root_script_stems(run_id)
+            ),
+            isolated=runs_isolated(node),
         ),
-        platform=node["platform"],
     )
-    # A Windows retire prints one line per leftover process it ended for
-    # holding the transcript (MCPs board task e40bca34), and one naming who
-    # held a directory rd left (MCPs board task a703ec42); the tick log is
-    # where a reader looks for what a runner killed or waited on.
-    for line in outcome["output"].splitlines():
-        _log.info("retire %s on %s: %s", run_id, node["host"], line)
-    return outcome
 
 
-__all__ = ["attempt_retire_on_node", "runs_isolated", "script_for"]
+__all__ = ["attempt_retire_on_node", "runs_isolated"]

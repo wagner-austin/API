@@ -1,14 +1,14 @@
 """Removing the cache generations no run on a node can still read.
 
 The generations are :mod:`fleet.core.tool_caches`'s (MCPs board task
-346abc45). After each retire the runner sends the node :func:`script_for`,
-which removes every generation under the node's cache root, and under
-execdocker's on a node that runs docker projects' builds as that user
-(:func:`fleet.core.retire.runs_isolated`), that is not current, that
-no run directory still on the node names in its marker, and that has not
-been current for :data:`~fleet.core.tool_caches.REMOVAL_GRACE_SECONDS`, by
-:data:`~fleet.core.tool_caches.SH_REMOVE_UNUSED`, the rule ci-clean runs over
-the CI runner hosts' caches too. On Windows the same rule is PowerShell.
+346abc45). After each retire the runner sends the node
+:func:`removal_script`, which removes every generation under the node's cache
+root, and under execdocker's on a node that runs docker projects' builds as
+that user (:func:`fleet.core.retire.runs_isolated`), that is not current,
+that no run directory still on the node names in its marker, and that has
+not been current for :data:`~fleet.core.tool_caches.REMOVAL_GRACE_SECONDS`,
+by :data:`~fleet.core.tool_caches.SH_REMOVE_UNUSED`, the rule ci-clean runs
+over the CI runner hosts' caches too.
 """
 
 from __future__ import annotations
@@ -19,13 +19,10 @@ from typing import Final
 
 from platform_core.logging import get_logger
 
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, names, remote, retire
-from fleet.core.dialect_linux import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_CACHE, EXEC_HOME_LINE, EXEC_STAGE
-from fleet.core.powershell_text import STRICT_HEADER
-from fleet.core.script_values import scriptable
-from fleet.core.tool_caches import REMOVAL_GRACE_SECONDS, SH_REMOVE_UNUSED, tool_caches_directory
+from fleet.core.tool_caches import SH_REMOVE_UNUSED, tool_caches_directory
 
 _log = get_logger(__name__)
 
@@ -39,7 +36,7 @@ REMOVAL_STEM: Final = "fleet-cache-generations"
 REMOVING: Final = threading.Lock()
 
 
-def linux_script(stage_root: str, *, isolated: bool) -> str:
+def removal_script(stage_root: str, *, isolated: bool) -> str:
     """The removal as a POSIX sh script, over the node's caches and execdocker's.
 
     Args:
@@ -62,97 +59,9 @@ def linux_script(stage_root: str, *, isolated: bool) -> str:
         "as='sudo -n'",
         f'remove_unused "{tool_caches_directory(EXEC_CACHE)}" "{EXEC_STAGE}"',
     )
-    return PROLOGUE + "".join(f"{line}\n" for line in lines + (isolated_lines if isolated else ()))
-
-
-def windows_script(stage_root: str) -> str:
-    """The removal as a PowerShell script, its stage root a parameter.
-
-    The root defaults to the rendered one, so a node runs it with no
-    arguments and the Pester suite over its committed render points it at a
-    directory it laid out.
-
-    Args:
-        stage_root: The node's declared stage root.
-
-    Returns:
-        The script's text, printing the same line as :func:`linux_script`.
-
-    Raises:
-        ValueError: When the stage root cannot be embedded verbatim.
-    """
-    body = (
-        "param(",
-        f"    [string]$StageRoot = '{scriptable(stage_root, label='stage root')}'",
-        ")",
-        *STRICT_HEADER,
-        f'$tools = "$StageRoot/{names.CACHE_DIRECTORY}/{names.TOOL_CACHES_DIRECTORY}"',
-        f'$currentFile = "$tools/{names.CURRENT_GENERATION_NAME}"',
-        "if (-not (Test-Path -LiteralPath $currentFile)) {",
-        '    "cache-generations: ${tools}: none yet"',
-        "    return",
-        "}",
-        "$current = (Get-Content -LiteralPath $currentFile -Raw).Trim()",
-        "$now = [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()",
-        "$used = @(foreach ($run in @(Get-ChildItem -LiteralPath $StageRoot -Directory -Force)) {",
-        f"    $marker = Join-Path $run.FullName '{names.GENERATION_MARKER_NAME}'",
-        "    if (Test-Path -LiteralPath $marker) {",
-        "        (Get-Content -LiteralPath $marker -Raw).Trim()",
-        "    }",
-        "})",
-        "$total = 0",
-        "$removed = 0",
-        "$bytes = [long]0",
-        "foreach ($entry in @(Get-ChildItem -LiteralPath $tools -Force)) {",
-        f"    if ($entry.Name -eq '{names.CURRENT_GENERATION_NAME}') {{",
-        "        continue",
-        "    }",
-        "    if (-not $entry.PSIsContainer -or $entry.Name -notmatch '^[0-9]+$') {",
-        '        throw "cache-generations: $($entry.FullName) is no generation"',
-        "    }",
-        "    $total++",
-        "    if ($entry.Name -eq $current -or $used -contains $entry.Name) {",
-        "        continue",
-        "    }",
-        "    $newest = [math]::Max([long]$entry.Name, [long]$current)",
-        f"    if ($now - $newest -le {REMOVAL_GRACE_SECONDS}) {{",
-        "        continue",
-        "    }",
-        "    $size = @(Get-ChildItem -LiteralPath $entry.FullName -Recurse -File -Force) | "
-        "Measure-Object -Property Length -Sum",
-        "    Remove-Item -Recurse -Force -LiteralPath $entry.FullName",
-        "    $removed++",
-        "    $bytes += [long]$size.Sum",
-        "}",
-        "'cache-generations: {0}: generation {1} current, removed {2} of {3} ({4} MB)' -f "
-        "$tools, $current, $removed, $total, [math]::Floor($bytes / 1MB)",
+    return dialect.PROLOGUE + "".join(
+        f"{line}\n" for line in lines + (isolated_lines if isolated else ())
     )
-    return "\n".join(body) + "\n"
-
-
-def script_for(platform: NodePlatform, *, stage_root: str, isolated: bool) -> str:
-    """The removal script a node is sent.
-
-    Args:
-        platform: The node's declared platform.
-        stage_root: The node's declared stage root.
-        isolated: Whether the node runs docker projects' builds as execdocker.
-
-    Returns:
-        The script's text.
-
-    Raises:
-        ValueError: When a Windows node is said to run isolated builds,
-            which none does.
-    """
-    if platform is NodePlatform.LINUX:
-        return linux_script(stage_root, isolated=isolated)
-    if isolated:
-        raise ValueError(
-            f"{stage_root} is a Windows node's stage root, and no Windows node runs a build "
-            "as execdocker"
-        )
-    return windows_script(stage_root)
 
 
 def remove_unused_on_node(node: NodeConfig) -> str:
@@ -179,11 +88,8 @@ def remove_unused_on_node(node: NodeConfig) -> str:
     with REMOVING:
         read = remote.read_script(
             node["host"],
-            dialect.for_platform(node["platform"]).script_path(stage_root, REMOVAL_STEM),
-            script_for(
-                node["platform"], stage_root=stage_root, isolated=retire.runs_isolated(node)
-            ),
-            platform=node["platform"],
+            dialect.script_path(stage_root, REMOVAL_STEM),
+            removal_script(stage_root, isolated=retire.runs_isolated(node)),
         )
     output = read["output"]
     if output is None:
@@ -201,8 +107,6 @@ def remove_unused_on_node(node: NodeConfig) -> str:
 __all__ = [
     "REMOVAL_STEM",
     "REMOVING",
-    "linux_script",
+    "removal_script",
     "remove_unused_on_node",
-    "script_for",
-    "windows_script",
 ]

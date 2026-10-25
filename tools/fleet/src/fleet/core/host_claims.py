@@ -1,30 +1,32 @@
-"""A host's claims under way, and the turn its runners take to claim.
+"""A host's claims under way, and the turn its processes take to claim.
 
-MCPs board task a85ef09e. A node's ordinary and elevated runners are two
+MCPs board task a85ef09e. A node's ordinary and elevated runners were two
 processes on the hub (:mod:`fleet.cli.node_agent`), and each charged its
 launches under way from its own memory only
 (:mod:`fleet.cli.node_launch`), so for the 40 to 80 s between a claim and
 its run reaching the ledger the other runner read the host as emptier than
 it was. On 2026-10-07 serendipity held three runs and 6 workers against a
 pool of 4 cores that way, twice in one evening, and fleet job c858b46b ran
-321 s of its 300 s budget. Two things now make the host the unit:
+321 s of its 300 s budget. The elevated runner left the fleet with its
+Windows nodes (board task e705f08c); the host stays the unit for any two
+processes claiming for it, by two things:
 
 THE CLAIMS ARE THE HOST'S. Each claimed job's grant is written to
 ``<records>/host-claims/<node>/<job>.json``
 (:class:`fleet.contracts.host_claim.HostClaim`) when its launch is handed to
 the pool, and the file is removed once the launch has ended, by which time
-a launched run is on the ledger. Every runner of the host charges every
-claim written there, whichever runner wrote it. One file per claim, so
-ending a launch is one removal that needs no turn: the launch ends on a
-thread of the pool while its runner may be holding the turn for its next
-claim. A runner killed mid-launch never removes its claim, so the next
+a launched run is on the ledger. Every process claiming for the host
+charges every claim written there, whichever process wrote it. One file per
+claim, so ending a launch is one removal that needs no turn: the launch ends
+on a thread of the pool while its runner may be holding the turn for its
+next claim. A runner killed mid-launch never removes its claim, so the next
 tick's collect pass, which refuses the job it finds claimed with nothing
 launched, removes it then (MCPs board task 3f7d40fe). A claim also stops
 counting at its ``until_unix``, the queue job's own claim lease, and the
 turn that finds one past it removes it.
 
 THE CLAIM IS TAKEN IN TURN. Reading the host's load and claiming against it
-are two steps, and two runners between them would both read the same free
+are two steps, and two processes between them would both read the same free
 room. So a claim pass runs inside :func:`claim_turn`, which holds
 ``<records>/host-claims/<node>.lock``: the file's exclusive creation is the
 lock, its text names the turn so only its holder removes it, and a lock
@@ -66,7 +68,7 @@ TURN_POLL_SECONDS: Final = 1
 #: The claim turn as :mod:`fleet.core.file_turn` holds it.
 CLAIM_TURN: Final = file_turn.TurnBounds(
     what="claim turn",
-    waited_for="its host's other runner",
+    waited_for="another process claiming for its host",
     stale_seconds=TURN_STALE_SECONDS,
     poll_seconds=TURN_POLL_SECONDS,
 )
@@ -194,33 +196,17 @@ def record(directory: pathlib.Path, *, alias: str, claim: HostClaim) -> None:
 def discharge(directory: pathlib.Path, *, alias: str, job_id: str) -> None:
     """Remove a job's claim once its launch has ended; no turn is needed.
 
-    On Windows a file another process has open cannot be removed (measured
-    on austinpc, Python 3.11.9, 2026-10-08: ``os.unlink`` raises
-    ``PermissionError`` while a plain ``open`` of it is held), and the
-    host's other runner opens each claim file for the moment it reads it, so
-    a removal refused that way is asked again, a poll apart, for as long as a
-    turn may last; a claim left behind would charge the host for an hour.
+    A file another process has open is removed all the same on Linux, so a
+    removal needs no retry; the Windows hub that refused one while the
+    host's elevated runner read it (MCPs board task a85ef09e) left with the
+    fleet's last Windows machine (board task e705f08c).
 
     Args:
         directory: The records' ``host-claims`` directory.
         alias: The node's workspace name.
         job_id: The queue job whose launch ended.
-
-    Raises:
-        PermissionError: When the file is still refused after
-            :data:`TURN_STALE_SECONDS`, which no read takes.
     """
-    path = claims_directory(directory, alias=alias) / f"{job_id}.json"
-    asked = _test_hooks.now()
-    while True:
-        try:
-            path.unlink(missing_ok=True)
-        except PermissionError:
-            if _test_hooks.now() - asked >= TURN_STALE_SECONDS:
-                raise
-            _test_hooks.sleep(TURN_POLL_SECONDS)
-            continue
-        return
+    (claims_directory(directory, alias=alias) / f"{job_id}.json").unlink(missing_ok=True)
 
 
 def host_load(claims: tuple[HostClaim, ...]) -> LiveLoad:

@@ -43,9 +43,7 @@ VERDICT_PREFIX: Final = "FLEET-CHECK"
 #: colossus's 323 logs on 2026-10-11, the last 'N passed' line sat 252 lines
 #: from the end for MCPs/watcher, 284 for MCPs/mcp-proxy, 460 for
 #: MCPs/packages/db and 826 for MCPs/mcp-shared. Fifteen hundred holds the
-#: largest with 1.8 times its length to grow into, and at about eighty
-#: characters a row still fits the Windows dialect's bounded read
-#: (:data:`fleet.core.windows_log_tail.TAIL_BYTES`).
+#: largest with 1.8 times its length to grow into.
 LOG_TAIL_LINES: Final = 1500
 
 #: ``N passed`` as both vitest (``Tests  887 passed (887)``) and pytest
@@ -213,11 +211,9 @@ def read_unit_end(tail: str) -> str | None:
     Returns:
         The last :data:`fleet.core.linux_unit_end.UNIT_ENDED_MARKER` line,
         marker included and line ending excluded (``FLEET_UNIT_ENDED: unit
-        ... ended with systemd result oom-kill (killed KILL) ...`` from a
-        Linux unit, ``FLEET_UNIT_ENDED: task ... ended with Task Scheduler
-        state 3 (Ready) and last result 0x00000001 ...`` from a Windows
-        node, :mod:`fleet.core.windows_result`), or None for a build that
-        wrote its own status, which is every build that was not killed.
+        ... ended with systemd result oom-kill (killed KILL) ...``), or
+        None for a build that wrote its own status, which is every build
+        that was not killed.
     """
     last: str | None = None
     for match in UNIT_ENDED_LINE.finditer(tail):

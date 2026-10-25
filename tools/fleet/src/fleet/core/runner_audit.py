@@ -25,7 +25,6 @@ asset it must write) asks as that account.
 
 from __future__ import annotations
 
-from fleet.contracts.node import NodePlatform
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import remote
 from fleet.core.runner_audit_cache import cache_rows, render_cache_check_lines
@@ -374,7 +373,6 @@ def attempt_audit_host(spec: HostRunnerSpec) -> AuditOutcome:
         spec["host"],
         payload_path(spec, AUDIT_SCRIPT_STEM),
         render_audit_script(spec),
-        platform=NodePlatform.LINUX,
         timeout_seconds=AUDIT_TIMEOUT_SECONDS,
     )
     failure = outcome["failure"]

@@ -44,7 +44,6 @@ import tarfile
 
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.contracts.node import NodePlatform
 from fleet.core import _test_hooks, dialect, names, remote, stage_repository
 
 #: Directory names never carried to a node.
@@ -160,7 +159,6 @@ def digest(payload: bytes) -> str:
 def send_verified(
     host: str,
     *,
-    platform: NodePlatform,
     into: str,
     source: pathlib.Path,
     payload: bytes,
@@ -177,7 +175,6 @@ def send_verified(
 
     Args:
         host: SSH destination.
-        platform: The node's declared platform.
         into: Absolute remote directory, which must already exist, that the
             archive lands in as :data:`fleet.core.names.ARCHIVE_NAME`.
         source: The local archive file, which scp copies.
@@ -192,13 +189,11 @@ def send_verified(
             retried: a transfer that truncated once will do it again, and a
             retry loop turns a diagnosable fault into an intermittent one.
     """
-    spoken = dialect.for_platform(platform)
     remote.send_file(host, source, f"{into}/{names.ARCHIVE_NAME}", size_bytes=len(payload))
     received = remote.run_script(
         host,
-        spoken.script_path(into, names.DIGEST_STEM),
-        spoken.digest_script(into),
-        platform=platform,
+        dialect.script_path(into, names.DIGEST_STEM),
+        dialect.digest_script(into),
     ).strip()
     expected = digest(payload)
     if received != expected:
@@ -212,7 +207,6 @@ def send_verified(
 def stage_companion(
     host: str,
     *,
-    platform: NodePlatform,
     stage_root: str,
     directory: str,
     ref: str,
@@ -232,7 +226,6 @@ def stage_companion(
 
     Args:
         host: SSH destination.
-        platform: The node's declared platform.
         stage_root: Absolute directory on the node holding staged trees.
         directory: The companion's declared directory name.
         ref: The companion's declared ref, whose branch is checked out.
@@ -247,25 +240,21 @@ def stage_companion(
         AppError: As :func:`send_verified` describes, and from the transport
             for any of the scripts around it.
     """
-    spoken = dialect.for_platform(platform)
     tree = names.companion_directory(stage_root, directory)
     staged = names.staging_directory(tree)
     staged_stem = names.make_directory_stem(names.stage_name(directory))
     remote.run_script(
         host,
-        spoken.script_path(stage_root, names.reset_directory_stem(directory)),
-        spoken.reset_directory_script(tree),
-        platform=platform,
+        dialect.script_path(stage_root, names.reset_directory_stem(directory)),
+        dialect.reset_directory_script(tree),
     )
     remote.run_script(
         host,
-        spoken.script_path(stage_root, staged_stem),
-        spoken.make_directory_script(staged),
-        platform=platform,
+        dialect.script_path(stage_root, staged_stem),
+        dialect.make_directory_script(staged),
     )
     send_verified(
         host,
-        platform=platform,
         into=staged,
         source=source,
         payload=payload,
@@ -273,13 +262,12 @@ def stage_companion(
     )
     remote.run_script(
         host,
-        spoken.script_path(staged, names.COMPANION_REPOSITORY_STEM),
-        spoken.checked_script(
+        dialect.script_path(staged, names.COMPANION_REPOSITORY_STEM),
+        dialect.checked_script(
             stage_repository.companion_repository_commands(
                 tree, f"{staged}/{names.ARCHIVE_NAME}", sha, ref
             )
         ),
-        platform=platform,
     )
     return tree
 
@@ -287,7 +275,6 @@ def stage_companion(
 def stage(
     host: str,
     *,
-    platform: NodePlatform,
     run_id: str,
     stage_root: str,
     source: pathlib.Path,
@@ -306,7 +293,6 @@ def stage(
 
     Args:
         host: SSH destination.
-        platform: The node's declared platform.
         run_id: The dispatch, which names its own directory so two dispatches
             of one project cannot extract over each other.
         stage_root: Absolute directory on the node holding staged trees.
@@ -320,24 +306,20 @@ def stage(
         AppError: As :func:`send_verified` describes, and from the transport
             for any of the scripts around it.
     """
-    spoken = dialect.for_platform(platform)
     target = names.dispatch_directory(stage_root, run_id)
     staged = names.staging_directory(target)
     remote.run_script(
         host,
-        spoken.script_path(stage_root, names.make_directory_stem(run_id)),
-        spoken.make_directory_script(target),
-        platform=platform,
+        dialect.script_path(stage_root, names.make_directory_stem(run_id)),
+        dialect.make_directory_script(target),
     )
     remote.run_script(
         host,
-        spoken.script_path(stage_root, names.make_directory_stem(names.stage_name(run_id))),
-        spoken.make_directory_script(staged),
-        platform=platform,
+        dialect.script_path(stage_root, names.make_directory_stem(names.stage_name(run_id))),
+        dialect.make_directory_script(staged),
     )
     send_verified(
         host,
-        platform=platform,
         into=staged,
         source=source,
         payload=payload,
@@ -345,15 +327,13 @@ def stage(
     )
     remote.run_script(
         host,
-        spoken.script_path(staged, names.EXTRACT_STEM),
-        spoken.checked_script(dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", target)),
-        platform=platform,
+        dialect.script_path(staged, names.EXTRACT_STEM),
+        dialect.checked_script(dialect.extract_commands(f"{staged}/{names.ARCHIVE_NAME}", target)),
     )
     remote.run_script(
         host,
-        spoken.script_path(staged, names.INIT_REPOSITORY_STEM),
-        spoken.checked_script(stage_repository.init_repository_commands(target, run_id)),
-        platform=platform,
+        dialect.script_path(staged, names.INIT_REPOSITORY_STEM),
+        dialect.checked_script(stage_repository.init_repository_commands(target, run_id)),
     )
     return target
 
@@ -393,7 +373,6 @@ def registry_payload(registry: pathlib.Path) -> bytes:
 def stage_registry(
     host: str,
     *,
-    platform: NodePlatform,
     target: str,
     registry: pathlib.Path,
     local: pathlib.Path,
@@ -410,7 +389,6 @@ def stage_registry(
 
     Args:
         host: SSH destination.
-        platform: The node's declared platform.
         target: The run's export directory, already staged.
         registry: The registry directory this runner loaded.
         local: Local file to write the archive to, removed once the node
@@ -424,7 +402,6 @@ def stage_registry(
             for any of the scripts around it.
         OSError: When a registry file cannot be read or the archive written.
     """
-    spoken = dialect.for_platform(platform)
     staged = names.staging_directory(target)
     carried = f"{staged}/{names.REGISTRY_ARCHIVE_DIRECTORY}"
     landed = names.registry_directory(target)
@@ -437,13 +414,11 @@ def stage_registry(
     ):
         remote.run_script(
             host,
-            spoken.script_path(staged, names.make_directory_stem(name)),
-            spoken.make_directory_script(directory),
-            platform=platform,
+            dialect.script_path(staged, names.make_directory_stem(name)),
+            dialect.make_directory_script(directory),
         )
     send_verified(
         host,
-        platform=platform,
         into=carried,
         source=local,
         payload=payload,
@@ -452,9 +427,8 @@ def stage_registry(
     local.unlink()
     remote.run_script(
         host,
-        spoken.script_path(carried, names.EXTRACT_STEM),
-        spoken.checked_script(dialect.extract_commands(f"{carried}/{names.ARCHIVE_NAME}", landed)),
-        platform=platform,
+        dialect.script_path(carried, names.EXTRACT_STEM),
+        dialect.checked_script(dialect.extract_commands(f"{carried}/{names.ARCHIVE_NAME}", landed)),
     )
     return landed
 

@@ -1,7 +1,7 @@
 """What a Linux build's unit records when it ends without the build's own status.
 
 MCPs board task c8585623. A Linux build writes its exit status to the result
-file as its LAST act (:meth:`fleet.core.dialect_linux.LinuxDialect.build_script`),
+file as its LAST act (:func:`fleet.core.dialect.build_script`),
 and the collector read an absent result as a run still going. A build whose
 processes are killed writes nothing, so the runner renewed its claim until the
 lease ran out and closed it ``LEASE_NOT_HELD`` with exit 124, which reads as a
@@ -91,15 +91,9 @@ MEMORY_KILLED_LINE: Final[re.Pattern[str]] = re.compile(
     rf"^{UNIT_ENDED_MARKER}: unit \S+ {RESULT_WORDS} {OOM_KILL_RESULT} \("
 )
 
-#: The line, as :func:`unit_end_script` and a Windows node's result script
-#: (:mod:`fleet.core.windows_result`) append it; the verdict reads the whole
-#: line, marker included. It ends before a carriage return as well as a line
-#: feed: a Windows tail crosses ssh with CRLF endings and is decoded as it
-#: came (:mod:`fleet.core._command`), so a ``$`` would leave the return in
-#: the verdict line.
-UNIT_ENDED_LINE: Final[re.Pattern[str]] = re.compile(
-    rf"^{UNIT_ENDED_MARKER}: [^\r\n]+", re.MULTILINE
-)
+#: The line, as :func:`unit_end_script` appends it; the verdict reads the
+#: whole line, marker included.
+UNIT_ENDED_LINE: Final[re.Pattern[str]] = re.compile(rf"^{UNIT_ENDED_MARKER}: .+", re.MULTILINE)
 
 #: The status recorded when the unit ended without a failing status of its
 #: own: its main process exited 0 without writing a result, which the build's
@@ -194,8 +188,7 @@ def killed_for_memory(unit_end: str) -> bool:
 
     Returns:
         True for a Linux unit whose ``SERVICE_RESULT`` was
-        :data:`OOM_KILL_RESULT`; False for any other ending, and for every
-        Windows task's line, which names no systemd result.
+        :data:`OOM_KILL_RESULT`; False for any other ending.
     """
     return MEMORY_KILLED_LINE.match(unit_end) is not None
 

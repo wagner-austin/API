@@ -10,8 +10,8 @@ and the fleet audit (MCPs ``fleet-mcp``) measures them on every machine that
 registers the hooks, reading ``tools/fleet`` from the checkout beside its
 workspace. So the tuple is rendered to ``rendered/`` as
 :data:`HOOKS_CHECK_DOCUMENT`, committed, and held equal to the contract by
-``tests/test_hooks_check_document.py``, as the rendered PowerShell is:
-``make render-documents`` rewrites it after a pin moves.
+``tests/test_hooks_check_document.py``: ``make render-documents`` rewrites
+it after a pin moves.
 
 THE SHAPE: ``{"packages": [{"name": ..., "version": ...}, ...]}`` in the
 contract's order, each pin split at its ``==``, so a reader neither parses a

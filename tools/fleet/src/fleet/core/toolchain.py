@@ -21,7 +21,6 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.capability import PROBE_NAME, Capability, measured
 from fleet.contracts.detection import GPU_PROBE, TESTDB_PROBE
-from fleet.contracts.elevation import INTEGRITY_PROBE
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tagged_tools import TAGGED_TOOLS
 from fleet.contracts.toolchain import (
@@ -51,8 +50,7 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         One report per line naming a required tool, a tagged tool
         (``ffmpeg``), a package manager, a toolchain's probe line
         (``cargo``, ``cxx``, ``docker``, ``stack``), the CUDA device or test
-        database line (``gpu``, ``testdb``, :mod:`fleet.contracts.detection`)
-        or the session's token (``integrity``, :mod:`fleet.contracts.elevation`),
+        database line (``gpu``, ``testdb``, :mod:`fleet.contracts.detection`),
         in the order the node emitted them. Empty when no line did.
     """
     reports: list[ToolReport] = []
@@ -60,7 +58,7 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
         {tool["name"] for tool in REQUIRED_TOOLS + TAGGED_TOOLS}
         | set(PACKAGE_MANAGERS)
         | set(PROBE_NAME.values())
-        | {GPU_PROBE, TESTDB_PROBE, INTEGRITY_PROBE}
+        | {GPU_PROBE, TESTDB_PROBE}
     )
     for line in output.splitlines():
         parts = line.strip().split("=", 2)
@@ -134,17 +132,12 @@ def attempt_toolchain(
         ``NODE_TOOL_MISSING`` when it answered with no line this package
         recognises.
     """
-    # Under the stage root rather than the node's TEMP: ``$env:TEMP`` was
-    # tried first and is wrong, because the writer's single-quoted literal
-    # does not expand it and a node would grow a directory of that name. The
-    # writer creates the parent, so nothing needs to exist before the very
-    # first probe.
-    spoken = dialect.for_platform(node["platform"])
+    # Under the stage root, whose parent the writer creates, so nothing needs
+    # to exist before the very first probe.
     outcome = remote.attempt_script(
         node["host"],
-        spoken.script_path(node["stage_root"], names.toolchain_probe_stem(writer)),
-        spoken.toolchain_probe_script(),
-        platform=node["platform"],
+        dialect.script_path(node["stage_root"], names.toolchain_probe_stem(writer)),
+        dialect.TOOLCHAIN_PROBE_SCRIPT,
     )
     failure = outcome["failure"]
     if failure is not None:

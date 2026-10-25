@@ -13,10 +13,9 @@ starts and one as it ends::
 for each install step under the phase the registry names
 (:class:`fleet.contracts.source.InstallStep`), then for the recipe itself
 as the phase ``check``. The stamps are UTC and the duration whole seconds of
-wall clock, read by the node's own shell, so the three renders
-(:mod:`fleet.core.dialect_linux`, :mod:`fleet.core.linux_isolated_build`,
-:mod:`fleet.core.windows_build`) write the same text and one grep reads any
-transcript.
+wall clock, read by the node's own shell, so the two renders
+(:mod:`fleet.core.dialect`, :mod:`fleet.core.linux_isolated_build`) write
+the same text and one grep reads any transcript.
 
 WHY ``check`` IS ONE PHASE AND NOT LINT AND TEST. Splitting it would mean
 running ``make lint`` and ``make test`` as separate makes, and an MCPs
