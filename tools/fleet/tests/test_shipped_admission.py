@@ -60,7 +60,9 @@ demure carries both, one check at a time and only the projects pinned to it,
 for another reason than a measurement (MCPs board task c036582e): the corvis
 stack moves onto it from diphtheria, and the operator, 2026-10-24, "cuz
 diptheria is too small. so demure*will be dedicated as the server pc. not a
-worker." No project is pinned to it yet, so it checks none.
+worker." One project is pinned to it, MCPs/execution-served-demure, whose
+case reads its provisioning as the stack host, so it checks that and none
+other.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -256,7 +258,7 @@ def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
     assert declared == {"demure", "diphtheria"}
 
 
-def test_demure_checks_no_project_while_none_is_pinned_to_it() -> None:
+def test_demure_checks_its_served_lane_and_no_other_project() -> None:
     workspace = _shipped()
     node = workspace["nodes"]["demure"]
     codes = {
@@ -264,9 +266,12 @@ def test_demure_checks_no_project_while_none_is_pinned_to_it() -> None:
         for name, project in workspace["projects"].items()
     }
 
-    # Every project the registry ships is refused by the pin before its tags
-    # are read.
-    assert codes == dict.fromkeys(workspace["projects"], FleetErrorCode.NODE_NOT_PINNED)
+    # Every other project the registry ships is refused by the pin before its
+    # tags are read.
+    assert codes == {
+        **dict.fromkeys(workspace["projects"], FleetErrorCode.NODE_NOT_PINNED),
+        "MCPs/execution-served-demure": None,
+    }
 
 
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:

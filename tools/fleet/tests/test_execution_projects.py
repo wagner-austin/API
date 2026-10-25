@@ -232,7 +232,7 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     )
 
 
-@pytest.mark.parametrize("host", ["diphtheria", "colossus"])
+@pytest.mark.parametrize("host", ["diphtheria", "colossus", "demure"])
 def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     """MCPs/execution-served-<host> reads what that host's search container serves.
 
@@ -241,7 +241,10 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     bf7a9460), and its case reads 127.0.0.1:8090, which only that host's
     build reaches: a run on any other node would read nothing, and one run
     through the public tunnel reads whichever origin its node's route
-    reaches. So each project names its host, and every other node refuses it.
+    reaches. demure's lane reads the host's own provisioning as the stack
+    host, its boot target, daemon, GPU runtime and load sampler (MCPs board
+    task c036582e), which no other node holds either. So each project names
+    its host, and every other node refuses it.
     It holds no test database and no companion, so it takes the npm workspace
     build's tags and nothing more.
     """
