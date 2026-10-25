@@ -1,20 +1,32 @@
-"""The projects whose code holds no Windows code run on Linux (MCPs board task 6c89be43).
+"""Which shipped projects require Windows, and why (MCPs board tasks 6c89be43 and e35812cc).
 
-services/Model-Trainer required gpu and windows, and libs/cleargbm_rs and
-libs/covenant_nn windows and rust, unchanged since the registry split (API
-7769257b9). On 2026-10-24 none of the three directories held a .ps1, .bat or
-.cmd file, git grep for powershell, pwsh, win32, sys.platform, cfg(windows)
-or .exe found nothing but poetry.lock platform markers, and each Makefile
-includes scripts/make/shell.mk. loki, the one Windows node, carries neither a
-GPU nor rust, so no node could run any of them: three Model-Trainer checks
-had sat queued since 2026-10-14 and covenant_ml and cleargbm_rs checks since
-2026-10-22, every runner answering lacks-tags. The operator, that day: "bro
-we removed the eindoes code from model trainer why rhe fu l doesit need to
-run on windows??? same for rust what rhe fuck ??"
+loki is the fleet's one Windows node, at one check at a time, and it
+declares no GPU. Every project that required windows could run nowhere
+else, and one that required windows and gpu could run nowhere at all once
+austinpc, the Windows box with the 3090 Ti, was reinstalled as the Linux
+node demure on 2026-10-22. On 2026-10-24 the operator asked "what other
+shit is stale?" and "why is loki getting so many jobs?? like we should have
+barely any windows code."
 
-Each project is exercised against the shipped registry: it requires no
-windows tag, and an enabled Linux node, idle with memory to spare, grants it
-workers.
+services/Model-Trainer, libs/cleargbm_rs and libs/covenant_nn held no
+Windows code (6c89be43). Of the 23 projects still requiring windows on
+2026-10-25 (e35812cc), eight held none either: services/procart-api and
+clients/TankpitBot/web passed make check on demure as they stood; Dashboards, Dashboards/rabbit,
+metabolomics-dashboard and LSTM needed only their Makefiles ported from
+SHELL := powershell.exe to the two-shell form of API scripts/make/shell.mk
+(Dashboards 3418f26, metabolomics-dashboard aa6ad90, LSTM 2532210), with
+Dashboards' to_bash_path read the same on Linux (16ac1b9); idle needed its
+pre-commit hook committed executable (96a857b); and services/grandma-api
+already asserts it runs no PowerShell (tests/test_linux_only.py).
+
+So this file pins both halves against the shipped registry: the projects
+that still require windows are exactly :data:`WINDOWS_REASONS`, each with
+what in its own code needs Windows, and each of :data:`LINUX_PROJECTS`
+requires no windows and an enabled Linux node, idle with memory to spare,
+grants it workers. A tool tag (ffmpeg, chrome, hooks, go, pdftotext) is one
+no declaration holds; a runner adds it on the tick its probe finds the
+tool, so it is counted here as present and the project's fleet check on
+Linux is what shows a node has it.
 """
 
 from __future__ import annotations
@@ -24,19 +36,93 @@ from pathlib import Path
 import pytest
 
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
-from fleet.contracts.tags import NodeTag, node_tags
+from fleet.contracts.tags import TOOL_TAG, NodeTag, node_tags
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core.capacity import assess
 from fleet.core.workspace_files import read_workspace_document
 
-#: Each project and the enabled Linux nodes that grant it workers, measured
-#: against the shipped registry on 2026-10-25 (diphtheria carries the tags
-#: too and refuses, because it checks only the projects pinned to it).
-LINUX_GRANTS = {
-    "libs/cleargbm_rs": ("lacrymal", "serendipity"),
-    "libs/covenant_nn": ("lacrymal", "serendipity"),
-    "services/Model-Trainer": ("demure", "lavender"),
+#: Every shipped project that requires windows, and what in its own code
+#: needs a Windows host, read on 2026-10-25 (board task e35812cc).
+WINDOWS_REASONS = {
+    "MCPs/execution": (
+        "the Windows lane of MCPs' real-machine suite (execution/README.md), whose cases run "
+        "Windows host code on the machine itself; MCPs/execution-linux is the Linux lane"
+    ),
+    "MCPs/packages/claude-hooks": (
+        "the hooks' Windows half: pyproject.toml pins mypy to platform win32 and the "
+        "sys.platform blocks run as Windows runs them; MCPs/packages/claude-hooks-linux is "
+        "the Linux half"
+    ),
+    "MCPs/scripts/ps-harness": (
+        "26 of its 27 files are .ps1, guarded, analysed and executed by Pester, and its "
+        "provision suites register real scheduled tasks under S4U on the elevated runner"
+    ),
+    "tools/ps-harness": (
+        "runs MCPs' ps-harness over every tracked API .ps1, registering real S4U scheduled "
+        "tasks on the elevated runner (its Makefile)"
+    ),
+    "chat": (
+        "its Makefile runs under powershell.exe and its 32 .ps1 scripts are covered by Pester "
+        "and PSScriptAnalyzer suites"
+    ),
+    "chat/execution": (
+        "its Pester deploy suite (execution/tests/Deploy.Execution.ps1) installs "
+        "cloudflared-windows-amd64.exe and reads the host's System32 nvidia-smi.exe"
+    ),
+    "clients/NavProbe": (
+        "scripts/_test_hooks.py calls kernel32 through ctypes.WinDLL, which mypy and the "
+        "tests reach only on Windows; on Linux mypy reports six errors there"
+    ),
+    "clients/TankpitBot": (
+        "the Windows half of a pair with clients/TankpitBot-linux: its host_windows cases "
+        "test Windows' own file-replace and process-exit behaviour (tests/_host.py)"
+    ),
+    "clients/TankpitBot-execution": (
+        "its live cases play the public demo in the installed Microsoft Edge every Windows "
+        "node ships (tests/live/_visitor.py)"
+    ),
+    "corvis-stick": (
+        "its root Makefile runs under powershell.exe and its 61 .ps1 scripts are executed by "
+        "Pester to 100 percent of commands and branch arms"
+    ),
+    "corvis-stick/execution": (
+        "the Windows lane of the drive's real-machine smoke (execution/Makefile); "
+        "corvis-stick/execution-linux is the Linux lane"
+    ),
+    "libs/instrument_io": (
+        "its six Thermo .raw integration cases run the committed .NET "
+        "ThermoRawFileParser.exe, which executes natively only on Windows, and no Linux node "
+        "carries mono; on Linux they skip"
+    ),
+    "slime": (
+        "scripts/performance-cores.ts reads Windows CPU sets and sets affinity through "
+        "PowerShell, and only its real cases cover it under the 100 percent gate; on Linux "
+        "they fail spawnSync powershell.exe ENOENT"
+    ),
+    "tools/fleet-execution": (
+        "the Windows lane of tools/fleet's host cases, which run rendered PowerShell for "
+        "real; tools/fleet-execution-linux is the Linux lane"
+    ),
+    "tree-bot": (
+        "its Makefile runs under powershell.exe and its 100 percent gate includes five "
+        "folder-picker cases that run only on Windows (tests/ui/test_folder_picker.py)"
+    ),
 }
+
+#: The projects whose windows tag was dropped because nothing in them needs it.
+LINUX_PROJECTS = (
+    "Dashboards",
+    "Dashboards/rabbit",
+    "LSTM",
+    "clients/TankpitBot/web",
+    "idle",
+    "libs/cleargbm_rs",
+    "libs/covenant_nn",
+    "metabolomics-dashboard",
+    "services/Model-Trainer",
+    "services/grandma-api",
+    "services/procart-api",
+)
 
 
 def _shipped() -> FleetWorkspace:
@@ -73,19 +159,29 @@ def _idle(node: NodeConfig) -> NodeState:
     )
 
 
-@pytest.mark.parametrize(("project_name", "granting"), sorted(LINUX_GRANTS.items()))
-def test_the_project_requires_no_windows_and_enabled_linux_nodes_grant_it(
-    project_name: str, granting: tuple[str, ...]
+def test_the_projects_requiring_windows_are_exactly_those_with_a_reason() -> None:
+    windows = sorted(
+        name
+        for name, project in _shipped()["projects"].items()
+        if NodeTag.WINDOWS in project["required_tags"]
+    )
+    assert windows == sorted(WINDOWS_REASONS)
+
+
+@pytest.mark.parametrize("project_name", LINUX_PROJECTS)
+def test_the_project_requires_no_windows_and_an_enabled_linux_node_grants_it(
+    project_name: str,
 ) -> None:
     workspace = _shipped()
     project = workspace["projects"][project_name]
+    detected = frozenset(project["required_tags"]) & frozenset(TOOL_TAG.values())
 
     assert NodeTag.WINDOWS not in project["required_tags"]
-    granted = tuple(
+    granted = [
         name
         for name, node in sorted(workspace["nodes"].items())
         if node["platform"] == "linux"
         and node["enabled"]
-        and assess(node, _idle(node), project, node_tags(node))["workers"] > 0
-    )
-    assert granted == granting
+        and assess(node, _idle(node), project, node_tags(node) | detected)["workers"] > 0
+    ]
+    assert granted, f"no enabled Linux node grants {project_name} workers"
