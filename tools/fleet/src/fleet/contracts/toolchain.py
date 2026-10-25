@@ -70,18 +70,6 @@ class ToolReport(TypedDict):
     version: str
 
 
-#: The exact Python a node is given when it has none.
-#:
-#: THE DECISION THIS PACKAGE ONCE REFUSED TO MAKE, made by the operator on
-#: 2026-09-23 after lavender took slime checks it could not run: the
-#: python.org build, at user scope, at the version every node already
-#: carried (sedona, lavender and the hub all answered ``Python 3.11.9`` from
-#: ``%LOCALAPPDATA%\\Programs\\Python\\Python311`` that day). User scope needs
-#: no elevation and lands at that same path, ahead of the Store alias on the
-#: user PATH. :data:`REQUIRED_PYTHON` is what a node is judged against; this
-#: is only what an install puts there, and a later 3.11 patch still passes.
-PINNED_PYTHON: Final = "3.11.9"
-
 #: The Poetry every install puts on a machine, and every host that commits or
 #: bakes a working tree (the hub, the session host, diphtheria) runs: the one
 #: every committed lock was written by. Measured 2026-10-17 (MCPs board task
@@ -90,40 +78,6 @@ PINNED_PYTHON: Final = "3.11.9"
 #: then carries that rewrite. Readers outside this package take it from
 #: ``rendered/toolchain-pins.json`` (:mod:`fleet.core.toolchain_document`).
 PINNED_POETRY: Final = "2.4.2"
-
-#: Why a python install stops on a machine where this version is already registered.
-#:
-#: MEASURED ON LAVENDER, 2026-09-23. GitHub Actions' setup-python had put
-#: 3.11.9 in the runner's tool cache with the same python.org installer, and
-#: its component packages were registered machine-wide. The per-user winget
-#: install of the identical version was taken as a change to those same
-#: products and MOVED their files to ``Python311``: the tool cache kept only
-#: ``site-packages`` and ``Scripts``, and every Windows Python job on that
-#: runner failed at ``pip install poetry`` until the files were copied back.
-#: A registration without a usable python on the build PATH means an
-#: interpreter exists somewhere a second install would uproot, so the command
-#: stops with the reason instead, and the fix is to put that interpreter on
-#: the PATH. A node with python already on its PATH never reaches this, since
-#: it is not missing one.
-PYTHON_REGISTERED_MESSAGE: Final = (
-    f"Python {PINNED_PYTHON} is already registered on this machine (a setup-python tool "
-    "cache is one such copy); installing it again moves that copy's files, as it did on "
-    "lavender 2026-09-23. Put the registered interpreter on the build account's PATH instead."
-)
-
-#: The PowerShell that stops an install with :data:`PYTHON_REGISTERED_MESSAGE`.
-#:
-#: One plain line on stderr rather than ``Write-Error``, whose record wraps the
-#: text in a category and a position, so the node's transcript and the failed
-#: install's AppError carry the sentence and nothing else.
-PYTHON_REGISTERED_GUARD: Final = (
-    "if (Get-ItemProperty "
-    "'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*',"
-    "'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*' "
-    "-ErrorAction SilentlyContinue | Where-Object { $_.DisplayName -like "
-    f"'Python {PINNED_PYTHON} Core Interpreter*' }}) {{ [Console]::Error.WriteLine("
-    "'" + PYTHON_REGISTERED_MESSAGE.replace("'", "''") + "'); exit 1 }; "
-)
 
 #: Everything a node needs to run a project's ``make check``.
 #:
@@ -134,9 +88,11 @@ PYTHON_REGISTERED_GUARD: Final = (
 #: ``node`` joined on 2026-09-23 for the same reason: every node answered
 #: v24 that day, but nothing asked, and slime's check (tsc, eslint, vitest)
 #: cannot start without it. Presence is the requirement, like git and make.
-#: The winget and choco packages are each manager's current LTS, which was
-#: 24 on both when this was written (OpenJS.NodeJS.LTS 24.19.0, nodejs-lts
-#: 24.21.0).
+#:
+#: ``python`` and ``node`` carry no install command: winget and choco were
+#: the only managers that installed them, and those left with the fleet's
+#: last Windows node (board task e705f08c); a Linux node gets both from its
+#: provisioning, never from a dispatch.
 #:
 #: ``ffmpeg`` is NOT on this list, although it was from 2026-10-01 (MCPs board
 #: task 512e7bf8) to 2026-10-02: only grandma-api's check uses it, and as a
@@ -148,24 +104,8 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="python",
         reason="every project pins Python 3.11; poetry builds its venv from it",
-        install={
-            "winget": (
-                f"{PYTHON_REGISTERED_GUARD}winget install --id Python.Python.3.11 "
-                f"--version {PINNED_PYTHON} -e --scope user --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": (
-                f"{PYTHON_REGISTERED_GUARD}choco install python311 --version {PINNED_PYTHON} -y"
-            ),
-        },
-        uninstall={
-            "winget": (
-                f"winget uninstall --id Python.Python.3.11 --version {PINNED_PYTHON} -e "
-                "--scope user --source winget --silent --accept-source-agreements "
-                "--disable-interactivity"
-            ),
-            "choco": f"choco uninstall python311 --version {PINNED_PYTHON} -y",
-        },
+        install={},
+        uninstall={},
     ),
     RequiredTool(
         name="poetry",
@@ -182,52 +122,20 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="git",
         reason="some suites read the repository state they are testing",
-        install={
-            "winget": "winget install --id Git.Git -e --source winget --accept-source-agreements",
-            "choco": "choco install git -y",
-            "apt-get": "sudo apt-get install -y git",
-        },
-        uninstall={
-            "winget": "winget uninstall --id Git.Git -e --source winget --accept-source-agreements",
-            "choco": "choco uninstall git -y",
-            "apt-get": "sudo apt-get remove -y git",
-        },
+        install={"apt-get": "sudo apt-get install -y git"},
+        uninstall={"apt-get": "sudo apt-get remove -y git"},
     ),
     RequiredTool(
         name="make",
         reason="make check is the entry point for every project in this monorepo",
-        install={
-            "winget": (
-                "winget install --id GnuWin32.Make -e --source winget --accept-source-agreements"
-            ),
-            "choco": "choco install make -y",
-            "apt-get": "sudo apt-get install -y make",
-        },
-        uninstall={
-            "winget": (
-                "winget uninstall --id GnuWin32.Make -e --source winget --accept-source-agreements"
-            ),
-            "choco": "choco uninstall make -y",
-            "apt-get": "sudo apt-get remove -y make",
-        },
+        install={"apt-get": "sudo apt-get install -y make"},
+        uninstall={"apt-get": "sudo apt-get remove -y make"},
     ),
     RequiredTool(
         name="node",
         reason="slime and the TypeScript packages run tsc, eslint and vitest under node",
-        install={
-            "winget": (
-                "winget install --id OpenJS.NodeJS.LTS -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install nodejs-lts -y",
-        },
-        uninstall={
-            "winget": (
-                "winget uninstall --id OpenJS.NodeJS.LTS -e --source winget --silent "
-                "--accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco uninstall nodejs-lts -y",
-        },
+        install={},
+        uninstall={},
     ),
     RequiredTool(
         name="tar",
@@ -250,21 +158,14 @@ REQUIRED_TOOLS: Final[tuple[RequiredTool, ...]] = (
 #: manager from the tool is what lets that node report the interpreter it has
 #: without being offered an install command that cannot work on it.
 #:
-#: ``winget`` before ``choco`` because it ships with Windows and needs no
-#: elevation for a user-scope install, while choco is a deliberate
-#: installation somebody made. Measured 2026-09-04: sedona has both, lavender
-#: only winget, loki only choco -- so the order decides only sedona, and
-#: either would work there.
-#:
-#: ``pipx`` and ``apt-get`` are the Linux pair, added with the first Linux
-#: node (diphtheria, 2026-09-20). ``pipx`` is how poetry documents its own
+#: ``pipx`` and ``apt-get`` were added with the first Linux node
+#: (diphtheria, 2026-09-20). ``pipx`` is how poetry documents its own
 #: install. ``apt-get`` is spelled with ``sudo`` because a package install is
-#: root's act on that platform; the node's account must be allowed it, and
-#: the command failing on a password prompt is the honest answer when it is
-#: not. A Windows probe never reports these two and a Linux probe never
-#: reports the Windows three, so the order only ever decides among managers
-#: one platform has.
-PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("pip", "pipx", "winget", "choco", "apt-get")
+#: root's act; the node's account must be allowed it, and the command failing
+#: on a password prompt is the honest answer when it is not. ``winget`` and
+#: ``choco``, the Windows pair, left with the fleet's last Windows node
+#: (board task e705f08c).
+PACKAGE_MANAGERS: Final[tuple[str, ...]] = ("pip", "pipx", "apt-get")
 
 #: The Python a project's environment is built from.
 #:
@@ -290,9 +191,9 @@ def missing(reports: tuple[ToolReport, ...]) -> tuple[str, ...]:
 
     Filtered to :data:`REQUIRED_TOOLS` rather than returning everything the
     probe found absent, because the probe also asks about package managers
-    and a node is not required to have any particular one. Unfiltered, loki
-    -- which has choco and no winget -- would be reported as missing a tool
-    and refused, though it can build perfectly well.
+    and a node is not required to have any particular one. Unfiltered, a
+    node without pipx would be reported as missing a tool and refused,
+    though it can build perfectly well.
 
     Args:
         reports: What the node answered, which covers the required tools and
@@ -317,7 +218,7 @@ def version_number(reported: str) -> str:
     caught it.
 
     The LAST whitespace-separated token, because every tool here leads with
-    its own name and some add more: ``git version 2.50.1.windows.1``,
+    its own name and some add more: ``git version 2.43.0``,
     ``Poetry (version 2.1.3)``. A tool that printed only a number is
     unaffected, which is what makes this safe to apply to all of them.
 
@@ -469,9 +370,9 @@ def describe_gap(node: str, reports: tuple[ToolReport, ...]) -> str:
 
     Returns:
         One line naming what is absent and what would install it ON THIS
-        NODE, or a line saying the node is ready. Node-specific because the
-        fleet does not share a package manager: the same missing ``make`` is
-        a winget command on lavender and a choco one on loki.
+        NODE, or a line saying the node is ready. Node-specific because a
+        node has the package managers it has, and one without ``apt-get``
+        gets no command for ``make``.
     """
     if is_ready(reports):
         return f"{node}: ready"
@@ -554,9 +455,6 @@ def decode_tool_report(value: JSONValue) -> ToolReport:
 __all__ = [
     "PACKAGE_MANAGERS",
     "PINNED_POETRY",
-    "PINNED_PYTHON",
-    "PYTHON_REGISTERED_GUARD",
-    "PYTHON_REGISTERED_MESSAGE",
     "REQUIRED_NODE_MAJOR",
     "REQUIRED_PYTHON",
     "REQUIRED_TOOLS",

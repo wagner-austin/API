@@ -34,7 +34,7 @@ from platform_core.json_utils import (
 from typing_extensions import TypedDict
 
 from fleet.contracts.machine import Machine, decode_machine, encode_machine
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.pins import check_pinned_nodes
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
@@ -416,37 +416,6 @@ def _decode_data_paths(
     return paths
 
 
-def _check_wsl_hosts(nodes: dict[str, NodeConfig]) -> dict[str, NodeConfig]:
-    """Refuse a ``wsl_host`` that is not another Windows node of this workspace.
-
-    Args:
-        nodes: The decoded nodes.
-
-    Returns:
-        The same nodes.
-
-    Raises:
-        JSONTypeError: If a node's ``wsl_host`` names no declared node, or a
-            node that is not Windows: the tick that asks the host what it sees
-            would ask a machine it cannot reach, or one with no WSL to report.
-    """
-    for name in sorted(nodes):
-        host = nodes[name]["wsl_host"]
-        if host is None:
-            continue
-        declared = nodes.get(host)
-        if declared is None:
-            raise JSONTypeError(
-                f"machines[{name!r}].guest names {host!r}, which declares no dispatch capacity"
-            )
-        if declared["platform"] is not NodePlatform.WINDOWS:
-            raise JSONTypeError(
-                f"machines[{name!r}].guest names {host!r}, a {declared['platform'].value} node; "
-                "only a windows node runs WSL"
-            )
-    return nodes
-
-
 def _encloses(data_path: str, project_path: str) -> bool:
     """Whether a data directory contains a project's own tree.
 
@@ -479,8 +448,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
             mistyped, the machine or project mapping is empty, no machine
             declares capacity, a machine fails
             :func:`fleet.contracts.machine.decode_machine`, a node-local
-            resource is declared by no project, a node's ``wsl_host`` is not
-            another Windows node, a
+            resource is declared by no project, a
             project is pinned to a node it cannot match, the
             node serve or poll lies outside its bounds, or a node or project fails
             its own decoder.
@@ -491,13 +459,11 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         name: decode_machine(name, machine)
         for name, machine in _decode_named(value, "machines").items()
     }
-    nodes = _check_wsl_hosts(
-        {
-            name: node
-            for name, machine in machines.items()
-            if (node := machine["dispatch"]) is not None
-        }
-    )
+    nodes = {
+        name: node
+        for name, machine in machines.items()
+        if (node := machine["dispatch"]) is not None
+    }
     if not nodes:
         raise JSONTypeError(
             "no machine declares what dispatch may take from it; the workspace could dispatch "

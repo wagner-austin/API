@@ -89,14 +89,14 @@ PATH_PATTERN: Final[re.Pattern[str]] = re.compile(
 )
 
 #: One argv element of an install step: a word or a ``-flag``. The tokens are
-#: joined with spaces, unquoted, into both dialects' scripts, so the leading
-#: character may not be one either shell reads (``@`` splats in PowerShell,
-#: ``$`` expands in both) and no position may carry whitespace or a quote.
+#: joined with spaces, unquoted, into the dialect's sh scripts, so the
+#: leading character may not be one sh reads (``$`` expands, ``~`` names a
+#: home), and no position may carry whitespace or a quote.
 INSTALL_TOKEN: Final[re.Pattern[str]] = re.compile(r"\A[A-Za-z0-9-][A-Za-z0-9._/@:=-]*\Z")
 
 #: The phase an install step belongs to: lowercase words joined by single
-#: hyphens. It is written into the transcript's ``fleet-phase`` lines by both
-#: dialects, so it carries nothing either shell reads.
+#: hyphens. It is written into the transcript's ``fleet-phase`` lines by the
+#: dialect, so it carries nothing sh reads.
 PHASE_PATTERN: Final[re.Pattern[str]] = re.compile(r"\A[a-z][a-z0-9]*(?:-[a-z0-9]+)*\Z")
 
 #: The ref a companion's tip is exported from: a branch name, or its full

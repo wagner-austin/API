@@ -1,24 +1,20 @@
-"""What every GitHub Actions runner install declares, on Linux and on Windows alike.
+"""What every GitHub Actions runner install declares to GitHub.
 
-MCPs board task 1e9ab738, its decision 7cd7182a's review: a runner install
-on lavender (:class:`fleet.contracts.runners.RunnerInstall`) and one on loki
-(:class:`fleet.contracts.runner_windows.WindowsRunnerInstall`) are the same
-registration in two places, so the four facts GitHub knows it by are
-declared, validated and spelled here once, and each platform's install adds
-only where it lives. Until then each platform declared the four itself and
-held them to different rules: the Windows decoder refused a runner name that
-was empty, a label holding a comma and a service the configuration would not
-create, and the Linux decoder refused none of them, while the registrations
-audit in :mod:`fleet.cli._runner_acts` read ``repo`` from both and so relied
-on the two staying parallel.
+MCPs board task 1e9ab738, its decision 7cd7182a's review: the four facts
+GitHub knows a runner install by are declared, validated and spelled here
+once, and :class:`fleet.contracts.runners.RunnerInstall` adds only where the
+install lives. The rules were lifted from the Windows decoder of that time,
+which refused a runner name that was empty, a label holding a comma and a
+service the configuration would not create, while the Linux one refused none
+of them; the Windows installs left the roster with loki on 2026-10-25 (board
+task e705f08c), and the rules stayed.
 
-THE SERVICE IS THE CONFIGURATION'S OWN NAME. ``config.sh`` and ``config.cmd``
-both name a runner's service ``actions.runner.<owner>-<repo>.<name>``, which
-systemd spells with its ``.service`` suffix and the Windows service manager
-without one. The roster records it exactly rather than deriving it, because
-"is the service running" is the audit question, and the decoder holds it to
-the name the configuration gives, so a roster cannot name a service no
-install will ever create.
+THE SERVICE IS THE CONFIGURATION'S OWN NAME. ``config.sh`` names a runner's
+service ``actions.runner.<owner>-<repo>.<name>``, which systemd spells with
+its ``.service`` suffix. The roster records it exactly rather than deriving
+it, because "is the service running" is the audit question, and the decoder
+holds it to the name the configuration gives, so a roster cannot name a
+service no install will ever create.
 """
 
 from __future__ import annotations
@@ -28,8 +24,8 @@ from typing import Final
 from platform_core.json_utils import JSONObject, JSONTypeError, require_str, require_str_list
 from typing_extensions import TypedDict
 
-#: The suffix systemd gives a Linux runner's unit; a Windows service has none.
-LINUX_UNIT_SUFFIX: Final = ".service"
+#: The suffix systemd gives a runner's unit.
+UNIT_SUFFIX: Final = ".service"
 
 
 class RunnerRegistration(TypedDict):
@@ -39,9 +35,9 @@ class RunnerRegistration(TypedDict):
         repo: The repository it is registered to, ``owner/name`` form;
             registrations are per repository, which is why one machine
             carries many.
-        runner_name: The registration's name, e.g. ``lavender-2`` or
-            ``loki``. Names are per repository: two installs on one machine
-            may share a name across repositories without being one install.
+        runner_name: The registration's name, e.g. ``lavender-2``. Names are
+            per repository: two installs on one machine may share a name
+            across repositories without being one install.
         service: The service the configuration creates for it
             (:func:`runner_service_name`), recorded exactly because "is the
             service running" is the audit question.
@@ -57,19 +53,17 @@ class RunnerRegistration(TypedDict):
     labels: list[str]
 
 
-def runner_service_name(repo: str, runner_name: str, *, unit_suffix: str) -> str:
+def runner_service_name(repo: str, runner_name: str) -> str:
     """The service the runner's configuration creates for one registration.
 
     Args:
         repo: The repository, ``owner/name``.
         runner_name: The registration's name.
-        unit_suffix: :data:`LINUX_UNIT_SUFFIX` for a systemd unit, empty for
-            a Windows service.
 
     Returns:
-        ``actions.runner.<owner>-<repo>.<name>`` and the suffix.
+        ``actions.runner.<owner>-<repo>.<name>.service``.
     """
-    return f"actions.runner.{repo.replace('/', '-')}.{runner_name}{unit_suffix}"
+    return f"actions.runner.{repo.replace('/', '-')}.{runner_name}{UNIT_SUFFIX}"
 
 
 def encode_runner_registration(registration: RunnerRegistration) -> JSONObject:
@@ -89,12 +83,11 @@ def encode_runner_registration(registration: RunnerRegistration) -> JSONObject:
     }
 
 
-def decode_runner_registration(value: JSONObject, *, unit_suffix: str) -> RunnerRegistration:
+def decode_runner_registration(value: JSONObject) -> RunnerRegistration:
     """Decode and validate the four registration fields of an install.
 
     Args:
         value: The install's JSON object.
-        unit_suffix: The platform's service suffix (:func:`runner_service_name`).
 
     Returns:
         The registration.
@@ -115,7 +108,7 @@ def decode_runner_registration(value: JSONObject, *, unit_suffix: str) -> Runner
     if not runner_name:
         raise JSONTypeError("runner_name must be non-empty")
     service = require_str(value, "service")
-    expected = runner_service_name(repo, runner_name, unit_suffix=unit_suffix)
+    expected = runner_service_name(repo, runner_name)
     if service != expected:
         raise JSONTypeError(
             f"service must be {expected!r}, the name the runner's configuration gives "
@@ -134,7 +127,7 @@ def decode_runner_registration(value: JSONObject, *, unit_suffix: str) -> Runner
 
 
 __all__ = [
-    "LINUX_UNIT_SUFFIX",
+    "UNIT_SUFFIX",
     "RunnerRegistration",
     "decode_runner_registration",
     "encode_runner_registration",

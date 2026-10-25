@@ -39,11 +39,10 @@ class RequiredTool(TypedDict):
 
             A MAPPING RATHER THAN ONE COMMAND, and this was a defect before
             it was a design. The first version hardcoded ``choco install`` --
-            inferred from loki's ``make`` living under
-            ``C:\\ProgramData\\chocolatey``, one node generalised to three.
-            Measured 2026-09-04: sedona has both managers, lavender has ONLY
-            winget, loki has ONLY choco. No single command works fleet-wide,
-            so the manager is chosen per node from what that node reported.
+            inferred from one Windows node's ``make``, one node generalised
+            to three. Measured 2026-09-04, the three nodes had three
+            different sets of managers, so the manager is chosen per node
+            from what that node reported.
         uninstall: The command per package manager that removes what that
             manager's ``install`` command put there, keyed exactly as
             ``install`` is. It is how an install that did not finish is
@@ -92,7 +91,7 @@ HOOKS_CHECK_PACKAGES: Final = (
 #: version beside it, and 1 otherwise, a missing one included (its
 #: ``PackageNotFoundError`` ends it). Until 2026-10-16 the probe asked only
 #: that the modules import, so a node kept whatever versions it was first
-#: given. It holds no quote character, so bash and cmd.exe pass it unchanged.
+#: given. It holds no quote character, so a shell passes it unchanged.
 HOOKS_CHECK_PROGRAM: Final = (
     "import sys, importlib.metadata as m; a = sys.argv[1:]; "
     "sys.exit(any(m.version(a[i]) != a[i + 1] for i in range(0, len(a), 2)))"
@@ -111,7 +110,7 @@ GO_VERSION_ARGUMENT: Final = "version"
 
 #: Where Playwright's channel ``chrome`` launches Google Chrome on Linux, the
 #: one path MCPs ``web-scraper``'s real-browser cases open
-#: (``src/hooks/browser.ts``), so it is the one path the Linux probe asks for.
+#: (``src/hooks/browser.ts``), so it is the one path the probe asks for.
 #: ``/usr/bin/google-chrome`` is a symlink the same package installs, but a
 #: node that carries only the symlink would answer present and fail the
 #: suite, so the probe asks for the binary itself. Measured 2026-10-09 (MCPs
@@ -120,21 +119,6 @@ GO_VERSION_ARGUMENT: Final = "version"
 #: fleet jobs 56d7fbb5 and 3f9131af failed there with ``browserType.launch:
 #: Chromium distribution 'chrome' is not found at /opt/google/chrome/chrome``.
 CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
-
-#: Where Playwright's channel ``chrome`` launches Google Chrome on Windows,
-#: relative to each of the three roots it tries in order: ``%ProgramFiles%``,
-#: ``%ProgramFiles(x86)%`` and ``%LOCALAPPDATA%`` (a per-user install). The
-#: Windows probe takes the roots as a parameter so its Pester suite can lay
-#: out a stand-in, and answers the first that exists.
-CHROME_WINDOWS_RELATIVE: Final = ("Google", "Chrome", "Application", "chrome.exe")
-
-#: Where MCPs ``packages/wiki-check`` finds pdftotext on Windows: its
-#: Makefile runs vitest with ``C:/Program Files/Git/mingw64/bin`` first on
-#: PATH, the poppler build Git for Windows ships, because a vitest worker
-#: launched from PowerShell has no Git Bash PATH. The Windows probe asks for
-#: this file first and the PATH after it, the order the suite resolves the
-#: name in.
-PDFTOTEXT_WINDOWS_PATH: Final = "C:\\Program Files\\Git\\mingw64\\bin\\pdftotext.exe"
 
 #: Tools only some projects need, each the source of a capability tag
 #: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
@@ -157,42 +141,25 @@ PDFTOTEXT_WINDOWS_PATH: Final = "C:\\Program Files\\Git\\mingw64\\bin\\pdftotext
 #: 874c160c on 2026-10-04 and 56d7fbb5 on 2026-10-09, both on diphtheria,
 #: while lavender-wsl, whose runner provisioning installed Chrome as a
 #: ``runners.json`` asset, passed the same suite). It is not an executable on
-#: a PATH on either platform, so each probe asks for it at the path
-#: Playwright opens (:data:`CHROME_LINUX_PATH`, :data:`CHROME_WINDOWS_RELATIVE`)
-#: rather than through ``report``'s ``command -v`` or ``Find-Tool``. The
-#: apt-get install is the asset's own ``provision_command``: Google ships the
-#: .deb from its own host, not from any apt repository the node already has.
+#: a PATH, so the probe asks for it at the path Playwright opens
+#: (:data:`CHROME_LINUX_PATH`) rather than through ``report``'s
+#: ``command -v``. The apt-get install is the asset's own
+#: ``provision_command``: Google ships the .deb from its own host, not from
+#: any apt repository the node already has.
 #:
 #: ``pdftotext`` because MCPs ``packages/wiki-check`` reads PDF sources
 #: through poppler's pdftotext and its audit rules depend on that tool's
 #: exact form-feed page breaks, so the suite cannot pass without it, and no
-#: tag named it (MCPs board task 6dd73ada). On 2026-10-11 every live runner
-#: had it only by accident: diphtheria, colossus and lavender-wsl in
-#: ``/usr/bin``, the Windows nodes at :data:`PDFTOTEXT_WINDOWS_PATH`, while
-#: the runner roster's ``apt_packages`` did not carry poppler-utils, so a
-#: lavender-wsl rebuild would have dropped it. On Windows the install is Git
-#: for Windows itself, whose full installer carries that build (MinGit does
-#: not).
+#: tag named it (MCPs board task 6dd73ada). On 2026-10-11 every live Linux
+#: runner had it only by accident, in ``/usr/bin``, while the runner roster's
+#: ``apt_packages`` did not carry poppler-utils, so a lavender-wsl rebuild
+#: would have dropped it.
 TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="ffmpeg",
         reason="grandma-api's check converts real audio files through ffmpeg",
-        install={
-            "winget": (
-                "winget install --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install ffmpeg -y",
-            "apt-get": "sudo apt-get install -y ffmpeg",
-        },
-        uninstall={
-            "winget": (
-                "winget uninstall --id Gyan.FFmpeg.Essentials -e --source winget --silent "
-                "--accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco uninstall ffmpeg -y",
-            "apt-get": "sudo apt-get remove -y ffmpeg",
-        },
+        install={"apt-get": "sudo apt-get install -y ffmpeg"},
+        uninstall={"apt-get": "sudo apt-get remove -y ffmpeg"},
     ),
     RequiredTool(
         name="hooks",
@@ -212,22 +179,8 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="go",
         reason="MCPs rcs-bridge is a Go module whose check runs go vet, staticcheck and go test",
-        install={
-            "winget": (
-                "winget install --id GoLang.Go -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install golang -y",
-            "apt-get": "sudo apt-get install -y golang-go",
-        },
-        uninstall={
-            "winget": (
-                "winget uninstall --id GoLang.Go -e --source winget --silent "
-                "--accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco uninstall golang -y",
-            "apt-get": "sudo apt-get remove -y golang-go",
-        },
+        install={"apt-get": "sudo apt-get install -y golang-go"},
+        uninstall={"apt-get": "sudo apt-get remove -y golang-go"},
     ),
     RequiredTool(
         name="chrome",
@@ -236,11 +189,6 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "Chrome, in three real-browser cases"
         ),
         install={
-            "winget": (
-                "winget install --id Google.Chrome -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install googlechrome -y",
             "apt-get": (
                 "curl -fsSL -o /tmp/google-chrome-stable_current_amd64.deb "
                 "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && "
@@ -248,14 +196,7 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
                 "rm -f /tmp/google-chrome-stable_current_amd64.deb"
             ),
         },
-        uninstall={
-            "winget": (
-                "winget uninstall --id Google.Chrome -e --source winget --silent "
-                "--accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco uninstall googlechrome -y",
-            "apt-get": "sudo apt-get remove -y google-chrome-stable",
-        },
+        uninstall={"apt-get": "sudo apt-get remove -y google-chrome-stable"},
     ),
     RequiredTool(
         name="pdftotext",
@@ -263,35 +204,19 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
             "MCPs wiki-check's audit rules read PDF sources through poppler's pdftotext and "
             "depend on its exact page breaks"
         ),
-        install={
-            "winget": (
-                "winget install --id Git.Git -e --source winget --silent "
-                "--accept-package-agreements --accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco install git -y",
-            "apt-get": "sudo apt-get install -y poppler-utils",
-        },
-        uninstall={
-            "winget": (
-                "winget uninstall --id Git.Git -e --source winget --silent "
-                "--accept-source-agreements --disable-interactivity"
-            ),
-            "choco": "choco uninstall git -y",
-            "apt-get": "sudo apt-get remove -y poppler-utils",
-        },
+        install={"apt-get": "sudo apt-get install -y poppler-utils"},
+        uninstall={"apt-get": "sudo apt-get remove -y poppler-utils"},
     ),
 )
 
 
 __all__ = [
     "CHROME_LINUX_PATH",
-    "CHROME_WINDOWS_RELATIVE",
     "GO_VERSION_ARGUMENT",
     "HOOKS_CHECK_ARGUMENTS",
     "HOOKS_CHECK_PACKAGES",
     "HOOKS_CHECK_PROGRAM",
     "HOOKS_ROUTE_FILE",
-    "PDFTOTEXT_WINDOWS_PATH",
     "TAGGED_TOOLS",
     "RequiredTool",
 ]

@@ -37,12 +37,16 @@ spelled a second time in :mod:`fleet.core.capacity`.
 
 So ``enabled`` is said once, whether the machine is expected to answer, and
 a node dispatches exactly when it is enabled and not held. ``host`` is the
-machine's name, which is its ssh alias everywhere, and a node runs inside
-another's WSL exactly when its ``guest`` names a host.
+machine's name, which is its ssh alias everywhere.
+
+EVERY MACHINE IS LINUX (board task e705f08c). The fleet renders only ``sh``
+(:mod:`fleet.core.dialect`), so a ``platform`` other than ``linux`` is
+refused rather than carried: loki, the last Windows machine, left the roster
+on 2026-10-25 and returns through enrolment once it runs NixOS.
 
 THIS PACKAGE DECODES WHAT IT READS. The identity fields only MCPs reads
 (``tailnetIp``, ``reachKey``, ``bootMac``, ``netbootWifi``, ``installDisk``,
-``disabledUntil``, ``tunnel``, ``guest.sshPort``, ``duties``, ``standby``,
+``disabledUntil``, ``tunnel``, ``guest``, ``duties``, ``standby``,
 ``ciWorkersPerRunner``, ``boot``, ``notes``) are decoded by MCPs
 ``fleet-mcp``'s registry decoder, which every fleet audit runs over this
 directory; deciding their shapes twice, in two languages, would be the
@@ -74,13 +78,10 @@ from platform_core.json_utils import (
 from platform_core.members import find_member
 from typing_extensions import TypedDict
 
-from fleet.contracts.node import (
-    NodeConfig,
-    NodePlatform,
-    decode_node_config,
-    decode_node_platform,
-    encode_node_config,
-)
+from fleet.contracts.node import NodeConfig, decode_node_config, encode_node_config
+
+#: The one ``platform`` a machine file may declare.
+PLATFORM = "linux"
 
 
 class MachineRole(StrEnum):
@@ -123,12 +124,8 @@ class Machine(TypedDict):
         role: What it is for.
         user: The account the fleet provisioned on it, or None for a client,
             which is never provisioned.
-        platform: Its operating-system family, the dialect every script to
-            it is rendered in.
         enabled: Whether it is expected to answer at all.
         ledger_observer: The arm that records its sessions in the ledger.
-        guest_host: The machine it runs inside and is reached through, or
-            None for one on the tailnet in its own right.
         dispatch: What dispatch may take from it, or None when it declares
             no capacity.
         held: Why its runners claim no work, or None when they do or when
@@ -139,10 +136,8 @@ class Machine(TypedDict):
     name: str
     role: MachineRole
     user: str | None
-    platform: NodePlatform
     enabled: bool
     ledger_observer: LedgerObserver
-    guest_host: str | None
     dispatch: NodeConfig | None
     held: str | None
 
@@ -159,10 +154,9 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
 
     Raises:
         JSONTypeError: If the value is not an object, a field this package
-            reads is missing or mistyped, ``role``, ``platform`` or
-            ``ledger_observer`` is outside its closed set, ``guest`` is
-            neither null nor an object naming a
-            host, ``dispatch`` is neither a non-empty reason nor an object,
+            reads is missing or mistyped, ``role`` or ``ledger_observer`` is
+            outside its closed set, ``platform`` is not :data:`PLATFORM`,
+            ``dispatch`` is neither a non-empty reason nor an object,
             ``held`` is neither null nor a non-empty reason, a node held
             out of dispatch is not enabled (a machine that is off is held by
             being off, and a reason on it would say a second thing), or a
@@ -172,21 +166,23 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
     if not isinstance(value, dict):
         raise JSONTypeError(f"machine {name!r} must be a JSON object, got {type(value).__name__}")
     role = _decode_role(name, require_str(value, "role"))
-    platform = decode_node_platform(require_str(value, "platform"))
+    platform = require_str(value, "platform")
+    if platform != PLATFORM:
+        raise JSONTypeError(
+            f"machine {name!r} platform must be {PLATFORM!r}, got {platform!r}; the fleet "
+            "renders every script in sh and runs no machine of another platform"
+        )
     enabled = require_bool(value, "enabled")
     ledger_observer = _decode_ledger_observer(name, require_str(value, "ledger_observer"))
     raw_user = value.get("user")
-    guest_host = _decode_guest_host(name, value)
     dispatch = value.get("dispatch")
     if isinstance(dispatch, str):
         return Machine(
             name=name,
             role=role,
             user=None if raw_user is None else narrow_json_to_str(raw_user),
-            platform=platform,
             enabled=enabled,
             ledger_observer=ledger_observer,
-            guest_host=guest_host,
             dispatch=None,
             held=_reason(name, dispatch, "dispatch"),
         )
@@ -196,13 +192,7 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
             "or an object of what dispatch may take from it"
         )
     held = _decode_held(name, dispatch, enabled=enabled)
-    node = decode_node_config(
-        dispatch,
-        host=name,
-        platform=platform,
-        enabled=enabled and held is None,
-        wsl_host=guest_host,
-    )
+    node = decode_node_config(dispatch, host=name, enabled=enabled and held is None)
     if role is MachineRole.SERVER and not node["budget"]["pinned_checks_only"]:
         raise JSONTypeError(
             f"machine {name!r} is a server, which takes no fleet work, and its dispatch would "
@@ -213,10 +203,8 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
         name=name,
         role=role,
         user=None if raw_user is None else narrow_json_to_str(raw_user),
-        platform=platform,
         enabled=enabled,
         ledger_observer=ledger_observer,
-        guest_host=guest_host,
         dispatch=node,
         held=held,
     )
@@ -229,23 +217,20 @@ def encode_machine(machine: Machine) -> JSONObject:
         machine: The machine.
 
     Returns:
-        Its ``role``, ``user``, ``platform``, ``enabled``,
-        ``ledger_observer``, ``guest`` (as ``{host}`` or null) and
-        ``dispatch``: its held reason when it declares no capacity, else its
-        capacity with ``held``.
+        Its ``role``, ``user``, ``platform`` (:data:`PLATFORM`), ``enabled``,
+        ``ledger_observer`` and ``dispatch``: its held reason when it
+        declares no capacity, else its capacity with ``held``.
     """
     node = machine["dispatch"]
     dispatch: JSONValue = (
         machine["held"] if node is None else {**encode_node_config(node), "held": machine["held"]}
     )
-    guest_host = machine["guest_host"]
     return {
         "role": machine["role"].value,
         "user": machine["user"],
-        "platform": machine["platform"].value,
+        "platform": PLATFORM,
         "enabled": machine["enabled"],
         "ledger_observer": machine["ledger_observer"].value,
-        "guest": None if guest_host is None else {"host": guest_host},
         "dispatch": dispatch,
     }
 
@@ -291,33 +276,6 @@ def _decode_ledger_observer(name: str, value: str) -> LedgerObserver:
         f"machine {name!r} ledger_observer must be one of {', '.join(LedgerObserver)}, "
         f"got {value!r}"
     )
-
-
-def _decode_guest_host(name: str, value: JSONObject) -> str | None:
-    """Read the machine another one runs inside, if any.
-
-    Args:
-        name: The machine, for the message.
-        value: Its object.
-
-    Returns:
-        ``guest.host``, or None when ``guest`` is null.
-
-    Raises:
-        JSONTypeError: If ``guest`` is absent, or neither null nor an object
-            carrying a non-empty ``host``.
-    """
-    if "guest" not in value:
-        raise JSONTypeError(
-            f"machine {name!r} must declare 'guest': null for a machine on the tailnet in its "
-            "own right, or {host, sshPort} for one reached through the machine it runs inside"
-        )
-    guest = value["guest"]
-    if guest is None:
-        return None
-    if not isinstance(guest, dict):
-        raise JSONTypeError(f"machine {name!r} guest must be an object or null")
-    return _reason(name, guest.get("host"), "guest.host")
 
 
 def _decode_held(name: str, dispatch: JSONObject, *, enabled: bool) -> str | None:
@@ -371,4 +329,11 @@ def _reason(name: str, value: JSONValue, field: str) -> str:
     return value
 
 
-__all__ = ["LedgerObserver", "Machine", "MachineRole", "decode_machine", "encode_machine"]
+__all__ = [
+    "PLATFORM",
+    "LedgerObserver",
+    "Machine",
+    "MachineRole",
+    "decode_machine",
+    "encode_machine",
+]

@@ -63,7 +63,6 @@ class RunnerTick(TypedDict):
 
     Attributes:
         node: The node it serves.
-        elevated: Whether it is the node's elevated runner.
         tags: The tags its probe detected this tick, in vocabulary order;
             empty when the tick ended before its toolchain probe.
         fits: The projects its node could launch now; empty when it fits
@@ -74,7 +73,6 @@ class RunnerTick(TypedDict):
     """
 
     node: str
-    elevated: bool
     tags: tuple[NodeTag, ...]
     fits: tuple[str, ...]
     load: TickLoad | None
@@ -91,10 +89,14 @@ def encode_runner_tick(tick: RunnerTick) -> JSONObject:
     Returns:
         The arguments; ``load`` is omitted when the node did not answer,
         since the tool's schema is strict and reads an absent load as none.
+        ``elevated`` is false on every tick: no node runs an elevated runner
+        since the fleet's last Windows node left it (board task e705f08c),
+        and the tool's schema still requires the field until MCPs board
+        task 5b040fdb drops it there, after which it goes from here too.
     """
     encoded: JSONObject = {
         "node": tick["node"],
-        "elevated": tick["elevated"],
+        "elevated": False,
         "tags": encode_tags(tick["tags"]),
         "fits": list(tick["fits"]),
         "claiming": tick["claiming"],
@@ -146,7 +148,6 @@ def decode_runner_tick(value: JSONValue) -> RunnerTick:
         )
     return RunnerTick(
         node=require_str(value, "node"),
-        elevated=require_bool(value, "elevated"),
         tags=decode_required_tags(value.get("tags"), field="tags"),
         fits=tuple(require_str_list(value, "fits")),
         load=load,

@@ -2,7 +2,7 @@
 
 A project says what it needs (``required_tags``); a node never declares tags
 at all. Its tags are DERIVED from the fields the node contract already
-carries: its ``platform``, whether ``gpu`` is a device rather than None,
+carries: whether ``gpu`` is a device rather than None,
 whether it runs the fleet test database (``test_database``), and which
 toolchains it names by version (``rust``, ``cxx``). That is the
 whole reason this module exists beside :mod:`node`: a declared ``tags``
@@ -19,13 +19,15 @@ every one of these facts from the node every tick and claims with that
 logging any difference, so installing a tool makes a node eligible on its
 next tick with no file edited.
 
-WHY THESE SIX. ``windows`` and ``linux`` because a suite may run on one
-dialect only: slime's browser project launches Chromium with ANGLE over
-Direct3D 11 and refuses every other platform by name
-(``slime/scripts/chromium-launch.ts``, MCPs board task 41f45bd7), so it needs
-``windows``, while every poetry project here runs under either dialect and
-names neither. ``gpu`` because that same suite drives a real scene on the
-machine's GPU and is too slow to run under the software rasteriser; the tag
+WHY THESE. ``linux`` is the platform every node runs and so every node
+carries: the fleet took its last Windows machine, loki, out of dispatch on
+2026-10-25 (board task e705f08c; the operator, that day: "dude. we cannot
+have tge bottlnecks. so no windows shit then ok ?"), and with it the
+``windows`` and ``elevated`` tags, which only loki carried, so every project
+that required either queued for one laptop. A project still naming
+``linux`` asks for what every node has. ``gpu`` because slime's browser
+suite drives a real scene on the machine's GPU and is too slow to run under
+the software rasteriser; the tag
 means a CUDA device ``nvidia-smi`` reports, which is what ``gpu`` on the
 node contract has always meant, and NOT an integrated adapter. The fleet
 audit's inventory reads every node's devices through ``nvidia-smi`` on each
@@ -37,8 +39,7 @@ diphtheria. ``testdb`` because 17 MCPs packages start
 their suites from ``packages/db``'s global test setup, which needs a migrated
 ``corvis_test`` and its owner role, and a node without its own container
 cannot reach one (MCPs board task 6bbfd171, measured 2026-09-26): the tag
-means the node runs ``corvis-fleet-testdb``, on Linux or under Docker Desktop
-on Windows (sedona, MCPs board task daae17f2), the loopback container MCPs
+means the node runs ``corvis-fleet-testdb``, the loopback container MCPs
 ``scripts/testdb-setup.sh`` restarts empty and migrates before each run, so
 such a package lands only where its global setup can succeed. ``rust``
 because API ``services/covenant-radar-api`` builds the maturin crate
@@ -46,8 +47,8 @@ because API ``services/covenant-radar-api`` builds the maturin crate
 node carried cargo (MCPs board task 1e2da299): the tag means the node
 declares the version its cargo prints, which the runner's probe re-measures
 every tick. ``cxx`` because every MCPs TypeScript project's root ``npm ci``
-rebuilds ``hnswlib-node`` under node-gyp, and on 2026-09-27 no Windows node
-had the VC tools it needs (MCPs board task 3f19c136): the tag means the node
+rebuilds ``hnswlib-node`` under node-gyp, and on 2026-09-27 most nodes had
+no compiler it could use (MCPs board task 3f19c136): the tag means the node
 declares the version of the C++ toolchain its probe finds. ``docker``
 because MCPs/execution-deploy runs the real make deploy and, on the
 operator's ruling of 2026-09-27, may only do so on a rootless daemon under a
@@ -89,34 +90,17 @@ passing the other 490, so the suite's verdict depended on which node
 claimed it (MCPs board task 2f596185). It is a tool tag like ``ffmpeg``,
 with one difference in how it is found: Chrome is not on a PATH, so the
 probe's ``chrome`` line answers present when the binary exists at the path
-Playwright launches, ``/opt/google/chrome/chrome`` on Linux and
-``Google\\Chrome\\Application\\chrome.exe`` under a Program Files root on
-Windows (:mod:`fleet.contracts.tagged_tools`).
+Playwright launches, ``/opt/google/chrome/chrome``
+(:mod:`fleet.contracts.tagged_tools`).
 ``pdftotext`` because MCPs ``packages/wiki-check``'s audit rules read PDF
 sources through poppler's pdftotext and depend on its exact page breaks,
 and no tag named the tool, so the queue would offer the suite to a node
 without it (MCPs board task 6dd73ada). It is a tool tag like ``ffmpeg``,
-found on Linux through the PATH and on Windows first at the Git for
-Windows build the package's Makefile puts on PATH, then on the PATH.
-``elevated`` because MCPs' Task Scheduler
-installers register what only an administrator may register, and every
-build launches as an S4U task at RunLevel Limited (MCPs board task
-a98d7083): the tag means the node declares ``elevated`` and runs a SECOND
-runner whose builds launch at RunLevel Highest, and that runner re-measures
-its ssh session's token every tick (:mod:`fleet.contracts.elevation`).
+found through the PATH.
 
-``elevated`` AND ``windows`` ARE EXCLUSIVE. Every other tag is a floor, so a
-runner claims whatever it can satisfy; a node's ordinary runner claims without
-``elevated`` (:func:`runner_tags`), and the queue's claim gives a job requiring
-either tag only to a runner carrying it and that runner only jobs requiring
-it (MCPs ``FLEET_DISPATCH_EXCLUSIVE_TAGS``), so an ordinary suite never runs as
-an administrator and an elevated one never waits behind ordinary checks. A
-Windows node therefore takes only the jobs that must run on Windows, and a
-project naming no platform runs on a Linux node (MCPs board task 42fb4e26).
-
-A project naming both platforms is refused at decode: no node is both, so
-the declaration could never match anything, and the honest way to say "either"
-is to name neither.
+Every tag is a floor: a runner claims whatever it can satisfy. A project
+row naming ``windows`` or ``elevated`` is refused at decode, since no node
+carries either and the row could only wait.
 """
 
 from __future__ import annotations
@@ -128,7 +112,7 @@ from platform_core.json_utils import JSONTypeError, JSONValue
 from platform_core.members import find_member
 
 from fleet.contracts.capability import Capability
-from fleet.contracts.node import NodeConfig, NodePlatform, declared_capability
+from fleet.contracts.node import NodeConfig, declared_capability
 from fleet.contracts.toolchain import ToolReport
 
 
@@ -136,18 +120,17 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622, 639, 648, 668, 707 and 722) is the same fourteen
-    words as these members' values, in this order.
+    570, 571, 615, 622, 639, 648, 668, 707 and 722) admits these twelve
+    words and the two this package no longer has, ``windows`` and
+    ``elevated``.
     """
 
-    WINDOWS = "windows"
     LINUX = "linux"
     GPU = "gpu"
     TESTDB = "testdb"
     RUST = "rust"
     CXX = "cxx"
     DOCKER = "docker"
-    ELEVATED = "elevated"
     STACK = "stack"
     FFMPEG = "ffmpeg"
     HOOKS = "hooks"
@@ -156,15 +139,8 @@ class NodeTag(StrEnum):
     PDFTOTEXT = "pdftotext"
 
 
-#: The tag each platform carries. A table rather than a lookup by word, so
-#: the two vocabularies stay separate types; test_tags pins that every
-#: platform has a row, which is what a third platform would need first.
-PLATFORM_TAG: Final[dict[NodePlatform, NodeTag]] = {
-    NodePlatform.WINDOWS: NodeTag.WINDOWS,
-    NodePlatform.LINUX: NodeTag.LINUX,
-}
-
-#: The tag each declared toolchain carries, for the same reason.
+#: The tag each declared toolchain carries. A table rather than a lookup by
+#: word, so the two vocabularies stay separate types.
 CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.RUST: NodeTag.RUST,
     Capability.CXX: NodeTag.CXX,
@@ -195,53 +171,22 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
         node: The node's declaration.
 
     Returns:
-        Its platform, plus ``gpu`` when the node declares a CUDA device,
-        ``testdb`` when it declares the fleet test database, ``elevated``
-        when it declares an elevated runner, and ``rust``, ``cxx``,
-        ``docker`` or ``stack`` for each capability it declares a version of.
+        ``linux``, plus ``gpu`` when the node declares a CUDA device,
+        ``testdb`` when it declares the fleet test database, and ``rust``,
+        ``cxx``, ``docker`` or ``stack`` for each capability it declares a
+        version of.
     """
-    tags: set[NodeTag] = {PLATFORM_TAG[node["platform"]]}
+    tags: set[NodeTag] = {NodeTag.LINUX}
     if node["gpu"] is not None:
         tags.add(NodeTag.GPU)
     if node["test_database"]:
         tags.add(NodeTag.TESTDB)
-    if node["elevated"]:
-        tags.add(NodeTag.ELEVATED)
     tags.update(
         tag
         for capability, tag in CAPABILITY_TAG.items()
         if declared_capability(node, capability) is not None
     )
     return frozenset(tags)
-
-
-def runner_tags(node: NodeConfig, *, elevated: bool) -> frozenset[NodeTag]:
-    """The tags one of a node's runners claims with.
-
-    Args:
-        node: The node's declaration.
-        elevated: Whether this is the node's elevated runner.
-
-    Returns:
-        :func:`node_tags` for the elevated runner, and the same without
-        ``elevated`` for the ordinary one, so the queue's exclusive rule
-        hands each runner only its own lane's jobs.
-
-    Raises:
-        ValueError: For an elevated runner of a node that declares none; the
-            runner registration creates one only for a node that does, so
-            this is a runner started by hand against the wrong node.
-    """
-    carried = node_tags(node)
-    if not elevated:
-        return carried - {NodeTag.ELEVATED}
-    if NodeTag.ELEVATED not in carried:
-        raise ValueError(
-            f"{node['host']} declares no elevated runner, so an elevated runner may not claim "
-            "for it; set elevated to true only for a Windows node whose ssh account is an "
-            "administrator"
-        )
-    return carried
 
 
 def tool_tags(reports: tuple[ToolReport, ...]) -> frozenset[NodeTag]:
@@ -282,11 +227,11 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         return tag
     raise JSONTypeError(
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
-        "the node contract carries (its platform, a CUDA device nvidia-smi reports, the "
-        "fleet test database, a Rust or C++ toolchain, the execution suite's rootless "
-        "Docker daemon, an elevated runner, the corvis compose stack, or a tool, the "
-        "hooks check's environment or Google Chrome its probe found), and one it does not "
-        "carry could never be satisfied"
+        "the node contract carries (linux, a CUDA device nvidia-smi reports, the fleet test "
+        "database, a Rust or C++ toolchain, the execution suite's rootless Docker daemon, "
+        "the corvis compose stack, or a tool, the hooks check's environment or Google "
+        "Chrome its probe found), and one it does not carry could never be satisfied: no "
+        "node runs windows or an elevated runner since board task e705f08c"
     )
 
 
@@ -305,7 +250,7 @@ def decode_required_tags(value: JSONValue, *, field: str) -> tuple[NodeTag, ...]
 
     Raises:
         JSONTypeError: If the key is absent, the value is not a list, an
-            entry is not a tag, a tag repeats, or both platforms are named.
+            entry is not a tag, or a tag repeats.
     """
     if value is None:
         raise JSONTypeError(
@@ -320,11 +265,6 @@ def decode_required_tags(value: JSONValue, *, field: str) -> tuple[NodeTag, ...]
         if tag in tags:
             raise JSONTypeError(f"{field}[{index}] repeats {tag.value!r}")
         tags.append(tag)
-    if NodeTag.WINDOWS in tags and NodeTag.LINUX in tags:
-        raise JSONTypeError(
-            f"{field} names both windows and linux; no node is both, so nothing could satisfy "
-            "it. Name neither to run on either platform"
-        )
     return tuple(tags)
 
 
@@ -357,7 +297,6 @@ def missing_tags(carried: frozenset[NodeTag], required: tuple[NodeTag, ...]) -> 
 
 __all__ = [
     "CAPABILITY_TAG",
-    "PLATFORM_TAG",
     "TOOL_TAG",
     "NodeTag",
     "decode_node_tag",
@@ -365,6 +304,5 @@ __all__ = [
     "encode_tags",
     "missing_tags",
     "node_tags",
-    "runner_tags",
     "tool_tags",
 ]

@@ -15,8 +15,6 @@ measurement is about to be pinned to a card.
 
 from __future__ import annotations
 
-from enum import StrEnum
-
 from platform_core.json_utils import (
     JSONObject,
     JSONTypeError,
@@ -27,29 +25,11 @@ from platform_core.json_utils import (
     require_int,
     require_str,
 )
-from platform_core.members import find_member
 from typing_extensions import TypedDict
 
 from fleet.contracts.action_cache import ActionCacheCounts
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
 from fleet.contracts.capability import Capability, decode_capability
-
-
-#: The operating-system family a node runs, which decides every script a
-#: dispatch sends it: how a file is written over ssh, how a script is run by
-#: path, how the suite is detached from the connection (Task Scheduler on
-#: one, a transient systemd user unit on the other), and how capacity is read.
-#:
-#: A closed set rather than a free string because each value names a whole
-#: dialect in :mod:`fleet.core.dialect`, and a third value would need a third
-#: one before it could dispatch anything. A machine's roster file declares
-#: it once (:mod:`fleet.contracts.machine`), and every reader in either
-#: repository reads that word.
-class NodePlatform(StrEnum):
-    """The operating-system family a node runs."""
-
-    WINDOWS = "windows"
-    LINUX = "linux"
 
 
 class NodeGpu(TypedDict):
@@ -81,19 +61,17 @@ class NodeGpu(TypedDict):
 class NodeConfig(TypedDict):
     """A machine the fleet may dispatch to: its roster file's ``dispatch`` object.
 
-    ``host``, ``platform``, ``enabled`` and ``wsl_host`` are the machine's
-    own facts, said once in its file (:mod:`fleet.contracts.machine`) and
-    handed to :func:`decode_node_config`; the rest is the ``dispatch``
-    object's.
+    ``host`` and ``enabled`` are the machine's own facts, said once in its
+    file (:mod:`fleet.contracts.machine`) and handed to
+    :func:`decode_node_config`; the rest is the ``dispatch`` object's. Every
+    node is a Linux machine, which its machine file is refused for unless it
+    says (:func:`fleet.contracts.machine.decode_machine`).
 
     Attributes:
         host: SSH destination: the machine's roster name, which is its alias
             in ``~/.ssh/config``, not a hostname or an address. The alias
             carries the user and the key, and a tailnet address changes
             without warning while an alias does not.
-        platform: Which :data:`NodePlatform` the node is, and so which script
-            dialect every remote act uses. Declared rather than probed
-            because it is needed to write the very first probe.
         stage_root: Absolute directory on the node holding staged working
             trees, one per run. Declared rather than derived from a home
             directory, because the three live nodes disagree about where a
@@ -116,9 +94,7 @@ class NodeConfig(TypedDict):
             loopback postgres container ``corvis-fleet-testdb`` that MCPs
             ``scripts/testdb-setup.sh --container`` restarts empty and
             migrates before each run, provisioned on diphtheria by MCPs
-            ``scripts/host/diphtheria/provision.sh`` and on a Windows node
-            with Docker Desktop by ``scripts/install-windows-testdb.ps1``
-            (sedona, MCPs board task daae17f2). True gives the node
+            ``scripts/host/diphtheria/provision.sh``. True gives the node
             the ``testdb`` tag (:mod:`fleet.contracts.tags`), which every
             project whose suite needs a migrated ``corvis_test`` requires.
 
@@ -136,8 +112,7 @@ class NodeConfig(TypedDict):
             (:mod:`fleet.contracts.capability`, MCPs board task 1e2da299).
             REQUIRED like ``gpu``, null spelled out, for the same reason.
         cxx: The version of the C++ toolchain node-gyp would build with,
-            as the probe reads it (vswhere's VC tools installationVersion
-            on Windows, ``g++ -dumpfullversion`` on Linux), or None. Gives
+            as the probe reads it (``g++ -dumpfullversion``), or None. Gives
             the ``cxx`` tag every project whose ``npm ci`` rebuilds a native
             module requires; required and re-measured like ``rust`` (MCPs
             board task 3f19c136).
@@ -152,27 +127,10 @@ class NodeConfig(TypedDict):
             or None. Gives the ``stack`` tag the suites that start those
             images require; required and re-measured like ``rust`` (MCPs
             board task 554bffc1).
-        elevated: Whether the node runs a second, ELEVATED runner, whose
-            builds launch at RunLevel Highest for suites that register what
-            only an administrator may (MCPs board task a98d7083). True gives
-            the ``elevated`` tag and a second hub runner job for the node
-            (MCPs ``scripts/fleet/hub-jobs.json``); that runner re-reads its
-            ssh session's token every tick and claims nothing unless the
-            token is an administrator's (:mod:`fleet.contracts.elevation`).
-            REQUIRED like ``test_database``, and refused on a linux node,
-            where the equivalent would be a root build and no suite asks
-            for one.
-        wsl_host: The name of the Windows node whose WSL runs this node's
-            distro, the machine's ``guest.host``, or None for a machine of
-            its own. A tick that cannot reach such a node asks that host
-            what it sees (MCPs board task 45a4f22b: lavender-wsl read 'did
-            not answer' for hours while lavender itself answered with 0.3 GB
-            free). Refused on a Windows node.
         budget: What share of this machine a dispatch may take.
     """
 
     host: str
-    platform: NodePlatform
     stage_root: str
     logical_cores: int
     ram_gb: float
@@ -183,8 +141,6 @@ class NodeConfig(TypedDict):
     cxx: str | None
     docker: str | None
     stack: str | None
-    elevated: bool
-    wsl_host: str | None
     budget: NodeBudget
 
 
@@ -239,8 +195,7 @@ class NodeState(TypedDict):
         free_disk_gb: Free space on the staging drive at probe time.
         live: What this node's live fleet runs were granted (:class:`LiveLoad`).
         ci_slice: The node's ``runners.slice`` memory, or None where the
-            node has no such cgroup (every Windows node, and every linux
-            node that hosts no CI runners). Read so a refusal can say CI
+            node hosts no CI runners and so has no such cgroup. Read so a refusal can say CI
             holds the lane rather than that somebody is on the machine
             (MCPs board task 5d6e57e7).
         reserved_cores: The cores the node's live reservations hold: work
@@ -256,11 +211,10 @@ class NodeState(TypedDict):
         cpu_pressure_pct: The share of the last minute some runnable task
             waited for a CPU, ``/proc/pressure/cpu``'s ``some avg60``
             (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
-            2ce5dc13), or None on a Windows node, whose kernel keeps no
-            such account. Every linux probe prints it or fails.
+            2ce5dc13). Every probe prints it or fails.
         io_pressure_pct: The share of the last minute some task stalled on
             I/O, ``/proc/pressure/io``'s ``some avg60`` (MCPs board task
-            814c4555); None exactly where :attr:`cpu_pressure_pct` is.
+            814c4555), printed as :attr:`cpu_pressure_pct` is.
     """
 
     host: str
@@ -270,8 +224,8 @@ class NodeState(TypedDict):
     ci_slice: SliceMemory | None
     reserved_cores: int
     action_cache: ActionCacheCounts | None
-    cpu_pressure_pct: float | None
-    io_pressure_pct: float | None
+    cpu_pressure_pct: float
+    io_pressure_pct: float
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:
@@ -333,9 +287,8 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         JSON-serialisable mapping carrying every field the ``dispatch``
         object declares, with ``gpu`` present and null for a CPU-only node
         rather than omitted. ``held`` is the machine's
-        (:func:`fleet.contracts.machine.encode_machine`), and ``host``,
-        ``platform``, ``enabled`` and ``wsl_host`` are the machine's own
-        facts, so none is here.
+        (:func:`fleet.contracts.machine.encode_machine`), and ``host`` and
+        ``enabled`` are the machine's own facts, so neither is here.
     """
     gpu = node["gpu"]
     return {
@@ -348,36 +301,25 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "cxx": node["cxx"],
         "docker": node["docker"],
         "stack": node["stack"],
-        "elevated": node["elevated"],
         "budget": encode_node_budget(node["budget"]),
     }
 
 
-def decode_node_config(
-    value: JSONValue,
-    *,
-    host: str,
-    platform: NodePlatform,
-    enabled: bool,
-    wsl_host: str | None,
-) -> NodeConfig:
+def decode_node_config(value: JSONValue, *, host: str, enabled: bool) -> NodeConfig:
     """Decode and validate one machine file's ``dispatch`` object.
 
     Args:
         value: The ``dispatch`` object, as the JSON loader produced it.
         host: The machine's name.
-        platform: The machine's platform.
         enabled: Whether the machine answers and its dispatch is not held.
-        wsl_host: The machine its ``guest`` names, or None.
 
     Returns:
         The validated node.
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, ``gpu`` is absent rather than explicitly null, the
-            machine's own numbers are not positive, ``elevated`` is true off
-            Windows, or a Windows node runs inside another machine.
+            mistyped, ``gpu`` is absent rather than explicitly null, or the
+            machine's own numbers are not positive.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"node must be a JSON object, got {type(value).__name__}")
@@ -386,11 +328,6 @@ def decode_node_config(
             "node must declare 'gpu', using null for a CPU-only machine. An absent key is "
             "indistinguishable from one nobody has filled in, and the difference matters "
             "the moment a measurement is pinned to a card."
-        )
-    if wsl_host is not None and platform is NodePlatform.WINDOWS:
-        raise JSONTypeError(
-            f"{host} is a windows node inside {wsl_host!r}; only a linux node runs inside another "
-            "machine's WSL"
         )
     if "test_database" not in value:
         raise JSONTypeError(
@@ -406,7 +343,6 @@ def decode_node_config(
                 "without it fails during its install, so an absent key is not a safe way to "
                 "say none."
             )
-    elevated = _decode_elevated(value, platform)
     logical_cores = require_int(value, "logical_cores")
     if logical_cores < 1:
         raise JSONTypeError(f"logical_cores must be at least 1, got {logical_cores}")
@@ -416,7 +352,6 @@ def decode_node_config(
     gpu_value = value["gpu"]
     return NodeConfig(
         host=host,
-        platform=platform,
         stage_root=stage_root,
         logical_cores=logical_cores,
         ram_gb=_positive_float(value, "ram_gb"),
@@ -427,8 +362,6 @@ def decode_node_config(
         cxx=decode_capability(Capability.CXX, value["cxx"]),
         docker=decode_capability(Capability.DOCKER, value["docker"]),
         stack=decode_capability(Capability.STACK, value["stack"]),
-        elevated=elevated,
-        wsl_host=wsl_host,
         budget=decode_node_budget(require_dict(value, "budget")),
     )
 
@@ -450,60 +383,6 @@ def declared_capability(node: NodeConfig, capability: Capability) -> str | None:
     if capability is Capability.DOCKER:
         return node["docker"]
     return node["stack"]
-
-
-def decode_node_platform(value: str) -> NodePlatform:
-    """Read a platform name into the closed set.
-
-    Args:
-        value: The declared name.
-
-    Returns:
-        The platform.
-
-    Raises:
-        JSONTypeError: If it is not one of :class:`NodePlatform`'s words. A
-            value outside the set has no dialect, so nothing could be sent
-            to the node; refusing here is what keeps that from surfacing as
-            a script the far side cannot parse.
-    """
-    platform = find_member(value, NodePlatform)
-    if platform is not None:
-        return platform
-    raise JSONTypeError(
-        f"platform must be one of {', '.join(NodePlatform)}, got {value!r}; each names the "
-        "script dialect every remote act uses, and a value outside the set has none"
-    )
-
-
-def _decode_elevated(obj: JSONObject, platform: NodePlatform) -> bool:
-    """Read whether a node runs a second, elevated runner.
-
-    Args:
-        obj: The node's declaration.
-        platform: Its already decoded platform.
-
-    Returns:
-        The declared value.
-
-    Raises:
-        JSONTypeError: If the key is absent or not a bool, or is true on a
-            node that is not Windows.
-    """
-    if "elevated" not in obj:
-        raise JSONTypeError(
-            "node must declare 'elevated': true only for a Windows node whose ssh account is an "
-            "administrator and which should run a second, elevated runner, false otherwise. "
-            "True registers a runner that launches builds as an administrator, so it is never a "
-            "default."
-        )
-    elevated = require_bool(obj, "elevated")
-    if elevated and platform is not NodePlatform.WINDOWS:
-        raise JSONTypeError(
-            f"elevated is true on a {platform.value} node; an elevated runner launches its "
-            "builds as a Task Scheduler task at RunLevel Highest, which only a Windows node has"
-        )
-    return elevated
 
 
 def _positive_float(obj: JSONObject, key: str) -> float:
@@ -549,13 +428,11 @@ __all__ = [
     "LiveLoad",
     "NodeConfig",
     "NodeGpu",
-    "NodePlatform",
     "NodeState",
     "SliceMemory",
     "declared_capability",
     "decode_node_config",
     "decode_node_gpu",
-    "decode_node_platform",
     "describe_node",
     "encode_node_config",
     "encode_node_gpu",

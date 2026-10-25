@@ -20,10 +20,7 @@ and the runner claims with what it answered:
 * ``ffmpeg`` and any other tagged tool: the executable was found
   (:func:`fleet.contracts.tags.tool_tags`).
 
-The platform tag is the declared one, because it chose the dialect the probe
-was written in: a node of the other platform cannot answer it at all.
-``elevated`` is not here: it names a second runner the node declares, and
-that runner re-reads its token every tick (:mod:`fleet.contracts.elevation`).
+``linux`` is carried by every node, the platform the probe is written for.
 
 The declaration is still compared every tick (:func:`tag_drift`), because the
 hub's own planning reads it without asking the node
@@ -37,7 +34,7 @@ from typing import Final
 
 from fleet.contracts.capability import Capability, detected, version_drift
 from fleet.contracts.node import NodeConfig, declared_capability
-from fleet.contracts.tags import CAPABILITY_TAG, PLATFORM_TAG, NodeTag, tool_tags
+from fleet.contracts.tags import CAPABILITY_TAG, NodeTag, tool_tags
 from fleet.contracts.toolchain import ToolReport
 
 #: The toolchain probe's line for the node's CUDA device.
@@ -66,19 +63,18 @@ def _answer(name: str, reports: tuple[ToolReport, ...]) -> str | None:
     return None
 
 
-def detected_tags(node: NodeConfig, reports: tuple[ToolReport, ...]) -> frozenset[NodeTag]:
+def detected_tags(reports: tuple[ToolReport, ...]) -> frozenset[NodeTag]:
     """The tags a node's probe found this tick.
 
     Args:
-        node: The node's declaration, for its platform.
         reports: What its toolchain probe answered.
 
     Returns:
-        Its platform's tag, plus ``gpu`` and ``testdb`` when their lines
-        answered present, the tag of every capability that answered with a
-        version, and the tag of every tagged tool found. Never ``elevated``.
+        ``linux``, plus ``gpu`` and ``testdb`` when their lines answered
+        present, the tag of every capability that answered with a version,
+        and the tag of every tagged tool found.
     """
-    tags: set[NodeTag] = {PLATFORM_TAG[node["platform"]]}
+    tags: set[NodeTag] = {NodeTag.LINUX}
     if _answer(GPU_PROBE, reports) is not None:
         tags.add(NodeTag.GPU)
     if _answer(TESTDB_PROBE, reports) is not None:

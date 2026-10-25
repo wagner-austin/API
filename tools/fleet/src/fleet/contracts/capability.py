@@ -103,8 +103,7 @@ RUST_CHECK_TOOLS: Final[tuple[str, ...]] = ("uv",)
 
 #: The probe line each capability is read from. ``cargo`` is the tool's own
 #: name because maturin builds with it; ``cxx`` is a synthetic line, since the
-#: toolchain node-gyp finds is not one executable on both platforms (vswhere's
-#: VC tools component on Windows, ``g++ -dumpfullversion`` on Linux); so is
+#: toolchain node-gyp finds is answered by ``g++ -dumpfullversion``; so is
 #: ``docker``, whose answer is the rootless execdocker daemon's, not whatever
 #: ``docker`` on the runner's PATH would reach; and so is ``stack``, whose
 #: answer is that PATH daemon's, and only when it holds the stack.
@@ -118,10 +117,7 @@ PROBE_NAME: Final[dict[Capability, str]] = {
 #: Where a declared version is read, for the decode refusal.
 _SOURCE: Final[dict[Capability, str]] = {
     Capability.RUST: "cargo --version prints, e.g. '1.98.1'",
-    Capability.CXX: (
-        "vswhere reports for the VC tools on Windows or g++ -dumpfullversion prints on Linux, "
-        "e.g. '13.3.0'"
-    ),
+    Capability.CXX: "g++ -dumpfullversion prints, e.g. '13.3.0'",
     Capability.DOCKER: (
         "the execdocker user's rootless daemon reports as its ServerVersion, e.g. '29.8.1'"
     ),
