@@ -867,38 +867,40 @@ budgeted checks a node's CPUs carry at once, across its runners, measured:
 serendipity's is 1, and `null` leaves a node to its pools until someone
 measures it.
 
-**On the stack host, free memory is net of what capped containers are
-promised, and the reservation is only the uncapped stack's margin** (MCPs board
-task a282400d). diphtheria reserved 16 GB from 2026-09-20, sized when it read
-26.4 GB free; once the stack's backends moved in, `MemAvailable` already
-excluded them and the reservation counted them a second time, so the node
-refused every dispatch (179 `NODE_OWNER_RESERVED` ticks by 18:30Z on
-2026-09-29). A smaller constant is not the answer, because four of its
-containers are capped at 4 GiB and may grow to their caps at any moment:
-about 10.3 GB was outstanding at 22:1xZ that day, about 16 when they idle.
-So the Linux capacity probe (`fleet.core.linux_capacity_probe`) reports
-`free_ram_gb` as `MemAvailable` minus each capped docker container's
-`memory.max` less its `anon`, prints that total as `promised_ram_gb`, and
-diphtheria's `reserved_ram_gb` is 2.0: 15.3 GB available, 10.3 promised and
-2.0 reserved left 3.0 GB, enough for `idle/execution`'s 2.0 GB worker. A node
-with no capped container reads the same `MemAvailable` it always did.
+**A check yields memory to the stack; free memory is `MemAvailable`** (MCPs
+board tasks a282400d and d111690a). diphtheria reserved 16 GB from
+2026-09-20, sized when it read 26.4 GB free; once the stack's backends moved
+in, `MemAvailable` already excluded them and the reservation counted them a
+second time, so the node refused every dispatch (179 `NODE_OWNER_RESERVED`
+ticks by 18:30Z on 2026-09-29). From then the Linux capacity probe
+(`fleet.core.linux_capacity_probe`) also took off what every memory-capped
+stack container could still grow into, so a job would never meet a worker
+growing to its cap; on colossus that held back 17.13 of an idle host's
+19.59 GiB available (8d3e4b16, 2026-10-15). The kernel decides instead now:
+every check starts through MCPs' fleet-check-unit at `OOMScoreAdjust=1000`
+with `OOMPolicy=stop`, so when the host runs out the check is ended before
+any stack container, and the whole of it, with the result `oom-kill`
+(`fleet.core.linux_unit_end`). `fleet.cli.node_settle` then gives such a job
+back to the queue rather than closing it failed, and the queue requeues it
+once and fails it the second time (`fleet.cli.job_close.give_back`), so a job
+too big for any node never loops. `free_ram_gb` is `MemAvailable`, and a
+node's `reserved_ram_gb` is the only memory dispatch holds back, for whoever
+uses the machine. The compose caps stay, as runaway containment.
 
-**What a stack host's compose caps leave is summed in MCPs, not discovered
-here** (MCPs board task 8d3e4b16). The probe is live, so a cap or a replica
-a compose change adds shows up only as a node that quietly claims nothing:
-on 2026-10-15 a fifth doc-extract replica took diphtheria to -0.47 GB free
-and 214 jobs had gone unclaimed and been cancelled by hand in two weeks.
-MCPs' `host-memory-budget.test.ts` now predicts this probe's reading for the
-caps its compose files declare, from `scripts/fleet/host-memory.json`
-(`make host-memory-measure API_ROOT=<this repo>` there), and fails when a
-stack host would leave less than its `reserved_ram_gb` plus the smallest
-project pinned to it. colossus's `reserved_ram_gb` is 1.5 since that day: its
-6.0 held memory for `glimmer.service` and a desktop session, the operator
-stopped glimmer and ruled colossus a server, and 2.1 GB free beside the OCR
-service's 13 GB cap then fits 1.5 plus `MCPs/execution-served-colossus`'s
-0.5. Its `reserved_cores` fell from 8 to 4 the same day for the same reason:
-four were glimmer's and the desktop's (aa8a6d0e1), four the OCR service's two
-torch processes at `OMP_NUM_THREADS=4` (3f384639a), which stay.
+**That every stack host's compose caps can fire is summed in MCPs** (MCPs
+board task 8d3e4b16). On 2026-10-15 a fifth doc-extract replica took the
+caps diphtheria declared past what the probe then read free, and nothing
+had counted the caps against the host. MCPs' `host-memory-budget.test.ts`
+fails when the caps a stack host's compose files declare could not all be
+reached before the host runs out, from `scripts/fleet/host-memory.json`,
+which `make host-memory-measure` there measures on each host in one read:
+its `MemAvailable` and each capped container's cap and resident memory.
+colossus's `reserved_ram_gb` is 1.5 since 2026-10-15: its 6.0 held memory for
+`glimmer.service` and a desktop session, and the operator stopped glimmer
+and ruled colossus a server. Its `reserved_cores` fell from 8 to 4 the same
+day for the same reason: four were glimmer's and the desktop's (aa8a6d0e1),
+four the OCR service's two torch processes at `OMP_NUM_THREADS=4`
+(3f384639a), which stay.
 
 **How many runs a node holds is live, not declared** (MCPs board task
 939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
