@@ -76,14 +76,14 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # (MCPs board task c036582e); 68 since MCPs/execution-lead-lacrymal,
     # the lead lane that runs one real planning pass (MCPs board task
     # 770837b7). The unprepared lose MCPs/execution-elevated, whose
-    # installer cases MCPs board task 42fb4e26 deleted.
+    # installer cases MCPs board task 42fb4e26 deleted, and MCPs/execution,
+    # the Windows lane MCPs board task 5b040fdb deleted.
     assert len(prepared) == 68
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
     )
     assert unprepared == [
-        "MCPs/execution",
         "MCPs/execution-deploy",
         "MCPs/execution-linux",
     ]

@@ -43,20 +43,11 @@ from fleet.core.workspace_files import read_workspace_document
 
 #: Every shipped project that requires windows, and what in its own code
 #: needs a Windows host, read on 2026-10-25 (board task e35812cc).
+#: MCPs' own three Windows projects, MCPs/execution, MCPs/packages/claude-hooks
+#: and MCPs/scripts/ps-harness, left the registry on 2026-10-25 when the
+#: operator ruled "so no windows shit then ok" (MCPs board task 5b040fdb): no
+#: MCPs check waits on loki.
 WINDOWS_REASONS = {
-    "MCPs/execution": (
-        "the Windows lane of MCPs' real-machine suite (execution/README.md), whose cases run "
-        "Windows host code on the machine itself; MCPs/execution-linux is the Linux lane"
-    ),
-    "MCPs/packages/claude-hooks": (
-        "the hooks' Windows half: pyproject.toml pins mypy to platform win32 and the "
-        "sys.platform blocks run as Windows runs them; MCPs/packages/claude-hooks-linux is "
-        "the Linux half"
-    ),
-    "MCPs/scripts/ps-harness": (
-        "26 of its 27 files are .ps1, guarded, analysed and executed by Pester, and its "
-        "provision suites register real scheduled tasks under S4U on the elevated runner"
-    ),
     "tools/ps-harness": (
         "runs MCPs' ps-harness over every tracked API .ps1, registering real S4U scheduled "
         "tasks on the elevated runner (its Makefile)"
