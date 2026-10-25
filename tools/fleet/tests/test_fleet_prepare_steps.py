@@ -73,10 +73,11 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/execution-egress-diphtheria, the execution suite's egress lane
     # (MCPs board task 523a7445); 67 since MCPs/execution-served-demure,
     # the served lane that reads demure's provisioning as the stack host
-    # (MCPs board task c036582e). The unprepared lose
-    # MCPs/execution-elevated, whose installer cases MCPs board task 42fb4e26
-    # deleted.
-    assert len(prepared) == 67
+    # (MCPs board task c036582e); 68 since MCPs/execution-lead-lacrymal,
+    # the lead lane that runs one real planning pass (MCPs board task
+    # 770837b7). The unprepared lose MCPs/execution-elevated, whose
+    # installer cases MCPs board task 42fb4e26 deleted.
+    assert len(prepared) == 68
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
@@ -104,8 +105,9 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # MCPs/packages/session-audit (MCPs board task 55189157); 31 since its
     # Linux lane, MCPs/packages/session-audit-linux (MCPs board task 31e0a1eb);
     # 30 again since the package dropped its Windows lane (MCPs board task
-    # c8cb0ac5).
-    assert len(databases) == 30
+    # c8cb0ac5); 31 since MCPs/execution-lead-lacrymal (MCPs board task
+    # 770837b7).
+    assert len(databases) == 31
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
@@ -219,6 +221,29 @@ def test_an_egress_lane_step_runs_last_and_only_for_the_egress_project() -> None
     assert sorted(marking) == ["MCPs/execution-egress-diphtheria"]
     for steps in marking.values():
         assert [step["phase"] for step in steps] == ["install", "workspace-build", "egress-lane"]
+
+
+def test_a_lead_lane_step_runs_last_and_only_for_the_lead_project() -> None:
+    """MCPs fleet-prepare's lead-lane phase builds session-audit's venv and
+    writes the marker that makes the execution workspace collect tests/lead
+    alone (MCPs board task 770837b7, A1). That case runs one real planning
+    pass, a ``claude -p`` on the session host that spends model usage, so no
+    other project may carry the step, and it follows the test database the
+    pass's board reads."""
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:] == ("lead-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-lead-lacrymal"]
+    for steps in marking.values():
+        assert [step["phase"] for step in steps] == [
+            "install",
+            "workspace-build",
+            "test-database",
+            "lead-lane",
+        ]
 
 
 def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:

@@ -324,6 +324,40 @@ def test_the_egress_lane_runs_on_the_stack_host_alone() -> None:
     )
 
 
+def test_the_lead_lane_runs_on_lacrymal_alone_holding_the_test_database() -> None:
+    """MCPs/execution-lead-lacrymal runs one real planning pass.
+
+    Its last install step builds session-audit's venv and writes the marker
+    that makes the execution workspace collect tests/lead alone (MCPs board
+    task 770837b7, A1), whose case starts taskboard-mcp over ``corvis_test``
+    on the node's loopback, carries it to the session host by ``ssh -R``,
+    and has the planning lead's program launch a ``claude -p`` there whose
+    only board is that one. The session host admits lacrymal's own key, so
+    the project names lacrymal and every other node refuses it; it holds the
+    test database exclusively, since the pass reads and files there.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/execution-lead-lacrymal")
+    assert project["node"] == "lacrymal"
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(
+                phase="test-database",
+                argv=(*prepare, "test-database", "CONTAINER=corvis-fleet-testdb"),
+            ),
+            InstallStep(phase="lead-lane", argv=(*prepare, "lead-lane")),
+        ),
+        companions=(),
+    )
+
+
 def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender() -> None:
     """MCPs/execution-netboot-diphtheria installs a clean VM by network boot.
 

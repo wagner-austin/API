@@ -1350,6 +1350,18 @@ until the block lifts, and a lane of its own keeps that red out of every
 served check and the probe off every served run. It takes no exclusive
 resource: two requests a run are all it sends.
 
+`MCPs/execution-lead-lacrymal` (MCPs board task 770837b7, A1) is pinned to
+`lacrymal` because its case runs one real planning pass, and the session
+host admits that node's own key. The case starts `taskboard-mcp` over
+`corvis_test` on the node's loopback, carries the port to the session host's
+loopback with `ssh -R` (the node's firewall admits no inbound port), and
+runs session-audit's planning program, which launches a `claude -p` there
+whose only MCP server is that board. Its last install step, `lead-lane`,
+builds session-audit's venv and writes the marker that makes the execution
+workspace collect `tests/lead` alone, so no other lane spends model usage.
+It holds `corvis-fleet-testdb` exclusively, because the pass reads and files
+there.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A
