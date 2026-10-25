@@ -98,7 +98,7 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_measured_boot_macs_stay_pinned_and_only_linux_workers_declare_one() -> None:
+def test_measured_boot_macs_stay_pinned_and_only_linux_workers_and_servers_declare_one() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
     # Automatic admission adds a disabled worker before its first install.
@@ -108,8 +108,11 @@ def test_measured_boot_macs_stay_pinned_and_only_linux_workers_declare_one() -> 
         "lavender": LAVENDER_MAC,
         "pendragon": PENDRAGON_MAC,
     }
+    # demure is a server since MCPs board task 4ec65b8f and keeps its MAC,
+    # since its reinstall as the stack host is a netboot install too.
+    assert machines["demure"]["role"] == "server"
     for name in declared:
-        assert machines[name]["role"] == "worker"
+        assert machines[name]["role"] in ("worker", "server")
         assert machines[name]["platform"] == "linux"
     assert machines["loki"]["bootMac"] is None
     assert machines["diphtheria"]["bootMac"] is None
