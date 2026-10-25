@@ -9,19 +9,16 @@
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.113.38.162",
   "reachKey": null,
-  "bootMac": "00:01:6c:d6:77:6f",
+  "bootMac": null,
   "netbootWifi": false,
-  "installDisk": {
-    "rule": "serial",
-    "serial": "ST2000DM001-1ER164_W4Z3PY7G"
-  },
+  "installDisk": null,
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
   "boot": {
     "units": []
   },
-  "notes": "Emerald is the Lenovo H50-55, model 90BG003JUS, with an AMD A10-7800 and existing 2 TB Seagate disk W4Z3PY7G. The operator authorized wiping its temporary enrollment identity pc-d6776f on 2026-10-24 (admission 84199d94-95d3-48ea-bf5c-f40bd3746fa6) and keeping the name emerald (board task 4b3809c7-28cd-4eb0-854f-2858c26e76f0). Ubuntu was installed by netboot arm 69e1d5ef and adopted at 100.113.38.162 on 2026-10-25T00:03:47.215Z. The fleet provision completed at 00:19:09Z using MCPs adb2b59f7654 and API pins 11c454ecb5d7; after reboot, the probe measured kernel 7.0.0-38-generic, 4 logical cores, 10.6 GiB usable RAM, no CUDA device, g++ 13.3.0, rootless Docker 29.8.1 and the running test database. The 00:24:17Z audit reported 33 OK and no failed machine checks; the automatic reimage task b9e2e7dd ended because its control-side commit hook lacked a virtualenv, before publishing the measured roster. The install-disk serial is the live udev ID_SERIAL verified on this node, to keep additional storage drives outside future OS installation selection.",
+  "notes": "Emerald is the Lenovo H50-55, model 90BG003JUS, with an AMD A10-7800, MAC 00:01:6c:d6:77:6f, and the fleet's storage machine (board task 4b3809c7-28cd-4eb0-854f-2858c26e76f0). On 2026-10-25 its 2 TB Seagate and DVD drive were replaced by two WD Red Plus 4 TB disks, WD-WX32D763CR1E and WD-WX82D56LED4P, and it was installed with NixOS 26.05 on a ZFS mirror of both with a RAID1 ESP, from MCPs fleet-mcp/nixos/hosts/emerald: netboot arm 578f3729 booted the live installer, whose install-disk guard refused before writing, and the install ran from a kexec NixOS installer. Arm 578f3729 checked in and was adopted at 100.113.38.162, retiring the old device. bootMac and installDisk are null because the Ubuntu network install would wipe one disk of the mirror; a NixOS network install is board task 213a1a87. Firmware: Secure Boot off until its Lanzaboote keys are enrolled, Wake on LAN enabled. The dispatch block is as measured under NixOS: no Docker, compiler or test database, so it stays disabled for checks.",
   "dispatch": {
     "held": null,
     "stage_root": "/home/corvis/fleet/stage",
@@ -36,10 +33,10 @@
       "checks_at_once": null,
       "pinned_checks_only": false
     },
-    "test_database": true,
+    "test_database": false,
     "rust": null,
-    "cxx": "13.3.0",
-    "docker": "29.8.1",
+    "cxx": null,
+    "docker": null,
     "stack": null,
     "elevated": false
   }
