@@ -1339,6 +1339,17 @@ marker that makes the execution workspace collect `tests/deployed` alone, so
 an audit's `command MCPs execution-deployed-diphtheria` line carries no other
 case's verdict. It takes no exclusive resource: it only reads.
 
+`MCPs/execution-egress-diphtheria` (MCPs board task 523a7445) is pinned to
+`diphtheria` because its case runs one probe inside `mcp-watcher` and one
+inside `mcp-doc-extract-api`, the stack's containers there, to reach
+Garden Grove's archive at ggcity.org through the host's own address. Its
+last install step, `egress-lane`, writes the marker that makes the execution
+workspace collect `tests/egress` alone. The site has dropped that address
+since 2026-10-19 (MCPs `fleet-mcp/README.md`, Known gaps), so the case is red
+until the block lifts, and a lane of its own keeps that red out of every
+served check and the probe off every served run. It takes no exclusive
+resource: two requests a run are all it sends.
+
 ## The staged tree is made a git repository, and that is not decoration
 
 Ruff honours `.gitignore` and applies it **only inside a git repository**. A
