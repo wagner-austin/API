@@ -48,7 +48,16 @@ from fleet.contracts.project import ProjectConfig
 from fleet.contracts.resources import fleet_wide
 from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node, require_project
-from fleet.core import _test_hooks, capacity, dispatch, leases, node_choice, probe, records
+from fleet.core import (
+    _test_hooks,
+    capacity,
+    dispatch,
+    leases,
+    node_choice,
+    probe,
+    recipe,
+    records,
+)
 
 _log = get_logger(__name__)
 
@@ -255,7 +264,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         # projects in it read no second repository; the one that does is
         # dispatched from the queue, where the export lives.
         companions=(),
-        recipe=dispatch.working_tree_recipe(project, plan),
+        recipe=recipe.working_tree_recipe(project, plan),
         registry=loaded.registry,
     )
 

@@ -52,7 +52,7 @@ from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.host_claim import HostClaim
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
-from fleet.core import _test_hooks, dispatch, export, host_claims, run_lease
+from fleet.core import _test_hooks, dispatch, export, host_claims, recipe, run_lease
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS
 from fleet.core.queue_lost import report_lost
 from fleet.core.queue_transport import unanswered
@@ -190,7 +190,7 @@ def launch_claimed(
             workers=prepared["workers"],
             build_payload=build,
             companions=prepared["companions"],
-            recipe=dispatch.recipe_for(
+            recipe=recipe.recipe_for(
                 prepared["plan"],
                 path=prepared["source"]["path"],
                 install=prepared["source"]["install"],
