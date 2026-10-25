@@ -5,6 +5,7 @@
   "required_tags": [
     "gpu"
   ],
+  "loopback_only": true,
   "source": {
     "remote": "https://github.com/wagner-austin/idle.git",
     "path": "",
