@@ -105,13 +105,17 @@ def close(
 def give_back(
     credentials: McpCredentials, job: DispatchJob, identity: JSONObject, *, detail: str
 ) -> DispatchJob:
-    """Give the queue back a job whose run the kernel or systemd-oomd ended for memory, and log it.
+    """Give the queue back a job whose run ended with no verdict of its own, and log it.
+
+    That is a run the kernel or systemd-oomd ended for memory, and one whose
+    project the rolled workspace no longer declares
+    (:mod:`fleet.cli.node_retired`, MCPs board task 4ec65b8f).
 
     Args:
         credentials: The queue's endpoint and headers.
         job: The job, reported started on this machine.
         identity: This runner's identity arguments.
-        detail: The verdict line, naming the run and its ending.
+        detail: The line naming the run and why it is given back.
 
     Returns:
         The job as the queue answered: ``queued`` the first time, ``failed``
@@ -124,7 +128,7 @@ def give_back(
         credentials, job_id=job["job_id"], detail=detail, identity=identity
     )
     _log.info(
-        "%s: ended for memory, the queue answered %s: %s",
+        "%s: given back, the queue answered %s: %s",
         encode_job_line(job),
         answered["status"],
         detail,

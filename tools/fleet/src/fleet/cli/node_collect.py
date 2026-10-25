@@ -59,7 +59,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, node_lost
+from fleet.cli import _config, node_lost, node_retired
 from fleet.cli import collect as collect_cli
 from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
@@ -137,11 +137,13 @@ def collect_one_job(
         its lease left as it is (MCPs board task 8993c306: lavender-wsl,
         10:30Z); a run still going whose lease was set under
         :data:`fleet.cli.node_collected.RENEW_AFTER_SECONDS` ago writes
-        nothing (MCPs board task c1d48330).
+        nothing (MCPs board task c1d48330). A run whose project the rolled
+        workspace no longer declares is settled by
+        :func:`fleet.cli.node_retired.settle_retired`.
 
     Raises:
-        AppError: With a node or workspace code when the node failed a read
-            it answered or its declaration has gone, ``LEASE_NOT_HELD`` when
+        AppError: With a node code when the node failed a read it answered
+            or its declaration has gone, ``LEASE_NOT_HELD`` when
             the build finished after its lease lapsed, or
             ``QUEUE_ANSWER_MALFORMED`` when a node-lane job carries no sha.
             Not caught: those mean this machine's records and the fleet disagree.
@@ -162,7 +164,6 @@ def collect_one_job(
                 line=f"{encode_job_line(job)}: no live run on this machine, leaving it",
             )
         node = require_node(loaded.workspace, row["node"])
-        plan = require_project(loaded.workspace, row["project"])
         polled = collect.attempt_poll_result(node, run_id=row["run_id"])
         if polled["unreachable"] is not None:
             return Collected(
@@ -170,6 +171,12 @@ def collect_one_job(
                 line=f"{encode_job_line(job)}: did not answer the read: {polled['unreachable']}",
             )
         result = polled["result"]
+        # A roll may remove the project of a run still held (MCPs board task 4ec65b8f).
+        if node_retired.is_retired(loaded, row):
+            return node_retired.settle_retired(
+                loaded, credentials, board, job, identity, row=row, node=node, result=result
+            )
+        plan = require_project(loaded.workspace, row["project"])
         if result is None:
             deadline = collect.lease_deadline(row, plan)
             now = _test_hooks.now()
