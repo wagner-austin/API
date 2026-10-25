@@ -106,6 +106,19 @@ class ProjectConfig(TypedDict):
             127.0.0.1, which no other node can reach, and no tag singles out
             one host. Optional, because it is the exception: absent reads as
             None, and the workspace refuses a name it does not declare.
+        loopback_only: True for a project whose ``make check`` reads no
+            network but this host's own loopback, so a Linux node runs that
+            step in a network namespace holding only lo (MCPs
+            ``fleet-check-unit loopback``, :mod:`fleet.contracts.check_unit`),
+            after its install steps ran in the host's. Chromium fails every
+            request it has in flight, to localhost too, with
+            ERR_NETWORK_CHANGED whenever the host's addresses change, and
+            the GitHub Actions jobs' service containers on lavender change
+            them all day: idle's browser test files failed to load in fleet
+            jobs dee131c3 and 1a8e13bc on 2026-10-25, and passed in such a
+            namespace beside a container started and removed every 4 s (MCPs
+            board task 649fcc7a). Optional, because it is the exception:
+            absent reads as False, and any value but a boolean is refused.
     """
 
     worker_ram_gb: float
@@ -116,6 +129,7 @@ class ProjectConfig(TypedDict):
     required_tags: tuple[NodeTag, ...]
     source: ProjectSource | None
     node: str | None
+    loopback_only: bool
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -167,6 +181,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "required_tags": encode_tags(project["required_tags"]),
         "source": encode_project_source(project["source"]),
         "node": project["node"],
+        "loopback_only": project["loopback_only"],
     }
 
 
@@ -190,6 +205,31 @@ def decode_pinned_node(value: JSONValue) -> str | None:
         raise JSONTypeError(
             f"project.node must be a node's registry name or absent, got {value!r}; an empty "
             "or non-string pin would run the project nowhere"
+        )
+    return value
+
+
+def decode_loopback_only(value: JSONValue) -> bool:
+    """Decode a project's optional ``loopback_only``.
+
+    Args:
+        value: The key's value, or None when the key is absent.
+
+    Returns:
+        True for a project whose check reads only loopback, False when the
+        key is absent.
+
+    Raises:
+        JSONTypeError: When the value is not a boolean: a string or a number
+            here is a misspelt declaration, and reading it as either answer
+            would run the check in a namespace its author did not choose.
+    """
+    if value is None:
+        return False
+    if not isinstance(value, bool):
+        raise JSONTypeError(
+            f"project.loopback_only must be true, false or absent, got {value!r}; it decides "
+            "whether the check runs in a network namespace holding only lo"
         )
     return value
 
@@ -256,12 +296,14 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         ),
         source=decode_project_source(value["source"], field="project.source"),
         node=decode_pinned_node(value.get("node")),
+        loopback_only=decode_loopback_only(value.get("loopback_only")),
     )
 
 
 __all__ = [
     "MAKE_TARGET",
     "ProjectConfig",
+    "decode_loopback_only",
     "decode_pinned_node",
     "decode_project_config",
     "encode_project_config",

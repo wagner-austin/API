@@ -33,6 +33,13 @@ inside dispatch's quota and weight, carrying systemd-oomd's
   wait for it, its output and exit status passed back, which the toolchain
   probe asks its docker questions through (:mod:`fleet.core.
   linux_toolchain_probe`).
+- ``loopback <unit> <program> [<argument>...]``: run one command of the
+  caller's running check ``<unit>`` as ``<unit>-loopback.service`` with
+  ``PrivateNetwork=yes``, in the directory it was called from, bound to the
+  check's unit so whatever ends the check ends it, and wait for it, its
+  output and exit status passed back. A project that declares
+  ``loopback_only`` runs its ``make check`` so (:mod:`fleet.core.
+  linux_loopback`, MCPs board task 649fcc7a).
 
 A unit is ``fleet-<run id>`` (:func:`fleet.core.names.task_name`), with or
 without ``.service``; the helper refuses any other name, and every refusal
