@@ -1,0 +1,46 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": false,
+  "disabledUntil": null,
+  "duties": [],
+  "standby": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.113.38.162",
+  "reachKey": null,
+  "bootMac": "00:01:6c:d6:77:6f",
+  "netbootWifi": false,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "ST2000DM001-1ER164_W4Z3PY7G"
+  },
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Emerald is the Lenovo H50-55, model 90BG003JUS, with an AMD A10-7800 and existing 2 TB Seagate disk W4Z3PY7G. The operator authorized wiping its temporary enrollment identity pc-d6776f on 2026-10-24 (admission 84199d94-95d3-48ea-bf5c-f40bd3746fa6) and keeping the name emerald (board task 4b3809c7-28cd-4eb0-854f-2858c26e76f0). Ubuntu was installed by netboot arm 69e1d5ef and adopted at 100.113.38.162 on 2026-10-25T00:03:47.215Z. The fleet provision completed at 00:19:09Z using MCPs adb2b59f7654 and API pins 11c454ecb5d7; after reboot, the probe measured kernel 7.0.0-38-generic, 4 logical cores, 10.6 GiB usable RAM, no CUDA device, g++ 13.3.0, rootless Docker 29.8.1 and the running test database. The 00:24:17Z audit reported 33 OK and no failed machine checks; the automatic reimage task b9e2e7dd ended because its control-side commit hook lacked a virtualenv, before publishing the measured roster. The install-disk serial is the live udev ID_SERIAL verified on this node, to keep additional storage drives outside future OS installation selection.",
+  "dispatch": {
+    "held": null,
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 4,
+    "ram_gb": 10.6,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": "13.3.0",
+    "docker": "29.8.1",
+    "stack": null,
+    "elevated": false
+  }
+}
