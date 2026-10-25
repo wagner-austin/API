@@ -56,6 +56,12 @@ d577036f): one check at a time, it still ran 10 of its 341 checks in the 7
 days to 2026-10-18 past the budget with their tests passing, beside the
 production stack, against 3 of about 1,500 on the other nodes.
 
+demure carries both, one check at a time and only the projects pinned to it,
+for another reason than a measurement (MCPs board task c036582e): the corvis
+stack moves onto it from diphtheria, and the operator, 2026-10-24, "cuz
+diptheria is too small. so demure*will be dedicated as the server pc. not a
+worker." No project is pinned to it yet, so it checks none.
+
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
 losing one is a change this file has to be told about.
@@ -149,7 +155,7 @@ def test_the_measured_nodes_are_the_bounded_ones() -> None:
         if node["budget"]["checks_at_once"] is not None
     }
 
-    assert bounds == {"diphtheria": 1, "lenovold": 1, "loki": 1, "serendipity": 1}
+    assert bounds == {"demure": 1, "diphtheria": 1, "lenovold": 1, "loki": 1, "serendipity": 1}
 
 
 @pytest.mark.parametrize(("name", "measured"), sorted(BOUNDED_GRANTS.items()))
@@ -184,18 +190,20 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
 
 #: The suites lenovold refuses, each measured over the budget there with
 #: every test passing (the module docstring), and each declaring the minimum
-#: of 3 workers its 2 spare cores cannot afford.
-LENOVOLD_REFUSED = (
-    "MCPs/execution-deploy",
-    "MCPs/execution-linux",
-    "MCPs/mcp-shared",
-    "MCPs/packages/db",
-)
+#: of 3 workers its 2 spare cores cannot afford; beside each, the stack hosts
+#: that carry its tags and refuse it because it is not pinned to them. demure
+#: carries no testdb tag, so MCPs/packages/db never reaches it.
+LENOVOLD_REFUSED = {
+    "MCPs/execution-deploy": ("demure", "diphtheria"),
+    "MCPs/execution-linux": ("demure", "diphtheria"),
+    "MCPs/mcp-shared": ("demure", "diphtheria"),
+    "MCPs/packages/db": ("diphtheria",),
+}
 
 
-@pytest.mark.parametrize("project_name", LENOVOLD_REFUSED)
+@pytest.mark.parametrize(("project_name", "unpinned"), sorted(LENOVOLD_REFUSED.items()))
 def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
-    project_name: str,
+    project_name: str, unpinned: tuple[str, ...]
 ) -> None:
     workspace = _shipped()
     project = workspace["projects"][project_name]
@@ -225,7 +233,7 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
     # property rather than by each node's worker count: a netboot reimage
     # rewrites a worker's roster file with what its provision measured (MCPs
     # board task 9fa23d42), and it should fail here only if it makes that
-    # node refuse. diphtheria refuses because it checks only its pinned
+    # node refuse. The stack hosts refuse because each checks only its pinned
     # suites.
     refused = {
         name: verdict["code"]
@@ -235,17 +243,33 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
         if verdict["code"] is not None
     }
     assert refused == {
-        "diphtheria": FleetErrorCode.NODE_NOT_PINNED,
+        **dict.fromkeys(unpinned, FleetErrorCode.NODE_NOT_PINNED),
         "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
     }
 
 
-def test_only_diphtheria_checks_only_its_pinned_projects() -> None:
+def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
     declared = {
         name for name, node in _shipped()["nodes"].items() if node["budget"]["pinned_checks_only"]
     }
 
-    assert declared == {"diphtheria"}
+    assert declared == {"demure", "diphtheria"}
+
+
+def test_demure_checks_no_project_while_none_is_pinned_to_it() -> None:
+    workspace = _shipped()
+    node = workspace["nodes"]["demure"]
+    taken = {
+        name
+        for name, project in workspace["projects"].items()
+        if assess(node, _idle(node), project, node_tags(node))["code"] is None
+    }
+
+    assert taken == set()
+    assert len(workspace["projects"]) > 0
+    for suite in ("MCPs/watcher", "MCPs/mcp-shared", "MCPs/packages/db"):
+        refused = assess(node, _idle(node), workspace["projects"][suite], node_tags(node))
+        assert refused["code"] == FleetErrorCode.NODE_NOT_PINNED
 
 
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
