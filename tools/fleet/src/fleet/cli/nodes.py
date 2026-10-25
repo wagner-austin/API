@@ -23,8 +23,7 @@ free against its 4.0 GB reservation, lavender 2.2 GB against 6.0 GB. So a
 reachable node's line ends with every runner's own pre-claim verdict,
 :func:`fleet.core.capacity.room_for_any` on the same probe (the owner's
 reservation against free memory, the cores and memory its live runs hold, disk),
-for its node lane and, where it declares one, its elevated lane; and an
-unreachable node inside another machine's WSL adds what that host reports.
+for its node lane.
 
 A DISABLED NODE IS NOT PROBED, and says so. Nobody expects it to answer, and
 asking costs a ten-second ssh timeout per node per run.
@@ -50,8 +49,8 @@ from platform_core.report_line import emit_error_line, emit_line
 from fleet.cli import _config
 from fleet.contracts.node import NodeConfig, NodeState, describe_node
 from fleet.contracts.project import ProjectConfig
-from fleet.contracts.tags import runner_tags
-from fleet.core import capacity, host_report, probe, records
+from fleet.contracts.tags import node_tags
+from fleet.core import capacity, probe, records
 
 _log = get_logger(__name__)
 
@@ -90,25 +89,20 @@ def describe_fleet(loaded: _config.LoadedWorkspace) -> tuple[list[str], int]:
     return lines, unreachable
 
 
-def lane_verdicts(node: NodeConfig, state: NodeState, projects: tuple[ProjectConfig, ...]) -> str:
-    """Whether each of a node's runners could claim on this probe, and why not.
+def lane_verdict(node: NodeConfig, state: NodeState, projects: tuple[ProjectConfig, ...]) -> str:
+    """Whether a node's runner could claim on this probe, and why not.
 
     Args:
         node: The node's declaration.
         state: What it reported just now.
-        projects: Every registered project, as the runners size a claim.
+        projects: Every registered project, as the runner sizes a claim.
 
     Returns:
-        One clause per runner, the node lane and (where the node declares
-        one) the elevated lane, each ``<lane> can claim`` or ``<lane> claims
-        nothing: CODE: reason`` in the runner's own words.
+        ``node lane can claim`` or ``node lane claims nothing: CODE: reason``
+        in the runner's own words.
     """
-    lanes = [("node lane", False)] + ([("elevated lane", True)] if node["elevated"] else [])
-    clauses: list[str] = []
-    for label, elevated in lanes:
-        full = capacity.room_for_any(node, state, projects, runner_tags(node, elevated=elevated))
-        clauses.append(f"{label} can claim" if full is None else f"{label} claims nothing: {full}")
-    return "; ".join(clauses)
+    full = capacity.room_for_any(node, state, projects, node_tags(node))
+    return "node lane can claim" if full is None else f"node lane claims nothing: {full}"
 
 
 def _probe_line(loaded: _config.LoadedWorkspace, name: str, node: NodeConfig) -> tuple[str, int]:
@@ -132,15 +126,9 @@ def _probe_line(loaded: _config.LoadedWorkspace, name: str, node: NodeConfig) ->
     try:
         state = probe.probe_node(node, live=live, writer=PROBE_WRITER)
     except AppError as unreachable:
-        line = f"{name}: UNREACHABLE -- {unreachable.message}"
-        if node["wsl_host"] is not None:
-            seen = host_report.describe_wsl_host(
-                loaded.workspace, loaded.ledger, node["wsl_host"], writer=PROBE_WRITER
-            )
-            line = f"{line}; {seen}"
-        return line, 1
+        return f"{name}: UNREACHABLE -- {unreachable.message}", 1
     projects = tuple(loaded.workspace["projects"].values())
-    return f"{name}: {describe_node(node, state)}; {lane_verdicts(node, state, projects)}", 0
+    return f"{name}: {describe_node(node, state)}; {lane_verdict(node, state, projects)}", 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:

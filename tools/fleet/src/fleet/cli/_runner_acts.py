@@ -16,7 +16,6 @@ from collections.abc import Sequence
 from platform_core.json_utils import dump_json_str
 from platform_core.logging import get_logger
 
-from fleet.contracts.runner_windows import WindowsRunnerHost
 from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, encode_runner_spec
 from fleet.core import (
     _test_hooks,
@@ -26,7 +25,6 @@ from fleet.core import (
     runner_rebuild,
     runner_registrations,
     runner_render,
-    runner_windows_host,
 )
 from fleet.core.runner_audit_types import AuditFinding
 
@@ -37,18 +35,13 @@ _log = get_logger(__name__)
 ROSTER_LABEL = "roster"
 
 
-def audit(
-    spec: RunnerSpec,
-    hosts: Sequence[HostRunnerSpec],
-    windows_hosts: Sequence[WindowsRunnerHost],
-) -> int:
+def audit(spec: RunnerSpec, hosts: Sequence[HostRunnerSpec]) -> int:
     """Audit every selected host and its repositories' registrations, and print the verdicts.
 
     Args:
         spec: The whole roster, which every registration is held to.
-        hosts: The Linux hosts to audit.
-        windows_hosts: The Windows hosts to audit. The installs of both
-            name the repositories whose registrations are read.
+        hosts: The hosts to audit, whose installs name the repositories
+            whose registrations are read.
 
     Returns:
         0 when every check on every reachable host passed, every host was
@@ -61,10 +54,6 @@ def audit(
             and ``RUNNER_GITHUB_UNREADABLE`` from a registrations read.
     """
     outcomes = [(host["name"], runner_audit.attempt_audit_host(host)) for host in hosts]
-    outcomes += [
-        (host["name"], runner_windows_host.attempt_audit_windows_host(host))
-        for host in windows_hosts
-    ]
     faults = 0
     for name, outcome in outcomes:
         findings = outcome["findings"]
@@ -73,10 +62,7 @@ def audit(
             faults += 1
             continue
         faults += log_findings(name, findings)
-    repos = sorted(
-        {install["repo"] for host in hosts for install in host["installs"]}
-        | {runner["repo"] for host in windows_hosts for runner in host["installs"]}
-    )
+    repos = sorted({install["repo"] for host in hosts for install in host["installs"]})
     readings = runner_registrations.read_registrations(spec, repos)
     faults += log_findings(
         ROSTER_LABEL, [runner_registrations.registration_finding(each) for each in readings]
@@ -241,30 +227,6 @@ def rebuild(host: HostRunnerSpec) -> int:
     return 0
 
 
-def rebuild_windows(host: WindowsRunnerHost) -> int:
-    """Rebuild one Windows runner host and print each step and the audit.
-
-    Args:
-        host: The host.
-
-    Returns:
-        0 when the audit afterwards is clean; 1 when it reports drift.
-
-    Raises:
-        AppError: As :func:`fleet.core.runner_windows_host.rebuild_windows_host`
-            describes.
-    """
-    rebuilt = runner_windows_host.rebuild_windows_host(host)
-    for step in rebuilt["steps"]:
-        _log.info("%s rebuild: %s", host["name"], step)
-    faults = log_findings(host["name"], rebuilt["findings"])
-    if faults:
-        _log.info("%d fault(s) after the rebuild; the drift lines name the repairs", faults)
-        return 1
-    _log.info("rebuild verified: every check green on %s", host["name"])
-    return 0
-
-
 def prune(spec: RunnerSpec) -> int:
     """Delete the roster's undeclared offline registrations and print each act.
 
@@ -338,7 +300,6 @@ __all__ = [
     "onboard",
     "prune",
     "rebuild",
-    "rebuild_windows",
     "render",
     "report",
     "sample",

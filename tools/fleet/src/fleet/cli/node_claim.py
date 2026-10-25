@@ -13,64 +13,41 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config
 from fleet.cli.node_collect import CLAIM_LEASE_SECONDS
 from fleet.cli.node_ready import Ready
 from fleet.contracts.dispatch import DispatchJob, DispatchLane, encode_job_line
-from fleet.contracts.node import NodeConfig
 from fleet.contracts.runner_tick import RunnerTick
-from fleet.contracts.tags import NodeTag
-from fleet.core import elevated_yield, queue, tick_report
+from fleet.core import queue, tick_report
 
 _log = get_logger(__name__)
 
 
 def ask_queue(
-    loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
     identity: JSONObject,
     tick: RunnerTick,
     ready: Ready,
     *,
     alias: str,
-    node: NodeConfig,
-    elevated: bool,
 ) -> DispatchJob | None:
     """Claim one job for a ready node, and record the tick with what came of it.
 
     Args:
-        loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
         identity: This runner's identity arguments.
         tick: The tick the gate composed for this ready node.
         ready: Its state, claim tags and fitting projects.
         alias: This node's workspace name.
-        node: Its declaration.
-        elevated: Whether this is the node's elevated runner.
 
     Returns:
-        The claimed job, or None when the ordinary runner yields to a waiting
-        elevated job or nothing in the lane matched; the elevated runner
-        whose lane matched nothing also asks :func:`claim_untagged`. The tick is recorded
-        either way, before anything is staged, so ``fleet_status`` reads the
-        claim while its build is still being prepared.
+        The claimed job, or None when nothing in the lane matched. The tick
+        is recorded either way, before anything is staged, so
+        ``fleet_status`` reads the claim while its build is still being
+        prepared.
 
     Raises:
-        AppError: From the queue calls.
+        AppError: From the queue call.
     """
-    if elevated_yield.yields_to_elevated(
-        credentials,
-        loaded.workspace,
-        alias=alias,
-        node=node,
-        elevated=elevated,
-        leases=loaded.leases,
-    ):
-        verdict = "yields to its elevated runner; claiming nothing"
-        tick_report.record_tick(
-            credentials, decided(tick, claiming=False, verdict=verdict), identity=identity
-        )
-        return None
     job = queue.claim_next(
         credentials,
         lane=DispatchLane.NODE,
@@ -80,87 +57,16 @@ def ask_queue(
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )
-    if job is None and elevated:
-        job = claim_untagged(loaded, credentials, identity, ready, alias=alias)
     verdict = (
         f"asked for {len(ready['fits'])} fitting project(s); nothing in the node lane matched"
         if job is None
-        else f"claimed {encode_job_line(job)}{untagged_note(job, elevated=elevated)}"
+        else f"claimed {encode_job_line(job)}"
     )
     _log.info("%s %s", alias, verdict)
     tick_report.record_tick(
         credentials, decided(tick, claiming=True, verdict=verdict), identity=identity
     )
     return job
-
-
-def claim_untagged(
-    loaded: _config.LoadedWorkspace,
-    credentials: McpCredentials,
-    identity: JSONObject,
-    ready: Ready,
-    *,
-    alias: str,
-) -> DispatchJob | None:
-    """Claim, for the elevated runner, a job only it can run that lacks the ``elevated`` tag.
-
-    The queue's exclusive rule (MCPs ``claimNextDispatchJob``) hands a
-    runner that carries ``elevated`` only jobs that require it, and every
-    ordinary runner's fits leave out a project that declares it
-    (:func:`fleet.core.capacity.assess`), so a job of such a project
-    submitted with fewer tags reached no runner on any node. MCPs board
-    task 939ec5c7: MCPs/scripts/ps-harness job 7c16305c, submitted with
-    ``[windows]``, waited from 2026-10-03 17:16Z while serendipity had room
-    in both lanes. So the elevated runner asks the lane once more as the
-    ordinary runner would, its tags less ``elevated``, for only the
-    projects that declare it among those it fits: the jobs it alone can run,
-    whatever tags they were submitted with. The project's declaration is
-    what the build needs (:func:`fleet.cli.node_agent.tags_refusal`).
-
-    Args:
-        loaded: The workspace and its resolved record paths.
-        credentials: The queue's endpoint and headers.
-        identity: This runner's identity arguments.
-        ready: The elevated runner's state, claim tags and fitting projects.
-        alias: This node's workspace name.
-
-    Returns:
-        The claimed job, or None when it fits no elevated project or no
-        such job waits; the queue is not asked when it fits none.
-
-    Raises:
-        AppError: From the queue call.
-    """
-    declaring = elevated_yield.elevated_projects(loaded.workspace)
-    own = tuple(name for name in ready["fits"] if name in declaring)
-    if not own:
-        return None
-    return queue.claim_next(
-        credentials,
-        lane=DispatchLane.NODE,
-        tags=tuple(sorted(ready["tags"] - {NodeTag.ELEVATED})),
-        node=alias,
-        projects=own,
-        lease_seconds=CLAIM_LEASE_SECONDS,
-        identity=identity,
-    )
-
-
-def untagged_note(job: DispatchJob, *, elevated: bool) -> str:
-    """What the elevated runner's verdict adds for a job submitted without the tag.
-
-    Args:
-        job: The claimed job.
-        elevated: Whether this is the node's elevated runner.
-
-    Returns:
-        A clause naming the missing tag, so the tick log says why a job
-        the lane's own rule would never hand this runner was taken; empty
-        for every other claim.
-    """
-    if not elevated or NodeTag.ELEVATED in job["required_tags"]:
-        return ""
-    return ", submitted without the elevated tag its project declares"
 
 
 def decided(tick: RunnerTick, *, claiming: bool, verdict: str) -> RunnerTick:
@@ -176,7 +82,6 @@ def decided(tick: RunnerTick, *, claiming: bool, verdict: str) -> RunnerTick:
     """
     return RunnerTick(
         node=tick["node"],
-        elevated=tick["elevated"],
         tags=tick["tags"],
         fits=tick["fits"],
         load=tick["load"],
@@ -185,4 +90,4 @@ def decided(tick: RunnerTick, *, claiming: bool, verdict: str) -> RunnerTick:
     )
 
 
-__all__ = ["ask_queue", "claim_untagged", "decided", "untagged_note"]
+__all__ = ["ask_queue", "decided"]

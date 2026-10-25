@@ -33,6 +33,11 @@ OUT_FLAG = "--out"
 
 _FLAGS = (OUT_FLAG,)
 
+#: Where the committed copies live, relative to tools/fleet: the directory
+#: ``make render-documents`` passes as ``--out``, and the one MCPs
+#: ``fleet-mcp`` and its host provisioning read the documents from.
+RENDERED_DIRECTORY: Final = "rendered"
+
 #: Every rendered document: its file name under ``--out`` and its renderer.
 DOCUMENTS: Final[tuple[tuple[str, Callable[[], str]], ...]] = (
     (HOOKS_CHECK_DOCUMENT, render_hooks_check_document),
@@ -77,7 +82,7 @@ def entrypoint() -> None:
     raise SystemExit(run_cli(main, emit=emit_line, emit_error=emit_error_line))
 
 
-__all__ = ["DOCUMENTS", "OUT_FLAG", "entrypoint", "main"]
+__all__ = ["DOCUMENTS", "OUT_FLAG", "RENDERED_DIRECTORY", "entrypoint", "main"]
 
 
 # Without this, `python -m fleet.cli.render_documents` imports the module,

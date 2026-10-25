@@ -3,7 +3,6 @@
 Usage:
     fleet-node-agent --config registry --node sedona
     fleet-node-agent --config registry --node sedona --announce
-    fleet-node-agent --config registry --node serendipity --elevated
 
 A run without ``--announce`` SERVES the node until it hands over before a
 fire boundary (:mod:`fleet.cli.node_serve`, MCPs board task 8993c306),
@@ -63,17 +62,9 @@ its own claims across ticks; a fresh UUID per tick would make every tick a
 stranger to the last. ``--announce`` posts the check-in that registers that
 session on the ledger (MCPs mig 530), once, from the registration script.
 
-A NODE THAT DECLARES ``elevated`` HAS A SECOND RUNNER (MCPs board task
-a98d7083), this command with ``--elevated``: a separate identity,
-``fleet-node-<alias>-elevated``, so it collects and stops only what it
-claimed; the ``elevated`` tag, which the queue's exclusive rule makes the
-only jobs it takes and the one kind the ordinary runner never gets
-(:func:`fleet.contracts.tags.runner_tags`); and one more gate before the
-claim, the ssh session's token as this tick's probe measured it
-(:func:`fleet.contracts.elevation.elevation_gap`), because every build it
-launches registers at RunLevel Highest. The two share the node's capacity,
-so the ORDINARY runner claims nothing while an elevated job waits for the
-node (:mod:`fleet.core.elevated_yield`); it would take every freed slot.
+ONE RUNNER PER NODE. A Windows node that declared ``elevated`` had a second
+runner, this command with ``--elevated`` (MCPs board task a98d7083); it left
+with the fleet's last Windows node (board task e705f08c).
 
 Exits 0 whenever the agent itself worked, refused jobs and failed suites
 included, for the reason :mod:`fleet.cli.agent` gives: the status is whether
@@ -106,14 +97,13 @@ from fleet.cli.node_prepare import admit
 from fleet.cli.node_ready import ready_state
 from fleet.cli.node_settle import require_sha
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.tags import runner_tags
+from fleet.contracts.tags import node_tags
 from fleet.contracts.workspace import require_node
 from fleet.core import _test_hooks, host_claims, names, queue, rolled, tick_report
 
 _log = get_logger(__name__)
 
 NODE_FLAG = "--node"
-ELEVATED_FLAG = "--elevated"
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 
@@ -121,25 +111,20 @@ _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 IDENTITY_NAMESPACE = uuid.NAMESPACE_URL
 
 
-def node_identity(alias: str, *, elevated: bool) -> tuple[str, str]:
+def node_identity(alias: str) -> tuple[str, str]:
     """The label and session id a node's runner acts as.
 
     Args:
         alias: The node's workspace name.
-        elevated: Whether this is the node's elevated runner.
 
     Returns:
         ``fleet-node-<alias>`` and the version-5 UUID of
         ``fleet-node-agent/<alias>`` in :data:`IDENTITY_NAMESPACE`, lowercase
-        hyphenated as the board wants it; for the elevated runner
-        ``fleet-node-<alias>-elevated`` and the UUID of
-        ``fleet-node-agent/<alias>/elevated``, a session of its own, since
-        each runner collects and stops only the jobs its label holds.
+        hyphenated as the board wants it.
     """
-    label = names.node_runner_label(alias, elevated=elevated)
-    if elevated:
-        return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}/elevated"))
-    return label, str(uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}"))
+    return names.node_runner_label(alias), str(
+        uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}")
+    )
 
 
 def claim_pass(
@@ -149,7 +134,6 @@ def claim_pass(
     *,
     alias: str,
     node: NodeConfig,
-    elevated: bool,
     launcher: Launcher,
 ) -> str | None:
     """Take one job for this node and hand its launch off, or report why it could not.
@@ -160,9 +144,6 @@ def claim_pass(
         identity: This runner's identity arguments.
         alias: This node's workspace name.
         node: Its declaration.
-        elevated: Whether this is the node's elevated runner, which claims
-            with the ``elevated`` tag and only once the probe has read an
-            administrator's token for its ssh session.
         launcher: The serve's launches, whose grants and projects the gate
             charges to the node and which the claimed job's launch joins
             (:mod:`fleet.cli.node_launch`, MCPs board task 8993c306).
@@ -174,21 +155,23 @@ def claim_pass(
     for nothing, claims nothing this tick and the job stays for one that
     can run it. The same holds for its TOOLCHAIN, asked before the room
     (:func:`fleet.core.toolchain.attempt_toolchain`, over the ssh account
-    whose SID the build's scheduled task is registered for): lavender
-    claimed slime jobs d515d038 and 7235d4c4, staged a whole export and ran
-    npm ci before dying at the Makefile's first python call on the Store
-    alias stub (MCPs board task e62c8120), so a node missing a tool now logs
-    the code, the tool and this node's install command and claims nothing.
-    A TAGGED tool it lacks closes nothing: the runner claims without that
-    tool's tag (:func:`fleet.cli.node_ready.ready_state`), so the queue keeps
-    the jobs that need it for another node (MCPs board task 939ec5c7).
+    the build runs as): lavender claimed slime jobs d515d038 and 7235d4c4,
+    staged a whole export and ran npm ci before dying at the Makefile's
+    first python call (MCPs board task e62c8120), so a node missing a tool
+    now logs the code, the tool and this node's install command and claims
+    nothing. A TAGGED tool it lacks closes nothing: the runner claims
+    without that tool's tag (:func:`fleet.cli.node_ready.ready_state`), so
+    the queue keeps the jobs that need it for another node (MCPs board task
+    939ec5c7).
 
-    THE HOST'S RUNNERS CLAIM IN TURN (MCPs board task a85ef09e). The gate,
+    A HOST'S CLAIMS ARE TAKEN IN TURN (MCPs board task a85ef09e). The gate,
     the claim and the claimed job's host claim all run inside the host's
-    claim turn (:func:`fleet.core.host_claims.claim_turn`), so a node's
-    ordinary and elevated runners, two processes, never both read the room
-    one claim is about to take; on 2026-10-07 serendipity's two runners did,
-    and held three runs and 6 workers against its 4 cores.
+    claim turn (:func:`fleet.core.host_claims.claim_turn`), so two processes
+    claiming for one host never both read the room one claim is about to
+    take; on 2026-10-07 serendipity's ordinary and elevated runners did, and
+    held three runs and 6 workers against its 4 cores. A host has one runner
+    since the elevated one left (board task e705f08c), and the turn holds
+    for any two of its processes all the same.
 
     Returns:
         The job id of the job claimed and handed to its launch; None when
@@ -206,17 +189,9 @@ def claim_pass(
             message verbatim and does not propagate: transport, not
             recovery.
     """
-    with host_claims.claim_turn(
-        loaded.host_claims, alias=alias, runner=node_identity(alias, elevated=elevated)[0]
-    ):
+    with host_claims.claim_turn(loaded.host_claims, alias=alias, runner=node_identity(alias)[0]):
         return _claim_in_turn(
-            loaded,
-            credentials,
-            identity,
-            alias=alias,
-            node=node,
-            elevated=elevated,
-            launcher=launcher,
+            loaded, credentials, identity, alias=alias, node=node, launcher=launcher
         )
 
 
@@ -227,14 +202,13 @@ def _claim_in_turn(
     *,
     alias: str,
     node: NodeConfig,
-    elevated: bool,
     launcher: Launcher,
 ) -> str | None:
     """The claim pass's gate and claim, run while this runner holds its host's turn.
 
-    The gate charges every claim the host's runners have under way, this
-    runner's and the other's, beside the ledger's live runs, and leaves out
-    their projects (:func:`fleet.core.host_claims.live_claims`).
+    The gate charges every claim the host's runners have under way beside
+    the ledger's live runs, and leaves out their projects
+    (:func:`fleet.core.host_claims.live_claims`).
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -242,7 +216,6 @@ def _claim_in_turn(
         identity: This runner's identity arguments.
         alias: This node's workspace name.
         node: Its declaration.
-        elevated: Whether this is the node's elevated runner.
         launcher: The serve's launches, which the claimed job's launch joins.
 
     Returns:
@@ -256,7 +229,6 @@ def _claim_in_turn(
         loaded,
         alias=alias,
         node=node,
-        elevated=elevated,
         launching=host_claims.host_load(claims),
         launching_projects=frozenset(claim["project"] for claim in claims),
     )
@@ -264,10 +236,7 @@ def _claim_in_turn(
     if ready is None:
         tick_report.record_tick(credentials, gate["tick"], identity=identity)
         return None
-    tick = gate["tick"]
-    job = ask_queue(
-        loaded, credentials, identity, tick, ready, alias=alias, node=node, elevated=elevated
-    )
+    job = ask_queue(credentials, identity, gate["tick"], ready, alias=alias)
     if job is None:
         return None
     sha = require_sha(job)
@@ -292,7 +261,6 @@ def fill_pass(
     *,
     alias: str,
     node: NodeConfig,
-    elevated: bool,
     launcher: Launcher,
 ) -> tuple[str, ...]:
     """Claim and launch until this node has no room or the lane nothing it fits.
@@ -321,7 +289,6 @@ def fill_pass(
         identity: This runner's identity arguments.
         alias: This node's workspace name.
         node: Its declaration.
-        elevated: Whether this is the node's elevated runner.
         launcher: The serve's launches, which hand each run to the serve's
             watch once its start is reported.
 
@@ -336,13 +303,7 @@ def fill_pass(
     launched: list[str] = []
     while (
         job_id := claim_pass(
-            loaded,
-            credentials,
-            identity,
-            alias=alias,
-            node=node,
-            elevated=elevated,
-            launcher=launcher,
+            loaded, credentials, identity, alias=alias, node=node, launcher=launcher
         )
     ) is not None:
         launched.append(job_id)
@@ -363,8 +324,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or
-            a required one is absent, or when ``--elevated`` names a node
-            that declares no elevated runner.
+            a required one is absent.
         AppError: When the queue or the board cannot be reached or answered
             a shape this runner cannot read, when the node is not declared,
             or when this machine's records and the fleet disagree about a
@@ -372,14 +332,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     announce = queue.ANNOUNCE_FLAG in tokens
-    elevated = ELEVATED_FLAG in tokens
-    remaining = [token for token in tokens if token not in (queue.ANNOUNCE_FLAG, ELEVATED_FLAG)]
+    remaining = [token for token in tokens if token != queue.ANNOUNCE_FLAG]
     parsed = cli_args.parse_single_flags(remaining, _FLAGS)
     loaded = _config.load_workspace(parsed)
     alias = cli_args.require_flag(parsed, NODE_FLAG)
     node = require_node(loaded.workspace, alias)
-    tags = runner_tags(node, elevated=elevated)
-    agent, session_id = node_identity(alias, elevated=elevated)
+    tags = node_tags(node)
+    agent, session_id = node_identity(alias)
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     board = board_config.load_credentials()
     if announce:
@@ -414,21 +373,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             identity,
             agent=agent,
             alias=alias,
-            elevated=elevated,
             holder=watch,
             launching=launcher.launching()["jobs"],
         )
 
     def fill() -> None:
-        fill_pass(
-            loaded,
-            credentials,
-            identity,
-            alias=alias,
-            node=node,
-            elevated=elevated,
-            launcher=launcher,
-        )
+        fill_pass(loaded, credentials, identity, alias=alias, node=node, launcher=launcher)
 
     def queued() -> frozenset[str] | None:
         return node_serve_claim.queued_here(credentials, alias=alias)
@@ -481,7 +431,6 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "ELEVATED_FLAG",
     "IDENTITY_NAMESPACE",
     "NODE_FLAG",
     "claim_pass",

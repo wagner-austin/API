@@ -8,8 +8,6 @@ Usage:
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane announce --node sedona
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
-        --lane elevated --node serendipity
-    poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane hub-announce
     poetry run -- python -m fleet.cli.tick --api-root ... --log-directory ... \\
         --lane sessions --node diphtheria
@@ -34,12 +32,11 @@ lane for that machine as ``fleet-sessions-<alias>``, with
 the ``netboot`` lane as ``fleet-netboot-<that machine's name>``, with
 ``netboot-announce`` its check-in (MCPs board task 83102d9d): the row names
 the installed netboot release it arms from, the node binary, the served root
-and the workspace env file, and the tick hands them to the agent. A node declaring
-``elevated`` also has ``fleet-node-<alias>-elevated``, whose ``elevated``
-lane (and its ``elevated-announce``) runs that node's second, elevated
-runner under its own identity and log (MCPs board task a98d7083). Until the
+and the workspace env file, and the tick hands them to the agent. Until the
 hub runner, each of these was a scheduled task of its own,
-``API-FleetAgent-3min`` and ``API-FleetNode-<alias>[-elevated]-3min``.
+``API-FleetAgent-3min`` and ``API-FleetNode-<alias>-3min``. The
+``elevated`` lane, a Windows node's second runner (MCPs board task
+a98d7083), left with the fleet's last Windows node (board task e705f08c).
 
 WHY PYTHON AND NOT POWERSHELL (MCPs board task 94ac1c4f). The ticks ran
 ``powershell.exe`` over a script until 2026-09-29. On the hub,
@@ -123,8 +120,6 @@ class Lane(StrEnum):
     NETBOOT_ANNOUNCE = "netboot-announce"
     NODE = "node"
     ANNOUNCE = "announce"
-    ELEVATED = "elevated"
-    ELEVATED_ANNOUNCE = "elevated-announce"
 
 
 #: The ticks ``fleet-agent`` runs, each a duty's tick or its one-time
@@ -140,20 +135,9 @@ _AGENT_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.NETBOOT_ANNOUNCE: DispatchLane.NETBOOT,
 }
 
-#: The node lanes that run a node's ELEVATED runner (MCPs board task
-#: a98d7083): its own identity and log, claiming only the jobs requiring the
-#: ``elevated`` tag.
-_ELEVATED_LANES: Final[frozenset[Lane]] = frozenset({Lane.ELEVATED, Lane.ELEVATED_ANNOUNCE})
-
 #: The lanes that post the runner's check-in and claim nothing.
 _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
-    {
-        Lane.HUB_ANNOUNCE,
-        Lane.SESSIONS_ANNOUNCE,
-        Lane.NETBOOT_ANNOUNCE,
-        Lane.ANNOUNCE,
-        Lane.ELEVATED_ANNOUNCE,
-    }
+    {Lane.HUB_ANNOUNCE, Lane.SESSIONS_ANNOUNCE, Lane.NETBOOT_ANNOUNCE, Lane.ANNOUNCE}
 )
 
 #: The namespace a hub, sessions or netboot runner's session id is derived in.
@@ -356,8 +340,6 @@ def plan_tick(
         return _agent_plan(api_root, lane, agent_lane, node, (*arms, *announce))
     if node is None:
         raise ValueError(f"FLEET_TICK_USAGE: the {lane.value} lane needs {NODE_FLAG}")
-    elevated = lane in _ELEVATED_LANES
-    runner = names.runner_name(node, elevated=elevated)
     return TickPlan(
         arguments=(
             rolled_cli.REPO_ROOT_FLAG,
@@ -367,11 +349,10 @@ def plan_tick(
             rolled_cli.SEPARATOR,
             "--node",
             node,
-            *(("--elevated",) if elevated else ()),
             *announce,
         ),
-        stem=f"fleet-node-{runner}",
-        header=f"{lane.value} {runner}",
+        stem=names.node_runner_label(node),
+        header=f"{lane.value} {node}",
     )
 
 

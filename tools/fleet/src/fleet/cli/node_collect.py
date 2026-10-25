@@ -40,11 +40,11 @@ runner holds and settles every run it launched in one of four ways:
   A refusal also removes the claim's host claim (MCPs board task 3f7d40fe):
   the launch that removes it ended with its killed tick, and measured
   2026-10-16, six claims the hub runner's restart left at 07:10:08Z held
-  colossus and serendipity, the one elevated node, for the hour until their
-  leases lapsed. A cancel of such a job reaches its run the same way.
+  colossus and serendipity, the one elevated node then, for the hour until
+  their leases lapsed. A cancel of such a job reaches its run the same way.
 
 A stop ends the build's whole process tree
-(:meth:`fleet.core.dialect.Dialect.stop_script`) and then closes the row
+(:func:`fleet.core.dialect.stop_script`) and then closes the row
 (:func:`fleet.core.stop.stop_and_finish`), in that order, so a stop that
 fails leaves the row live, matching the node.
 """
@@ -493,21 +493,12 @@ def collect_pass(
     *,
     agent: str,
     alias: str,
-    elevated: bool,
     holder: RunHolder,
     launching: frozenset[str],
 ) -> None:
     """Send every retire this node owes (:mod:`fleet.core.retire_owed`),
     settle every running job this runner holds, reconcile every claim an
     earlier tick left without a start, then stop what was cancelled.
-
-    THE NODE'S ORDINARY RUNNER ALONE SENDS ITS OWED RETIRES (MCPs board task
-    3d9eec0d). The record names a run's node, not its runner, so on a node
-    with an elevated runner both read the same owed runs; measured on
-    serendipity 2026-10-18T18:23Z, the two sent one run's retire at once and
-    each failed, one writing the script the other held open, the other
-    walking a tree the first was removing. The elevated runner reaches the
-    node over the same host, so nothing it owes is out of the other's reach.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -516,8 +507,6 @@ def collect_pass(
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
-        elevated: Whether this is the node's elevated runner, which sends
-            no owed retire.
         holder: The serve's watch (:mod:`fleet.cli.node_watch`), given the
             run ids of the running jobs this runner holds as soon as the
             queue has said, before any is settled, so it reads them while
@@ -535,14 +524,13 @@ def collect_pass(
     # First, so a retire a settle of this pass owes waits for the next pass
     # rather than meeting the node that just missed it again at once
     # (MCPs board task 8776b828).
-    if not elevated:
-        retire_owed.retire_owed(
-            loaded.retires,
-            require_node(loaded.workspace, alias),
-            alias=alias,
-            leases_path=loaded.leases,
-            ledger_path=loaded.ledger,
-        )
+    retire_owed.retire_owed(
+        loaded.retires,
+        require_node(loaded.workspace, alias),
+        alias=alias,
+        leases_path=loaded.leases,
+        ledger_path=loaded.ledger,
+    )
     held = queue_listing.held_by(credentials, agent=agent)
     running = frozenset(job["run_id"] for job in held if job["status"] is DispatchStatus.RUNNING)
     holder.hold(running)

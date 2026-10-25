@@ -22,9 +22,9 @@ ended, and at the same pace the loop's thread lists the queued jobs (one
 fill pass again when a job naming this node or no node has arrived since
 its last fill, or the watch has settled a run since then. The
 fill pass is the one every start runs, so the claim still goes through the
-node's probe, its tags, its leases, its owner reservation and the elevated
-yield, unchanged. At every fire boundary it runs the collect pass again,
-which renews each running job's queue lease as each start did.
+node's probe, its tags, its leases and its owner reservation, unchanged. At
+every fire boundary it runs the collect pass again, which renews each
+running job's queue lease as each start did.
 
 WHEN IT HANDS OVER. Only :data:`HANDOVER_SECONDS` before a fire boundary,
 and only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.close_if_idle`)
