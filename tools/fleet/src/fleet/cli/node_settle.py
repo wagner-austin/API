@@ -60,6 +60,7 @@ from fleet.core import (
     collect,
     dialect,
     dispatch,
+    linux_unit_end,
     names,
     queue,
     remote,
@@ -83,8 +84,9 @@ def settle(
     stopped: str | None,
 ) -> Collected:
     """Read a run's tail and judge it, post a task-less run's verdict, close its
-    queue job, then finish its row, retire its directory and remove the
-    node's cache generations no run reads.
+    queue job (or give it back when its unit was ended for memory), then
+    finish its row, retire its directory and remove the node's cache
+    generations no run reads.
 
     Args:
         loaded: The workspace and its resolved record paths.
@@ -159,14 +161,20 @@ def settle(
             line=line,
             identity=identity,
         )
-    job_close.close(
-        credentials,
-        job,
-        identity,
-        status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
-        exit_code=exit_code,
-        detail=line,
-    )
+    # A check yields memory to the stack, so a unit the kernel or
+    # systemd-oomd ended for memory is given back to the queue, which
+    # requeues it once (MCPs board task d111690a, fleet.cli.job_close).
+    if unit_end is not None and linux_unit_end.killed_for_memory(unit_end):
+        job_close.give_back(credentials, job, identity, detail=line)
+    else:
+        job_close.close(
+            credentials,
+            job,
+            identity,
+            status=ClosingStatus.PASSED if exit_code == 0 else ClosingStatus.FAILED,
+            exit_code=exit_code,
+            detail=line,
+        )
     dispatch.finish(
         loaded.leases,
         loaded.ledger,
