@@ -150,10 +150,30 @@ done
 # scripts/make/project-roots.json, read from the tip. Both run as MCPs'
 # origin/main carries them (published_maketools.py), over the ranges
 # commit-tasks gets, with nothing that skips them.
+#
+# ON A SESSION HOST THE FLEET CHECKS THE PUSH INSTEAD (MCPs board task
+# f8390a08). The operator, 2026-10-25: "and then confirming ziggurat does all
+# creds, and auth and claude sessions, and the other pcs run the code ? no
+# code on ziggurat". maketools' session-host asks the roster whether this
+# machine is a session host: 0 sends each pushed range to pushed-fleet-check,
+# one fleet make check per project the commits change at the staged tip
+# (this repository's registry keys its projects by path), in place of the
+# venvs and tests here; 3 means any other machine, which runs them as above;
+# any other exit refuses the push rather than guess where its checks belong.
+session_host_status=0
+"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" session-host "$REPO" < /dev/null || session_host_status=$?
+if [ "$session_host_status" -ne 0 ] && [ "$session_host_status" -ne 3 ]; then
+    echo "=== PRE-PUSH BLOCKED: session-host exited $session_host_status, so whether this push's checks belong on the fleet is unknown ==="
+    exit 1
+fi
 printf '%s\n' "$PUSH_INPUT" | while read -r _pt_local_ref pt_local_sha _pt_remote_ref pt_remote_sha; do
     [ -z "$pt_local_sha" ] && continue
     [ "$pt_local_sha" = "$ZERO" ] && continue
-    if [ "$pt_remote_sha" = "$ZERO" ]; then
+    if [ "$session_host_status" -eq 0 ] && [ "$pt_remote_sha" = "$ZERO" ]; then
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-fleet-check "$REPO" "$pt_local_sha" "$pt_local_sha" "^origin/main" < /dev/null
+    elif [ "$session_host_status" -eq 0 ]; then
+        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-fleet-check "$REPO" "$pt_local_sha" "$pt_remote_sha..$pt_local_sha" < /dev/null
+    elif [ "$pt_remote_sha" = "$ZERO" ]; then
         "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-venvs "$REPO" "$pt_local_sha" "^origin/main" < /dev/null
         "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-tests "$REPO" "$pt_local_sha" "$pt_local_sha" "^origin/main" < /dev/null
     else
