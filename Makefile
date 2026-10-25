@@ -4,7 +4,7 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: align-commit commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles check-powershell
+.PHONY: align-commit commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
 
 # ---------------------------------------------------------------------------
 # The main checkout
@@ -39,14 +39,15 @@ commit-tasks:
 	$(PYTHON) .githooks/published_maketools.py commit-tasks ../MCPs . HEAD^!
 
 # A DEPLOY SHIPS A COMMIT ITS HOST CODE RAN AT (MCPs board task 465689f5,
-# b6eb30c8's R3). tools/fleet's rendered PowerShell and sh run on every
-# node, and API's CI is Linux, so its Windows half ran on no machine but the
-# hub. MCPs' maketools publish-executed asks the fleet queue for a passed run
-# of each execution project at exactly HEAD, and refuses a tree that differs
-# from HEAD: EXECUTION_UNRUN, EXECUTION_TREE_DIRTY or, when the queue cannot
-# be asked, EXECUTION_UNREADABLE. It reads no variable and has no override.
+# b6eb30c8's R3). tools/fleet's rendered sh runs on every node, and its host
+# cases skip off a Linux host. MCPs' maketools publish-executed asks the
+# fleet queue for a passed run of the execution project at exactly HEAD, and
+# refuses a tree that differs from HEAD: EXECUTION_UNRUN, EXECUTION_TREE_DIRTY
+# or, when the queue cannot be asked, EXECUTION_UNREADABLE. It reads no
+# variable and has no override. Until board task e705f08c it asked for
+# tools/fleet-execution too, the Windows node's half, which left with the
+# fleet's last Windows node.
 executed:
-	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution .
 	$(PYTHON) .githooks/published_maketools.py publish-executed ../MCPs tools/fleet-execution-linux .
 
 # A SERVICE DEPLOY SHIPS A COMMIT ITS SERVICES WERE DEPLOYED AT (MCPs board
@@ -156,27 +157,6 @@ logs:
 # ---------------------------------------------------------------------------
 lint:
 	$(MAKETOOLS) fan-out lint libs services clients tools
-
-# EVERY POWERSHELL FILE THIS REPOSITORY TRACKS, GUARDED, ANALYSED AND RUN BY
-# ITS PESTER SUITE TO 100 PERCENT OF COMMANDS AND BRANCH ARMS (MCPs board
-# task d69786fa). The harness is MCPs' scripts/ps-harness at the MCPs commit
-# .githooks/mcps-harness.sha records, extracted by
-# .githooks/published_maketools.py from the MCPs checkout beside this one, so
-# no copy of it or of its rules lives here. It is repository-wide because it
-# inventories through git ls-files, so it runs over the whole repository and
-# not inside each package's check.
-#
-# PINNED, not origin/main (d69786fa A3): a verdict at an API commit is then
-# the verdict of the harness that commit names, however far MCPs has moved
-# when a review re-runs it, and moving the harness is a commit here. The CI
-# job reads the same file.
-#
-# THE COMMAND LIVES IN tools/ps-harness (MCPs board task 939ec5c7), the
-# directory the fleet runs as a project, so a node's row and this target run
-# one recipe. `make test` reaches it through the fan-out, which is why `lint`
-# no longer depends on this target: it would run the harness twice.
-check-powershell:
-	make -C tools/ps-harness test
 
 test:
 	$(MAKETOOLS) fan-out test libs services clients tools
