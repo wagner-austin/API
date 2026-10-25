@@ -97,6 +97,7 @@ BOUNDED_GRANTS = {
 DIPHTHERIA_PINNED = (
     "MCPs/doc-extract-api",
     "MCPs/execution-deployed-diphtheria",
+    "MCPs/execution-egress-diphtheria",
     "MCPs/execution-netboot-diphtheria",
     "MCPs/execution-served-diphtheria",
     "MCPs/pg-backup-sidecar",

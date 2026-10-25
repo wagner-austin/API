@@ -69,10 +69,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/kvm-mcp, the hardware KVM tools (MCPs board task c8f09479); 64
     # since MCPs/instagram-mcp, the creator tools (MCPs board task f986db61);
     # 65 since MCPs/execution-deployed-diphtheria, the execution suite's
-    # deployed lane (MCPs board task 03b683d2). The unprepared lose
+    # deployed lane (MCPs board task 03b683d2); 66 since
+    # MCPs/execution-egress-diphtheria, the execution suite's egress lane
+    # (MCPs board task 523a7445). The unprepared lose
     # MCPs/execution-elevated, whose installer cases MCPs board task 42fb4e26
     # deleted.
-    assert len(prepared) == 65
+    assert len(prepared) == 66
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
@@ -192,6 +194,25 @@ def test_a_deployed_lane_step_runs_last_and_only_for_the_deployed_project() -> N
     assert sorted(marking) == ["MCPs/execution-deployed-diphtheria"]
     for steps in marking.values():
         assert [step["phase"] for step in steps] == ["install", "workspace-build", "deployed-lane"]
+
+
+def test_an_egress_lane_step_runs_last_and_only_for_the_egress_project() -> None:
+    """MCPs fleet-prepare's egress-lane phase writes the marker that makes
+    the execution workspace collect tests/egress alone (MCPs board task
+    523a7445). That case reaches ggcity.org from inside the stack's
+    containers and stays red while the site drops the host's address, so no
+    other project may carry the step, and it follows install and
+    workspace-build, which store the tree's untracked files for the node's
+    next row."""
+    marking = {
+        name: steps
+        for name, steps in _steps().items()
+        if any(step["argv"][4:] == ("egress-lane",) for step in steps)
+    }
+
+    assert sorted(marking) == ["MCPs/execution-egress-diphtheria"]
+    for steps in marking.values():
+        assert [step["phase"] for step in steps] == ["install", "workspace-build", "egress-lane"]
 
 
 def test_a_netboot_lane_step_runs_last_and_only_for_the_netboot_project() -> None:

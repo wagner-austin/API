@@ -292,6 +292,35 @@ def test_the_deployed_lane_runs_on_the_database_host_alone() -> None:
     )
 
 
+def test_the_egress_lane_runs_on_the_stack_host_alone() -> None:
+    """MCPs/execution-egress-diphtheria reaches an upstream from the stack.
+
+    Its last install step writes the marker that makes the execution
+    workspace collect tests/egress alone (MCPs board task 523a7445), whose
+    case runs a probe inside mcp-watcher and mcp-doc-extract-api, the
+    containers that fetch Garden Grove's archive, through the host's own
+    address. Only diphtheria runs those containers, so the project names it
+    and every other node refuses it. It holds no test database and no
+    companion.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/execution-egress-diphtheria")
+    assert project["node"] == "diphtheria"
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.CXX)
+    assert project["exclusive_resources"] == ()
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(phase="egress-lane", argv=(*prepare, "egress-lane")),
+        ),
+        companions=(),
+    )
+
+
 def test_the_netboot_lane_runs_on_diphtheria_with_its_vm_on_lavender() -> None:
     """MCPs/execution-netboot-diphtheria installs a clean VM by network boot.
 
