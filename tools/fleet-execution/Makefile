@@ -1,14 +1,13 @@
-# tools/fleet's host cases, executed where their platform is (board task
-# 465689f5).
+# tools/fleet's host cases, executed on a Linux host (board task 465689f5).
 #
 # `make check` here runs tools/fleet's `execution` target: the cases that
-# run rendered PowerShell or sh for real, kept to this host's platform, with
-# none allowed to skip. It is the fleet projects tools/fleet-execution (a
-# Windows node) and tools/fleet-execution-linux (a Linux node), and the
-# deploys that run fleet code refuse a commit either has not passed at
-# (tools/maketools publish-executed, read from MCPs). tools/fleet's own
-# `make check` skips these cases off their platform, and API's CI is Linux,
-# so without this project the Windows ones ran on no machine but the hub.
+# run rendered sh for real, with none allowed to skip. It is the fleet
+# project tools/fleet-execution-linux, and the deploys that run fleet code
+# refuse a commit it has not passed at (tools/maketools publish-executed,
+# read from MCPs). tools/fleet's own `make check` skips these cases off a
+# Linux host. Until board task e705f08c a Windows node ran the same recipe
+# as tools/fleet-execution; that project left with the fleet's last Windows
+# node.
 include ../../scripts/make/shell.mk
 
 .PHONY: lint test check _check-unbudgeted
@@ -18,10 +17,6 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py lint-makefiles
 
-# `make`, never $(MAKE): on serendipity $(MAKE) is
-# C:/Program Files (x86)/GnuWin32/bin/make, which PowerShell splits at the
-# spaces, and the first fleet run (6b3249c7) exited 2 on "The term 'x86' is
-# not recognized" before any case ran.
 test:
 	make -C ../fleet execution
 
