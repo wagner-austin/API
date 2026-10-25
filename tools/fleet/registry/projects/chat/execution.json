@@ -3,8 +3,8 @@
   "minimum_workers": 1,
   "expected_minutes": 20,
   "required_tags": [
-    "windows",
-    "gpu"
+    "gpu",
+    "docker"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/chat.git",

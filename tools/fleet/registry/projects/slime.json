@@ -3,8 +3,7 @@
   "minimum_workers": 4,
   "expected_minutes": 15,
   "required_tags": [
-    "gpu",
-    "windows"
+    "gpu"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/slime.git",

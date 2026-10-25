@@ -3,7 +3,7 @@
   "minimum_workers": 2,
   "expected_minutes": 30,
   "required_tags": [
-    "windows"
+    "linux"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/corvis-stick.git",
