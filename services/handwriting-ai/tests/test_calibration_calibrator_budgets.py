@@ -56,7 +56,7 @@ def _make_snapshot(limit_bytes: int) -> MemorySnapshotDict:
     }
 
 
-def test_calibrator_low_mem_branch() -> None:
+def test_calibrator_low_mem_branch(tmp_path: Path) -> None:
     captured: list[OrchestratorConfig] = []
 
     class _Orch:
@@ -134,7 +134,7 @@ def test_calibrator_low_mem_branch() -> None:
         limits=limits,
         requested_batch_size=4,
         samples=1,
-        cache_path=Path("/tmp/calib.json"),
+        cache_path=tmp_path / "calib.json",
         ttl_seconds=0,
         force=True,
     )
@@ -143,7 +143,7 @@ def test_calibrator_low_mem_branch() -> None:
     assert cfg["stage_b_budget"]["abort_pct"] == 88.0
 
 
-def test_calibrator_high_mem_branch() -> None:
+def test_calibrator_high_mem_branch(tmp_path: Path) -> None:
     captured: list[OrchestratorConfig] = []
 
     class _Orch:
@@ -223,7 +223,7 @@ def test_calibrator_high_mem_branch() -> None:
         limits=limits,
         requested_batch_size=4,
         samples=1,
-        cache_path=Path("/tmp/calib.json"),
+        cache_path=tmp_path / "calib.json",
         ttl_seconds=0,
         force=True,
     )
