@@ -26,6 +26,15 @@ identity and, under ``dispatch``, what dispatch may take from it:
   do not (emerald, a NixOS storage machine with no Docker, compiler or test
   database for a check to run on).
 
+A SERVER TAKES NO FLEET WORK (MCPs board task 4ec65b8f; the operator,
+2026-10-24: "so demure*will be dedicated as the server pc. not a worker."). A
+``server`` runs the corvis stack, so the fleet's pool is never offered to
+it: its ``dispatch`` is a reason, or a capacity whose budget declares
+``pinned_checks_only``, which leaves it only the checks pinned to it by
+name, the ones that read the server itself. Dispatch reads that budget flag
+and never the role, so the role is held to the flag here rather than
+spelled a second time in :mod:`fleet.core.capacity`.
+
 So ``enabled`` is said once, whether the machine is expected to answer, and
 a node dispatches exactly when it is enabled and not held. ``host`` is the
 machine's name, which is its ssh alias everywhere, and a node runs inside
@@ -81,10 +90,13 @@ class MachineRole(StrEnum):
     VPN_JUMP = "vpn-jump"
     WORKER = "worker"
     SESSION_HOST = "session-host"
+    #: Runs the corvis stack and takes no fleet work but the checks pinned to
+    #: it by name (MCPs board task 4ec65b8f).
+    SERVER = "server"
     CLIENT = "client"
     #: A machine the operator can reach but does not own (a relative's PC,
     #: helped remotely with consent); MCPs fleet-mcp's FleetRole names the same
-    #: six, and fleet-enroll takes it as --role (MCPs board task e447de72).
+    #: seven, and fleet-enroll takes it as --role (MCPs board task e447de72).
     UNTRUSTED_MANAGED = "untrusted-managed"
 
 
@@ -151,9 +163,11 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
             ``ledger_observer`` is outside its closed set, ``guest`` is
             neither null nor an object naming a
             host, ``dispatch`` is neither a non-empty reason nor an object,
-            ``held`` is neither null nor a non-empty reason, or a node held
+            ``held`` is neither null nor a non-empty reason, a node held
             out of dispatch is not enabled (a machine that is off is held by
-            being off, and a reason on it would say a second thing).
+            being off, and a reason on it would say a second thing), or a
+            server declares a capacity that would take checks not pinned to
+            it.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"machine {name!r} must be a JSON object, got {type(value).__name__}")
@@ -182,6 +196,19 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
             "or an object of what dispatch may take from it"
         )
     held = _decode_held(name, dispatch, enabled=enabled)
+    node = decode_node_config(
+        dispatch,
+        host=name,
+        platform=platform,
+        enabled=enabled and held is None,
+        wsl_host=guest_host,
+    )
+    if role is MachineRole.SERVER and not node["budget"]["pinned_checks_only"]:
+        raise JSONTypeError(
+            f"machine {name!r} is a server, which takes no fleet work, and its dispatch would "
+            "take any check its tags fit: declare budget.pinned_checks_only true, so it takes "
+            "only the checks pinned to it, or give dispatch as the reason it takes none"
+        )
     return Machine(
         name=name,
         role=role,
@@ -190,13 +217,7 @@ def decode_machine(name: str, value: JSONValue) -> Machine:
         enabled=enabled,
         ledger_observer=ledger_observer,
         guest_host=guest_host,
-        dispatch=decode_node_config(
-            dispatch,
-            host=name,
-            platform=platform,
-            enabled=enabled and held is None,
-            wsl_host=guest_host,
-        ),
+        dispatch=node,
         held=held,
     )
 
