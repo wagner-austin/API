@@ -259,17 +259,14 @@ def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
 def test_demure_checks_no_project_while_none_is_pinned_to_it() -> None:
     workspace = _shipped()
     node = workspace["nodes"]["demure"]
-    taken = {
-        name
+    codes = {
+        name: assess(node, _idle(node), project, node_tags(node))["code"]
         for name, project in workspace["projects"].items()
-        if assess(node, _idle(node), project, node_tags(node))["code"] is None
     }
 
-    assert taken == set()
-    assert len(workspace["projects"]) > 0
-    for suite in ("MCPs/watcher", "MCPs/mcp-shared", "MCPs/packages/db"):
-        refused = assess(node, _idle(node), workspace["projects"][suite], node_tags(node))
-        assert refused["code"] == FleetErrorCode.NODE_NOT_PINNED
+    # Every project the registry ships is refused by the pin before its tags
+    # are read.
+    assert codes == dict.fromkeys(workspace["projects"], FleetErrorCode.NODE_NOT_PINNED)
 
 
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
