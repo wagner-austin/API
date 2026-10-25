@@ -47,6 +47,18 @@ on 2026-10-07: a unit whose cgroup was sent SIGKILL ran it with
 What still reaches the lease: a node that cannot run this script at all, for
 example one whose user manager is itself gone. The lease remains the outer
 bound for that case, as it was for every case before.
+
+A BUILD ENDED FOR MEMORY IS NOT A FAILING SUITE (MCPs board task d111690a).
+Every check now starts at ``OOMScoreAdjust=1000`` with ``OOMPolicy=stop``
+(MCPs ``scripts/host/lib/cpu-shares.sh``), so a host that runs out ends the
+check before any stack container, and the kill of any one of its processes
+stops the whole unit with the result ``oom-kill``, as systemd-oomd's kill
+does. Measured on lavender on 2026-10-25T14:50:49Z: a unit started through
+the helper, capped at 256 MiB and filled by a child, ended with
+``SERVICE_RESULT=oom-kill EXIT_CODE=killed EXIT_STATUS=TERM``.
+:func:`killed_for_memory` reads that ending from the line, which the runner
+then gives back to the queue rather than closing as failed
+(:func:`fleet.cli.node_settle.settle`).
 """
 
 from __future__ import annotations
@@ -63,6 +75,21 @@ UNIT_END_STEM: Final = "unit-end"
 
 #: The word that opens the transcript line, so a reader can grep for it.
 UNIT_ENDED_MARKER: Final = "FLEET_UNIT_ENDED"
+
+#: The words between the unit's name and systemd's ``SERVICE_RESULT`` on the
+#: line, written by :func:`unit_end_script` and read by
+#: :func:`killed_for_memory`.
+RESULT_WORDS: Final = "ended with systemd result"
+
+#: The ``SERVICE_RESULT`` of a unit the kernel's OOM killer or systemd-oomd
+#: ended (systemd.exec(5), "Environment Variables Set or Propagated by the
+#: Service Manager").
+OOM_KILL_RESULT: Final = "oom-kill"
+
+#: A Linux unit's line when its unit was ended for memory.
+MEMORY_KILLED_LINE: Final[re.Pattern[str]] = re.compile(
+    rf"^{UNIT_ENDED_MARKER}: unit \S+ {RESULT_WORDS} {OOM_KILL_RESULT} \("
+)
 
 #: The line, as :func:`unit_end_script` and a Windows node's result script
 #: (:mod:`fleet.core.windows_result`) append it; the verdict reads the whole
@@ -150,7 +177,7 @@ def unit_end_script(*, target: str, unit: str, prologue: str) -> str:
         'if [ "$code" -eq 0 ]; then\n'
         f"  code={UNEXPLAINED_EXIT_CODE}\n"
         "fi\n"
-        f"printf '%s: unit %s ended with systemd result %s (%s %s) before the build wrote "
+        f"printf '%s: unit %s {RESULT_WORDS} %s (%s %s) before the build wrote "
         f"its status; recorded exit %s\\n' {UNIT_ENDED_MARKER} {shlex.quote(unit)} "
         '"$service_result" "$exit_code" "$exit_status" "$code" '
         f">> {log}\n"
@@ -158,13 +185,32 @@ def unit_end_script(*, target: str, unit: str, prologue: str) -> str:
     )
 
 
+def killed_for_memory(unit_end: str) -> bool:
+    """Whether a unit-end line says the kernel or systemd-oomd ended the unit for memory.
+
+    Args:
+        unit_end: The line, as :func:`fleet.core.verdict.read_unit_end`
+            returns it.
+
+    Returns:
+        True for a Linux unit whose ``SERVICE_RESULT`` was
+        :data:`OOM_KILL_RESULT`; False for any other ending, and for every
+        Windows task's line, which names no systemd result.
+    """
+    return MEMORY_KILLED_LINE.match(unit_end) is not None
+
+
 __all__ = [
+    "MEMORY_KILLED_LINE",
+    "OOM_KILL_RESULT",
+    "RESULT_WORDS",
     "SIGNAL_EXIT_BASE",
     "SIGNAL_LIMIT",
     "UNEXPLAINED_EXIT_CODE",
     "UNIT_ENDED_LINE",
     "UNIT_ENDED_MARKER",
     "UNIT_END_STEM",
+    "killed_for_memory",
     "unit_end_path",
     "unit_end_script",
 ]
