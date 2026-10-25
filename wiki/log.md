@@ -226,3 +226,12 @@ the generic streaming worker the container runs never commits offsets and has
 no dead-letter path; scripts.optimize discards its own determinism record and
 fingerprints every run as unpinned; and RESEARCH.md's cleargbm entry says the
 opposite of the second.
+
+## [2026-10-25] new page | fleet-loki-tunnel-stall-cloudflared-start
+Pages written: fleet-loki-tunnel-stall-cloudflared-start
+Hubs updated: infrastructure (+1), index 49 -> 50
+Notes: MCPs board task 8b70921f A2. loki's banner-exchange stalls were matched
+against cloudflared's own records (loki's connector through cloudflared tail,
+the hub's two tunnels) and found to start on the hub, in each per-call
+cloudflared's SHA-256 of its own executable on a starved CPU; the fix is MCPs
+board task 4c604f4d.

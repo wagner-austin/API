@@ -10,4 +10,6 @@ The cross-service platform that makes the monorepo run — Redis (queues + RQ), 
 
 [Runner listeners and dropped jobs](../pages/fleet-runner-listener-isolation-and-dropped-jobs.md) -- why lavender's runner listeners sit in an unbounded `listeners.slice` with each job moved into a scope of the bounded `runners.slice`, why `MemoryLow` could not protect them, and how the hub's reap pass ends a Worker only when GitHub reads its runner not busy (the offline busy=true incident)
 
+[loki's tunnel stall is the hub starting cloudflared](../pages/fleet-loki-tunnel-stall-cloudflared-start.md) -- why fleet ssh to loki timed out "during banner exchange": loki's connector and the hub's tunnels recorded nothing, a quiet machine on the same uplink saw no stall, and the seconds went into each per-call `cloudflared` hashing its own 40 MB executable on the CPU-starved hub; the A/B against one long-lived forwarder
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
