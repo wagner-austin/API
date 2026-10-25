@@ -33,9 +33,6 @@ is, and keeps this module pure.
 from __future__ import annotations
 
 import http.client
-import socket
-import threading
-import time
 import urllib.parse
 import urllib.request
 from typing import Final, Protocol, TypedDict
@@ -51,6 +48,12 @@ from platform_core.json_utils import (
     narrow_json_to_list,
     narrow_json_to_str,
 )
+from platform_core.mcp_exchange import (
+    DEFAULT_MCP_TIMEOUT_SECONDS,
+    ExchangeDeadline,
+    exchange_opener,
+    raise_if_deadline_passed,
+)
 
 #: The SSE field carrying the JSON-RPC payload.
 _DATA_PREFIX: Final = "data: "
@@ -58,16 +61,10 @@ _DATA_PREFIX: Final = "data: "
 #: What the endpoint answers with when it accepts the request.
 EVENT_STREAM_MEDIA_TYPE: Final = "text/event-stream"
 
-#: How long a single call may take before it is abandoned.
-DEFAULT_MCP_TIMEOUT_SECONDS: Final = 20
-
 #: The one scheme an exchange's deadline bounds. Every declared MCP endpoint
 #: (MCPs scripts/fleet/stack-endpoints.json, 3 of 3 on 2026-10-16) is plain
 #: http on loopback or the tailnet.
 HTTP_SCHEME: Final = "http"
-
-#: http.client's default read size for a connection's buffered reader.
-_BLOCKSIZE: Final = 8192
 
 
 class McpHttpResponse(TypedDict):
@@ -172,222 +169,6 @@ class _UrlResponse(Protocol):
         ...
 
 
-class _PassThroughErrorProcessor(urllib.request.HTTPErrorProcessor):
-    """An error processor that hands back non-2xx responses instead of raising.
-
-    ``urllib``'s default turns a 401 into a raised
-    :class:`urllib.error.HTTPError`, which would force :func:`call_mcp_tool` to
-    catch an exception in order to read a status code it needs. The status is
-    not an exceptional condition here -- a rotated API key is the ordinary way
-    this fails, and the caller's job is to attach
-    :attr:`McpClientErrorCode.HTTP_STATUS` to it.
-
-    Replacing the processor removes the exception at its source rather than
-    handling it downstream, so no ``except`` appears anywhere in this path.
-    """
-
-    def http_response(
-        self, request: urllib.request.Request, response: http.client.HTTPResponse
-    ) -> http.client.HTTPResponse:
-        """Return the response unchanged, whatever its status.
-
-        Args:
-            request: The request that produced it, unused.
-            response: The response as received.
-
-        Returns:
-            That same response.
-        """
-        return response
-
-    https_response = http_response
-
-
-class ExchangeDeadline:
-    """One exchange's deadline, kept by shutting its socket when it passes.
-
-    ``urllib``'s ``timeout`` bounds each socket operation, not the exchange:
-    measured 2026-10-16 (MCPs board task e14815d3), a peer that sent one byte
-    a second held a 2-second call open 12 seconds, and a hub tick held one
-    connection to fleet-mcp 290 seconds across a deploy that recreated it.
-    Shutting the socket at the deadline ends whatever read or write is blocked
-    on it, wherever in the exchange that is.
-
-    Attributes:
-        at: The deadline on the :func:`time.monotonic` clock.
-    """
-
-    def __init__(self, seconds: float) -> None:
-        """Start the clock.
-
-        Args:
-            seconds: How long the whole exchange may take from now.
-        """
-        self.at = time.monotonic() + seconds
-        self._lock = threading.Lock()
-        self._finished = False
-        self._passed = False
-        self._timer: threading.Timer | None = None
-
-    def arm(self, sock: socket.socket) -> None:
-        """Shut ``sock`` down when the deadline passes, unless finished first.
-
-        Args:
-            sock: The exchange's connected socket.
-        """
-        self._timer = threading.Timer(max(0.0, self.at - time.monotonic()), self.expire, (sock,))
-        self._timer.daemon = True
-        self._timer.start()
-
-    def expire(self, sock: socket.socket) -> None:
-        """Shut the socket down, unless the exchange already finished.
-
-        Under the lock, so the exchange never closes the socket while this
-        shuts it down, and a finished exchange's socket is never touched.
-
-        Args:
-            sock: The exchange's connected socket.
-        """
-        with self._lock:
-            if self._finished:
-                return
-            self._passed = True
-            sock.shutdown(socket.SHUT_RDWR)
-
-    def finish(self) -> bool:
-        """Stop the watchdog.
-
-        Returns:
-            Whether the deadline passed first, so what the exchange read or
-            raised was cut short by it.
-        """
-        with self._lock:
-            self._finished = True
-            passed = self._passed
-        if self._timer is not None:
-            self._timer.cancel()
-        return passed
-
-
-class _DeadlineConnection(http.client.HTTPConnection):
-    """An HTTP connection that arms its exchange's deadline once connected."""
-
-    def __init__(
-        self,
-        host: str,
-        *,
-        port: int | None,
-        timeout: float,
-        source_address: tuple[str, int] | None,
-        blocksize: int,
-        deadline: ExchangeDeadline,
-    ) -> None:
-        """Build the connection.
-
-        Args:
-            host: The host, with or without its port.
-            port: The port, when not in ``host``.
-            timeout: Each socket operation's bound, the connect among them.
-            source_address: The local address to bind, if any.
-            blocksize: The buffered reader's read size.
-            deadline: The exchange's deadline, armed on connect.
-        """
-        super().__init__(
-            host, port=port, timeout=timeout, source_address=source_address, blocksize=blocksize
-        )
-        self._deadline = deadline
-
-    def connect(self) -> None:
-        """Connect, then arm the deadline on the connected socket."""
-        super().connect()
-        self._deadline.arm(self.sock)
-
-
-class _DeadlineHandler(urllib.request.HTTPHandler):
-    """Open http URLs on connections bounded by one exchange's deadline."""
-
-    def __init__(self, deadline: ExchangeDeadline) -> None:
-        """Build the handler.
-
-        Args:
-            deadline: The exchange's deadline.
-        """
-        super().__init__()
-        self._deadline = deadline
-
-    def http_open(self, req: urllib.request.Request) -> http.client.HTTPResponse:
-        """Open the request on a deadline-bounded connection.
-
-        Args:
-            req: The request.
-
-        Returns:
-            The response, whatever its status.
-        """
-        return self.do_open(self._connection, req)
-
-    def _connection(
-        self,
-        host: str,
-        /,
-        *,
-        port: int | None = None,
-        timeout: float = DEFAULT_MCP_TIMEOUT_SECONDS,
-        source_address: tuple[str, int] | None = None,
-        blocksize: int = _BLOCKSIZE,
-    ) -> http.client.HTTPConnection:
-        """Build the connection ``do_open`` asks for, carrying the deadline.
-
-        Args:
-            host: The host, with or without its port.
-            port: The port, when not in ``host``.
-            timeout: Each socket operation's bound.
-            source_address: The local address to bind, if any.
-            blocksize: The buffered reader's read size.
-
-        Returns:
-            The connection.
-        """
-        return _DeadlineConnection(
-            host,
-            port=port,
-            timeout=timeout,
-            source_address=source_address,
-            blocksize=blocksize,
-            deadline=self._deadline,
-        )
-
-
-def raise_if_deadline_passed(
-    deadline: ExchangeDeadline, url: str, seconds: int, cause: BaseException | None
-) -> None:
-    """Stop the watchdog, and raise when the exchange ran past its deadline.
-
-    Called whether the exchange raised or returned: a shutdown ends a blocked
-    read with an error on Windows but as an ordinary end of stream on Linux,
-    where a body read to its close returns normally, cut short. Either way an
-    exchange the deadline ended never returns an answer.
-
-    A :class:`TimeoutError` because callers already read every ``OSError``
-    out of the poster as an unanswered call (fleet's ``answering`` turns one
-    into ``QUEUE_UNANSWERED``), and an exchange that ran out its deadline is
-    exactly that.
-
-    Args:
-        deadline: The exchange's deadline.
-        url: The endpoint.
-        seconds: The deadline's length.
-        cause: What the exchange raised, or None when it returned.
-
-    Raises:
-        TimeoutError: When the deadline passed first, chained to ``cause``.
-    """
-    if deadline.finish():
-        raise TimeoutError(
-            f"{url} did not finish the exchange within its {seconds} s deadline"
-        ) from cause
-
-
 def urllib_mcp_post(
     url: str,
     *,
@@ -406,7 +187,8 @@ def urllib_mcp_post(
     Lives beside the client rather than in each caller's ``_test_hooks``: the
     SEAM belongs to the package (production binds this, a test binds a fake),
     but the implementation behind it is the same everywhere, down to the
-    error-processor replacement above.
+    opener :func:`platform_core.mcp_exchange.exchange_opener` builds, with
+    its error-processor replacement and no SSL context.
 
     THE WHOLE EXCHANGE ENDS AT ITS DEADLINE: connect, request, headers and
     body together, by :class:`ExchangeDeadline`. ``timeout_seconds`` also
@@ -438,7 +220,7 @@ def urllib_mcp_post(
         )
     deadline = ExchangeDeadline(timeout_seconds)
     request = urllib.request.Request(url=url, data=body, headers=headers, method="POST")
-    opener = urllib.request.build_opener(_PassThroughErrorProcessor, _DeadlineHandler(deadline))
+    opener = exchange_opener(deadline)
     try:
         # Annotated at the assignment so the Protocol, not ``open``'s loose
         # return type, is what the rest of this function is checked against.
