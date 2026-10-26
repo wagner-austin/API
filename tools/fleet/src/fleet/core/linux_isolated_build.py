@@ -93,6 +93,15 @@ EXEC_CACHE = "$exec_home/fleet/cache"
 #: task c2e3f31f).
 EXEC_PATH = "/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin"
 
+#: The library path the isolated build carries across ``env -i``: the one the
+#: check's unit was started with, or empty where it set none. A NixOS node's
+#: fleet-check-unit sets it over the C++ runtime, zlib and libpython, because
+#: a wheel's extension finds none of them there by itself; cleared, execdocker
+#: on loki could not import greenlet ("libstdc++.so.6: cannot open shared
+#: object file") and carried it could (MCPs board task c2e3f31f). An Ubuntu
+#: node's unit sets none, and an empty value is read as no path at all.
+EXEC_LIBRARY_PATH = 'LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}"'
+
 #: The lock every check on the lane holds shared and the lane's prune holds
 #: exclusively, in that user's runtime directory, over ``$exec_uid``. MCPs'
 #: scripts/host/lib/fleet-exec-docker.sh names the same file, EXEC_LANE_LOCK.
@@ -163,6 +172,7 @@ def isolated_build_lines(
         "as_exec() {",
         f"  sudo -n -u {EXEC_USER} env -i "
         f'HOME="$exec_home" USER={EXEC_USER} LOGNAME={EXEC_USER} PATH={EXEC_PATH} '
+        f"{EXEC_LIBRARY_PATH} "
         'XDG_RUNTIME_DIR="/run/user/$exec_uid" '
         'DOCKER_HOST="unix:///run/user/$exec_uid/docker.sock" '
         'npm_config_cache="$tool_cache/npm" '
@@ -211,6 +221,7 @@ __all__ = [
     "EXEC_CACHE",
     "EXEC_HOME_LINE",
     "EXEC_LANE_LOCK",
+    "EXEC_LIBRARY_PATH",
     "EXEC_PATH",
     "EXEC_STAGE",
     "EXEC_USER",

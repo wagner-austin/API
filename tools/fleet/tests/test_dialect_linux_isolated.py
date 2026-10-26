@@ -123,6 +123,10 @@ class TestIsolatedText:
 
         assert f"  sudo -n -u {EXEC_USER} env -i " in body
         assert f"PATH={EXEC_PATH} " in body
+        # The check unit's library path crosses the cleared environment, so a
+        # wheel's extension finds the C++ runtime on a NixOS node (MCPs board
+        # task c2e3f31f).
+        assert 'LD_LIBRARY_PATH="${LD_LIBRARY_PATH-}" ' in body
         assert 'DOCKER_HOST="unix:///run/user/$exec_uid/docker.sock" ' in body
         # The submitter crosses the cleared environment, for the deploy
         # suite's fleet hold (MCPs board task 6c4516af A4).
