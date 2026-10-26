@@ -41,9 +41,10 @@ DEMURE_MAC = "d8:43:ae:24:7c:04"
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
 #: SSD. demure's one NVMe, whose netboot install accepted it on 2026-10-22
 #: (arm b54008dd). pendragon's NVMe went with its boot MAC (MCPs board task
-#: 7d7ea0e9), and loki's one NVMe is only-disk until its installer reads the
-#: serial Windows does not report.
+#: 7d7ea0e9). loki's one NVMe, read with udevadm on its NixOS install on
+#: 2026-10-26 (arm 2ec3a579).
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
+LOKI_INSTALL_DISK = "SAMSUNG_MZVL81T0HELB-00BTW_S7HZNX0XC49177_1"
 DEMURE_INSTALL_DISK = "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
 
 #: diphtheria's adb server, as its roster file declares it.
@@ -151,7 +152,7 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     assert {name: named[name] for name in ("demure", "lavender", "loki")} == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
-        "loki": {"rule": "only-disk", "serial": None},
+        "loki": {"rule": "serial", "serial": LOKI_INSTALL_DISK},
     }
     assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
         name for name, m in machines.items() if m["bootMac"] is None
