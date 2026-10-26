@@ -16,8 +16,9 @@ import pathlib
 
 import pytest
 
-from fleet.core import _test_hooks, commit_tree, rolled, scratch
-from tests._git_fixtures import committed_repository, git
+from fleet.core import _test_hooks, commit_tree, rolled, rolled_fetch, scratch
+from tests._git_fixtures import committed_repository, git, rolled_at_origin
+from tests._rolled_fetch_script import FETCH_TIMEOUTS, fetch_calls, fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
 #: The commit the scripted ``git rev-parse`` answers with.
@@ -52,18 +53,20 @@ def staging_of(scratch_root: pathlib.Path) -> pathlib.Path:
 
 
 def scripted_calls(api: pathlib.Path, scratch_root: pathlib.Path) -> list[tuple[str, ...]]:
-    """The three commands a fresh extraction runs, in order.
+    """The five commands a fresh extraction runs, in order.
 
     Args:
         api: The API checkout.
         scratch_root: The pinned scratch root.
 
     Returns:
-        ``git rev-parse``, ``git archive`` and ``tar -x``, as argv tuples.
+        The fetch's two (:mod:`tests._rolled_fetch_script`), then ``git
+        rev-parse``, ``git archive`` and ``tar -x``, as argv tuples.
     """
     staging = staging_of(scratch_root)
     tarball = staging / "published.tar"
     return [
+        *fetch_calls(api),
         ("git", "-C", str(api), "rev-parse", "--verify", "refs/fleet/rolled^{commit}"),
         (
             "git",
@@ -153,7 +156,7 @@ class TestScriptedExtraction:
         _test_hooks.temp_root = FakeTempRoot(scratch_root)
         _test_hooks.now = FakeClock(DEMO_NOW)
         plant(staging_of(scratch_root), tarball=True)
-        runner = FakeRun([ok(f"{COMMIT}\n"), ok(""), ok("")])
+        runner = FakeRun([*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n"), ok(""), ok("")])
         _test_hooks.run = runner
 
         tree = rolled.extract_rolled_tree(api)
@@ -174,8 +177,9 @@ class TestScriptedExtraction:
             reaped=(),
         )
         assert runner.calls == scripted_calls(api, scratch_root)
-        assert runner.timeouts == [commit_tree.TREE_STEP_TIMEOUT_SECONDS] * 3 == [120] * 3
-        assert runner.set_env == [(), (), ()]
+        assert runner.timeouts == [*FETCH_TIMEOUTS, *[commit_tree.TREE_STEP_TIMEOUT_SECONDS] * 3]
+        assert runner.timeouts == [30, 60, 120, 120, 120]
+        assert runner.set_env == [(), (), (), (), ()]
         # Renamed into place whole, without the tarball, and touched now;
         # the turn's lock is given back.
         assert not staging_of(scratch_root).exists()
@@ -183,7 +187,7 @@ class TestScriptedExtraction:
         assert int(destination.stat().st_mtime) == DEMO_NOW
         assert sorted(path.name for path in (scratch_root / "fleet-rolled").iterdir()) == [COMMIT]
 
-    def test_a_later_launch_reuses_the_tree_and_runs_only_the_ref_read(
+    def test_a_later_launch_reuses_the_tree_and_runs_only_the_fetch_and_the_ref_read(
         self, tmp_path: pathlib.Path
     ) -> None:
         """The SSD wear this removes: every tick extracted its own copy."""
@@ -193,13 +197,13 @@ class TestScriptedExtraction:
         _test_hooks.now = FakeClock(DEMO_NOW)
         plant(tree_of(scratch_root), tarball=False)
         age(tree_of(scratch_root), 600)
-        runner = FakeRun([ok(f"{COMMIT}\n")])
+        runner = FakeRun([*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n")])
         _test_hooks.run = runner
 
         tree = tree_from(rolled.extract_rolled_tree(api))
 
         assert tree["directory"] == str(tree_of(scratch_root))
-        assert runner.calls == scripted_calls(api, scratch_root)[:1]
+        assert runner.calls == scripted_calls(api, scratch_root)[:3]
         assert int(tree_of(scratch_root).stat().st_mtime) == DEMO_NOW
 
     def test_a_tree_missing_a_file_is_removed_and_refused(self, tmp_path: pathlib.Path) -> None:
@@ -208,7 +212,7 @@ class TestScriptedExtraction:
         plant(tree_of(scratch_root), tarball=False)
         damaged = tree_of(scratch_root) / pathlib.PurePosixPath(rolled.REQUIRED_FILES[1])
         damaged.unlink()
-        runner = FakeRun([ok(f"{COMMIT}\n")])
+        runner = FakeRun([*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n")])
         _test_hooks.run = runner
 
         refusal = rolled.extract_rolled_tree(tmp_path / "api")
@@ -217,7 +221,7 @@ class TestScriptedExtraction:
             f"FLEET_ROLL_INCOMPLETE: the extraction of {COMMIT} at {tree_of(scratch_root)} "
             "lacks tools/fleet/src/fleet/cli/node_agent.py; nothing ran"
         )
-        assert len(runner.calls) == 1
+        assert len(runner.calls) == 3
         assert not tree_of(scratch_root).exists()
 
     @pytest.mark.parametrize(
@@ -229,7 +233,7 @@ class TestScriptedExtraction:
     ) -> None:
         api = tmp_path / "api"
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-        runner = FakeRun([reply])
+        runner = FakeRun([*fetch_replies(tmp_path / "git"), reply])
         _test_hooks.run = runner
 
         refusal = refusal_of(rolled.extract_rolled_tree(api))
@@ -239,7 +243,27 @@ class TestScriptedExtraction:
             f"commit (exit {reply['returncode']}"
         )
         assert refusal.endswith("; nothing ran")
-        assert len(runner.calls) == 1
+        assert len(runner.calls) == 3
+
+    def test_a_failed_fetch_refuses_before_the_ref_is_read(self, tmp_path: pathlib.Path) -> None:
+        """A roll origin holds is not read off a ref the fetch could not move
+        (MCPs board task 8db0f536)."""
+        api = tmp_path / "api"
+        scratch_root = tmp_path / "scratch"
+        _test_hooks.temp_root = FakeTempRoot(scratch_root)
+        located, _ = fetch_replies(tmp_path / "git")
+        runner = FakeRun([located, failed(128, "fatal: unable to access origin")])
+        _test_hooks.run = runner
+
+        refusal = refusal_of(rolled.extract_rolled_tree(api))
+
+        assert refusal == (
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128: "
+            "fatal: unable to access origin"
+        )
+        assert runner.calls == fetch_calls(api)
+        assert not (scratch_root / "fleet-rolled").exists()
 
     @pytest.mark.parametrize(
         ("failing_step", "code", "step_words"),
@@ -254,7 +278,9 @@ class TestScriptedExtraction:
         scratch_root = tmp_path / "scratch"
         _test_hooks.temp_root = FakeTempRoot(scratch_root)
         replies = [ok(f"{COMMIT}\n"), ok("")][:failing_step]
-        runner = FakeRun([*replies, failed(2, "  the step's own complaint  ")])
+        runner = FakeRun(
+            [*fetch_replies(tmp_path / "git"), *replies, failed(2, "  the step's own complaint  ")]
+        )
         _test_hooks.run = runner
 
         refusal = refusal_of(rolled.extract_rolled_tree(tmp_path / "api"))
@@ -262,7 +288,7 @@ class TestScriptedExtraction:
         assert refusal.startswith(f"{code}: ")
         assert step_words in refusal
         assert refusal.endswith(" exited 2: the step's own complaint")
-        assert len(runner.calls) == failing_step + 1
+        assert len(runner.calls) == failing_step + 3
         # MCPs board task 94ac1c4f: a refused launch leaves no directory.
         assert not staging_of(scratch_root).exists()
         assert not tree_of(scratch_root).exists()
@@ -272,7 +298,9 @@ class TestScriptedExtraction:
     ) -> None:
         scratch_root = tmp_path / "scratch"
         _test_hooks.temp_root = FakeTempRoot(scratch_root)
-        _test_hooks.run = FakeRun([ok(f"{COMMIT}\n"), ok(""), ok("")])
+        _test_hooks.run = FakeRun(
+            [*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n"), ok(""), ok("")]
+        )
 
         refusal = rolled.extract_rolled_tree(tmp_path / "api")
 
@@ -313,7 +341,7 @@ class TestReaping:
         (archives / "dead-run.tgz").write_bytes(b"left by a failed stage")
         age(archives / "dead-run.tgz", scratch.STALE_SECONDS + 1)
         (archives / "live-run.tgz").write_bytes(b"a stage under way")
-        _test_hooks.run = FakeRun([ok(f"{COMMIT}\n")])
+        _test_hooks.run = FakeRun([*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n")])
 
         tree = tree_from(rolled.extract_rolled_tree(tmp_path / "api"))
 
@@ -333,7 +361,9 @@ class TestReaping:
         archives.mkdir(parents=True)
         (archives / "dead-run.tgz").write_bytes(b"left by a failed stage")
         age(archives / "dead-run.tgz", scratch.STALE_SECONDS + 1)
-        _test_hooks.run = FakeRun([ok(f"{COMMIT}\n"), failed(128, "bad object")])
+        _test_hooks.run = FakeRun(
+            [*fetch_replies(tmp_path / "git"), ok(f"{COMMIT}\n"), failed(128, "bad object")]
+        )
 
         refusal_of(rolled.extract_rolled_tree(tmp_path / "api"))
 
@@ -357,7 +387,7 @@ class TestRealExtraction:
         self, tmp_path: pathlib.Path
     ) -> None:
         api = tmp_path / "api"
-        commit = committed_repository(api, ROLLED_FILES, rolled.ROLLED_REF)
+        commit = rolled_at_origin(api, ROLLED_FILES)
         agent_source = api / "tools/fleet/src/fleet/cli/agent.py"
         agent_source.write_text("ROLLED = False\n", encoding="utf-8")
         (api / "tools/fleet/registry/settings.json").write_text(
@@ -393,9 +423,12 @@ class TestRealExtraction:
     ) -> None:
         """A serving agent knows only its records directory, tools/fleet in
         the checkout, and reads the ref from there; a roll moves what it
-        reads (MCPs board task 8993c306)."""
+        reads (MCPs board task 8993c306) once origin holds it and the last
+        fetch is no longer fresh (MCPs board task 8db0f536)."""
+        clock = FakeClock(DEMO_NOW)
+        _test_hooks.now = clock
         api = tmp_path / "api"
-        first = committed_repository(api, ROLLED_FILES, rolled.ROLLED_REF)
+        first = rolled_at_origin(api, ROLLED_FILES)
         records = api / pathlib.PurePosixPath(rolled.RECORDS_DIR)
 
         assert rolled.rolled_state(records) == first
@@ -405,7 +438,8 @@ class TestRealExtraction:
         )
         git(api, "commit", "--quiet", "--all", "-m", "the next roll")
         second = git(api, "rev-parse", "HEAD")
-        git(api, "update-ref", rolled.ROLLED_REF, second)
+        git(api, "push", "--quiet", "--force", "origin", f"{second}:{rolled.ROLLED_REF}")
+        clock.seconds += rolled_fetch.FRESH_SECONDS
 
         assert rolled.rolled_state(records) == second
         assert second != first
@@ -414,21 +448,37 @@ class TestRealExtraction:
         self, tmp_path: pathlib.Path
     ) -> None:
         api = tmp_path / "api"
-        committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")
+        never_rolled(api)
 
         assert rolled.rolled_state(api).startswith(
-            f"FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in {api} did not resolve"
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128: "
+            "fatal: couldn't find remote ref refs/fleet/rolled"
         )
 
     def test_a_repository_never_rolled_refuses_for_real(self, tmp_path: pathlib.Path) -> None:
         api = tmp_path / "api"
-        committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")
+        never_rolled(api)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
 
         refusal = refusal_of(rolled.extract_rolled_tree(api))
 
         assert refusal.startswith(
-            f"FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in {api} did not resolve to a "
-            "commit (exit 128"
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128"
         )
         assert not (tmp_path / "scratch" / "fleet-rolled").exists()
+
+
+def never_rolled(api: pathlib.Path) -> None:
+    """Build a repository whose origin holds a branch and no roll.
+
+    Args:
+        api: Where to build it; its origin is ``<api>-origin.git`` beside it.
+    """
+    origin = api.parent / f"{api.name}-origin.git"
+    origin.mkdir()
+    git(origin, "init", "--quiet", "--bare")
+    committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")
+    git(api, "remote", "add", "origin", str(origin))
+    git(api, "push", "--quiet", "origin", "refs/heads/elsewhere")

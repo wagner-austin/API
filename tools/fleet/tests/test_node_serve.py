@@ -41,6 +41,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
 from tests._registry import shipped_document, write_registry
+from tests._rolled_fetch_script import fetch_calls, fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, ok, pin_clock
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -436,7 +437,8 @@ class TestAServingRunner:
         document = sourced_document((NPM_CI,))
         document["node_serve_seconds"] = 60
         write_registry(sourced_config, document)
-        node = FakeRun([ok(f"{DEFAULT_SHA}\n"), *PROBED])
+        records = sourced_config.resolve().parent
+        node = FakeRun([*fetch_replies(records / "git"), ok(f"{DEFAULT_SHA}\n"), *PROBED])
         _test_hooks.run = node
         endpoint = FakeQueue(
             [
@@ -450,17 +452,18 @@ class TestAServingRunner:
         with caplog.at_level("INFO"):
             assert node_agent.main(node_argv(sourced_config)) == 0
 
-        # Read from the records directory, which is the document's own here,
-        # resolved as the workspace loader resolves it.
-        assert node.calls[0] == (
+        # Fetched and read from the records directory, which is the
+        # document's own here, resolved as the workspace loader resolves it.
+        assert node.calls[:2] == fetch_calls(records)
+        assert node.calls[2] == (
             "git",
             "-C",
-            str(sourced_config.resolve().parent),
+            str(records),
             "rev-parse",
             "--verify",
             "refs/fleet/rolled^{commit}",
         )
-        assert len(node.calls) == 1 + len(PROBED)
+        assert len(node.calls) == 3 + len(PROBED)
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_list"]
         assert endpoint.arguments[2] == {
             "status": "queued",

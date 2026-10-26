@@ -21,7 +21,8 @@ import pytest
 
 from fleet.cli import rolled as rolled_cli
 from fleet.core import _test_hooks, rolled, scratch
-from tests._git_fixtures import committed_repository
+from tests._git_fixtures import rolled_at_origin
+from tests._rolled_fetch_script import fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
 #: A stand-in agent: it names itself, echoes its argv, writes to both
@@ -88,7 +89,9 @@ class TestLaunch:
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-        runner = FakeRun([failed(128, "fatal: Needed a single revision")])
+        runner = FakeRun(
+            [*fetch_replies(tmp_path / "git"), failed(128, "fatal: Needed a single revision")]
+        )
         _test_hooks.run = runner
 
         with caplog.at_level("INFO"):
@@ -97,7 +100,7 @@ class TestLaunch:
             )
 
         assert status == rolled_cli.REFUSED_EXIT == 2
-        assert len(runner.calls) == 1
+        assert len(runner.calls) == 3
         [message] = [record.getMessage() for record in caplog.records]
         assert message.startswith("FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in ")
 
@@ -118,7 +121,7 @@ class TestLaunch:
         left.write_bytes(b"left by a failed stage")
         then = DEMO_NOW - scratch.STALE_SECONDS - 1
         os.utime(left, (then, then))
-        runner = FakeRun([ok(f"{commit}\n"), ok("")])
+        runner = FakeRun([*fetch_replies(tmp_path / "git"), ok(f"{commit}\n"), ok("")])
         _test_hooks.run = runner
 
         with caplog.at_level("INFO"):
@@ -157,7 +160,7 @@ class TestLaunch:
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         api = tmp_path / "api"
-        commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
+        commit = rolled_at_origin(api, STAND_IN_FILES)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         launch = tmp_path / "scratch" / "fleet-rolled" / commit
         config = launch / "tools" / "fleet" / "registry"
@@ -189,7 +192,7 @@ class TestLaunch:
         tree (MCPs board task fb505198).
         """
         api = tmp_path / "api"
-        commit = committed_repository(api, STAND_IN_FILES, rolled.ROLLED_REF)
+        commit = rolled_at_origin(api, STAND_IN_FILES)
         tree = _test_hooks._default_temp_root() / "fleet-rolled" / commit
         config = tree / "tools" / "fleet" / "registry"
         command = (
