@@ -245,6 +245,24 @@ class TestScriptedExtraction:
         assert refusal.endswith("; nothing ran")
         assert len(runner.calls) == 3
 
+    def test_the_state_a_serve_compares_refuses_when_the_fetched_ref_names_no_commit(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        records = tmp_path / "api" / "tools" / "fleet"
+        runner = FakeRun(
+            [*fetch_replies(tmp_path / "git"), failed(128, "fatal: Needed a single revision")]
+        )
+        _test_hooks.run = runner
+
+        state = rolled.rolled_state(records)
+
+        assert state.startswith(
+            f"FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in {records} did not resolve to a "
+            "commit (exit 128"
+        )
+        assert runner.calls[:2] == fetch_calls(records)
+        assert len(runner.calls) == 3
+
     def test_a_failed_fetch_refuses_before_the_ref_is_read(self, tmp_path: pathlib.Path) -> None:
         """A roll origin holds is not read off a ref the fetch could not move
         (MCPs board task 8db0f536)."""
