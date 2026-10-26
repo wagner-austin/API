@@ -40,7 +40,7 @@ def _stanza() -> list[str]:
     return [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
 
 
-def test_each_range_is_checked_by_the_fleet_on_a_session_host_or_here_as_mcps_published_it() -> None:
+def test_each_range_is_checked_on_the_fleet_from_a_session_host_or_here_elsewhere() -> None:
     # The session host's arm came with MCPs board task f8390a08 (API
     # 5e655da79): session-host decides, then each range goes to
     # pushed-fleet-check there and to pushed-venvs then pushed-tests anywhere
