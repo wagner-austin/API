@@ -12,7 +12,8 @@ So this file pins three things against the shipped registry: no project file
 names windows or elevated in its ``required_tags`` (read from the raw files,
 since the decoder refuses either word, so a row naming one fails here by
 name before it fails every decode), no machine file declares a platform but
-linux and loki is not among them, and every project that ever required
+linux, loki included since it returned as a linux vpn-jump for its NixOS
+install (MCPs board task 7d7ea0e9), and every project that ever required
 windows (:data:`FORMERLY_WINDOWS` and :data:`LINUX_PROJECTS`) is granted
 workers by an enabled node, idle with memory to spare. A tool tag (ffmpeg,
 chrome, hooks, go, pdftotext) is one no declaration holds; a runner adds it
@@ -131,11 +132,11 @@ def test_no_project_row_requires_windows_or_elevated() -> None:
     assert naming == []
 
 
-def test_every_machine_is_linux_and_loki_is_not_one() -> None:
+def test_every_machine_is_linux_and_loki_returned_as_linux() -> None:
     machines = require_dict(read_workspace_document(REGISTRY), "machines")
     platforms = {name: require_dict(machines, name)["platform"] for name in machines}
 
-    assert "loki" not in platforms
+    assert platforms["loki"] == "linux"
     assert {name for name, platform in platforms.items() if platform != "linux"} == set()
 
 
