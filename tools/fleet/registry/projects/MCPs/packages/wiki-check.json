@@ -124,6 +124,11 @@
         "remote": "https://github.com/wagner-austin/markets-wiki.git",
         "ref": "main",
         "directory": "markets-wiki"
+      },
+      {
+        "remote": "https://github.com/wagner-austin/creator-wiki.git",
+        "ref": "main",
+        "directory": "creator-wiki"
       }
     ]
   }
