@@ -24,10 +24,12 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
     fleet verdict, fd5cabfa), the commit is what gives packages/db's migrator
     the HEAD its test admission reads (MCPs board task 6bbfd171), and gc.auto
     0 keeps that commit's loose objects where the build copies them (MCPs
-    board task 939ec5c7)."""
+    board task 939ec5c7), with maintenance.auto false for a git that runs
+    maintenance instead of gc after a commit (MCPs board task c2e3f31f)."""
     assert stage_repository.init_repository_commands("/s/run", "MCPs-packages-db-1790400000") == (
         ("git", "-C", "/s/run", "init", "--quiet"),
         ("git", "-C", "/s/run", "config", "gc.auto", "0"),
+        ("git", "-C", "/s/run", "config", "maintenance.auto", "false"),
         ("git", "-C", "/s/run", "add", "--all", "--force"),
         (
             "git",
@@ -57,6 +59,7 @@ def test_a_companion_is_cloned_from_its_bundle_onto_its_branch() -> None:
     assert commands == (
         ("git", "-C", "/s/MCPs", "init", "--quiet"),
         ("git", "-C", "/s/MCPs", "config", "gc.auto", "0"),
+        ("git", "-C", "/s/MCPs", "config", "maintenance.auto", "false"),
         (
             "git",
             "-C",
@@ -275,10 +278,18 @@ class TestNoAutoGc:
         """The control: the same commands less the setting are what raced
         the copy, so the repository above does make gc run here."""
         tree, _object_ids = self._eager_tree(tmp_path)
-        initialise, no_auto_gc, *index_and_commit = stage_repository.init_repository_commands(
-            tree.as_posix(), "run-1"
+        initialise, no_auto_gc, no_auto_maintenance, *index_and_commit = (
+            stage_repository.init_repository_commands(tree.as_posix(), "run-1")
         )
         assert no_auto_gc == ("git", "-C", tree.as_posix(), "config", "gc.auto", "0")
+        assert no_auto_maintenance == (
+            "git",
+            "-C",
+            tree.as_posix(),
+            "config",
+            "maintenance.auto",
+            "false",
+        )
         for command in (initialise, *index_and_commit):
             subprocess.run(command, check=True, capture_output=True, timeout=60)
 

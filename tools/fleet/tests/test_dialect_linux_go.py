@@ -18,31 +18,17 @@ import pytest
 
 from fleet.contracts.tagged_tools import GO_VERSION_ARGUMENT
 from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
+from tests._system_tools import link_system_tools
 from tests.test_dialect_linux import fields_of
 
 #: What the fake answers ``go version`` with, as go1.27.1 does on Linux.
 GO_ANSWER = "go version go1.27.1 linux/amd64"
 
-#: The system directories whose programs the case's tools directory links.
-SYSTEM_BINARIES = (pathlib.Path("/usr/bin"), pathlib.Path("/bin"))
-
-
-def _link_system_tools_except_go(tools: pathlib.Path) -> None:
-    """Link every program in :data:`SYSTEM_BINARIES` but ``go`` into ``tools``.
-
-    The node's own ``go`` never reaches the probe this way, whatever the node
-    has installed: lavender-wsl gained apt's go1.22.2 at ``/usr/bin/go``, and
-    with ``/usr/bin`` on ``PATH`` the no-go case read it (fleet job 986d128c,
-    2026-10-07). A name in both directories is linked once, from the first.
-
-    Args:
-        tools: The empty directory the links go in.
-    """
-    for directory in SYSTEM_BINARIES:
-        for program in sorted(directory.iterdir()):
-            link = tools / program.name
-            if program.name != "go" and not program.is_dir() and not link.is_symlink():
-                link.symlink_to(program)
+#: The node's own ``go`` never reaches the probe, whatever the node has
+#: installed: lavender-wsl gained apt's go1.22.2 at ``/usr/bin/go``, and with
+#: ``/usr/bin`` on ``PATH`` the no-go case read it (fleet job 986d128c,
+#: 2026-10-07).
+PLACED = frozenset({"go"})
 
 
 def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
@@ -57,7 +43,7 @@ def _probe_fields(tmp_path: pathlib.Path, with_go: bool) -> dict[str, str]:
     """
     tools = tmp_path / "tools"
     tools.mkdir()
-    _link_system_tools_except_go(tools)
+    link_system_tools(tools, PLACED)
     if with_go:
         fake = tools / "go"
         fake.write_bytes(

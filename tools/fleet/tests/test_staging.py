@@ -269,6 +269,7 @@ class TestStage:
             == (
                 f"{dialect.PROLOGUE}git -C {target} init --quiet\n"
                 f"git -C {target} config gc.auto 0\n"
+                f"git -C {target} config maintenance.auto false\n"
                 f"git -C {target} add --all --force\n"
                 f"git -C {target} -c user.name=fleet -c user.email=fleet@corvis.invalid "
                 f"commit --quiet --message 'fleet export {DEMO_RUN_ID}'\n"

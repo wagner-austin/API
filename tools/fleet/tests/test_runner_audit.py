@@ -19,6 +19,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec
 from fleet.core import _test_hooks, runner_audit, runner_audit_disk, runner_dropped_check
+from fleet.core.linux_isolated_build import EXEC_PATH
 from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
 from fleet.core.runner_reaper_render import REAPER_PATH
@@ -73,7 +74,7 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
     base = bash_path(tmp_path)
     root = tmp_path / "actions-runner-api-1"
     (root / "_work").mkdir(parents=True)
-    (root / ".path").write_text(f"{base}/stand-ins:/usr/bin:/bin")
+    (root / ".path").write_text(f"{base}/stand-ins:{EXEC_PATH}")
     (tmp_path / "game-lib.jar").write_bytes(_JAR_BYTES)
     (tmp_path / "data").mkdir()
     install = an_install()

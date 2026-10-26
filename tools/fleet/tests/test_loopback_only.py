@@ -30,6 +30,7 @@ from fleet.contracts.project import decode_loopback_only, decode_project_config
 from fleet.contracts.source import InstallStep
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import dialect, names, recipe
+from fleet.core.linux_isolated_build import EXEC_PATH
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
 from tests._registry import shipped_document
 
@@ -162,10 +163,12 @@ class TestTheBuild:
         )
         command = recipe_command(UNIT).removeprefix(f"{CHECK_UNIT} loopback '{UNIT}' ")
         exports = " ".join(f"{name}=value-of-{name}" for name in BUILD_EXPORTS)
-        # env -i first, so a value can only reach make through the command.
+        # env -i first, so a value can only reach make through the command,
+        # on the system PATH an isolated build starts from (make is in the
+        # system profile on NixOS, MCPs board task c2e3f31f).
         script = f"export {exports}\ncd '{tmp_path}'\n{command}\n"
         ran = subprocess.run(
-            ["/usr/bin/env", "-i", "PATH=/usr/bin:/bin", "/bin/sh", "-c", script],
+            ["/usr/bin/env", "-i", f"PATH={EXEC_PATH}", "/bin/sh", "-c", script],
             text=True,
             capture_output=True,
             check=True,

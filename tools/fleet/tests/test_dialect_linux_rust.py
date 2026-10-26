@@ -19,31 +19,14 @@ import pytest
 
 from fleet.contracts.capability import RUST_CHECK_SUBCOMMANDS, RUST_CHECK_TOOLS
 from fleet.core.dialect import PROLOGUE, SH_INVOCATION, TOOLCHAIN_PROBE_SCRIPT
+from tests._system_tools import link_system_tools
 from tests.test_dialect_linux import fields_of
 
 #: What the fake answers ``cargo --version`` with, as diphtheria's did.
 CARGO_ANSWER = "cargo 1.98.1 (797e8a9bc 2026-08-05)"
 
-#: The system directories whose programs the case's tools directory links.
-SYSTEM_BINARIES = (pathlib.Path("/usr/bin"), pathlib.Path("/bin"))
-
 #: The programs a case places itself, never linked from the node.
 PLACED = frozenset({"cargo", *RUST_CHECK_TOOLS})
-
-
-def _link_system_tools(tools: pathlib.Path) -> None:
-    """Link every program in :data:`SYSTEM_BINARIES` but :data:`PLACED` into ``tools``.
-
-    A name in both directories is linked once, from the first.
-
-    Args:
-        tools: The empty directory the links go in.
-    """
-    for directory in SYSTEM_BINARIES:
-        for program in sorted(directory.iterdir()):
-            link = tools / program.name
-            if program.name not in PLACED and not program.is_dir() and not link.is_symlink():
-                link.symlink_to(program)
 
 
 def _executable(path: pathlib.Path, text: str) -> None:
@@ -72,7 +55,7 @@ def _probe_fields(
     """
     tools = tmp_path / "tools"
     tools.mkdir()
-    _link_system_tools(tools)
+    link_system_tools(tools, PLACED)
     if subcommands is not None:
         cases = "".join(f'  {name}) echo "{name} 1.0.0"; exit 0 ;;\n' for name in subcommands)
         _executable(

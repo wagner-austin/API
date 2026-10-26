@@ -52,6 +52,27 @@ def _no_auto_gc_command(target: str) -> tuple[str, ...]:
     return ("git", "-C", target, "config", "gc.auto", "0")
 
 
+def _no_auto_maintenance_command(target: str) -> tuple[str, ...]:
+    """The setting that keeps a newer git from packing a staged repository behind the build.
+
+    ``gc.auto`` 0 is not enough on every node (MCPs board task c2e3f31f):
+    git 2.54, a NixOS node's, ends ``git commit`` with ``git maintenance run
+    --auto`` instead of ``git gc --auto``, and its tasks repack the loose
+    objects whatever ``gc.auto`` says. Measured on loki on 2026-10-26: three
+    loose blobs in one object directory, ``gc.auto`` 0, and the commit left
+    a pack and no loose object; with ``maintenance.auto`` false beside it
+    every loose object stayed, on loki's 2.54 and lavender's 2.43 alike.
+
+    Args:
+        target: Absolute remote directory holding the repository, just
+            initialised.
+
+    Returns:
+        The command, as an argument vector.
+    """
+    return ("git", "-C", target, "config", "maintenance.auto", "false")
+
+
 def _commit_command(target: str, message: str) -> tuple[str, ...]:
     """The one commit of a staged tree, under the export identity.
 
@@ -122,7 +143,7 @@ def companion_repository_commands(
         ref: The companion's declared ref, ``main`` or ``refs/heads/main``.
 
     Returns:
-        The six commands, in order, for
+        The seven commands, in order, for
         :func:`fleet.core.dialect.checked_script`.
     """
     branch = ref.removeprefix("refs/heads/")
@@ -130,6 +151,7 @@ def companion_repository_commands(
     return (
         ("git", "-C", target, "init", "--quiet"),
         _no_auto_gc_command(target),
+        _no_auto_maintenance_command(target),
         (
             "git",
             "-C",
@@ -202,8 +224,9 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
     so no hook the project's install configures (husky's
     ``core.hooksPath``) exists yet to run on it.
 
-    AUTOMATIC GC IS TURNED OFF before the commit (:func:`_no_auto_gc_command`),
-    so the commit leaves its loose objects where the build copies them. Until
+    AUTOMATIC GC AND MAINTENANCE ARE TURNED OFF before the commit
+    (:func:`_no_auto_gc_command`, :func:`_no_auto_maintenance_command`), so
+    the commit leaves its loose objects where the build copies them. Until
     board task e705f08c it also set ``core.autocrlf`` false for a Windows
     node's git, whose add warned once per file (MCPs board task ee3d6cdc); a
     Linux node's git converts no line endings unless it is asked to.
@@ -214,12 +237,13 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
             node names the run it was staged for.
 
     Returns:
-        The four commands, in order, for
+        The five commands, in order, for
         :func:`fleet.core.dialect.checked_script`.
     """
     return (
         ("git", "-C", target, "init", "--quiet"),
         _no_auto_gc_command(target),
+        _no_auto_maintenance_command(target),
         ("git", "-C", target, "add", "--all", "--force"),
         _commit_command(target, f"fleet export {run_id}"),
     )

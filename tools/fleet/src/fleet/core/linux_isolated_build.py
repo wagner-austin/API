@@ -87,7 +87,11 @@ EXEC_CACHE = "$exec_home/fleet/cache"
 
 #: The PATH the isolated build starts from: the system's tools only, since
 #: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
-EXEC_PATH = "/usr/local/bin:/usr/bin:/bin"
+#: A NixOS node keeps them in its setuid wrappers and its system profile,
+#: both root's, and has nothing in /usr/bin but env; an Ubuntu node has
+#: neither directory, so each finds its tools where it keeps them (MCPs board
+#: task c2e3f31f).
+EXEC_PATH = "/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin"
 
 #: The lock every check on the lane holds shared and the lane's prune holds
 #: exclusively, in that user's runtime directory, over ``$exec_uid``. MCPs'
