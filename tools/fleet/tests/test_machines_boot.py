@@ -20,6 +20,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     narrow_json_to_list,
     require_dict,
+    require_str,
 )
 
 from tests._registry import shipped_document
@@ -112,7 +113,8 @@ def test_measured_boot_macs_stay_pinned_and_only_workers_servers_and_jumps_decla
     }
     # An arm keys on the MAC, so two machines naming one adapter would hand
     # one's installer to the other (MCPs board task 7d7ea0e9).
-    assert sorted(declared.values()) == sorted(set(declared.values()))
+    macs = [require_str(m, "bootMac") for m in machines.values() if m["bootMac"] is not None]
+    assert len(macs) == len(set(macs))
     # demure is a server since MCPs board task 4ec65b8f and keeps its MAC,
     # since its reinstall as the stack host is a netboot install too; loki is
     # the vpn-jump the netboot installs (MCPs board task 7d7ea0e9).
