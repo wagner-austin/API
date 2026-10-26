@@ -161,7 +161,7 @@ class TestConvertRawToMzml:
         else:
             script_path = tmp_path / "fail_parser.sh"
             script_path.write_text(
-                "#!/bin/bash\necho 'Conversion failed: test error' >&2\nexit 1\n"
+                "#!/usr/bin/env bash\necho 'Conversion failed: test error' >&2\nexit 1\n"
             )
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
@@ -189,7 +189,7 @@ class TestConvertRawToMzml:
             script_path.write_text("@echo off\nexit /b 0\n")
         else:
             script_path = tmp_path / "no_output_parser.sh"
-            script_path.write_text("#!/bin/bash\nexit 0\n")
+            script_path.write_text("#!/usr/bin/env bash\nexit 0\n")
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
 
         # Point hook to our script
@@ -222,7 +222,7 @@ exit /b 0
             script_path.write_text(script_content)
         else:
             script_path = tmp_path / "success_parser.sh"
-            script_content = f"""#!/bin/bash
+            script_content = f"""#!/usr/bin/env bash
 touch "{output_dir}/test.mzML"
 exit 0
 """

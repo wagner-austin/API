@@ -520,7 +520,7 @@ class TestProdThermoWrappers:
         else:
             script_path = tmp_path / "parser.sh"
             script_path.write_text(
-                f'#!/bin/bash\ntouch "{output_dir}/sample.mzML"\nexit 0\n',
+                f'#!/usr/bin/env bash\ntouch "{output_dir}/sample.mzML"\nexit 0\n',
                 encoding="utf-8",
             )
             script_path.chmod(script_path.stat().st_mode | stat.S_IEXEC)
