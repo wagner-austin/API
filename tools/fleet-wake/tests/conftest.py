@@ -29,7 +29,7 @@ from typing import Final
 import pytest
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.machine import LedgerObserver, Machine, MachineRole, encode_machine
-from fleet.contracts.node import NodeConfig, NodePlatform
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig, encode_project_config
 from fleet.core.workspace_files import (
     JSON_SUFFIX,
@@ -92,15 +92,12 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
         Machine(
             name="lavender",
             role=MachineRole.WORKER,
-            user="austi",
-            platform=NodePlatform.WINDOWS,
+            user="corvis",
             enabled=True,
             ledger_observer=LedgerObserver.FLEET_ARM,
-            guest_host=None,
             dispatch=NodeConfig(
                 host="lavender",
-                platform=NodePlatform.WINDOWS,
-                stage_root="C:/fleet/stage",
+                stage_root="/home/corvis/fleet/stage",
                 logical_cores=16,
                 ram_gb=32.0,
                 gpu=None,
@@ -110,8 +107,6 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                 cxx=None,
                 docker=None,
                 stack=None,
-                elevated=False,
-                wsl_host=None,
                 budget=NodeBudget(
                     reserved_cores=2,
                     reserved_ram_gb=4.0,
@@ -157,6 +152,9 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # names the one node a project reads something only it holds
             # (MCPs board task bf7a9460).
             node=None,
+            # The bridge reads the network as well as loopback, so its check
+            # runs in the host's namespace.
+            loopback_only=False,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
