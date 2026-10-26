@@ -67,13 +67,13 @@ infra: commit-tasks executed services-executed
 # board task 465689f5). The hub's scheduled ticks run fleet-agent and every
 # fleet-node-agent from the commit refs/fleet/rolled names, extracted by
 # tools/fleet's fleet.cli.rolled, never from this checkout; this is the only
-# thing that moves the ref, and only after executed passed at HEAD. The ref
-# lives in the object store every worktree shares, so a roll from any of
-# them is what the next tick runs. It is pushed to origin as well (MCPs
-# board task c39ee056), since a machine holding a hub-runner duty other than
-# the hub ticks its own lanes and has no other way to learn the roll: MCPs
-# maketools release-sync fetches it there and aligns that machine's checkout
-# to it. A roll may move the ref back, so the push forces it.
+# thing that moves the ref, and only after executed passed at HEAD. It is
+# pushed to origin, and every tick fetches origin's ref before reading it
+# (tools/fleet's fleet.core.rolled_fetch, MCPs board task 8db0f536), so a
+# roll made on any machine is what the hub's next tick runs; MCPs maketools
+# release-sync also fetches it and aligns each hub-runner machine's checkout
+# to it (MCPs board task c39ee056). A roll may move the ref back, so the
+# push forces it.
 fleet-roll: commit-tasks executed
 	git update-ref refs/fleet/rolled HEAD
 	git push origin +refs/fleet/rolled:refs/fleet/rolled
