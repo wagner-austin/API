@@ -40,16 +40,23 @@ def _stanza() -> list[str]:
     return [line for line in text[start:end].split("\n") if not line.lstrip().startswith("#")]
 
 
-def test_each_range_builds_its_venvs_then_runs_its_tests_as_mcps_published_them() -> None:
+def test_each_range_is_checked_by_the_fleet_on_a_session_host_or_here_as_mcps_published_it() -> None:
+    # The session host's arm came with MCPs board task f8390a08 (API
+    # 5e655da79): session-host decides, then each range goes to
+    # pushed-fleet-check there and to pushed-venvs then pushed-tests anywhere
+    # else, all as MCPs' origin/main carries them.
     stanza = _stanza()
-    launch = '        "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py"'
+    launch = '"$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py"'
     new_ref = '"$pt_local_sha" "^origin/main" < /dev/null'
     known_ref = '"$pt_remote_sha..$pt_local_sha" < /dev/null'
     assert [line for line in stanza if "published_maketools.py" in line] == [
-        f'{launch} pushed-venvs "$REPO" {new_ref}',
-        f'{launch} pushed-tests "$REPO" "$pt_local_sha" {new_ref}',
-        f'{launch} pushed-venvs "$REPO" {known_ref}',
-        f'{launch} pushed-tests "$REPO" "$pt_local_sha" {known_ref}',
+        f'{launch} session-host "$REPO" < /dev/null || session_host_status=$?',
+        f'        {launch} pushed-fleet-check "$REPO" "$pt_local_sha" {new_ref}',
+        f'        {launch} pushed-fleet-check "$REPO" "$pt_local_sha" {known_ref}',
+        f'        {launch} pushed-venvs "$REPO" {new_ref}',
+        f'        {launch} pushed-tests "$REPO" "$pt_local_sha" {new_ref}',
+        f'        {launch} pushed-venvs "$REPO" {known_ref}',
+        f'        {launch} pushed-tests "$REPO" "$pt_local_sha" {known_ref}',
     ]
     # Only a deleted ref and git's empty line are skipped; no variable or
     # author skips a range.
@@ -65,6 +72,7 @@ def test_each_range_builds_its_venvs_then_runs_its_tests_as_mcps_published_them(
         "ZERO",
         "pt_local_sha",
         "pt_remote_sha",
+        "session_host_status",
     ]
 
 
