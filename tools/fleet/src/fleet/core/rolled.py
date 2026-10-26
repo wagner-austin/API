@@ -19,9 +19,13 @@ the trees the agent imports and the registry it reads from that commit
 The dependencies stay the checkout's tools/fleet environment; the code and
 the configuration are pinned.
 
-WHY A REF. It lives in the object store every worktree of the repository
-shares, so a roll made from any worktree is what the next tick reads, it
-names a commit git already holds, and nothing that edits files can move it.
+WHY A REF. It names a commit git already holds, nothing that edits files
+can move it, and ``make fleet-roll`` pushes it to origin, where a roll made
+on any machine lands. Every read here fetches origin's ref first
+(:mod:`fleet.core.rolled_fetch`, MCPs board task 8db0f536), so a roll made
+on ziggurat is what the hub's next boundary runs; until then only the
+worktrees sharing the hub's object store reached it at once, and a roll from
+anywhere else waited up to 15 minutes for release-sync's fetch.
 
 NOTHING RUNS WITHOUT A ROLL. A ref that does not resolve, a failed archive
 or extraction, or an extraction lacking an entry point refuses the tick by
@@ -56,7 +60,7 @@ import pathlib
 import shutil
 from typing import Final, TypedDict
 
-from fleet.core import _test_hooks, commit_tree, file_turn, scratch
+from fleet.core import _test_hooks, commit_tree, file_turn, rolled_fetch, scratch
 from fleet.core.workspace_files import SETTINGS_FILE
 
 #: The ref ``make fleet-roll`` sets and every tick reads.
@@ -164,8 +168,12 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
 
     Returns:
         The commit's extraction, or a ``CODE: message`` refusal when any
-        step fails; nothing is run from the working tree instead.
+        step fails, the fetch of origin's ref first; nothing is run from the
+        working tree instead.
     """
+    unfetched = rolled_fetch.fetch_rolled(api_root)
+    if unfetched is not None:
+        return unfetched
     resolved = commit_tree.resolve_commit(api_root, ROLLED_REF, REF_UNRESOLVED_CODE)
     if isinstance(resolved, str):
         return resolved
@@ -285,11 +293,15 @@ def rolled_state(checkout: pathlib.Path) -> str:
             read: the agent's records directory, ``tools/fleet`` there.
 
     Returns:
-        The commit the ref names, or the :data:`REF_UNRESOLVED_CODE`
-        refusal saying why it names none; either compares unequal to a
-        different answer, so a ref that stops resolving hands over too, and
-        the next start reports the refusal as its own.
+        The commit the ref names once origin's has been fetched, or the
+        refusal saying why it names none, the fetch's among them; either
+        compares unequal to a different answer, so a ref that stops
+        resolving hands over too, and the next start reports the refusal as
+        its own.
     """
+    unfetched = rolled_fetch.fetch_rolled(checkout)
+    if unfetched is not None:
+        return unfetched
     resolved = commit_tree.resolve_commit(checkout, ROLLED_REF, REF_UNRESOLVED_CODE)
     if isinstance(resolved, str):
         return resolved
