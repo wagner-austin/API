@@ -27,8 +27,10 @@ from tests._registry import shipped_document
 #: lavender's wired Realtek GbE adapter, measured 2026-10-18T23:55:15Z.
 LAVENDER_MAC = "1c:69:7a:fe:78:9a"
 
-#: pendragon's wired adapter, declared at ee52f9b22 (MCPs board task 1e9ab738).
-PENDRAGON_MAC = "d8:5e:d3:84:53:d4"
+#: The Realtek USB GbE adapter on loki, measured there 2026-10-26T05:05:38Z
+#: (MCPs board task 7d7ea0e9). It was pendragon's dock adapter, declared at
+#: ee52f9b22 (MCPs board task 1e9ab738), until the operator moved it to loki.
+LOKI_MAC = "d8:5e:d3:84:53:d4"
 
 #: demure's Intel I225-V Ethernet, declared at 493821b9f (MCPs board task e2ffed0d)
 #: when it was austinpc, renamed demure for MCPs board task e0c286f5.
@@ -36,11 +38,11 @@ DEMURE_MAC = "d8:43:ae:24:7c:04"
 
 #: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
-#: SSD, and pendragon's NVMe, beside which it also carries a 512 GB SD card
-#: only 36 MB smaller, which a largest-disk rule would one day choose.
-#: demure's one NVMe, whose netboot install accepted it on 2026-10-22 (arm b54008dd).
+#: SSD. demure's one NVMe, whose netboot install accepted it on 2026-10-22
+#: (arm b54008dd). pendragon's NVMe went with its boot MAC (MCPs board task
+#: 7d7ea0e9), and loki's one NVMe is only-disk until its installer reads the
+#: serial Windows does not report.
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
-PENDRAGON_INSTALL_DISK = "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
 DEMURE_INSTALL_DISK = "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
 
 #: diphtheria's adb server, as its roster file declares it.
@@ -98,35 +100,42 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_measured_boot_macs_stay_pinned_and_only_workers_and_servers_declare_one() -> None:
+def test_measured_boot_macs_stay_pinned_and_only_workers_servers_and_jumps_declare_one() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
     # Automatic admission adds a disabled worker before its first install.
     # Pin measured identities without making each admission a test-code edit.
-    assert {name: declared[name] for name in ("demure", "lavender", "pendragon")} == {
+    assert {name: declared[name] for name in ("demure", "lavender", "loki")} == {
         "demure": DEMURE_MAC,
         "lavender": LAVENDER_MAC,
-        "pendragon": PENDRAGON_MAC,
+        "loki": LOKI_MAC,
     }
+    # An arm keys on the MAC, so two machines naming one adapter would hand
+    # one's installer to the other (MCPs board task 7d7ea0e9).
+    assert sorted(declared.values()) == sorted(set(declared.values()))
     # demure is a server since MCPs board task 4ec65b8f and keeps its MAC,
-    # since its reinstall as the stack host is a netboot install too.
+    # since its reinstall as the stack host is a netboot install too; loki is
+    # the vpn-jump the netboot installs (MCPs board task 7d7ea0e9).
     assert machines["demure"]["role"] == "server"
+    assert machines["loki"]["role"] == "vpn-jump"
     for name in declared:
-        assert machines[name]["role"] in ("worker", "server")
+        assert machines[name]["role"] in ("worker", "server", "vpn-jump")
         assert machines[name]["platform"] == "linux"
     assert machines["diphtheria"]["bootMac"] is None
+    assert machines["pendragon"]["bootMac"] is None
 
 
-def test_pendragon_alone_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
+def test_no_machine_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
     # MCPs board task f78f7e33: pendragon's one USB-C port is also its
     # charging port, so its netboot install must bring up Wi-Fi to lose the
     # dock. fleet-mcp's decoder requires the key and refuses true without a
-    # bootMac.
+    # bootMac, and pendragon has none until its new adapter is measured
+    # (MCPs board task 7d7ea0e9).
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     assert {name: type(m.get("netbootWifi")) for name, m in machines.items()} == dict.fromkeys(
         machines, bool
     )
-    assert sorted(name for name, m in machines.items() if m["netbootWifi"] is True) == ["pendragon"]
+    assert [name for name, m in machines.items() if m["netbootWifi"] is True] == []
 
 
 def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() -> None:
@@ -137,10 +146,10 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     # a disk. Every other machine still carries null.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
-    assert {name: named[name] for name in ("demure", "lavender", "pendragon")} == {
+    assert {name: named[name] for name in ("demure", "lavender", "loki")} == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
-        "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
+        "loki": {"rule": "only-disk", "serial": None},
     }
     assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
         name for name, m in machines.items() if m["bootMac"] is None

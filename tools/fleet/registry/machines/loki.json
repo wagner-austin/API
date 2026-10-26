@@ -1,0 +1,46 @@
+{
+  "role": "vpn-jump",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "standby": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.120.151.28",
+  "reachKey": null,
+  "bootMac": "d8:5e:d3:84:53:d4",
+  "netbootWifi": false,
+  "installDisk": {
+    "rule": "only-disk",
+    "serial": null
+  },
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "ASUS Zenbook 14 UX3405CA, a laptop that travels. RETURNED 2026-10-26 as linux for MCPs board task 7d7ea0e9, to be installed with NixOS by the fleet's netboot install from the fleet flake's worker configuration (MCPs fleet-mcp/nixos/modules/worker.nix), after API ec95b830f deleted its Windows file for MCPs board task e705f08c; the operator, 2026-10-25: 'i dont need anything on it', so the install wipes its one disk. Its role stays vpn-jump: MCPs board task b5a58266 measured diphtheria -> loki -> hpc3.rcic.uci.edu:22 over its UCI VPN on 2026-10-20, and bringing that VPN up on NixOS is MCPs board task e4298734. BOOT MAC: d8:5e:d3:84:53:d4 is the Realtek USB GbE adapter now on loki, measured from diphtheria at 2026-10-26T05:05:38Z (Get-NetAdapter: Ethernet 4, Realtek USB GbE Family Controller #2, Up, 1 Gbps). It was pendragon's dock adapter until the operator moved it here, and pendragon.json gives it up in the same commit (the operator, 2026-10-25: 'i can get a new usb to ethernet device tomorrow ok'). INSTALL DISK: only-disk, its one NVMe (NVMe SAMSUNG MZVL81T0HELB-00BTW, 1024209543168 bytes, the only disk Get-PhysicalDisk lists at 05:05:38Z); Windows reports its EUI, not the udev ID_SERIAL a serial rule names, so the serial is pinned once the installer reads it. Measured on Windows on 2026-10-03: 16 logical cores, 31.4 GB of RAM, an Intel Arc 140T and no CUDA device, so gpu stays null. DISPATCH IS HELD until the install is adopted at this tailnet address and the node answers ssh as corvis; then held goes to null with the toolchain the node reports (cxx and docker are null until then, as emerald's were). Its firmware held Microsoft's Secure Boot keys at 05:05:38Z (Confirm-SecureBootUEFI True, BIOS UX3405CA.314), which the install refuses, so the keys are cleared into setup mode at its firmware through the corvis-opi KVM first.",
+  "dispatch": {
+    "held": "Being reinstalled with NixOS by the fleet's netboot install (MCPs board task 7d7ea0e9); it still runs Windows until the install is adopted.",
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 16,
+    "ram_gb": 31.0,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": true,
+    "rust": null,
+    "cxx": null,
+    "docker": null,
+    "stack": null,
+    "elevated": false
+  }
+}
