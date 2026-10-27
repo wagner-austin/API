@@ -47,13 +47,14 @@ MAX_COMMAND_CHARS = 4000
 
 #: The ssh options every remote call carries. ``BatchMode`` turns a prompt
 #: into a failure instead of a wait. The other three bound the ROUTE, which
-#: runs hub -> cloudflared -> sedona -> hpc3 and whose legs can stall without
-#: closing: ``ConnectTimeout`` bounds the TCP connect and the banner exchange,
+#: is selected by the workspace's SSH alias. Its ProxyJump points through
+#: Loki's university VPN; no jump host is hardcoded in this module.
+#: ``ConnectTimeout`` bounds the TCP connect and the banner exchange,
 #: and ``ServerAliveInterval`` with ``ServerAliveCountMax`` ends a session
 #: whose far side stops answering after four unanswered 15-second probes. A
 #: stalled leg exits ssh with its own named timeout on stderr ("Connection
 #: timed out during banner exchange", met on this route on 2026-09-30 at
-#: 12:07Z while sedona's VPN was down), which :func:`run_remote` and
+#: 12:07Z while the former jump host's VPN was down), which :func:`run_remote` and
 #: :func:`put_bytes` carry into ``REMOTE_COMMAND_FAILED``.
 #:
 #: WHAT THESE DO NOT BOUND, measured the same day (board task 465689f5): a
