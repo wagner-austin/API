@@ -11,7 +11,7 @@ import sys
 import pytest
 
 from hpc3.core import _test_hooks, wrds_scan
-from hpc3.core.wrds_catalog import read_catalog
+from hpc3.core.wrds_catalog import probe_archive, read_catalog
 from hpc3.core.wrds_scan import main, permission_error, scan
 
 
@@ -29,7 +29,13 @@ def test_real_tree_records_readability_sizes_aliases_and_dangling_links(
     assert ("file", str(data), 18, True, str(data)) in records
     assert ("alias", str(tmp_path / "z_alias"), 0, False, str(current)) in records
     assert ("alias", str(current / "cycle"), 0, False, str(tmp_path)) in records
-    assert ("broken_link", str(current / "missing"), 0, False, str(tmp_path / "absent")) in records
+    assert (
+        "unresolved_link",
+        str(current / "missing"),
+        0,
+        False,
+        str(tmp_path / "absent"),
+    ) in records
     assert sum(record[0] == "file" for record in records) == 1
 
 
@@ -77,11 +83,14 @@ def test_standalone_script_runs_without_package_dependencies(tmp_path: pathlib.P
     root = tmp_path / "root"
     root.mkdir()
     output = tmp_path / "catalog.jsonl"
+    archive = tmp_path / "scan.pyz"
+    archive.write_bytes(probe_archive())
     result = _test_hooks._default_run(
         [
             sys.executable,
             "-I",
-            wrds_scan.__file__,
+            "-S",
+            str(archive),
             "--root",
             str(root),
             "--output",
@@ -94,7 +103,8 @@ def test_standalone_script_runs_without_package_dependencies(tmp_path: pathlib.P
         [
             sys.executable,
             "-I",
-            wrds_scan.__file__,
+            "-S",
+            str(archive),
             "--root",
             str(root / "missing"),
             "--output",

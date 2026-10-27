@@ -4,18 +4,19 @@ Only directory entries, stat metadata and effective read permissions are
 examined. No dataset is opened. Directory aliases are recorded and pruned,
 so archived mounts and symlink cycles cannot multiply a traversal forever.
 The wire format is a JSON array per line: kind, path, bytes, readable, target.
-This module uses only the standard library on the remote host.
+The remote archive includes the shared JSON serializer and needs no installation.
 """
 
 from __future__ import annotations
 
 import argparse
 import errno
-import json
 import os
 import pathlib
 import stat
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
+
+from platform_core.json_utils import dump_json_str
 
 
 class ScanArguments(argparse.Namespace):
@@ -40,7 +41,7 @@ def permission_error(error: OSError, denied: list[str]) -> None:
     denied.append(error.filename)
 
 
-def scan(root: pathlib.Path) -> Iterator[tuple[str, str, int, bool, str]]:
+def scan(root: pathlib.Path) -> Generator[tuple[str, str, int, bool, str], None, None]:
     """Yield filesystem metadata, including inaccessible paths and aliases.
 
     Args:
@@ -75,7 +76,8 @@ def scan(root: pathlib.Path) -> Iterator[tuple[str, str, int, bool, str]]:
             path = pathlib.Path(directory) / name
             target = os.path.realpath(path)
             if path.is_symlink() and not path.exists():
-                yield ("broken_link", str(path), 0, False, target)
+                # exists() cannot distinguish a missing target from denied traversal.
+                yield ("unresolved_link", str(path), 0, False, target)
                 continue
             metadata = path.stat()
             if stat.S_ISREG(metadata.st_mode):
@@ -104,8 +106,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     output = pathlib.Path(args.output)
     with output.open("x", encoding="utf-8") as handle:
         for record in scan(root):
-            handle.write(json.dumps(record) + "\n")
-        handle.write(json.dumps(("complete", str(root), 0, False, "")) + "\n")
+            handle.write(dump_json_str(record) + "\n")
+        handle.write(dump_json_str(("complete", str(root), 0, False, "")) + "\n")
 
 
 __all__ = ["ScanArguments", "main", "permission_error", "scan"]

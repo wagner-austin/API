@@ -9,15 +9,37 @@ catalog requiring database authentication.
 from __future__ import annotations
 
 import hashlib
+import io
 import pathlib
 import shlex
+import zipfile
 
+from platform_core import json_utils
 from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
 
 from hpc3.contracts.wrds_catalog import CatalogEntry, decode_catalog_entry
 from hpc3.core import _test_hooks, wrds_scan
 from hpc3.core.digest import check_remote_digest, parse_remote_digest
 from hpc3.core.remote import put_bytes, remote_digest, run_remote
+
+
+def probe_archive() -> bytes:
+    """Package the scanner and its exact shared serializer into a deterministic zipapp.
+
+    Returns:
+        Executable archive requiring only Python's standard library on WRDS.
+    """
+    serializer = pathlib.Path(json_utils.__file__)
+    members = {
+        "__main__.py": pathlib.Path(wrds_scan.__file__),
+        "platform_core/__init__.py": serializer.with_name("__init__.py"),
+        "platform_core/json_utils.py": serializer,
+    }
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for name, path in members.items():
+            archive.writestr(zipfile.ZipInfo(name), _test_hooks.read_bytes(path))
+    return buffer.getvalue()
 
 
 def read_catalog(text: str) -> list[CatalogEntry]:
@@ -63,10 +85,10 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> list[CatalogE
     receipt_path = output.with_suffix(output.suffix + ".receipt.json")
     if _test_hooks.file_exists(output) or _test_hooks.file_exists(receipt_path):
         raise FileExistsError(str(output))
-    source = _test_hooks.read_bytes(pathlib.Path(wrds_scan.__file__))
+    source = probe_archive()
     source_sha = hashlib.sha256(source).hexdigest()
     run_remote(host, shlex.join(["mkdir", "-m", "700", "--", str(remote)]))
-    probe = str(remote / "scan.py")
+    probe = str(remote / "scan.pyz")
     artifact = str(remote / "catalog.jsonl")
     put_bytes(host, probe, source)
     check_remote_digest(probe, source_sha, parse_remote_digest(remote_digest(host, probe), probe))
@@ -119,4 +141,4 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> list[CatalogE
     return entries
 
 
-__all__ = ["inventory", "read_catalog"]
+__all__ = ["inventory", "probe_archive", "read_catalog"]

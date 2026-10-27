@@ -9,12 +9,11 @@ import sys
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str
+from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.cli import wrds_catalog as cli
 from hpc3.contracts.wrds_catalog import decode_catalog_entry, encode_catalog_entry
-from hpc3.core import wrds_scan
-from hpc3.core.wrds_catalog import inventory, read_catalog
+from hpc3.core.wrds_catalog import inventory, probe_archive, read_catalog
 from tests.conftest import FakeRun
 
 CATALOG = (
@@ -36,7 +35,7 @@ def prepare(
         source_sha: Explicit digest for a corrupt upload test.
         catalog_sha: Explicit digest for a corrupt download test.
     """
-    source = pathlib.Path(wrds_scan.__file__).read_bytes()
+    source = probe_archive()
     fake_run.add(
         "sha256sum",
         stdout=(hashlib.sha256(source).hexdigest() if source_sha is None else source_sha)
@@ -184,7 +183,6 @@ def test_cli_entrypoint_rejects_missing_flags() -> None:
 
 
 def test_all_record_kinds_decode() -> None:
-    for kind in ("alias", "broken_link", "special"):
+    for kind in ("alias", "unresolved_link", "special"):
         value: list[JSONValue] = [kind, "/wrds/example", 0, False, "/target"]
         assert decode_catalog_entry(value)["kind"] == kind
-    assert dump_json_str(encode_catalog_entry(read_catalog(CATALOG)[0])) != ""

@@ -48,7 +48,9 @@ def decode_catalog_entry(value: JSONValue) -> CatalogEntry:
     """
     if not isinstance(value, list) or len(value) != 5:
         raise JSONTypeError("WRDS_CATALOG_RECORD: expected five fields")
-    fields: dict[str, JSONValue] = dict(zip(("kind", "path", "bytes", "readable", "target"), value))
+    fields: dict[str, JSONValue] = dict(
+        zip(("kind", "path", "bytes", "readable", "target"), value, strict=True)
+    )
     kind = require_str(fields, "kind")
     path = require_str(fields, "path")
     size = require_int(fields, "bytes")
@@ -59,7 +61,7 @@ def decode_catalog_entry(value: JSONValue) -> CatalogEntry:
         "directory",
         "alias",
         "denied_directory",
-        "broken_link",
+        "unresolved_link",
         "special",
         "complete",
     }:

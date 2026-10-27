@@ -30,7 +30,9 @@ python -m hpc3.cli.wrds_catalog --host wrds \
 Choose a new remote directory and local output for each run. The command
 submits a one-hour-bounded Grid Engine job and waits for completion. It
 records every file visible beneath `/wrds`, its effective readability and
-logical size, plus denied directories, broken links and directory aliases.
+logical size, plus denied directories, unresolved links and directory aliases.
+An unresolved link may have a missing target or an inaccessible target; the
+catalog does not infer which from a failed existence check.
 It follows each resolved directory once and includes historical trees; summed
 sizes are referenced logical bytes, not unique current datasets or disk usage.
 It never opens dataset contents. The JSONL catalog and adjacent receipt carry
