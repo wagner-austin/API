@@ -16,7 +16,7 @@ from fleet.contracts.capability import (
     STACK_NETWORK,
 )
 from fleet.contracts.check_unit import CHECK_UNIT
-from fleet.contracts.detection import TESTDB_CONTAINER
+from fleet.contracts.detection import GPU_CDI_DEVICE, TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import (
     CHROME_LINUX_PATH,
     GO_VERSION_ARGUMENT,
@@ -77,6 +77,16 @@ from fleet.contracts.tagged_tools import (
 #: B60, answered ``gpu=yes=NVIDIA-SMI has failed because it couldn't
 #: communicate with the NVIDIA driver...`` (exit 9 on stdout) and claimed
 #: with the gpu tag (MCPs board task 28c43011, its runner log of 2026-10-09).
+#: On a node whose ``docker`` line answered, the card must also reach that
+#: lane: its daemon's discovered devices must name
+#: :data:`fleet.contracts.detection.GPU_CDI_DEVICE`, which NVIDIA's container
+#: toolkit's CDI specification gives it (MCPs board task 8092e6a0). A job
+#: asking ``gpu`` and ``docker`` runs its GPU in a container, and lavender and
+#: sedona carried both tags with the driver and no toolkit, so chat/execution's
+#: llama case failed there on 2026-10-25 and 2026-10-27 with 'failed to discover
+#: GPU vendor from CDI'; on 2026-10-27 lavender's, sedona's and diphtheria's
+#: rootless daemons listed ``nvidia.com/gpu=all`` once each carried the toolkit.
+#: A node with no docker lane answers by nvidia-smi alone.
 #:
 #: THE ``hooks`` LINE is the MCPs claude-hooks check's environment (MCPs
 #: board task ec895824): the route file under the account's home and one
@@ -151,6 +161,7 @@ TOOLCHAIN_PROBE_BODY = (
     "else\n"
     "  printf 'cxx=no=\\n'\n"
     "fi\n"
+    "lane=\n"
     "if id execdocker > /dev/null 2>&1 &&"
     ' d="$(sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
     " info --format '{{.ServerVersion}} {{json .SecurityOptions}}' 2>/dev/null)\"; then\n"
@@ -159,6 +170,7 @@ TOOLCHAIN_PROBE_BODY = (
     "      if sudo -n -u execdocker docker compose version > /dev/null 2>&1 &&"
     " sudo -n -u execdocker docker buildx version > /dev/null 2>&1; then\n"
     "        printf 'docker=yes=%s\\n' \"${d%% *}\"\n"
+    "        lane=yes\n"
     "      else\n"
     "        printf 'docker=no=\\n'\n"
     "      fi ;;\n"
@@ -179,7 +191,11 @@ TOOLCHAIN_PROBE_BODY = (
     "fi\n"
     "if command -v nvidia-smi > /dev/null 2>&1 &&"
     ' g="$(nvidia-smi --query-gpu=name,compute_cap --format=csv,noheader 2>/dev/null)" &&'
-    ' g="$(printf \'%s\\n\' "$g" | head -n 1)" && [ -n "$g" ]; then\n'
+    ' g="$(printf \'%s\\n\' "$g" | head -n 1)" && [ -n "$g" ] &&'
+    ' { [ -z "$lane" ] ||'
+    ' sudo -n -u execdocker docker -H "unix:///run/user/$(id -u execdocker)/docker.sock"'
+    " info --format '{{json .DiscoveredDevices}}' 2>/dev/null"
+    f" | grep -qF '\"{GPU_CDI_DEVICE}\"'; }}; then\n"
     "  printf 'gpu=yes=%s\\n' \"$g\"\n"
     "else\n"
     "  printf 'gpu=no=\\n'\n"

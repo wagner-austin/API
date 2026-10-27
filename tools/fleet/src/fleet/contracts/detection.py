@@ -40,6 +40,11 @@ from fleet.contracts.toolchain import ToolReport
 #: The toolchain probe's line for the node's CUDA device.
 GPU_PROBE: Final = "gpu"
 
+#: The CDI device a docker lane's daemon discovers when NVIDIA's container
+#: toolkit has described the node's cards, which a compose ``gpus: all`` and a
+#: ``docker run --gpus all`` reach (MCPs board task 8092e6a0).
+GPU_CDI_DEVICE: Final = "nvidia.com/gpu=all"
+
 #: The toolchain probe's line for the fleet test database's container.
 TESTDB_PROBE: Final = "testdb"
 
@@ -104,12 +109,18 @@ def tag_drift(node: NodeConfig, reports: tuple[ToolReport, ...]) -> tuple[str, .
     found_gpu = _answer(GPU_PROBE, reports)
     if found_gpu != declared_gpu:
         said = "none" if declared_gpu is None else repr(declared_gpu)
-        reported = "none" if found_gpu is None else repr(found_gpu)
-        claims = "without" if found_gpu is None else "with"
-        lines.append(
-            f"declares gpu {said} but nvidia-smi reports {reported}, so it claims {claims} the "
-            "gpu tag; correct gpu in its registry/machines file"
-        )
+        if found_gpu is None:
+            lines.append(
+                f"declares gpu {said} but the probe reports none (nvidia-smi lists no device, "
+                f"or its docker lane's daemon discovers no {GPU_CDI_DEVICE}), so it claims "
+                "without the gpu tag; correct gpu in its registry/machines file, or give the "
+                "lane NVIDIA's container toolkit"
+            )
+        else:
+            lines.append(
+                f"declares gpu {said} but nvidia-smi reports {found_gpu!r}, so it claims with "
+                "the gpu tag; correct gpu in its registry/machines file"
+            )
     found_testdb = _answer(TESTDB_PROBE, reports)
     if node["test_database"] != (found_testdb is not None):
         if found_testdb is None:

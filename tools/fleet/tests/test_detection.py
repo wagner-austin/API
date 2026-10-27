@@ -95,8 +95,10 @@ class TestTagDrift:
         ).replace("testdb=yes=pgvector/pgvector:pg16-bookworm", "testdb=no=")
 
         assert tag_drift(_diphtheria(), toolchain.read_reports(answer)) == (
-            "declares gpu 'NVIDIA RTX A2000 12GB, 8.6' but nvidia-smi reports none, so it claims "
-            "without the gpu tag; correct gpu in its registry/machines file",
+            "declares gpu 'NVIDIA RTX A2000 12GB, 8.6' but the probe reports none (nvidia-smi "
+            "lists no device, or its docker lane's daemon discovers no nvidia.com/gpu=all), so it "
+            "claims without the gpu tag; correct gpu in its registry/machines file, or give the "
+            "lane NVIDIA's container toolkit",
             "declares test_database true but no corvis-fleet-testdb container exists, so it "
             "claims without the testdb tag; set test_database to false in its registry/machines "
             "file, or provision the container",
