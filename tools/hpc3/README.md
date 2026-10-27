@@ -17,6 +17,36 @@ topic. New incident narrative goes into the wiki, not here.
 
 ## Quick start
 
+### WRDS data inventory
+
+The same package can inventory WRDS Cloud through its existing SSH alias:
+
+```bash
+python -m hpc3.cli.wrds_catalog --host wrds \
+  --remote-dir /home/uci/awagner14/wrds-setup/inventory-UNIQUE \
+  --output /existing/local/directory/wrds-catalog.jsonl
+```
+
+Choose a new remote directory and local output for each run. The command
+submits a one-hour-bounded Grid Engine job and waits for completion. It
+records every file visible beneath `/wrds`, its effective readability and
+logical size, plus denied directories, broken links and directory aliases.
+It follows each resolved directory once and includes historical trees; summed
+sizes are referenced logical bytes, not unique current datasets or disk usage.
+It never opens dataset contents. The JSONL catalog and adjacent receipt carry
+the scheduler job ID and verified scanner/catalog SHA-256 digests. A missing
+completion marker, unexpected filesystem error or failed job fails the command.
+
+This is the filesystem catalog, not the separately authenticated PostgreSQL
+catalog. A readable path is not permission to redistribute it. Data extracts
+are chosen after inventory; this command does not download data or register
+training datasets automatically. Existing `hpc3-stage` handles manifest-backed
+HPC3 transfers, while `libs/covenant_ml` owns Covenant Radar's dataset loaders.
+`libs/platform_kaggle` discovers competitions; it is not a WRDS connector.
+Grid Engine receipts remain distinct from the Slurm job ledger.
+
+### HPC3 research runs
+
 Three files, one directory:
 
 ```
