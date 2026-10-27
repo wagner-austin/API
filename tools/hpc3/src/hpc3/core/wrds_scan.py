@@ -36,9 +36,10 @@ def permission_error(error: OSError, denied: list[str]) -> None:
     Raises:
         OSError: For failures other than denied access.
     """
-    if error.errno != errno.EACCES or error.filename is None:
+    filename: str | None = error.filename
+    if error.errno != errno.EACCES or filename is None:
         raise error
-    denied.append(error.filename)
+    denied.append(filename)
 
 
 def scan(root: pathlib.Path) -> Generator[tuple[str, str, int, bool, str], None, None]:
@@ -84,8 +85,8 @@ def scan(root: pathlib.Path) -> Generator[tuple[str, str, int, bool, str], None,
                 yield ("file", str(path), metadata.st_size, os.access(path, os.R_OK), target)
             else:
                 yield ("special", str(path), 0, False, target)
-    for path in denied:
-        yield ("denied_directory", path, 0, False, os.path.realpath(path))
+    for denied_path in denied:
+        yield ("denied_directory", denied_path, 0, False, os.path.realpath(denied_path))
 
 
 def main(argv: Sequence[str] | None = None) -> None:
