@@ -61,8 +61,10 @@ demure carries both, one check at a time and only the projects pinned to it,
 for another reason than a measurement (MCPs board task c036582e): the corvis
 stack moves onto it from diphtheria, and the operator, 2026-10-24, "cuz
 diptheria is too small. so demure*will be dedicated as the server pc. not a
-worker." One project is pinned to it, MCPs/execution-served-demure, whose
-case reads its provisioning as the stack host, so it checks that and none
+worker." Two projects are pinned to it, MCPs/execution-served-demure, whose
+case reads its provisioning as the stack host, and since MCPs board task
+43fa3a6c MCPs/execution-deployed-demure, whose case reads the deploy that
+migrates and keeps the database it hosts, so it checks those and none
 other. Its role is server since MCPs board task 4ec65b8f (the operator,
 2026-10-25: "isnt demute supposed to br msrked as a server node? not a
 worker snymore."), and the machine contract refuses a server whose budget
@@ -107,7 +109,6 @@ BOUNDED_GRANTS = {
 #: holds, each pinned there, so it checks them and nothing else.
 DIPHTHERIA_PINNED = (
     "MCPs/doc-extract-api",
-    "MCPs/execution-deployed-diphtheria",
     "MCPs/execution-egress-diphtheria",
     "MCPs/execution-netboot-diphtheria",
     "MCPs/execution-served-diphtheria",
@@ -261,7 +262,7 @@ def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
     assert declared == {"demure", "diphtheria"}
 
 
-def test_demure_checks_its_served_lane_and_no_other_project() -> None:
+def test_demure_checks_its_served_and_deployed_lanes_and_no_other_project() -> None:
     workspace = _shipped()
     node = workspace["nodes"]["demure"]
     codes = {
@@ -273,6 +274,7 @@ def test_demure_checks_its_served_lane_and_no_other_project() -> None:
     # tags are read.
     assert codes == {
         **dict.fromkeys(workspace["projects"], FleetErrorCode.NODE_NOT_PINNED),
+        "MCPs/execution-deployed-demure": None,
         "MCPs/execution-served-demure": None,
     }
 

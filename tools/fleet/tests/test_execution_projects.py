@@ -259,19 +259,21 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
 
 
 def test_the_deployed_lane_runs_on_the_database_host_alone() -> None:
-    """MCPs/execution-deployed-diphtheria reads that host's newest deploy.
+    """MCPs/execution-deployed-demure reads that host's newest deploy.
 
     Its last install step writes the marker that makes the execution
     workspace collect tests/deployed alone (MCPs board task 03b683d2), whose
     case runs maketools deploy-kept against the database host's own
     checkout: its deploy record and journal, its postgres and every
     container of its stack, which only that host's fleet user reads. So the
-    project names diphtheria, the database's host, and every other node
-    refuses it. It holds no test database and no companion.
+    project names demure, the database's host since MCPs board task
+    43fa3a6c, whose deploy alone migrates and journals the kept database,
+    and every other node refuses it. It holds no test database and no
+    companion.
     """
     workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, "MCPs/execution-deployed-diphtheria")
-    assert project["node"] == "diphtheria"
+    project = require_project(workspace, "MCPs/execution-deployed-demure")
+    assert project["node"] == "demure"
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.CXX)
     assert project["exclusive_resources"] == ()
     prepare = ("make", "-s", "-C", "scripts/fleet-prepare")

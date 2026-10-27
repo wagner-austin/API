@@ -1301,15 +1301,18 @@ on 2026-10-19), reserving its four cores there in
 the definition's fixed port, so `netboot-http-8780` is its exclusive
 resource and two runs never start at once.
 
-`MCPs/execution-deployed-diphtheria` (MCPs board task 03b683d2) is pinned to
-`diphtheria` because its case runs MCPs maketools `deploy-kept` against the
+`MCPs/execution-deployed-demure` (MCPs board task 03b683d2) is pinned to
+`demure` because its case runs MCPs maketools `deploy-kept` against the
 database host's own checkout, `/home/corvis/PROJECTS/MCPs`: its newest
 deploy record and the journaled hold that wrote it, held against the
 postgres and every container of the stack running there, which only that
-host's fleet user reads. Its last install step, `deployed-lane`, writes the
-marker that makes the execution workspace collect `tests/deployed` alone, so
-an audit's `command MCPs execution-deployed-diphtheria` line carries no other
-case's verdict. It takes no exclusive resource: it only reads.
+host's fleet user reads. It was `MCPs/execution-deployed-diphtheria` until
+the database moved to demure (MCPs board task 43fa3a6c): diphtheria's deploy
+now migrates nothing, so only demure's hold journals the kept database. Its
+last install step, `deployed-lane`, writes the marker that makes the
+execution workspace collect `tests/deployed` alone, so an audit's `command
+MCPs execution-deployed-demure` line carries no other case's verdict. It
+takes no exclusive resource: it only reads.
 
 `MCPs/execution-egress-diphtheria` (MCPs board task 523a7445) is pinned to
 `diphtheria` because its case runs one probe inside `mcp-watcher` and one

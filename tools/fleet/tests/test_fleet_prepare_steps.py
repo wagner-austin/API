@@ -69,7 +69,8 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # MCPs/kvm-mcp, the hardware KVM tools (MCPs board task c8f09479); 64
     # since MCPs/instagram-mcp, the creator tools (MCPs board task f986db61);
     # 65 since MCPs/execution-deployed-diphtheria, the execution suite's
-    # deployed lane (MCPs board task 03b683d2); 66 since
+    # deployed lane (MCPs board task 03b683d2), named for demure since the
+    # database moved there (MCPs board task 43fa3a6c); 66 since
     # MCPs/execution-egress-diphtheria, the execution suite's egress lane
     # (MCPs board task 523a7445); 67 since MCPs/execution-served-demure,
     # the served lane that reads demure's provisioning as the stack host
@@ -199,7 +200,7 @@ def test_a_deployed_lane_step_runs_last_and_only_for_the_deployed_project() -> N
         if any(step["argv"][4:] == ("deployed-lane",) for step in steps)
     }
 
-    assert sorted(marking) == ["MCPs/execution-deployed-diphtheria"]
+    assert sorted(marking) == ["MCPs/execution-deployed-demure"]
     for steps in marking.values():
         assert [step["phase"] for step in steps] == ["install", "workspace-build", "deployed-lane"]
 
