@@ -47,8 +47,8 @@ MAX_COMMAND_CHARS = 4000
 
 #: The ssh options every remote call carries. ``BatchMode`` turns a prompt
 #: into a failure instead of a wait. The other three bound the ROUTE, which
-#: is selected by the workspace's SSH alias. Its ProxyJump points through
-#: Loki's university VPN; no jump host is hardcoded in this module.
+#: is selected by the workspace's SSH alias, including any ProxyJump.
+#: Direct VPN connections and jump hosts are configured outside this module.
 #: ``ConnectTimeout`` bounds the TCP connect and the banner exchange,
 #: and ``ServerAliveInterval`` with ``ServerAliveCountMax`` ends a session
 #: whose far side stops answering after four unanswered 15-second probes. A
