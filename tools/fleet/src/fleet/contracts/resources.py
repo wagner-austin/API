@@ -192,6 +192,37 @@ def fleet_wide(names: tuple[str, ...], *, node_local: tuple[str, ...]) -> tuple[
     return tuple(name for name in names if name not in node_local)
 
 
+#: Begins the name a lease holds a companion directory under.
+COMPANION_PREFIX = "companion:"
+
+
+def companion_names(directories: tuple[str, ...], *, node: str) -> tuple[str, ...]:
+    """Name the companion directories a dispatch to one node holds while it runs.
+
+    A COMPANION IS ONE DIRECTORY PER NODE, REPLACED BY EVERY RUN THAT STAGES
+    IT (:func:`fleet.core.names.companion_directory`), so two runs on one node
+    that stage the same companion cannot overlap: the second one's staging
+    deletes and rewrites the tree the first one's check is reading. On loki,
+    NixOS 26.05, on 2026-10-26 (MCPs board task c2e3f31f), corvis-stick's run
+    began at 22:36:18Z and Dashboards' at 22:36:24Z, both staging the MCPs
+    companion, and corvis-stick's check, from 22:37:02Z to 22:37:37Z, failed
+    lint and twelve cases with ``fatal: not a git repository:
+    '/home/corvis/fleet/stage/MCPs/.git'`` while Dashboards rewrote it (fleet
+    job ef321996). So each directory is held as that node's own copy, as a
+    node-local resource is, and is contended only by a run on the same node.
+
+    Args:
+        directories: The companions' declared directory names.
+        node: The workspace name of the node the dispatch goes to.
+
+    Returns:
+        ``companion:<directory>@<node>`` for each, in declaration order.
+    """
+    return tuple(
+        f"{COMPANION_PREFIX}{directory}{NODE_SCOPE_SEPARATOR}{node}" for directory in directories
+    )
+
+
 def contended(held: tuple[str, ...], wanted: tuple[str, ...]) -> tuple[str, ...]:
     """Name the resources a would-be holder cannot have.
 
@@ -209,7 +240,9 @@ def contended(held: tuple[str, ...], wanted: tuple[str, ...]) -> tuple[str, ...]
 
 
 __all__ = [
+    "COMPANION_PREFIX",
     "NODE_SCOPE_SEPARATOR",
+    "companion_names",
     "contended",
     "decode_held_names",
     "decode_names",

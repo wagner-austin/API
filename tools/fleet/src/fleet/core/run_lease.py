@@ -39,7 +39,7 @@ from collections.abc import Mapping
 from fleet.contracts.feed import FeedEvent, FeedKind
 from fleet.contracts.lease import Lease
 from fleet.contracts.project import ProjectConfig, lease_seconds
-from fleet.contracts.resources import scoped
+from fleet.contracts.resources import companion_names, scoped
 from fleet.core import _test_hooks, leases, records, retire_owed
 
 #: How much longer than its estimate a dispatch may hold its lease.
@@ -121,7 +121,31 @@ def open_lease(
         session_id=session_id,
         acquired_unix=now_unix,
         expires_unix=now_unix + lease_seconds(plan, slack=LEASE_SLACK),
-        resources=scoped(plan["exclusive_resources"], node=node, node_local=node_local),
+        resources=held_names(plan, node=node, node_local=node_local),
+    )
+
+
+def held_names(plan: ProjectConfig, *, node: str, node_local: tuple[str, ...]) -> tuple[str, ...]:
+    """Name everything a dispatch of one project to one node holds while it runs.
+
+    The resources it declares, each at its scope, then the companion
+    directories it stages there (:func:`fleet.contracts.resources.companion_names`),
+    so the lease and the runner's question before it claims ask about the same
+    names.
+
+    Args:
+        plan: The project.
+        node: The workspace name of the node it is dispatched to.
+        node_local: The workspace's node-local resource names.
+
+    Returns:
+        The declared names, then one per companion; no companion names for a
+        project with no source or no companions.
+    """
+    source = plan["source"]
+    directories = () if source is None else tuple(c["directory"] for c in source["companions"])
+    return scoped(plan["exclusive_resources"], node=node, node_local=node_local) + companion_names(
+        directories, node=node
     )
 
 
@@ -139,10 +163,11 @@ def held_on_node(
     node runs several jobs at once, the projects it fits by capacity include
     one already running on it, whose lease :func:`take` refuses
     ``LEASE_HELD``, and every testdb project while one testdb suite runs
-    there, since each declares the node's own ``corvis-fleet-testdb``
-    (``RESOURCE_HELD``). A claimed job refused for either is closed for good,
-    so the runner leaves these out of the projects it hands the queue, and
-    the job waits for another node or a later tick instead.
+    there, since each declares the node's own ``corvis-fleet-testdb``, as
+    every project staging a companion is while another run there stages the
+    same one (both ``RESOURCE_HELD``). A claimed job refused for either is
+    closed for good, so the runner leaves these out of the projects it hands
+    the queue, and the job waits for another node or a later tick instead.
 
     The same two questions :func:`fleet.core.leases.acquire` asks, through
     the same functions, so this answer and the refusal cannot disagree.
@@ -164,7 +189,7 @@ def held_on_node(
         if leases.find_holder(leases_path, node=node, project=name, now_unix=now_unix) is not None
         or leases.contended_by(
             leases_path,
-            wanted=scoped(projects[name]["exclusive_resources"], node=node, node_local=node_local),
+            wanted=held_names(projects[name], node=node, node_local=node_local),
             now_unix=now_unix,
         )
         is not None
@@ -322,6 +347,7 @@ __all__ = [
     "LEASE_SLACK",
     "abandon",
     "emit",
+    "held_names",
     "held_on_node",
     "open_lease",
     "run_id_for",

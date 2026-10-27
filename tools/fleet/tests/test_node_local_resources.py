@@ -6,6 +6,10 @@ the day lavender-wsl became the second, every testdb job lavender-wsl claimed
 while diphtheria ran one was closed ``RESOURCE_HELD ... held fleet-wide``. The
 cases here hold the new distinction both ways: two nodes' copies never
 contend, one node's copy still does, and a fleet-wide name is untouched.
+
+A companion directory is one more thing each node holds one copy of, staged
+by every run that declares it (MCPs board task c2e3f31f): its cases hold that
+two such runs never share one node at once and still share the fleet.
 """
 
 from __future__ import annotations
@@ -18,13 +22,16 @@ from platform_core.json_utils import JSONObject, JSONTypeError
 
 from fleet.cli import _config, run
 from fleet.contracts.lease import Lease
+from fleet.contracts.project import ProjectConfig
 from fleet.contracts.resources import (
+    companion_names,
     decode_held_names,
     decode_names,
     encode_names,
     fleet_wide,
     scoped,
 )
+from fleet.contracts.source import ProjectCompanion, ProjectSource
 from fleet.contracts.workspace import (
     decode_fleet_workspace,
     encode_fleet_workspace,
@@ -235,3 +242,108 @@ class TestTheWorkspace:
         misspelt = _document(node_local=("corvis-fleet-testbd",), exclusive=(TESTDB,))
         with pytest.raises(JSONTypeError, match="names 'corvis-fleet-testbd', which no project"):
             decode_fleet_workspace(misspelt)
+
+
+def _staging(directories: tuple[str, ...], *, exclusive: tuple[str, ...] = ()) -> ProjectConfig:
+    """A project whose check reads these companions beside its export.
+
+    Args:
+        directories: The companions' directory names.
+        exclusive: The resources it declares.
+
+    Returns:
+        The project.
+    """
+    return ProjectConfig(
+        worker_ram_gb=1.0,
+        minimum_workers=2,
+        expected_minutes=30,
+        exclusive_resources=exclusive,
+        external_paths=(),
+        required_tags=(),
+        source=ProjectSource(
+            remote="https://github.com/wagner-austin/corvis-stick.git",
+            path="",
+            install=(),
+            companions=tuple(
+                ProjectCompanion(
+                    remote="https://github.com/wagner-austin/MCPs.git", ref="main", directory=name
+                )
+                for name in directories
+            ),
+        ),
+        node=None,
+        loopback_only=False,
+    )
+
+
+class TestCompanions:
+    def test_each_companion_is_held_as_that_node_s_copy(self) -> None:
+        assert companion_names(("MCPs", "API"), node="loki") == (
+            "companion:MCPs@loki",
+            "companion:API@loki",
+        )
+
+    def test_a_dispatch_holds_its_declared_names_then_its_companions(self) -> None:
+        plan = _staging(("MCPs",), exclusive=(TESTDB, SHARED))
+        assert run_lease.held_names(plan, node="loki", node_local=(TESTDB,)) == (
+            "corvis-fleet-testdb@loki",
+            SHARED,
+            "companion:MCPs@loki",
+        )
+
+    def test_a_source_with_no_companions_holds_only_its_declared_names(self) -> None:
+        plan = _staging((), exclusive=(SHARED,))
+        assert run_lease.held_names(plan, node="loki", node_local=()) == (SHARED,)
+
+    def test_a_run_staging_a_companion_keeps_another_off_its_node_alone(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """THE RACE, fleet job ef321996 on loki: Dashboards staged the MCPs
+        companion while corvis-stick's check read it. With corvis-stick
+        holding it, loki's runner leaves Dashboards out and takes a project
+        staging none, and lavender takes Dashboards."""
+        path = tmp_path / "leases.json"
+        projects = {
+            "corvis-stick": _staging(("MCPs",)),
+            "Dashboards": _staging(("MCPs", "API")),
+            "tree-bot": _staging(()),
+        }
+        held = run_lease.held_names(projects["corvis-stick"], node="loki", node_local=())
+        leases.acquire(
+            path,
+            _lease(node="loki", resources=held, run_id="a", project="corvis-stick"),
+            now_unix=DEMO_NOW,
+        )
+
+        def ask(node: str) -> tuple[str, ...]:
+            return run_lease.held_on_node(
+                path, node=node, names=("Dashboards", "tree-bot"), projects=projects, node_local=()
+            )
+
+        _test_hooks.now = FakeClock(DEMO_NOW)
+        assert (ask("loki"), ask("lavender")) == (("Dashboards",), ())
+
+    def test_a_second_run_on_the_node_is_refused_naming_the_companion(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        path = tmp_path / "leases.json"
+        first = run_lease.held_names(_staging(("MCPs",)), node="loki", node_local=())
+        leases.acquire(
+            path,
+            _lease(node="loki", resources=first, run_id="a", project="corvis-stick"),
+            now_unix=DEMO_NOW,
+        )
+        second = run_lease.held_names(_staging(("MCPs", "API")), node="loki", node_local=())
+        with pytest.raises(AppError) as refusal:
+            leases.acquire(
+                path,
+                _lease(node="loki", resources=second, run_id="b", project="Dashboards"),
+                now_unix=DEMO_NOW,
+            )
+        assert refusal.value.code is FleetErrorCode.RESOURCE_HELD
+        assert refusal.value.message == (
+            "cannot dispatch: companion:MCPs@loki is held on loki by opus-fleet-0929 "
+            "(run a, corvis-stick on loki, session s), 600s remaining; "
+            "each node runs its own copy, so another node carrying one is an alternative"
+        )
