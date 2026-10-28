@@ -28,13 +28,18 @@ SSH authentication can submit remotely through these maintained commands:
 | Admitted validation on frozen WRDS data | `scripts.research_proposals submit` | HPC3 Slurm; policy journal, shared HPC ledger and measured RunRecord |
 | Other registered HPC3 experiments | `hpc3.cli.submit` | HPC3 Slurm; shared HPC ledger and project artifacts |
 | WRDS extraction or Python experiment | `hpc3.cli.wrds submit` | WRDS Grid Engine; attempt receipt, WRDS ledger and verified outputs |
+| Prepared HPC3 or WRDS research request | Corvis `dispatch_submit` with `command: "research"` | Shared fleet queue; frozen specification reference, native controller and verified result digest |
 | Fleet checks, lint, tests or base-image builds | Corvis `dispatch_submit` | Fleet dispatch queue; commit-bound checks or hub build |
 
-**Research jobs are not accepted by `dispatch_submit`.** Its command set is
-`check`, `lint`, `test`, and `build-bases`; it has no research payload field.
-An agent limited to that MCP tool needs access to a controller session to use
-the cluster commands. The board coordinates ownership and receives evidence;
-posting a task does not itself submit a cluster job.
+**Prepared research requests use the existing `dispatch_submit` tool.** Name
+`command: "research"`, project `research/hpc3` or `research/wrds`, controller
+node `ziggurat`, an owning board `taskId`, and
+`researchRequest: {backend, specSha256, attempt}`. The hash resolves a private,
+tenant-bound specification on the installed controller; the queue accepts no
+shell command or data payload. Repeating a reference returns its original
+receipt, including after completion. See [fleet's research configuration](../fleet/README.md#research-queue-polling)
+for preparation, pinned inputs, resource controls and recovery. Posting a board
+task alone does not submit a cluster job.
 
 For the installed validation study, inspect the existing journal first:
 
@@ -54,11 +59,14 @@ directory before submitting. Reconcile a submitted attempt until terminal;
 do not submit it again after a disconnect. A completed attempt can be remeasured
 with `execution_inspect` without creating another trial.
 
-There is no unattended research queue consumer or reconciliation daemon in this
-controller. An agent must invoke reconciliation; the native scheduler keeps
-accepted jobs running after the agent disconnects. WRDS uses its separate
-`status`, held-job `resume`, `collect` and `report` lifecycle below. SSH sessions
-can expire and require renewed authentication before another control operation.
+The scheduled `fleet-research` worker invokes these same native commands for
+shared-queue requests and records terminal results on the owning board task.
+Direct CLI submissions still require explicit reconciliation unless a prepared
+queue request adopts them. The native scheduler keeps accepted jobs running
+after the agent disconnects. WRDS retains its `status`, held-job `resume`,
+`collect` and `report` lifecycle below. SSH sessions can expire and require
+renewed authentication before another control operation; an uncertain control
+operation preserves the receipt for reconciliation instead of submitting again.
 
 ### WRDS repeatable experiments
 
