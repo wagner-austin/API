@@ -425,6 +425,52 @@ from covenant_ml.ensemble import optimize_regression_ensemble_weights
 
 Optimizes model weights on out-of-fold predictions. Supports three metrics: `neg_rmse`, `neg_mae`, `r_squared`.
 
+## WRDS extract evaluation
+
+The existing paired benchmark also accepts `--wrds-manifest extract.json`
+instead of `--csv bankruptcy.csv`. It uses the same ClearGBM, LightGBM and
+XGBoost trainers, paired comparisons, benchmark manifest and shared RunRecord.
+Run the evaluation inside the registered HPC3 image through `tools/hpc3`;
+WRDS can materialize the source extract separately. The adapter does not
+download a dataset or execute SQL.
+
+The manifest sits beside a UTF-8 CSV with exactly `permno,date,ret` and the
+exact SQL used to obtain it. It declares these required fields:
+
+| Field | Meaning |
+| --- | --- |
+| `source_table` | `crsp.dsf` or `crsp_a_stock.dsf` |
+| `security_id` | One positive CRSP PERMNO, shared by every row |
+| `extracted_at` | UTC timestamp of extraction |
+| `csv_file`, `csv_sha256` | Sibling CSV filename and SHA256 of its exact bytes |
+| `query_file`, `query_sha256` | Sibling SQL filename and SHA256 of its exact bytes |
+| `train_fraction`, `validation_fraction` | Positive chronological shares with sum below one |
+| `embargo` | At least one observation excluded after training and validation |
+
+Both evidence files are verified before fitting. Rows must have strictly
+increasing dates before extraction, one security and finite nonmissing
+returns no smaller than -1. Missing observations are never imputed. The
+dataset identity covers the complete manifest, including evidence hashes and
+split settings; preserve and stage all three files together.
+
+```bash
+python -m scripts.benchmark_paired_evaluation \
+  --wrds-manifest /private/extract/extract.json \
+  --seeds 42 43 --trees 100 --max-depth 4 --max-bins 64 --num-leaves 15 \
+  --reference lightgbm --unit block --block-length 20 \
+  --n-resamples 2000 --resample-seed 7 --confidence 0.95 \
+  --true-alert-value 1 --false-alert-cost 1 --missed-cost 0 \
+  --out /private/results/paired.json
+```
+
+This first diagnostic uses the current observed return as one feature and
+the next observed return's positive sign as its label. It requires time-block
+inference and uses `ChronologicalGroupedSplits`; it does not select a universe,
+tune a trading strategy, incorporate delisting returns, or establish historical
+vendor availability. A next observed date need not be the next exchange session.
+The alert utility is the declared classification payoff, not trading profit.
+Synthetic fixtures verify the integration without asserting market performance.
+
 ## Testing
 
 ```python
