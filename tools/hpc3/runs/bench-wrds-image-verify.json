@@ -1,0 +1,21 @@
+{
+  "project": "cleargbm",
+  "name": "wrds-image-verify-2a50e93ca",
+  "command": "bash -c 'python /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/checked-selfcheck.py && python -m pip check'",
+  "artifact": null,
+  "experiment": {
+    "kind": "image-verification",
+    "spec_commit": "f9d66a2b1c122864bb432a27b4dc4417a7a1fd13",
+    "selfcheck_sha256": "9db790abc4b8fb0bedaeb7c132276635a4806188bf18706479792ef66c108efb"
+  },
+  "cpus": 2,
+  "mem_gb": 4,
+  "minutes": 10,
+  "image": {
+    "path": "/pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif",
+    "sha256": "f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  }
+}

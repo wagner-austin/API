@@ -1,0 +1,21 @@
+{
+  "destination": "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts",
+  "files": [
+    {
+      "name": "__init__.py",
+      "sha256": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+      "size_bytes": 37
+    },
+    {
+      "name": "benchmark_paired_evaluation.py",
+      "sha256": "4ff3b990d6475ad549cf8a874d6c9b65fb20f00352eb8431ac313a9ed3796ace",
+      "size_bytes": 6214
+    }
+  ],
+  "provenance": {
+    "source_commit": "2a50e93ca06fcc82896c143a37ee247187cd2b12",
+    "source_archive_sha256": "02e542cdfc0909cda9a228bf6cf535397e8c395502619979bb4b5defade3d2d8",
+    "data_kind": "synthetic integration fixture; no WRDS query executed",
+    "board_task": "eadd19d5-6d5e-4c05-a8fe-1867337fdbef"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "destination": "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/inputs",
+  "files": [
+    {
+      "name": "extract.sql",
+      "sha256": "a6fb659e1eaba0e13c60a173489083342b3cc1c652060e60fdfd94ec81d4e1ff",
+      "size_bytes": 72
+    },
+    {
+      "name": "synthetic.csv",
+      "sha256": "d6e5df0ce304fe86bbedda78bf49d2a8ca4f848ce9ef0287f696b6e14cfb5090",
+      "size_bytes": 3582
+    },
+    {
+      "name": "synthetic.json",
+      "sha256": "b20bd4daf4c33485b5ac1789b61b746f0c684e4b745e8c7f09527beb3d04c30b",
+      "size_bytes": 365
+    }
+  ],
+  "provenance": {
+    "source_commit": "2a50e93ca06fcc82896c143a37ee247187cd2b12",
+    "source_archive_sha256": "02e542cdfc0909cda9a228bf6cf535397e8c395502619979bb4b5defade3d2d8",
+    "data_kind": "synthetic integration fixture; no WRDS query executed",
+    "board_task": "eadd19d5-6d5e-4c05-a8fe-1867337fdbef"
+  }
+}

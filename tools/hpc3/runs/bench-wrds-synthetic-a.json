@@ -1,0 +1,23 @@
+{
+  "project": "cleargbm",
+  "name": "wrds-synthetic-2a50e93ca-a",
+  "command": "bash -c 'cd /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint && python -m scripts.benchmark_paired_evaluation --wrds-manifest /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/inputs/synthetic.json --seeds 42 43 --trees 10 --max-depth 3 --max-bins 16 --num-leaves 7 --reference lightgbm --unit block --block-length 3 --n-resamples 200 --resample-seed 7 --confidence 0.95 --true-alert-value 1 --false-alert-cost 1 --missed-cost 0 --out /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/results/paired-a.json'",
+  "artifact": "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/results/paired-a.json",
+  "experiment": {
+    "data": "synthetic-only",
+    "manifest_sha256": "b20bd4daf4c33485b5ac1789b61b746f0c684e4b745e8c7f09527beb3d04c30b",
+    "source_commit": "2a50e93ca06fcc82896c143a37ee247187cd2b12",
+    "repetition": "a",
+    "seeds": "42,43"
+  },
+  "cpus": 2,
+  "mem_gb": 4,
+  "minutes": 10,
+  "image": {
+    "path": "/pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif",
+    "sha256": "f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  }
+}
