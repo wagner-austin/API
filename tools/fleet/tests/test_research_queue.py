@@ -60,8 +60,7 @@ def test_native_tick_records_only_verified_outcomes_and_releases_resources(
         assert "private transport details" not in dump_json_str(reported)
     assert leases.read_leases(path) == ()
     assert runner.timeouts == [120, research_queue.CONTROL_TIMEOUT_SECONDS]
-    assert runner.stdin[0] is not None
-    assert b"fleet.cli.research_native" in runner.stdin[0]
+    assert runner.stdin[0] is not None and b"fleet.cli.research_native" in runner.stdin[0]
     assert b"--attempt pilot" in runner.stdin[0]
 
 
@@ -172,8 +171,7 @@ def test_full_lane_polls_oldest_renewal_without_claiming_more(tmp_path: pathlib.
         [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
     )
     result = research_queue.tick(QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), tmp_path / "leases")
-    assert result is not None
-    assert result["job_id"] == "job-0"
+    assert result == decode_job(rows[0], answer="")
     assert endpoint.tools == ["dispatch_list", "dispatch_report"]
 
 
@@ -189,8 +187,7 @@ def test_reclaimed_row_is_polled_once_with_its_existing_run_identity(
         [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
     )
     result = research_queue.tick(QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), tmp_path / "leases")
-    assert result is not None
-    assert result["run_id"] == "saved"
+    assert result == decode_job(row, answer="")
     assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
 
 
