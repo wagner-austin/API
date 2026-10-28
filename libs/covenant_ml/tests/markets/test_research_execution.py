@@ -5,7 +5,7 @@ from collections.abc import Generator
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject, require_dict
+from platform_core.json_utils import JSONObject, dump_json_str, require_dict
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.campaign_process import run_command
@@ -15,7 +15,7 @@ from covenant_ml.markets.research_cluster import (
     prepare_bundle,
 )
 from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
-from covenant_ml.markets.research_journal import research_journal
+from covenant_ml.markets.research_journal import admit_proposal, research_journal
 from covenant_ml.markets.research_trial_records import decode_research_trial, encode_research_trial
 from covenant_ml.markets.validation import read_document
 
@@ -95,6 +95,31 @@ def test_altered_admission_is_refused_before_transport(tmp_path: Path, change: J
     with pytest.raises(ValueError, match="differs from admission"):
         submit_attempt(path, decode_research_trial(document), cluster, directory)
     assert not directory.exists()
+
+
+def test_reordered_json_preserves_raw_admission_and_executes(tmp_path: Path) -> None:
+    _path, trial, cluster, directory = setup(tmp_path)
+    proposal = require_dict(encode_research_trial(trial), "proposal")
+    config = require_dict(proposal, "config")
+    proposal["config"] = dict(reversed(tuple(config.items())))
+    reordered: JSONObject = dict(reversed(tuple(proposal.items())))
+    path = tmp_path / "reordered.sqlite"
+    journal = research_journal(trial["policy"])
+    journal.initialize(path)
+    admitted = admit_proposal(path, trial["policy"], reordered, 0)
+    assert admitted["status"] == "admitted"
+    assert admitted["request"] == dump_json_str(reordered)
+    scheduler = Scheduler(trial)
+    _test_hooks.campaign_runner = scheduler
+    assert submit_attempt(path, trial, cluster, directory)["job_id"] == "123"
+    row = reconcile_attempt(path, trial, cluster, directory)
+    assert (row["status"], row["job_id"], row["request"]) == (
+        "complete",
+        "123",
+        admitted["request"],
+    )
+    assert journal.read(path) == (row,)
+    assert len(scheduler.calls) == 3
 
 
 @pytest.mark.parametrize("field", ["job_id", "experiment", "artifact", "image_digest"])

@@ -5,11 +5,19 @@ from __future__ import annotations
 from hashlib import sha256
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_str
+from platform_core.json_utils import (
+    JSONObject,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_str,
+)
 
 from . import _test_hooks
 from .research_cluster import ResearchCluster, attempt_identity, prepare_bundle
 from .research_journal import ResearchAttempt, research_journal
+from .research_records import decode_research_proposal
 from .research_trial_records import ResearchTrial, encode_research_trial
 from .validation import parse_timestamp, read_document
 
@@ -36,7 +44,7 @@ def _event(path: Path, trial: ResearchTrial, action: str, extra: JSONObject) -> 
 
 
 def _require_trial(path: Path, trial: ResearchTrial) -> ResearchAttempt:
-    """Require exact admitted proposal bytes before any external operation.
+    """Require the admitted proposal's typed values before any external operation.
 
     Args:
         path: Admission journal.
@@ -50,8 +58,10 @@ def _require_trial(path: Path, trial: ResearchTrial) -> ResearchAttempt:
     """
     rows = research_journal(trial["policy"]).read(path)
     number = trial["number"]
-    if number > len(rows) or rows[number - 1]["request"] != dump_json_str(
-        encode_research_trial(trial)["proposal"]
+    if (
+        number > len(rows)
+        or decode_research_proposal(narrow_json_to_dict(load_json_str(rows[number - 1]["request"])))
+        != trial["proposal"]
     ):
         raise ValueError("RESEARCH_EXECUTION_REQUEST: request differs from admission")
     return rows[number - 1]
