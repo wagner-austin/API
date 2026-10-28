@@ -11,6 +11,8 @@ from __future__ import annotations
 import pathlib
 import subprocess
 
+import pytest
+
 from hpc3.core.image_exec import APPTAINER_MODULE
 from hpc3.core.image_layout import SELFCHECK_NAME, SPEC_DIR
 from hpc3.core.image_sbatch import (
@@ -47,6 +49,17 @@ def _render(smoke_commands: list[str] | None = None) -> str:
         env_prefix="/opt/env",
         smoke_commands=[] if smoke_commands is None else smoke_commands,
     )
+
+
+def _scratch_script() -> str:
+    """Execute the renderer's scratch setup separately from cluster modules."""
+    lines = [
+        line
+        for line in _render().splitlines()
+        if line.startswith((': "${TMPDIR:', "export APPTAINER_"))
+    ]
+    assert len(lines) == 3
+    return "\n".join([*lines, 'printf "%s\\n" "$APPTAINER_CACHEDIR" "$APPTAINER_TMPDIR"'])
 
 
 class TestThePreemptionGuard:
@@ -86,8 +99,32 @@ class TestTheEnvironment:
         # as though the build were broken rather than the disk.
         rendered = _render()
 
-        assert f"export APPTAINER_CACHEDIR={CACHE_DIR}" in rendered
-        assert f"export APPTAINER_TMPDIR={TMP_DIR}" in rendered
+        assert f'export APPTAINER_CACHEDIR="{CACHE_DIR}"' in rendered
+        assert f'export APPTAINER_TMPDIR="{TMP_DIR}"' in rendered
+
+    def test_scratch_paths_expand_on_the_node_and_preserve_spaces(self) -> None:
+        result = subprocess.run(
+            [posix_bash(), "-c", _scratch_script()],
+            env={"TMPDIR": "/tmp/slurm job/123"},
+            capture_output=True,
+            check=True,
+        )
+        assert result.stdout.decode("utf-8").splitlines() == [
+            "/tmp/slurm job/123/apptainer-cache",
+            "/tmp/slurm job/123/apptainer-tmp",
+        ]
+
+    @pytest.mark.parametrize("environment", [{}, {"TMPDIR": ""}])
+    def test_missing_node_scratch_stops_before_exporting(self, environment: dict[str, str]) -> None:
+        result = subprocess.run(
+            [posix_bash(), "-c", _scratch_script()],
+            env=environment,
+            capture_output=True,
+            check=False,
+        )
+        assert result.returncode != 0
+        assert result.stdout == b""
+        assert "HPC3_NODE_SCRATCH_MISSING" in result.stderr.decode("utf-8")
 
     def test_it_probes_outbound_access_before_building(self) -> None:
         rendered = _render()
