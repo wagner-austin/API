@@ -101,7 +101,9 @@ def test_download_returns_the_verified_text(fake_run: FakeRun) -> None:
     digest = hashlib.sha256(text.encode()).hexdigest()
     fake_run.add("cat --", stdout=text)
     fake_run.add("sha256sum", stdout=f"{digest}  /home/uci/test/out.csv\n")
-    assert artifacts.download("wrds", "/home/uci/test/out.csv") == {"text": text, "sha256": digest}
+    assert artifacts.download("wrds", "/home/uci/test/out.csv") == artifacts.Artifact(
+        text=text, sha256=digest
+    )
 
 
 def test_download_refuses_a_text_that_differs_from_the_remote_file(fake_run: FakeRun) -> None:
