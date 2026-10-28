@@ -11,14 +11,18 @@ source_paths:
   - "libs/platform_core/src/platform_core/event_journal.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_execution.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "fbc3a9a59bea4e8025d4064e179fdb0dbf418e53"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4e4740d246c440f85c1a5ab12e89f383c5a56cab"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "d48ddb10eae0c3934d5117e8b9c0a9a92877c298"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "610bd9cfcabecbd8a028411a538d018f2dd39091"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
 provenance:
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
@@ -31,9 +35,9 @@ confidence: medium
 The implementation path is a bounded extension: Corvis owns task claims and review;
 the research libraries own evaluation rules and evidence; WRDS and HPC3 own jobs.
 There is no evidence here requiring a replacement coordinator or a second research
-framework. Frozen proposal admission and durable attempt recording are implemented
-in the existing libraries. The monthly study, scheduler adapter and restricted
-holdout identity below remain integration work.[^request][^admission]
+framework. Frozen proposal admission, durable attempt recording and HPC3 submission
+and reconciliation are implemented in the existing libraries. The monthly study
+and restricted holdout identity below remain integration work.[^request][^admission][^execution]
 
 ## What is already reusable
 
@@ -90,9 +94,15 @@ binds the frozen policy to `platform_core.event_journal`, lifted from the existi
 execution rehearsal and used by both consumers. Raw object proposals are recorded
 before decoding. Policy refusals remain visible, and admitted candidate/seed pairs
 stay consumed after failure. The lifecycle records submission intent, unique job
-identity and an identity-checked shared RunRecord; this does not yet independently
-attest a real scheduler execution. `scripts.research_proposals` exposes init,
-propose and status operations. This control layer refuses final-partition proposals
+identity and an identity-checked shared RunRecord. `scripts.research_proposals`
+exposes init, propose, status, submit and reconcile operations. Submission uses the
+maintained cluster staging and job commands; reconciliation requires native Slurm
+accounting and verified results through the cluster evidence command. Transport
+ambiguity remains unresolved until exactly one matching ledger row is found; no
+automatic resubmission is allowed. The validation worker reuses the existing
+trainers, metrics and RunRecord publisher, with early stopping drawn from training.
+These are provenance checks over owner-writable evidence, not protection against
+an adversary controlling the account.[^execution] This control layer refuses final-partition proposals
 but does not implement filesystem isolation or the substantive monthly evaluator.
 The CLI's policy is evaluator-owned configuration, not a field agents may replace
 in a proposal.[^admission]
@@ -112,3 +122,4 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
 [^records]: `libs/platform_core/src/platform_core/run_record.py:309` `agree_across_runs`.
 [^admission]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py` frozen contracts; `libs/covenant_ml/src/covenant_ml/markets/research_journal.py` admission and lifecycle reducers; `libs/platform_core/src/platform_core/event_journal.py` transactional persistence; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 399048d8-b1d6-4e12-a4d3-a0ce2281c810.
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/research_execution.py` submission and reconciliation; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py` validation diagnostic; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", execution settings and limitations. Board task 6d2d086c-5242-482b-ac81-8a61dd8e354d.
