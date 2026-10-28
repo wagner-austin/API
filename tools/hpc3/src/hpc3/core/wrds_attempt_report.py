@@ -67,7 +67,7 @@ def _identity_lines(run: WrdsRun, attempt: str, identifier: str) -> list[str]:
     ]
 
 
-def render(run: WrdsRun, attempt: str) -> str:
+def measure(run: WrdsRun, attempt: str) -> tuple[str, str | None]:
     """Measure one attempt on WRDS and render its report.
 
     Args:
@@ -75,7 +75,7 @@ def render(run: WrdsRun, attempt: str) -> str:
         attempt: Attempt label.
 
     Returns:
-        One report, a line per measured fact.
+        Report text and the canonical completion digest, absent until completed.
 
     Raises:
         AppError: When WRDS cannot be reached or a remote read fails.
@@ -86,6 +86,7 @@ def render(run: WrdsRun, attempt: str) -> str:
     identifier = wrds_jobs.job_id(run, attempt)
     lines = _identity_lines(run, attempt, identifier)
     state = wrds_scheduler.status(run["host"], identifier)
+    completion_digest: str | None = None
     lines.append(f"scheduler state={state}")
     if state in {"completed", "failed"}:
         record = wrds_scheduler.accounting(run["host"], identifier)
@@ -95,6 +96,7 @@ def render(run: WrdsRun, attempt: str) -> str:
         )
     if state == "completed":
         result = wrds_results.attested_completion(run, attempt, identifier)
+        completion_digest = hashlib.sha256(dump_json_str(result).encode()).hexdigest()
         outputs = require_dict(result, "outputs")
         lines.extend(
             f"output {name} sha256={narrow_json_to_str(outputs[name])}" for name in run["outputs"]
@@ -105,7 +107,7 @@ def render(run: WrdsRun, attempt: str) -> str:
         lines.append("collect refused: " + wrds_results.not_complete(identifier, state))
         directory = wrds_jobs.attempt_directory(run, attempt)
         lines.append("completion.json " + completion_presence(run["host"], directory))
-    return "\n".join(lines)
+    return "\n".join(lines), completion_digest
 
 
-__all__ = ["completion_presence", "render"]
+__all__ = ["completion_presence", "measure"]

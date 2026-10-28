@@ -6,9 +6,10 @@ import hashlib
 import pathlib
 
 import pytest
+from platform_core.json_utils import dump_json_str, load_json_str
 
 from hpc3.contracts.wrds_run import run_identity
-from hpc3.core.wrds_attempt_report import completion_presence, render
+from hpc3.core.wrds_attempt_report import completion_presence, measure
 from hpc3.core.wrds_jobs import attempt_directory
 from hpc3.core.wrds_results import collect, verified_completion
 from tests.conftest import FakeRun
@@ -23,9 +24,13 @@ def test_completed_attempt_reports_what_collect_writes(tmp_path: pathlib.Path) -
     run, result = actual_result(tmp_path)
     transport = CopyTransport(tmp_path / "outputs")
     completed(transport, run, result)
-    lines = render(run, "one").splitlines()
+    body, completion_digest = measure(run, "one")
+    lines = body.splitlines()
     destination = tmp_path / "collected"
     collect(run, "one", destination, tmp_path / "ledger", NOW)
+    assert completion_digest == hashlib.sha256(
+        dump_json_str(load_json_str((destination / "completion.json").read_text())).encode()
+    ).hexdigest()
     metrics = hashlib.sha256((destination / "outputs/metrics.json").read_bytes()).hexdigest()
     record = hashlib.sha256((destination / "results.runrecord.json").read_bytes()).hexdigest()
     assert lines[0] == (
@@ -57,7 +62,9 @@ def test_failed_attempt_reports_the_refusal_and_a_missing_attestation(
     transport.add("qacct", stdout=FAILED)
     transport.add("test -e", stdout="absent\n")
     completed(transport, run, result)
-    lines = render(run, "one").splitlines()
+    body, digest = measure(run, "one")
+    assert digest is None
+    lines = body.splitlines()
     presence = transport.commands()[-1]
     assert lines[1] == "identity " + run_identity(run)
     assert lines[3] == "input numbers sha256=" + numbers
@@ -79,7 +86,9 @@ def test_active_attempt_has_no_accounting_yet(tmp_path: pathlib.Path) -> None:
     transport.add("qstat", stdout=HELD)
     transport.add("test -e", stdout="present\n")
     completed(transport, run, result)
-    lines = render(run, "one").splitlines()
+    body, digest = measure(run, "one")
+    assert digest is None
+    lines = body.splitlines()
     assert lines[-3:] == [
         "scheduler state=hqw",
         "collect refused: WRDS_NOT_COMPLETE: job 123 is hqw",
@@ -95,7 +104,7 @@ def test_completed_attempt_with_a_mismatched_attestation_fails_the_report(
     result["attempt"] = "other"
     completed(FakeRun(), run, result)
     with pytest.raises(ValueError, match="WRDS_RESULT_IDENTITY"):
-        render(run, "one")
+        measure(run, "one")
 
 
 def test_presence_refuses_an_unexpected_reply(fake_run: FakeRun) -> None:

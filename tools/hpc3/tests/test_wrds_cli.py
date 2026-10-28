@@ -14,7 +14,7 @@ from hpc3.cli import wrds
 from hpc3.cli._load_report import report_identity
 from hpc3.contracts.wrds_run import encode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks
-from hpc3.core.wrds_attempt_report import render
+from hpc3.core.wrds_attempt_report import measure
 from tests.conftest import FakeRun
 from tests.test_wrds_results import actual_result
 from tests.wrds_board import TASK, accepting_board
@@ -101,15 +101,17 @@ def test_report_posts_the_measured_attempt_as_the_task_identity(
     post = accepting_board(2)
     flags = ["--spec", str(spec), "--attempt", "one", "--report-task", TASK]
     assert wrds.main(["report", *flags]) == 0
+    body, digest = measure(run, "one")
     assert load_json_str(emitted[-1]) == {
         "report_task": TASK,
         "identity": run_identity(run),
         "attempt": "one",
+        "completion_sha256": digest,
     }
     note = sent_arguments(post.bodies[1])
     assert note["agent"] == report_identity(TASK, "wrds")["agent"]
     assert note["taskId"] == TASK
-    assert note["body"] == render(run, "one")
+    assert note["body"] == body
 
 
 def test_report_refuses_a_malformed_task_before_touching_wrds(tmp_path: pathlib.Path) -> None:

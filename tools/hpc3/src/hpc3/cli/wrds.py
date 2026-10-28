@@ -132,10 +132,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif action == "report":
         task_id = cli_args.require_flag(flags, "--report-task")
         report_identity(task_id, "wrds")  # refuses a malformed task before WRDS is queried
-        post_load_report(task_id, wrds_attempt_report.render(run, attempt), "wrds")
+        body, completion_digest = wrds_attempt_report.measure(run, attempt)
+        post_load_report(task_id, body, "wrds")
         _test_hooks.emit(
             dump_json_str(
-                {"report_task": task_id, "identity": run_identity(run), "attempt": attempt}
+                {
+                    "report_task": task_id,
+                    "identity": run_identity(run),
+                    "attempt": attempt,
+                    "completion_sha256": completion_digest,
+                }
             )
         )
     else:
