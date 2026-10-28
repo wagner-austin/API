@@ -111,6 +111,11 @@ class Verdict(TypedDict):
             other record held.
         log_path: The transcript's absolute path on the node.
         run_id: The fleet ledger's run id.
+        workers: The test workers the capacity check granted the run, from
+            its ledger row. A suite's parallelism is the one input a
+            total must not depend on, and until MCPs board task 022efecf
+            no record said what it was: packages/db's total changed with
+            it, and nothing on the thread could show two runs differed.
     """
 
     job_id: str
@@ -125,6 +130,7 @@ class Verdict(TypedDict):
     ended: str
     log_path: str
     run_id: str
+    workers: int
 
 
 def read_tests(tail: str) -> str:
@@ -232,6 +238,7 @@ def judge(
     ended_unix: int,
     log_path: str,
     run_id: str,
+    workers: int,
 ) -> Verdict:
     """Compose a verdict from a finished run and its transcript tail.
 
@@ -245,6 +252,7 @@ def judge(
         ended_unix: When the check ended, whole seconds since the epoch.
         log_path: The transcript's absolute path on the node.
         run_id: The fleet ledger's run id.
+        workers: The test workers its ledger row records it was granted.
 
     Returns:
         The verdict, with the counts read or marked unread.
@@ -263,6 +271,7 @@ def judge(
         ended=ended.strftime("%Y-%m-%dT%H:%M:%SZ"),
         log_path=log_path,
         run_id=run_id,
+        workers=workers,
     )
 
 
@@ -275,8 +284,10 @@ def render_verdict(verdict: Verdict) -> str:
     Returns:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
-        ended=<time> log=<node>:<path> run=<run id>``, one line, so a
-        closure can quote it and a reader can grep a thread for the prefix.
+        ended=<time> log=<node>:<path> run=<run id> workers=<n>``, one
+        line, so a closure can quote it and a reader can grep a thread for
+        the prefix. ``workers`` comes last, after every field the readers
+        in MCPs' maketools and session-audit match one by one.
     """
     return (
         f"{VERDICT_PREFIX} {verdict['job_id'][:8]} {verdict['project']} "
@@ -284,7 +295,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"banner={'yes' if verdict['banner'] else 'no'} tests={verdict['tests']} "
         f"coverage={verdict['coverage']} budget={verdict['budget']} "
         f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
-        f"run={verdict['run_id']}"
+        f"run={verdict['run_id']} workers={verdict['workers']}"
     )
 
 
