@@ -12,10 +12,10 @@ from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import load_json_str
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import _config
+from fleet.cli import _config, research_queue
 from fleet.contracts.dispatch import encode_job_line
 from fleet.contracts.research_worker import decode_worker
-from fleet.core import _test_hooks, queue, research_queue
+from fleet.core import _test_hooks, queue
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, "--agent", "--session", "--repo-root")
 

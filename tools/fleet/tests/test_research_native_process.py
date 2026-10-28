@@ -7,11 +7,12 @@ import pathlib
 import sys
 
 import pytest
-from platform_core.json_utils import dump_json_str, load_json_str
+from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict, require_int
 
+from fleet.cli import research_queue
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.research_worker import decode_worker, encode_worker
-from fleet.core import _test_hooks, research_queue
+from fleet.core import _test_hooks
 from tests._research_fixtures import research_job, worker
 from tests.test_research_hpc import _document, _row
 
@@ -64,4 +65,7 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
         assert "RESEARCH_CONTROLLER_PROCESS: exit 7" in result["stderr"]
     assert not (directory / "poll.lock").exists()
     transcript = (directory / "controller.jsonl").read_text()
-    assert f'"exit": {exit_code}' in transcript
+    assert [
+        require_int(narrow_json_to_dict(load_json_str(line)), "exit")
+        for line in transcript.splitlines()
+    ] == ([0, 0] if exit_code == 0 else [7])

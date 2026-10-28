@@ -252,6 +252,8 @@ class TestTheLanes:
             "netboot-announce",
             "node",
             "announce",
+            "research",
+            "research-announce",
         )
         assert [tick.require_lane(name) for name in names] == [
             tick.Lane.HUB,
@@ -262,6 +264,8 @@ class TestTheLanes:
             tick.Lane.NETBOOT_ANNOUNCE,
             tick.Lane.NODE,
             tick.Lane.ANNOUNCE,
+            tick.Lane.RESEARCH,
+            tick.Lane.RESEARCH_ANNOUNCE,
         ]
         assert all(type(tick.require_lane(name)) is tick.Lane for name in names)
         with pytest.raises(ValueError) as refused:
@@ -270,7 +274,8 @@ class TestTheLanes:
         # e705f08c), so a hub still naming one is refused by the word.
         assert str(refused.value) == (
             "FLEET_TICK_USAGE: --lane is one of ['hub', 'hub-announce', 'sessions', "
-            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce'], "
+            "'sessions-announce', 'netboot', 'netboot-announce', 'node', 'announce', "
+            "'research', 'research-announce'], "
             "not 'elevated'"
         )
 

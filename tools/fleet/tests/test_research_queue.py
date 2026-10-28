@@ -6,13 +6,14 @@ import pathlib
 import socket
 
 import pytest
-from platform_core.errors import AppError
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.errors import AppError, FleetErrorCode
+from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
+from fleet.cli import research_queue
 from fleet.contracts.dispatch import DispatchStatus, decode_job
 from fleet.contracts.lease import Lease
-from fleet.core import _test_hooks, leases, research_queue
+from fleet.core import _test_hooks, leases
 from tests._queue_fakes import QUEUE_CREDENTIALS, RUNNER_IDENTITY, FakeQueue
 from tests._research_fixtures import research_job, worker
 from tests.conftest import FakeRun, failed, ok
@@ -40,7 +41,7 @@ def test_native_tick_records_only_verified_outcomes_and_releases_resources(
     _test_hooks.run = runner
     path = tmp_path / "leases.json"
     if state == "malformed":
-        with pytest.raises(ValueError, match="Invalid state"):
+        with pytest.raises(JSONTypeError, match="Invalid state"):
             research_queue.reconcile(
                 QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), path, decode_job(row, answer="")
             )
@@ -139,7 +140,7 @@ def test_empty_queue_claims_only_research_and_handles_idle(
     tmp_path: pathlib.Path, claimed: bool
 ) -> None:
     row = research_job()
-    replies = [dump_json_str({"jobs": []}), dump_json_str({"job": row if claimed else None})]
+    replies = [dump_json_str({"jobs": []}), dump_json_str({"claimed": row if claimed else None})]
     if claimed:
         replies.extend([dump_json_str({"job": research_job(status="running")})] * 2)
     endpoint = FakeQueue(replies)
@@ -180,7 +181,11 @@ def test_reclaimed_row_is_polled_once_with_its_existing_run_identity(
 ) -> None:
     row = research_job(status="running", runId="saved")
     endpoint = FakeQueue(
-        [dump_json_str({"jobs": [row]}), dump_json_str({"job": row}), dump_json_str({"job": row})]
+        [
+            dump_json_str({"jobs": [row]}),
+            dump_json_str({"claimed": row}),
+            dump_json_str({"job": row}),
+        ]
     )
     _test_hooks.http_post = endpoint
     _test_hooks.run = FakeRun(
@@ -197,6 +202,7 @@ def test_real_queue_connection_failure_does_not_acquire_a_resource(tmp_path: pat
     port: int = listener.getsockname()[1]
     listener.close()
     credentials: McpCredentials = {**QUEUE_CREDENTIALS, "url": f"http://127.0.0.1:{port}/mcp"}
-    with pytest.raises(AppError, match="QUEUE_UNANSWERED"):
+    with pytest.raises(AppError) as raised:
         research_queue.tick(credentials, RUNNER_IDENTITY, worker(), tmp_path / "leases")
+    assert raised.value.code is FleetErrorCode.QUEUE_UNANSWERED
     assert not (tmp_path / "leases").exists()

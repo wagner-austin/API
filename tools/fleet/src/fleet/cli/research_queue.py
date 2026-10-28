@@ -13,6 +13,7 @@ import shlex
 from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, require_str
 from platform_core.mcp_client import McpCredentials
 
+from fleet.cli import job_close
 from fleet.contracts.dispatch import (
     ClosingStatus,
     DispatchCommand,
@@ -167,10 +168,10 @@ def reconcile(
                 identity=identity,
             )
         passed = observation["state"] is ResearchState.COMPLETE
-        return queue.report_close(
+        return job_close.close(
             credentials,
-            job_id=job["job_id"],
-            identity=identity,
+            job,
+            identity,
             status=ClosingStatus.PASSED if passed else ClosingStatus.FAILED,
             exit_code=0 if passed else 1,
             detail="Native controller outcome (adapter exit status): " + detail,

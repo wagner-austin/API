@@ -77,10 +77,11 @@ class TestCommandLine:
     def test_each_agent_names_its_module_and_nothing_else_is_accepted(self) -> None:
         assert rolled_cli.require_module("fleet-agent") == "fleet.cli.agent"
         assert rolled_cli.require_module("fleet-node-agent") == "fleet.cli.node_agent"
+        assert rolled_cli.require_module("fleet-research") == "fleet.cli.research"
         with pytest.raises(ValueError) as refused:
             rolled_cli.require_module("fleet-run")
         assert str(refused.value) == (
-            "FLEET_ROLL_USAGE: --agent is one of ['fleet-agent', 'fleet-node-agent']"
+            "FLEET_ROLL_USAGE: --agent is one of ['fleet-agent', 'fleet-node-agent', 'fleet-research']"
         )
 
 

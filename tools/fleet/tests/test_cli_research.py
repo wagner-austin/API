@@ -90,7 +90,7 @@ def test_queue_cli_announces_or_runs_one_tick(
     replies = (
         ["posted"]
         if announce
-        else [dump_json_str({"jobs": []}), dump_json_str({"job": row if active else None})]
+        else [dump_json_str({"jobs": []}), dump_json_str({"claimed": row if active else None})]
     )
     if active:
         replies.append(dump_json_str({"job": row}))
