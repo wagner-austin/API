@@ -68,7 +68,8 @@ def test_round_trip_and_exact_chronological_rows(tmp_path: Path) -> None:
     )
     np.testing.assert_array_equal(grouped.split.y_train, [(i % 7 - 3) > 0 for i in range(1, 96)])
     np.testing.assert_array_equal(
-        grouped.test_groups, np.arange(date(2020, 5, 8).toordinal(), date(2020, 6, 8).toordinal())
+        grouped.test_groups,
+        np.arange(date(2020, 5, 8).toordinal(), date(2020, 6, 8).toordinal(), dtype=np.int64),
     )
     assert loaded.info == {
         "sha256": hashlib.sha256(dump_json_str(document).encode()).hexdigest(),
