@@ -59,11 +59,15 @@ BUILD_TIME_LIMIT = "02:00:00"
 """Twice the ~25 minutes a torch+CUDA build takes, so a slow mirror does not
 kill a build that was working."""
 
-CACHE_DIR = "/pub/wagnera3/apptainer-cache"
-TMP_DIR = "/pub/wagnera3/apptainer-tmp"
-"""Apptainer's own defaults live under ``$HOME``, a 50 GB volume on HPC3 that
-a multi-gigabyte build fills -- failing as though the build were broken
-rather than the disk."""
+CACHE_DIR = "${TMPDIR}/apptainer-cache"
+TMP_DIR = "${TMPDIR}/apptainer-tmp"
+"""Shell paths expanded on the allocated node, after Slurm supplies TMPDIR.
+
+Unpacking an image creates many small files. Keeping those on BeeGFS made
+builds depend on shared metadata latency; using HOME instead fills its 50 GB
+quota. Slurm's job-local scratch owns this disposable work, while the final
+image and logs remain in the declared image directory.
+"""
 
 
 def _preamble(job_name: str, image_dir: str) -> list[str]:
@@ -95,8 +99,9 @@ def _preamble(job_name: str, image_dir: str) -> list[str]:
         f"module load {APPTAINER_MODULE}",
         'echo "apptainer $(command -v apptainer)"',
         "",
-        f"export APPTAINER_CACHEDIR={CACHE_DIR}",
-        f"export APPTAINER_TMPDIR={TMP_DIR}",
+        ': "${TMPDIR:?HPC3_NODE_SCRATCH_MISSING: Slurm must provide TMPDIR}"',
+        f'export APPTAINER_CACHEDIR="{CACHE_DIR}"',
+        f'export APPTAINER_TMPDIR="{TMP_DIR}"',
         "",
     ]
 
