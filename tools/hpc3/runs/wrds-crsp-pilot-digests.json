@@ -1,0 +1,11 @@
+{
+  "wrds_job": "40534563",
+  "attested_outputs_and_prepared_manifest": {
+    "data.csv": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+    "extract.sql": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+    "extraction.json": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+    "metrics.json": "91e1a8fcd92ce0f6ef6c8e8818a9f3b8cfa36ddbbc27f2232ba0f56f24ef4b81",
+    "evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+    "checksums.txt": "a27ed18d2730a52a589f402f201ff3e237d96bc4625f4ea6fc95c5aafb63eaea"
+  }
+}

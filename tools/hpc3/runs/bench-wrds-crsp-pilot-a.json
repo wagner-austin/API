@@ -1,0 +1,25 @@
+{
+  "project": "cleargbm",
+  "name": "wrds-crsp-14593-2019-2020-1028-a",
+  "command": "bash -c 'sha256sum -c /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/checksums.txt && cd /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint && python -m scripts.benchmark_paired_evaluation --wrds-manifest /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json --seeds 42 43 --trees 10 --max-depth 3 --max-bins 16 --num-leaves 7 --reference lightgbm --unit block --block-length 3 --n-resamples 200 --resample-seed 7 --confidence 0.95 --true-alert-value 1 --false-alert-cost 1 --missed-cost 0 --out /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-a.json'",
+  "artifact": "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-a.json",
+  "experiment": {
+    "data": "bounded-crsp-pilot",
+    "manifest_sha256": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+    "source_commit": "2a50e93ca06fcc82896c143a37ee247187cd2b12",
+    "repetition": "a",
+    "seeds": "42,43",
+    "wrds_job": "40534563",
+    "extractor_commit": "c32f389c35a9a6a720881ed7edd52d873a61a4b7"
+  },
+  "cpus": 2,
+  "mem_gb": 4,
+  "minutes": 10,
+  "image": {
+    "path": "/pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif",
+    "sha256": "f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b",
+    "binds": [
+      "/pub/wagnera3"
+    ]
+  }
+}

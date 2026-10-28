@@ -1,0 +1,37 @@
+{
+  "destination": "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs",
+  "files": [
+    {
+      "name": "data.csv",
+      "sha256": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+      "size_bytes": 13366
+    },
+    {
+      "name": "extract.sql",
+      "sha256": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+      "size_bytes": 322
+    },
+    {
+      "name": "extraction.json",
+      "sha256": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+      "size_bytes": 455
+    },
+    {
+      "name": "evaluation.json",
+      "sha256": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+      "size_bytes": 376
+    },
+    {
+      "name": "checksums.txt",
+      "sha256": "a27ed18d2730a52a589f402f201ff3e237d96bc4625f4ea6fc95c5aafb63eaea",
+      "size_bytes": 1003
+    }
+  ],
+  "provenance": {
+    "wrds_job": "40534563",
+    "wrds_identity": "b73297ea1872766a0fdb71c9f1843fab4082c5443812055d744a194f177a4d8e",
+    "source_table": "crsp_a_stock.dsf",
+    "extractor_commit": "c32f389c35a9a6a720881ed7edd52d873a61a4b7",
+    "board_task": "35895aac-1b12-4cf5-b868-516196914789"
+  }
+}
