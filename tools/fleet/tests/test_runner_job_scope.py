@@ -22,7 +22,12 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
-from fleet.core import runner_job_scope_render, runner_render, runner_tool_caches
+from fleet.core import (
+    runner_job_scope_render,
+    runner_render,
+    runner_tool_caches,
+    runner_workspace_unlock,
+)
 from fleet.core.runner_unit_files import render_drop_in_lines
 from tests._audit_rows import run_rows
 from tests._host_bash import host_bash
@@ -503,7 +508,10 @@ class TestTheRenderedPieces:
         lines = runner_job_scope_render.JOB_HOOK_SCRIPT.splitlines()
         assert runner_job_scope_render.JOB_HOOK_PATH.endswith(".sh")
         strict = lines.index("set -euo pipefail")
-        assert lines[strict + 1 : -1] == list(runner_tool_caches.HOOK_LINES)
+        assert lines[strict + 1 : -1] == [
+            *runner_tool_caches.HOOK_LINES,
+            *runner_workspace_unlock.UNLOCK_LINES,
+        ]
         assert lines[-1] == "exec sudo -n /usr/local/sbin/fleet-runner-job-scope"
 
     def test_sudo_admits_the_helper_with_no_argument_only(self) -> None:
