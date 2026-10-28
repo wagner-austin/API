@@ -13,6 +13,11 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_execution.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
+  - "tools/fleet/src/fleet/cli/research_queue.py"
+  - "tools/fleet/src/fleet/core/research_control.py"
+  - "tools/fleet/src/fleet/core/research_hpc.py"
+  - "tools/fleet/src/fleet/core/research_wrds.py"
+  - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
@@ -23,6 +28,11 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
+  "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
+  "tools/fleet/src/fleet/core/research_control.py": "84af969117df4a38b47eaae30b25ddb14803d145"
+  "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
+  "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
+  "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
 provenance:
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
@@ -38,6 +48,23 @@ There is no evidence here requiring a replacement coordinator or a second resear
 framework. Frozen proposal admission, durable attempt recording and HPC3 submission
 and reconciliation are implemented in the existing libraries. The monthly study
 and restricted holdout identity below remain integration work.[^request][^admission][^execution]
+
+## Shared queue integration
+
+The fleet research lane has an implementation in the existing fleet package:
+it claims shared dispatch rows, uses existing resource leases during bounded
+controller operations, and polls native jobs through maintained controllers.
+Four requests may remain active, with the oldest renewed receipt polled each
+tick. Native scheduler waiting does not occupy a local execution slot.
+Deployment and live queue verification are tracked separately on board task
+`3dff6fbf`; code presence alone does not establish activation.[^queue]
+
+The queue reference contains backend, exact private specification digest and
+attempt. The native adapter checks tenant binding and input hashes on each
+poll. HPC3 keeps proposal admission and its attempt journal; WRDS keeps held
+submission and its durable receipt. Transport failures retain those identities.
+Completion requires fresh native evidence and verified RunRecord metadata;
+no research rows or credentials are placed on the board.[^queue][^controllers]
 
 ## What is already reusable
 
@@ -119,6 +146,8 @@ an implemented guarantee today. Do not autonomously launch this research loop
 until admission, holdout isolation and append-only attempt recording are tested.[^request]
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
+[^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
+[^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
