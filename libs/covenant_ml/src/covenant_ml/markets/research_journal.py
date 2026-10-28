@@ -23,8 +23,8 @@ from platform_core.json_utils import (
 from platform_core.run_record import decode_run_record
 from typing_extensions import ReadOnly, TypedDict
 
-from ..benchmarking.factory import make_benchmark_config
 from .campaign_records import require_digest
+from .research_limits import policy_refusal
 from .research_records import (
     ResearchPolicy,
     ResearchProposal,
@@ -111,61 +111,20 @@ def decode_research_attempt(document: JSONObject) -> ResearchAttempt:
 def _refusal(
     policy: ResearchPolicy, proposal: ResearchProposal, history: tuple[ResearchAttempt, ...]
 ) -> str:
-    """Decide fixed limits against history while holding the writer lock.
+    """Check policy and consumed attempts while holding the journal writer lock.
 
     Args:
-        policy: Frozen admission rules.
-        proposal: Decoded candidate.
-        history: Complete attempt history.
+        policy: Frozen evaluator limits.
+        proposal: Decoded request.
+        history: Complete journal history.
 
     Returns:
-        Named refusal reason or empty string for admission.
+        Named refusal, or empty for an admissible proposal.
     """
-    if proposal["protocol_digest"] != policy["protocol_digest"]:
-        return "protocol_changed"
-    if proposal["partition"] != "validation":
-        return "holdout_forbidden"
-    if not set(proposal["features"]).issubset(policy["features"]):
-        return "features_forbidden"
-    if proposal["seed"] not in policy["seeds"]:
-        return "seed_forbidden"
-    configuration_refusal = _configuration_refusal(policy, proposal)
-    if configuration_refusal:
-        return configuration_refusal
+    reason = policy_refusal(policy, proposal)
+    if reason:
+        return reason
     return _history_refusal(policy, proposal, history)
-
-
-def _configuration_refusal(policy: ResearchPolicy, proposal: ResearchProposal) -> str:
-    """Check resource ceilings and the existing benchmark's fixed settings.
-
-    Args:
-        policy: Frozen ceilings.
-        proposal: Decoded candidate.
-
-    Returns:
-        Named refusal or empty string.
-    """
-    if proposal["seconds"] > policy["max_seconds"]:
-        return "time_budget"
-    config = proposal["config"]
-    if not (
-        1 <= config["n_estimators"] <= policy["max_trees"]
-        and 2 <= config["num_leaves"] <= policy["max_leaves"]
-        and 1 <= config["max_depth"] <= 16
-        and 2 <= config["max_bins"] <= 255
-    ):
-        return "model_budget"
-    expected = make_benchmark_config(
-        config["n_estimators"],
-        config["max_depth"],
-        config["max_bins"],
-        config["num_leaves"],
-        repeats=1,
-        warmups=0,
-    )
-    if config != expected:
-        return "fixed_configuration_changed"
-    return ""
 
 
 def _history_refusal(

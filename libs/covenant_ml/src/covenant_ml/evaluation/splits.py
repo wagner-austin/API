@@ -220,10 +220,52 @@ class ChronologicalGroupedSplits:
         group_masks = chronological_masks(
             len(keys), self._train_fraction, self._val_fraction, self._embargo
         )
+        return self._partition(
+            keys[group_masks.train], keys[group_masks.val], keys[group_masks.test]
+        )
+
+    def validation_split(self, inner_train_fraction: float) -> GroupedSplit:
+        """Score only outer validation, with stopping rows drawn from training.
+
+        Args:
+            inner_train_fraction: Fraction of outer training keys used for fitting.
+
+        Returns:
+            Training, early-stopping and scoring arrays with no final-test rows.
+
+        Raises:
+            ValueError: Invalid fraction or an empty inner fold after its embargo.
+        """
+        if not 0 < inner_train_fraction < 1:
+            raise ValueError(f"[{ERR_INVALID_FRACTION}] inner training fraction must be in (0, 1)")
+        keys: NDArray[np.int64] = np.unique(self._time_keys)
+        outer = chronological_masks(
+            len(keys), self._train_fraction, self._val_fraction, self._embargo
+        )
+        training = keys[outer.train]
+        cut = int(len(training) * inner_train_fraction)
+        stopping = cut + self._embargo
+        if cut < 1 or stopping >= len(training):
+            raise ValueError(f"[{ERR_TOO_FEW_UNITS}] inner training or stopping fold is empty")
+        return self._partition(training[:cut], training[stopping:], keys[outer.val])
+
+    def _partition(
+        self, training: NDArray[np.int64], stopping: NDArray[np.int64], scoring: NDArray[np.int64]
+    ) -> GroupedSplit:
+        """Apply one key partition through the shared array splitter.
+
+        Args:
+            training: Keys available to model fitting.
+            stopping: Separate keys for early stopping.
+            scoring: Held-out keys scored by the evaluator.
+
+        Returns:
+            Partition and scoring keys, preserving whole time groups.
+        """
         masks = SplitMasks(
-            train=np.isin(self._time_keys, keys[group_masks.train]),
-            val=np.isin(self._time_keys, keys[group_masks.val]),
-            test=np.isin(self._time_keys, keys[group_masks.test]),
+            train=np.isin(self._time_keys, training),
+            val=np.isin(self._time_keys, stopping),
+            test=np.isin(self._time_keys, scoring),
         )
         return GroupedSplit(
             split=apply_split_masks(self._features, self._labels, masks),

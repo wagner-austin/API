@@ -368,15 +368,51 @@ def write_manifest_and_record(
         ValueError: If two observations collide on a name, meaning two arms
             shared one and a reader could not tell them apart.
     """
-    out_path.write_text(dump_json_str(encoded_manifest, indent=1), encoding="utf-8")
+    results = results_of(encoded_manifest)
+    return write_observed_manifest(
+        encoded_manifest,
+        fingerprint,
+        out_path,
+        declaration["experiment"],
+        f"{label_prefix}{len(seeds)}seeds",
+        declared_observations(declaration, results) + derived,
+    )
+
+
+def write_observed_manifest(
+    encoded_manifest: JSONValue,
+    fingerprint: RunFingerprint,
+    out_path: Path,
+    experiment: str,
+    label: str,
+    observations: tuple[Observation, ...],
+) -> Path:
+    """Publish one measured payload and its shared numerical record together.
+
+    Args:
+        encoded_manifest: Family-specific manifest containing a results list.
+        fingerprint: Measured runtime identity.
+        out_path: Manifest destination.
+        experiment: Fixed experiment or admitted protocol identity.
+        label: Seed summary or durable attempt number.
+        observations: Metrics derived by the existing evaluation family.
+
+    Returns:
+        Shared record sidecar path.
+
+    Raises:
+        ValueError: Invalid results or shared numerical record.
+        OSError: Either artifact cannot be written.
+    """
     results = results_of(encoded_manifest)
     record = run_record(
-        experiment=declaration["experiment"],
-        label=f"{label_prefix}{len(seeds)}seeds",
+        experiment=experiment,
+        label=label,
         fingerprint=fingerprint,
-        observations=declared_observations(declaration, results) + derived,
+        observations=observations,
         payload_digest=sha256(dump_json_str(list(results)).encode("utf-8")).hexdigest(),
     )
+    out_path.write_text(dump_json_str(encoded_manifest, indent=1), encoding="utf-8")
     record_path = run_record_sidecar(out_path)
     record_path.write_text(dump_json_str(encode_run_record(record), indent=1), encoding="utf-8")
     return record_path
@@ -393,4 +429,5 @@ __all__ = [
     "shared_parser",
     "summary_lines",
     "write_manifest_and_record",
+    "write_observed_manifest",
 ]
