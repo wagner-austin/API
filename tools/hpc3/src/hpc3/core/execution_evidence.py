@@ -74,15 +74,15 @@ def parse_checksums(text: str) -> dict[str, str]:
     return result
 
 
-def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
-    """Read completed allocation evidence directly from Slurm in UTC.
+def allocation_document(entry: LedgerEntry, cluster: ClusterFacts) -> JSONObject:
+    """Read one allocation directly from Slurm, including unfinished states.
 
     Args:
         entry: Unique recorded submission.
         cluster: Declared partitions.
 
     Returns:
-        Native successful allocation evidence.
+        Native accounting document; success is validated separately.
 
     Raises:
         ValueError: HPC_EVIDENCE_ACCOUNTING for missing/mismatched accounting.
@@ -105,15 +105,28 @@ def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
         entry["partition"],
     ):
         raise ValueError("HPC_EVIDENCE_ACCOUNTING: allocation does not match ledger")
-    return decode_execution_evidence(
-        {
-            "job": encode_job_status(job),
-            "exit_code": values[-3],
-            "started_at": values[-2],
-            "ended_at": values[-1],
-        },
-        cluster,
-    )
+    return {
+        "job": encode_job_status(job),
+        "exit_code": values[-3],
+        "started_at": values[-2],
+        "ended_at": values[-1],
+    }
+
+
+def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
+    """Require successful native allocation evidence before reading results.
+
+    Args:
+        entry: Recorded submission.
+        cluster: Declared partitions.
+
+    Returns:
+        Completed, zero-exit allocation with known node and ordered instants.
+
+    Raises:
+        ValueError: Missing, mismatched or unsuccessful native accounting.
+    """
+    return decode_execution_evidence(allocation_document(entry, cluster), cluster)
 
 
 def _artifact_time(host: str, path: str, evidence: ExecutionEvidence) -> int:
@@ -249,4 +262,11 @@ def replay_report(
     }
 
 
-__all__ = ["MeasuredRun", "accounting", "measure", "parse_checksums", "replay_report"]
+__all__ = [
+    "MeasuredRun",
+    "accounting",
+    "allocation_document",
+    "measure",
+    "parse_checksums",
+    "replay_report",
+]
