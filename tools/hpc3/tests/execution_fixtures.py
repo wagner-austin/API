@@ -22,7 +22,7 @@ INSTANT = int(datetime.fromisoformat(START).replace(tzinfo=UTC).timestamp()) + 5
 CHECKSUMS = {"/pub/runtime.sif": IMAGE}
 
 
-def entry(job: str = "101", **changes: JSONValue) -> LedgerEntry:
+def entry(job: str = "101", /, **changes: JSONValue) -> LedgerEntry:
     """Build a recorded benchmark submission.
 
     Args:

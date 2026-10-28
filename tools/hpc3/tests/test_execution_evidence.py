@@ -62,7 +62,7 @@ def test_missing_partial_or_multiple_accounting_rows_fail(fake_run: FakeRun, row
 
 def test_job_id_cannot_inject_a_scheduler_option() -> None:
     with pytest.raises(ValueError, match="numeric allocation"):
-        accounting(entry(job="101;true"), cluster())
+        accounting(entry("101;true"), cluster())
 
 
 @pytest.mark.parametrize(

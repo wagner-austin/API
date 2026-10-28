@@ -90,7 +90,9 @@ def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
     """
     if not entry["job_id"].isdecimal():
         raise ValueError("HPC_EVIDENCE_ACCOUNTING: numeric allocation id required")
-    fields = (SACCT_FIELDS[0], "JobName%200", *SACCT_FIELDS[2:], "ExitCode", "Start", "End")
+    fields = list(SACCT_FIELDS)
+    fields[1] = "JobName%200"
+    fields.extend(["ExitCode", "Start", "End"])
     command = sacct_commands([entry["job_id"]], fields)[0]
     lines = remote.run_remote(entry["host"], "env TZ=UTC " + command).strip().splitlines()
     if len(lines) != 1 or len(lines[0].split("|")) != len(fields):
