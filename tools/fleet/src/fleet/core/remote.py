@@ -332,7 +332,9 @@ def send_script(host: str, remote_path: str, body: str) -> None:
     _raise_on(attempt_send(host, remote_path, body))
 
 
-def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
+def attempt_script(
+    host: str, remote_path: str, body: str, *, timeout_seconds: int = SSH_TIMEOUT_SECONDS
+) -> RemoteOutcome:
     """Send a script to a node and run it by path, reporting failure as a value.
 
     Args:
@@ -340,6 +342,7 @@ def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
         remote_path: Absolute path on the node to write and then execute
             (:data:`fleet.core.dialect.SH_INVOCATION`).
         body: The script's complete text.
+        timeout_seconds: Execution deadline; sending keeps its separate short bound.
 
     Returns:
         The script's standard output, or the reason there is none. A send that
@@ -350,7 +353,9 @@ def attempt_script(host: str, remote_path: str, body: str) -> RemoteOutcome:
     failure = attempt_send(host, remote_path, body)
     if failure is not None:
         return RemoteOutcome(output="", failure=failure)
-    return attempt_ssh(host, (*dialect.SH_INVOCATION, remote_path))
+    return _attempt_ssh_within(
+        host, (*dialect.SH_INVOCATION, remote_path), timeout_seconds=timeout_seconds
+    )
 
 
 class Answered(TypedDict):

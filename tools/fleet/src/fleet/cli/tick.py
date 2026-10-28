@@ -120,6 +120,8 @@ class Lane(StrEnum):
     NETBOOT_ANNOUNCE = "netboot-announce"
     NODE = "node"
     ANNOUNCE = "announce"
+    RESEARCH = "research"
+    RESEARCH_ANNOUNCE = "research-announce"
 
 
 #: The ticks ``fleet-agent`` runs, each a duty's tick or its one-time
@@ -133,11 +135,19 @@ _AGENT_LANES: Final[Mapping[Lane, DispatchLane]] = {
     Lane.SESSIONS_ANNOUNCE: DispatchLane.SESSIONS,
     Lane.NETBOOT: DispatchLane.NETBOOT,
     Lane.NETBOOT_ANNOUNCE: DispatchLane.NETBOOT,
+    Lane.RESEARCH: DispatchLane.RESEARCH,
+    Lane.RESEARCH_ANNOUNCE: DispatchLane.RESEARCH,
 }
 
 #: The lanes that post the runner's check-in and claim nothing.
 _ANNOUNCE_LANES: Final[frozenset[Lane]] = frozenset(
-    {Lane.HUB_ANNOUNCE, Lane.SESSIONS_ANNOUNCE, Lane.NETBOOT_ANNOUNCE, Lane.ANNOUNCE}
+    {
+        Lane.HUB_ANNOUNCE,
+        Lane.SESSIONS_ANNOUNCE,
+        Lane.NETBOOT_ANNOUNCE,
+        Lane.ANNOUNCE,
+        Lane.RESEARCH_ANNOUNCE,
+    }
 )
 
 #: The namespace a hub, sessions or netboot runner's session id is derived in.
@@ -287,12 +297,14 @@ def _agent_plan(
     label, session = runner_identity(agent_lane, alias)
     rebuild = ("--mcps-root", str(api_root.parent / "MCPs")) if lane is Lane.HUB else ()
     repo = str(api_root)
+    module = "fleet-research" if agent_lane is DispatchLane.RESEARCH else "fleet-agent"
+    lane_arguments = () if agent_lane is DispatchLane.RESEARCH else ("--lane", agent_lane.value)
     return TickPlan(
         arguments=(
             rolled_cli.REPO_ROOT_FLAG,
             repo,
             rolled_cli.AGENT_FLAG,
-            "fleet-agent",
+            module,
             rolled_cli.SEPARATOR,
             "--agent",
             label,
@@ -300,8 +312,7 @@ def _agent_plan(
             session,
             "--repo-root",
             repo,
-            "--lane",
-            agent_lane.value,
+            *lane_arguments,
             *placement,
             *rebuild,
             *trailing,

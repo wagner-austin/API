@@ -59,6 +59,7 @@ SEPARATOR: Final = "--"
 AGENT_MODULES: Final[dict[str, str]] = {
     "fleet-agent": "fleet.cli.agent",
     "fleet-node-agent": "fleet.cli.node_agent",
+    "fleet-research": "fleet.cli.research",
 }
 
 #: The agent's deadline: one minute inside the 40-minute ExecutionTimeLimit
