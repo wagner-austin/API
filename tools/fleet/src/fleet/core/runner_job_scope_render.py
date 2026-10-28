@@ -53,6 +53,7 @@ from fleet.core.runner_proc_bash import (
 )
 from fleet.core.runner_tool_caches import HOOK_LINES
 from fleet.core.runner_unit_files import render_drop_in_lines
+from fleet.core.runner_workspace_unlock import UNLOCK_LINES
 from fleet.core.script_values import scriptable
 
 #: Where the helper is installed.
@@ -98,11 +99,12 @@ JOB_HOOK_SCRIPT = (
 # fleet-runner-job-started.sh -- rendered by fleet-runners (MCPs board tasks 715b9ec5, 4b405239).
 # The runners' job-started hook ({HOOK_VARIABLE}): before the job's first
 # step, the job is given its package caches' generation (fleet.core.runner_tool_caches),
-# then root moves its Runner.Worker out of its listener's cgroup into a scope
-# of {CI_SLICE_NAME}. A refusal fails the job by name.
+# its work tree is left deletable (fleet.core.runner_workspace_unlock, MCPs board
+# task 678de6ba), then root moves its Runner.Worker out of its listener's cgroup
+# into a scope of {CI_SLICE_NAME}. A refusal fails the job by name.
 set -euo pipefail
 """
-    + "".join(f"{line}\n" for line in HOOK_LINES)
+    + "".join(f"{line}\n" for line in (*HOOK_LINES, *UNLOCK_LINES))
     + f"exec sudo -n {JOB_SCOPE_PATH}\n"
 )
 
