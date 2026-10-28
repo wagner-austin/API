@@ -40,7 +40,7 @@ from hpc3.core.remote import run_remote
 
 #: Flags whose value is a file the job READS. A run naming one of these must
 #: have that file on the cluster before it is submitted.
-INPUT_FLAGS: tuple[str, ...] = ("--payload", "--spec", "--items", "--corpus")
+INPUT_FLAGS: tuple[str, ...] = ("--payload", "--spec", "--items", "--corpus", "--wrds-manifest")
 
 #: Flags whose value the job WRITES. Never required to exist. Kept as an
 #: explicit list rather than "anything not an input" so that a flag nobody
