@@ -18,6 +18,9 @@ provenance:
   - "API libs/covenant_ml/src/covenant_ml/markets/research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; outside this wiki workspaceRoot"
   - "API libs/covenant_ml/tests/markets/test_research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; fleet b0e902f6-b54c-41eb-a1d9-03c5d0c84131 on Loki: 4511 passed, 100% coverage"
   - "API libs/covenant_ml/src/covenant_ml/markets/research_cluster.py and research_trial.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421: fixed resources, no requeue, validation partition; outside this wiki workspaceRoot"
+  - "MCPs fleet-mcp/src/tools/dispatch-submit.ts at 14b0c4c7d5467ad1275570d726db66180f168bb6, blob 609ece4ff9bfeee7384f1fe8df54c9098727350c; compared with served dispatch_submit schema on 2026-10-28; outside this wiki workspaceRoot"
+  - "API libs/covenant_ml/scripts/research_proposals.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421: explicit status/submit/reconcile commands; outside this wiki workspaceRoot"
+  - "Board task f12aa47e-328f-4473-bb89-cc54c49fed30; hpc-report-f12aa47e independently remeasured retained job 58578878 on 2026-10-28; no new trial submitted"
 fact_checked: 2026-10-28
 confidence: high
 ---
@@ -62,6 +65,30 @@ requirements. The compute SIF remains the earlier immutable evaluator.[^live]
 
 ## Boundaries of this evidence
 
+### Agents and the queues
+
+Shell-capable agents on the controller can submit to the native queues using
+the installed commands: HPC3 uses Slurm through the maintained admission and
+HPC tools; WRDS uses Grid Engine through the WRDS CLI. The fleet's served
+`dispatch_submit` accepts only `check`, `lint`, `test` and `build-bases`.
+It does not accept a research job payload. A board task is coordination,
+not a scheduler submission.[^routes]
+
+The proposal controller has no unattended consumer or reconciliation daemon.
+Agents explicitly call `reconcile` for submitted attempts, preserving the
+existing journal and consumed candidate/seed budgets. Disconnecting the agent
+does not cancel an accepted native job. Recovery inspects the recorded identity
+and refuses to guess when the submission ledger is missing or ambiguous.
+The package README's **Agent submission routes** section gives the installed
+status command and routes to the existing lifecycle references.[^routes][^inspect]
+
+The fresh inspection for task f12aa47e revalidated job 58578878's zero-exit
+allocation and the same result/RunRecord hashes recorded above. The installed
+journal still contained three completed attempts and one refusal. This read
+consumed no additional candidate or seed.[^recheck]
+
+### Evaluation and evidence limits
+
 The worker scores chronological validation and uses training rows for early
 stopping. Final-fold exclusion is logical; the shared account can still read
 the source snapshot. Monthly portfolio evaluation and a restricted final-holdout
@@ -78,3 +105,5 @@ execution. Results and local journals remain owner-writable evidence.[^query][^m
 [^live]: `artifacts/wrds-controller-verification-20261028/provenance.json`, fields `attempts`, `controller_build_hashes` and `interpretation`; program-authored board reports named in provenance.
 [^repair]: API commit bda8ca2af532d89b301b56cc0b55a4346bb6e421, `research_execution.py` function `_require_trial` and regression `test_reordered_json_preserves_raw_admission_and_executes`; source and fleet evidence are named in provenance. API wiki `wrds-equity-research-protocol` records the separate monthly study and holdout requirements.
 [^wrds]: Board task 8a113204-42d0-41a0-8094-73776bae8846, program-authored post by load-report-8a113204 at 2026-10-28T19:57:42.310Z, native accounting and output digest lines.
+[^routes]: MCPs `dispatch-submit.ts` function `registerDispatchSubmit` and the served schema named in provenance; API `research_proposals.py` function `main`, plus `research_execution.py` functions `submit_attempt` and `reconcile_attempt` at the source commit named in provenance. The WRDS lifecycle is documented in [[wrds-repeatable-attempts]].
+[^recheck]: Board task f12aa47e-328f-4473-bb89-cc54c49fed30, program-authored HPC3 ATTEMPT LOAD-REPORT by hpc-report-f12aa47e; controller status saved privately as `agent-route-journal-status.json` beside the installed study journal on 2026-10-28. Status is a local file reading; the report measures live cluster evidence.

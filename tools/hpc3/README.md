@@ -18,6 +18,48 @@ topic. New incident narrative goes into the wiki, not here.
 
 ## Quick start
 
+### Agent submission routes
+
+Agents with shell access to the installed Ziggurat controller and valid cluster
+SSH authentication can submit remotely through these maintained commands:
+
+| Work | Submission entrypoint | Queue and evidence |
+|---|---|---|
+| Admitted validation on frozen WRDS data | `scripts.research_proposals submit` | HPC3 Slurm; policy journal, shared HPC ledger and measured RunRecord |
+| Other registered HPC3 experiments | `hpc3.cli.submit` | HPC3 Slurm; shared HPC ledger and project artifacts |
+| WRDS extraction or Python experiment | `hpc3.cli.wrds submit` | WRDS Grid Engine; attempt receipt, WRDS ledger and verified outputs |
+| Fleet checks, lint, tests or base-image builds | Corvis `dispatch_submit` | Fleet dispatch queue; commit-bound checks or hub build |
+
+**Research jobs are not accepted by `dispatch_submit`.** Its command set is
+`check`, `lint`, `test`, and `build-bases`; it has no research payload field.
+An agent limited to that MCP tool needs access to a controller session to use
+the cluster commands. The board coordinates ownership and receives evidence;
+posting a task does not itself submit a cluster job.
+
+For the installed validation study, inspect the existing journal first:
+
+```bash
+cd /home/corvis/research-control/wrds-validation-bda8ca2af/entrypoint
+research_python=/home/corvis/research-control/wrds-validation-bda8ca2af/bin/python
+research_study=/home/corvis/research-data/wrds/experiments/admitted-validation-20261028
+"$research_python" -m scripts.research_proposals \
+  --policy "$research_study/policy.json" --ledger "$research_study/attempts.sqlite" status
+```
+
+Use the admission, submit and reconcile commands linked under
+[Run admitted validation research](#run-admitted-validation-research), replacing
+`poetry run python` with `"$research_python"`. Preserve the frozen policy and
+journal; prepare an admitted trial, owning board task and exclusive attempt
+directory before submitting. Reconcile a submitted attempt until terminal;
+do not submit it again after a disconnect. A completed attempt can be remeasured
+with `execution_inspect` without creating another trial.
+
+There is no unattended research queue consumer or reconciliation daemon in this
+controller. An agent must invoke reconciliation; the native scheduler keeps
+accepted jobs running after the agent disconnects. WRDS uses its separate
+`status`, held-job `resume`, `collect` and `report` lifecycle below. SSH sessions
+can expire and require renewed authentication before another control operation.
+
 ### WRDS repeatable experiments
 
 Use the existing `wrds` SSH alias with this package installed locally.
