@@ -142,6 +142,7 @@ def settle(
         ended_unix=ended_unix,
         log_path=names.retained_log_path(node["stage_root"], row["run_id"]),
         run_id=row["run_id"],
+        workers=row["workers"],
     )
     rendered = verdict.render_verdict(judged)
     # How the unit ended, when the build did not write its own status: an
