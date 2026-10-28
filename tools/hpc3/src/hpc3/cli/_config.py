@@ -19,7 +19,15 @@ import pathlib
 from platform_core import cli_args
 from platform_core.config import _optional_env_str
 from platform_core.json_utils import JSONValue, load_json_str
-from platform_core.session_label import LABEL_VARIABLE, SESSION_ID_VARIABLE, resolve_label
+from platform_core.mcp_client import McpCredentials
+from platform_core.session_label import (
+    LABEL_VARIABLE,
+    SESSION_ID_VARIABLE,
+    STACK_ENV_PATH,
+    resolve_label,
+    stack_credentials,
+)
+from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.contracts.workspace import (
@@ -116,6 +124,23 @@ def _stack_file_text(path: pathlib.Path) -> str:
     return core_hooks.read_bytes(path).decode("utf-8")
 
 
+def taskboard_credentials() -> McpCredentials:
+    """Read the taskboard's address and secrets from the stack's own files.
+
+    For a command that posts its own report under a service identity; the
+    same two files :func:`submitter_label` reads, through the same seam.
+
+    Returns:
+        The credentials, bound to the declared taskboard url.
+
+    Raises:
+        AppError: ``STACK_ENDPOINT_UNDECLARED`` or ``CREDENTIALS_MISSING``
+            when either file does not carry its part.
+    """
+    url = declared_url(_stack_file_text(STACK_ENDPOINTS_PATH), TASKBOARD_SERVICE)
+    return stack_credentials(_stack_file_text(STACK_ENV_PATH), url)
+
+
 def submitter_label() -> str:
     """Resolve the submitting session's agent-board label against the board.
 
@@ -162,4 +187,5 @@ __all__ = [
     "load_workspace",
     "load_workspace_connection",
     "submitter_label",
+    "taskboard_credentials",
 ]
