@@ -37,7 +37,7 @@ from hpc3.contracts.wrds_sql import (
     encode_sql_receipt,
     psql_argv,
 )
-from hpc3.core import _test_hooks, wrds_grid
+from hpc3.core import _test_hooks, artifacts, wrds_grid
 
 _GUARD = "'has_table_privilege\\(''([^'']+)''::text, ''SELECT''::text\\)'"
 
@@ -230,7 +230,7 @@ def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     metadata_job = wrds_grid.submit(
         host, remote, "wrds_sql_catalog", psql_argv(query, remote_catalog), environment=True
     )
-    artifact = wrds_grid.download(host, remote_catalog)
+    artifact = artifacts.download(host, remote_catalog)
     relations = read_relations(artifact["text"])
     statuses = [classify(relation) for relation in relations]
     accessible = [

@@ -18,7 +18,7 @@ from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
 from hpc3.cli import _test_hooks
-from hpc3.cli._wrds_report import post_load_report, report_identity
+from hpc3.cli._load_report import post_load_report, report_identity
 from hpc3.contracts.wrds_run import decode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import wrds_attempt_report, wrds_jobs, wrds_results, wrds_scheduler
@@ -131,8 +131,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         _test_hooks.emit(dump_json_str({"output": str(output), "identity": result["identity"]}))
     elif action == "report":
         task_id = cli_args.require_flag(flags, "--report-task")
-        report_identity(task_id)  # refuses a malformed task before WRDS is queried
-        post_load_report(task_id, wrds_attempt_report.render(run, attempt))
+        report_identity(task_id, "wrds")  # refuses a malformed task before WRDS is queried
+        post_load_report(task_id, wrds_attempt_report.render(run, attempt), "wrds")
         _test_hooks.emit(
             dump_json_str(
                 {"report_task": task_id, "identity": run_identity(run), "attempt": attempt}

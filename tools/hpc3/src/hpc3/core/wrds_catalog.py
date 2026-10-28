@@ -22,7 +22,7 @@ from hpc3.contracts.wrds_catalog import (
     decode_catalog_entry,
     encode_catalog_receipt,
 )
-from hpc3.core import _test_hooks, wrds_grid, wrds_scan
+from hpc3.core import _test_hooks, artifacts, wrds_grid, wrds_scan
 
 
 def probe_archive() -> bytes:
@@ -90,7 +90,7 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> CatalogRun:
     source_sha = wrds_grid.upload(host, probe, probe_archive())
     command = ["python3", probe, "--root", "/wrds", "--output", remote_catalog]
     job_id = wrds_grid.submit(host, remote, "wrds_catalog", command, environment=False)
-    artifact = wrds_grid.download(host, remote_catalog)
+    artifact = artifacts.download(host, remote_catalog)
     entries = read_catalog(artifact["text"])
     receipt = CatalogReceipt(
         host=host,

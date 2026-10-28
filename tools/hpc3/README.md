@@ -155,6 +155,30 @@ CSV and query using `hpc3-stage`, then run the existing paired evaluation with
 has its own timestamp and identity even when its rows match. The timestamp
 records when data were acquired, not when every historical value became known.
 
+### Verify a benchmark replay
+
+```bash
+python -m hpc3.cli.execution_report --config runs/hpc3.json \
+  --job FIRST_JOB --repeat SECOND_JOB --checksums /private/inputs/checksums.txt \
+  --report-task FULL_TASK_UUID
+```
+
+This reads both submissions from the shared ledger, queries native Slurm
+accounting, and requires completed zero-exit allocations with matching names,
+partitions and known execution times. It downloads checksum-verified benchmark
+manifests and shared `RunRecord` sidecars, verifies their payload/runtime binding,
+and rejects files modified outside their allocation. Each frozen input, runtime
+and external entrypoint must still match its checksum and appear as successful
+in the compute log. Supply the checksum manifest frozen before either job ran.
+
+The command posts its measured report under `hpc-report-<task prefix>` using
+the publication mechanism shared with WRDS inventories. Exit zero means the
+complete observations, payloads and result bytes agree; exit two records measured
+disagreement. Missing evidence or publication failure fails the command. This
+reader understands the paired benchmark's `results` payload convention. It
+provides reproducibility evidence, not tamper-proof attestation against an owner
+who can rewrite the cluster files, ledger and logs.
+
 ### WRDS data inventory
 
 The same package can inventory WRDS Cloud through its existing SSH alias:

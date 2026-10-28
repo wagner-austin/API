@@ -13,18 +13,9 @@ import hashlib
 import pathlib
 import shlex
 
-from typing_extensions import TypedDict
-
 from hpc3.core import _test_hooks
 from hpc3.core.digest import check_remote_digest, parse_remote_digest
 from hpc3.core.remote import put_bytes, remote_digest, run_remote
-
-
-class Artifact(TypedDict):
-    """A remote text file copied back with its verified digest."""
-
-    text: str
-    sha256: str
 
 
 def receipt_path(output: pathlib.Path) -> pathlib.Path:
@@ -156,29 +147,8 @@ def submit(
     return job_id
 
 
-def download(host: str, path: str) -> Artifact:
-    """Copy a job's text artifact back and confirm it matches the remote file.
-
-    Args:
-        host: WRDS SSH alias.
-        path: Absolute artifact path.
-
-    Returns:
-        The text and its sha256.
-
-    Raises:
-        AppError: When the read fails or the remote digest differs.
-    """
-    text = run_remote(host, shlex.join(["cat", "--", path]))
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    check_remote_digest(path, digest, parse_remote_digest(remote_digest(host, path), path))
-    return Artifact(text=text, sha256=digest)
-
-
 __all__ = [
-    "Artifact",
     "create_directory",
-    "download",
     "receipt_path",
     "refuse_existing",
     "remote_directory",

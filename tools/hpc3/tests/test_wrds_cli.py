@@ -11,7 +11,7 @@ from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import wrds
-from hpc3.cli._wrds_report import report_identity
+from hpc3.cli._load_report import report_identity
 from hpc3.contracts.wrds_run import encode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks
 from hpc3.core.wrds_attempt_report import render
@@ -107,7 +107,7 @@ def test_report_posts_the_measured_attempt_as_the_task_identity(
         "attempt": "one",
     }
     note = sent_arguments(post.bodies[1])
-    assert note["agent"] == report_identity(TASK)["agent"]
+    assert note["agent"] == report_identity(TASK, "wrds")["agent"]
     assert note["taskId"] == TASK
     assert note["body"] == render(run, "one")
 

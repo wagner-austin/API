@@ -30,7 +30,7 @@ SACCT_FIELDS = ("JobID", "JobName", "Partition", "State", "ElapsedRaw", "AllocTR
 _EXPECTED_COLUMNS = len(SACCT_FIELDS)
 
 
-def sacct_commands(job_ids: Sequence[str]) -> list[str]:
+def sacct_commands(job_ids: Sequence[str], fields: Sequence[str] = SACCT_FIELDS) -> list[str]:
     """Build the accounting query for one or more jobs, split to fit.
 
     ``sacct`` takes a comma-separated id list, so a sweep of six jobs is one
@@ -42,6 +42,7 @@ def sacct_commands(job_ids: Sequence[str]) -> list[str]:
     Args:
         job_ids: Slurm job ids. Never empty -- a query naming no job would
             return every job the user has ever run.
+        fields: Accounting columns; execution evidence adds exit status and times.
 
     Returns:
         One or more ``sacct`` command lines, together covering every id in the
@@ -55,7 +56,7 @@ def sacct_commands(job_ids: Sequence[str]) -> list[str]:
     if len(job_ids) == 0:
         raise ValueError("sacct_commands requires at least one job id")
     prefix = "sacct -j "
-    suffix = f" -n -P -o {','.join(SACCT_FIELDS)} -X"
+    suffix = f" -n -P -o {','.join(fields)} -X"
     return [
         f"{prefix}{','.join(batch)}{suffix}"
         for batch in token_batches(job_ids, overhead=len(prefix) + len(suffix), separator=",")

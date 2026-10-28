@@ -8,7 +8,7 @@ import pathlib
 import pytest
 from platform_core.errors import AppError
 
-from hpc3.core import wrds_grid
+from hpc3.core import artifacts, wrds_grid
 from tests.conftest import FakeRun
 
 REMOTE = pathlib.PurePosixPath("/home/uci/test/run one")
@@ -101,11 +101,11 @@ def test_download_returns_the_verified_text(fake_run: FakeRun) -> None:
     digest = hashlib.sha256(text.encode()).hexdigest()
     fake_run.add("cat --", stdout=text)
     fake_run.add("sha256sum", stdout=f"{digest}  /home/uci/test/out.csv\n")
-    assert wrds_grid.download("wrds", "/home/uci/test/out.csv") == {"text": text, "sha256": digest}
+    assert artifacts.download("wrds", "/home/uci/test/out.csv") == {"text": text, "sha256": digest}
 
 
 def test_download_refuses_a_text_that_differs_from_the_remote_file(fake_run: FakeRun) -> None:
     fake_run.add("cat --", stdout="truncated")
     fake_run.add("sha256sum", stdout="0" * 64 + "  /home/uci/test/out.csv\n")
     with pytest.raises(AppError):
-        wrds_grid.download("wrds", "/home/uci/test/out.csv")
+        artifacts.download("wrds", "/home/uci/test/out.csv")
