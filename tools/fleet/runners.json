@@ -122,7 +122,8 @@
           "ffmpeg",
           "golang-go",
           "poppler-utils",
-          "unzip"
+          "unzip",
+          "inkscape"
         ],
         "disk": {
           "ceiling_gb": 150,
