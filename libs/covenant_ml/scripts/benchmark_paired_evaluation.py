@@ -54,17 +54,23 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         write_manifest_and_record,
     )
     from covenant_ml.benchmarking.provenance import benchmark_fingerprint
+    from covenant_ml.benchmarking.types import DatasetInfo
     from covenant_ml.evaluation.arguments import parse_unit, resampling_settings
     from covenant_ml.evaluation.codec_manifests import encode_evaluation_manifest
     from covenant_ml.evaluation.provenance import policy_observations, pooled_observations
     from covenant_ml.evaluation.runner import run_paired_evaluation
-    from covenant_ml.evaluation.splits import CompanyDisjointGroupedSplits
+    from covenant_ml.evaluation.splits import CompanyDisjointGroupedSplits, GroupedSplitFactoryProto
     from covenant_ml.evaluation.types import AlertCosts
+    from covenant_ml.evaluation.wrds import load_wrds_evaluation
 
-    parsed = shared_parser(PAIRED_EVALUATION).parse_args(argv)
+    parser = shared_parser(PAIRED_EVALUATION)
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--csv", type=Path, help="Bankruptcy corpus CSV.")
+    source.add_argument("--wrds-manifest", type=Path, help="Verified CRSP extract manifest.")
+    parsed = parser.parse_args(argv)
 
     # Annotated at assignment: argparse hands back Any.
-    csv_path: Path = parsed.csv
+    wrds_path: Path | None = parsed.wrds_manifest
     seeds: list[int] = parsed.seeds
     out_path: Path = parsed.out
     n_estimators: int = parsed.trees
@@ -101,15 +107,27 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     )
     fingerprint = benchmark_fingerprint(determinism, config_test_hooks.get_env)
 
-    sys.stdout.write(f"loading {csv_path} ...\n")
-    dataset = load_bankruptcy_dataset(csv_path)
+    split_factory: GroupedSplitFactoryProto
+    dataset_info: DatasetInfo
+    if wrds_path is not None:
+        if unit_flag != "block":
+            raise ValueError("WRDS_DATA_UNIT: time-series evaluation requires --unit block")
+        wrds_data = load_wrds_evaluation(wrds_path)
+        split_factory, dataset_info = wrds_data.splits, wrds_data.info
+    else:
+        csv_path: Path = parsed.csv
+        dataset = load_bankruptcy_dataset(csv_path)
+        split_factory = CompanyDisjointGroupedSplits(
+            dataset.features, dataset.labels, dataset.company_codes
+        )
+        dataset_info = dataset.info
     manifest = run_paired_evaluation(
         make_baseline_trainers(config),
-        CompanyDisjointGroupedSplits(dataset.features, dataset.labels, dataset.company_codes),
+        split_factory,
         seeds,
         reference,
         config,
-        dataset.info,
+        dataset_info,
         settings,
         costs,
         fingerprint,
@@ -126,7 +144,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         out_path,
         seeds,
         derived=derived,
-        label_prefix=f"{dataset.info['sha256'][:12]}-{settings['unit'].value}-",
+        label_prefix=f"{dataset_info['sha256'][:12]}-{settings['unit'].value}-",
     )
     for line in summary_lines(PAIRED_EVALUATION, encoded, derived):
         sys.stdout.write(f"{line}\n")
