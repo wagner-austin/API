@@ -300,16 +300,21 @@ that used it and is never reused.
 through the existing rolled launcher. `research-announce` registers the stable
 runner identity. The control-duty `fleet-research` scheduler row supplies the
 same 180-second cadence and 40-minute outer deadline as the other fleet ticks.
-This code requires the research queue schema and a provisioned native controller;
-installation and live proof are tracked on board task `3dff6fbf`.
+On 2026-10-28, board task `3dff6fbf` verified the deployed scheduler on
+Diphtheria against the installed Ziggurat controller: both retained HPC3 and
+WRDS pilots reached `passed` through automatic ticks, and repeat submissions
+returned the original receipts. The metadata and scope of that check are in
+[the installed-controller record](../hpc3/wiki/pages/wrds-installed-controller-verification.md).
 
 The control host reads private `tools/fleet/runs/research.json`, with exactly
 `tenant`, `node`, `host`, `python`, `root`, `env_file` and `script` fields.
 `node` is the queue's explicit controller node, `host` its SSH alias, and all
 four paths are absolute paths on that host. `python` names an installed frozen
-fleet runtime; `root` holds tenant-authorized requests; `env_file` holds the
-existing native-report credentials; `script` is the private remote tick path.
+fleet runtime; `root` holds tenant-authorized requests; `env_file` supplies
+native-report environment assignments; `script` is the private remote tick path.
 Credentials are never included in queue payloads or controller transcripts.
+The current environment file sets the runner label only; maintained native
+reporters read their credentials through the existing workspace configuration.
 
 Submit `command: "research"`, `project: "research/hpc3"` or `"research/wrds"`,
 an explicit `node` and board `taskId`, and
