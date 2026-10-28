@@ -6,8 +6,20 @@ import pathlib
 import shlex
 import xml.etree.ElementTree as ET
 
+from typing_extensions import TypedDict
+
 from hpc3.contracts.wrds_run import WrdsRun
 from hpc3.core import _test_hooks, remote
+
+_ACCOUNTING_FIELDS = ("jobnumber", "hostname", "failed", "exit_status")
+
+
+class WrdsAccounting(TypedDict):
+    """What Grid Engine's accounting records about where and how a job ended."""
+
+    hostname: str
+    failed: str
+    exit_status: str
 
 
 def job_argv(run: WrdsRun, directory: str, attempt: str, runner_sha: str) -> list[str]:
@@ -98,6 +110,39 @@ def queue_state(xml: str, job_id: str) -> str:
     return str(matches[0].findtext("state"))
 
 
+def decode_accounting(text: str, job_id: str) -> WrdsAccounting:
+    """Read the one qacct record of a job, as the scheduler wrote it.
+
+    Args:
+        text: qacct stdout.
+        job_id: Expected job number.
+
+    Returns:
+        The record's execution host, scheduler failure code and payload exit
+        status; each is the field's first token, so ``failed 100 : assumedly
+        after job`` reads ``100``.
+
+    Raises:
+        ValueError: ``WRDS_ACCOUNTING`` for a missing, duplicate or mismatched
+            field; a recycled job number yields two records and is refused
+            rather than read as either.
+    """
+    rows: dict[str, str] = {}
+    for line in text.splitlines():
+        fields = line.split(maxsplit=1)
+        if len(fields) == 2 and fields[0] in _ACCOUNTING_FIELDS:
+            if fields[0] in rows:
+                raise ValueError("WRDS_ACCOUNTING: duplicate accounting record")
+            rows[fields[0]] = fields[1].split()[0]
+    if rows.get("jobnumber") != job_id or not set(_ACCOUNTING_FIELDS) <= rows.keys():
+        raise ValueError("WRDS_ACCOUNTING: incomplete or mismatched record")
+    return {
+        "hostname": rows["hostname"],
+        "failed": rows["failed"],
+        "exit_status": rows["exit_status"],
+    }
+
+
 def account_state(text: str, job_id: str) -> str:
     """Require a matching completed qacct record.
 
@@ -109,18 +154,28 @@ def account_state(text: str, job_id: str) -> str:
         'completed' only for scheduler failure=0 and payload exit_status=0.
 
     Raises:
-        ValueError: For missing, duplicate or mismatched accounting fields.
+        ValueError: From :func:`decode_accounting`.
     """
-    rows: dict[str, str] = {}
-    for line in text.splitlines():
-        fields = line.split(maxsplit=1)
-        if len(fields) == 2 and fields[0] in {"jobnumber", "failed", "exit_status"}:
-            if fields[0] in rows:
-                raise ValueError("WRDS_ACCOUNTING: duplicate accounting record")
-            rows[fields[0]] = fields[1].split()[0]
-    if rows.get("jobnumber") != job_id or not {"failed", "exit_status"} <= rows.keys():
-        raise ValueError("WRDS_ACCOUNTING: incomplete or mismatched record")
-    return "completed" if rows["failed"] == "0" and rows["exit_status"] == "0" else "failed"
+    record = decode_accounting(text, job_id)
+    return "completed" if record["failed"] == "0" and record["exit_status"] == "0" else "failed"
+
+
+def accounting(host: str, job_id: str) -> WrdsAccounting:
+    """Read a terminal job's accounting record from WRDS.
+
+    Args:
+        host: SSH alias.
+        job_id: Numeric scheduler id of a job that has left the queue.
+
+    Returns:
+        The decoded record.
+
+    Raises:
+        AppError: When qacct exits non-zero, including before the record exists.
+        ValueError: From :func:`parse_job_id` and :func:`decode_accounting`.
+    """
+    parse_job_id(job_id)
+    return decode_accounting(remote.run_remote(host, shlex.join(["qacct", "-j", job_id])), job_id)
 
 
 def status(host: str, job_id: str) -> str:
@@ -149,4 +204,13 @@ def status(host: str, job_id: str) -> str:
     return account_state(answer["stdout"], job_id)
 
 
-__all__ = ["account_state", "job_argv", "parse_job_id", "queue_state", "status"]
+__all__ = [
+    "WrdsAccounting",
+    "account_state",
+    "accounting",
+    "decode_accounting",
+    "job_argv",
+    "parse_job_id",
+    "queue_state",
+    "status",
+]

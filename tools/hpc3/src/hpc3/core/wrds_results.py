@@ -21,6 +21,35 @@ from hpc3.core import _test_hooks, remote, wrds_jobs, wrds_scheduler
 from hpc3.wrds import _test_hooks as worker_hooks
 
 
+def not_complete(identifier: str, state: str) -> str:
+    """Word the refusal collect gives a job that did not succeed.
+
+    Args:
+        identifier: Scheduler job id.
+        state: Its state from :func:`wrds_scheduler.status`.
+
+    Returns:
+        The ``WRDS_NOT_COMPLETE`` message.
+    """
+    return f"WRDS_NOT_COMPLETE: job {identifier} is {state}"
+
+
+def run_record_bytes(result: JSONObject) -> bytes:
+    """Serialize an attested run record exactly as collect writes it.
+
+    Args:
+        result: Verified completion metadata.
+
+    Returns:
+        The bytes of ``results.runrecord.json``.
+
+    Raises:
+        ValueError: When the completion carries no valid run record.
+    """
+    record = decode_run_record(require_dict(result, "record"))
+    return (dump_json_str(encode_run_record(record)) + "\n").encode()
+
+
 def verified_completion(run: WrdsRun, attempt: str) -> JSONObject:
     """Require terminal scheduler success and a matching worker attestation.
 
@@ -32,13 +61,34 @@ def verified_completion(run: WrdsRun, attempt: str) -> JSONObject:
         Validated completion metadata.
 
     Raises:
-        ValueError: For nonterminal/failed jobs, mismatched identity, runtime,
-            outputs, worker bytes or aggregate payload digest.
+        ValueError: For nonterminal/failed jobs, and from
+            :func:`attested_completion`.
     """
     identifier = wrds_jobs.job_id(run, attempt)
     state = wrds_scheduler.status(run["host"], identifier)
     if state != "completed":
-        raise ValueError(f"WRDS_NOT_COMPLETE: job {identifier} is {state}")
+        raise ValueError(not_complete(identifier, state))
+    return attested_completion(run, attempt, identifier)
+
+
+def attested_completion(run: WrdsRun, attempt: str, identifier: str) -> JSONObject:
+    """Require a worker attestation matching the experiment and its submission.
+
+    Only meaningful once the scheduler reports the job completed; callers
+    establish that first, as :func:`verified_completion` does.
+
+    Args:
+        run: Experiment definition.
+        attempt: Attempt label.
+        identifier: The attempt's scheduler job id.
+
+    Returns:
+        Validated completion metadata.
+
+    Raises:
+        ValueError: For mismatched identity, runtime, outputs, worker bytes or
+            aggregate payload digest.
+    """
     directory = wrds_jobs.attempt_directory(run, attempt)
     result = narrow_json_to_dict(
         load_json_str(wrds_jobs.read_verified(run["host"], directory + "/completion.json"))
@@ -108,11 +158,7 @@ def collect(
             raise ValueError(f"WRDS_RESULT_TRANSFER: {name}: {transferred['stderr']}")
         if worker_hooks.digest_file(target) != require_str(outputs, name):
             raise ValueError(f"WRDS_RESULT_DIGEST: transported output changed: {name}")
-    record = decode_run_record(require_dict(result, "record"))
-    worker_hooks.write(
-        output / "results.runrecord.json",
-        (dump_json_str(encode_run_record(record)) + "\n").encode(),
-    )
+    worker_hooks.write(output / "results.runrecord.json", run_record_bytes(result))
     worker_hooks.write(output / "completion.json", (dump_json_str(result) + "\n").encode())
     wrds_jobs.record_event(
         ledger, run, attempt, "collected", require_str(result, "job_id"), timestamp
@@ -120,4 +166,10 @@ def collect(
     return result
 
 
-__all__ = ["collect", "verified_completion"]
+__all__ = [
+    "attested_completion",
+    "collect",
+    "not_complete",
+    "run_record_bytes",
+    "verified_completion",
+]

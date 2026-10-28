@@ -5,8 +5,17 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+from platform_core.errors import AppError
 
-from hpc3.core.wrds_scheduler import account_state, job_argv, parse_job_id, queue_state, status
+from hpc3.core.wrds_scheduler import (
+    account_state,
+    accounting,
+    decode_accounting,
+    job_argv,
+    parse_job_id,
+    queue_state,
+    status,
+)
 from tests.conftest import FakeRun
 from tests.wrds_support import example
 
@@ -15,7 +24,7 @@ HELD = (
     "<job_info><queue_info/><job_info><job_list><JB_job_number>123</JB_job_number>"
     "<state>hqw</state></job_list></job_info></job_info>"
 )
-DONE = "jobnumber 123\nfailed 0\nexit_status 0\n"
+DONE = "hostname wrds-sas35-w.wharton.private\njobnumber 123\nfailed 0\nexit_status 0\n"
 
 
 def test_resource_request_is_quoted_and_bounded(tmp_path: pathlib.Path) -> None:
@@ -63,7 +72,13 @@ def test_queue_requires_exact_job_and_well_formed_state() -> None:
 
 
 @pytest.mark.parametrize(
-    "text", ["", "jobnumber 456\nfailed 0\nexit_status 0", DONE + "jobnumber 123\n"]
+    "text",
+    [
+        "",
+        DONE.replace("jobnumber 123", "jobnumber 456"),
+        DONE.replace("hostname wrds-sas35-w.wharton.private\n", ""),
+        DONE + "jobnumber 123\n",
+    ],
 )
 def test_invalid_accounting(text: str) -> None:
     with pytest.raises(ValueError, match="WRDS_ACCOUNTING"):
@@ -74,6 +89,31 @@ def test_accounting_requires_both_scheduler_and_payload_success() -> None:
     assert account_state("=====\nqname all.q\n" + DONE, "123") == "completed"
     assert account_state(DONE.replace("failed 0", "failed 37 : lost host"), "123") == "failed"
     assert account_state(DONE.replace("exit_status 0", "exit_status 7"), "123") == "failed"
+
+
+def test_accounting_record_reads_first_tokens_as_qacct_writes_them() -> None:
+    deleted = DONE.replace("failed 0", "failed 100 : assumedly after job").replace(
+        "exit_status 0", "exit_status 137"
+    )
+    assert decode_accounting("=====\nqname all.q\n" + deleted, "123") == {
+        "hostname": "wrds-sas35-w.wharton.private",
+        "failed": "100",
+        "exit_status": "137",
+    }
+
+
+def test_accounting_reads_the_job_record_and_refuses_a_failed_query(fake_run: FakeRun) -> None:
+    fake_run.add("qacct -j 123", stdout=DONE, once=True)
+    fake_run.add("qacct -j 123", returncode=1, stderr="error: job id 123 not found")
+    assert accounting("wrds", "123") == {
+        "hostname": "wrds-sas35-w.wharton.private",
+        "failed": "0",
+        "exit_status": "0",
+    }
+    with pytest.raises(AppError, match="not found"):
+        accounting("wrds", "123")
+    with pytest.raises(ValueError, match="WRDS_JOB_ID"):
+        accounting("wrds", "123; true")
 
 
 def test_status_active_and_completed(fake_run: FakeRun) -> None:

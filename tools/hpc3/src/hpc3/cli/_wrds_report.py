@@ -1,9 +1,10 @@
-"""Post a WRDS inventory's measured counts on its board task, as the program.
+"""Post a WRDS program's measured reading on its board task, as the program.
 
 A count a session copies into a note is a restatement; the reading the board's
 audit accepts is a post the measuring program writes itself. The WRDS
-inventories therefore post their own load report on the task named by
-``--report-task``, under a service identity derived from that task -- label
+inventories and the experiment ``report`` action therefore post their own load
+report on the task named by ``--report-task``, under a service identity derived
+from that task -- label
 ``load-report-<first eight characters>``, the convention other measuring
 programs on the board use -- so a check can select the program's post by its
 author and never the worker's.
@@ -76,7 +77,10 @@ def post_load_report(task_id: str, body: str) -> None:
         credentials,
         identity,
         harness=HARNESS,
-        purpose="posts the WRDS filesystem and SQL inventories' measured counts on their task",
+        purpose=(
+            "posts the WRDS inventories' measured counts and experiment attempts' "
+            "measured outcomes on their task"
+        ),
     )
     post_to_task(
         cli_hooks.http_post, credentials, identity, task_id=task_id, kind="note", body=body

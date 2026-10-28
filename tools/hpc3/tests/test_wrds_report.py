@@ -44,8 +44,8 @@ def test_report_registers_the_identity_then_posts_on_the_task() -> None:
         "kind": "checkin",
         "harness": HARNESS,
         "body": (
-            "load-report-c4522545 checking in: posts the WRDS filesystem and SQL "
-            "inventories' measured counts on their task"
+            "load-report-c4522545 checking in: posts the WRDS inventories' measured "
+            "counts and experiment attempts' measured outcomes on their task"
         ),
         "agent": identity["agent"],
         "sessionId": identity["session_id"],

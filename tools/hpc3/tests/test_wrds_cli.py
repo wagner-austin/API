@@ -7,13 +7,17 @@ import runpy
 
 import pytest
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import wrds
+from hpc3.cli._wrds_report import report_identity
 from hpc3.contracts.wrds_run import encode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks
+from hpc3.core.wrds_attempt_report import render
 from tests.conftest import FakeRun
 from tests.test_wrds_results import actual_result
+from tests.wrds_board import TASK, accepting_board
 from tests.wrds_support import example
 from tests.wrds_transport import NOW, CopyTransport, completed, prepare
 
@@ -84,6 +88,39 @@ def test_collect_only_reports_metadata(tmp_path: pathlib.Path, emitted: list[str
         == 0
     )
     assert load_json_str(emitted[-1]) == {"output": str(output), "identity": run_identity(run)}
+
+
+def test_report_posts_the_measured_attempt_as_the_task_identity(
+    tmp_path: pathlib.Path, emitted: list[str]
+) -> None:
+    run, result = actual_result(tmp_path)
+    transport = FakeRun()
+    completed(transport, run, result)
+    spec = tmp_path / "experiment.json"
+    spec.write_text(dump_json_str(encode_wrds_run(run)))
+    post = accepting_board(2)
+    flags = ["--spec", str(spec), "--attempt", "one", "--report-task", TASK]
+    assert wrds.main(["report", *flags]) == 0
+    assert load_json_str(emitted[-1]) == {
+        "report_task": TASK,
+        "identity": run_identity(run),
+        "attempt": "one",
+    }
+    note = sent_arguments(post.bodies[1])
+    assert note["agent"] == report_identity(TASK)["agent"]
+    assert note["taskId"] == TASK
+    assert note["body"] == render(run, "one")
+
+
+def test_report_refuses_a_malformed_task_before_touching_wrds(tmp_path: pathlib.Path) -> None:
+    run = example(tmp_path)
+    spec = tmp_path / "experiment.json"
+    spec.write_text(dump_json_str(encode_wrds_run(run)))
+    transport = FakeRun()
+    _test_hooks.run = transport
+    with pytest.raises(ValueError, match="WRDS_REPORT_TASK"):
+        wrds.main(["report", "--spec", str(spec), "--attempt", "one", "--report-task", "d43697b3"])
+    assert transport.calls == []
 
 
 def test_command_boundaries(argv: list[str]) -> None:
