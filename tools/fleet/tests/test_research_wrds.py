@@ -156,7 +156,7 @@ def test_changed_collection_cannot_close_success(tmp_path: pathlib.Path, drift: 
             ok(dump_json_str({"identity": "identity", "completion_sha256": digest})),
         ]
     )
-    with pytest.raises(ValueError, match="RESEARCH_WRDS_(RECEIPT|ARTIFACT)"):
+    with pytest.raises(ValueError, match=r"RESEARCH_WRDS_(RECEIPT|ARTIFACT)"):
         research_wrds.poll(_document(tmp_path, adopt=True), tmp_path / "transcript", "task")
 
 
