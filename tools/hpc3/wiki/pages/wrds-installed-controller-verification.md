@@ -33,6 +33,10 @@ success lines from the compute job.[^inspect][^measure]
 
 ## Measured installed runs
 
+The installed tools also re-read the original extraction on WRDS: job 40534563
+still reports failed=0, exit_status=0 and matching output hashes. This was a
+remote verification of retained evidence, not a new extraction.[^wrds]
+
 Both jobs used the same 505-row CRSP snapshot, which produces 504 examples,
 and the same SIF hash `7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550`.
 Each used one CPU, no GPU, eight verified files and thirteen shared observations.
@@ -72,4 +76,5 @@ execution. Results and local journals remain owner-writable evidence.[^query][^m
 [^measure]: `src/hpc3/core/execution_evidence.py:77` `allocation_document` and `:154` `measure`.
 [^query]: `src/hpc3/core/status.py:33` `sacct_commands`; the recipe constructor named in provenance sets `requeue=False`. Upstream semantics are archived in tech-wiki pages `slurm-accounting-allocation-and-requeue-records` and `slurm-batch-success-and-artifact-evidence`.
 [^live]: `artifacts/wrds-controller-verification-20261028/provenance.json`, fields `attempts`, `controller_build_hashes` and `interpretation`; program-authored board reports named in provenance.
-[^repair]: API source and fleet regression evidence named in provenance; API wiki `wrds-equity-research-protocol` records the separate monthly study and holdout requirements.
+[^repair]: API commit bda8ca2af532d89b301b56cc0b55a4346bb6e421, `research_execution.py` function `_require_trial` and regression `test_reordered_json_preserves_raw_admission_and_executes`; source and fleet evidence are named in provenance. API wiki `wrds-equity-research-protocol` records the separate monthly study and holdout requirements.
+[^wrds]: Board task 8a113204-42d0-41a0-8094-73776bae8846, program-authored post by load-report-8a113204 at 2026-10-28T19:57:42.310Z, native accounting and output digest lines.
