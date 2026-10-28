@@ -12,7 +12,7 @@ from platform_core.http_client import build_client
 from platform_core.json_utils import dump_json_str, require_dict
 
 from covenant_ml.markets.demo_trial import build_demo_trial
-from covenant_ml.markets.execution_journal import read_execution_journal
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.submission_evidence import (
     decode_submission_capture,
     decode_submission_timing,
@@ -93,7 +93,7 @@ def test_disconnect_preserves_capture_and_cannot_resend(
         capture_bytes = (root / "submission-capture.json").read_bytes()
         assert (
             decode_submission_capture(read_document(root / "submission-capture.json"))["intent"]
-            == read_execution_journal(root / "execution.sqlite")["orders"][0]["intent"]
+            == execution_journal().read(root / "execution.sqlite")["orders"][0]["intent"]
         )
         assert not (root / "acknowledgement.json").exists()
         assert not (root / "submission-timing.json").exists()

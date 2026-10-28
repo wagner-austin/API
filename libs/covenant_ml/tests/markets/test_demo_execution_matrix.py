@@ -10,7 +10,7 @@ from platform_core.http_client import build_client
 from platform_core.json_utils import require_dict, require_list, require_str
 
 from covenant_ml.markets.demo_trial import build_demo_trial
-from covenant_ml.markets.execution_journal import read_execution_journal
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.execution_records import OrderReceipt, OrderStatus
 
 from ._demo_matrix_fixtures import PREFIX, serve_variable_account, serve_variable_credit
@@ -47,7 +47,7 @@ def test_execution_matrix_rejects_corruption_and_replays_exactly(
             api_server.requests.count(PREFIX + "fills?subaccount=0&limit=1000&cursor=second-fill")
             == 1
         )
-        state = read_execution_journal(root / "execution.sqlite")
+        state = execution_journal().read(root / "execution.sqlite")
         evidence = service.evidence(root)
         assert require_dict(evidence, "acknowledgement")["remaining_count"] == "0.00"
         assert state["orders"][0]["receipt"] == OrderReceipt(
@@ -73,7 +73,7 @@ def test_execution_matrix_rejects_corruption_and_replays_exactly(
         fill["fee_cost"] = "0.007401"
         with pytest.raises(ValueError, match="DEMO-TRIAL-003"):
             service.reconcile(root)
-        assert read_execution_journal(root / "execution.sqlite") == state
+        assert execution_journal().read(root / "execution.sqlite") == state
         api_server.documents.clear()
 
         # Settlement cannot release exposure if the credited account cash disagrees.
@@ -81,7 +81,7 @@ def test_execution_matrix_rejects_corruption_and_replays_exactly(
         api_server.documents[PREFIX + "balance"][-1]["balance_dollars"] = "99.000000"
         with pytest.raises(ValueError, match="DEMO-TRIAL-007"):
             service.reconcile(root)
-        assert read_execution_journal(root / "execution.sqlite") == state
+        assert execution_journal().read(root / "execution.sqlite") == state
         api_server.documents.clear()
 
         serve_variable_credit(api_server, root, price, quantity, payout)

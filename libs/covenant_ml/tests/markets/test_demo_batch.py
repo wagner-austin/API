@@ -11,7 +11,7 @@ from platform_core.http_client import build_client
 from platform_core.json_utils import dump_json_str, require_dict
 
 from covenant_ml.markets.demo_batch import build_demo_batch
-from covenant_ml.markets.execution_journal import read_execution_journal
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.execution_records import OrderIntent
 from covenant_ml.markets.submission import read_submission_evidence
 from covenant_ml.markets.validation import read_document
@@ -117,13 +117,13 @@ def test_disconnect_cannot_resend_and_later_account_visibility_resolves_it(
 
         with pytest.raises(RemoteProtocolError):
             service.advance(root)
-        before = read_execution_journal(root / "execution.sqlite")
+        before = execution_journal().read(root / "execution.sqlite")
         assert before["orders"][1]["receipt"] is None
         assert service.status(root)["issues"] == ["EXECUTION-UNRESOLVED"]
         serve_snapshot(api_server, account_document((baseline,), (100,)))
         with pytest.raises(ValueError, match="DEMO-BATCH-001"):
             service.advance(root)
-        assert read_execution_journal(root / "execution.sqlite") == before
+        assert execution_journal().read(root / "execution.sqlite") == before
         assert len(api_server.bodies) == 2
         api_server.disconnect_paths.clear()
         serve_snapshot(api_server, account_document((baseline, row), (100, 100)))
@@ -190,12 +190,12 @@ def test_partial_acknowledgement_persistence_is_verified_before_journal_update(
             document = read_document(path / "acknowledgement.json")
             document["order_id"] = "wrong-exchange-order"
             (path / "acknowledgement.json").write_text(dump_json_str(document), encoding="utf-8")
-        before = read_execution_journal(root / "execution.sqlite")
+        before = execution_journal().read(root / "execution.sqlite")
         serve_snapshot(api_server, account_document((baseline, row), (100, 100), settled=True))
         if changed_id:
             with pytest.raises(ValueError, match="acknowledgement and account order disagree"):
                 service.reconcile(root)
-            assert read_execution_journal(root / "execution.sqlite") == before
+            assert execution_journal().read(root / "execution.sqlite") == before
         else:
             report = service.reconcile(root)
             assert report["settled_batch_orders"] == 1

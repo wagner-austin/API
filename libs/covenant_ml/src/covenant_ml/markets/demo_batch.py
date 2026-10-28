@@ -20,7 +20,7 @@ from .batch_records import (
 )
 from .demo_trial import DemoTrialService, build_demo_trial
 from .demo_trial_records import decode_trial, validate_acknowledgement
-from .execution_journal import append_execution_event, read_execution_journal
+from .execution_journal import execution_journal
 from .execution_policy import apply_execution_event
 from .execution_records import (
     EXPOSURE_LIMIT,
@@ -94,7 +94,7 @@ class DemoBatchService:
         """
         self._trial.reconcile(predecessor)
         source = predecessor / "execution.sqlite"
-        state = read_execution_journal(source)
+        state = execution_journal().read(source)
         previous = decode_trial(read_document(predecessor / "trial.json"))
         created = parse_timestamp(self._clock())
         plan = decode_batch_plan(
@@ -112,7 +112,7 @@ class DemoBatchService:
         )
         require_batch_history(plan, state, self._fingerprint)
         initialize_batch_storage(root, source)
-        copied = read_execution_journal(root / "execution.sqlite")
+        copied = execution_journal().read(root / "execution.sqlite")
         require_batch_history(plan, copied, self._fingerprint)
         read_batch_attempts(root, plan, copied)
         persist_evidence(root / "plan.json", encode_batch_plan(plan))
@@ -134,7 +134,7 @@ class DemoBatchService:
         """
         require_batch_owner(self._guard_root, root, self._fingerprint)
         plan = decode_batch_plan(read_document(root / "plan.json"))
-        state = read_execution_journal(root / "execution.sqlite")
+        state = execution_journal().read(root / "execution.sqlite")
         require_batch_history(plan, state, self._fingerprint)
         return plan, state, read_batch_attempts(root, plan, state)
 
@@ -175,7 +175,7 @@ class DemoBatchService:
                 ):
                     raise ValueError("[DEMO-BATCH-003] acknowledgement and account order disagree")
         persist_evidence(root / ("account-" + str(uuid4()) + ".json"), document)
-        return append_execution_event(root / "execution.sqlite", event)
+        return execution_journal().transact(root / "execution.sqlite", lambda _: event)
 
     def advance(self, root: Path) -> JSONObject:
         """Reconcile first, consume one frozen attempt, reserve once and submit once.
@@ -220,7 +220,7 @@ class DemoBatchService:
                 intent,
                 state["observed_ms"],
             )
-            state = self._reconcile(root, plan, read_execution_journal(root / "execution.sqlite"))
+            state = self._reconcile(root, plan, execution_journal().read(root / "execution.sqlite"))
             return self._report(plan, state, (*attempts, intent), parse_timestamp(self._clock()))
 
     def reconcile(self, root: Path) -> JSONObject:

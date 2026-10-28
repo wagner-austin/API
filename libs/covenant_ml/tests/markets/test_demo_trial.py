@@ -12,7 +12,7 @@ from platform_core.json_utils import dump_json_str, require_dict, require_list
 
 from covenant_ml.markets.demo_trial import build_demo_trial
 from covenant_ml.markets.demo_trial_records import decode_trial
-from covenant_ml.markets.execution_journal import read_execution_journal
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.kalshi_transport import DemoTransport
 from covenant_ml.markets.validation import read_document
 
@@ -90,7 +90,7 @@ def test_real_disconnect_retains_risk_and_reconciles_without_resending(
         api_server.disconnect_paths.add("/trade-api/v2/portfolio/events/orders")
         with pytest.raises(RemoteProtocolError):
             service.submit(root)
-        state = read_execution_journal(root / "execution.sqlite")
+        state = execution_journal().read(root / "execution.sqlite")
         assert len(state["orders"]) == 1
         assert state["orders"][0]["receipt"] is None
         assert not (root / "acknowledgement.json").exists()
@@ -206,7 +206,7 @@ def test_admission_failures_never_reserve_or_send(
         with pytest.raises(ValueError, match=code):
             service.submit(root)
         assert api_server.bodies == []
-        assert read_execution_journal(root / "execution.sqlite")["orders"] == ()
+        assert execution_journal().read(root / "execution.sqlite")["orders"] == ()
 
 
 def test_credentials_and_missing_reservation_refused(api_server: ApiServer, tmp_path: Path) -> None:

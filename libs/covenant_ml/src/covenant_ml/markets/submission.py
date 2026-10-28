@@ -16,7 +16,7 @@ from platform_core.json_utils import (
 )
 
 from .demo_trial_records import validate_acknowledgement
-from .execution_journal import append_execution_event
+from .execution_journal import execution_journal
 from .execution_records import OrderIntent, encode_intent
 from .execution_storage import persist_evidence
 from .kalshi_transport import DemoTransport
@@ -70,8 +70,9 @@ def submit_reserved_order(
             "started_ms": parse_timestamp(clock()),
         }
     )
-    append_execution_event(
-        ledger, {"action": "reserve", "observed_ms": observed, "data": encode_intent(intent)}
+    execution_journal().transact(
+        ledger,
+        lambda _: {"action": "reserve", "observed_ms": observed, "data": encode_intent(intent)},
     )
     capture_digest = persist_evidence(
         root / "submission-capture.json", encode_submission_capture(capture)

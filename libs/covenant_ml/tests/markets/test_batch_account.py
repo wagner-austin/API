@@ -8,11 +8,7 @@ import pytest
 from platform_core.json_utils import JSONObject, JSONValue, require_dict, require_list
 
 from covenant_ml.markets.batch_account import account_snapshot_event
-from covenant_ml.markets.execution_journal import (
-    append_execution_event,
-    initialize_execution_journal,
-    read_execution_journal,
-)
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.execution_policy import apply_execution_event
 from covenant_ml.markets.execution_records import encode_intent
 from covenant_ml.markets.execution_state import (
@@ -58,22 +54,27 @@ def test_corrupt_account_field_leaves_sqlite_unchanged(
 ) -> None:
     first, second = intent(1, 120000), batch_intent(2)
     journal = tmp_path / "execution.sqlite"
-    initialize_execution_journal(journal)
-    append_execution_event(
-        journal, {"action": "reserve", "observed_ms": 120000, "data": encode_intent(first)}
+    execution_journal().initialize(journal)
+    execution_journal().transact(
+        journal,
+        lambda _: {"action": "reserve", "observed_ms": 120000, "data": encode_intent(first)},
     )
-    state = read_execution_journal(journal)
-    append_execution_event(
-        journal, account_snapshot_event(account_document((first,), (100,)), state, 20000099)
+    state = execution_journal().read(journal)
+    execution_journal().transact(
+        journal,
+        lambda _: account_snapshot_event(account_document((first,), (100,)), state, 20000099),
     )
-    before = append_execution_event(
-        journal, {"action": "reserve", "observed_ms": 120000, "data": encode_intent(second)}
+    before = execution_journal().transact(
+        journal,
+        lambda _: {"action": "reserve", "observed_ms": 120000, "data": encode_intent(second)},
     )
     document = account_document((first, second), (100, 100))
     replace_field(document, section, index, key, value)
     with pytest.raises(ValueError, match=code):
-        append_execution_event(journal, account_snapshot_event(document, before, 20000099))
-    assert read_execution_journal(journal) == before
+        execution_journal().transact(
+            journal, lambda _: account_snapshot_event(document, before, 20000099)
+        )
+    assert execution_journal().read(journal) == before
 
 
 @pytest.mark.parametrize("field", ["orders", "fills", "settlements", "markets", "positions"])

@@ -28,11 +28,7 @@ from .demo_trial_records import (
     validate_acknowledgement,
     verify_fills,
 )
-from .execution_journal import (
-    append_execution_event,
-    initialize_execution_journal,
-    read_execution_journal,
-)
+from .execution_journal import execution_journal
 from .execution_records import (
     ORDER_LIMIT,
     OrderReceipt,
@@ -101,7 +97,7 @@ class DemoTrialService:
         document = encode_trial(DemoTrial(intent=intent, initial=initial))
         decode_trial(document)
         root.mkdir()
-        initialize_execution_journal(root / "execution.sqlite")
+        execution_journal().initialize(root / "execution.sqlite")
         with (root / "trial.json").open("x", encoding="utf-8") as stream:
             stream.write(dump_json_str(document))
         return encode_trial(self._load(root))
@@ -145,7 +141,7 @@ class DemoTrialService:
         """
         trial = self._load(root)
         ledger = root / "execution.sqlite"
-        if read_execution_journal(ledger)["orders"]:
+        if execution_journal().read(ledger)["orders"]:
             raise ValueError("[DEMO-TRIAL-005] trial already reserved; reconcile without resending")
         current = self._account.preflight()
         if current["balance_microdollars"] != trial["initial"]["balance_microdollars"]:
@@ -170,7 +166,7 @@ class DemoTrialService:
         """
         trial = self._load(root)
         ledger = root / "execution.sqlite"
-        state = read_execution_journal(ledger)
+        state = execution_journal().read(ledger)
         intent = trial["intent"]
         if len(state["orders"]) != 1 or state["orders"][0]["intent"] != intent:
             raise ValueError("[DEMO-TRIAL-007] require exactly the manifest's reserved intent")
@@ -228,11 +224,11 @@ class DemoTrialService:
             "client_order_id": intent["client_order_id"],
             "data": encode_receipt(receipt),
         }
-        state = append_execution_event(ledger, event)
+        state = execution_journal().transact(ledger, lambda _: event)
         if credit is not None:
-            state = append_execution_event(
+            state = execution_journal().transact(
                 ledger,
-                {
+                lambda _: {
                     "action": "account_settlement",
                     "observed_ms": observed,
                     "client_order_id": intent["client_order_id"],
@@ -302,7 +298,7 @@ class DemoTrialService:
             ValueError: Changed credentials or invalid persisted evidence.
         """
         self._load(root)
-        return self._report(read_execution_journal(root / "execution.sqlite"))
+        return self._report(execution_journal().read(root / "execution.sqlite"))
 
     def evidence(self, root: Path) -> JSONObject:
         """Verify a completed submission capture without contacting the exchange.

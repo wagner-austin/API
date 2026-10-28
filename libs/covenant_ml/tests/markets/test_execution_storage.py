@@ -13,11 +13,7 @@ from typing import IO
 import pytest
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from covenant_ml.markets.execution_journal import (
-    append_execution_event,
-    initialize_execution_journal,
-    read_execution_journal,
-)
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.execution_records import encode_intent
 from covenant_ml.markets.execution_storage import (
     batch_operation,
@@ -33,12 +29,13 @@ from ._execution_fixtures import intent
 
 def test_backup_is_exact_and_exclusive_evidence_cannot_be_overwritten(tmp_path: Path) -> None:
     source, root = tmp_path / "original.sqlite", tmp_path / "batch"
-    initialize_execution_journal(source)
-    state = append_execution_event(
-        source, {"action": "reserve", "observed_ms": 1000, "data": encode_intent(intent())}
+    execution_journal().initialize(source)
+    state = execution_journal().transact(
+        source,
+        lambda _: {"action": "reserve", "observed_ms": 1000, "data": encode_intent(intent())},
     )
     initialize_batch_storage(root, source)
-    assert read_execution_journal(root / "execution.sqlite") == state
+    assert execution_journal().read(root / "execution.sqlite") == state
     document: JSONObject = {"text": "é"}
     digest = persist_evidence(root / "evidence.json", document)
     assert (root / "evidence.json").read_bytes() == dump_json_str(document).encode("utf-8")
@@ -54,7 +51,7 @@ def test_backup_is_exact_and_exclusive_evidence_cannot_be_overwritten(tmp_path: 
 
 def test_real_process_lock_is_released_after_forced_process_death(tmp_path: Path) -> None:
     source, root = tmp_path / "original.sqlite", tmp_path / "batch"
-    initialize_execution_journal(source)
+    execution_journal().initialize(source)
     initialize_batch_storage(root, source)
     script = (
         "from pathlib import Path\nimport sys\n"
@@ -85,7 +82,7 @@ def test_real_process_lock_is_released_after_forced_process_death(tmp_path: Path
         assert code in (1, -9)
         assert error == ""
     with batch_operation(root):
-        assert read_execution_journal(root / "execution.sqlite")["orders"] == ()
+        assert execution_journal().read(root / "execution.sqlite")["orders"] == ()
     with closing(sqlite3.connect(root / "operation.sqlite")) as connection, connection:
         connection.execute("UPDATE ownership SET mode = 'wrong'")
     with pytest.raises(ValueError, match="DEMO-BATCH-008"), batch_operation(root):

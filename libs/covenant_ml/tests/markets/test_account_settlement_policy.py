@@ -11,11 +11,7 @@ from covenant_ml.markets.account_settlement import (
     decode_native_account_settlement,
     encode_account_settlement,
 )
-from covenant_ml.markets.execution_journal import (
-    append_execution_event,
-    initialize_execution_journal,
-    read_execution_journal,
-)
+from covenant_ml.markets.execution_journal import execution_journal
 from covenant_ml.markets.execution_policy import apply_execution_event
 from covenant_ml.markets.execution_records import decode_native_order, encode_intent, encode_receipt
 from covenant_ml.markets.execution_state import (
@@ -51,17 +47,18 @@ def events() -> tuple[JSONObject, JSONObject, JSONObject]:
 
 def test_persisted_credit_and_repeated_replay(tmp_path: Path) -> None:
     path = tmp_path / "journal.sqlite"
-    initialize_execution_journal(path)
+    execution_journal().initialize(path)
     reserve, receipt, credit = events()
-    for event in (reserve, receipt, credit):
-        append_execution_event(path, event)
-    state = read_execution_journal(path)
+    execution_journal().transact(path, lambda _: reserve)
+    execution_journal().transact(path, lambda _: receipt)
+    execution_journal().transact(path, lambda _: credit)
+    state = execution_journal().read(path)
     assert decode_execution_state(encode_execution_state(state)) == state
     assert execution_report(state)["exposure"] == 0
     assert execution_report(state)["net_realized_profit"] == 0
-    assert append_execution_event(path, credit) == state
+    assert execution_journal().transact(path, lambda _: credit) == state
     repeated = {**receipt, "observed_ms": 120000}
-    assert append_execution_event(path, repeated) == state
+    assert execution_journal().transact(path, lambda _: repeated) == state
     alternate: JSONObject = {
         "action": "settlement",
         "observed_ms": 120000,
@@ -69,8 +66,8 @@ def test_persisted_credit_and_repeated_replay(tmp_path: Path) -> None:
         "data": settlement(intent()),
     }
     with pytest.raises(ValueError, match="EXECUTION-006"):
-        append_execution_event(path, alternate)
-    assert read_execution_journal(path) == state
+        execution_journal().transact(path, lambda _: alternate)
+    assert execution_journal().read(path) == state
 
 
 @pytest.mark.parametrize(
@@ -90,18 +87,18 @@ def test_persisted_credit_and_repeated_replay(tmp_path: Path) -> None:
 )
 def test_contradictory_credit_never_mutates_journal(tmp_path: Path, failure: str) -> None:
     path = tmp_path / "journal.sqlite"
-    initialize_execution_journal(path)
+    execution_journal().initialize(path)
     reserve, receipt, credit = events()
-    append_execution_event(path, reserve)
+    execution_journal().transact(path, lambda _: reserve)
     if failure == "resting":
         require_dict(receipt, "data").update(status="resting", filled_count=50, remaining_count=50)
     if failure != "missing":
-        append_execution_event(path, receipt)
+        execution_journal().transact(path, lambda _: receipt)
     data = require_dict(credit, "data")
     if failure == "public":
-        append_execution_event(
+        execution_journal().transact(
             path,
-            {
+            lambda _: {
                 "action": "settlement",
                 "observed_ms": 1001,
                 "client_order_id": intent()["client_order_id"],
@@ -119,11 +116,11 @@ def test_contradictory_credit_never_mutates_journal(tmp_path: Path, failure: str
     elif failure == "future":
         data["settled_ms"] = 120001
     elif failure == "changed":
-        append_execution_event(path, credit)
+        execution_journal().transact(path, lambda _: credit)
         data.update(payout=0, revenue=0)
-    before = read_execution_journal(path)
+    before = execution_journal().read(path)
     with pytest.raises(ValueError, match="EXECUTION-011"):
         apply_execution_event(before, credit)
     with pytest.raises(ValueError, match="EXECUTION-011"):
-        append_execution_event(path, credit)
-    assert read_execution_journal(path) == before
+        execution_journal().transact(path, lambda _: credit)
+    assert execution_journal().read(path) == before

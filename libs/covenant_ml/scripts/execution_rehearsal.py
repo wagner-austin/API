@@ -27,11 +27,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     """
     pin()
     from covenant_ml.markets import _test_hooks
-    from covenant_ml.markets.execution_journal import (
-        append_execution_event,
-        initialize_execution_journal,
-        read_execution_journal,
-    )
+    from covenant_ml.markets.execution_journal import execution_journal
     from covenant_ml.markets.execution_records import (
         decode_intent,
         decode_native_order,
@@ -61,9 +57,9 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     path: Path = args.ledger
     payload: JSONObject | None = None
     if action == "init":
-        state = initialize_execution_journal(path)
+        state = execution_journal().initialize(path)
     elif action == "status":
-        state = read_execution_journal(path)
+        state = execution_journal().read(path)
     else:
         event: JSONObject = {"action": action, "observed_ms": parse_timestamp(_test_hooks.clock())}
         if action == "reserve":
@@ -84,7 +80,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         else:
             reason: str = args.reason
             event["reason"] = reason
-        state = append_execution_event(path, event)
+        state = execution_journal().transact(path, lambda _: event)
     report = execution_report(state)
     report["inspection_only_order_payload"] = payload
     sys.stdout.write(dump_json_str(report) + "\n")
