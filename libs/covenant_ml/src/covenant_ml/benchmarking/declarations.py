@@ -233,7 +233,6 @@ PAIRED_EVALUATION = BenchmarkDeclaration(
         "Brier and the value of its alerting decisions, with intervals per seed and pooled."
     ),
     arguments=(
-        _CSV,
         _TREES,
         _MAX_DEPTH,
         _MAX_BINS,
