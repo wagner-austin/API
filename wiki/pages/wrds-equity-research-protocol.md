@@ -8,11 +8,17 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/equity_study.py"
   - "libs/platform_core/src/platform_core/run_record.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
+  - "libs/platform_core/src/platform_core/event_journal.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "976da4e9ae76c81cf3357e797886d57092422666"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "fbc3a9a59bea4e8025d4064e179fdb0dbf418e53"
+  "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "d48ddb10eae0c3934d5117e8b9c0a9a92877c298"
+  "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
 provenance:
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
@@ -25,8 +31,9 @@ confidence: medium
 The implementation path is a bounded extension: Corvis owns task claims and review;
 the research libraries own evaluation rules and evidence; WRDS and HPC3 own jobs.
 There is no evidence here requiring a replacement coordinator or a second research
-framework. This page defines the next study and integration boundary; the monthly
-study and restricted agent interface below are **designed, not implemented**.[^request]
+framework. Frozen proposal admission and durable attempt recording are implemented
+in the existing libraries. The monthly study, scheduler adapter and restricted
+holdout identity below remain integration work.[^request][^admission]
 
 ## What is already reusable
 
@@ -71,12 +78,24 @@ edge needs a later prospective frozen follow-up.[^request]
 
 ## Agent integration after the pilot
 
-Add a typed proposal/admission boundary to the existing research runner: a proposal
+The implemented typed proposal/admission boundary accepts a proposal that
 names its hypothesis, parent, protocol digest, allowed features, model parameters
 and resource budget. Admission records the attempt **before** extraction or job
 submission. Link proposal → snapshot/query → code/image → scheduler attempt →
 RunRecord → review, including refusal, crash, timeout, null and negative results.
 One candidate with five seeds is one hypothesis with five tracked jobs.[^request]
+
+`research_records` reuses the benchmark configuration codec; `research_journal`
+binds the frozen policy to `platform_core.event_journal`, lifted from the existing
+execution rehearsal and used by both consumers. Raw object proposals are recorded
+before decoding. Policy refusals remain visible, and admitted candidate/seed pairs
+stay consumed after failure. The lifecycle records submission intent, unique job
+identity and an identity-checked shared RunRecord; this does not yet independently
+attest a real scheduler execution. `scripts.research_proposals` exposes init,
+propose and status operations. This control layer refuses final-partition proposals
+but does not implement filesystem isolation or the substantive monthly evaluator.
+The CLI's policy is evaluator-owned configuration, not a field agents may replace
+in a proposal.[^admission]
 
 The coordinator can assign proposer, runner and reviewer work using its current
 tasks. The evaluator enforces dates, costs, permitted changes and trial limits.
@@ -92,3 +111,4 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
 [^records]: `libs/platform_core/src/platform_core/run_record.py:309` `agree_across_runs`.
+[^admission]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py` frozen contracts; `libs/covenant_ml/src/covenant_ml/markets/research_journal.py` admission and lifecycle reducers; `libs/platform_core/src/platform_core/event_journal.py` transactional persistence; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 399048d8-b1d6-4e12-a4d3-a0ce2281c810.
