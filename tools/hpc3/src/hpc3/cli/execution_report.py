@@ -12,31 +12,10 @@ from platform_core.json_utils import dump_json_str
 
 from hpc3.cli import _config, _test_hooks
 from hpc3.cli._load_report import post_load_report, report_identity
-from hpc3.contracts.ledger import LedgerEntry
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import ledger
 from hpc3.core.execution_evidence import parse_checksums, replay_report
-
-
-def _select(entries: Sequence[LedgerEntry], job: str, host: str) -> LedgerEntry:
-    """Resolve exactly one submission on the configured host.
-
-    Args:
-        entries: Persisted submissions.
-        job: Requested allocation id.
-        host: Workspace SSH alias.
-
-    Returns:
-        Unique matching ledger entry.
-
-    Raises:
-        ValueError: HPC_EVIDENCE_LEDGER for absent, duplicate or foreign entries.
-    """
-    matches = [entry for entry in entries if entry["job_id"] == job]
-    if len(matches) != 1 or matches[0]["host"] != host:
-        raise ValueError("HPC_EVIDENCE_LEDGER: require one submission on the workspace host")
-    return matches[0]
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -65,8 +44,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     cluster = workspace_cluster(workspace)
     entries = ledger.read(pathlib.Path(workspace["ledger"]), cluster)
     report = replay_report(
-        _select(entries, job, workspace["host"]),
-        _select(entries, repeat, workspace["host"]),
+        ledger.require_entry(entries, job, workspace["host"]),
+        ledger.require_entry(entries, repeat, workspace["host"]),
         cluster,
         checksums,
     )

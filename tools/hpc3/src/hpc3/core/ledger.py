@@ -67,6 +67,26 @@ def read(path: pathlib.Path, cluster: ClusterFacts) -> list[LedgerEntry]:
     ]
 
 
+def require_entry(entries: Sequence[LedgerEntry], job: str, host: str) -> LedgerEntry:
+    """Resolve exactly one submission on the configured host.
+
+    Args:
+        entries: Persisted submissions.
+        job: Requested allocation id.
+        host: Workspace SSH alias.
+
+    Returns:
+        Unique matching ledger entry.
+
+    Raises:
+        ValueError: HPC_EVIDENCE_LEDGER for absent, duplicate or foreign entries.
+    """
+    matches = [entry for entry in entries if entry["job_id"] == job]
+    if len(matches) != 1 or matches[0]["host"] != host:
+        raise ValueError("HPC_EVIDENCE_LEDGER: require one submission on the workspace host")
+    return matches[0]
+
+
 def closure_path(ledger: pathlib.Path) -> pathlib.Path:
     """Locate the closure record belonging to a ledger.
 
@@ -144,5 +164,6 @@ __all__ = [
     "closure_path",
     "read",
     "read_closures",
+    "require_entry",
     "unfinished",
 ]

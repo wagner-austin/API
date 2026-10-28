@@ -26,14 +26,16 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import log_dir, script_dir
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.session_label import LABEL_VARIABLE
 
 from hpc3.cli import _config, _test_hooks
 from hpc3.contracts.cluster import ClusterFacts, describe_gpu_request, partition_bills
+from hpc3.contracts.ledger import encode_ledger_entry
 from hpc3.contracts.run import resolve_run
 from hpc3.contracts.workspace import require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core import ledger
 from hpc3.core.budget import check_projection
 from hpc3.core.certification import require_inputs_certified
 from hpc3.core.drift import describe_drift
@@ -44,7 +46,7 @@ from hpc3.core.inputs import (
 )
 from hpc3.core.submit import submit
 
-_FLAGS = (_config.CONFIG_FLAG, "--run")
+_FLAGS = (_config.CONFIG_FLAG, "--run", "--format")
 
 
 def _cost_label(cluster: ClusterFacts, partition: str, charge_account: str) -> str:
@@ -86,6 +88,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    output_format = parsed.get("--format", "text")
+    if output_format not in {"text", "json"}:
+        raise ValueError("HPC_SUBMIT_FORMAT: require text or json")
     workspace = _config.load_workspace(parsed)
     cluster = workspace_cluster(workspace)
     run_path = pathlib.Path(cli_args.require_flag(parsed, "--run"))
@@ -132,6 +137,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         charge_account=budget["charge_account"],
         repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
     )
+
+    if output_format == "json":
+        recorded = ledger.require_entry(
+            ledger.read(pathlib.Path(workspace["ledger"]), cluster), member.job_id, host
+        )
+        _test_hooks.emit(dump_json_str(encode_ledger_entry(recorded)))
+        return 0
 
     _test_hooks.emit(f"submitted {member.job_id} {member.name}")
     _test_hooks.emit(
