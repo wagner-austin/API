@@ -198,9 +198,11 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
 #: every test passing (the module docstring), and each declaring the minimum
 #: of 3 workers its 2 spare cores cannot afford; beside each, the stack hosts
 #: that carry its tags and refuse it because it is not pinned to them. demure
-#: carries no testdb tag, so MCPs/packages/db never reaches it.
+#: carries no testdb tag, so MCPs/packages/db never reaches it, and no docker
+#: tag since MCPs board task ae130923 (it has no rootless execdocker lane), so
+#: neither does MCPs/execution-deploy.
 LENOVOLD_REFUSED = {
-    "MCPs/execution-deploy": ("demure", "diphtheria"),
+    "MCPs/execution-deploy": ("diphtheria",),
     "MCPs/execution-linux": ("demure", "diphtheria"),
     "MCPs/mcp-shared": ("demure", "diphtheria"),
     "MCPs/packages/db": ("diphtheria",),
