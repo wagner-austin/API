@@ -102,6 +102,23 @@ into a new output directory. Results include the shared
 them. Lifecycle events go to `wrds-ledger.jsonl` beside an external spec or
 at the shared main checkout for repository specs.
 
+```bash
+python -m hpc3.cli.wrds report --spec experiment.json --attempt first --report-task TASK_UUID
+```
+
+`report` measures one attempt on WRDS and posts the reading on board task
+`TASK_UUID` as `load-report-<first eight characters>`, the identity the WRDS
+inventories also post under, so an audit selects the program's post rather
+than a session's restatement. The post names the job, the experiment identity,
+every code and input sha256, the interpreter digest and package-pin digest,
+and the scheduler state. A terminal job adds qacct's execution `hostname`,
+`failed` and `exit_status`. A completed job adds each attested output's sha256
+and the sha256 of the `results.runrecord.json` bytes collect writes, so two
+attempts match exactly when those lines do. Any other job adds the
+`WRDS_NOT_COMPLETE` refusal collect gives and whether `completion.json` is
+present or absent on WRDS. A completed job whose attestation does not match
+fails the command with collect's own refusal, and posts nothing.
+
 The backend currently supports individual Python CPU jobs, with conservative
 limits of eight slots, 48 GiB total and seven days. It pins interpreter bytes
 and installed package **versions**, not an immutable container or every
