@@ -434,9 +434,17 @@ class TestTheHubTickPublishes:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_registry_publish"]
         assert endpoint.arguments[2]["projects"] == [
-            {"project": "MCPs", "requiredTags": []},
-            {"project": "MCPs/packages/wiki-check", "requiredTags": ["cxx", "pdftotext"]},
-            {"project": "tools/fleet", "requiredTags": ["linux"]},
+            {"project": "MCPs", "requiredTags": [], "dispatchNodes": ["sedona", "serendipity"]},
+            {
+                "project": "MCPs/packages/wiki-check",
+                "requiredTags": ["cxx", "pdftotext"],
+                "dispatchNodes": [],
+            },
+            {
+                "project": "tools/fleet",
+                "requiredTags": ["linux"],
+                "dispatchNodes": ["sedona", "serendipity"],
+            },
         ]
         assert endpoint.arguments[2]["runners"] == list(RUNNERS)
         assert endpoint.arguments[2]["commit"] == commit
