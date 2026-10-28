@@ -124,6 +124,18 @@
   },
   "required_symbols": [
     {
+      "module": "cleargbm.ensemble",
+      "attribute": "train_gradient_boosting"
+    },
+    {
+      "module": "covenant_domain",
+      "attribute": "extract_features"
+    },
+    {
+      "module": "platform_ml",
+      "attribute": "ModelManifestV2"
+    },
+    {
       "module": "covenant_ml.evaluation.wrds",
       "attribute": "load_wrds_evaluation"
     },
