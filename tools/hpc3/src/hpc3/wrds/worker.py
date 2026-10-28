@@ -15,9 +15,15 @@ from collections.abc import Sequence
 from platform_core.comparability import cpu_run_fingerprint
 from platform_core.determinism_record import determinism_record
 from platform_core.environment_record import package_versions
-from platform_core.json_utils import dump_json_str, load_json_bytes, narrow_json_to_list
+from platform_core.json_utils import (
+    dump_json_str,
+    load_json_bytes,
+    load_json_str,
+    narrow_json_to_list,
+)
 from platform_core.run_record import decode_observation, encode_run_record, run_record
 
+from hpc3.contracts.wrds_extract import decode_crsp_selection
 from hpc3.contracts.wrds_run import (
     WrdsRun,
     decode_wrds_run,
@@ -25,6 +31,7 @@ from hpc3.contracts.wrds_run import (
     run_identity,
 )
 from hpc3.wrds import _test_hooks
+from hpc3.wrds.extract import extract
 
 
 def checked_file(path: pathlib.Path, expected: str) -> str:
@@ -181,8 +188,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         sys.stdout.write(dump_json_str(encode_wrds_runtime(_test_hooks.runtime())) + "\n")
     elif len(tokens) == 3 and tokens[0] == "run":
         execute_run(pathlib.Path(tokens[1]), tokens[2])
+    elif len(tokens) == 2 and tokens[0] == "extract":
+        extract(decode_crsp_selection(load_json_str(tokens[1])))
     else:
-        raise ValueError("WRDS_WORKER_ARGS: expected inspect or run DOCUMENT ATTEMPT")
+        raise ValueError("WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT or extract SCOPE")
     return 0
 
 

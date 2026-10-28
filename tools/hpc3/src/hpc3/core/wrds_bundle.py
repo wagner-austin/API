@@ -35,7 +35,15 @@ def worker_bundle() -> bytes:
         "config/_test_hooks",
     ):
         members[f"platform_core/{name}.py"] = shared / f"{name}.py"
-    for name in ("contracts/pins", "contracts/wrds_run", "wrds/_test_hooks", "wrds/worker"):
+    for name in (
+        "contracts/pins",
+        "contracts/wrds_run",
+        "contracts/wrds_extract",
+        "contracts/wrds_sql",
+        "wrds/_test_hooks",
+        "wrds/worker",
+        "wrds/extract",
+    ):
         members[f"hpc3/{name}.py"] = package / f"{name}.py"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:

@@ -38,6 +38,19 @@ ACCESSIBLE_STATUSES: tuple[str, ...] = ("direct_table_granted", "alias_and_under
 _FIELDS = 13
 
 
+def psql_argv(script: str, output: str) -> list[str]:
+    """Build the noninteractive, fail-fast database command used by WRDS jobs.
+
+    Args:
+        script: Saved SQL file, passed literally without shell interpretation.
+        output: File receiving query output.
+
+    Returns:
+        Arguments disabling user startup scripts and password prompting.
+    """
+    return ["psql", "-X", "-w", "-q", "-v", "ON_ERROR_STOP=1", "-f", script, "-o", output]
+
+
 class SqlRelation(TypedDict):
     """One visible relation and the privileges the account holds on it."""
 

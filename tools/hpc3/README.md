@@ -128,6 +128,33 @@ payloads deterministic. UCI's Slurm sweeps, chains and container workflow
 remain separate commands. SSH authentication must be valid when commands
 connect; submitted jobs continue if the client disconnects.
 
+### Bounded CRSP extraction
+
+`python -m hpc3.cli.wrds bundle --output extract.pyz` saves the maintained
+worker as a portable payload and prints its SHA256. Declare those bytes in
+a normal WRDS run's `code`, set `entrypoint` to `extract.pyz`, and set
+`arguments` to `["extract", "<selection JSON>"]`. The selection has exactly
+`source_table` (`crsp.dsf` or `crsp_a_stock.dsf`), positive `security_id`,
+inclusive `start_date` and `end_date` in `YYYY-MM-DD`, and `max_rows`
+(3–10,000). The end must precede the extraction day. Use the ordinary
+inspect/preflight/submit/status/collect/report lifecycle above.
+
+Declare `data.csv`, `extract.sql`, `extraction.json` and `metrics.json` as
+outputs. The extraction uses a read-only repeatable-read transaction with a
+120-second statement timeout. It requests one extra row and refuses a result
+over the declared cap; it never silently truncates. Missing return values
+remain in the CSV for the evaluation adapter to reject explicitly. The receipt
+records the scope, start/completion timestamps, row count and both file hashes;
+the enclosing worker attests them with its existing completion record.
+
+Collect into private storage. Prepare the existing `covenant_ml.evaluation.wrds`
+manifest using its encoder and the receipt's file names, hashes and extraction
+time, plus explicitly chosen split fractions and embargo. Stage the manifest,
+CSV and query using `hpc3-stage`, then run the existing paired evaluation with
+`--wrds-manifest`. Replays use the same saved snapshot; another live extraction
+has its own timestamp and identity even when its rows match. The timestamp
+records when data were acquired, not when every historical value became known.
+
 ### WRDS data inventory
 
 The same package can inventory WRDS Cloud through its existing SSH alias:

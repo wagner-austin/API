@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import importlib.metadata
 import os
@@ -59,6 +60,15 @@ def _default_host() -> HostRecord:
         Operating system, architecture and processor count.
     """
     return capture_host_record(stdlib_host_probe(os.cpu_count))
+
+
+def _default_now_iso() -> str:
+    """Read the current UTC instant for the extraction receipt.
+
+    Returns:
+        Timezone-qualified ISO timestamp.
+    """
+    return datetime.datetime.now(datetime.UTC).isoformat()
 
 
 class Execute(Protocol):
@@ -155,11 +165,13 @@ environment: Callable[[], dict[str, str]] = config_hooks.get_environment
 read: Callable[[pathlib.Path], bytes] = _default_read
 write: Callable[[pathlib.Path, bytes], None] = _default_write
 new_directory: Callable[[pathlib.Path], None] = _default_new_directory
+now_iso: Callable[[], str] = _default_now_iso
 
 
 def reset_hooks() -> None:
     """Restore all production implementations."""
     global digest_file, runtime, host, execute, environment, read, write, new_directory
+    global now_iso
     digest_file, runtime, host = _default_digest, _default_runtime, _default_host
     execute, environment, read, write = (
         _default_execute,
@@ -168,6 +180,7 @@ def reset_hooks() -> None:
         _default_write,
     )
     new_directory = _default_new_directory
+    now_iso = _default_now_iso
 
 
 __all__ = [

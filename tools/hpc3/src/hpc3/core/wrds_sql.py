@@ -35,6 +35,7 @@ from hpc3.contracts.wrds_sql import (
     SqlRun,
     decode_sql_relation,
     encode_sql_receipt,
+    psql_argv,
 )
 from hpc3.core import _test_hooks, wrds_grid
 
@@ -197,20 +198,6 @@ def shortlist_csv(relations: list[SqlRelation], statuses: list[str]) -> str:
     return buffer.getvalue()
 
 
-def _psql(script: str, output: str) -> list[str]:
-    """Build the psql invocation every job runs.
-
-    Args:
-        script: Remote script path.
-        output: Where psql writes query output.
-
-    Returns:
-        The argv: no ``.psqlrc``, never prompting for a password, quiet, and
-        stopping at the first error.
-    """
-    return ["psql", "-X", "-w", "-q", "-v", "ON_ERROR_STOP=1", "-f", script, "-o", output]
-
-
 def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     """Catalog and validate SQL access, saving verified metadata locally.
 
@@ -241,7 +228,7 @@ def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     remote_catalog = str(remote / "relations.csv")
     query_sha = wrds_grid.upload(host, query, RELATIONS_QUERY.encode("utf-8"))
     metadata_job = wrds_grid.submit(
-        host, remote, "wrds_sql_catalog", _psql(query, remote_catalog), environment=True
+        host, remote, "wrds_sql_catalog", psql_argv(query, remote_catalog), environment=True
     )
     artifact = wrds_grid.download(host, remote_catalog)
     relations = read_relations(artifact["text"])
@@ -255,7 +242,7 @@ def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     validation = str(remote / "validate.sql")
     validation_sha = wrds_grid.upload(host, validation, script)
     validation_job = wrds_grid.submit(
-        host, remote, "wrds_sql_validate", _psql(validation, "/dev/null"), environment=True
+        host, remote, "wrds_sql_validate", psql_argv(validation, "/dev/null"), environment=True
     )
     receipt = SqlReceipt(
         host=host,

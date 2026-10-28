@@ -23,9 +23,12 @@ from hpc3.contracts.wrds_run import decode_wrds_run, encode_wrds_runtime, run_id
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import wrds_attempt_report, wrds_jobs, wrds_results, wrds_scheduler
 from hpc3.core.checkout import shared_directory
+from hpc3.core.wrds_bundle import worker_bundle
+from hpc3.wrds import _test_hooks as worker_hooks
 
 _FLAGS = ("--spec", "--attempt", "--output", "--host", "--root", "--python", "--report-task")
 _ACTIONS = {
+    "bundle",
     "inspect",
     "preflight",
     "submit",
@@ -70,6 +73,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError("WRDS_ACTION: expected " + ", ".join(sorted(_ACTIONS)))
     action = tokens[0]
     flags = cli_args.parse_single_flags(tokens[1:], _FLAGS)
+    if action == "bundle":
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        worker_hooks.write(output, worker_bundle())
+        _test_hooks.emit(
+            dump_json_str({"output": str(output), "sha256": worker_hooks.digest_file(output)})
+        )
+        return 0
     if action == "inspect":
         runtime = wrds_jobs.inspect_runtime(
             cli_args.require_flag(flags, "--host"),
