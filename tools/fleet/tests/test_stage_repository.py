@@ -251,10 +251,15 @@ class TestNoAutoGc:
         The files' blobs all land in :data:`SAMPLED_DIRECTORY`. ``gc.auto``
         1 makes two loose objects there enough, and ``gc.autoDetach`` false
         makes the commit wait for the pack, so what took three seconds in
-        the background on diphtheria is over when the command returns. The
-        stage's own ``git init`` that runs next keeps both values, as it
-        would keep a node's defaults, and its ``gc.auto 0`` overrides the
-        first, as it overrides a node's 6700.
+        the background on diphtheria is over when the command returns.
+        ``maintenance.strategy`` gc keeps the commit's automatic maintenance
+        a gc: git 2.56.0's default strategy runs none, so on the GitHub
+        runner image of 2026-10-25 the control below found every loose
+        object still in place (API packages run 40626462260), and on loki
+        on 2026-10-28 this setting alone made 2.56.0 pack and prune them as
+        2.54.0 does without it. The stage's own ``git init`` that runs next
+        keeps these values, as it would keep a node's defaults, and its
+        ``gc.auto 0`` overrides the first, as it overrides a node's 6700.
 
         Args:
             tmp_path: Where the tree is made.
@@ -270,6 +275,7 @@ class TestNoAutoGc:
         _git("init", "--quiet", str(tree))
         _git("-C", str(tree), "config", "gc.auto", "1")
         _git("-C", str(tree), "config", "gc.autoDetach", "false")
+        _git("-C", str(tree), "config", "maintenance.strategy", "gc")
         return tree, [object_id for _content, object_id in blobs]
 
     def test_without_the_setting_the_commit_packs_and_prunes_the_loose_objects(
