@@ -179,6 +179,43 @@ reader understands the paired benchmark's `results` payload convention. It
 provides reproducibility evidence, not tamper-proof attestation against an owner
 who can rewrite the cluster files, ledger and logs.
 
+### Run admitted validation research
+
+The existing `covenant_ml` proposal journal now drives staging, submission and
+reconciliation through this package. See
+[`MARKET_RESEARCH.md`](../../libs/covenant_ml/docs/MARKET_RESEARCH.md#frozen-research-proposal-admission)
+for the operator-owned trial/cluster configuration and lifecycle commands.
+`hpc3.cli.submit --format json` emits the persisted ledger row. Recovery and
+single-attempt verification use:
+
+```bash
+python -m hpc3.cli.execution_inspect --config runs/hpc3.json \
+  --attempt POLICY_SHA256:ATTEMPT_NUMBER --checksums /private/attempt/checksums.txt \
+  --report-task FULL_TASK_UUID
+```
+
+This resolves one `research_attempt` in the shared ledger. Pending and failed
+allocations report their native state; completed allocations must also pass the
+same artifact, runtime, timestamp and compute-checksum checks used by replay
+verification. The program posts its measurement and emits structured JSON for
+the journal controller. Missing or ambiguous submissions never authorize retry.
+
+The installed Ziggurat controller is
+`/home/corvis/research-control/wrds-validation-2e445e25e/bin/python`, with the
+proposal entrypoint under the adjacent `entrypoint/` working directory. Its
+policy, journal and cluster configuration are under
+`/home/corvis/research-data/wrds/experiments/admitted-validation-20261028/`.
+It uses installed wheels rather than relying on this temporary worktree.
+
+Live attempt **58578600** completed with exit `0:0` on `hpc3-17-19` in 12
+seconds, using one CPU, no GPU, eight verified files and 13 shared observations.
+The controller recorded completion and refused the duplicate candidate/seed.
+The frozen image was built and verified by job **58578547**. Metadata, policy,
+recipe and image spec are retained in
+[`artifacts/wrds-validation-20261028/`](artifacts/wrds-validation-20261028/provenance.json).
+This validates the engineering path on one CRSP security. It does not implement
+the monthly portfolio protocol or establish profitability.
+
 ### WRDS data inventory
 
 The same package can inventory WRDS Cloud through its existing SSH alias:

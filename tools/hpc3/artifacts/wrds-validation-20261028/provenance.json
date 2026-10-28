@@ -1,0 +1,69 @@
+{
+  "kind": "wrds-admitted-validation-provenance",
+  "source_commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+  "task_id": "6d2d086c-5242-482b-ac81-8a61dd8e354d",
+  "report_author": "hpc-report-6d2d086c",
+  "report_prefix": "HPC3 ATTEMPT LOAD-REPORT",
+  "private_evidence_root": "/home/corvis/research-data/wrds/experiments/admitted-validation-20261028",
+  "controller_python": "/home/corvis/research-control/wrds-validation-2e445e25e/bin/python",
+  "controller_working_directory": "/home/corvis/research-control/wrds-validation-2e445e25e/entrypoint",
+  "shared_ledger": "/home/corvis/PROJECTS/API/tools/hpc3/runs/ledger.jsonl",
+  "accounting": {
+    "job": {
+      "job_id": "58578600",
+      "name": "cleargbm.research-e9ad0a4ef118-1",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 12,
+      "billing_tres": 1,
+      "gpu_count": 0,
+      "cpu_count": 1,
+      "node_list": "hpc3-17-19"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-10-28T19:29:54",
+    "ended_at": "2026-10-28T19:30:06"
+  },
+  "verified_files": {
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+    "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+    "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/research_trial.py": "0788b3f20d1798c53f33fc4cbb7ca4aee6ca4949bf3fcb7f9f43d825c457add2",
+    "/pub/wagnera3/images/research-validation-2e445e25e/research-validation.sif": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+    "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/1/request.json": "2206e1aa96913dea26b57b1866173183b520a2f052ffe76c86661961ddd5a90c"
+  },
+  "result_sha256": "6d78c73d1479a7580e91854289a471cceaea170a6e7d0b230bdcebff25e8cf83",
+  "record_sha256": "d1d88df70e3cace828a1569e2423a8cd3f32abac5cd49f20015cb8f2d5141e79",
+  "stdout_sha256": "e1c4d1bc253186b5de8484cbd5377d52fdc8f8c2d92dc4737910d6a792a81bdd",
+  "result_mtime": 1793215805,
+  "record_mtime": 1793215805,
+  "observation_count": 13,
+  "protocol_digest": "b37275094e3c5f2831f4e35c669a3c143ba8f7d4e5f1cfd10cafbbdfb3cffc8f",
+  "attempt": "1",
+  "duplicate_refusal": "candidate_seed_consumed",
+  "controller_wheel_sha256": "715caf1dd31e7f56d1aeee4cc4d1e83d1d4fef6ed0e6aa5f25b920331acbb604",
+  "image_build": {
+    "image": "/pub/wagnera3/images/research-validation-2e445e25e/research-validation.sif",
+    "sha256": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+    "source_commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+    "accounting": {
+      "job": {
+        "job_id": "58578547",
+        "name": "cleargbm.research-image-2e445e25e",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 84,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-15-16"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-28T19:26:17",
+      "ended_at": "2026-10-28T19:27:41"
+    }
+  },
+  "interpretation": "Next-observed-return sign validation diagnostic on one CRSP security, not a monthly strategy or profitability evidence."
+}
