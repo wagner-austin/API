@@ -265,7 +265,9 @@ class TestReadDeclared:
         assert declared.read_declared(tmp_path) == declared.RegistryRead(
             commit=COMMIT,
             projects=(
-                declared.DeclaredProject(project="MCPs", required_tags=(), dispatch_nodes=("sedona",)),
+                declared.DeclaredProject(
+                    project="MCPs", required_tags=(), dispatch_nodes=("sedona",)
+                ),
             ),
             runners=("fleet-node-sedona",),
             checked_at="2026-10-14T23:00:00+00:00",
