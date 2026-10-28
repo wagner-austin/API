@@ -41,15 +41,15 @@ object from `runtime.json` and the SHA256 of each source/input file:
   "root": "/home/uci/awagner14/wrds-experiments",
   "runtime": {
     "python": "/usr/local/bin/python3",
-    "sha256": "<measured interpreter sha256>",
-    "version": "<measured Python version>",
-    "packages": {"<normalized distribution name>": "<installed version>"}
+    "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "version": "3.14.5",
+    "packages": {}
   },
   "slots": 1,
   "memory_gb_per_slot": 2,
   "seconds": 600,
   "seed": 42,
-  "code": [{"path": "main.py", "name": "main.py", "sha256": "<source sha256>"}],
+  "code": [{"path": "main.py", "name": "main.py", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],
   "inputs": [],
   "entrypoint": "main.py",
   "arguments": [],
@@ -57,7 +57,9 @@ object from `runtime.json` and the SHA256 of each source/input file:
 }
 ```
 
-`code.path` resolves against the specification directory; `code.name` is
+The example hashes are placeholders; replace the entire runtime object with
+the measured one, including every installed package. `code.path` resolves
+against the specification directory; `code.name` is
 its staged relative path. Each input has the same three fields, but its
 `path` is an existing absolute WRDS path. Pin a research extract before
 running experiments against it: an unversioned SQL query is not a frozen

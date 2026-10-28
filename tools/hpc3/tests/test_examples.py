@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import pathlib
 
-from platform_core.json_utils import JSONValue, load_json_str
+from platform_core.json_utils import JSONValue, load_json_str, narrow_json_to_dict
 
 from hpc3.contracts.run import resolve_chain, resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, decode_workspace
+from hpc3.contracts.wrds_run import decode_wrds_run
 from tests.against_hpc3 import decode_project_config
 
 _EXAMPLES = pathlib.Path(__file__).parent.parent / "examples"
@@ -124,8 +125,8 @@ class TestTheReadmeIsAnExampleToo:
 
     def test_every_documented_json_block_parses(self) -> None:
         blocks = _readme_json_blocks()
-        assert len(blocks) == 7
-        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 7
+        assert len(blocks) == 8
+        assert [isinstance(load_json_str(block), dict) for block in blocks] == [True] * 8
 
     def test_every_documented_project_entry_decodes(self) -> None:
         configs = _readme_project_configs()
@@ -142,9 +143,17 @@ class TestTheReadmeIsAnExampleToo:
         assert decode_project_config(cpu[0])["partition"] == "free"
 
     def test_the_documented_workspace_decodes_whole(self) -> None:
-        document = load_json_str(_readme_json_blocks()[0])
+        documents = [narrow_json_to_dict(load_json_str(block)) for block in _readme_json_blocks()]
+        document = next(item for item in documents if item.get("cluster") == "hpc3")
         workspace = decode_workspace(document, config_dir=_EXAMPLES, ledger_dir=_EXAMPLES)
         assert workspace["host"] == "hpc3"
+
+    def test_the_wrds_example_decodes_whole(self) -> None:
+        documents = [narrow_json_to_dict(load_json_str(block)) for block in _readme_json_blocks()]
+        document = next(item for item in documents if item.get("host") == "wrds")
+        run = decode_wrds_run(document)
+        assert run["entrypoint"] == "main.py"
+        assert run["outputs"] == ["metrics.json"]
 
     def test_the_readme_states_what_it_cannot_submit(self) -> None:
         """A tool that only documents its powers reads as having no limits.
