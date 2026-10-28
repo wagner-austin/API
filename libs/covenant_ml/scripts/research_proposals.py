@@ -27,6 +27,8 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     """
     pin()
     from covenant_ml.markets import _test_hooks
+    from covenant_ml.markets.research_cluster import decode_research_cluster
+    from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
     from covenant_ml.markets.research_journal import (
         admit_proposal,
         encode_research_attempt,
@@ -34,6 +36,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         research_policy_digest,
     )
     from covenant_ml.markets.research_records import decode_research_policy
+    from covenant_ml.markets.research_trial_records import decode_research_trial
     from covenant_ml.markets.validation import parse_timestamp, read_document
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -44,6 +47,11 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     commands.add_parser("status")
     propose = commands.add_parser("propose")
     propose.add_argument("--proposal", required=True, type=Path)
+    for name in ("submit", "reconcile"):
+        execution = commands.add_parser(name)
+        execution.add_argument("--trial", required=True, type=Path)
+        execution.add_argument("--cluster", required=True, type=Path)
+        execution.add_argument("--directory", required=True, type=Path)
     args = parser.parse_args(argv)
     action: str = args.action
     policy_path: Path = args.policy
@@ -55,7 +63,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         attempts = journal.initialize(ledger_path)
     elif action == "status":
         attempts = journal.read(ledger_path)
-    else:
+    elif action == "propose":
         proposal_path: Path = args.proposal
         row = admit_proposal(
             ledger_path,
@@ -66,6 +74,16 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         attempts = (row,)
         if row["status"] == "refused":
             code = 2
+    else:
+        trial_path: Path = args.trial
+        cluster_path: Path = args.cluster
+        directory: Path = args.directory
+        trial = decode_research_trial(read_document(trial_path))
+        if trial["policy"] != policy:
+            raise ValueError("RESEARCH_EXECUTION_REQUEST: trial policy differs from journal")
+        cluster = decode_research_cluster(read_document(cluster_path))
+        operation = submit_attempt if action == "submit" else reconcile_attempt
+        attempts = (operation(ledger_path, trial, cluster, directory.resolve()),)
     report: JSONObject = {
         "policy_digest": research_policy_digest(policy),
         "attempts": [encode_research_attempt(row) for row in attempts],

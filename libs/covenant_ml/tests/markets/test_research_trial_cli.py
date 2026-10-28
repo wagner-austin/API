@@ -19,7 +19,7 @@ from tests.benchmarking._cli_fixtures import stand_in_pin
 from ._trial_fixtures import trial_document
 
 
-@pytest.fixture
+@pytest.fixture()
 def image_environment() -> Generator[None, None, None]:
     """Declare the synthetic runtime identity and restore the shared seam."""
     previous = config_test_hooks.get_env
@@ -42,7 +42,10 @@ def test_compute_cli_measures_its_entrypoint_source(
     record = decode_run_record(load_json_str(run_record_sidecar(output).read_text()))
     assert record["label"] == "1"
     assert record["fingerprint"]["image_digest"] == "d" * 64
-    assert f"manifest -> {output}" in capsys.readouterr().out
+    assert capsys.readouterr().out.splitlines()[-2:] == [
+        f"manifest -> {output}",
+        f"run record -> {run_record_sidecar(output)}",
+    ]
 
 
 def test_entrypoint_refuses_a_late_numerical_pin() -> None:
@@ -67,5 +70,7 @@ def test_real_compute_process_reports_missing_request(tmp_path: Path) -> None:
         check=False,
     )
     assert result.returncode != 0
-    assert "FileNotFoundError" in result.stderr
+    assert result.stderr.splitlines()[-1] == (
+        f"FileNotFoundError: [Errno 2] No such file or directory: '{tmp_path / 'missing.json'}'"
+    )
     assert not (tmp_path / "result").exists()

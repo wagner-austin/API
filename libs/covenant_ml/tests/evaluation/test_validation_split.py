@@ -13,9 +13,15 @@ def test_validation_keeps_whole_groups_and_excludes_final_rows() -> None:
     labels: NDArray[np.int64] = keys % 2
     factory = ChronologicalGroupedSplits(features, labels, keys, 0.5, 0.25, 1)
     actual = factory.validation_split(0.7)
-    np.testing.assert_array_equal(actual.split.x_train[:, 0], np.repeat(np.arange(14), 2))
-    np.testing.assert_array_equal(actual.split.x_val[:, 0], np.repeat(np.arange(15, 20), 2))
-    np.testing.assert_array_equal(actual.test_groups, np.repeat(np.arange(21, 30), 2))
+    np.testing.assert_array_equal(
+        actual.split.x_train[:, 0], np.repeat(np.arange(14, dtype=np.int64), 2)
+    )
+    np.testing.assert_array_equal(
+        actual.split.x_val[:, 0], np.repeat(np.arange(15, 20, dtype=np.int64), 2)
+    )
+    np.testing.assert_array_equal(
+        actual.test_groups, np.repeat(np.arange(21, 30, dtype=np.int64), 2)
+    )
     np.testing.assert_array_equal(actual.split.x_test[:, 0], actual.test_groups)
     # Alter only final-test rows. No fitting, stopping or scoring input may change.
     features[keys >= 31] = 1e9
