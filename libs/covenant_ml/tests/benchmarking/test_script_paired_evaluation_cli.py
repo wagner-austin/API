@@ -16,6 +16,7 @@ from covenant_ml.benchmarking.declarations import PAIRED_EVALUATION
 from covenant_ml.evaluation.codec_manifests import decode_evaluation_manifest
 from covenant_ml.evaluation.types import EvaluationManifest, ResamplingUnit
 
+from ..evaluation.test_wrds import write_extract
 from ._cli_fixtures import interval_flags, model_flags, stand_in_pin, write_corpus
 
 
@@ -84,6 +85,34 @@ def test_an_unknown_unit_is_refused_before_any_fit(tmp_path: Path) -> None:
 def test_a_run_that_states_nothing_is_refused() -> None:
     with pytest.raises(SystemExit):
         main([], pin=stand_in_pin)
+
+
+def test_wrds_uses_the_same_real_learners_and_record_writer(tmp_path: Path) -> None:
+    path, _ = write_extract(tmp_path)
+    output = tmp_path / "paired.json"
+    args = _args(path, output, unit="block")
+    args[args.index("--csv")] = "--wrds-manifest"
+    args[args.index("--block-length") + 1] = "3"
+    assert main(args, pin=stand_in_pin) == 0
+    manifest = _read(output)
+    assert manifest["dataset"]["n_rows"] == 159
+    assert manifest["resampling"]["unit"] is ResamplingUnit.BLOCK
+    assert {r["arm"] for r in manifest["results"]} == {"cleargbm", "lightgbm", "xgboost"}
+    record = decode_run_record(
+        narrow_json_to_dict(load_json_str(run_record_sidecar(output).read_text("utf-8")))
+    )
+    assert record["label"].startswith(manifest["dataset"]["sha256"][:12])
+    assert record["fingerprint"] == manifest["fingerprint"]
+
+
+def test_wrds_refuses_independent_row_inference(tmp_path: Path) -> None:
+    path, _ = write_extract(tmp_path)
+    output = tmp_path / "paired.json"
+    args = _args(path, output, unit="row")
+    args[args.index("--csv")] = "--wrds-manifest"
+    with pytest.raises(ValueError, match="WRDS_DATA_UNIT"):
+        main(args, pin=stand_in_pin)
+    assert not output.exists()
 
 
 def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
