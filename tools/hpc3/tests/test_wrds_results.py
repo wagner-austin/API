@@ -15,7 +15,7 @@ from platform_core.json_utils import (
 
 from hpc3.contracts.wrds_run import WrdsRun
 from hpc3.core.wrds_results import collect, verified_completion
-from hpc3.wrds import _test_hooks as hooks
+from hpc3.wrds import _test_hooks as worker_hooks
 from hpc3.wrds.worker import execute_run
 from tests.conftest import FakeRun
 from tests.test_wrds_scheduler import HELD
@@ -34,9 +34,9 @@ def actual_result(directory: pathlib.Path) -> tuple[WrdsRun, JSONObject]:
         Run and completion metadata.
     """
     run = example(directory)
-    hooks.environment = job_environment
+    worker_hooks.environment = job_environment
     execute_run(directory / "run.json", "one")
-    hooks.reset_hooks()
+    worker_hooks.reset_hooks()
     return run, narrow_json_to_dict(load_json_str((directory / "completion.json").read_text()))
 
 

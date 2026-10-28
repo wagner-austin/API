@@ -3,20 +3,20 @@
 from __future__ import annotations
 
 import hashlib
-import os
 import pathlib
 import subprocess
 import sys
 from collections.abc import Generator
 
 import pytest
+from platform_core.config import _test_hooks as config_hooks
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict, require_dict
 from platform_core.run_record import decode_run_record
 
-from hpc3.contracts.wrds_run import WrdsFile, WrdsRuntime, execution_document
+from hpc3.contracts.wrds_run import WrdsFile, WrdsRuntime, encode_wrds_runtime, execution_document
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.wrds_bundle import worker_bundle
-from hpc3.wrds import _test_hooks as hooks
+from hpc3.wrds import _test_hooks as worker_hooks
 from hpc3.wrds.worker import check_inputs, check_runtime, checked_file, execute_run, main
 from tests.wrds_support import PAYLOAD, example
 
@@ -32,10 +32,10 @@ def job_environment() -> dict[str, str]:
 
 @pytest.fixture(autouse=True)
 def worker_effects() -> Generator[None, None, None]:
-    hooks.reset_hooks()
-    hooks.environment = job_environment
+    worker_hooks.reset_hooks()
+    worker_hooks.environment = job_environment
     yield
-    hooks.reset_hooks()
+    worker_hooks.reset_hooks()
 
 
 def test_real_worker_repeats_and_emits_shared_run_record(tmp_path: pathlib.Path) -> None:
@@ -66,7 +66,7 @@ def test_bundle_is_deterministic_and_runs_without_installed_hpc3(tmp_path: pathl
     reply = core_hooks._default_run([sys.executable, "-s", str(archive), "inspect"])
     assert reply["returncode"] == 0
     result = narrow_json_to_dict(load_json_str(reply["stdout"]))
-    assert result["sha256"] == hooks._default_runtime()["sha256"]
+    assert result["sha256"] == worker_hooks._default_runtime()["sha256"]
     failed = core_hooks._default_run([sys.executable, "-s", str(archive), "invalid"])
     assert failed["returncode"] != 0
     assert "WRDS_WORKER_ARGS" in failed["stderr"]
@@ -99,10 +99,12 @@ def test_real_payload_failures_never_attest_success(
 
 
 def test_real_process_timeout_and_nonzero_exit(tmp_path: pathlib.Path) -> None:
-    code = hooks._default_execute([sys.executable, "-c", "raise SystemExit(7)"], tmp_path, {}, 5)
+    code = worker_hooks._default_execute(
+        [sys.executable, "-c", "raise SystemExit(7)"], tmp_path, {}, 5
+    )
     assert code == 7
     with pytest.raises(subprocess.TimeoutExpired):
-        hooks._default_execute(
+        worker_hooks._default_execute(
             [sys.executable, "-c", "import time; time.sleep(20)"], tmp_path, {}, 1
         )
     assert (tmp_path / "payload.out").read_bytes() == b""
@@ -149,7 +151,7 @@ def test_runtime_drift_and_bad_job_id(tmp_path: pathlib.Path) -> None:
     def bad_job() -> dict[str, str]:
         return {"JOB_ID": "invalid"}
 
-    hooks.environment = bad_job
+    worker_hooks.environment = bad_job
     with pytest.raises(ValueError, match="WRDS_JOB_ID"):
         execute_run(tmp_path / "run.json", "one")
 
@@ -161,12 +163,12 @@ def test_runtime_recheck_refuses_changed_environment(tmp_path: pathlib.Path) -> 
     def changed_runtime() -> WrdsRuntime:
         nonlocal calls
         calls += 1
-        value = hooks._default_runtime()
+        value = worker_hooks._default_runtime()
         if calls == 2:
             value["version"] = "changed"
         return value
 
-    hooks.runtime = changed_runtime
+    worker_hooks.runtime = changed_runtime
     with pytest.raises(ValueError, match="WRDS_RUNTIME_DRIFT"):
         execute_run(tmp_path / "run.json", "one")
     assert calls == 2
@@ -176,28 +178,29 @@ def test_runtime_recheck_refuses_changed_environment(tmp_path: pathlib.Path) -> 
 
 def test_io_effects_fail_without_overwriting(tmp_path: pathlib.Path) -> None:
     path = tmp_path / "artifact"
-    hooks._default_write(path, b"one")
-    assert hooks._default_read(path) == b"one"
+    worker_hooks._default_write(path, b"one")
+    assert worker_hooks._default_read(path) == b"one"
     assert (
         checked_file(path, hashlib.sha256(b"one").hexdigest()) == hashlib.sha256(b"one").hexdigest()
     )
     with pytest.raises(FileExistsError):
-        hooks._default_write(path, b"two")
+        worker_hooks._default_write(path, b"two")
     with pytest.raises(FileNotFoundError):
-        hooks._default_digest(tmp_path / "absent")
+        worker_hooks._default_digest(tmp_path / "absent")
     directory = tmp_path / "new"
-    hooks._default_new_directory(directory)
+    worker_hooks._default_new_directory(directory)
     with pytest.raises(FileExistsError):
-        hooks._default_new_directory(directory)
+        worker_hooks._default_new_directory(directory)
     assert directory.is_dir()
-    assert hooks._default_environment() == dict(os.environ)
+    worker_hooks.reset_hooks()
+    assert worker_hooks.environment() == config_hooks.get_environment()
 
 
 def test_worker_argument_boundaries(
     capsys: pytest.CaptureFixture[str], tmp_path: pathlib.Path
 ) -> None:
     assert main(["inspect"]) == 0
-    assert '"python"' in capsys.readouterr().out
+    assert load_json_str(capsys.readouterr().out) == encode_wrds_runtime(worker_hooks.runtime())
     with pytest.raises(ValueError, match="WRDS_WORKER_ARGS"):
         main([])
 
@@ -209,7 +212,7 @@ def test_runtime_refuses_broken_distribution_metadata(tmp_path: pathlib.Path) ->
     sys.path.insert(0, str(tmp_path))
     try:
         with pytest.raises(ValueError, match="distribution has no Name"):
-            hooks._default_runtime()
+            worker_hooks._default_runtime()
     finally:
         sys.path.remove(str(tmp_path))
 
@@ -219,6 +222,6 @@ def test_worker_uses_process_arguments(capsys: pytest.CaptureFixture[str]) -> No
     sys.argv = ["wrds-worker", "inspect"]
     try:
         assert main() == 0
-        assert '"python"' in capsys.readouterr().out
+        assert load_json_str(capsys.readouterr().out) == encode_wrds_runtime(worker_hooks.runtime())
     finally:
         sys.argv = previous

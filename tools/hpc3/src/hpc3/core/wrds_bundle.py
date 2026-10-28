@@ -31,13 +31,21 @@ def worker_bundle() -> bytes:
         "comparability",
         "environment_record",
         "determinism_record",
+        "toml_utils",
+        "config/_test_hooks",
     ):
         members[f"platform_core/{name}.py"] = shared / f"{name}.py"
     for name in ("contracts/pins", "contracts/wrds_run", "wrds/_test_hooks", "wrds/worker"):
         members[f"hpc3/{name}.py"] = package / f"{name}.py"
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
-        for name in ("platform_core", "hpc3", "hpc3/contracts", "hpc3/wrds"):
+        for name in (
+            "platform_core",
+            "platform_core/config",
+            "hpc3",
+            "hpc3/contracts",
+            "hpc3/wrds",
+        ):
             archive.writestr(zipfile.ZipInfo(f"{name}/__init__.py"), b"")
         for name, source in sorted(members.items()):
             archive.writestr(zipfile.ZipInfo(name), _test_hooks.read_bytes(source))

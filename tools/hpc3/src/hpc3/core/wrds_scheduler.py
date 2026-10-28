@@ -33,6 +33,8 @@ def job_argv(run: WrdsRun, directory: str, attempt: str, runner_sha: str) -> lis
         "-terse",
         "-b",
         "y",
+        "-shell",
+        "n",
         "-N",
         "wrds_" + runner_sha[:12] + "_" + attempt[:16],
         "-pe",

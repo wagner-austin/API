@@ -22,7 +22,8 @@ def test_resource_request_is_quoted_and_bounded(tmp_path: pathlib.Path) -> None:
     run = example(tmp_path)
     argv = job_argv(run, "/home/uci/awagner14/run with spaces", "one", "a" * 64)
     assert argv[argv.index("-pe") + 1 : argv.index("-pe") + 3] == ["onenode", "1"]
-    assert "h_rt=30,m_mem_free=2G" in argv
+    assert argv[argv.index("-l") + 1] == "h_rt=30,m_mem_free=2G"
+    assert argv[argv.index("-shell") + 1] == "n"
     assert "-V" not in argv
     assert argv[-2] == "-c"
     assert "sha256sum -c -" in argv[-1]

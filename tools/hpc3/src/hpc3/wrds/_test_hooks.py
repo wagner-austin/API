@@ -12,6 +12,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from typing import Protocol
 
+from platform_core.config import _test_hooks as config_hooks
 from platform_core.environment_record import HostRecord, capture_host_record, stdlib_host_probe
 
 from hpc3.contracts.pins import normalise_name
@@ -114,15 +115,6 @@ def _default_execute(
         ).returncode
 
 
-def _default_environment() -> dict[str, str]:
-    """Read the scheduler environment for the child process.
-
-    Returns:
-        A copy, never a reference to process-global state.
-    """
-    return dict(os.environ)
-
-
 def _default_read(path: pathlib.Path) -> bytes:
     """Read an explicitly requested file.
 
@@ -159,7 +151,7 @@ digest_file: Callable[[pathlib.Path], str] = _default_digest
 runtime: Callable[[], WrdsRuntime] = _default_runtime
 host: Callable[[], HostRecord] = _default_host
 execute: Execute = _default_execute
-environment: Callable[[], dict[str, str]] = _default_environment
+environment: Callable[[], dict[str, str]] = config_hooks.get_environment
 read: Callable[[pathlib.Path], bytes] = _default_read
 write: Callable[[pathlib.Path, bytes], None] = _default_write
 new_directory: Callable[[pathlib.Path], None] = _default_new_directory
@@ -171,7 +163,7 @@ def reset_hooks() -> None:
     digest_file, runtime, host = _default_digest, _default_runtime, _default_host
     execute, environment, read, write = (
         _default_execute,
-        _default_environment,
+        config_hooks.get_environment,
         _default_read,
         _default_write,
     )
