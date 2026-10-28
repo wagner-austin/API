@@ -115,6 +115,13 @@ def test_wrds_refuses_independent_row_inference(tmp_path: Path) -> None:
     assert not output.exists()
 
 
+def test_input_sources_are_mutually_exclusive(tmp_path: Path) -> None:
+    path, _ = write_extract(tmp_path)
+    args = [*_args(path, tmp_path / "out.json"), "--wrds-manifest", str(path)]
+    with pytest.raises(SystemExit):
+        main(args, pin=stand_in_pin)
+
+
 def test_the_entry_point_refuses_once_numpy_is_loaded(tmp_path: Path) -> None:
     """Run as ``__main__`` in this numpy process, the real pin must refuse."""
     import numpy
