@@ -25,8 +25,8 @@ source_git_blobs:
   "src/hpc3/core/wrds_jobs.py": "e79b573ab5a1f145599018c38c95fcde511d9d7b"
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
-  "src/hpc3/core/wrds_attempt_report.py": "bfc35caed2d3825c6bce7664f4e6617746d1b7f7"
-  "src/hpc3/cli/wrds.py": "aa834308825091ae3c0fe78ba74d0c4be91cb0d9"
+  "src/hpc3/core/wrds_attempt_report.py": "97a16cbbd011b4311db2da780b5901791f00580e"
+  "src/hpc3/cli/wrds.py": "51b8110f69f6fd553f070fe9e064ef0f78026864"
   "src/hpc3/wrds/worker.py": "e8a91def08eb391ac271f04c5cf3dbc3561470a5"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
@@ -86,7 +86,11 @@ host, failure code and exit status, the spec's code, input and runtime
 digests, and either the attested output and run-record digests collect would
 write or collect's own refusal and whether `completion.json` exists. The
 completed path calls the same attestation check collect uses, so a report
-cannot call an attempt good that collect would refuse.[^report][^cli]
+cannot call an attempt good that collect would refuse. Its structured output
+also carries `completion_sha256`, the canonical completion manifest digest
+from that same native measurement, or null before completion. A queue consumer
+can compare this with its collected manifest without trusting a cached local
+success label.[^report][^cli]
 
 The synthetic fixture ran twice with the same worker, code, five-number
 input, runtime and seed. Jobs **40530016** and **40530018** ran on two
@@ -179,7 +183,7 @@ validation-controller runs and the subsequent repair are recorded in
 [^collect]: `src/hpc3/core/wrds_results.py:53` `verified_completion`, `:74` `attested_completion` and `:127` `collect`.
 [^status]: `src/hpc3/core/wrds_scheduler.py:181` `status` and `:113` `decode_accounting`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:25` `job_argv`.
-[^report]: `src/hpc3/core/wrds_attempt_report.py:70` `render` and `:25` `completion_presence`.
+[^report]: `src/hpc3/core/wrds_attempt_report.py:70` `measure` and `:25` `completion_presence`.
 [^cli]: `src/hpc3/cli/wrds.py:80` `main`.
 [^live]: The four posts by `load-report-d43697b3` on board task d43697b3 listed in the frontmatter provenance section, and Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`.
 [^paired]: API `libs/covenant_ml/README.md` WRDS input contract; executed manifests under `artifacts/wrds-synthetic-2a50e93ca/`, fields `dataset`, `seeds`, `results` and `seed_comparisons`; synthetic provenance in `runs/wrds-synthetic-stage.json`.
