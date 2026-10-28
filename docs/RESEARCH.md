@@ -1413,6 +1413,15 @@ name appeared nowhere here — was mine, and another session bridged it.
 - **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`, and
   (since 2026-10-12, board task `80b6e6ea`) `libs/covenant_ml`'s
   `scripts.benchmark_paired_evaluation` and `scripts.benchmark_feature_ablation`
+- **Admitted validation diagnostics:** `scripts.research_proposals` admits,
+  submits and reconciles bounded requests; `scripts.research_trial` scores only
+  chronological validation, with early stopping drawn from training. The
+  existing trainers and RunRecord writer are shared with paired evaluation.
+  `hpc3.cli.execution_inspect` measures one recorded attempt from native Slurm
+  accounting and verified artifacts; `hpc3.cli.execution_report` measures a
+  paired replay. Both publish program-owned execution evidence. The diagnostic
+  predicts next-observed-return sign for a declared CRSP snapshot; it does not
+  implement the monthly portfolio protocol or provide filesystem holdout isolation.
 - **Produces:** `libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json` (41 of them) and
   `services/covenant-radar-api/models/optimization_history.jsonl`; the two
   paired families write a manifest and `RunRecord` wherever `--out` names
