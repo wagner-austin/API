@@ -85,9 +85,9 @@ and scoring need a restricted evaluator identity and filesystem/tool permissions
 a prompt telling an agent with unrestricted SSH to avoid a directory is not
 isolation. That capability boundary is a focused integration requirement, not
 an implemented guarantee today. Do not autonomously launch this research loop
-until admission, holdout isolation and append-only attempt recording are tested.
+until admission, holdout isolation and append-only attempt recording are tested.[^request]
 
-[^request]: Operator request and live discovery recorded in frontmatter; these study rules are this session's proposed design in response, not quotations or empirical findings.
+[^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
