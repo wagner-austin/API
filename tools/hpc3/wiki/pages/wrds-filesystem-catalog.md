@@ -59,7 +59,7 @@ The scanner therefore labels the link unresolved, not broken. It records
 directory aliases and visits each resolved directory only once; it opens no
 dataset contents. Unexpected storage errors fail the job.[^scan]
 
-The filesystem command does not establish SQL privileges.
+The filesystem command does not establish SQL privileges.[^scan]
 
 ## SQL: visible is not accessible
 
