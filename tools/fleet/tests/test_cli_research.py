@@ -14,7 +14,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, load_json_str
 from fleet.cli import research, research_native, rolled, tick
 from fleet.contracts.research_worker import encode_worker
 from fleet.core import _test_hooks
-from tests._queue_fakes import FakeQueue, queue_env
+from tests._queue_fakes import QUEUE_CREDENTIALS, FakeEnv, FakeQueue
 from tests._research_fixtures import research_job, worker
 from tests.conftest import FakeRun, ok
 from tests.test_research_hpc import _document as hpc_document
@@ -71,7 +71,15 @@ def test_queue_cli_announces_or_runs_one_tick(
     announce: bool,
     active: bool,
 ) -> None:
-    env = queue_env()
+    env = FakeEnv(
+        {
+            "CORVIS_TENANT_ID": QUEUE_CREDENTIALS["tenant_id"],
+            "FLEET_MCP_API_KEY": "test-key",
+            "TASKBOARD_MCP_API_KEY": "test-key",
+            "FLEET_DISPATCH_URL": QUEUE_CREDENTIALS["url"],
+            "BOARD_WATCH_URL": QUEUE_CREDENTIALS["url"],
+        }
+    )
     _test_hooks.env = env
     board_hooks.env = env
     root = tmp_path / "api"
