@@ -66,6 +66,7 @@ class TestTheBudgetOnTheLine:
             ended_unix=1791168490,
             log_path="C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log",
             run_id="services-grandma-api-loki-1791168143",
+            workers=2,
         )
 
         assert judged["budget"] == "over:347s/300s"
@@ -74,5 +75,5 @@ class TestTheBudgetOnTheLine:
             "banner=no tests=unread coverage=unread budget=over:347s/300s "
             "ended=2026-10-05T02:48:10Z "
             "log=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log "
-            "run=services-grandma-api-loki-1791168143"
+            "run=services-grandma-api-loki-1791168143 workers=2"
         )

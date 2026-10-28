@@ -100,7 +100,8 @@ class TestACloseTheQueueDidNotAnswer:
         settled_line = narrow_json_to_str(answering_queue.arguments[1]["detail"])
         assert settled_line == refused_line
         assert settled_line.endswith(
-            f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
+            f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
+            "workers=7"
         )
         retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
         assert [retire_path in " ".join(call) for call in settling_node.calls[:6]] == [
@@ -228,7 +229,9 @@ def _settle_killed(
 
 
 #: Where every verdict line here ends, before the unit's ending.
-VERDICT_END = f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID}"
+VERDICT_END = (
+    f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} workers=7"
+)
 
 
 class TestABuildItsUnitClosed:

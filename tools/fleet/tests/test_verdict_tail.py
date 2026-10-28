@@ -50,6 +50,7 @@ def _judged(tail: str) -> verdict.Verdict:
         ended_unix=1791706310,
         log_path="/home/user/fleet/stage/logs/MCPs-mcp-shared-colossus-1791706189.log",
         run_id="MCPs-mcp-shared-colossus-1791706189",
+        workers=4,
     )
 
 
