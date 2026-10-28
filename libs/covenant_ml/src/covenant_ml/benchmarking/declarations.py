@@ -226,6 +226,13 @@ _CONFIDENCE = BenchmarkArgument(
     flag="--confidence", kind=ArgumentKind.FLOAT, help="Coverage of every interval, e.g. 0.95."
 )
 
+PAIRED_SOURCES: tuple[BenchmarkArgument, ...] = (
+    _CSV,
+    BenchmarkArgument(
+        flag="--wrds-manifest", kind=ArgumentKind.PATH, help="Verified CRSP extract manifest."
+    ),
+)
+
 PAIRED_EVALUATION = BenchmarkDeclaration(
     experiment="covenant-paired-evaluation",
     description=(
@@ -306,6 +313,7 @@ __all__ = [
     "GOSS",
     "MULTICLASS",
     "PAIRED_EVALUATION",
+    "PAIRED_SOURCES",
     "QUANTIZED",
     "RANKING",
     "REGRESSION",

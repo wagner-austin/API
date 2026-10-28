@@ -142,11 +142,16 @@ class BenchmarkDeclaration(TypedDict):
     result_metrics: tuple[str, ...]
 
 
-def shared_parser(declaration: BenchmarkDeclaration) -> argparse.ArgumentParser:
+def shared_parser(
+    declaration: BenchmarkDeclaration,
+    exclusive_sources: Sequence[BenchmarkArgument] = (),
+) -> argparse.ArgumentParser:
     """Build the parser every benchmark shares, plus this family's own flags.
 
     Args:
         declaration: The family.
+        exclusive_sources: Alternative valued input flags; exactly one is required
+            when the family declares alternatives.
 
     Returns:
         A parser carrying ``--seeds`` and ``--out``, then the declared flags.
@@ -181,6 +186,14 @@ def shared_parser(declaration: BenchmarkDeclaration) -> argparse.ArgumentParser:
             required=True,
             help=argument["help"],
         )
+    if exclusive_sources:
+        source = parser.add_mutually_exclusive_group(required=True)
+        for argument in exclusive_sources:
+            source.add_argument(
+                argument["flag"],
+                type=VALUE_TYPES[argument["kind"]],
+                help=argument["help"],
+            )
     return parser
 
 
