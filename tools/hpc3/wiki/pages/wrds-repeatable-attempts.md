@@ -2,7 +2,7 @@
 title: WRDS experiments need durable attempts and verified results
 tags: [wrds, reproducibility, operations]
 hubs: [operations]
-related: ["[[one-ledger-per-repository]]", "[[wrds-filesystem-catalog]]"]
+related: ["[[one-ledger-per-repository]]", "[[wrds-filesystem-catalog]]", "[[node-local-scratch]]"]
 source_paths:
   - "src/hpc3/contracts/wrds_run.py"
   - "src/hpc3/core/wrds_jobs.py"
@@ -11,6 +11,14 @@ source_paths:
   - "src/hpc3/core/wrds_attempt_report.py"
   - "src/hpc3/cli/wrds.py"
   - "src/hpc3/wrds/worker.py"
+  - "specs/cleargbm-paired-image.json"
+  - "runs/bench-wrds-synthetic-a.json"
+  - "runs/bench-wrds-synthetic-b.json"
+  - "runs/bench-wrds-image-verify.json"
+  - "runs/wrds-synthetic-stage.json"
+  - "runs/wrds-entrypoint-stage.json"
+  - "artifacts/wrds-synthetic-2a50e93ca/agreement.json"
+  - "artifacts/wrds-synthetic-2a50e93ca/configuration-comparison.json"
 source_git_blobs:
   "src/hpc3/contracts/wrds_run.py": "00660ff78017fe0dd51c344ba8f3f0b51ae0b23f"
   "src/hpc3/core/wrds_jobs.py": "e79b573ab5a1f145599018c38c95fcde511d9d7b"
@@ -19,6 +27,14 @@ source_git_blobs:
   "src/hpc3/core/wrds_attempt_report.py": "bfc35caed2d3825c6bce7664f4e6617746d1b7f7"
   "src/hpc3/cli/wrds.py": "4a6c3e17385d3fdca93e20077d65c9492a3755b3"
   "src/hpc3/wrds/worker.py": "a87cc9d46e07f46c4a0d010f4a23566f2d1532b4"
+  "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
+  "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
+  "runs/bench-wrds-synthetic-b.json": "d3df02db2cf4c5743ed9a4de8352dfb6491f1bcd"
+  "runs/bench-wrds-image-verify.json": "e0b7c5c599f69f0e01cef31478ca3c97aa10fb63"
+  "runs/wrds-synthetic-stage.json": "a9aaa744576049beec872f55cf24fde5a0be44a5"
+  "runs/wrds-entrypoint-stage.json": "d9b5d637c391388e0e782212f123402ea5be5309"
+  "artifacts/wrds-synthetic-2a50e93ca/agreement.json": "4554212fd3f74b2d40e7c8844607c395fd51f9f2"
+  "artifacts/wrds-synthetic-2a50e93ca/configuration-comparison.json": "4c03455a561841511de0c13141c7bfe871c96a11"
 provenance:
   - "Board task d43697b3: operator requested the existing HPC system for repeatable WRDS experiments"
   - "2026-10-27 America/Los_Angeles: WRDS jobs 40530016 and 40530018, same synthetic input/code/runtime/worker/seed, collected through hpc3.cli.wrds"
@@ -26,6 +42,13 @@ provenance:
   - "Board task d43697b3, posts by load-report-d43697b3 at 2026-10-28T04:18:48Z, 04:19:54Z, 04:20:58Z and 04:21:34Z: hpc3.cli.wrds report at API f87c0758f measured jobs 40530016, 40530018, 40530005 and 40530008 on WRDS"
   - "Job 40530005's payload raised SystemExit(17); the worker refused it with WRDS_PAYLOAD_FAILED, so qacct records failed 0, exit_status 1 on wrds-sas24-w. Job 40530008 was cancelled through the CLI; qacct records failed 100, exit_status 137 on wrds-sas20-w. Neither attempt directory holds completion.json"
   - "Earlier job 40529992 failed at its worker checksum because Grid Engine's shell wrapper altered escaping; job 40529996 completed after -shell n"
+  - "Board task eadd19d5: operator moved numerical evaluation compute to HPC3; no licensed WRDS rows were extracted for these checks"
+  - "HPC3 image build 58566045: COMPLETED 0:0 in 85s on hpc3-20-20; SIF /pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif, SHA256 f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b"
+  - "HPC3 synthetic replays 58566380 and 58574881: COMPLETED in 13s on hpc3-22-05 and 6s on hpc3-20-20; each 2 CPUs, 4 GiB, free partition, 0 SU"
+  - "HPC3 image verification 58574938: COMPLETED 0:0 in 5s on hpc3-17-13; generated selfcheck SHA256 9db790abc4b8fb0bedaeb7c132276635a4806188bf18706479792ef66c108efb checked the strengthened committed spec; selfcheck and pip check passed"
+  - "Ziggurat /home/corvis/research-data/wrds/runtime/2a50e93ca preserves source archive, six wheel digests, original captured spec, rendered build, synthetic input and query, run documents and collected logs; source commit 2a50e93ca06fcc82896c143a37ee247187cd2b12, archive SHA256 02e542cdfc0909cda9a228bf6cf535397e8c395502619979bb4b5defade3d2d8"
+  - "Remote and collected replay files SHA256: both manifests db9c0d4cd183655762f49ad7940db8e68b62e90e66409da0bc30afb23243ab05; both RunRecords 6a317031cd5ba5cafbedbc8ab0db75a6d59acd81e0a034a931b9721abc3f1fac"
+  - "API libs/covenant_ml/README.md section WRDS-shaped evaluation inputs and libs/platform_core/src/platform_core/run_record.py agree_across_runs, outside this wiki workspaceRoot"
 fact_checked: 2026-10-28
 confidence: high
 ---
@@ -85,6 +108,42 @@ The adapter now requests `-shell n` and explicitly invokes one shell with
 quoted arguments. The failed job was recorded as failed rather than being
 accepted because it had left the queue.[^scheduler][^live]
 
+## Frozen numerical evaluation on HPC3
+
+The operator chose HPC3 for the numerical workload. The existing paired
+evaluation entrypoint now accepts a declared WRDS-shaped extraction manifest,
+using the same ClearGBM, LightGBM and XGBoost arms, chronological splits and
+shared RunRecord. The first deployment used the existing synthetic test
+fixture: **no query downloaded WRDS rows**. Its 160 input rows yield 159
+next-observation examples; this is an integration check, not a trading
+backtest or evidence of predictive value.[^paired]
+
+The frozen SIF contains six first-party wheels from source commit
+`2a50e93ca06fcc82896c143a37ee247187cd2b12` and 52 pinned third-party
+requirements. The existing image-capture and image-build workflow produced
+it; each replay declares its content hash. The committed spec later gained
+three additional symbol assertions. Job **58574938** ran the newly rendered
+self-check against the original immutable SIF and passed, followed by
+`pip check`. That job verifies the stronger checks without claiming the
+original build contained them.[^image]
+
+Jobs **58566380** and **58574881** ran on different HPC3 nodes using the same
+synthetic manifest, image and seeds 42/43. The full result manifests and
+RunRecords were byte-identical. The existing `agree_across_runs` reports
+**45/45 identical observations**, no unmatched observations; the shared
+configuration comparator reports `identical`. This establishes agreement
+for these two runs only. The host fingerprint records OS, architecture and
+logical core count, not CPU model, so that verdict has that resolution.[^replay]
+
+The committed `bench-wrds-synthetic-a.json` and `-b.json` are the executed
+recipes. For another attempt, copy one and give it a new name plus new
+`--out` and `artifact` paths; then use the existing `hpc3-preflight`,
+`hpc3-submit` and `hpc3-watch` commands with `runs/hpc3.json`. Input and
+entrypoint stage manifests preserve their hashes. The entrypoint lives
+outside the image and is separately tied to the source archive: the image
+commit alone does not attest it. Production extraction remains a separate
+step requiring a selected dataset, fields and date range.[^recipe]
+
 [^identity]: `src/hpc3/contracts/wrds_run.py:230` `decode_wrds_run` and `:345` `run_identity`.
 [^submit]: `src/hpc3/core/wrds_jobs.py:245` `submit`, `:220` `resume` and `:170` `record_event`.
 [^worker]: `src/hpc3/wrds/worker.py:85` `execute_run`.
@@ -94,3 +153,7 @@ accepted because it had left the queue.[^scheduler][^live]
 [^report]: `src/hpc3/core/wrds_attempt_report.py:70` `render` and `:25` `completion_presence`.
 [^cli]: `src/hpc3/cli/wrds.py:55` `main`.
 [^live]: The four posts by `load-report-d43697b3` on board task d43697b3 listed in the frontmatter provenance section, and Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`.
+[^paired]: API `libs/covenant_ml/README.md` WRDS input contract; executed manifests under `artifacts/wrds-synthetic-2a50e93ca/`, fields `dataset`, `seeds`, `results` and `seed_comparisons`; synthetic provenance in `runs/wrds-synthetic-stage.json`.
+[^image]: `specs/cleargbm-paired-image.json`; `runs/bench-wrds-image-verify.json`; job 58566045 build logs and job 58574938 verification logs identified in `provenance`.
+[^replay]: `artifacts/wrds-synthetic-2a50e93ca/agreement.json` and `configuration-comparison.json`; scheduler placement and independently checked remote/collected file hashes in `provenance`; host fields in the preserved RunRecords.
+[^recipe]: `runs/bench-wrds-synthetic-a.json`, `runs/bench-wrds-synthetic-b.json`, `runs/wrds-synthetic-stage.json` and `runs/wrds-entrypoint-stage.json`.

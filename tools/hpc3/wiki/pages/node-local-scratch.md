@@ -23,7 +23,7 @@ provenance:
   - "clients/RustedWarfareBot src/rw_bot/harness/campaign.py@member_command (outside this workspaceRoot)"
   - "login-i17, 2026-09-30 23:40Z: /proc/<pid>/task/*/wchan of a hung apptainer exec showed __IBVSocket_waitForRecvCompletionEvent (D) in syscall 262, newfstatat; board task 465689f5"
   - "login-i15, 2026-10-28T06:07Z: PID 2581254 stat of /pub/wagnera3/envs/cleargbm/bin/python waited in D state, IBVSocket_waitForRecvCompletionEvent, syscall 332 (statx); board task eadd19d5"
-  - "login-i15, 2026-10-28: PID 2810355 writing the synthetic benchmark entrypoint waited in D state, FhgfsOps_revalidateIntent; dfsquotas reported 342.16 GiB of 1.00 TiB and 564.45k of 8.00M files"
+  - "login-i15, 2026-10-28: PID 2810355 writing the synthetic benchmark entrypoint waited in D state, FhgfsOps_revalidateIntent; dfsquotas reported 342.16 GiB of 1.00 TiB and 564.45k of 8.00M chunk files"
   - "HPC3 job 58566045, hpc3-20-20, COMPLETED 0:0 in 85 seconds, 2026-10-28: paired image build with node-local Apptainer cache and temporary directory"
 fact_checked: 2026-10-28
 confidence: high
@@ -112,7 +112,7 @@ ClearGBM environment's interpreter exceeded a ten-second probe bound; a
 subsequent probe was observed in `IBVSocket_waitForRecvCompletionEvent`
 inside `statx`. A later staging writer waited in `FhgfsOps_revalidateIntent`.
 SSH and home-directory operations remained responsive, and both byte and
-file quotas were below their limits. These observations locate the delay in
+chunk-file quotas were below their limits. These observations locate the delay in
 BeeGFS metadata operations; they do not identify the failing storage server
 or establish a cluster-wide outage.[^october]
 
