@@ -165,13 +165,14 @@ vendor vintage, or a monthly strategy. The proposed substantive protocol and
 agent integration boundary are in the API wiki's
 [`wrds-equity-research-protocol`](../../../../wiki/pages/wrds-equity-research-protocol.md).
 The earlier frozen-runtime audit was reopened for insufficient machine-readable
-live-run verification. Its repaired closure now references a program-authored
-native replay report and remains subject to independent audit. Installed
+live-run verification. Its repaired closure references a program-authored
+native replay report; both the extraction and frozen-runtime tasks passed
+independent audit on 2026-10-28. Installed
 validation-controller runs and the subsequent repair are recorded in
 [[wrds-installed-controller-verification]].[^crsp][^audit]
 
 [^crsp]: `artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json`; native `accounting-and-digests.txt`, `watch.txt`, `trace-a.txt`, `trace-b.txt` and `compute-checksums.json` beside it; service-authored WRDS report named in provenance.
-[^audit]: Board task eadd19d5-6d5e-4c05-a8fe-1867337fdbef, original audit rejection 2026-10-28T16:35:56.756Z and repaired closure 2026-10-28T19:37:41.061Z; native report by hpc-report-14d9e920 on task 14d9e920-dd4c-41f7-8460-ccf4623844c7.
+[^audit]: Board task eadd19d5-6d5e-4c05-a8fe-1867337fdbef, original audit rejection 2026-10-28T16:35:56.756Z, repaired closure 2026-10-28T19:37:41.061Z and VERIFIED 2026-10-28T19:52:23.242Z; extraction task 35895aac-1b12-4cf5-b868-516196914789 VERIFIED 2026-10-28T19:52:01.056Z. Native report by hpc-report-14d9e920 on task 14d9e920-dd4c-41f7-8460-ccf4623844c7.
 [^identity]: `src/hpc3/contracts/wrds_run.py:230` `decode_wrds_run` and `:345` `run_identity`.
 [^submit]: `src/hpc3/core/wrds_jobs.py:245` `submit`, `:220` `resume` and `:170` `record_event`.
 [^worker]: `src/hpc3/wrds/worker.py:92` `execute_run`.
