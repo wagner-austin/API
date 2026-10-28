@@ -19,14 +19,15 @@ source_paths:
   - "runs/wrds-entrypoint-stage.json"
   - "artifacts/wrds-synthetic-2a50e93ca/agreement.json"
   - "artifacts/wrds-synthetic-2a50e93ca/configuration-comparison.json"
+  - "artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json"
 source_git_blobs:
   "src/hpc3/contracts/wrds_run.py": "00660ff78017fe0dd51c344ba8f3f0b51ae0b23f"
   "src/hpc3/core/wrds_jobs.py": "e79b573ab5a1f145599018c38c95fcde511d9d7b"
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
   "src/hpc3/core/wrds_attempt_report.py": "bfc35caed2d3825c6bce7664f4e6617746d1b7f7"
-  "src/hpc3/cli/wrds.py": "4a6c3e17385d3fdca93e20077d65c9492a3755b3"
-  "src/hpc3/wrds/worker.py": "a87cc9d46e07f46c4a0d010f4a23566f2d1532b4"
+  "src/hpc3/cli/wrds.py": "2b4caf7989b600d5ef71d015314da9c07a2f596e"
+  "src/hpc3/wrds/worker.py": "e8a91def08eb391ac271f04c5cf3dbc3561470a5"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
   "runs/bench-wrds-synthetic-b.json": "d3df02db2cf4c5743ed9a4de8352dfb6491f1bcd"
@@ -35,7 +36,10 @@ source_git_blobs:
   "runs/wrds-entrypoint-stage.json": "d9b5d637c391388e0e782212f123402ea5be5309"
   "artifacts/wrds-synthetic-2a50e93ca/agreement.json": "4554212fd3f74b2d40e7c8844607c395fd51f9f2"
   "artifacts/wrds-synthetic-2a50e93ca/configuration-comparison.json": "4c03455a561841511de0c13141c7bfe871c96a11"
+  "artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json": "300beff429aa112b7cd21fde60f0c8985953a6fb"
 provenance:
+  - "2026-10-28 bounded CRSP pilot: WRDS 40534563 produced 505 rows for PERMNO 14593 in 2019–2020; hpc3.cli.wrds report posted measured accounting and hashes as load-report-35895aac on board 35895aac"
+  - "HPC3 real-data replays 58575271 and 58575282 completed 0:0 on hpc3-17-01 in 11s and 10s; native accounting, checksum-success lines and traces preserved beside the metadata-only provenance record; numerical outputs remain private"
   - "Board task d43697b3: operator requested the existing HPC system for repeatable WRDS experiments"
   - "2026-10-27 America/Los_Angeles: WRDS jobs 40530016 and 40530018, same synthetic input/code/runtime/worker/seed, collected through hpc3.cli.wrds"
   - "Ziggurat /home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json pins both completion records and common RunRecord files; metrics SHA256 60dc457a811582434c73d554c0df58942856247aac8874abcab1942e86d52756; observed sum 45195"
@@ -141,17 +145,39 @@ recipes. For another attempt, copy one and give it a new name plus new
 `hpc3-submit` and `hpc3-watch` commands with `runs/hpc3.json`. Input and
 entrypoint stage manifests preserve their hashes. The entrypoint lives
 outside the image and is separately tied to the source archive: the image
-commit alone does not attest it. Production extraction remains a separate
-step requiring a selected dataset, fields and date range.[^recipe]
+commit alone does not attest it. These earlier recipes use synthetic data;
+the separately scoped real-data extraction and replay follow below.[^recipe]
 
+## Real-data pilot and the next study
+
+WRDS job 40534563 extracted 505 daily rows from `crsp_a_stock.dsf` for
+PERMNO 14593, inclusive 2019-01-01 through 2020-12-31, with a 600-row cap.
+The maintained worker saved the exact read-only query, timestamps and digests;
+the existing collector verified the outputs. Five files were hash-verified
+on HPC3. Replays 58575271 and 58575282 used the same snapshot and frozen SIF,
+checking seven data/code/image files before evaluation. Their 45 observations,
+result manifests and RunRecords matched exactly. Native scheduler records,
+compute checksum lines, recipes and metadata hashes are retained; licensed
+rows and numerical results stay under the private evidence root.[^crsp]
+
+This is an engineering pilot. It does not establish profitability, historical
+vendor vintage, or a monthly strategy. The proposed substantive protocol and
+agent integration boundary are in the API wiki's
+[`wrds-equity-research-protocol`](../../../../wiki/pages/wrds-equity-research-protocol.md).
+The earlier frozen-runtime task's audit was reopened for insufficient
+machine-readable live-run verification; its existing recorded executions are
+not an audit pass. This pilot retains explicit scheduler and checksum evidence
+rather than only a comparison verdict.
+
+[^crsp]: `artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json`; native `accounting-and-digests.txt`, `watch.txt`, `trace-a.txt`, `trace-b.txt` and `compute-checksums.json` beside it; service-authored WRDS report named in provenance.
 [^identity]: `src/hpc3/contracts/wrds_run.py:230` `decode_wrds_run` and `:345` `run_identity`.
 [^submit]: `src/hpc3/core/wrds_jobs.py:245` `submit`, `:220` `resume` and `:170` `record_event`.
-[^worker]: `src/hpc3/wrds/worker.py:85` `execute_run`.
+[^worker]: `src/hpc3/wrds/worker.py:92` `execute_run`.
 [^collect]: `src/hpc3/core/wrds_results.py:53` `verified_completion`, `:74` `attested_completion` and `:127` `collect`.
 [^status]: `src/hpc3/core/wrds_scheduler.py:181` `status` and `:113` `decode_accounting`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:25` `job_argv`.
 [^report]: `src/hpc3/core/wrds_attempt_report.py:70` `render` and `:25` `completion_presence`.
-[^cli]: `src/hpc3/cli/wrds.py:55` `main`.
+[^cli]: `src/hpc3/cli/wrds.py:80` `main`.
 [^live]: The four posts by `load-report-d43697b3` on board task d43697b3 listed in the frontmatter provenance section, and Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`.
 [^paired]: API `libs/covenant_ml/README.md` WRDS input contract; executed manifests under `artifacts/wrds-synthetic-2a50e93ca/`, fields `dataset`, `seeds`, `results` and `seed_comparisons`; synthetic provenance in `runs/wrds-synthetic-stage.json`.
 [^image]: `specs/cleargbm-paired-image.json`; `runs/bench-wrds-image-verify.json`; job 58566045 build logs and job 58574938 verification logs identified in `provenance`.
