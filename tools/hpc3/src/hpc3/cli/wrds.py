@@ -1,0 +1,112 @@
+"""WRDS experiments: inspect, preflight, submit, resume, status, cancel, collect, trace.
+
+Run as python -m hpc3.cli.wrds ACTION. Every execution action requires a
+specification; every attempt action also names an explicit attempt. Structured
+stdout contains metadata only, never payload logs or downloaded dataset rows.
+"""
+
+from __future__ import annotations
+
+import pathlib
+import sys
+from collections.abc import Sequence
+
+from platform_core import cli_args
+from platform_core.cli_boundary import run_cli
+from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+
+from hpc3.cli import _test_hooks
+from hpc3.contracts.wrds_run import decode_wrds_run, encode_wrds_runtime, run_identity
+from hpc3.core import _test_hooks as core_hooks
+from hpc3.core import wrds_jobs, wrds_results, wrds_scheduler
+from hpc3.core.checkout import shared_directory
+
+_FLAGS = ("--spec", "--attempt", "--output", "--host", "--root", "--python")
+_ACTIONS = {"inspect", "preflight", "submit", "resume", "status", "cancel", "collect", "trace"}
+
+
+def _trace(ledger: pathlib.Path, identity: str, attempt: str) -> None:
+    """Emit only ledger events belonging to the requested attempt.
+
+    Args:
+        ledger: Repository ledger.
+        identity: Full experiment identity.
+        attempt: Attempt label.
+    """
+    for line in core_hooks.read_bytes(ledger).decode().splitlines():
+        event = narrow_json_to_dict(load_json_str(line))
+        if event.get("identity") == identity and event.get("attempt") == attempt:
+            _test_hooks.emit(dump_json_str(event))
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Execute one WRDS lifecycle action.
+
+    Args:
+        argv: Command arguments, or process arguments.
+
+    Returns:
+        Zero for a successful control-plane operation. A status report may
+        describe a failed experiment; collect refuses every non-success state.
+
+    Raises:
+        ValueError: For unknown actions or missing required parameters.
+    """
+    tokens = list(sys.argv[1:] if argv is None else argv)
+    if not tokens or tokens[0] not in _ACTIONS:
+        raise ValueError("WRDS_ACTION: expected " + ", ".join(sorted(_ACTIONS)))
+    action = tokens[0]
+    flags = cli_args.parse_single_flags(tokens[1:], _FLAGS)
+    if action == "inspect":
+        runtime = wrds_jobs.inspect_runtime(
+            cli_args.require_flag(flags, "--host"),
+            cli_args.require_flag(flags, "--root"),
+            cli_args.require_flag(flags, "--python"),
+        )
+        _test_hooks.emit(dump_json_str(encode_wrds_runtime(runtime)))
+        return 0
+    spec_path = pathlib.Path(cli_args.require_flag(flags, "--spec")).resolve()
+    run = decode_wrds_run(load_json_str(core_hooks.read_bytes(spec_path).decode()))
+    ledger = shared_directory(spec_path.parent) / "wrds-ledger.jsonl"
+    if action == "preflight":
+        wrds_jobs.preflight(run, spec_path.parent)
+        _test_hooks.emit(dump_json_str({"identity": run_identity(run), "preflight": "passed"}))
+        return 0
+    attempt = cli_args.require_flag(flags, "--attempt")
+    now = _test_hooks.now_iso()
+    if action == "submit":
+        identifier = wrds_jobs.submit(run, spec_path.parent, attempt, ledger, now)
+        _test_hooks.emit(
+            dump_json_str(
+                {"job_id": identifier, "directory": wrds_jobs.attempt_directory(run, attempt)}
+            )
+        )
+    elif action == "resume":
+        _test_hooks.emit(dump_json_str({"job_id": wrds_jobs.resume(run, attempt, ledger, now)}))
+    elif action == "status":
+        identifier = wrds_jobs.job_id(run, attempt)
+        _test_hooks.emit(
+            dump_json_str(
+                {"job_id": identifier, "state": wrds_scheduler.status(run["host"], identifier)}
+            )
+        )
+    elif action == "cancel":
+        _test_hooks.emit(dump_json_str({"state": wrds_jobs.cancel(run, attempt, ledger, now)}))
+    elif action == "collect":
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        result = wrds_results.collect(run, attempt, output, ledger, now)
+        _test_hooks.emit(dump_json_str({"output": str(output), "identity": result["identity"]}))
+    else:
+        _trace(ledger, run_identity(run), attempt)
+    return 0
+
+
+def entrypoint() -> None:
+    """Use the same error boundary and report streams as the HPC3 commands."""
+    raise SystemExit(run_cli(main, emit=_test_hooks.emit, emit_error=_test_hooks.emit_error))
+
+
+__all__ = ["entrypoint", "main"]
+
+if __name__ == "__main__":
+    entrypoint()
