@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from platform_core.json_utils import (
+    JSONObject,
     JSONTypeError,
     JSONValue,
+    narrow_json_to_dict,
     require_bool,
     require_int,
     require_str,
@@ -71,4 +73,79 @@ def decode_catalog_entry(value: JSONValue) -> CatalogEntry:
     return CatalogEntry(kind=kind, path=path, bytes=size, readable=readable, target=target)
 
 
-__all__ = ["CatalogEntry", "decode_catalog_entry", "encode_catalog_entry"]
+class CatalogReceipt(TypedDict):
+    """Where and how one filesystem catalog was produced.
+
+    ``job_id`` is the WRDS Grid Engine job's id, not a Slurm ledger row.
+    """
+
+    host: str
+    scheduler: str
+    job_id: str
+    source_sha256: str
+    catalog_sha256: str
+    remote_catalog: str
+    scope: str
+
+
+class CatalogRun(TypedDict):
+    """A verified catalog's records and the receipt saved beside it."""
+
+    entries: list[CatalogEntry]
+    receipt: CatalogReceipt
+
+
+def encode_catalog_receipt(receipt: CatalogReceipt) -> JSONObject:
+    """Encode a receipt for the JSON file saved beside its catalog.
+
+    Args:
+        receipt: Validated receipt.
+
+    Returns:
+        The JSON object.
+    """
+    return {
+        "host": receipt["host"],
+        "scheduler": receipt["scheduler"],
+        "job_id": receipt["job_id"],
+        "source_sha256": receipt["source_sha256"],
+        "catalog_sha256": receipt["catalog_sha256"],
+        "remote_catalog": receipt["remote_catalog"],
+        "scope": receipt["scope"],
+    }
+
+
+def decode_catalog_receipt(value: JSONValue) -> CatalogReceipt:
+    """Validate a saved receipt.
+
+    Args:
+        value: Parsed JSON value.
+
+    Returns:
+        The typed receipt.
+
+    Raises:
+        JSONTypeError: When the value is not an object or a field is missing
+            or not a string.
+    """
+    fields = narrow_json_to_dict(value)
+    return CatalogReceipt(
+        host=require_str(fields, "host"),
+        scheduler=require_str(fields, "scheduler"),
+        job_id=require_str(fields, "job_id"),
+        source_sha256=require_str(fields, "source_sha256"),
+        catalog_sha256=require_str(fields, "catalog_sha256"),
+        remote_catalog=require_str(fields, "remote_catalog"),
+        scope=require_str(fields, "scope"),
+    )
+
+
+__all__ = [
+    "CatalogEntry",
+    "CatalogReceipt",
+    "CatalogRun",
+    "decode_catalog_entry",
+    "decode_catalog_receipt",
+    "encode_catalog_entry",
+    "encode_catalog_receipt",
+]
