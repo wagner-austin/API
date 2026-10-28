@@ -128,3 +128,7 @@ Notes: MCPs board task 7aab32ef. A module the image carries was admitted with no
 Pages written: pages/wrds-repeatable-attempts.md
 Pages updated: hubs/operations.md, index.md (29 to 30 pages)
 Notes: Board task d43697b3. Added Grid Engine attempt lifecycle to tools/hpc3 with shared RunRecord output. Jobs 40530016 and 40530018 matched code/input/runtime/worker identities, output digests and observations. Failure 40530005 and cancellation 40530008 produced no success receipt.
+
+## [2026-10-28] update | automatic shared research queue verification
+Pages updated: pages/wrds-installed-controller-verification.md
+Notes: Board task 3dff6fbf. The existing fleet scheduler reconciled retained HPC3 58578878 and WRDS 40534563 through shared dispatch receipts, with zero-exit bounded ticks and automatic board outcomes. Repeat submission and native inspection preserved identities and result digests. The pinned metadata artifact records queue trails, scheduler rows and the frozen runtime; licensed data remains private. README now explains prepared research references alongside the maintained direct CLI routes.
