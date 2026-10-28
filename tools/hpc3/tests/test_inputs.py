@@ -48,8 +48,11 @@ class TestWhichPathsAreInputs:
         )
         manifest = "/pub/wagnera3/inputs/synthetic.json"
         assert declared_inputs(command) == (manifest,)
-        with pytest.raises(AppError, match="RUN_INPUT_MISSING"):
+        with pytest.raises(AppError) as caught:
             require_inputs_present(command, frozenset())
+        error: AppError[Hpc3ErrorCode] = caught.value
+        assert error.code == Hpc3ErrorCode.RUN_INPUT_MISSING
+        assert manifest in str(error)
         require_inputs_present(command, frozenset({manifest}))
 
     def test_a_payload_is_an_input(self) -> None:
