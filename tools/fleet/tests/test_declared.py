@@ -149,7 +149,7 @@ def blob(text: str) -> str:
 
 
 class TestReadDeclared:
-    def test_pins_use_declared_capacity_without_treating_unprobed_tools_as_absent(
+    def test_pins_preserve_lanes_whose_runtime_capabilities_outgrow_their_declarations(
         self, tmp_path: pathlib.Path
     ) -> None:
         capable = dispatch_document()
@@ -161,7 +161,7 @@ class TestReadDeclared:
                 machine_document(role="worker", dispatch=capable)
             ),
             "tools/fleet/registry/projects/MCPs/packages/wiki-check.json": project_file(
-                ["testdb", "cxx", "pdftotext"]
+                ["testdb", "cxx", "rust", "gpu", "pdftotext"]
             ),
         }
         repo = tmp_path / "pins"
@@ -174,8 +174,10 @@ class TestReadDeclared:
             ),
             declared.DeclaredProject(
                 project="MCPs/packages/wiki-check",
-                required_tags=(NodeTag.TESTDB, NodeTag.CXX, NodeTag.PDFTOTEXT),
-                dispatch_nodes=("sedona",),
+                required_tags=(
+                    NodeTag.TESTDB, NodeTag.CXX, NodeTag.RUST, NodeTag.GPU, NodeTag.PDFTOTEXT
+                ),
+                dispatch_nodes=("sedona", "serendipity"),
             ),
             declared.DeclaredProject(
                 project="tools/fleet",
@@ -199,7 +201,7 @@ class TestReadDeclared:
                 declared.DeclaredProject(
                     project="MCPs/packages/wiki-check",
                     required_tags=(NodeTag.CXX, NodeTag.PDFTOTEXT),
-                    dispatch_nodes=(),
+                    dispatch_nodes=("sedona", "serendipity"),
                 ),
                 declared.DeclaredProject(
                     project="tools/fleet",
@@ -438,7 +440,7 @@ class TestTheHubTickPublishes:
             {
                 "project": "MCPs/packages/wiki-check",
                 "requiredTags": ["cxx", "pdftotext"],
-                "dispatchNodes": [],
+                "dispatchNodes": ["sedona", "serendipity"],
             },
             {
                 "project": "tools/fleet",
