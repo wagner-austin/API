@@ -2,25 +2,27 @@
 
 WRDS uses Grid Engine, so this workflow does not forge Slurm ledger entries.
 Its receipt retains the real scheduler id, source digest and artifact digest.
-The full /wrds filesystem is scanned; SQL-only libraries remain a separate
-catalog requiring database authentication.
+The full /wrds filesystem is scanned; SQL-only libraries are the separate
+catalog :mod:`hpc3.core.wrds_sql` reads.
 """
 
 from __future__ import annotations
 
-import hashlib
 import io
 import pathlib
-import shlex
 import zipfile
 
 from platform_core import json_utils
-from platform_core.json_utils import JSONTypeError, JSONValue, dump_json_str, load_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 
-from hpc3.contracts.wrds_catalog import CatalogEntry, decode_catalog_entry
-from hpc3.core import _test_hooks, wrds_scan
-from hpc3.core.digest import check_remote_digest, parse_remote_digest
-from hpc3.core.remote import put_bytes, remote_digest, run_remote
+from hpc3.contracts.wrds_catalog import (
+    CatalogEntry,
+    CatalogReceipt,
+    CatalogRun,
+    decode_catalog_entry,
+    encode_catalog_receipt,
+)
+from hpc3.core import _test_hooks, wrds_grid, wrds_scan
 
 
 def probe_archive() -> bytes:
@@ -62,7 +64,7 @@ def read_catalog(text: str) -> list[CatalogEntry]:
     return records[:-1]
 
 
-def inventory(host: str, remote_dir: str, output: pathlib.Path) -> list[CatalogEntry]:
+def inventory(host: str, remote_dir: str, output: pathlib.Path) -> CatalogRun:
     """Submit a bounded metadata job and save verified catalog and receipt locally.
 
     Args:
@@ -71,7 +73,8 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> list[CatalogE
         output: New local JSONL path. Its parent must already exist.
 
     Returns:
-        Validated path records. Only metadata is transported.
+        Validated path records and the saved receipt. Only metadata is
+        transported.
 
     Raises:
         ValueError: If paths are unsafe or a scheduler id cannot be read.
@@ -79,66 +82,30 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> list[CatalogE
         AppError: If transport or the Grid Engine job fails.
         JSONTypeError: If the returned artifact is incomplete.
     """
-    remote = pathlib.PurePosixPath(remote_dir)
-    if not remote.is_absolute() or ".." in remote.parts or not str(remote).startswith("/home/"):
-        raise ValueError("WRDS_CATALOG_PATH: remote directory must be beneath /home")
-    receipt_path = output.with_suffix(output.suffix + ".receipt.json")
-    if _test_hooks.file_exists(output) or _test_hooks.file_exists(receipt_path):
-        raise FileExistsError(str(output))
-    source = probe_archive()
-    source_sha = hashlib.sha256(source).hexdigest()
-    run_remote(host, shlex.join(["mkdir", "-m", "700", "--", str(remote)]))
+    remote = wrds_grid.remote_directory(remote_dir)
+    wrds_grid.refuse_existing([output, wrds_grid.receipt_path(output)])
+    wrds_grid.create_directory(host, remote)
     probe = str(remote / "scan.pyz")
-    artifact = str(remote / "catalog.jsonl")
-    put_bytes(host, probe, source)
-    check_remote_digest(probe, source_sha, parse_remote_digest(remote_digest(host, probe), probe))
-    command = shlex.join(
-        [
-            "qsub",
-            "-terse",
-            "-sync",
-            "y",
-            "-b",
-            "y",
-            "-N",
-            "wrds_catalog",
-            "-l",
-            "h_rt=3600",
-            "-o",
-            str(remote / "job.out"),
-            "-e",
-            str(remote / "job.err"),
-            "python3",
-            probe,
-            "--root",
-            "/wrds",
-            "--output",
-            artifact,
-        ]
+    remote_catalog = str(remote / "catalog.jsonl")
+    source_sha = wrds_grid.upload(host, probe, probe_archive())
+    command = ["python3", probe, "--root", "/wrds", "--output", remote_catalog]
+    job_id = wrds_grid.submit(host, remote, "wrds_catalog", command, environment=False)
+    artifact = wrds_grid.download(host, remote_catalog)
+    entries = read_catalog(artifact["text"])
+    receipt = CatalogReceipt(
+        host=host,
+        scheduler="grid-engine",
+        job_id=job_id,
+        source_sha256=source_sha,
+        catalog_sha256=artifact["sha256"],
+        remote_catalog=remote_catalog,
+        scope="/wrds filesystem metadata, including historical trees",
     )
-    scheduler = run_remote(host, command)
-    job_id = scheduler.splitlines()[0] if scheduler.splitlines() else ""
-    if not job_id.isdecimal():
-        raise ValueError(f"WRDS_JOB_ID: unrecognized scheduler receipt {scheduler!r}")
-    text = run_remote(host, shlex.join(["cat", "--", artifact]))
-    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
-    check_remote_digest(
-        artifact, digest, parse_remote_digest(remote_digest(host, artifact), artifact)
+    _test_hooks.write_text(output, artifact["text"])
+    _test_hooks.write_text(
+        wrds_grid.receipt_path(output), dump_json_str(encode_catalog_receipt(receipt)) + "\n"
     )
-    entries = read_catalog(text)
-    receipt: dict[str, JSONValue] = {
-        "host": host,
-        "scheduler": "grid-engine",
-        "job_id": job_id,
-        "source_sha256": source_sha,
-        "catalog_sha256": digest,
-        "remote_catalog": artifact,
-        "scope": "/wrds filesystem metadata, including historical trees",
-        "sql_catalog": "not inventoried; separate database authentication required",
-    }
-    _test_hooks.write_text(output, text)
-    _test_hooks.write_text(receipt_path, dump_json_str(receipt) + "\n")
-    return entries
+    return CatalogRun(entries=entries, receipt=receipt)
 
 
 __all__ = ["inventory", "probe_archive", "read_catalog"]
