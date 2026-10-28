@@ -73,4 +73,4 @@ accepted because it had left the queue.[^scheduler][^live]
 [^collect]: `src/hpc3/core/wrds_results.py:24` `verified_completion` and `:77` `collect`.
 [^status]: `src/hpc3/core/wrds_scheduler.py:126` `status`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:13` `job_argv`.
-[^live]: Actual jobs and hash-pinned local receipts listed in `provenance`.
+[^live]: Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`; actual scheduler jobs and failure observations listed in the frontmatter provenance section.
