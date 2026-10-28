@@ -702,12 +702,48 @@ attempt number. Negative observations remain in the record. A crash between
 submission and recording the scheduler response leaves `submitting` unresolved;
 it does not authorize resubmission.
 
-This is an admission and provenance interface. The final partition is refused by
-this interface; filesystem isolation from agents with general SSH access is not
-provided by a Python policy. The monthly CRSP portfolio evaluator and automatic
-scheduler reconciliation remain separate integration work. A caller-supplied
-completion is checked for consistent identity, not independently attested as a
-real cluster execution. Hash chaining detects corruption, not deliberate rewriting
+The same entrypoint now connects an admitted attempt to maintained HPC3 commands:
+
+```sh
+poetry run python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite submit --trial trial.json --cluster cluster.json --directory /absolute/attempt-1
+poetry run python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite reconcile --trial trial.json --cluster cluster.json --directory /absolute/attempt-1
+```
+
+`ResearchTrial` contains the frozen policy, exact admitted proposal, evaluation
+settings, attempt number and absolute compute-side evaluation manifest path.
+`ResearchCluster` is operator-owned: the HPC3 Python executable, workspace,
+project, remote attempt root, entrypoint directory, image path, checksum text and
+board report task. The checksums must include the image, evaluation manifest and
+`scripts/research_trial.py`; include every source data/query/receipt file and the
+entrypoint package initializer as well. The policy's dataset digest is the SHA-256
+of the evaluation manifest's exact bytes; that manifest pins the data and SQL.
+Its code digest names the external trial entrypoint; the image pins imported code.
+
+Submission freezes a request and recipe in a new directory, then uses `hpc3.cli.stage`
+and `hpc3.cli.submit --format json`. The recipe requests one CPU, 4 GiB, no GPU,
+the free partition and a rounded allocation deadline. `timeout` enforces the
+proposal's exact seconds, with five seconds for forced cleanup. A refused or
+already-consumed attempt cannot submit. Transport failures leave durable
+`submitting` state; `reconcile` finds exactly one matching attempt in the shared
+HPC ledger and never launches another job. If Slurm accepted a job but the HPC
+ledger itself was not written, automatic recovery refuses rather than guessing;
+the operator must investigate the scheduler before resolving that attempt.
+
+Reconciliation uses `hpc3.cli.execution_inspect`, which reads native accounting,
+checks compute-side input hashes and verifies result/RunRecord bytes and write
+times inside the allocation. The measuring program posts its evidence to the
+board. Only a successful measured allocation may complete; pending jobs remain
+running, and terminal failures consume the attempt. Repeated observations preserve
+separate logs. These are owner-writable files, not hostile-owner attestation.
+
+`scripts.research_trial` reuses existing trainers, per-seed comparisons and result
+publication. It scores chronological validation, taking early-stopping rows from
+training with the declared embargo. Final-test rows enter none of those three
+partitions. The fixed diagnostic is next-observed-return sign from `return_1`;
+it is not the monthly portfolio strategy. Its protocol hash includes that semantic
+version and all evaluation settings. The final partition is refused by this
+interface; filesystem isolation from agents with general SSH access remains a
+separate requirement. Hash chaining detects corruption, not deliberate rewriting
 by someone who can modify the journal database.
 
 ## Standards and regression checks
