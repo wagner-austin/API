@@ -8,17 +8,24 @@ source_paths:
   - "src/hpc3/core/array_sbatch.py"
   - "src/hpc3/core/preflight.py"
   - "src/hpc3/core/remote.py"
+  - "src/hpc3/core/image_sbatch.py"
+  - "src/hpc3/core/image_build.py"
 source_git_blobs:
   "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
   "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
-  "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
+  "src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
+  "src/hpc3/core/image_sbatch.py": "40f0336fc86894be4569b1c2c8f55e028961f85a"
+  "src/hpc3/core/image_build.py": "55143e4d98a086254d42979a475d735ed6943666"
 provenance:
   - "probe job 55675199 on hpc3-l18-04, 2026-09-01"
   - "rusted engine log champion-s2707 (ab48-v7), 2026-09-01"
   - "clients/RustedWarfareBot src/rw_bot/harness/campaign.py@member_command (outside this workspaceRoot)"
   - "login-i17, 2026-09-30 23:40Z: /proc/<pid>/task/*/wchan of a hung apptainer exec showed __IBVSocket_waitForRecvCompletionEvent (D) in syscall 262, newfstatat; board task 465689f5"
-fact_checked: 2026-10-16
+  - "login-i15, 2026-10-28T06:07Z: PID 2581254 stat of /pub/wagnera3/envs/cleargbm/bin/python waited in D state, IBVSocket_waitForRecvCompletionEvent, syscall 332 (statx); board task eadd19d5"
+  - "login-i15, 2026-10-28: PID 2810355 writing the synthetic benchmark entrypoint waited in D state, FhgfsOps_revalidateIntent; dfsquotas reported 342.16 GiB of 1.00 TiB and 564.45k of 8.00M files"
+  - "HPC3 job 58566045, hpc3-20-20, COMPLETED 0:0 in 85 seconds, 2026-10-28: paired image build with node-local Apptainer cache and temporary directory"
+fact_checked: 2026-10-28
 confidence: high
 ---
 
@@ -93,6 +100,35 @@ from 23:34Z was still in that state at 23:41Z, re-parented to init, because
 a process in uninterruptible sleep takes no signal until its I/O returns.
 
 What this means for a reader: a preflight or execution run that sits on the
-environment probe for minutes is this, and it is a storage stall on the
-cluster, not a network or ssh fault on this side. A remote `timeout` would
-not end it either, for the same reason the orphan outlived its session.
+environment probe for minutes can have this cause. Inspect the remote wait
+state before attributing a new hang to storage. A remote `timeout` cannot
+complete termination while a process remains in uninterruptible I/O, for
+the same reason the orphan outlived its session.
+
+## The October 28 recurrence and image-build mitigation
+
+On `login-i15`, `/pub` resolved to `/dfs6b/pub`. A `stat` of the existing
+ClearGBM environment's interpreter exceeded a ten-second probe bound; a
+subsequent probe was observed in `IBVSocket_waitForRecvCompletionEvent`
+inside `statx`. A later staging writer waited in `FhgfsOps_revalidateIntent`.
+SSH and home-directory operations remained responsive, and both byte and
+file quotas were below their limits. These observations locate the delay in
+BeeGFS metadata operations; they do not identify the failing storage server
+or establish a cluster-wide outage.[^october]
+
+The shared image builder now requires the compute node's `$TMPDIR` and
+places `APPTAINER_CACHEDIR` and `APPTAINER_TMPDIR` beneath it. Missing or empty
+scratch fails with `HPC3_NODE_SCRATCH_MISSING`; final images and logs remain
+in the declared image directory. This reduces shared-filesystem work during
+builds, but cannot repair login-node metadata stalls when staging files or
+opening an image.[^builder]
+
+Job **58566045** built the paired evaluation image on `hpc3-20-20` in
+**85 seconds**, including image self-checks, unprivileged verification and
+`pip check`, with exit `0:0`. This is evidence that the build completed with
+node-local temporary storage, not a controlled performance comparison or
+proof that BeeGFS recovered everywhere.[^build]
+
+[^october]: Live probes on `login-i15`, 2026-10-28, PIDs 2581254 and 2810355 and `dfsquotas` readings recorded in `provenance`; board task eadd19d5.
+[^builder]: `src/hpc3/core/image_sbatch.py:73` `_preamble`, including the required scratch check and quoted cache/temp exports; `src/hpc3/core/image_build.py` failure guidance.
+[^build]: `sacct` for job 58566045 and `/pub/wagnera3/images/cleargbm-paired-2a50e93ca/build-58566045.out` and `.err`, 2026-10-28; image SHA256 `f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b`.
