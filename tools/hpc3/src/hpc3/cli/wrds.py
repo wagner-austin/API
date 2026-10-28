@@ -55,6 +55,28 @@ def _trace(ledger: pathlib.Path, identity: str, attempt: str) -> None:
             _test_hooks.emit(dump_json_str(event))
 
 
+def _prepare(action: str, flags: dict[str, str]) -> None:
+    """Prepare payload bytes or runtime pins before an experiment exists.
+
+    Args:
+        action: Validated bundle or inspect action.
+        flags: Parsed preparation arguments.
+    """
+    if action == "bundle":
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        worker_hooks.write(output, worker_bundle())
+        _test_hooks.emit(
+            dump_json_str({"output": str(output), "sha256": worker_hooks.digest_file(output)})
+        )
+    else:
+        runtime = wrds_jobs.inspect_runtime(
+            cli_args.require_flag(flags, "--host"),
+            cli_args.require_flag(flags, "--root"),
+            cli_args.require_flag(flags, "--python"),
+        )
+        _test_hooks.emit(dump_json_str(encode_wrds_runtime(runtime)))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Execute one WRDS lifecycle action.
 
@@ -73,20 +95,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError("WRDS_ACTION: expected " + ", ".join(sorted(_ACTIONS)))
     action = tokens[0]
     flags = cli_args.parse_single_flags(tokens[1:], _FLAGS)
-    if action == "bundle":
-        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
-        worker_hooks.write(output, worker_bundle())
-        _test_hooks.emit(
-            dump_json_str({"output": str(output), "sha256": worker_hooks.digest_file(output)})
-        )
-        return 0
-    if action == "inspect":
-        runtime = wrds_jobs.inspect_runtime(
-            cli_args.require_flag(flags, "--host"),
-            cli_args.require_flag(flags, "--root"),
-            cli_args.require_flag(flags, "--python"),
-        )
-        _test_hooks.emit(dump_json_str(encode_wrds_runtime(runtime)))
+    if action in {"bundle", "inspect"}:
+        _prepare(action, flags)
         return 0
     spec_path = pathlib.Path(cli_args.require_flag(flags, "--spec")).resolve()
     run = decode_wrds_run(load_json_str(core_hooks.read_bytes(spec_path).decode()))

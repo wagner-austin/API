@@ -191,7 +191,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     elif len(tokens) == 2 and tokens[0] == "extract":
         extract(decode_crsp_selection(load_json_str(tokens[1])))
     else:
-        raise ValueError("WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT or extract SCOPE")
+        raise ValueError(
+            "WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT or extract SCOPE"
+        )
     return 0
 
 
