@@ -8,11 +8,13 @@ source_paths:
   - "src/hpc3/core/execution_evidence.py"
   - "src/hpc3/core/status.py"
   - "artifacts/wrds-controller-verification-20261028/provenance.json"
+  - "artifacts/research-queue-verification-20261028/provenance.json"
 source_git_blobs:
   "src/hpc3/cli/execution_inspect.py": "fd0d98dc12dba896ebc552149a7da69f76d4316e"
   "src/hpc3/core/execution_evidence.py": "f0347915a8720f9a95d62be1221340a876f31e49"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
+  "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
 provenance:
   - "Board task 8a113204-42d0-41a0-8094-73776bae8846; native reports by hpc-report-8a113204, prefix HPC3 ATTEMPT LOAD-REPORT, jobs 58578791 and 58578878"
   - "API libs/covenant_ml/src/covenant_ml/markets/research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; outside this wiki workspaceRoot"
@@ -21,6 +23,7 @@ provenance:
   - "MCPs fleet-mcp/src/tools/dispatch-submit.ts at 14b0c4c7d5467ad1275570d726db66180f168bb6, blob 609ece4ff9bfeee7384f1fe8df54c9098727350c; compared with served dispatch_submit schema on 2026-10-28; outside this wiki workspaceRoot"
   - "API libs/covenant_ml/scripts/research_proposals.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421: explicit status/submit/reconcile commands; outside this wiki workspaceRoot"
   - "Board task f12aa47e-328f-4473-bb89-cc54c49fed30; hpc-report-f12aa47e independently remeasured retained job 58578878 on 2026-10-28; no new trial submitted"
+  - "Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80; API rolled consumer f4064ef451f9dc66ecbd09632f0bfca22fd3718e; MCPs deployment a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b; automatic scheduler and live queue receipts captured in the research-queue provenance artifact"
 fact_checked: 2026-10-28
 confidence: high
 ---
@@ -69,18 +72,36 @@ requirements. The compute SIF remains the earlier immutable evaluator.[^live]
 
 Shell-capable agents on the controller can submit to the native queues using
 the installed commands: HPC3 uses Slurm through the maintained admission and
-HPC tools; WRDS uses Grid Engine through the WRDS CLI. The fleet's served
-`dispatch_submit` accepts only `check`, `lint`, `test` and `build-bases`.
-It does not accept a research job payload. A board task is coordination,
-not a scheduler submission.[^routes]
+HPC tools; WRDS uses Grid Engine through the WRDS CLI. Prepared requests now
+also enter through Corvis `dispatch_submit`, using `command: "research"`,
+project `research/hpc3` or `research/wrds`, controller node, owning task and
+`researchRequest: {backend, specSha256, attempt}`. The reference names exact
+private specification bytes; it carries no shell command or data. A board task
+alone remains coordination, not a scheduler submission.[^routes][^queue]
 
-The proposal controller has no unattended consumer or reconciliation daemon.
-Agents explicitly call `reconcile` for submitted attempts, preserving the
-existing journal and consumed candidate/seed budgets. Disconnecting the agent
-does not cancel an accepted native job. Recovery inspects the recorded identity
-and refuses to guess when the submission ledger is missing or ambiguous.
-The package README's **Agent submission routes** section gives the installed
-status command and routes to the existing lifecycle references.[^routes][^inspect]
+The existing fleet scheduler invokes the frozen native adapter through the
+rolled consumer every 180 seconds. Its shared lease bounds a controller
+operation; waiting for Slurm or Grid Engine consumes no local worker slot.
+The adapter reuses the proposal journal, consumed candidate/seed budgets and
+maintained WRDS lifecycle. Direct CLI submissions still require explicit
+reconciliation unless adopted by a prepared queue request. Disconnecting the
+agent does not cancel an accepted native job; missing or ambiguous receipts
+cannot authorize another submission.[^queue][^inspect]
+
+Automatic ticks by `fleet-research-diphtheria` completed both retained pilots:
+
+| Backend | Shared queue receipt | Native job | Completed UTC |
+|---|---|---|---|
+| HPC3 | d925f987-1e9b-4ff2-aca2-0a85c1a3b07d | 58578878 | 22:28:06 |
+| WRDS | 84ae382d-ff5f-4292-8d8a-3271b8fa30c7 | 40534563 | 22:31:33 |
+
+Both ticks exited zero without timing out and posted their outcomes to the
+owning board task. Repeated submissions returned the same completed receipts;
+separate repeated native inspections returned the same allocation IDs and
+RunRecord hashes. The metadata artifact contains the live queue trails,
+scheduler rows, frozen controller's 23 wheel hashes and offline hashed
+requirements. No new allocation or extraction was requested by this check.
+This supersedes the manual-only route measured earlier under f12aa47e.[^queue]
 
 The fresh inspection for task f12aa47e revalidated job 58578878's zero-exit
 allocation and the same result/RunRecord hashes recorded above. The installed
@@ -107,3 +128,4 @@ execution. Results and local journals remain owner-writable evidence.[^query][^m
 [^wrds]: Board task 8a113204-42d0-41a0-8094-73776bae8846, program-authored post by load-report-8a113204 at 2026-10-28T19:57:42.310Z, native accounting and output digest lines.
 [^routes]: MCPs `dispatch-submit.ts` function `registerDispatchSubmit` and the served schema named in provenance; API `research_proposals.py` function `main`, plus `research_execution.py` functions `submit_attempt` and `reconcile_attempt` at the source commit named in provenance. The WRDS lifecycle is documented in [[wrds-repeatable-attempts]].
 [^recheck]: Board task f12aa47e-328f-4473-bb89-cc54c49fed30, program-authored HPC3 ATTEMPT LOAD-REPORT by hpc-report-f12aa47e; controller status saved privately as `agent-route-journal-status.json` beside the installed study journal on 2026-10-28. Status is a local file reading; the report measures live cluster evidence.
+[^queue]: `artifacts/research-queue-verification-20261028/provenance.json`, fields `runtime`, `scheduler_runs` and `pilots`. Queue receipts were read through live Corvis tools, scheduler rows from production `hub_runner_runs`, and runtime hashes from local build metadata. API `tools/fleet/src/fleet/cli/research_queue.py` and `core/research_hpc.py` / `research_wrds.py` at f4064ef451f9dc66ecbd09632f0bfca22fd3718e implement the existing lease and native-command integration. MCPs `scripts/fleet/hub-jobs.json` at a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b supplies its schedule. These cross-package source files lie outside this wiki's workspaceRoot.
