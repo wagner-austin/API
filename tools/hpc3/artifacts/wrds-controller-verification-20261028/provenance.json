@@ -1,0 +1,173 @@
+{
+  "kind": "wrds-controller-verification",
+  "task_id": "8a113204-42d0-41a0-8094-73776bae8846",
+  "report_author": "hpc-report-8a113204",
+  "report_prefix": "HPC3 ATTEMPT LOAD-REPORT",
+  "controller_source_commit": "bda8ca2af532d89b301b56cc0b55a4346bb6e421",
+  "controller_python": "/home/corvis/research-control/wrds-validation-bda8ca2af/bin/python",
+  "controller_working_directory": "/home/corvis/research-control/wrds-validation-bda8ca2af/entrypoint",
+  "private_evidence_root": "/home/corvis/research-data/wrds/experiments/admitted-validation-20261028",
+  "controller_build_root": "/home/corvis/research-data/wrds/runtime/controller-bda8ca2af",
+  "controller_build_hashes": {
+    "source.tar": "a69d2bbbf9b36e70aa9104a78b713e1b6064c42a89082cb1b905aa015719b796",
+    "covenant_ml-0.1.0-py3-none-any.whl": "481e81e83d4349a8cf84bba1699df37f75df5d8746d35236805f093f3fcb5403",
+    "requirements.txt": "d99383de54a93eaa4dcff494c556598dbacf254d41335abbf182840402716187",
+    "controller-installed.txt": "d99383de54a93eaa4dcff494c556598dbacf254d41335abbf182840402716187"
+  },
+  "pip_check": "No broken requirements found.",
+  "attempts": [
+    {
+      "attempt": 3,
+      "status": "complete",
+      "candidate": "c90291a531e4e38cf9ca09780838022ad626d718e67e5f6589c70fc5492b2444",
+      "measurement": {
+        "ledger": {
+          "job_id": "58578791",
+          "project": "cleargbm",
+          "name": "cleargbm.research-e9ad0a4ef118-3",
+          "host": "hpc3",
+          "partition": "free",
+          "submitted_at": "2026-10-28T19:44:58.312890+00:00",
+          "log_dir": "/pub/wagnera3/cleargbm/logs",
+          "deterministic": true,
+          "experiment": {
+            "research_attempt": "e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb:3",
+            "request_sha256": "6a667a1b31afdfb15bbc119cf769cf3a0200d3755eac9e89ab20863ca1eee628"
+          },
+          "image_digest": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+          "submitter": "codex-wrds-1027",
+          "artifact": "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/3/result/evaluation.json",
+          "image_drift": {
+            "image_commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+            "head": "19b0f5252079ebe2ecadc943fff62d6aa3226ede",
+            "modules": [
+              {
+                "directory": "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint",
+                "module": "scripts.research_trial",
+                "compared": [],
+                "changed": [],
+                "not_compared": "resolved from /pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+              }
+            ]
+          }
+        },
+        "accounting": {
+          "job": {
+            "job_id": "58578791",
+            "name": "cleargbm.research-e9ad0a4ef118-3",
+            "partition": "free",
+            "state": "COMPLETED",
+            "elapsed_seconds": 11,
+            "billing_tres": 1,
+            "gpu_count": 0,
+            "cpu_count": 1,
+            "node_list": "hpc3-20-19"
+          },
+          "exit_code": "0:0",
+          "started_at": "2026-10-28T19:45:06",
+          "ended_at": "2026-10-28T19:45:17"
+        },
+        "result_sha256": "2a0f11062897c9f26f8a37fcabe4856fffbebc663e7673bc924e71709b30f75c",
+        "record_sha256": "50d31847d8d59fbbc807492debf99e06b50d8b6ca85423c77c2d6e2b328591c0",
+        "stdout_sha256": "c65f40df85a1454da7431e0754771a9e1be3d200339632f0073521daed3fb465",
+        "result_mtime": 1793216717,
+        "record_mtime": 1793216717,
+        "verified_files": {
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+          "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+          "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/research_trial.py": "0788b3f20d1798c53f33fc4cbb7ca4aee6ca4949bf3fcb7f9f43d825c457add2",
+          "/pub/wagnera3/images/research-validation-2e445e25e/research-validation.sif": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+          "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/3/request.json": "6a667a1b31afdfb15bbc119cf769cf3a0200d3755eac9e89ab20863ca1eee628"
+        },
+        "compute_checksum_lines": 8,
+        "dataset": {
+          "sha256": "c8d59956aa695d2871cd0b030bd21b00bc4f596a62b2ed3500e6ec6920f1219e",
+          "n_rows": 504,
+          "n_features": 1
+        }
+      },
+      "observation_count": 13,
+      "report_file_sha256": "735e53fd892c3af50edc50b16af6f0c62d79bf34804a7e2fcccffeadd39812e0"
+    },
+    {
+      "attempt": 4,
+      "status": "complete",
+      "candidate": "9c6575a5a8fbeaa8c173c577c7a053babbaffe29ce0acd5f169d9357b28d2275",
+      "measurement": {
+        "ledger": {
+          "job_id": "58578878",
+          "project": "cleargbm",
+          "name": "cleargbm.research-e9ad0a4ef118-4",
+          "host": "hpc3",
+          "partition": "free",
+          "submitted_at": "2026-10-28T19:53:17.200346+00:00",
+          "log_dir": "/pub/wagnera3/cleargbm/logs",
+          "deterministic": true,
+          "experiment": {
+            "research_attempt": "e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb:4",
+            "request_sha256": "278845ec91e7eba8d981c5a353e0d003ddc12fe8214109f8f95687202e99eaca"
+          },
+          "image_digest": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+          "submitter": "codex-wrds-1027",
+          "artifact": "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/4/result/evaluation.json",
+          "image_drift": {
+            "image_commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+            "head": "19b0f5252079ebe2ecadc943fff62d6aa3226ede",
+            "modules": [
+              {
+                "directory": "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint",
+                "module": "scripts.research_trial",
+                "compared": [],
+                "changed": [],
+                "not_compared": "resolved from /pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+              }
+            ]
+          }
+        },
+        "accounting": {
+          "job": {
+            "job_id": "58578878",
+            "name": "cleargbm.research-e9ad0a4ef118-4",
+            "partition": "free",
+            "state": "COMPLETED",
+            "elapsed_seconds": 14,
+            "billing_tres": 1,
+            "gpu_count": 0,
+            "cpu_count": 1,
+            "node_list": "hpc3-20-19"
+          },
+          "exit_code": "0:0",
+          "started_at": "2026-10-28T19:53:27",
+          "ended_at": "2026-10-28T19:53:41"
+        },
+        "result_sha256": "b820110da1618abb0de1bf0ed085e62a24b30192a8165a315e509484675d5164",
+        "record_sha256": "62d46fc3e0a23eeb1e2644ed2bcc71e64a224d52bb5e077a8e03f26c1b4f9dd8",
+        "stdout_sha256": "fa5524276b5cc9579582b51cf891a7e0d7c66d7f504e1f3dd2cec0646f47802f",
+        "result_mtime": 1793217221,
+        "record_mtime": 1793217221,
+        "verified_files": {
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+          "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+          "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+          "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/research_trial.py": "0788b3f20d1798c53f33fc4cbb7ca4aee6ca4949bf3fcb7f9f43d825c457add2",
+          "/pub/wagnera3/images/research-validation-2e445e25e/research-validation.sif": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+          "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/4/request.json": "278845ec91e7eba8d981c5a353e0d003ddc12fe8214109f8f95687202e99eaca"
+        },
+        "compute_checksum_lines": 8,
+        "dataset": {
+          "sha256": "c8d59956aa695d2871cd0b030bd21b00bc4f596a62b2ed3500e6ec6920f1219e",
+          "n_rows": 504,
+          "n_features": 1
+        }
+      },
+      "observation_count": 13,
+      "report_file_sha256": "5a6fb01246543f23b4d57bfbd2f5392f8b752366db6d30376189b7b68198df1e"
+    }
+  ],
+  "interpretation": "Attempt3 uses the original installed controller with seed23. Attempt4 uses the repaired controller with reordered JSON keys and a second 11-tree candidate, exercising the same frozen evaluator and data. These are execution diagnostics, not profitability evidence or identical-seed replays."
+}

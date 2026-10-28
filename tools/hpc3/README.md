@@ -201,20 +201,17 @@ verification. The program posts its measurement and emits structured JSON for
 the journal controller. Missing or ambiguous submissions never authorize retry.
 
 The installed Ziggurat controller is
-`/home/corvis/research-control/wrds-validation-2e445e25e/bin/python`, with the
+`/home/corvis/research-control/wrds-validation-bda8ca2af/bin/python`, with the
 proposal entrypoint under the adjacent `entrypoint/` working directory. Its
 policy, journal and cluster configuration are under
 `/home/corvis/research-data/wrds/experiments/admitted-validation-20261028/`.
 It uses installed wheels rather than relying on this temporary worktree.
 
-Live attempt **58578600** completed with exit `0:0` on `hpc3-17-19` in 12
-seconds, using one CPU, no GPU, eight verified files and 13 shared observations.
-The controller recorded completion and refused the duplicate candidate/seed.
-The frozen image was built and verified by job **58578547**. Metadata, policy,
-recipe and image spec are retained in
-[`artifacts/wrds-validation-20261028/`](artifacts/wrds-validation-20261028/provenance.json).
-This validates the engineering path on one CRSP security. It does not implement
-the monthly portfolio protocol or establish profitability.
+Use `cluster-4.json` as the installed-controller configuration reference; its
+`report_task` must name the task owning a new run. Preserve the existing journal
+and use a newly admitted attempt number and exclusive directory for each run.
+The [operational verification record](wiki/pages/wrds-installed-controller-verification.md)
+documents the measured jobs, controller repair, frozen image and remaining limits.
 
 ### WRDS data inventory
 

@@ -11,3 +11,4 @@ thing saying stop.
 [Two command-length ceilings, and the token count that met both](../pages/command-length-limits.md) -- a query sized by the ledger died before reaching the cluster; why the split measures width, not tokens
 [One ledger per repository, whichever worktree submits](../pages/one-ledger-per-repository.md) -- a worktree's own ledger missed 12 live members and a campaign submitted them twice; the main checkout's ledger, and the refusal for a live job no ledger here records
 [WRDS experiments need durable attempts and verified results](../pages/wrds-repeatable-attempts.md) -- held submission recovery, input/runtime checks, shared run records and two matching compute-node executions
+[Installed WRDS research controllers submit and reconcile bounded validation](../pages/wrds-installed-controller-verification.md) -- live installed runs, proposal-order repair, measured artifacts and evidence boundaries
