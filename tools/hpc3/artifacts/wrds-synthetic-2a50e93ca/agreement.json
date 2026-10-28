@@ -1,0 +1,412 @@
+{
+  "experiment": "covenant-paired-evaluation",
+  "runs": 2,
+  "shared": [
+    {
+      "name": "mean_cleargbm.auc_roc",
+      "values": [
+        0.957983193277311,
+        0.957983193277311
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_cleargbm.brier",
+      "values": [
+        0.1309838935092482,
+        0.1309838935092482
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_cleargbm.log_loss",
+      "values": [
+        0.44035894659796126,
+        0.44035894659796126
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_lightgbm.auc_roc",
+      "values": [
+        0.957983193277311,
+        0.957983193277311
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_lightgbm.brier",
+      "values": [
+        0.130983893311134,
+        0.130983893311134
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_lightgbm.log_loss",
+      "values": [
+        0.4403589460187277,
+        0.4403589460187277
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_policy_value.cleargbm",
+      "values": [
+        0.3225806451612903,
+        0.3225806451612903
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_policy_value.lightgbm",
+      "values": [
+        0.3225806451612903,
+        0.3225806451612903
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_policy_value.never_alert",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_policy_value.xgboost",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_xgboost.auc_roc",
+      "values": [
+        0.49579831932773105,
+        0.49579831932773105
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_xgboost.brier",
+      "values": [
+        0.24859261887715423,
+        0.24859261887715423
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "mean_xgboost.log_loss",
+      "values": [
+        0.6903615305500646,
+        0.6903615305500646
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.auc.ci_high",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.auc.ci_low",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.auc.difference",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.auc.p_value",
+      "values": [
+        1.0,
+        1.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.brier.ci_high",
+      "values": [
+        1.4571783433788762e-09,
+        1.4571783433788762e-09
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.brier.ci_low",
+      "values": [
+        -1.0609499474072083e-09,
+        -1.0609499474072083e-09
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.brier.difference",
+      "values": [
+        1.9811419798583395e-10,
+        1.9811419798583395e-10
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.brier.p_value",
+      "values": [
+        0.2952530870106874,
+        0.2952530870106874
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.log_loss.ci_high",
+      "values": [
+        3.816003408342712e-09,
+        3.816003408342712e-09
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.log_loss.ci_low",
+      "values": [
+        -2.657536301153555e-09,
+        -2.657536301153555e-09
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.log_loss.difference",
+      "values": [
+        5.792335535945786e-10,
+        5.792335535945786e-10
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.log_loss.p_value",
+      "values": [
+        0.2637695885504643,
+        0.2637695885504643
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.utility.ci_high",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.utility.ci_low",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.utility.difference",
+      "values": [
+        0.0,
+        0.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_cleargbm_vs_lightgbm.utility.p_value",
+      "values": [
+        1.0,
+        1.0
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.auc.ci_high",
+      "values": [
+        -0.15363843868849908,
+        -0.15363843868849908
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.auc.ci_low",
+      "values": [
+        -0.7791346705551985,
+        -0.7791346705551985
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.auc.difference",
+      "values": [
+        -0.46638655462184875,
+        -0.46638655462184875
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.auc.p_value",
+      "values": [
+        0.03356682254727765,
+        0.03356682254727765
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.brier.ci_high",
+      "values": [
+        0.3149253425266278,
+        0.3149253425266278
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.brier.ci_low",
+      "values": [
+        -0.07970789139458738,
+        -0.07970789139458738
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.brier.difference",
+      "values": [
+        0.11760872556602021,
+        0.11760872556602021
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.brier.p_value",
+      "values": [
+        0.0835763335518033,
+        0.0835763335518033
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.log_loss.ci_high",
+      "values": [
+        0.6515853120408879,
+        0.6515853120408879
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.log_loss.ci_low",
+      "values": [
+        -0.15158014297821404,
+        -0.15158014297821404
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.log_loss.difference",
+      "values": [
+        0.25000258453133695,
+        0.25000258453133695
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.log_loss.p_value",
+      "values": [
+        0.08005658244991844,
+        0.08005658244991844
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.utility.ci_high",
+      "values": [
+        0.8211927924993596,
+        0.8211927924993596
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.utility.ci_low",
+      "values": [
+        -1.4663540828219401,
+        -1.4663540828219401
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.utility.difference",
+      "values": [
+        -0.3225806451612903,
+        -0.3225806451612903
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    },
+    {
+      "name": "pooled_xgboost_vs_lightgbm.utility.p_value",
+      "values": [
+        0.17324323118206963,
+        0.17324323118206963
+      ],
+      "distinct": 1,
+      "spread": 0.0
+    }
+  ],
+  "unmatched": []
+}

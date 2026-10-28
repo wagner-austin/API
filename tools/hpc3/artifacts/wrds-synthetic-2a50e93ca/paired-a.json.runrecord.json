@@ -1,0 +1,232 @@
+{
+ "experiment": "covenant-paired-evaluation",
+ "label": "b20bd4daf4c3-block-2seeds",
+ "fingerprint": {
+  "image_digest": "f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 48
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ },
+ "observations": [
+  {
+   "name": "mean_cleargbm.auc_roc",
+   "value": 0.957983193277311
+  },
+  {
+   "name": "mean_cleargbm.brier",
+   "value": 0.1309838935092482
+  },
+  {
+   "name": "mean_cleargbm.log_loss",
+   "value": 0.44035894659796126
+  },
+  {
+   "name": "mean_lightgbm.auc_roc",
+   "value": 0.957983193277311
+  },
+  {
+   "name": "mean_lightgbm.brier",
+   "value": 0.130983893311134
+  },
+  {
+   "name": "mean_lightgbm.log_loss",
+   "value": 0.4403589460187277
+  },
+  {
+   "name": "mean_policy_value.cleargbm",
+   "value": 0.3225806451612903
+  },
+  {
+   "name": "mean_policy_value.lightgbm",
+   "value": 0.3225806451612903
+  },
+  {
+   "name": "mean_policy_value.never_alert",
+   "value": 0.0
+  },
+  {
+   "name": "mean_policy_value.xgboost",
+   "value": 0.0
+  },
+  {
+   "name": "mean_xgboost.auc_roc",
+   "value": 0.49579831932773105
+  },
+  {
+   "name": "mean_xgboost.brier",
+   "value": 0.24859261887715423
+  },
+  {
+   "name": "mean_xgboost.log_loss",
+   "value": 0.6903615305500646
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.auc.ci_high",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.auc.ci_low",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.auc.difference",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.auc.p_value",
+   "value": 1.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.brier.ci_high",
+   "value": 1.4571783433788762e-09
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.brier.ci_low",
+   "value": -1.0609499474072083e-09
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.brier.difference",
+   "value": 1.9811419798583395e-10
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.brier.p_value",
+   "value": 0.2952530870106874
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.log_loss.ci_high",
+   "value": 3.816003408342712e-09
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.log_loss.ci_low",
+   "value": -2.657536301153555e-09
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.log_loss.difference",
+   "value": 5.792335535945786e-10
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.log_loss.p_value",
+   "value": 0.2637695885504643
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.utility.ci_high",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.utility.ci_low",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.utility.difference",
+   "value": 0.0
+  },
+  {
+   "name": "pooled_cleargbm_vs_lightgbm.utility.p_value",
+   "value": 1.0
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.auc.ci_high",
+   "value": -0.15363843868849908
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.auc.ci_low",
+   "value": -0.7791346705551985
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.auc.difference",
+   "value": -0.46638655462184875
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.auc.p_value",
+   "value": 0.03356682254727765
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.brier.ci_high",
+   "value": 0.3149253425266278
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.brier.ci_low",
+   "value": -0.07970789139458738
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.brier.difference",
+   "value": 0.11760872556602021
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.brier.p_value",
+   "value": 0.0835763335518033
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.log_loss.ci_high",
+   "value": 0.6515853120408879
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.log_loss.ci_low",
+   "value": -0.15158014297821404
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.log_loss.difference",
+   "value": 0.25000258453133695
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.log_loss.p_value",
+   "value": 0.08005658244991844
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.utility.ci_high",
+   "value": 0.8211927924993596
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.utility.ci_low",
+   "value": -1.4663540828219401
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.utility.difference",
+   "value": -0.3225806451612903
+  },
+  {
+   "name": "pooled_xgboost_vs_lightgbm.utility.p_value",
+   "value": 0.17324323118206963
+  }
+ ],
+ "payload_digest": "53afd7f8e48922724a15cb9e0e92c49dfd5ef0758fe802e1cea65fe2faeb63f9"
+}
