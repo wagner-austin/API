@@ -6,19 +6,21 @@ related: ["[[partitions-and-billing]]"]
 source_paths:
   - "src/hpc3/core/wrds_scan.py"
   - "src/hpc3/core/wrds_grid.py"
+  - "src/hpc3/core/artifacts.py"
   - "src/hpc3/core/wrds_catalog.py"
   - "src/hpc3/core/wrds_sql.py"
   - "src/hpc3/cli/wrds_catalog.py"
   - "src/hpc3/cli/wrds_sql_catalog.py"
-  - "src/hpc3/cli/_wrds_report.py"
+  - "src/hpc3/cli/_load_report.py"
 source_git_blobs:
   "src/hpc3/core/wrds_scan.py": "377d02f3bcbbb15e1b362298f59ae5eec89e97fb"
-  "src/hpc3/core/wrds_grid.py": "35858122430e411c3a190a97ebf3426d72e1f04c"
-  "src/hpc3/core/wrds_catalog.py": "ad623e2f37d7c747ed860ddbf5b911ab3e84e8eb"
-  "src/hpc3/core/wrds_sql.py": "36478e3b7d088ed9b8ece9dd4bc33fe73023f046"
-  "src/hpc3/cli/wrds_catalog.py": "63a99689ac63d276a85b4b38e06c556f2bafbe0f"
-  "src/hpc3/cli/wrds_sql_catalog.py": "90b6685c1ae9e6bf08216f03a4d8744cd465e893"
-  "src/hpc3/cli/_wrds_report.py": "fe5569d6a836c1dc94e4a908125d00130f78ac4c"
+  "src/hpc3/core/wrds_grid.py": "beb9d589853518e51185aa30ad44365e49290806"
+  "src/hpc3/core/artifacts.py": "4dffdf06b94e1cd6d58f45ac785788ad242f05c4"
+  "src/hpc3/core/wrds_catalog.py": "b9633ede191be573181933067b3a3ab89f3ce8ab"
+  "src/hpc3/core/wrds_sql.py": "91c9b1054a60eff86a037bc5ebd17b420cd8bb52"
+  "src/hpc3/cli/wrds_catalog.py": "d46ba2ea77da094898227c93093ed54790c2b2d1"
+  "src/hpc3/cli/wrds_sql_catalog.py": "a49efcd087ea7ee21fca3adaab4be51f49c47308"
+  "src/hpc3/cli/_load_report.py": "3a109d6314c9a077bbfbf860a073217dd2efdd8f"
 provenance:
   - "WRDS Grid Engine job 40529889, awagner14, 2026-10-28T01:29Z, run by hpc3.cli.wrds_catalog at API d0d0cafe8; synchronous qsub exit 0"
   - "Ziggurat /home/corvis/research-data/wrds/catalogs/2026-10-28/filesystem.jsonl, sha256 cff2ebb8751f6bb1b4f574330f89cdfeafdf9a9f435d271bddfeb0555951647a; adjacent receipt records probe archive sha256 7878f224f9d7ba0f117a539bcf7b0b4894c0e634e441fdd427f099bf07335b86"
@@ -108,10 +110,10 @@ staging manifest and a matching dataset-registry entry before training.
 Neither inventory downloads, registers or trains on any data; downloads wait
 for the operator's dataset selection.[^integration]
 
-[^report]: `src/hpc3/cli/_wrds_report.py:59` (`post_load_report`), under the identity `src/hpc3/cli/_wrds_report.py:37` (`report_identity`) derives from the task id.
+[^report]: `src/hpc3/cli/_load_report.py:59` (`post_load_report`), under the identity `src/hpc3/cli/_load_report.py:34` (`report_identity`) derives from the task id.
 [^measurement]: WRDS job 40529889 and the local catalog and receipt named in `provenance`, posted by `src/hpc3/cli/wrds_catalog.py:22` (`report`); a dated observation, not a live entitlement service.
 [^scan]: `src/hpc3/core/wrds_scan.py:45` (`scan`) and `src/hpc3/core/wrds_scan.py:29` (`permission_error`).
-[^sql]: WRDS jobs 40529873 and 40529878 and the artifacts named in `provenance`; classification in `src/hpc3/core/wrds_sql.py:101` (`classify`), the run in `src/hpc3/core/wrds_sql.py:214` (`sql_inventory`).
-[^workflow]: `src/hpc3/core/wrds_grid.py:111` (`submit`), `src/hpc3/core/wrds_grid.py:159` (`download`) and `src/hpc3/core/wrds_catalog.py:67` (`inventory`).
+[^sql]: WRDS jobs 40529873 and 40529878 and the artifacts named in `provenance`; classification in `src/hpc3/core/wrds_sql.py:102` (`classify`), the run in `src/hpc3/core/wrds_sql.py:201` (`sql_inventory`).
+[^workflow]: `src/hpc3/core/wrds_grid.py:102` (`submit`), `src/hpc3/core/artifacts.py:54` (`download`) and `src/hpc3/core/wrds_catalog.py:67` (`inventory`).
 [^cli]: `src/hpc3/cli/wrds_catalog.py:48` (`main`) and `src/hpc3/cli/wrds_sql_catalog.py:50` (`main`).
 [^integration]: The API repository paths and revision recorded in `provenance`; the cluster's staging command is documented in this package's `README.md`.

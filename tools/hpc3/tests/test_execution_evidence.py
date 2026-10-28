@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Sequence
 
 import pytest
@@ -194,7 +195,12 @@ def test_remote_failure_real_process_twin() -> None:
     ) -> _test_hooks.CommandResult:
         assert argv[0] == "ssh"
         return real_run(
-            ["sh", "-c", "echo accounting-unavailable >&2; exit 7"], stdin_bytes=stdin_bytes
+            [
+                sys.executable,
+                "-c",
+                "import sys; sys.stderr.write('accounting-unavailable'); sys.exit(7)",
+            ],
+            stdin_bytes=stdin_bytes,
         )
 
     _test_hooks.run = failed_transport

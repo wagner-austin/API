@@ -109,3 +109,13 @@ def test_download_refuses_a_text_that_differs_from_the_remote_file(fake_run: Fak
     fake_run.add("sha256sum", stdout="0" * 64 + "  /home/uci/test/out.csv\n")
     with pytest.raises(AppError):
         artifacts.download("wrds", "/home/uci/test/out.csv")
+
+
+def test_verified_artifact_codec_checks_content_and_exact_fields() -> None:
+    text = "a,b\n"
+    value = artifacts.Artifact(text=text, sha256=hashlib.sha256(text.encode()).hexdigest())
+    assert artifacts.decode_artifact(artifacts.encode_artifact(value)) == value
+    with pytest.raises(ValueError, match="HPC_ARTIFACT_FIELDS"):
+        artifacts.decode_artifact({"text": text})
+    with pytest.raises(AppError, match="digests"):
+        artifacts.decode_artifact({"text": text, "sha256": "0" * 64})
