@@ -179,6 +179,19 @@ def reconcile(
         leases.release_if_held(lease_path, run_id=run_id, now_unix=_test_hooks.now())
 
 
+def _renewal_order(job: DispatchJob) -> int:
+    """Order unrenewed receipts first and then the oldest lease expiry.
+
+    Args:
+        job: Held queue receipt.
+
+    Returns:
+        Epoch seconds, with an unrenewed claim ordered before renewed work.
+    """
+    expiry = job["lease_expires_unix"]
+    return 0 if expiry is None else expiry
+
+
 def tick(
     credentials: McpCredentials,
     identity: JSONObject,
@@ -226,7 +239,7 @@ def tick(
             held = (*retained, claimed)
     if not held:
         return None
-    selected = min(held, key=lambda job: job["lease_expires_unix"] or 0)
+    selected = min(held, key=_renewal_order)
     return reconcile(credentials, identity, worker, lease_path, selected)
 
 
