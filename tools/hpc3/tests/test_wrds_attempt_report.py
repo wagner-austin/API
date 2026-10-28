@@ -58,6 +58,7 @@ def test_failed_attempt_reports_the_refusal_and_a_missing_attestation(
     transport.add("test -e", stdout="absent\n")
     completed(transport, run, result)
     lines = render(run, "one").splitlines()
+    presence = transport.commands()[-1]
     assert lines[1] == "identity " + run_identity(run)
     assert lines[3] == "input numbers sha256=" + numbers
     assert lines[-4:] == [
@@ -69,7 +70,7 @@ def test_failed_attempt_reports_the_refusal_and_a_missing_attestation(
     with pytest.raises(ValueError, match="WRDS_NOT_COMPLETE: job 123 is failed"):
         verified_completion(run, "one")
     path = attempt_directory(run, "one") + "/completion.json"
-    assert f"test -e {path} && echo present || echo absent" in transport.commands()[-1]
+    assert f"test -e {path} && echo present || echo absent" in presence
 
 
 def test_active_attempt_has_no_accounting_yet(tmp_path: pathlib.Path) -> None:
