@@ -167,9 +167,10 @@ agent integration boundary are in the API wiki's
 The earlier frozen-runtime task's audit was reopened for insufficient
 machine-readable live-run verification; its existing recorded executions are
 not an audit pass. This pilot retains explicit scheduler and checksum evidence
-rather than only a comparison verdict.
+rather than only a comparison verdict.[^crsp][^audit]
 
 [^crsp]: `artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json`; native `accounting-and-digests.txt`, `watch.txt`, `trace-a.txt`, `trace-b.txt` and `compute-checksums.json` beside it; service-authored WRDS report named in provenance.
+[^audit]: Board task eadd19d5-6d5e-4c05-a8fe-1867337fdbef, audit-verifier status change 2026-10-28T16:35:56.756Z; audit request 968460dd-bbf7-4412-bfde-ca8e6dea3e9e, criterion A1 evidence rejection.
 [^identity]: `src/hpc3/contracts/wrds_run.py:230` `decode_wrds_run` and `:345` `run_identity`.
 [^submit]: `src/hpc3/core/wrds_jobs.py:245` `submit`, `:220` `resume` and `:170` `record_event`.
 [^worker]: `src/hpc3/wrds/worker.py:92` `execute_run`.
