@@ -149,6 +149,41 @@ def blob(text: str) -> str:
 
 
 class TestReadDeclared:
+    def test_pins_use_declared_capacity_without_treating_unprobed_tools_as_absent(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        capable = dispatch_document()
+        capable["test_database"] = True
+        capable["cxx"] = "15.3.0"
+        files = {
+            **REGISTRY_FILES,
+            "tools/fleet/registry/machines/sedona.json": dump_json_str(
+                machine_document(role="worker", dispatch=capable)
+            ),
+            "tools/fleet/registry/projects/MCPs/packages/wiki-check.json": project_file(
+                ["testdb", "cxx", "pdftotext"]
+            ),
+        }
+        repo = tmp_path / "pins"
+        committed_repository(repo, files, rolled.ROLLED_REF)
+        read = declared.read_declared(repo)
+        assert not isinstance(read, str)
+        assert read["projects"] == (
+            declared.DeclaredProject(
+                project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity")
+            ),
+            declared.DeclaredProject(
+                project="MCPs/packages/wiki-check",
+                required_tags=(NodeTag.TESTDB, NodeTag.CXX, NodeTag.PDFTOTEXT),
+                dispatch_nodes=("sedona",),
+            ),
+            declared.DeclaredProject(
+                project="tools/fleet",
+                required_tags=(NodeTag.LINUX,),
+                dispatch_nodes=("sedona", "serendipity"),
+            ),
+        )
+
     def test_reads_each_project_and_its_tags_at_the_rolled_commit_and_the_instant_before(
         self, rolled_repo: tuple[pathlib.Path, str]
     ) -> None:
@@ -158,12 +193,19 @@ class TestReadDeclared:
         assert declared.read_declared(repo) == declared.RegistryRead(
             commit=commit,
             projects=(
-                declared.DeclaredProject(project="MCPs", required_tags=()),
+                declared.DeclaredProject(
+                    project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity")
+                ),
                 declared.DeclaredProject(
                     project="MCPs/packages/wiki-check",
                     required_tags=(NodeTag.CXX, NodeTag.PDFTOTEXT),
+                    dispatch_nodes=(),
                 ),
-                declared.DeclaredProject(project="tools/fleet", required_tags=(NodeTag.LINUX,)),
+                declared.DeclaredProject(
+                    project="tools/fleet",
+                    required_tags=(NodeTag.LINUX,),
+                    dispatch_nodes=("sedona", "serendipity"),
+                ),
             ),
             runners=RUNNERS,
             checked_at="2026-10-14T23:00:00+00:00",
@@ -222,7 +264,9 @@ class TestReadDeclared:
 
         assert declared.read_declared(tmp_path) == declared.RegistryRead(
             commit=COMMIT,
-            projects=(declared.DeclaredProject(project="MCPs", required_tags=()),),
+            projects=(
+                declared.DeclaredProject(project="MCPs", required_tags=(), dispatch_nodes=("sedona",)),
+            ),
             runners=("fleet-node-sedona",),
             checked_at="2026-10-14T23:00:00+00:00",
         )
@@ -295,9 +339,13 @@ class TestPublishRegistry:
     READ = declared.RegistryRead(
         commit="b" * 40,
         projects=(
-            declared.DeclaredProject(project="MCPs", required_tags=()),
             declared.DeclaredProject(
-                project="tools/fleet", required_tags=(NodeTag.LINUX, NodeTag.TESTDB)
+                project="MCPs", required_tags=(), dispatch_nodes=("lavender", "sedona")
+            ),
+            declared.DeclaredProject(
+                project="tools/fleet",
+                required_tags=(NodeTag.LINUX, NodeTag.TESTDB),
+                dispatch_nodes=("sedona",),
             ),
         ),
         runners=("fleet-node-lavender", "fleet-node-sedona"),
@@ -330,8 +378,12 @@ class TestPublishRegistry:
         )
         sent: JSONObject = {
             "projects": [
-                {"project": "MCPs", "requiredTags": []},
-                {"project": "tools/fleet", "requiredTags": ["linux", "testdb"]},
+                {"project": "MCPs", "requiredTags": [], "dispatchNodes": ["lavender", "sedona"]},
+                {
+                    "project": "tools/fleet",
+                    "requiredTags": ["linux", "testdb"],
+                    "dispatchNodes": ["sedona"],
+                },
             ],
             "runners": ["fleet-node-lavender", "fleet-node-sedona"],
             "commit": "b" * 40,
