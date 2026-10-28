@@ -40,6 +40,18 @@ _GEN = (
 class TestWhichPathsAreInputs:
     """The flag says which, not the directory."""
 
+    def test_wrds_manifest_is_required_but_its_result_is_not(self) -> None:
+        command = (
+            "python -m scripts.benchmark_paired_evaluation "
+            "--wrds-manifest /pub/wagnera3/inputs/synthetic.json "
+            "--out /pub/wagnera3/results/paired.json"
+        )
+        manifest = "/pub/wagnera3/inputs/synthetic.json"
+        assert declared_inputs(command) == (manifest,)
+        with pytest.raises(AppError, match="RUN_INPUT_MISSING"):
+            require_inputs_present(command, frozenset())
+        require_inputs_present(command, frozenset({manifest}))
+
     def test_a_payload_is_an_input(self) -> None:
         assert declared_inputs(_TRAIN) == (
             "/pub/wagnera3/code-style/payloads/code-style-qlora-v2.json",
