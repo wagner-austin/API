@@ -130,6 +130,20 @@ class TestOverTheTable:
             [],
         )
 
+    def test_a_worker_an_updated_runner_started_is_ended(self, tmp_path: pathlib.Path) -> None:
+        """A runner that updated itself starts its Workers from ``bin.<version>``
+        (:data:`fleet.core.runner_proc_bash.WORKER_PATHS`)."""
+        updated = Process(
+            pid=13,
+            ppid=12,
+            cmdline="/home/gharunner/actions-runner-mcps-1/bin.2.338.0/Runner.Worker spawnclient",
+            start_ticks=WORKER["start_ticks"],
+        )
+        _lay_out(tmp_path, (*OWN, updated, STEP))
+        ran = _run(tmp_path, "--dropped", UNIT, "13", STARTED)
+        assert ran.returncode == 0, ran.stderr
+        assert _killed(tmp_path) == ["13", "14"]
+
     def test_a_process_that_outlives_sigkill_is_refused_after_the_wait(
         self, tmp_path: pathlib.Path
     ) -> None:

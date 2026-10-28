@@ -29,7 +29,8 @@ def _host() -> HostRunnerSpec:
 
 #: A forest with the incident's shape: an API worker whose xdist child has
 #: DataLoader grandchildren, an MCPs worker with one vitest child, and
-#: unrelated processes that must count for nobody.
+#: unrelated processes that must count for nobody. The MCPs install's runner
+#: has updated itself, so its Worker runs from ``bin.<version>``.
 _FOREST = "\n".join(
     [
         "1 0 /sbin/init",
@@ -40,7 +41,7 @@ _FOREST = "\n".join(
         "104 103 pt_data_worker",
         "105 103 pt_data_worker",
         "200 1 /home/gharunner/actions-runner-mcps-1/bin/Runner.Listener run",
-        "201 200 /home/gharunner/actions-runner-mcps-1/bin/Runner.Worker spawnclient",
+        "201 200 /home/gharunner/actions-runner-mcps-1/bin.2.338.0/Runner.Worker spawnclient",
         "202 201 node vitest-worker",
         "300 1 postgres",
         "301 300 postgres checkpointer",

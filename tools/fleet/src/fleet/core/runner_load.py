@@ -52,6 +52,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import remote
 from fleet.core.runner_install import install_root_for
+from fleet.core.runner_proc_bash import is_runner_worker
 
 
 class InstallLoad(TypedDict):
@@ -153,8 +154,9 @@ def take_sample(spec: HostRunnerSpec, ps_output: str, *, at: int) -> LoadSample:
         at: The reading's timestamp, whole epoch seconds.
 
     Returns:
-        The sample. Each install's Runner.Worker is found by its own path,
-        ``<install root>/bin/Runner.Worker``, in the args.
+        The sample. Each install's Runner.Worker is found by its own path
+        under its install's root, ``bin`` or ``bin.<version>``, as the
+        args' first word.
 
     Raises:
         AppError: ``RUNNER_AUDIT_UNPARSABLE`` from the forest parser.
@@ -163,8 +165,12 @@ def take_sample(spec: HostRunnerSpec, ps_output: str, *, at: int) -> LoadSample:
     installs: list[InstallLoad] = []
     total = 0
     for install in spec["installs"]:
-        marker = f"{install_root_for(install)}/bin/Runner.Worker"
-        workers = [pid for pid, (_, args) in forest.items() if marker in args]
+        root = install_root_for(install)
+        workers = [
+            pid
+            for pid, (_, args) in forest.items()
+            if is_runner_worker(args.split(" ", 1)[0], root)
+        ]
         descendants = sum(_descendant_count(forest, pid) for pid in workers)
         installs.append(
             InstallLoad(

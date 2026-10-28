@@ -36,15 +36,12 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict, require
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX
+from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, is_runner_worker
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
 #: The cgroup filesystem and the process table.
 CGROUP_ROOT: Final[pathlib.Path] = pathlib.Path("/sys/fs/cgroup")
 PROC_ROOT: Final[pathlib.Path] = pathlib.Path("/proc")
-
-#: How a Worker's argv0 ends, under any runner's install directory.
-WORKER_SUFFIX: Final[str] = "/bin/Runner.Worker"
 
 #: systemd's ``G``: the roster's ``memory_high_gb`` is rendered ``<n>G``.
 GIB: Final[int] = 1 << 30
@@ -126,7 +123,7 @@ def _workers() -> dict[int, str]:
         except (FileNotFoundError, ProcessLookupError):
             # The process ended between the listing and the read: it runs nowhere.
             continue
-        if argv0.endswith(WORKER_SUFFIX):
+        if is_runner_worker(argv0, "*"):
             found[int(entry.name)] = cgroup.strip().split("::", 1)[1]
     return found
 

@@ -239,6 +239,34 @@ class TestAdoption:
             f"Description s GitHub Actions job of {UNIT}, outside its listener 0"
         ]
 
+    def test_a_worker_an_updated_runner_started_is_adopted(self, tmp_path: pathlib.Path) -> None:
+        """A runner that updated itself starts its Listener through ``bin`` and
+        its Workers from ``bin.<version>``: lavender's ran from ``bin.2.338.0``
+        from 2026-10-25T18:26Z, and the helper refused every job's hook until
+        MCPs board task 0e8d4118."""
+        root = "/home/gharunner/actions-runner-mcps-1"
+        listener = Process(
+            pid=12,
+            ppid=11,
+            cmdline=f"{root}/bin/Runner.Listener run --startuptype service",
+            start_ticks=1000,
+            cgroup=OWN,
+        )
+        worker = Process(
+            pid=13,
+            ppid=12,
+            cmdline=f"{root}/bin.2.338.0/Runner.Worker spawnclient 132 135",
+            start_ticks=99000,
+            cgroup=OWN,
+        )
+        _lay_out(tmp_path, (*SERVICE[:2], listener, worker, *HOOK))
+        ran = _run(tmp_path)
+        assert ran.returncode == 0, ran.stderr
+        assert ran.stdout == (
+            f"fleet-runner-job-scope: Runner.Worker 13 of {UNIT} runs in {CI_SLICE_NAME}/{SCOPE}, "
+            "outside its listener's cgroup\n"
+        )
+
     def test_a_caller_with_no_worker_above_it_is_refused_and_nothing_is_adopted(
         self, tmp_path: pathlib.Path
     ) -> None:
@@ -400,12 +428,13 @@ class TestTheWorkersMode:
     def test_each_worker_in_the_unit_or_its_scopes_is_named_with_its_start_and_age(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """A Worker 990 s old in its scope beside one 10 s old in the unit,
-        and a step whose command line names a Worker but which is none."""
+        """A Worker 990 s old in its scope, started from the ``bin.<version>``
+        an updated runner starts its Workers from, beside one 10 s old in the
+        unit, and a step whose command line names a Worker but which is none."""
         scoped = Process(
             pid=20,
             ppid=12,
-            cmdline="./bin/Runner.Worker spawnclient",
+            cmdline="./bin.2.338.0/Runner.Worker spawnclient",
             start_ticks=1000,
             cgroup=f"/{CI_SLICE_NAME}/fleet-job-{UNIT.removesuffix('.service')}-20.scope",
         )

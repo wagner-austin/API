@@ -87,7 +87,11 @@ from __future__ import annotations
 
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
+from fleet.core.runner_proc_bash import (
+    PROCESS_FUNCTIONS,
+    UNIT_PROCS_FUNCTION,
+    WORKER_CASE_PATTERN,
+)
 from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 
 #: The runner drop-in's file name inside ``<unit>.d``.
@@ -247,7 +251,7 @@ dropped() {
         return 0
     fi
     case "$(argv0_of "$worker" || true)" in
-        */bin/Runner.Worker) ;;
+        $WORKER_PATTERN) ;;
         *) refuse "$unit's pid $worker, started at $started, is no Runner.Worker" ;;
     esac
     for pid in $pids; do
@@ -354,6 +358,7 @@ done
     .replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
     .replace("$PLACE_TRIES", str(PLACE_WAIT_SECONDS * 5))
     .replace("$LISTENER_SLICE", LISTENER_SLICE_NAME)
+    .replace("$WORKER_PATTERN", WORKER_CASE_PATTERN)
 )
 
 #: The reaper's timer.

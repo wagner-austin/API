@@ -45,7 +45,12 @@ from __future__ import annotations
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
 from fleet.core.runner_install import RUNNER_ACCOUNT
-from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, PROCESS_FUNCTIONS, UNIT_PROCS_FUNCTION
+from fleet.core.runner_proc_bash import (
+    JOB_SCOPE_PREFIX,
+    PROCESS_FUNCTIONS,
+    UNIT_PROCS_FUNCTION,
+    WORKER_CASE_PATTERN,
+)
 from fleet.core.runner_tool_caches import HOOK_LINES
 from fleet.core.runner_unit_files import render_drop_in_lines
 from fleet.core.script_values import scriptable
@@ -133,7 +138,7 @@ adopt() {
     local pid=$caller worker='' step listener cgroup unit scope moved
     for step in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do
         case "$(argv0_of "$pid")" in
-            */bin/Runner.Worker) worker=$pid; break ;;
+            $WORKER_PATTERN) worker=$pid; break ;;
         esac
         pid=$(parent_of "$pid") || break
         [ "$pid" -gt 1 ] || break
@@ -212,7 +217,7 @@ workers() {
         if [ -n "$cgroup" ]; then
             for pid in $(unit_procs "$cgroup" "$unit"); do
                 case "$(argv0_of "$pid")" in
-                    */bin/Runner.Worker) ;;
+                    $WORKER_PATTERN) ;;
                     *) continue ;;
                 esac
                 started=$(start_of "$pid") || continue
@@ -242,6 +247,7 @@ fi
     .replace("$LISTENER_SLICE", LISTENER_SLICE_NAME)
     .replace("$JOB_SLICE", CI_SLICE_NAME)
     .replace("$JOB_PREFIX", JOB_SCOPE_PREFIX)
+    .replace("$WORKER_PATTERN", WORKER_CASE_PATTERN)
     .replace("$GRACE", str(ADOPTION_GRACE_SECONDS))
     .replace("$MOVE_TRIES", str(MOVE_WAIT_SECONDS * 10))
     .replace("$MOVE_SECONDS", str(MOVE_WAIT_SECONDS))
