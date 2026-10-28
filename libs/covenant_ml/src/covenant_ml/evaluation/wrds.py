@@ -231,7 +231,8 @@ def load_wrds_evaluation(path: Path) -> WrdsEvaluationData:
     if len(days) < 3:
         raise ValueError("WRDS_DATA_ROWS: at least three dated returns are required")
     features = np.asarray(returns[:-1], dtype=np.float64).reshape(-1, 1)
-    labels = np.asarray([value > 0 for value in returns[1:]], dtype=np.int64)
+    label_values: list[bool] = [value > 0 for value in returns[1:]]
+    labels = np.asarray(label_values, dtype=np.int64)
     splits = ChronologicalGroupedSplits(
         features,
         labels,
