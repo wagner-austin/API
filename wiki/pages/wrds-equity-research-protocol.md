@@ -21,7 +21,7 @@ source_git_blobs:
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "610bd9cfcabecbd8a028411a538d018f2dd39091"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
 provenance:
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
@@ -96,7 +96,9 @@ before decoding. Policy refusals remain visible, and admitted candidate/seed pai
 stay consumed after failure. The lifecycle records submission intent, unique job
 identity and an identity-checked shared RunRecord. `scripts.research_proposals`
 exposes init, propose, status, submit and reconcile operations. Submission uses the
-maintained cluster staging and job commands; reconciliation requires native Slurm
+maintained cluster staging and job commands. The submission boundary compares typed
+proposal values, preserving raw admission bytes while accepting JSON key reordering;
+changed proposal values remain refused. Reconciliation requires native Slurm
 accounting and verified results through the cluster evidence command. Transport
 ambiguity remains unresolved until exactly one matching ledger row is found; no
 automatic resubmission is allowed. The validation worker reuses the existing
