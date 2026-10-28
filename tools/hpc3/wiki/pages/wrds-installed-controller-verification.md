@@ -88,7 +88,7 @@ reconciliation unless adopted by a prepared queue request. Disconnecting the
 agent does not cancel an accepted native job; missing or ambiguous receipts
 cannot authorize another submission.[^queue][^inspect]
 
-Automatic ticks by `fleet-research-diphtheria` completed both retained pilots:
+Automatic ticks by `fleet-research-diphtheria` completed both retained pilots:[^queue]
 
 | Backend | Shared queue receipt | Native job | Completed UTC |
 |---|---|---|---|
