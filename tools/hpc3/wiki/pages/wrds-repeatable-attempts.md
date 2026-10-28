@@ -26,7 +26,7 @@ source_git_blobs:
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
   "src/hpc3/core/wrds_attempt_report.py": "bfc35caed2d3825c6bce7664f4e6617746d1b7f7"
-  "src/hpc3/cli/wrds.py": "2b4caf7989b600d5ef71d015314da9c07a2f596e"
+  "src/hpc3/cli/wrds.py": "aa834308825091ae3c0fe78ba74d0c4be91cb0d9"
   "src/hpc3/wrds/worker.py": "e8a91def08eb391ac271f04c5cf3dbc3561470a5"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
