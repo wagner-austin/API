@@ -61,7 +61,7 @@ def _lane_sudo(devices: str) -> str:
     """
     return (
         "#!/bin/sh\n"
-        f'case "$*" in *DiscoveredDevices*) printf \'%s\\n\' \'{devices}\' ;;'
+        f"case \"$*\" in *DiscoveredDevices*) printf '%s\\n' '{devices}' ;;"
         f" *) printf '%s' '{ROOTLESS_ANSWER}' ;; esac\n"
     )
 
