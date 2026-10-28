@@ -81,7 +81,8 @@ class TestCommandLine:
         with pytest.raises(ValueError) as refused:
             rolled_cli.require_module("fleet-run")
         assert str(refused.value) == (
-            "FLEET_ROLL_USAGE: --agent is one of ['fleet-agent', 'fleet-node-agent', 'fleet-research']"
+            "FLEET_ROLL_USAGE: --agent is one of "
+            "['fleet-agent', 'fleet-node-agent', 'fleet-research']"
         )
 
 
