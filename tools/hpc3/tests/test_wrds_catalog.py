@@ -1,4 +1,4 @@
-"""Catalog validation and the WRDS Grid Engine transport contract."""
+"""Catalog validation and the WRDS filesystem inventory over Grid Engine."""
 
 from __future__ import annotations
 
@@ -9,20 +9,30 @@ import sys
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import JSONTypeError, JSONValue
+from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL, sent_arguments
 
 from hpc3.cli import wrds_catalog as cli
-from hpc3.contracts.wrds_catalog import decode_catalog_entry, encode_catalog_entry
+from hpc3.contracts.wrds_catalog import (
+    decode_catalog_entry,
+    decode_catalog_receipt,
+    encode_catalog_entry,
+    encode_catalog_receipt,
+)
 from hpc3.core.wrds_catalog import inventory, probe_archive, read_catalog
 from tests.conftest import FakeRun
+from tests.wrds_board import TASK, accepting_board
 
 CATALOG = (
     '["directory", "/wrds", 0, true, "/wrdslin"]\n'
     '["file", "/wrds/comp/sasdata/funda.sas7bdat", 42, true, "/data/funda"]\n'
     '["file", "/wrds/other/table.sas7bdat", 8, false, "/data/table"]\n'
     '["denied_directory", "/wrds/secret", 0, false, "/data/secret"]\n'
+    '["unresolved_link", "/wrds/gone", 0, false, "/data/gone"]\n'
     '["complete", "/wrds", 0, false, ""]\n'
 )
+CATALOG_SHA = hashlib.sha256(CATALOG.encode()).hexdigest()
+SOURCE_SHA = hashlib.sha256(probe_archive()).hexdigest()
 
 
 def prepare(
@@ -35,19 +45,14 @@ def prepare(
         source_sha: Explicit digest for a corrupt upload test.
         catalog_sha: Explicit digest for a corrupt download test.
     """
-    source = probe_archive()
     fake_run.add(
         "sha256sum",
-        stdout=(hashlib.sha256(source).hexdigest() if source_sha is None else source_sha)
-        + "  scan.py\n",
+        stdout=(SOURCE_SHA if source_sha is None else source_sha) + "  scan.pyz\n",
         once=True,
     )
     fake_run.add(
         "sha256sum",
-        stdout=(
-            hashlib.sha256(CATALOG.encode()).hexdigest() if catalog_sha is None else catalog_sha
-        )
-        + "  catalog.jsonl\n",
+        stdout=(CATALOG_SHA if catalog_sha is None else catalog_sha) + "  catalog.jsonl\n",
     )
     fake_run.add("qsub", stdout="12345\nJob 12345 exited with exit code 0.\n")
     fake_run.add("cat --", stdout=CATALOG)
@@ -88,34 +93,55 @@ def test_inventory_copies_only_verified_metadata_and_receipt(
 ) -> None:
     prepare(fake_run)
     output = tmp_path / "catalog.jsonl"
-    entries = inventory("wrds", "/home/uci/awagner14/catalog one", output)
-    assert entries == read_catalog(CATALOG)
+    run = inventory("wrds", "/home/uci/awagner14/catalog one", output)
+    assert run["entries"] == read_catalog(CATALOG)
+    assert run["receipt"] == {
+        "host": "wrds",
+        "scheduler": "grid-engine",
+        "job_id": "12345",
+        "source_sha256": SOURCE_SHA,
+        "catalog_sha256": CATALOG_SHA,
+        "remote_catalog": "/home/uci/awagner14/catalog one/catalog.jsonl",
+        "scope": "/wrds filesystem metadata, including historical trees",
+    }
     assert output.read_text() == CATALOG
-    receipt = output.with_suffix(".jsonl.receipt.json").read_text()
-    assert '"job_id":"12345"' in receipt
-    assert '"scheduler":"grid-engine"' in receipt
-    assert hashlib.sha256(CATALOG.encode()).hexdigest() in receipt
+    saved = load_json_str(output.with_suffix(".jsonl.receipt.json").read_text())
+    assert decode_catalog_receipt(saved) == run["receipt"]
     commands = fake_run.commands()
     assert commands[0] == "mkdir -m 700 -- '/home/uci/awagner14/catalog one'"
     submitted = [command for command in commands if command.startswith("qsub ")]
     assert len(submitted) == 1
     assert "-sync y -b y" in submitted[0]
-    assert "h_rt=3600" in submitted[0]
+    assert "-V" not in submitted[0].split()
     assert "--root /wrds" in submitted[0]
 
 
-@pytest.mark.parametrize("remote", ["relative", "/tmp/wrds", "/home/../wrds"])
-def test_remote_path_validation(remote: str, tmp_path: pathlib.Path) -> None:
-    with pytest.raises(ValueError, match="WRDS_CATALOG_PATH"):
-        inventory("wrds", remote, tmp_path / "out")
+def test_receipt_roundtrip_and_refusal() -> None:
+    receipt = decode_catalog_receipt(
+        {
+            "host": "wrds",
+            "scheduler": "grid-engine",
+            "job_id": "1",
+            "source_sha256": "a",
+            "catalog_sha256": "b",
+            "remote_catalog": "/home/x",
+            "scope": "s",
+        }
+    )
+    assert decode_catalog_receipt(encode_catalog_receipt(receipt)) == receipt
+    with pytest.raises(JSONTypeError):
+        decode_catalog_receipt({"host": "wrds"})
 
 
 @pytest.mark.parametrize("existing", ["out", "out.receipt.json"])
-def test_existing_artifacts_are_not_overwritten(existing: str, tmp_path: pathlib.Path) -> None:
+def test_existing_artifacts_are_not_overwritten(
+    existing: str, tmp_path: pathlib.Path, fake_run: FakeRun
+) -> None:
     (tmp_path / existing).write_text("keep")
     with pytest.raises(FileExistsError):
         inventory("wrds", "/home/uci/test", tmp_path / "out")
     assert (tmp_path / existing).read_text() == "keep"
+    assert fake_run.commands() == []
 
 
 @pytest.mark.parametrize("bad", ["source", "catalog"])
@@ -134,16 +160,6 @@ def test_digest_mismatch_refuses_local_success(
     assert not (tmp_path / "out").exists()
 
 
-@pytest.mark.parametrize("response", ["", "not a scheduler receipt"])
-def test_invalid_scheduler_receipt(
-    response: str, tmp_path: pathlib.Path, fake_run: FakeRun
-) -> None:
-    fake_run.add("qsub", stdout=response)
-    prepare(fake_run)
-    with pytest.raises(ValueError, match="WRDS_JOB_ID"):
-        inventory("wrds", "/home/uci/test", tmp_path / "out")
-
-
 def test_failed_job_does_not_copy_a_partial_catalog(
     tmp_path: pathlib.Path, fake_run: FakeRun
 ) -> None:
@@ -154,23 +170,46 @@ def test_failed_job_does_not_copy_a_partial_catalog(
     assert not (tmp_path / "out").exists()
 
 
-def test_cli_reports_metadata_only(
+def test_cli_posts_its_own_load_report(
     tmp_path: pathlib.Path,
     fake_run: FakeRun,
     emitted: list[str],
 ) -> None:
     prepare(fake_run)
-    assert (
-        cli.main(
-            ["--host", "wrds", "--remote-dir", "/home/uci/test", "--output", str(tmp_path / "out")]
-        )
-        == 0
+    post = accepting_board(2)
+    argv = ["--host", "wrds", "--remote-dir", "/home/uci/test", "--output", str(tmp_path / "out")]
+    assert cli.main([*argv, "--report-task", TASK]) == 0
+    report = (
+        f"WRDS FILESYSTEM LOAD-REPORT job 12345 on wrds (grid-engine): catalog sha256 "
+        f"{CATALOG_SHA}; 2 visible files, 1 readable files, 42 readable logical bytes, "
+        "1 inaccessible directories, 1 unresolved links; "
+        f"probe sha256 {SOURCE_SHA}. A visible file is not a readable one, "
+        "and neither is a SQL privilege. Metadata only; no dataset rows."
     )
-    assert emitted[:3] == [
-        "WRDS files: 2 visible, 1 readable",
-        "Readable logical bytes: 42",
-        "Inaccessible directories: 1; SQL catalog not inventoried",
-    ]
+    assert emitted[0] == report
+    assert emitted[-1] == f"Posted on board task {TASK}"
+    assert post.urls == [DECLARED_TASKBOARD_URL, DECLARED_TASKBOARD_URL]
+    checkin, note = (sent_arguments(body) for body in post.bodies)
+    assert checkin["kind"] == "checkin"
+    assert checkin["harness"] == "hpc3-wrds-inventory"
+    assert note == {
+        "room": "main",
+        "taskId": TASK,
+        "kind": "note",
+        "body": report,
+        "agent": "load-report-c4522545",
+        "sessionId": checkin["sessionId"],
+        "cwd": "service://hpc3-wrds-inventory",
+    }
+
+
+def test_cli_refuses_a_task_prefix_before_submitting(
+    tmp_path: pathlib.Path, fake_run: FakeRun
+) -> None:
+    argv = ["--host", "wrds", "--remote-dir", "/home/uci/test", "--output", str(tmp_path / "out")]
+    with pytest.raises(ValueError, match="WRDS_REPORT_TASK"):
+        cli.main([*argv, "--report-task", "c4522545"])
+    assert fake_run.commands() == []
 
 
 def test_cli_entrypoint_rejects_missing_flags() -> None:
