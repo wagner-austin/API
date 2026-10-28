@@ -55,7 +55,7 @@ from platform_core.mcp_client import McpCredentials, call_mcp_tool
 
 from fleet.contracts.machine import Machine, decode_machine
 from fleet.contracts.project import decode_project_config
-from fleet.contracts.tags import TOOL_TAG, NodeTag, encode_tags, node_tags
+from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks, commit_tree, names, rolled
 from fleet.core.workspace_files import (
     JSON_SUFFIX,
@@ -95,7 +95,7 @@ class DeclaredProject(TypedDict):
     Attributes:
         project: Its key, the file's path under ``projects`` without the suffix.
         required_tags: The tags its file names, decoded by the project contract.
-        dispatch_nodes: Enabled, unheld candidates satisfying declared capacity.
+        dispatch_nodes: Enabled, unheld dispatching lanes; probes decide capacity.
     """
 
     project: str
@@ -200,28 +200,24 @@ def declared_runners(machines: Sequence[Machine]) -> tuple[str, ...]:
     )
 
 
-def dispatch_nodes(machines: Sequence[Machine], required: tuple[NodeTag, ...]) -> tuple[str, ...]:
+def dispatch_nodes(machines: Sequence[Machine]) -> tuple[str, ...]:
     """Candidates for a pin from the roster, without requiring a prior heartbeat.
 
-    Runtime-only tool tags remain the runner's probe responsibility: absence
-    from the declaration is not proof that a tool is absent. Declared hardware
-    and test-database requirements must fit, and held or disabled nodes never
-    qualify (board task db88c5bb).
+    Every capability remains the runner's probe responsibility: installing a
+    toolchain or test database makes a lane eligible on its next tick, even
+    before its declaration changes. Held or disabled nodes never qualify
+    (board task db88c5bb).
 
     Args:
         machines: Machines decoded from the same rolled commit as the projects.
-        required: The project's complete requirements.
 
     Returns:
         Candidate node names in the roster's stable order.
     """
-    declared = set(required).difference(TOOL_TAG.values())
     return tuple(
         machine["name"]
         for machine in machines
-        if (node := machine["dispatch"]) is not None
-        and node["enabled"]
-        and declared.issubset(node_tags(node))
+        if (node := machine["dispatch"]) is not None and node["enabled"]
     )
 
 
@@ -325,8 +321,8 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
     projects = tuple(
         DeclaredProject(
             project=key,
-            required_tags=(required := decode_project_config(load_json_str(blob))["required_tags"]),
-            dispatch_nodes=dispatch_nodes(machines, required),
+            required_tags=decode_project_config(load_json_str(blob))["required_tags"],
+            dispatch_nodes=dispatch_nodes(machines),
         )
         for (key, _), blob in zip(files, blobs[: len(files)], strict=True)
     )
