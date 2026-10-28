@@ -288,7 +288,14 @@ class TestMalformedAnswers:
             decoded = claimed_job(answer({"claimed": queue_job(status=status.value)}))
             assert decoded["status"] is status
         for command in DispatchCommand:
-            decoded = claimed_job(answer({"claimed": queue_job(command=command.value)}))
+            reference: JSONValue = (
+                {"backend": "wrds", "specSha256": "a" * 64, "attempt": "pilot"}
+                if command is DispatchCommand.RESEARCH
+                else None
+            )
+            decoded = claimed_job(
+                answer({"claimed": queue_job(command=command.value, researchRequest=reference)})
+            )
             assert decoded["command"] is command
 
 
