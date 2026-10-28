@@ -158,9 +158,7 @@ class TestTheGpuLineOnADockerLane:
         assert fields["docker"] == "yes=29.8.1"
         assert fields["gpu"] == "yes=NVIDIA GeForce GTX 1630, 7.5"
 
-    def test_a_lane_whose_daemon_discovers_no_card_answers_no(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_a_lane_whose_daemon_discovers_no_card_answers_no(self, tmp_path: pathlib.Path) -> None:
         """sedona with the driver and no toolkit: nvidia-smi answers, the lane cannot."""
         fields = _probe_fields(
             tmp_path,
