@@ -36,6 +36,7 @@ from fleet.contracts.queue_answer import (
     require_optional_str,
     require_str,
 )
+from fleet.contracts.research import ResearchRequest, decode_research_request
 from fleet.contracts.tags import NodeTag
 
 
@@ -205,6 +206,7 @@ class DispatchJob(TypedDict):
     task_id: str | None
     claimed_unix: int | None
     lease_expires_unix: int | None
+    research_request: ResearchRequest | None
 
 
 def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus:
@@ -296,10 +298,11 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
     """
     if not isinstance(value, dict):
         raise malformed(f"a job is {type(value).__name__}, not an object", answer=answer)
+    command = _require_command(value, answer=answer)
     return DispatchJob(
         job_id=require_str(value, "id", answer=answer),
         project=require_str(value, "project", answer=answer),
-        command=_require_command(value, answer=answer),
+        command=command,
         status=_require_status(value, answer=answer),
         requested_node=require_optional_str(value, "requestedNode", answer=answer),
         node=require_optional_str(value, "node", answer=answer),
@@ -314,6 +317,11 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         task_id=require_optional_str(value, "taskId", answer=answer),
         claimed_unix=require_optional_instant(value, "claimedAt", answer=answer),
         lease_expires_unix=require_optional_instant(value, "leaseExpiresAt", answer=answer),
+        research_request=(
+            decode_research_request(value.get("researchRequest"))
+            if command is DispatchCommand.RESEARCH
+            else None
+        ),
     )
 
 
