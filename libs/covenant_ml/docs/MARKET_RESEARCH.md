@@ -670,6 +670,46 @@ reservation; explicit GET-only reconciliation verified order, fills, position
 and cash without resubmission. Restarted submission was refused. This verifies
 the bounded demo execution path, not a profitable signal or production readiness.
 
+## Frozen research proposal admission
+
+`scripts.research_proposals` records validation proposals under an evaluator-owned
+policy. It uses `platform_core.event_journal.EventJournal`, lifted from the
+execution rehearsal; those rehearsal callers now use the same persistence code.
+The policy pins protocol, dataset, code and image digests, permitted features and
+seeds, and candidate, runtime, tree and leaf ceilings. Proposals reuse the existing
+benchmark configuration codec and cannot supply a shell command or data path.
+
+From this package, initialize and use a study with:
+
+```sh
+poetry run python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite init
+poetry run python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite propose --proposal proposal.json
+poetry run python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite status
+```
+
+Admission returns exit code zero; a policy refusal returns two. Malformed object
+proposals are saved as `refused/not_admitted` before decoding raises. Unreadable
+files or malformed JSON are input transport errors and never become proposals.
+Renaming a hypothesis or reordering feature names cannot reset candidate identity.
+An admitted candidate/seed remains consumed after failure, timeout or interruption.
+Every admission decision runs inside a SQLite write transaction; a competing
+writer is refused rather than allowed to oversubscribe a budget.
+
+The runner-facing lifecycle records `submitting` before an external submission,
+then a unique scheduler identity and finally a shared `RunRecord` or explicit
+failure. A completion must match the study's data/code/image identities and its
+attempt number. Negative observations remain in the record. A crash between
+submission and recording the scheduler response leaves `submitting` unresolved;
+it does not authorize resubmission.
+
+This is an admission and provenance interface. The final partition is refused by
+this interface; filesystem isolation from agents with general SSH access is not
+provided by a Python policy. The monthly CRSP portfolio evaluator and automatic
+scheduler reconciliation remain separate integration work. A caller-supplied
+completion is checked for consistent identity, not independently attested as a
+real cluster execution. Hash chaining detects corruption, not deliberate rewriting
+by someone who can modify the journal database.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
