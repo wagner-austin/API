@@ -1,0 +1,8 @@
+58575271 cleargbm.wrds-crsp-14593-2019-2020-1028-a submitted 2026-10-28T16:53:52.716747+00:00
+  data=bounded-crsp-pilot extractor_commit=c32f389c35a9a6a720881ed7edd52d873a61a4b7 manifest_sha256=7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f repetition=a seeds=42,43 source_commit=2a50e93ca06fcc82896c143a37ee247187cd2b12 wrds_job=40534563
+  image f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b
+  code: image built from 2a50e93ca06fcc82896c143a37ee247187cd2b12, compared with HEAD c32f389c35a9a6a720881ed7edd52d873a61a4b7
+  scripts.benchmark_paired_evaluation: not compared: resolved from /pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code
+  artifact /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-a.json
+  logs /pub/wagnera3/cleargbm/logs
+1 of 6 recorded run(s) match

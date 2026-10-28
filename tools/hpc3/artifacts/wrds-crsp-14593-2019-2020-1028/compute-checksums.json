@@ -1,0 +1,20 @@
+{
+  "cleargbm.wrds-crsp-14593-2019-2020-1028-a-58575271.out": [
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json: OK",
+    "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts/__init__.py: OK",
+    "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts/benchmark_paired_evaluation.py: OK",
+    "/pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif: OK"
+  ],
+  "cleargbm.wrds-crsp-14593-2019-2020-1028-b-58575282.out": [
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json: OK",
+    "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json: OK",
+    "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts/__init__.py: OK",
+    "/pub/wagnera3/cleargbm/wrds-synthetic-2a50e93ca/entrypoint/scripts/benchmark_paired_evaluation.py: OK",
+    "/pub/wagnera3/images/cleargbm-paired-2a50e93ca/cleargbm-paired.sif: OK"
+  ]
+}

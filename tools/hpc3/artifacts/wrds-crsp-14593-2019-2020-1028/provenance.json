@@ -1,0 +1,67 @@
+{
+  "status": "real-data-replay-identical",
+  "scope": {
+    "source_table": "crsp_a_stock.dsf",
+    "security_id": 14593,
+    "start_date": "2019-01-01",
+    "end_date": "2020-12-31",
+    "max_rows": 600
+  },
+  "extracted_rows": 505,
+  "wrds_job": "40534563",
+  "extraction_receipt": {
+    "selection": {
+      "source_table": "crsp_a_stock.dsf",
+      "security_id": 14593,
+      "start_date": "2019-01-01",
+      "end_date": "2020-12-31",
+      "max_rows": 600
+    },
+    "started_at": "2026-10-28T16:49:12.994691+00:00",
+    "extracted_at": "2026-10-28T16:49:13.268241+00:00",
+    "rows": 505,
+    "csv_file": "data.csv",
+    "csv_sha256": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+    "query_file": "extract.sql",
+    "query_sha256": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14"
+  },
+  "evaluation_manifest": {
+    "source_table": "crsp_a_stock.dsf",
+    "security_id": 14593,
+    "extracted_at": "2026-10-28T16:49:13.268241+00:00",
+    "csv_file": "data.csv",
+    "csv_sha256": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+    "query_file": "extract.sql",
+    "query_sha256": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+    "train_fraction": 0.6,
+    "validation_fraction": 0.2,
+    "embargo": 1
+  },
+  "hpc3_jobs": [
+    "58575271",
+    "58575282"
+  ],
+  "shared_observations": 45,
+  "unmatched_observations": 0,
+  "result_manifests_byte_identical": true,
+  "run_records_byte_identical": true,
+  "configuration_comparison": {
+    "kind": "identical"
+  },
+  "image_sha256": "f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b",
+  "private_evidence_root": "/home/corvis/research-data/wrds/pilots/crsp-14593-2019-2020-1028",
+  "artifact_sha256": {
+    "extraction-run.json": "05eb137c011078f14c8e3ed6c6f5ab716bb0747acab86a0dd3f8ea625b167c1c",
+    "extract.pyz": "8939fe055b796dda0e7c49fa68fd710f057f9a34801a9da14b5c3aed049ab1de",
+    "collected/completion.json": "f24a951087b796f393719abbffd257e5407cf3de97857bd6d1b840c8d43b351f",
+    "collected/outputs/evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+    "results/paired-a.json": "cea08610ea077d53a60abf58559a06123d0bd02eeee560cd2800e1010b358bbb",
+    "results/paired-a.json.runrecord.json": "7993e47f2176828d9f642bfe2ffb58947fe921dc1de12e626d3b131437c45af7",
+    "results/paired-b.json": "cea08610ea077d53a60abf58559a06123d0bd02eeee560cd2800e1010b358bbb",
+    "results/paired-b.json.runrecord.json": "7993e47f2176828d9f642bfe2ffb58947fe921dc1de12e626d3b131437c45af7",
+    "results/cleargbm.wrds-crsp-14593-2019-2020-1028-a-58575271.out": "63a7870a9ecb240121d06282e829a91485714e3047d23204e085bec601d04f47",
+    "results/cleargbm.wrds-crsp-14593-2019-2020-1028-b-58575282.out": "6a0815731624f53a79203d3afdd6d7b8999fc0f264df141a6f5c7bdcbd8de8a4"
+  },
+  "interpretation": "engineering replay only; not a trading-edge test",
+  "board_task": "35895aac-1b12-4cf5-b868-516196914789"
+}

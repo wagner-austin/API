@@ -1,0 +1,6 @@
+58575271|cleargbm.wrds-crsp-14593-2019-2020-1028-a|COMPLETED|0:0|hpc3-17-01|2026-10-28T09:54:01|2026-10-28T09:54:02|2026-10-28T09:54:13|11
+58575282|cleargbm.wrds-crsp-14593-2019-2020-1028-b|COMPLETED|0:0|hpc3-17-01|2026-10-28T09:54:34|2026-10-28T09:54:35|2026-10-28T09:54:45|10
+cea08610ea077d53a60abf58559a06123d0bd02eeee560cd2800e1010b358bbb  /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-a.json
+7993e47f2176828d9f642bfe2ffb58947fe921dc1de12e626d3b131437c45af7  /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-a.json.runrecord.json
+cea08610ea077d53a60abf58559a06123d0bd02eeee560cd2800e1010b358bbb  /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-b.json
+7993e47f2176828d9f642bfe2ffb58947fe921dc1de12e626d3b131437c45af7  /pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/results/paired-b.json.runrecord.json

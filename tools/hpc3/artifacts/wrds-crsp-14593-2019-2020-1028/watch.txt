@@ -1,0 +1,6 @@
+final 58575271 cleargbm.wrds-crsp-14593-2019-2020-1028-a COMPLETED 11s 0.0000 SU on free @ hpc3-17-01
+final 58575282 cleargbm.wrds-crsp-14593-2019-2020-1028-b COMPLETED 10s 0.0000 SU on free @ hpc3-17-01
+total 0.0000 SU across 2 row(s)
+gpu-hours 0.00
+states COMPLETED=2
+budget OK cleargbm
