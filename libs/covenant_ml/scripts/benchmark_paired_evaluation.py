@@ -46,7 +46,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     determinism = pin()
 
     from covenant_ml.benchmarking import load_bankruptcy_dataset, make_baseline_trainers
-    from covenant_ml.benchmarking.declarations import PAIRED_EVALUATION
+    from covenant_ml.benchmarking.declarations import PAIRED_EVALUATION, PAIRED_SOURCES
     from covenant_ml.benchmarking.factory import make_benchmark_config
     from covenant_ml.benchmarking.harness import (
         shared_parser,
@@ -63,11 +63,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.evaluation.types import AlertCosts
     from covenant_ml.evaluation.wrds import load_wrds_evaluation
 
-    parser = shared_parser(PAIRED_EVALUATION)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--csv", type=Path, help="Bankruptcy corpus CSV.")
-    source.add_argument("--wrds-manifest", type=Path, help="Verified CRSP extract manifest.")
-    parsed = parser.parse_args(argv)
+    parsed = shared_parser(PAIRED_EVALUATION, PAIRED_SOURCES).parse_args(argv)
 
     # Annotated at assignment: argparse hands back Any.
     wrds_path: Path | None = parsed.wrds_manifest
