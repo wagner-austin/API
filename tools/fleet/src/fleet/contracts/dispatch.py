@@ -98,6 +98,8 @@ class DispatchCommand(StrEnum):
     # whose install has failed, revoking its key, so it can be armed again;
     # run by the same duty, carrying why in sessionReason.
     NETBOOT_RETIRE = "netboot-retire"
+    # Decode before MCPs migration 877 admits live research rows.
+    RESEARCH = "research"
 
 
 class DispatchLane(StrEnum):
@@ -117,6 +119,7 @@ class DispatchLane(StrEnum):
     SESSIONS = "sessions"
     NODE = "node"
     NETBOOT = "netboot"
+    RESEARCH = "research"
 
 
 class ClosingStatus(StrEnum):
@@ -498,6 +501,8 @@ def encode_job_line(job: DispatchJob) -> str:
     elif job["command"] is DispatchCommand.NETBOOT_RETIRE:
         # Nor is a retirement; the machine whose arm it ends is @where.
         verb = "retire netboot arm"
+    elif job["command"] is DispatchCommand.RESEARCH:
+        verb = f"research request {job['project']}"
     else:
         verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
