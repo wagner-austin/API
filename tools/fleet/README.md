@@ -293,6 +293,56 @@ the new holder its own label (MCPs board task c39ee056). austinpc's former
 pair, `fleet-runner-austinpc` and session a850f688, stays bound to the runner
 that used it and is never reused.
 
+### Research queue polling
+
+`python -m fleet.cli.tick --api-root /home/corvis/PROJECTS/API
+--log-directory /private/logs --lane research` runs a bounded research poll
+through the existing rolled launcher. `research-announce` registers the stable
+runner identity. The control-duty `fleet-research` scheduler row supplies the
+same 180-second cadence and 40-minute outer deadline as the other fleet ticks.
+This code requires the research queue schema and a provisioned native controller;
+installation and live proof are tracked on board task `3dff6fbf`.
+
+The control host reads private `tools/fleet/runs/research.json`, with exactly
+`tenant`, `node`, `host`, `python`, `root`, `env_file` and `script` fields.
+`node` is the queue's explicit controller node, `host` its SSH alias, and all
+four paths are absolute paths on that host. `python` names an installed frozen
+fleet runtime; `root` holds tenant-authorized requests; `env_file` holds the
+existing native-report credentials; `script` is the private remote tick path.
+Credentials are never included in queue payloads or controller transcripts.
+
+Submit `command: "research"`, `project: "research/hpc3"` or `"research/wrds"`,
+an explicit `node` and board `taskId`, and
+`researchRequest: {backend, specSha256, attempt}` through `dispatch_submit`.
+The digest resolves only to `root/<specSha256>/request.json`. That document
+must bind the authenticated tenant, backend and attempt. Every referenced
+immutable input uses `{path, sha256}` and is rehashed on every poll.
+
+An HPC3 request additionally names `python`, pinned `script`, `policy`, `trial`
+and `cluster`, plus absolute mutable `ledger` and `directory` paths and the
+`native_attempt` identity. It invokes the maintained proposal controller:
+`admitted` submits once, `submitting` or `running` reconciles, and `complete`
+requires a fresh native inspection matching the journal's allocation and
+RunRecord. Admission budgets remain in the existing research journal.
+
+A WRDS request additionally names `python`, pinned `spec`, absolute `output`
+and boolean `adopt`. `adopt: true` reconciles a pre-existing native attempt.
+Otherwise durable submission intent is recorded before invoking the maintained
+held-submission command. Subsequent polls inspect the receipt and resume a held
+job. Completed work is collected and checked against a freshly measured native
+completion digest, local artifact hashes and the shared RunRecord.
+
+Four requests may be active; one least-recently-renewed receipt is polled per
+tick. The existing shared fleet lease file protects `research/controller` on
+the configured node and `research-controller@<node>` only for the bounded
+controller operation. Native scheduler waiting consumes no local worker slot.
+Cluster resource requests and allocation limits stay with the native controllers.
+Transport failure records progress and preserves the receipt for the next poll.
+Missing submission receipts, changed inputs and partial collections refuse
+success; they never authorize a replacement native job. Stop an active native
+job through its controller and reconcile; generic queue cancellation is only
+available before a research request is claimed.
+
 **The netboot runner arms machines, and nothing is typed** (MCPs board task
 83102d9d). A `netboot-arm` row (MCPs migs 807 and 809, queued only by
 `dispatch_netboot_arm`) names one roster machine as its requested node. The
