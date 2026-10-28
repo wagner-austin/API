@@ -8,13 +8,14 @@ import runpy
 import pytest
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
+from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import wrds
 from hpc3.contracts.wrds_run import encode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks
 from tests.conftest import FakeRun
 from tests.test_wrds_results import actual_result
 from tests.wrds_support import example
-from tests.wrds_transport import CopyTransport, completed, prepare
+from tests.wrds_transport import NOW, CopyTransport, completed, prepare
 
 
 def test_inspect_and_preflight(
@@ -44,6 +45,7 @@ def test_inspect_and_preflight(
 
 
 def test_submit_resume_status_cancel_and_trace(tmp_path: pathlib.Path, emitted: list[str]) -> None:
+    cli_hooks.now_iso = lambda: NOW
     run = example(tmp_path)
     spec = tmp_path / "experiment.json"
     spec.write_text(dump_json_str(encode_wrds_run(run)))

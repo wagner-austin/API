@@ -1,6 +1,7 @@
 # hpc3
 
-Submit, watch and account for work on UCI's HPC3 Slurm cluster.
+Submit, watch and account for work on UCI's HPC3 Slurm cluster and run
+digest-bound Python experiments on WRDS Cloud's Grid Engine cluster.
 
 HPC3 is shared — 102 distinct users had jobs running when this package was
 measured against it — and it is unforgiving in specific, learnable ways. This
@@ -16,6 +17,97 @@ topic. New incident narrative goes into the wiki, not here.
 ---
 
 ## Quick start
+
+### WRDS repeatable experiments
+
+Use the existing `wrds` SSH alias with this package installed locally.
+The maintained worker is uploaded automatically; WRDS needs no hpc3 install.
+First measure the interpreter and installed package versions:
+
+```bash
+python -m hpc3.cli.wrds inspect --host wrds \
+  --root /home/uci/awagner14/wrds-experiments/tools \
+  --python /usr/local/bin/python3 > runtime.json
+```
+
+Write an `experiment.json` with exactly these fields, inserting the complete
+object from `runtime.json` and the SHA256 of each source/input file:
+
+```json
+{
+  "project": "my-research",
+  "name": "baseline",
+  "host": "wrds",
+  "root": "/home/uci/awagner14/wrds-experiments",
+  "runtime": {
+    "python": "/usr/local/bin/python3",
+    "sha256": "<measured interpreter sha256>",
+    "version": "<measured Python version>",
+    "packages": {"<normalized distribution name>": "<installed version>"}
+  },
+  "slots": 1,
+  "memory_gb_per_slot": 2,
+  "seconds": 600,
+  "seed": 42,
+  "code": [{"path": "main.py", "name": "main.py", "sha256": "<source sha256>"}],
+  "inputs": [],
+  "entrypoint": "main.py",
+  "arguments": [],
+  "outputs": ["metrics.json"]
+}
+```
+
+`code.path` resolves against the specification directory; `code.name` is
+its staged relative path. Each input has the same three fields, but its
+`path` is an existing absolute WRDS path. Pin a research extract before
+running experiments against it: an unversioned SQL query is not a frozen
+dataset. All declared input contents are checked on the compute node before
+and after execution. The specification identity covers code/input hashes,
+runtime pins, arguments, seed, resources and declared outputs.
+
+The payload receives `WRDS_SEED`, `WRDS_OUTPUT_DIR`, and `WRDS_INPUTS_JSON`
+(an object mapping input names to their absolute paths). It must seed its
+own RNGs from `WRDS_SEED` and write every declared output beneath
+`WRDS_OUTPUT_DIR`. `metrics.json` must be a nonempty list of finite named
+observations, for example `[{"name":"validation_loss","value":0.125}]`.
+Python hashing and common CPU thread-count variables are set by the launcher.
+
+```bash
+python -m hpc3.cli.wrds preflight --spec experiment.json
+python -m hpc3.cli.wrds submit --spec experiment.json --attempt first
+python -m hpc3.cli.wrds status --spec experiment.json --attempt first
+python -m hpc3.cli.wrds collect --spec experiment.json --attempt first --output results-first
+python -m hpc3.cli.wrds submit --spec experiment.json --attempt repeat
+python -m hpc3.cli.wrds trace --spec experiment.json --attempt first
+python -m hpc3.cli.wrds cancel --spec experiment.json --attempt repeat
+```
+
+`preflight` checks local code, remote runtime and input readability. Submit
+additionally asks Grid Engine to validate the exact resource request, creates
+an exclusive attempt directory, stages and verifies the bytes, submits held,
+persists the job ID, then releases it. After a lost submission response,
+inspect `status`; use `resume --spec experiment.json --attempt first` only
+if it is held. Reusing an attempt never submits a second job. A partially
+staged attempt without a job receipt requires inspection and a new attempt
+label; `resume` does not manufacture a job ID.
+
+Queue absence is `accounting-pending` until accounting answers; only a zero
+scheduler failure and zero process exit count as `completed`. Collection
+also requires the worker's matching completion record and verifies each
+transferred file. A failed transfer leaves no local completion marker; retry
+into a new output directory. Results include the shared
+`results.runrecord.json`, so existing research comparison code can consume
+them. Lifecycle events go to `wrds-ledger.jsonl` beside an external spec or
+at the shared main checkout for repository specs.
+
+The backend currently supports individual Python CPU jobs, with conservative
+limits of eight slots, 48 GiB total and seven days. It pins interpreter bytes
+and installed package **versions**, not an immutable container or every
+library byte. A changed runtime fails closed; inspect and deliberately
+update the specification to adopt it. A seed alone does not make arbitrary
+payloads deterministic. UCI's Slurm sweeps, chains and container workflow
+remain separate commands. SSH authentication must be valid when commands
+connect; submitted jobs continue if the client disconnects.
 
 ### WRDS data inventory
 
