@@ -38,3 +38,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [The known-answer registry](../pages/model-trainer-known-answer-registry.md) -- `platform_core.known_answer` and `known_answer_registry`: three outcomes, discrimination controls at registration, and the two invariants the collection layer enforces
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
+
+[WRDS equity research extends the existing systems](../pages/wrds-equity-research-protocol.md) -- bounded pilot versus the proposed monthly study; reusable evaluation contracts and the agent admission/holdout boundary
