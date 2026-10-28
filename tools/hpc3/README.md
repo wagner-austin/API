@@ -24,7 +24,8 @@ The same package can inventory WRDS Cloud through its existing SSH alias:
 ```bash
 python -m hpc3.cli.wrds_catalog --host wrds \
   --remote-dir /home/uci/awagner14/wrds-setup/inventory-UNIQUE \
-  --output /existing/local/directory/wrds-catalog.jsonl
+  --output /existing/local/directory/wrds-catalog.jsonl \
+  --report-task <full board task id>
 ```
 
 Choose a new remote directory and local output for each run. The command
@@ -39,9 +40,36 @@ It never opens dataset contents. The JSONL catalog and adjacent receipt carry
 the scheduler job ID and verified scanner/catalog SHA-256 digests. A missing
 completion marker, unexpected filesystem error or failed job fails the command.
 
-This is the filesystem catalog, not the separately authenticated PostgreSQL
-catalog. A readable path is not permission to redistribute it. Data extracts
-are chosen after inventory; this command does not download data or register
+This is the filesystem catalog. The PostgreSQL catalog is its own command:
+
+```bash
+python -m hpc3.cli.wrds_sql_catalog --host wrds \
+  --remote-dir /home/uci/awagner14/wrds-setup/sql-UNIQUE \
+  --output /existing/local/directory/sql-relations.csv \
+  --report-task <full board task id>
+```
+
+It runs two Grid Engine jobs under `psql -X -w -v ON_ERROR_STOP=1`, exporting
+the login environment so the job uses WRDS Cloud's ident-authenticated
+database host; no password is stored or sent. The first reads `pg_catalog`
+in a read-only transaction and writes one CSV row per visible relation: its
+schema USAGE and SELECT grants, the `has_table_privilege` guard a WRDS alias
+view names, and how many of the relations the view reads are accessible. A
+relation counts as accessible only as a granted table, or as an alias whose
+guard target and every underlying relation carry both privileges. The second
+job opens every accessible relation with `SELECT * LIMIT 0` in one read-only
+transaction, so one refused grant fails the run. The CSV, the accessible
+shortlist (`<output>.accessible.csv`) and a receipt with both job ids, the
+query, validation and catalog digests and every status count are saved
+locally. No dataset rows are read.
+
+Both commands post their counts, job ids and catalog digest on the board task
+named by `--report-task`, under the service identity
+`load-report-<first eight characters of the task id>`, and fail if the board
+refuses the post. A malformed task id is refused before any job is submitted.
+
+A readable path or an accessible relation is not permission to redistribute
+it. Data extracts are chosen after inventory; neither command downloads data or registers
 training datasets automatically. Existing `hpc3-stage` handles manifest-backed
 HPC3 transfers, while `libs/covenant_ml` owns Covenant Radar's dataset loaders.
 `libs/platform_kaggle` discovers competitions; it is not a WRDS connector.
