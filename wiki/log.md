@@ -250,3 +250,5 @@ Notes: Board task 3261e090. The decoder now validates local Python and workspace
 paths with the controller's filesystem semantics, while keeping remote roots,
 entrypoints and images POSIX-only. Pin the repaired source and command reference;
 keep controller portability distinct from the installed Linux runtime's provenance.
+
+- 2026-10-29: Added evaluation-numerical-contracts: shared ranking correction, independent numerical tests, and explicit uncertainty/learning-curve/provenance limits (board 82a072db).
