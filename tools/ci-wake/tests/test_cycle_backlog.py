@@ -54,9 +54,7 @@ def test_newest_batch_is_bounded_and_the_next_tick_drains_older_work(
     _test_hooks.http_post = announcing_poster()
     run_cycle(path)
     assert remaining.calls == [runs_argv(REPO, shas[0]), jobs_argv(REPO, RUN_ID)]
-    assert read_announced(position_path(path)) == frozenset(
-        attempt_key(REPO, sha) for sha in shas
-    )
+    assert read_announced(position_path(path)) == frozenset(attempt_key(REPO, sha) for sha in shas)
 
 
 __all__: list[str] = []

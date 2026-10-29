@@ -228,13 +228,12 @@ def run_cycle(enrolment: pathlib.Path, *, source_host: str = "") -> None:
     now_epoch = _test_hooks.now()
     selected = outstanding
     if len(outstanding) > MAX_PUSHES_PER_CYCLE:
+
         def attempted_at(attempt: PushAttempt) -> int:
             """Return the enrollment timestamp used to prioritize this batch."""
             return attempt["attempted_unix"]
 
-        selected = tuple(
-            sorted(outstanding, key=attempted_at, reverse=True)[:MAX_PUSHES_PER_CYCLE]
-        )
+        selected = tuple(sorted(outstanding, key=attempted_at, reverse=True)[:MAX_PUSHES_PER_CYCLE])
         _test_hooks.emit(
             f"backlog: inspecting {len(selected)} of {len(outstanding)} outstanding pushes; "
             "newest first, deferred pushes remain unacknowledged"
