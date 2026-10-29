@@ -7,7 +7,7 @@ from math import inf, nan
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject, JSONValue
+from platform_core.json_utils import JSONObject, JSONValue, require_list
 
 from covenant_ml.markets.crsp_calendar import (
     CrspWindow,
@@ -64,6 +64,55 @@ def test_frozen_protocol_roundtrip_preserves_dates_and_cost_order() -> None:
     assert protocol["coverage_end"] == "2025-02-28"
     assert protocol["cost_bps"] == (10, 5, 25)
     assert protocol["share_codes"] == (10, 11)
+    assert protocol["membership_columns"] == ("permno", "namedt", "nameendt", "shrcd", "exchcd")
+    assert protocol["returns_columns"] == (
+        "permno",
+        "dlycaldt",
+        "dlyprevdt",
+        "dlyret",
+        "dlyretmissflg",
+        "dlyretdurflg",
+        "dlydelflg",
+        "dlyprc",
+        "dlyprcflg",
+        "dlyvol",
+    )
+    assert protocol["calendar_columns"] == ("caldt", "exchangegroup", "tradingflg")
+    assert protocol["delists_columns"] == (
+        "permno",
+        "delistingdt",
+        "deldlydt",
+        "delamtdt",
+        "delnextdt",
+        "delret",
+        "delretmisstype",
+    )
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "membership_columns",
+        "returns_columns",
+        "calendar_columns",
+        "delists_columns",
+    ],
+)
+@pytest.mark.parametrize("mutation", ["omit", "add", "duplicate", "reorder"])
+def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> None:
+    document = protocol_document()
+    columns = require_list(document, field)
+    if mutation == "omit":
+        changed = columns[:-1]
+    elif mutation == "add":
+        changed = [*columns, "other"]
+    elif mutation == "duplicate":
+        changed = [*columns, columns[0]]
+    else:
+        changed = list(reversed(columns))
+    document[field] = changed
+    with pytest.raises(ValueError, match="CRSP-001.*exact column set"):
+        decode_crsp_protocol(document)
 
 
 @pytest.mark.parametrize(
