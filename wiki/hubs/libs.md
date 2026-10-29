@@ -40,3 +40,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 
 [WRDS equity research extends the existing systems](../pages/wrds-equity-research-protocol.md) -- bounded pilot versus the proposed monthly study; reusable evaluation contracts and the agent admission/holdout boundary
+
+[Evaluation numerical contracts](../pages/evaluation-numerical-contracts.md) -- paired comparisons, tie-aware scores, uncertainty, ablation, learning curves, chronology and provenance limits
