@@ -35,9 +35,10 @@ def purge_label_overlap(
         if not bool(np.any(mask)):
             raise ValueError(f"[{ERR_TOO_FEW_UNITS}] chronological folds must be nonempty")
     reversed_labels: NDArray[np.bool_] = available_at < times
-    membership: NDArray[np.int64] = (
-        masks.train.astype(np.int64) + masks.val.astype(np.int64) + masks.test.astype(np.int64)
+    fitting_membership: NDArray[np.int64] = masks.train.astype(np.int64) + masks.val.astype(
+        np.int64
     )
+    membership: NDArray[np.int64] = fitting_membership + masks.test.astype(np.int64)
     overlapping: NDArray[np.bool_] = membership > 1
     if bool(np.any(reversed_labels)) or bool(np.any(overlapping)):
         raise ValueError(f"[{ERR_INVALID_ARGUMENT}] reversed label intervals or overlapping folds")

@@ -261,13 +261,11 @@ def compare_moving_block(
     if not bool(np.all(consecutive)):
         raise ValueError(f"[{ERR_INVALID_ARGUMENT}] monthly observations must be consecutive")
     differences: NDArray[np.float64] = values_arm - values_reference
-    draws: NDArray[np.float64] = np.asarray(
-        [
-            float(np.sum(weights * differences)) / count
-            for weights in moving_block_weights(count, block_length, n_resamples, seed)
-        ],
-        dtype=np.float64,
-    )
+    draw_values: list[float] = []
+    for weights in moving_block_weights(count, block_length, n_resamples, seed):
+        weighted: NDArray[np.float64] = weights * differences
+        draw_values.append(float(np.sum(weighted)) / count)
+    draws: NDArray[np.float64] = np.asarray(draw_values, dtype=np.float64)
     interval = percentile_interval(
         IntervalMethod.MOVING_BLOCK_BOOTSTRAP,
         _mean(differences),

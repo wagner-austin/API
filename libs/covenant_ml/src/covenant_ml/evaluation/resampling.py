@@ -199,7 +199,8 @@ def moving_block_weights(
         starts: NDArray[np.int64] = rng.integers(
             0, n_rows - block_length + 1, size=blocks, dtype=np.int64
         )
-        indices: NDArray[np.int64] = (starts[:, None] + offsets).reshape(-1)[:n_rows]
+        block_indices: NDArray[np.int64] = starts[:, None] + offsets
+        indices: NDArray[np.int64] = block_indices.reshape(-1)[:n_rows]
         weights: NDArray[np.float64] = np.bincount(indices, minlength=n_rows).astype(np.float64)
         yield weights
 
