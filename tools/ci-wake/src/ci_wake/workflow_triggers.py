@@ -10,8 +10,8 @@ push trigger admits the ref it updates, and the workflows are files in the
 pushed commit. So the enrolment reads them, and a push no trigger admits is
 not enrolled, with the workflows it read named.
 
-NOT "NEVER ENROL A TAG". API's ``packages.yml`` declares a bare ``push:``,
-which GitHub runs for every branch AND every tag, so a tag rule would be
+NOT "NEVER ENROL A TAG". API's ``packages.yml`` admits every tag while
+excluding temporary fleet source-transport branches, so a tag rule would be
 right in one repository and wrong in the other. Only the workflow decides.
 
 WHAT GITHUB DOES, as its workflow syntax reference states it for

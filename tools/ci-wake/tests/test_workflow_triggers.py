@@ -76,10 +76,25 @@ class TestTheWorkflowsThatExist:
         }
 
         assert len(workflows) == len(files) > 0
-        # API's bare ``push:``: GitHub runs it for every branch and tag, which
-        # is why "never enrol a tag" would have been wrong here.
-        assert workflows["packages.yml"].push == EVERY_REF
-        assert admits(EVERY_REF, DX_MOD)
+        # Source-transport branches must not start duplicate CI, but adding a
+        # branch filter alone would accidentally stop every tag run as well.
+        transport_filtered = PushTrigger(
+            branches=None, branches_ignore=("pushed-tests/**",), tags=("**",), tags_ignore=None
+        )
+        for name in (
+            "packages.yml",
+            "covenant-ml.yml",
+            "navprobe.yml",
+            "tankpitbot.yml",
+            "turkic-api.yml",
+        ):
+            assert workflows[name].push == transport_filtered
+        for ref in (MAIN, "refs/heads/feature/x", DX_MOD, "refs/tags/pushed-tests/v1"):
+            assert admits(transport_filtered, ref)
+        for workflow in workflows.values():
+            if workflow.push is not None:
+                assert not admits(workflow.push, "refs/heads/pushed-tests/abc-session")
+                assert not admits(workflow.push, "refs/heads/pushed-tests/abc/nested")
         assert workflows["runner-reaper-proof.yml"].push is None
 
 
