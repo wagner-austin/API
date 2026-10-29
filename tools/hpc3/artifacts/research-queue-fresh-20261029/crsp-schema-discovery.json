@@ -1,0 +1,41 @@
+{
+  "task_id": "8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb",
+  "measured_utc_date": "2026-10-29",
+  "scheduler": "grid-engine",
+  "job_id": "40538087",
+  "query_sha256": "1032c0d47523561773e3ecab754cd371342f0973370a0202505dfef2fee6bde4",
+  "artifact_sha256": "96d0a79553b073585726a3137985c17894634fb88393e9a343ef2522a1f29389",
+  "private_local_directory": "/home/corvis/research-data/wrds/catalogs/2026-10-29",
+  "private_remote_artifact": "/home/uci/awagner14/corvis-crsp-columns-20261029/columns.csv",
+  "scope": "Read-only pg_catalog column names, types and comments; no security observations",
+  "library": "crsp_a_stock",
+  "columns": 331,
+  "relation_column_counts": {
+    "dsedelist": 19,
+    "dsenames": 21,
+    "dsf": 20,
+    "dsf_v2": 50,
+    "metacalendarperiod": 14,
+    "metaexchangecalendar": 7,
+    "msedelist": 19,
+    "msf": 21,
+    "msf_v2": 45,
+    "stkdelists": 19,
+    "stkdlysecuritydata": 32,
+    "stkdlysecurityprimarydata": 12,
+    "stksecurityinfohist": 36,
+    "stocknames": 16
+  },
+  "candidate_fields": {
+    "stkdlysecuritydata": ["permno", "dlycaldt", "dlyret", "dlyretmissflg", "dlyretdurflg", "dlydelflg", "dlyprc", "dlyprcflg", "dlyvol"],
+    "stksecurityinfohist": ["permno", "secinfostartdt", "secinfoenddt", "securitytype", "securitysubtype", "sharetype", "primaryexch", "conditionaltype", "tradingstatusflg"],
+    "metaexchangecalendar": ["caldt", "exchangegroup", "tradingflg"],
+    "stkdelists": ["permno", "delistingdt", "delret", "delretmisstype", "deldlydt"]
+  },
+  "transport": "Existing hpc3.core.wrds_grid upload/submit and hpc3.core.artifacts.download; existing psql_argv",
+  "limits": [
+    "Column existence does not establish return or delisting semantics.",
+    "No wider security universe was downloaded and no holdout was scored.",
+    "The monthly adapter is not implemented by this metadata query."
+  ]
+}
