@@ -152,7 +152,10 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
                 "--source-host",
                 SESSION_HOST,
                 "--enrolment",
-                str(pathlib.Path(SESSION_HOST_CHECKOUT).parent / "API/tools/ci-wake/runs/pushes.jsonl"),
+                str(
+                    pathlib.PurePosixPath(SESSION_HOST_CHECKOUT).parent
+                    / "API/tools/ci-wake/runs/pushes.jsonl"
+                ),
             ),
             "cwd": "../ci-wake",
         },
