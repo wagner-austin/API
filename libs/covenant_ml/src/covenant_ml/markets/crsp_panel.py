@@ -119,6 +119,7 @@ def _decision(
             counts[result] = counts.get(result, 0) + 1
         else:
             features.append(result)
+
     def rank(row: CrspFeature) -> tuple[float, int]:
         """Order greatest liquidity first, breaking ties by permanent identifier."""
         return -row.liquidity, row.permno
