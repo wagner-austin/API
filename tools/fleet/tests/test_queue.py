@@ -13,8 +13,7 @@ import pytest
 from platform_core.error_codes_tooling import StackEndpointErrorCode
 from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import dump_json_str
-from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoints_text
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
+from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoint_files
 
 from fleet.contracts.dispatch import ClosingStatus, DispatchLane
 from fleet.contracts.tags import NodeTag
@@ -41,10 +40,11 @@ class TestCredentials:
             }
         )
         read: list[pathlib.Path] = []
+        files = stack_endpoint_files()
 
         def declaration(path: pathlib.Path) -> str:
             read.append(path)
-            return stack_endpoints_text()
+            return files[path]
 
         _test_hooks.read_text = declaration
 
@@ -53,7 +53,7 @@ class TestCredentials:
         assert credentials["api_key"] == "k"
         assert credentials["tenant_id"] == "t"
         assert credentials["url"] == DECLARED_FLEET_URL
-        assert read == [STACK_ENDPOINTS_PATH]
+        assert read == [*files]
 
     def test_a_declaration_naming_no_fleet_url_is_refused(self) -> None:
         _test_hooks.env = FakeEnv(

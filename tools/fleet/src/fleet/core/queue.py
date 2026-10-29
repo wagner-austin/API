@@ -29,7 +29,7 @@ from platform_core.error_codes_fleet import FleetErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONObject, JSONValue
 from platform_core.mcp_client import McpCredentials, call_mcp_tool
-from platform_core.stack_endpoints import FLEET_SERVICE, STACK_ENDPOINTS_PATH, declared_url
+from platform_core.stack_endpoints import FLEET_SERVICE, declared_url
 
 from fleet.contracts.dispatch import (
     ClosingStatus,
@@ -100,7 +100,7 @@ def load_credentials() -> McpCredentials:
         )
     url = _test_hooks.env(URL_VARIABLE)
     if url is None:
-        url = declared_url(_test_hooks.read_text(STACK_ENDPOINTS_PATH), FLEET_SERVICE)
+        url = declared_url(_test_hooks.read_text, FLEET_SERVICE)
     return McpCredentials(url=url, api_key=api_key, tenant_id=tenant_id)
 
 
