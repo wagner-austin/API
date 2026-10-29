@@ -30,6 +30,7 @@ def make_binary_dataset(
     y: NDArray[np.int64] = np.zeros(n_samples, dtype=np.int64)
     y[: int(n_samples * pos_ratio)] = 1
     rng.shuffle(y)
-    signal: NDArray[np.float64] = 6.0 * y[:, None]
+    signal: NDArray[np.float64] = y[:, None].astype(np.float64)
+    signal *= 6.0
     x += signal
     return x, y, [f"f{i}" for i in range(n_features)]
