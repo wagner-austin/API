@@ -2,10 +2,12 @@
 
 import sys
 from collections.abc import Generator
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
 from platform_core.json_utils import JSONObject, dump_json_str, require_dict
+from platform_core.stage_manifest import decode_stage_manifest
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.campaign_process import run_command
@@ -164,6 +166,26 @@ def test_cluster_codec_and_missing_pin(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="require frozen runtime"):
         prepare_bundle(directory, decode_research_cluster(document), trial)
     assert not directory.exists()
+
+
+def test_bundle_manifest_identifies_exact_written_bytes(tmp_path: Path) -> None:
+    _path, trial, cluster, directory = setup(tmp_path)
+    prepare_bundle(directory, cluster, trial)
+    manifest = decode_stage_manifest(read_document(directory / "stage.json"))
+    assert [item["name"] for item in manifest["files"]] == ["request.json", "checksums.txt"]
+    for item in manifest["files"]:
+        payload = (directory / item["name"]).read_bytes()
+        assert len(payload) == item["size_bytes"]
+        assert sha256(payload).hexdigest() == item["sha256"]
+    request_digest = sha256((directory / "request.json").read_bytes()).hexdigest()
+    expected = (
+        cluster["checksums"].rstrip("\n")
+        + f"\n{request_digest}  {manifest['destination']}/request.json\n"
+    ).encode("utf-8")
+    assert (directory / "checksums.txt").read_bytes() == expected
+    assert (directory / "expected.txt").read_text().splitlines() == [
+        item["sha256"] for item in manifest["files"]
+    ]
 
 
 @pytest.mark.parametrize("field", ["python", "workspace", "root", "entrypoint", "image"])
