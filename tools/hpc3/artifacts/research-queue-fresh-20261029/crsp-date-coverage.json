@@ -1,18 +1,21 @@
 {
   "task_id": "0a3132f8-dbd9-4350-acfd-1fdee405639c",
-  "job_id": "40544368",
+  "job_id": "40544470",
   "scheduler": "grid-engine",
-  "started_at": "2026-10-29T20:37:04.878344+00:00",
-  "completed_at": "2026-10-29T20:37:07.933233+00:00",
-  "query_sha256": "fa004da40181f023fdd8e6016f0e1bfae082ec64f72dc048a43bf7782170001e",
-  "artifact_sha256": "2c06c81e2e9d01f107ec3aea086748921743afef01b2ab7a02fba67c313600d6",
+  "started_at": "2026-10-29T20:59:48.279485+00:00",
+  "completed_at": "2026-10-29T20:59:51.562906+00:00",
+  "query_sha256": "fc3f6bf4e43a203efaa7288835de8cbe9bfc8a094882fc7dfa61056dfee0852b",
+  "artifact_sha256": "22371a1b5f394003f305d88cb2f4485aba9bf4b804b32b1632629555f1f397d9",
   "private_directory": "/home/corvis/research-data/wrds/catalogs/2026-10-29",
-  "scope": "Table-level date extents only; no security observations or scoring",
+  "private_query_file": "crsp-date-coverage-v2.sql",
+  "private_artifact_file": "crsp-date-coverage-v2.csv",
+  "scope": "Four required relation date extents only; no security observations or scoring",
   "library": "crsp_a_stock",
   "date_extents": {
     "dsenames": ["1925-12-31", "2024-12-31", "2024-12-31"],
     "stkdlysecuritydata": ["1925-12-31", "2025-12-31", "2025-12-31"],
-    "calendar-CIZ": ["1925-12-31", "2025-12-31", "2025-12-31"]
+    "calendar-CIZ": ["1925-12-31", "2025-12-31", "2025-12-31"],
+    "stkdelists": ["1926-02-24", "2025-12-30", "2025-12-31"]
   },
   "limits": [
     "Extents do not establish every security's completeness.",

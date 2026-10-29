@@ -27,10 +27,11 @@
     "stocknames": 16
   },
   "candidate_fields": {
-    "stkdlysecuritydata": ["permno", "dlycaldt", "dlyret", "dlyretmissflg", "dlyretdurflg", "dlydelflg", "dlyprc", "dlyprcflg", "dlyvol"],
+    "dsenames": ["permno", "namedt", "nameendt", "shrcd", "exchcd"],
+    "stkdlysecuritydata": ["permno", "dlycaldt", "dlyprevdt", "dlyret", "dlyretmissflg", "dlyretdurflg", "dlydelflg", "dlyprc", "dlyprcflg", "dlyvol"],
     "stksecurityinfohist": ["permno", "secinfostartdt", "secinfoenddt", "securitytype", "securitysubtype", "sharetype", "primaryexch", "conditionaltype", "tradingstatusflg"],
     "metaexchangecalendar": ["caldt", "exchangegroup", "tradingflg"],
-    "stkdelists": ["permno", "delistingdt", "delret", "delretmisstype", "deldlydt"]
+    "stkdelists": ["permno", "delistingdt", "deldlydt", "delamtdt", "delnextdt", "delret", "delretmisstype"]
   },
   "transport": "Existing hpc3.core.wrds_grid upload/submit and hpc3.core.artifacts.download; existing psql_argv",
   "limits": [
