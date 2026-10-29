@@ -10,6 +10,7 @@ source_paths:
   - "artifacts/wrds-controller-verification-20261028/provenance.json"
   - "artifacts/research-queue-verification-20261028/provenance.json"
   - "artifacts/research-queue-fresh-20261029/provenance.json"
+  - "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
 source_git_blobs:
   "src/hpc3/cli/execution_inspect.py": "fd0d98dc12dba896ebc552149a7da69f76d4316e"
   "src/hpc3/core/execution_evidence.py": "f0347915a8720f9a95d62be1221340a876f31e49"
@@ -17,6 +18,7 @@ source_git_blobs:
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
   "artifacts/research-queue-fresh-20261029/provenance.json": "da6266d1583b6ad0bab4a66f70de69aafdd8db83"
+  "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "d1a69245c7fd39affab69216f78cde86374e67c3"
 provenance:
   - "Board task 8a113204-42d0-41a0-8094-73776bae8846; native reports by hpc-report-8a113204, prefix HPC3 ATTEMPT LOAD-REPORT, jobs 58578791 and 58578878"
   - "API libs/covenant_ml/src/covenant_ml/markets/research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; outside this wiki workspaceRoot"
@@ -27,6 +29,7 @@ provenance:
   - "Board task f12aa47e-328f-4473-bb89-cc54c49fed30; hpc-report-f12aa47e independently remeasured retained job 58578878 on 2026-10-28; no new trial submitted"
   - "Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80; API rolled consumer f4064ef451f9dc66ecbd09632f0bfca22fd3718e; MCPs deployment a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b; automatic scheduler and live queue receipts captured in the research-queue provenance artifact"
   - "Board task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb; fresh queue fb62c111-f5c8-48f6-a790-899e68f76920 submitted and reconciled native allocation 58586013 through fleet-research-diphtheria on 2026-10-29 UTC; independent program-owned reports by hpc-report-8b19319c and load-report-8b19319c"
+  - "MCPs execution/tests/served/research-queue-replay.test.ts at 06512f6450c960e52409448f306c1254ed633fb6; fleet c469a100-f103-4e26-a246-396d81b5ee04 on Demure passed this case in 2.497 seconds on 2026-10-29 UTC; outside this wiki workspaceRoot"
 fact_checked: 2026-10-28
 confidence: high
 ---
@@ -137,6 +140,35 @@ requesting another extraction. An independent HPC3 reinspection also returned
 58586013 and its unchanged canonical RunRecord hash. This fresh test extends the retained-job evidence
 above to automatic submission of a new allocation.[^fresh]
 
+The first verification audit, `182e4ebb`, rejected A2's evidence: counting queue
+rows did not exercise repeat submission, and a worker-written comparison file
+did not independently read the admission journal. The served replay case now
+calls `dispatch_submit` twice through the live proxy, requires the same terminal
+receipt and native digest, and finds exactly one queue row. Three reads through
+the installed controller's `status` command retain all five rows with the same
+full-journal digest `727b765412d7ce3b19edfc71b45311135f06d72c1486e307a641f094f5bd9ab6`.
+The original four rows match the pinned pre-run snapshot's normalized digest
+`adec96603bc29d395be58a79d5f6c731972b42295b55b521f4d44a133a9f95ca`.
+This case passed; the full served run remained red on three separate cases:
+dispatch waiting, minutes evidence and transcriber writes. A case pass does not
+make the whole suite or the board audit a pass.[^replay]
+
+### Column discovery for the monthly adapter
+
+Metadata-only WRDS job **40538087** read 331 columns across fourteen
+`crsp_a_stock` relations. It reused the existing grid upload, submit and verified
+artifact-download functions, saving the exact read-only SQL and checksummed CSV
+privately. No security observations were downloaded.[^schema]
+
+The candidate inputs are `stkdlysecuritydata` for daily values and return flags,
+`stksecurityinfohist` for dated security classifications, `metaexchangecalendar`
+for calendar fields and `stkdelists` for delisting fields. These are schema
+findings, not a completed data contract. The next step is to verify CRSP's field
+and return conventions, including whether a selected return already incorporates
+delisting, before defining the extraction joins. The monthly adapter must also
+retain missing-return flags and historical classification intervals; column
+existence alone does not establish how to interpret them.[^schema]
+
 ### Evaluation and evidence limits
 
 The worker scores chronological validation and uses training rows for early
@@ -159,3 +191,5 @@ execution. Results and local journals remain owner-writable evidence.[^query][^m
 [^recheck]: Board task f12aa47e-328f-4473-bb89-cc54c49fed30, program-authored HPC3 ATTEMPT LOAD-REPORT by hpc-report-f12aa47e; controller status saved privately as `agent-route-journal-status.json` beside the installed study journal on 2026-10-28. Status is a local file reading; the report measures live cluster evidence.
 [^queue]: `artifacts/research-queue-verification-20261028/provenance.json`, fields `runtime`, `scheduler_runs` and `pilots`. Queue receipts were read through live Corvis tools, scheduler rows from production `hub_runner_runs`, and runtime hashes from local build metadata. API `tools/fleet/src/fleet/cli/research_queue.py` and `core/research_hpc.py` / `research_wrds.py` at f4064ef451f9dc66ecbd09632f0bfca22fd3718e implement the existing lease and native-command integration. MCPs `scripts/fleet/hub-jobs.json` at a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b supplies its schedule. These cross-package source files lie outside this wiki's workspaceRoot.
 [^fresh]: `artifacts/research-queue-fresh-20261029/provenance.json`, fields `queue`, `scheduler_runs`, `admission_history`, `native`, `replay` and `wrds_reinspection`. Live Corvis receipts and program-owned native reports are distinguished from local journal comparisons; numerical observations and licensed source rows remain private.
+[^replay]: MCPs served test and fleet job named in provenance. The test checks the existing terminal receipt before submission, hashes the saved pre-run snapshot and live controller rows, compares every full-journal digest, and verifies a single queue reference after both submissions. Fleet transcript lines 273-274 record the measured digests and passing case. Audit `182e4ebb` is the earlier rejection, not an acceptance of this repair.
+[^schema]: `artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, fields `job_id`, `query_sha256`, `artifact_sha256`, `relation_column_counts`, `candidate_fields` and `limits`. This is a local metadata measurement with verified remote bytes, not a vendor semantic specification.
