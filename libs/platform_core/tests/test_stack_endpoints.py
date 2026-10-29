@@ -9,7 +9,7 @@ import pytest
 
 from platform_core.error_codes_tooling import StackEndpointErrorCode
 from platform_core.errors import AppError
-from platform_core.json_utils import InvalidJsonError, JSONTypeError, dump_json_str
+from platform_core.json_utils import InvalidJsonError, JSONTypeError, JSONValue, dump_json_str
 from platform_core.mcp_testing import (
     DECLARED_FLEET_URL,
     DECLARED_STACK_HOST,
@@ -70,7 +70,7 @@ def test_moving_a_service_moves_its_url_to_the_new_hosts_address() -> None:
     ],
 )
 def test_a_declaration_without_the_services_port_is_refused_naming_it_and_the_file(
-    declaration: dict[str, object],
+    declaration: JSONValue,
 ) -> None:
     files = stack_endpoint_files()
     files[STACK_ENDPOINTS_PATH] = dump_json_str(declaration)
@@ -83,9 +83,9 @@ def test_a_declaration_without_the_services_port_is_refused_naming_it_and_the_fi
     "hosts",
     [None, DECLARED_STACK_HOST, [], [DECLARED_STACK_HOST, "elsewhere"], [7]],
 )
-def test_a_service_on_no_one_host_is_refused_naming_the_placement(hosts: object) -> None:
+def test_a_service_on_no_one_host_is_refused_naming_the_placement(hosts: JSONValue) -> None:
     files = stack_endpoint_files()
-    services = {} if hosts is None else {TASKBOARD_SERVICE: hosts}
+    services: JSONValue = {} if hosts is None else {TASKBOARD_SERVICE: hosts}
     files[STACK_PLACEMENT_PATH] = dump_json_str({"services": services})
     caught = refusal(files)
     assert caught.code is StackEndpointErrorCode.UNPLACED
@@ -94,7 +94,7 @@ def test_a_service_on_no_one_host_is_refused_naming_the_placement(hosts: object)
 
 @pytest.mark.parametrize("machine", [{}, {"tailnetIp": ""}, {"tailnetIp": 7}])
 def test_a_host_the_roster_gives_no_address_is_refused_naming_its_file(
-    machine: dict[str, object],
+    machine: JSONValue,
 ) -> None:
     files = stack_endpoint_files()
     files[MACHINE] = dump_json_str(machine)
