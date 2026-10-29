@@ -26,7 +26,8 @@ def require_observations(values: NDArray[np.float64], name: str) -> None:
     """
     if values.ndim != 1:
         raise ValueError(f"[{ERR_INVALID_ARGUMENT}] {name} must be one-dimensional")
-    if not bool(np.all(np.isfinite(values))):
+    finite: NDArray[np.bool_] = np.isfinite(values)
+    if not bool(np.all(finite)):
         raise ValueError(f"[{ERR_INVALID_ARGUMENT}] {name} must contain only finite values")
 
 

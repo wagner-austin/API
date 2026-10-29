@@ -51,7 +51,8 @@ def _require_aligned(labels: NDArray[np.int64], *scores: NDArray[np.float64]) ->
     Raises:
         ValueError: If any score array differs in length from the labels.
     """
-    if labels.ndim != 1 or not bool(np.all((labels == 0) | (labels == 1))):
+    binary: NDArray[np.bool_] = (labels == 0) | (labels == 1)
+    if labels.ndim != 1 or not bool(np.all(binary)):
         raise ValueError(f"[{ERR_INVALID_ARGUMENT}] labels must be a vector of binary values")
     for score in scores:
         require_observations(score, "scores")
