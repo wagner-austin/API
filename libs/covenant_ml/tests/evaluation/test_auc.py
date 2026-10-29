@@ -16,14 +16,12 @@ from numpy.typing import NDArray
 from covenant_ml.evaluation.auc import (
     bootstrap_auc_difference,
     delong_auc_difference,
-    midranks,
     score_bins,
     weighted_auc,
 )
 from covenant_ml.evaluation.resampling import build_resampling
 from covenant_ml.evaluation.types import (
     ERR_DEGENERATE_RESAMPLE,
-    ERR_LENGTH_MISMATCH,
     ERR_SINGLE_CLASS,
     IntervalMethod,
     ResamplingUnit,
@@ -60,12 +58,7 @@ def _variance(values: list[float]) -> float:
     return sum((v - mean) ** 2 for v in values) / (len(values) - 1)
 
 
-def test_midranks_average_tied_ranks() -> None:
-    ranks = midranks(floats([3.0, 1.0, 3.0, 2.0]))
-    assert np.array_equal(ranks, floats([3.5, 1.0, 3.5, 2.0]))
-
-
-def test_delong_auc_matches_the_trapezoid_auc_on_untied_scores() -> None:
+def test_delong_auc_matches_headline_auc_on_untied_scores() -> None:
     result = delong_auc_difference(ints(LABELS), floats(SCORES_A), floats(SCORES_B), 0.95)
     assert result.auc_arm == pytest.approx(compute_auc(ints(LABELS), floats(SCORES_A)))
     assert result.auc_reference == pytest.approx(compute_auc(ints(LABELS), floats(SCORES_B)))
@@ -89,6 +82,11 @@ def test_delong_handles_ties_as_halves() -> None:
     expected, _, _ = _brute_force_components(LABELS, tied)
     result = delong_auc_difference(ints(LABELS), floats(tied), floats(SCORES_B), 0.95)
     assert result.auc_arm == pytest.approx(expected)
+    assert compute_auc(ints(LABELS), floats(tied)) == pytest.approx(expected)
+    for order in (list(reversed(range(len(LABELS)))), list(range(1, len(LABELS))) + [0]):
+        labels = ints([LABELS[index] for index in order])
+        scores = floats([tied[index] for index in order])
+        assert compute_auc(labels, scores) == pytest.approx(expected)
 
 
 def test_identical_models_differ_by_exactly_nothing() -> None:
@@ -106,7 +104,7 @@ def test_delong_needs_two_rows_of_each_class() -> None:
 
 
 def test_delong_refuses_misaligned_scores() -> None:
-    with pytest.raises(ValueError, match=ERR_LENGTH_MISMATCH):
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
         delong_auc_difference(ints(LABELS), floats(SCORES_A[:-1]), floats(SCORES_B), 0.95)
 
 
@@ -173,7 +171,7 @@ def test_a_resample_of_one_class_is_refused_not_skipped() -> None:
 
 def test_bootstrap_refuses_misaligned_scores() -> None:
     resampling = build_resampling(ResamplingUnit.CLUSTER, len(LABELS), _clusters(), 1)
-    with pytest.raises(ValueError, match=ERR_LENGTH_MISMATCH):
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
         bootstrap_auc_difference(
             ints(LABELS), floats(SCORES_A), floats(SCORES_B[:-1]), resampling, 10, 0, 0.9
         )

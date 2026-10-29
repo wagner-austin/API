@@ -130,14 +130,14 @@ def test_paired_mean_refuses_too_few_rows_before_dividing(n_rows: int) -> None:
 def test_auc_rejects_nonbinary_labels(invalid: int) -> None:
     labels = ints([0, 0, 1, 1, invalid])
     scores: NDArray[np.float64] = np.arange(5, dtype=np.float64)
-    with pytest.raises(ValueError, match="binary values"):
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
         delong_auc_difference(labels, scores, scores, 0.95)
 
 
 def test_auc_rejects_multidimensional_labels() -> None:
     labels: NDArray[np.int64] = ints([0, 0, 1, 1]).reshape(4, 1)
     scores: NDArray[np.float64] = np.arange(4, dtype=np.float64)
-    with pytest.raises(ValueError, match="binary values"):
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
         delong_auc_difference(labels, scores, scores, 0.95)
 
 
