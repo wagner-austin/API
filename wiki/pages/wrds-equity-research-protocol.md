@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[model-trainer-run-record-provenance]]"]
 source_paths:
+  - "CODE_STANDARDS.md"
+  - "libs/platform_core/src/platform_core/stage_manifest.py"
+  - "libs/covenant_ml/tests/markets/test_research_execution.py"
   - "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py"
   - "libs/covenant_ml/src/covenant_ml/markets/equity_study.py"
   - "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py"
@@ -24,6 +27,9 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
+  "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
+  "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
+  "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
@@ -36,7 +42,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "a14e864128b900ca67df11af1ce4b78a65973932"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "bd2c9fd8c7810948c0702ac5f9d5a502c7054289"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "84af969117df4a38b47eaae30b25ddb14803d145"
@@ -44,6 +50,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
 provenance:
+  - "Ownership review 2026-10-29: MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6 is external to this API wiki's source_paths; live queue, installed controller and board reads are identified separately in the review footnotes."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
 fact_checked: 2026-10-29
@@ -77,6 +84,48 @@ poll. HPC3 keeps proposal admission and its attempt journal; WRDS keeps held
 submission and its durable receipt. Transport failures retain those identities.
 Completion requires fresh native evidence and verified RunRecord metadata;
 no research rows or credentials are placed on the board.[^queue][^controllers]
+
+## Ownership review and remaining boundaries
+
+The 2026-10-29 review traced the research submission, recovery and result path,
+including its failure tests. It found no compatibility shim, alternate backend
+fallback, passthrough alias or new type alias in the reviewed integration.
+This is a bounded source review, not a claim about every file in either repository.
+The named guard rules remain `hook-fallback-dispatch`,
+`shim-compatibility-marker`, `passthrough-alias`, `qr-legacy-validators`
+and `typealias-forbidden`; tests also exercise identity and recovery behavior.[^review]
+
+| Responsibility | Authoritative implementation reused |
+|---|---|
+| Tenant-scoped submission and deduplication | MCPs `submitDispatchJob`, its research routing functions and the existing dispatch table's immutable research reference. |
+| Controller capacity and polling | `fleet.cli.research_queue` uses shared queue operations and resource leases; native scheduler waits retain their receipts. |
+| Proposal configuration and attempt history | `research_records` uses the benchmark codec; `research_journal` uses `platform_core.event_journal`. |
+| Native execution and collection | HPC3/WRDS adapters invoke the maintained `hpc3` commands. Resumed WRDS collection rechecks local bytes against freshly verified native evidence. |
+| Staging identity and numerical evidence | Shared `StageManifest` and `RunRecord` codecs; no research-specific replacement records. |
+
+The review found one concrete provenance defect: the bundle writer hashed UTF-8
+text but wrote it in text mode, allowing Windows newline translation to change
+the emitted bytes. `prepare_bundle` now writes, hashes and sizes the same byte
+payload. The existing execution test suite reads those files back and verifies
+their exact hashes, lengths and checksum content through the shared manifest
+codec. The repair adds no helper or second writer. Its full fleet check passed 4,525 tests
+with 100% coverage; Windows CI and the independent repair audit were pending
+when this review was published.[^bundle]
+
+A fresh read of live queue job `fb62c111-f5c8-48f6-a790-899e68f76920` retained
+native job `58586013` and RunRecord digest
+`49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17`.
+The installed controller still reports four completed trials and one refusal;
+its canonical full-report digest remains
+`727b765412d7ce3b19edfc71b45311135f06d72c1486e307a641f094f5bd9ab6`.
+This read consumed no trial budget and submitted no allocation.[^live-review]
+
+The earlier controller-path repair passed its Windows check and independent
+audit. The native replay case also passed, but its parent board task
+`8b19319c` remains waiting on the unrelated minutes-corpus root-cause task
+`671c2919`; that parent audit is not complete. Monthly return accounting,
+label-overlap purging, moving-block resampling and restricted holdout access
+remain the substantive extensions described below.[^live-review]
 
 ## What is already reusable
 
@@ -185,6 +234,9 @@ an implemented guarantee today. Do not autonomously launch this research loop
 until admission, holdout isolation and append-only attempt recording are tested.[^request]
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
+[^review]: `CODE_STANDARDS.md`, named guard-rule table; API functions cited in [^queue], [^controllers], [^admission] and [^records]. External MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6: `packages/db/src/fleet-dispatch/research.ts` functions `requireResearchRouting` and `existingResearchJob`, and `packages/db/migrations/877_fleet_dispatch_research_requests.sql` immutable reference constraints. Scope and findings: board task 79c9a370-763e-4fd0-a609-cd1a64080b19.
+[^bundle]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py` function `prepare_bundle`; `libs/platform_core/src/platform_core/stage_manifest.py` codecs; `libs/covenant_ml/tests/markets/test_research_execution.py` case `test_bundle_manifest_identifies_exact_written_bytes`. API source commit 6f98b519968ea5435119aec0d21105f6e3cb2997 and regression commit 1eb02136baa6b86938b73dbad3395e0a41d9ce5c; fleet job 748608d6-faf0-4cb2-ac45-50fe75e9a977 passed at the latter tip. Board repair db0ddd19-bd02-4941-ac09-f4a88a8361f0 maps the Windows result to GitHub check `check`, run 40820758612.
+[^live-review]: Live `dispatch_get` and installed `research_proposals.py status` reads on 2026-10-29, preserved in board task 79c9a370 thread post 1a29cf1d-3ed9-4d47-a6a6-8a23c7c08bd3. `task_get 3261e090` records audit ed3e8e63 VERIFIED; `task_get 8b19319c` records its remaining wait on 671c2919. Earlier served replay case: MCPs `execution/tests/served/research-queue-replay.test.ts`, two submissions and three controller reads in served run c469a100-f103-4e26-a246-396d81b5ee04; the entire served suite was not green.
 [^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
 [^window]: `libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py:67` `evaluate_equity_window`, complete-calendar check and `net_selected = gross_selected - cost` arithmetic.
 [^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py:53` `build_resampling` and `:135` `bootstrap_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py` function `paired_mean_difference`. These sources were read during board task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb; the extension column is design synthesis, not an implementation claim.
