@@ -33,23 +33,23 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/crsp-monthly-v1.json": "2927f9840dc660311e0c0dfe5c13ffbda236174e"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "ec1276449611853eb9c80e283f9dfcddcce9c6dd"
+  "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "664260549885a8826a454ac489757e9acde64dfd"
-  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "1389d0ba6ffee407de927e983fde8073001ed3b5"
-  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "d1a69245c7fd39affab69216f78cde86374e67c3"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "7fcb101a3be190956bb3d9a2c187247c67401f41"
+  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
+  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
   "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
-  "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
+  "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bbc48dfe352e9a212a4802207433888506bcd09f"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
-  "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "e72d1e11e542cb9353f24142a40ae3029698c9b0"
-  "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "402410874ac09c1889bbec98cb03d66dd37ac73f"
-  "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "4efca7be5d2ce636c20510223eb3c5bfc8379516"
+  "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "5e757666177c852826a7aa8066e6953d5973dd1c"
+  "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "60e9255630cd79e777f67495b91690b662ffbb4f"
+  "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "eee4fd7306a8ba8e4fecd0d805407dc8ceb3861e"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "44dfcd58adde8408d1b34a558214ac70d36af563"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
@@ -136,9 +136,10 @@ This read consumed no trial budget and submitted no allocation.[^live-review]
 The earlier controller-path repair passed its Windows check and independent
 audit. The native replay case also passed, but its parent board task
 `8b19319c` remains waiting on the unrelated minutes-corpus root-cause task
-`671c2919`; that parent audit is not complete. Monthly return accounting,
-label-overlap purging, moving-block resampling and restricted holdout access
-remain the substantive extensions described below.[^live-review]
+`671c2919`; that parent audit is not complete. Label-overlap exclusion and
+paired moving-block primitives now have implementations; their integration
+into monthly return accounting and restricted holdout access remains work
+described below.[^live-review][^sampling][^splits]
 
 ## What is already reusable
 
@@ -163,9 +164,9 @@ their current contracts differ from that study in specific ways:[^equity][^windo
 |---|---|---|
 | `equity_study.load_equity_study` | Binds a verified snapshot, cohort, selected weights and independently supplied session calendar. | Bind effective-dated CRSP membership and decision/entry/exit dates, preserving its frozen-design checks. |
 | `equity_outcomes.evaluate_equity_window` | Requires the entire frozen cohort and every declared session; scores adjusted-price endpoints and subtracts one fixed round-trip cost. | Carry holdings between rebalances, charge absolute traded notional against drifted pre-trade weights, and represent return/delisting events explicitly. A fixed cost per window is not turnover accounting. |
-| `ChronologicalGroupedSplits` | Partitions whole distinct time keys; validation stopping rows come from training. | Freeze explicit date boundaries and purge labels by their actual exit/availability timestamps. The existing embargo counts keys, not elapsed time or label intervals. |
-| `build_resampling` / `bootstrap_weights` | Forms fixed, non-overlapping blocks by integer division and resamples their counts. | Add explicit overlapping moving-block semantics to the shared evaluation package for the proposed monthly statistic; retain the current diagnostic's declared semantics. |
-| `paired_mean_difference` | Uses Newey-West errors for block-unit means. | The proposed primary moving-block bootstrap interval needs a distinct measured method; selecting the existing block unit does not implement it. |
+| `ChronologicalGroupedSplits` | Partitions whole distinct time keys and requires actual label availability strictly before stopping and scoring boundaries. Validation stopping rows come from training. | Bind the monthly study's fixed dates and actual outcome-availability timestamps. The separate embargo counts keys, not elapsed time. |
+| `build_resampling` / `bootstrap_weights` / `moving_block_weights` | The first two retain fixed, non-overlapping blocks. The new primitive samples overlapping, noncircular blocks and truncates the last block to preserve the exact observation count. | Integrate monthly return differences and the frozen block length into the study worker. |
+| `paired_mean_difference` / `compare_moving_block` | Newey-West errors remain available. The new paired comparison requires identical consecutive month identities and records a distinct moving-block percentile method. | Publish the monthly study's paired interval. Its uncentered bootstrap sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
 
 The shared admission journal, queue, native scheduler adapters and RunRecord
 publisher already compose. Extending the numerical evaluator does not require
@@ -195,9 +196,11 @@ These are study assumptions, not profitability findings.[^frozen]
 | Primary measurement | Mean monthly net-return difference versus momentum on the same dates. Report annualized return, volatility, drawdown and turnover secondarily. Use paired 12-month moving-block bootstrap, 10,000 draws, seed 7, with intervals and sample length; 36 final decisions limit inference. |
 | Trial accounting | At most 20 distinct validation candidates under v1, five fixed seeds 11/23/37/53/71 each, identical candidate budget. Select one candidate on primary validation score, tie by fewer leaves then candidate id. Evaluate the selected candidate once on the sealed final period. Seeds are repetitions, not extra hypotheses or independent market histories. |
 
-The date change preceded outcome inspection: WRDS compute probe `40544368`
-found legacy membership only through December 2024 and CIZ returns/calendar
-through December 2025. The previous February 2026 exit was unavailable.
+The date change preceded outcome inspection: WRDS compute probes `40544368`
+and `40544470` found legacy membership only through December 2024 and CIZ
+returns/calendar through December 2025. The second probe also confirmed
+terminal-event dates through 2025-12-30, with stored dates through 2025-12-31.
+The previous February 2026 exit was unavailable.
 Table extents do not prove individual-history completeness.[^coverage]
 Historical data may already be known
 to model pretraining or prior research: a sealed retrospective period limits
@@ -215,8 +218,10 @@ adapter extension; they are not a claim that the existing `dsf` engineering pilo
 implements CIZ monthly outcomes.[^ciz-contract][^adapter]
 
 The read-only catalog probe established the subscribed `crsp_a_stock` relations
-and candidate columns. It downloaded metadata only. Column existence and type
-do not prove field semantics, historical completeness or publication availability.[^ciz-schema]
+and candidate columns. It downloaded metadata only. Four exact ordered column
+arrays are now frozen in the machine-readable protocol; its decoder refuses
+omitted, additional, repeated or reordered columns. Column existence and type
+do not prove field semantics, historical completeness or publication availability.[^ciz-schema][^frozen]
 
 | Use | Selected input and constraint |
 |---|---|
@@ -285,13 +290,13 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^live-review]: Live `dispatch_get` and installed `research_proposals.py status` reads on 2026-10-29, preserved in board task 79c9a370 thread post 1a29cf1d-3ed9-4d47-a6a6-8a23c7c08bd3. `task_get 3261e090` records audit ed3e8e63 VERIFIED; `task_get 8b19319c` records its remaining wait on 671c2919. Earlier served replay case: MCPs `execution/tests/served/research-queue-replay.test.ts`, two submissions and three controller reads in served run c469a100-f103-4e26-a246-396d81b5ee04; the entire served suite was not green.
 [^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
 [^window]: `libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py:67` `evaluate_equity_window`, complete-calendar check and `net_selected = gross_selected - cost` arithmetic.
-[^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py:53` `build_resampling` and `:135` `bootstrap_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py` function `paired_mean_difference`. These sources were read during board task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb; the extension column is design synthesis, not an implementation claim.
+[^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py`, `build_resampling`, `bootstrap_weights` and `moving_block_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py`, `paired_mean_difference` and `compare_moving_block`. The monthly integration column remains design work; the listed numerical primitives are implemented.
 [^splits]: `libs/covenant_ml/src/covenant_ml/evaluation/splits.py` class `ChronologicalGroupedSplits`, methods `__call__` and `validation_split`.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
 [^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
 [^frozen]: `libs/covenant_ml/docs/crsp-monthly-v1.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
-[^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544368 on 2026-10-29. No security observations were returned or scored.
+[^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544470 on 2026-10-29, extending the three-relation probe 40544368 with stkdelists coverage. No security observations were returned or scored.
 [^ciz-contract]: External tech-wiki pages `crsp-ciz-daily-return-contract`, `crsp-ciz-daily-return-quality`, `crsp-ciz-aggregate-return-quality`, field and flag dictionaries plus Application notes. Their single captured vendor guide is https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d, pp. 14-18, 49, 63, 81-82 and 90-92; text capture SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e. Application constraints here are proposed protocol rules, not vendor guarantees or implemented monthly behavior.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
