@@ -305,14 +305,31 @@ def read_attempts(path: pathlib.Path) -> tuple[PushAttempt, ...]:
     """
     if not _test_hooks.file_exists(path):
         return ()
+    return decode_attempts(_test_hooks.read_text(path), str(path))
+
+
+def decode_attempts(text: str, source: str) -> tuple[PushAttempt, ...]:
+    """Decode a local or remote enrolment snapshot through the same row contract.
+
+    Args:
+        text: Enrolment JSONL, in append order.
+        source: The named file or host and file, used in error messages.
+
+    Returns:
+        Every validated row, preserving its author and timestamp.
+
+    Raises:
+        JSONTypeError: A line is not an enrolment object.
+        AppError: A row's fields fail the canonical decoder.
+    """
     rows: list[PushAttempt] = []
-    for index, line in enumerate(_test_hooks.read_text(path).splitlines(), start=1):
+    for index, line in enumerate(text.splitlines(), start=1):
         if line.strip() == "":
             continue
         value = load_json_str(line)
         if not isinstance(value, dict):
             raise JSONTypeError(
-                f"{path} line {index} is a {type(value).__name__}, not an object; a "
+                f"{source} line {index} is a {type(value).__name__}, not an object; a "
                 "line that cannot be read is a push whose author is never told what "
                 "their CI did, which is the silence this bridge exists to remove"
             )
@@ -358,6 +375,7 @@ __all__ = [
     "PushAttempt",
     "append_attempt",
     "attempt_key",
+    "decode_attempts",
     "decode_push_attempt",
     "encode_push_attempt",
     "latest_attempts",

@@ -2,6 +2,7 @@
 
 Usage:
     ci-wake --enrolment /path/to/pushes.jsonl
+    ci-wake --source-host ziggurat --enrolment /absolute/path/to/pushes.jsonl
 
 One cycle, then exit. The interval belongs to the scheduler that calls this,
 where it is visible, for the same reason ``fleet-watch`` has no ``--follow``
@@ -9,7 +10,7 @@ and ``fleet-wake`` has no loop.
 
 THE ENROLMENT RECORD IS NAMED, NOT DISCOVERED, and it is the same path the
 ``pre-push`` hooks write to. Both halves take it as an argument so the two
-cannot disagree about where the record is -- the failure that would produce
+name the same source host and path -- the failure that would produce
 is a bridge announcing nothing while every push is enrolled correctly, which
 reads exactly like a quiet week.
 
@@ -34,8 +35,9 @@ from platform_core import cli_args
 from ci_wake.cycle import run_cycle
 
 ENROLMENT_FLAG = "--enrolment"
+SOURCE_HOST_FLAG = "--source-host"
 
-ALLOWED_FLAGS = (ENROLMENT_FLAG,)
+ALLOWED_FLAGS = (ENROLMENT_FLAG, SOURCE_HOST_FLAG)
 
 
 def main(argv: Sequence[str]) -> int:
@@ -57,7 +59,10 @@ def main(argv: Sequence[str]) -> int:
         OSError: A record that cannot be read or written.
     """
     parsed = cli_args.parse_single_flags(argv, ALLOWED_FLAGS)
-    run_cycle(pathlib.Path(cli_args.require_flag(parsed, ENROLMENT_FLAG)))
+    run_cycle(
+        pathlib.Path(cli_args.require_flag(parsed, ENROLMENT_FLAG)),
+        source_host=parsed.get(SOURCE_HOST_FLAG, ""),
+    )
     return 0
 
 

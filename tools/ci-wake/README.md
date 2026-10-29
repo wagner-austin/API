@@ -76,12 +76,14 @@ refuses the push as `WORKFLOW_TRIGGER_UNREAD`, naming the file and line.
 ## One cycle
 
 ```bash
-ci-wake --enrolment C:\Users\Test\PROJECTS\API\tools\ci-wake\runs\pushes.jsonl
+ci-wake --source-host ziggurat --enrolment /home/corvis/PROJECTS/API/tools/ci-wake/runs/pushes.jsonl
 ```
 
 1. Read the enrolment record, collapse repeated pushes of one sha to the
    most recent, and drop the pushes already in the position record.
-2. For each **outstanding** push, ask GitHub what runs exist for its sha —
+2. Inspect at most twenty outstanding pushes per tick, newest first when a
+   backlog exceeds that bound. Deferred pushes remain unacknowledged and are
+   retried on later ticks. For each selected push, ask GitHub what runs exist for its sha —
    one `gh api` call per push in flight, none for a push already answered.
 3. Classify each against the clock (see below).
 4. For each announceable push, fetch its runs' job tallies.
@@ -98,6 +100,15 @@ silence this exists to remove.
 **Nothing is caught.** A refused post, or a `gh` that is not logged in, ends
 the cycle non-zero for the scheduler to record, and the position rows are not
 written, so the next cycle retries.
+
+The hub's installed pump reads the session host's enrollment over SSH. Its
+announcement positions stay on the hub, beside the same absolute path; the
+source file is never copied over the hub's delivery record. A failed SSH read
+or missing remote file fails the tick visibly instead of consulting a stale
+local enrollment. Omitting `--source-host` explicitly selects a local file.
+This repairs board task `b053741f`: after sessions moved to Ziggurat the pump
+was still reading five old hub enrollments, so successful CI could remain
+unannounced even though the existing successor-run resolver worked.
 
 ## The four states, and why three of them post
 

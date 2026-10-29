@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import pathlib
 from collections.abc import Sequence
+from typing import Final
 
 from board_watch.config import load_credentials
 from platform_core.board import post_to_task, register_service_session
@@ -43,6 +44,7 @@ from ci_wake.enrolment import PushAttempt, attempt_key, latest_attempts, read_at
 from ci_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from ci_wake.landing import UNLANDED, UnlandedPush, holds, landing_of
 from ci_wake.position import AnnouncedPush, append_announced, position_path, read_announced
+from ci_wake.remote import read_remote_attempts
 from ci_wake.runs import decode_jobs, decode_runs, gh_json, jobs_argv, runs_argv
 from ci_wake.verdicts import (
     PushVerdict,
@@ -51,6 +53,9 @@ from ci_wake.verdicts import (
     is_announceable,
     is_evicted,
 )
+
+#: Bound recovery work per pump tick; fresh pushes precede historical backlog.
+MAX_PUSHES_PER_CYCLE: Final = 20
 
 
 class BranchRuns:
@@ -181,11 +186,13 @@ def _report(
     return PushReport(verdict=verdict, reports=reports, covers=())
 
 
-def run_cycle(enrolment: pathlib.Path) -> None:
+def run_cycle(enrolment: pathlib.Path, *, source_host: str = "") -> None:
     """Run one bridge cycle against one enrolment record.
 
     Args:
         enrolment: Path to the record the ``pre-push`` hooks append to.
+        source_host: Empty for a local source, otherwise its SSH host. Position
+            state stays beside enrolment on this machine, never on the remote.
 
     Raises:
         AppError: Configuration (missing credentials or task id), the
@@ -198,7 +205,9 @@ def run_cycle(enrolment: pathlib.Path) -> None:
     credentials = load_credentials()
     task_id = load_task_id()
 
-    attempts = latest_attempts(read_attempts(enrolment))
+    attempts = latest_attempts(
+        read_attempts(enrolment) if source_host == "" else read_remote_attempts(source_host, enrolment)
+    )
     if attempts == ():
         _test_hooks.emit("enrolment record is empty; nothing has been pushed from this machine")
         return
@@ -215,10 +224,21 @@ def run_cycle(enrolment: pathlib.Path) -> None:
         return
 
     now_epoch = _test_hooks.now()
-    branches = BranchRuns(min(attempt["attempted_unix"] for attempt in outstanding))
+    selected = outstanding
+    if len(outstanding) > MAX_PUSHES_PER_CYCLE:
+        selected = tuple(
+            sorted(outstanding, key=lambda attempt: attempt["attempted_unix"], reverse=True)[
+                :MAX_PUSHES_PER_CYCLE
+            ]
+        )
+        _test_hooks.emit(
+            f"backlog: inspecting {len(selected)} of {len(outstanding)} outstanding pushes; "
+            "newest first, deferred pushes remain unacknowledged"
+        )
+    branches = BranchRuns(min(attempt["attempted_unix"] for attempt in selected))
     decided = [
         report
-        for report in (_report(attempt, now_epoch, branches) for attempt in outstanding)
+        for report in (_report(attempt, now_epoch, branches) for attempt in selected)
         if report is not None
     ]
     if len(decided) == 0:
@@ -285,4 +305,4 @@ def run_cycle(enrolment: pathlib.Path) -> None:
     )
 
 
-__all__ = ["BranchRuns", "run_cycle"]
+__all__ = ["MAX_PUSHES_PER_CYCLE", "BranchRuns", "run_cycle"]
