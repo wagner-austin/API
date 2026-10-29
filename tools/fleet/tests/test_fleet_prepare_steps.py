@@ -121,8 +121,9 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
     # Linux lane, MCPs/packages/session-audit-linux (MCPs board task 31e0a1eb);
     # 30 again since the package dropped its Windows lane (MCPs board task
     # c8cb0ac5); 31 since MCPs/execution-lead-lacrymal (MCPs board task
-    # 770837b7).
-    assert len(databases) == 31
+    # 770837b7); 32 since MCPs/execution-served-diphtheria, for its
+    # usage-limit case (MCPs board task ea46a7a4).
+    assert len(databases) == 32
     assert {step["phase"] for step in databases} == {"test-database"}
     assert {step["argv"][5:] for step in databases} == {("CONTAINER=corvis-fleet-testdb",)}
 
