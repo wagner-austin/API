@@ -4,6 +4,12 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[model-trainer-run-record-provenance]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_extract.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_panel.py"
   - "libs/covenant_ml/docs/crsp-monthly-v1.json"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
@@ -33,6 +39,12 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "3035c22326bc69ff6d06c5e5f72d6660290e270b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "8da57b12ff35b89a0bac5b1c8189dafa498df174"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "3c2f343bf9759f132bf75409cbd3482916ec1fd4"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "24cbf1954c01e793dc68e69a987894336422d5d5"
+  "libs/covenant_ml/tests/markets/test_crsp_panel.py": "65b468538f16a34e5207880c2276361bf12d7b09"
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
@@ -42,7 +54,7 @@ source_git_blobs:
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
   "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
-  "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bbc48dfe352e9a212a4802207433888506bcd09f"
+  "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
   "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "6d95079f002b370fa9a8920c3d361a4f803e6136"
@@ -242,6 +254,25 @@ staging, RunRecord, admission, queue and native controllers retain ownership.[^f
 
 ## Agent integration after the pilot
 
+The input adapter now reads four relation CSVs and their exact SQL alongside
+the frozen protocol, using the shared staging file identities and the evidence
+reader lifted from the single-security diagnostic. It verifies consumed bytes,
+refuses duplicate source keys and changed projections, and preserves explicit
+missing values. A checksum binds bytes; it does not attest vendor authorship or
+prove that a supplied query generated those bytes.[^panel]
+
+Decision construction uses only observations through the decision close, counts
+one first exclusion reason per rejected historical security, and keeps empty
+decision months visible. Liquidity is the trailing 60-session median absolute
+price times volume; equal liquidity sorts by PERMNO. Momentum skips the entire
+decision month and compounds the preceding eleven calendar months, with every
+required daily predecessor checked against the independent session calendar.
+The 252-session history window ends at the decision close. Future fill prices
+never filter this universe. Hand-computable fixture cases test −12% momentum
+and invariance under changed future returns, prices, volumes and new listings.
+This is input construction, not an executed monthly portfolio study; holdings,
+cost accounting, worker integration and enforced holdout isolation remain.[^panel]
+
 The controller's `python` executable and `workspace` configuration use absolute
 native filesystem paths. HPC3 `root`, `entrypoint` and `image` use absolute POSIX
 paths regardless of the controller's operating system. All five fields reject
@@ -293,7 +324,8 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py`, `build_resampling`, `bootstrap_weights` and `moving_block_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py`, `paired_mean_difference` and `compare_moving_block`. The monthly integration column remains design work; the listed numerical primitives are implemented.
 [^splits]: `libs/covenant_ml/src/covenant_ml/evaluation/splits.py` class `ChronologicalGroupedSplits`, methods `__call__` and `validation_split`.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
-[^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
+[^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:129` `load_wrds_evaluation`.
+[^panel]: `libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py`, `load_crsp_sources`; `libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py`, `decode_crsp_rows`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `build_crsp_panel`; `libs/covenant_ml/src/covenant_ml/evaluation/evidence.py`, `read_evidence`; `libs/covenant_ml/tests/markets/test_crsp_extract.py` and `libs/covenant_ml/tests/markets/test_crsp_panel.py`, real-file and independent arithmetic fixtures. Board task 869761ed-980a-4595-a45b-fc400aab371e tracks fleet verification separately from implementation.
 [^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
 [^frozen]: `libs/covenant_ml/docs/crsp-monthly-v1.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
 [^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544470 on 2026-10-29, extending the three-relation probe 40544368 with stkdelists coverage. No security observations were returned or scored.
