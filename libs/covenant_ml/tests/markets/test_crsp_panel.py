@@ -117,5 +117,5 @@ def test_panel_refuses_ambiguous_or_impossible_sources(tmp_path: Path, mutation:
     else:
         last = "2025-01-01"
     path, _ = write_sources(tmp_path, rows)
-    with pytest.raises(ValueError, match="CRSP-003|CRSP-008"):
+    with pytest.raises(ValueError, match=r"CRSP-003|CRSP-008"):
         build_crsp_panel(load_crsp_sources(path), first, last)

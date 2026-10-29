@@ -6,6 +6,7 @@ import csv
 import hashlib
 import io
 from datetime import date, timedelta
+from itertools import pairwise
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, dump_json_str, require_list, require_str
@@ -28,7 +29,7 @@ def source_rows() -> dict[str, list[JSONObject]]:
     sessions = [day for day in days if day.weekday() < 5]
     returns: list[JSONObject] = []
     for permno in (1, 2, 3):
-        for previous, day in zip(sessions[:-1], sessions[1:], strict=True):
+        for previous, day in pairwise(sessions):
             ret = 0.0
             if permno == 1 and day == date(2019, 1, 2):
                 ret = 0.1

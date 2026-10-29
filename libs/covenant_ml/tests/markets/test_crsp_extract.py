@@ -83,7 +83,7 @@ def test_ambiguous_manifest_is_refused(tmp_path: Path, mutation: str) -> None:
     else:
         narrow_json_to_dict(membership["csv"])["name"] = "bad\nname"
     path.write_text(dump_json_str(document), encoding="utf-8")
-    with pytest.raises(ValueError, match="CRSP-006|WRDS_DATA_PATH"):
+    with pytest.raises(ValueError, match=r"CRSP-006|WRDS_DATA_PATH"):
         load_crsp_sources(path)
 
 
@@ -103,7 +103,7 @@ def test_duplicate_natural_keys_fail(tmp_path: Path, relation: str) -> None:
     ]
     rows[relation].append(rows[relation][0].copy())
     path, _ = write_sources(tmp_path, rows)
-    with pytest.raises(ValueError, match="CRSP-007.*duplicate"):
+    with pytest.raises(ValueError, match=r"CRSP-007.*duplicate"):
         load_crsp_sources(path)
 
 
@@ -137,5 +137,5 @@ def test_malformed_source_cells_fail(
 def test_projection_and_width_fail(payload: bytes) -> None:
     with pytest.raises(ValueError, match="CRSP-007"):
         decode_crsp_rows(payload, "membership", ("permno", "namedt"), "2026-10-29T00:00:00Z")
-    with pytest.raises(ValueError, match="CRSP-007.*unknown"):
+    with pytest.raises(ValueError, match=r"CRSP-007.*unknown"):
         decode_crsp_rows(payload, "unknown", (), "2026-10-29T00:00:00Z")
