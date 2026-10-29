@@ -1,0 +1,244 @@
+{
+  "kind": "research-queue-fresh-verification-v1",
+  "measured_at": "2026-10-29",
+  "board_task": "8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb",
+  "scope": "Fresh admitted HPC3 validation through automatic shared queue; retained WRDS extraction reinspection. Metadata only.",
+  "runtime": {
+    "queue_source_commit": "f4064ef451f9dc66ecbd09632f0bfca22fd3718e",
+    "proposal_controller_commit": "bda8ca2af532d89b301b56cc0b55a4346bb6e421",
+    "compute_image_sha256": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+    "prior_runtime_provenance": "../research-queue-verification-20261028/provenance.json"
+  },
+  "queue": {
+    "job": {
+      "researchRequest": {
+        "backend": "hpc3",
+        "specSha256": "165f318b2e108b13211fbdfc494c04f1585cc0ac9ab60c1cc15fa1f93e30508f",
+        "attempt": "admitted-5"
+      },
+      "id": "fb62c111-f5c8-48f6-a790-899e68f76920",
+      "project": "research/hpc3",
+      "command": "research",
+      "status": "passed",
+      "requestedNode": "ziggurat",
+      "sessionTarget": null,
+      "sessionReason": null,
+      "sha": null,
+      "requiredTags": [],
+      "taskId": "8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb",
+      "node": "ziggurat",
+      "runId": "fb62c111-f5c8-48f6-a790-899e68f76920",
+      "exitCode": 0,
+      "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58586013\",\"record_sha256\":\"49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17\"}",
+      "submittedBy": "codex-wrds-1027",
+      "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+      "cwd": "/home/corvis/PROJECTS/MCPs-codex-wrds-1027",
+      "claimedBy": "fleet-research-diphtheria",
+      "leaseExpiresAt": null,
+      "createdAt": "2026-10-29T01:21:50.340Z",
+      "updatedAt": "2026-10-29T01:27:37.115Z",
+      "claimedAt": "2026-10-29T01:24:09.831Z",
+      "closedAt": "2026-10-29T01:27:37.115Z",
+      "reclaimable": false,
+      "claimsFirst": false
+    },
+    "trail": [
+      {
+        "id": "fb4c40c8-4cf7-4fc4-8447-dcfda4e45561",
+        "kind": "submitted",
+        "actor": "codex-wrds-1027",
+        "body": "queued research hpc3 specification 165f318b2e108b13211fbdfc494c04f1585cc0ac9ab60c1cc15fa1f93e30508f attempt admitted-5 on ziggurat for task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb",
+        "createdAt": "2026-10-29T01:21:50.340Z"
+      },
+      {
+        "id": "b724ad46-8552-488a-8b62-e4fb495e4372",
+        "kind": "claimed",
+        "actor": "fleet-research-diphtheria",
+        "body": "claimed by fleet-research-diphtheria under a 7200s lease",
+        "createdAt": "2026-10-29T01:24:09.831Z"
+      },
+      {
+        "id": "b2d02e27-cda5-4f2c-b668-bd06e8715aea",
+        "kind": "progress",
+        "actor": "fleet-research-diphtheria",
+        "body": "started make research for research/hpc3 on ziggurat as run fb62c111-f5c8-48f6-a790-899e68f76920",
+        "createdAt": "2026-10-29T01:24:09.870Z"
+      },
+      {
+        "id": "3015fbcd-cce1-4fee-9ebf-c18691e958bb",
+        "kind": "progress",
+        "actor": "fleet-research-diphtheria",
+        "body": "{\"state\":\"running\",\"native_job_id\":\"58586013\",\"record_sha256\":null}",
+        "createdAt": "2026-10-29T01:24:24.044Z"
+      },
+      {
+        "id": "d27d96ce-57c7-4ccc-9ddc-321c06d55dae",
+        "kind": "closed",
+        "actor": "fleet-research-diphtheria",
+        "body": "passed: Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58586013\",\"record_sha256\":\"49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17\"}",
+        "createdAt": "2026-10-29T01:27:37.115Z"
+      }
+    ],
+    "waiting": []
+  },
+  "replay": {
+    "before_claim_job_id": "fb62c111-f5c8-48f6-a790-899e68f76920",
+    "after_completion_job_id": "fb62c111-f5c8-48f6-a790-899e68f76920",
+    "after_completion_native_job_id": "58586013",
+    "additional_admissions": 0
+  },
+  "scheduler_runs": [
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-10-29T01:24:02.414731+00:00",
+      "phase": "tick",
+      "deadline_seconds": 2400,
+      "ended_at": "2026-10-29T01:24:24.154607+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-10-29T01:27:03.883871+00:00",
+      "phase": "tick",
+      "deadline_seconds": 2400,
+      "ended_at": "2026-10-29T01:27:41.084875+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ],
+  "admission_history": {
+    "prior_attempts_unchanged": true,
+    "before_count": 4,
+    "after_count": 5,
+    "prior_rows_sha256": "adec96603bc29d395be58a79d5f6c731972b42295b55b521f4d44a133a9f95ca",
+    "retained_rows_sha256": "adec96603bc29d395be58a79d5f6c731972b42295b55b521f4d44a133a9f95ca",
+    "policy_digest": "e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb",
+    "attempts": [
+      {
+        "number": 1,
+        "status": "complete",
+        "job_id": "58578600",
+        "candidate": "c90291a531e4e38cf9ca09780838022ad626d718e67e5f6589c70fc5492b2444",
+        "reason": ""
+      },
+      {
+        "number": 2,
+        "status": "refused",
+        "job_id": "",
+        "candidate": "",
+        "reason": "candidate_seed_consumed"
+      },
+      {
+        "number": 3,
+        "status": "complete",
+        "job_id": "58578791",
+        "candidate": "c90291a531e4e38cf9ca09780838022ad626d718e67e5f6589c70fc5492b2444",
+        "reason": ""
+      },
+      {
+        "number": 4,
+        "status": "complete",
+        "job_id": "58578878",
+        "candidate": "9c6575a5a8fbeaa8c173c577c7a053babbaffe29ce0acd5f169d9357b28d2275",
+        "reason": ""
+      },
+      {
+        "number": 5,
+        "status": "complete",
+        "job_id": "58586013",
+        "candidate": "9c6575a5a8fbeaa8c173c577c7a053babbaffe29ce0acd5f169d9357b28d2275",
+        "reason": ""
+      }
+    ]
+  },
+  "native": {
+    "ledger": {
+      "job_id": "58586013",
+      "project": "cleargbm",
+      "name": "cleargbm.research-e9ad0a4ef118-5",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-10-29T01:24:15.847704+00:00",
+      "log_dir": "/pub/wagnera3/cleargbm/logs",
+      "deterministic": true,
+      "experiment": {
+        "research_attempt": "e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb:5",
+        "request_sha256": "ca2ed913a92a8b05e076929ce16c6593a6a6f4e936ffc1ca1609165a3a7a6bcd"
+      },
+      "image_digest": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+      "submitter": "fleet-research-diphtheria",
+      "artifact": "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/5/result/evaluation.json",
+      "image_drift": {
+        "image_commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+        "head": "e57f1e1b2e65c120ae77c588969fba9336947c90",
+        "modules": [
+          {
+            "directory": "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint",
+            "module": "scripts.research_trial",
+            "compared": [],
+            "changed": [],
+            "not_compared": "resolved from /pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+          }
+        ]
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58586013",
+        "name": "cleargbm.research-e9ad0a4ef118-5",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 11,
+        "billing_tres": 1,
+        "gpu_count": 0,
+        "cpu_count": 1,
+        "node_list": "hpc3-22-05"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-29T01:24:25",
+      "ended_at": "2026-10-29T01:24:36"
+    },
+    "result_sha256": "92b1cc22003a2cdb944cee4b8eee546db2f754592e528a06506ec2d1a4e0dda8",
+    "file_runrecord_sha256": "de79b6929fc911171eeec3c3d8c82a2737d574cbc84be89431615b479a51fb2c",
+    "canonical_runrecord_sha256": "49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17",
+    "verified_files": {
+      "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/data.csv": "b0fef3fc4ac9f4568b76c4767d7ef67d4283540eb0c9a93003b5365b74c67a87",
+      "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extract.sql": "72b8067fcc4ccf42fb4d97d7d4923ab144f090b233d98bdc3600d09e1a5dae14",
+      "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/extraction.json": "3a8c51335542569c29e9651273d68c8316fcc5f4400d3550ee5d5239517a9348",
+      "/pub/wagnera3/cleargbm/wrds-crsp-14593-2019-2020-1028/inputs/evaluation.json": "7d649c9f02353f659e1ecad3b50416ceedc635c14508834d4f1f4b5292904a5f",
+      "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+      "/pub/wagnera3/cleargbm/research-validation-2e445e25e/entrypoint/scripts/research_trial.py": "0788b3f20d1798c53f33fc4cbb7ca4aee6ca4949bf3fcb7f9f43d825c457add2",
+      "/pub/wagnera3/images/research-validation-2e445e25e/research-validation.sif": "7d91f3436403abca44cd2265340f3960da9a27972396cb8e0877f5499498e550",
+      "/pub/wagnera3/cleargbm/admitted-validation-20261028/e9ad0a4ef1183790603b2f4312344ec9af5a23200b4126b2b09c0b08de15d3bb/5/request.json": "ca2ed913a92a8b05e076929ce16c6593a6a6f4e936ffc1ca1609165a3a7a6bcd"
+    },
+    "compute_checksum_lines": 8,
+    "dataset": {
+      "sha256": "c8d59956aa695d2871cd0b030bd21b00bc4f596a62b2ed3500e6ec6920f1219e",
+      "n_rows": 504,
+      "n_features": 1
+    }
+  },
+  "hpc3_reinspection": {
+    "native_job_id": "58586013",
+    "state": "complete",
+    "record_sha256": "49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17",
+    "new_submission": false
+  },
+  "wrds_reinspection": {
+    "native_job_id": "40534563",
+    "state": "complete",
+    "record_sha256": "9a8df4c5941b3bc15a8615ce46ee07410e4542d57c8659df6a33cd8e16becc2c",
+    "new_extraction": false
+  },
+  "limits": [
+    "Engineering validation diagnostic, not monthly portfolio performance.",
+    "The four allowed candidate/seed pairs are consumed; the journal also retains one refused duplicate.",
+    "Final-period exclusion is logical, not a separate permission boundary.",
+    "Shared account owns the evidence; hashes are provenance, not hostile-owner attestation."
+  ]
+}
