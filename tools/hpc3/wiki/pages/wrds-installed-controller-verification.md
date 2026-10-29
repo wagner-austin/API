@@ -9,12 +9,14 @@ source_paths:
   - "src/hpc3/core/status.py"
   - "artifacts/wrds-controller-verification-20261028/provenance.json"
   - "artifacts/research-queue-verification-20261028/provenance.json"
+  - "artifacts/research-queue-fresh-20261029/provenance.json"
 source_git_blobs:
   "src/hpc3/cli/execution_inspect.py": "fd0d98dc12dba896ebc552149a7da69f76d4316e"
   "src/hpc3/core/execution_evidence.py": "f0347915a8720f9a95d62be1221340a876f31e49"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
+  "artifacts/research-queue-fresh-20261029/provenance.json": "da6266d1583b6ad0bab4a66f70de69aafdd8db83"
 provenance:
   - "Board task 8a113204-42d0-41a0-8094-73776bae8846; native reports by hpc-report-8a113204, prefix HPC3 ATTEMPT LOAD-REPORT, jobs 58578791 and 58578878"
   - "API libs/covenant_ml/src/covenant_ml/markets/research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; outside this wiki workspaceRoot"
@@ -24,6 +26,7 @@ provenance:
   - "API libs/covenant_ml/scripts/research_proposals.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421: explicit status/submit/reconcile commands; outside this wiki workspaceRoot"
   - "Board task f12aa47e-328f-4473-bb89-cc54c49fed30; hpc-report-f12aa47e independently remeasured retained job 58578878 on 2026-10-28; no new trial submitted"
   - "Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80; API rolled consumer f4064ef451f9dc66ecbd09632f0bfca22fd3718e; MCPs deployment a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b; automatic scheduler and live queue receipts captured in the research-queue provenance artifact"
+  - "Board task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb; fresh queue fb62c111-f5c8-48f6-a790-899e68f76920 submitted and reconciled native allocation 58586013 through fleet-research-diphtheria on 2026-10-29 UTC; independent program-owned reports by hpc-report-8b19319c and load-report-8b19319c"
 fact_checked: 2026-10-28
 confidence: high
 ---
@@ -108,6 +111,32 @@ allocation and the same result/RunRecord hashes recorded above. The installed
 journal still contained three completed attempts and one refusal. This read
 consumed no additional candidate or seed.[^recheck]
 
+### Fresh submission through the shared queue
+
+On 2026-10-29 UTC, request `admitted-5` used the last unused candidate/seed pair
+under the existing policy: the 11-tree candidate and seed 23. Admission appended
+attempt 5 to the original journal before queue submission. Queue receipt
+`fb62c111-f5c8-48f6-a790-899e68f76920` was submitted at 01:21:50, claimed by the
+scheduled runner at 01:24:09 and closed passed at 01:27:37. The runner submitted
+new Slurm allocation **58586013**, which completed on `hpc3-22-05` in 11 seconds,
+exit `0:0`, one CPU, no GPU, on the free partition.[^fresh]
+
+Both automatic scheduler ticks exited zero without timing out. Repeating the
+request before claim and after completion returned the same queue receipt.
+The verified evidence includes eight input checksums, native accounting and
+result/RunRecord hashes. Canonical RunRecord hash
+`49b7a44e64b76b7d153a6a3fb1a3f1805ea328720fbc855ca6e0bc892d75af17`
+is distinct from the file-byte hash because the queue re-encodes the decoded
+record. Both encodings are recorded in the metadata artifact.[^fresh]
+
+All four earlier admission rows compare equal before and after this run,
+including the refused duplicate. The policy now has four completed candidate/seed
+pairs and that refusal; no budget or history was reset. A separate retained-WRDS
+inspection returned allocation 40534563 and its unchanged RunRecord hash without
+requesting another extraction. An independent HPC3 reinspection also returned
+58586013 and its unchanged canonical RunRecord hash. This fresh test extends the retained-job evidence
+above to automatic submission of a new allocation.[^fresh]
+
 ### Evaluation and evidence limits
 
 The worker scores chronological validation and uses training rows for early
@@ -129,3 +158,4 @@ execution. Results and local journals remain owner-writable evidence.[^query][^m
 [^routes]: MCPs `dispatch-submit.ts` function `registerDispatchSubmit` and the served schema named in provenance; API `research_proposals.py` function `main`, plus `research_execution.py` functions `submit_attempt` and `reconcile_attempt` at the source commit named in provenance. The WRDS lifecycle is documented in [[wrds-repeatable-attempts]].
 [^recheck]: Board task f12aa47e-328f-4473-bb89-cc54c49fed30, program-authored HPC3 ATTEMPT LOAD-REPORT by hpc-report-f12aa47e; controller status saved privately as `agent-route-journal-status.json` beside the installed study journal on 2026-10-28. Status is a local file reading; the report measures live cluster evidence.
 [^queue]: `artifacts/research-queue-verification-20261028/provenance.json`, fields `runtime`, `scheduler_runs` and `pilots`. Queue receipts were read through live Corvis tools, scheduler rows from production `hub_runner_runs`, and runtime hashes from local build metadata. API `tools/fleet/src/fleet/cli/research_queue.py` and `core/research_hpc.py` / `research_wrds.py` at f4064ef451f9dc66ecbd09632f0bfca22fd3718e implement the existing lease and native-command integration. MCPs `scripts/fleet/hub-jobs.json` at a09431951c0cfa1eb5b67e2ce11c2bc5e9938e6b supplies its schedule. These cross-package source files lie outside this wiki's workspaceRoot.
+[^fresh]: `artifacts/research-queue-fresh-20261029/provenance.json`, fields `queue`, `scheduler_runs`, `admission_history`, `native`, `replay` and `wrds_reinspection`. Live Corvis receipts and program-owned native reports are distinguished from local journal comparisons; numerical observations and licensed source rows remain private.
