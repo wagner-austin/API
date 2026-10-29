@@ -52,7 +52,7 @@ from platform_core.env_file import parse_env_file
 from platform_core.error_codes_tooling import SessionLabelErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials, McpPostProtocol, call_mcp_tool
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
+from platform_core.stack_endpoints import TASKBOARD_SERVICE, declared_url
 
 #: Environment variable the harness exports carrying the acting session's id.
 SESSION_ID_VARIABLE: Final = "CLAUDE_CODE_SESSION_ID"
@@ -203,7 +203,7 @@ def read_identity(
     if session_id is None:
         return SessionIdentity(session_id="", exported=declared, bound="")
     session = require_session_id(session_id)
-    url = declared_url(read_text(STACK_ENDPOINTS_PATH), TASKBOARD_SERVICE)
+    url = declared_url(read_text, TASKBOARD_SERVICE)
     credentials = stack_credentials(read_text(STACK_ENV_PATH), url)
     text = call_mcp_tool(post, credentials, WHEREIS_TOOL, {"session": session})
     return SessionIdentity(session_id=session, exported=declared, bound=bound_label(text))

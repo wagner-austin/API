@@ -21,7 +21,7 @@ from platform_core.mcp_testing import (
     DECLARED_TASKBOARD_URL,
     FakeHttpPost,
     sent_arguments,
-    stack_endpoints_text,
+    stack_endpoint_files,
     tool_text_body,
 )
 from platform_core.session_label import (
@@ -42,6 +42,9 @@ from platform_core.session_label import (
 )
 from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
+#: The files a url is formed from, in the order the resolution reads them.
+STACK_FILES = stack_endpoint_files()
+
 SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
 BOUND = "opus-rebuild-deadlock-0910"
 WRONG = "opus-dashboard-0911"
@@ -52,7 +55,7 @@ ENV_TEXT = (
     "\n"
     f"{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-000000000000\n"
 )
-ENDPOINTS_TEXT = stack_endpoints_text()
+ENDPOINTS_TEXT = STACK_FILES[STACK_ENDPOINTS_PATH]
 
 #: ``task_whereis`` for a session the board has written under a label, as
 #: taskboard-mcp renders it (the em dash and the double-space column).
@@ -85,11 +88,12 @@ def reply(text: str) -> McpHttpResponse:
 def env_reader(
     text: str = ENV_TEXT, endpoints: str = ENDPOINTS_TEXT
 ) -> tuple[list[pathlib.Path], Callable[[pathlib.Path], str]]:
-    """A file seam answering the stack's ``.env`` with ``text`` and its
-    endpoint declaration with ``endpoints``, recording what was asked for.
-    Any other path is a ``KeyError``: the resolution reads nothing else."""
+    """A file seam answering the stack's ``.env`` with ``text``, its
+    endpoint declaration with ``endpoints`` and the placement and roster
+    file a url is formed from, recording what was asked for. Any other path
+    is a ``KeyError``: the resolution reads nothing else."""
     asked: list[pathlib.Path] = []
-    files = {STACK_ENV_PATH: text, STACK_ENDPOINTS_PATH: endpoints}
+    files = {**STACK_FILES, STACK_ENV_PATH: text, STACK_ENDPOINTS_PATH: endpoints}
 
     def read_text(path: pathlib.Path) -> str:
         asked.append(path)
@@ -192,7 +196,7 @@ def test_inside_a_session_the_board_is_asked_with_the_stacks_credentials() -> No
     assert read_identity(
         session_id=SESSION, exported=None, read_text=read_text, post=post
     ) == identity(SESSION, "", BOUND)
-    assert asked == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
+    assert asked == [*STACK_FILES, STACK_ENV_PATH]
     assert post.urls == [DECLARED_TASKBOARD_URL]
     assert post.headers[0]["x-api-key"] == "internal-key"
     assert post.headers[0]["X-Tenant-Id"] == "2e137b5f-0000-4000-8000-000000000000"

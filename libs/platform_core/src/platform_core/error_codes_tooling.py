@@ -430,6 +430,15 @@ class StackEndpointErrorCode(ErrorCodeBase):
     # ports (MCPs board task c6fc4882), so no address is assumed instead.
     UNDECLARED = "STACK_ENDPOINT_UNDECLARED"
 
+    # The MCPs placement does not put the service on exactly one host, so
+    # there is no one machine whose address the url carries (MCPs board task
+    # 50381dd9).
+    UNPLACED = "STACK_ENDPOINT_UNPLACED"
+
+    # The roster's file for the host the service is placed on names no
+    # tailnetIp, the one place a machine's address is written.
+    UNADDRESSED = "STACK_ENDPOINT_UNADDRESSED"
+
 
 class MaketoolsErrorCode(ErrorCodeBase):
     """What the Makefile recipes' launcher (``tools/maketools``) refuses.

@@ -24,6 +24,7 @@ would hide exactly that.
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import Sequence
 
 from platform_core.json_utils import (
@@ -33,6 +34,13 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
 )
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
+from platform_core.stack_endpoints import (
+    FLEET_SERVICE,
+    ROSTER_MACHINES_PATH,
+    STACK_ENDPOINTS_PATH,
+    STACK_PLACEMENT_PATH,
+    TASKBOARD_SERVICE,
+)
 
 
 def sse_body(payload: str) -> str:
@@ -195,43 +203,56 @@ def notes_sent(poster: FakeHttpPost) -> list[JSONObject]:
     return [sent_arguments(body) for body in poster.bodies[1:]]
 
 
-#: The taskboard url :func:`stack_endpoints_text` declares by default:
-#: deliberately not any address the real stack uses, so an assertion that
-#: finds it proves the url came from the declaration the test supplied.
-DECLARED_TASKBOARD_URL = "http://taskboard.declared.test:8033/mcp"
+#: The machine :func:`stack_endpoint_files` places every service on, and the
+#: roster address it gives that machine: deliberately not any address the
+#: real stack uses, so an assertion that finds it proves the url was formed
+#: from the files the test supplied.
+DECLARED_STACK_HOST = "stack-host"
+DECLARED_STACK_ADDRESS = "stack.declared.test"
 
-#: The fleet-mcp url :func:`stack_endpoints_text` declares by default, chosen
-#: the same way as :data:`DECLARED_TASKBOARD_URL`.
-DECLARED_FLEET_URL = "http://fleet.declared.test:8035/mcp"
+#: The ports :func:`stack_endpoint_files` declares for the taskboard and fleet-mcp.
+DECLARED_TASKBOARD_PORT = 8033
+DECLARED_FLEET_PORT = 8035
+
+#: The urls those files form (MCPs board task 50381dd9).
+DECLARED_TASKBOARD_URL = f"http://{DECLARED_STACK_ADDRESS}:{DECLARED_TASKBOARD_PORT}/mcp"
+DECLARED_FLEET_URL = f"http://{DECLARED_STACK_ADDRESS}:{DECLARED_FLEET_PORT}/mcp"
 
 
-def stack_endpoints_text(taskboard_url: str = DECLARED_TASKBOARD_URL) -> str:
-    """The MCPs stack's endpoint declaration, declaring the taskboard and fleet-mcp.
+def stack_endpoint_files() -> dict[pathlib.Path, str]:
+    """The files a service's url is formed from, each path to its text.
 
     Shared rather than written into each suite because several packages
     (``platform_core``, ``ci-wake``, ``hpc3``, ``board-watch``, ``fleet``)
-    answer the same file, and the declaration's shape is the MCPs
-    repository's ``scripts/fleet/stack-endpoints.json``, one place to follow
-    it when it changes.
-
-    Args:
-        taskboard_url: The url to declare for ``taskboard-mcp``.
+    form the same urls, and the files' shapes are the MCPs repository's
+    ``scripts/fleet/stack-endpoints.json`` and ``placement.json`` and this
+    repository's roster, one place to follow them when they change.
 
     Returns:
-        The file's text. fleet-mcp is declared at :data:`DECLARED_FLEET_URL`.
+        The declaration giving the taskboard :data:`DECLARED_TASKBOARD_PORT`
+        and fleet-mcp :data:`DECLARED_FLEET_PORT`, the placement putting both
+        on :data:`DECLARED_STACK_HOST`, and that machine's roster file giving
+        it :data:`DECLARED_STACK_ADDRESS`.
     """
-    return dump_json_str(
-        {
-            "services": {
-                "taskboard-mcp": {"runsOn": "diphtheria", "url": taskboard_url},
-                "fleet-mcp": {"runsOn": "diphtheria", "url": DECLARED_FLEET_URL},
-            }
-        }
-    )
+    services = {TASKBOARD_SERVICE: DECLARED_TASKBOARD_PORT, FLEET_SERVICE: DECLARED_FLEET_PORT}
+    declaration: JSONObject = {
+        "services": {service: {"port": port} for service, port in services.items()}
+    }
+    placement: JSONObject = {"services": {service: [DECLARED_STACK_HOST] for service in services}}
+    machine: JSONObject = {"tailnetIp": DECLARED_STACK_ADDRESS}
+    return {
+        STACK_ENDPOINTS_PATH: dump_json_str(declaration),
+        STACK_PLACEMENT_PATH: dump_json_str(placement),
+        ROSTER_MACHINES_PATH / f"{DECLARED_STACK_HOST}.json": dump_json_str(machine),
+    }
 
 
 __all__ = [
+    "DECLARED_FLEET_PORT",
     "DECLARED_FLEET_URL",
+    "DECLARED_STACK_ADDRESS",
+    "DECLARED_STACK_HOST",
+    "DECLARED_TASKBOARD_PORT",
     "DECLARED_TASKBOARD_URL",
     "FakeHttpPost",
     "announcing_poster",
@@ -239,6 +260,6 @@ __all__ = [
     "posted_ok",
     "sent_arguments",
     "sse_body",
-    "stack_endpoints_text",
+    "stack_endpoint_files",
     "tool_text_body",
 ]
