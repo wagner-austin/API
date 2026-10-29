@@ -30,6 +30,8 @@ from covenant_ml.evaluation.types import (
     ResamplingUnit,
 )
 
+from ._fixtures import floats, ints
+
 
 def test_t_interval_matches_analytic_cauchy_distribution() -> None:
     # Student t with one degree of freedom is Cauchy, with elementary CDF
@@ -43,8 +45,8 @@ def test_t_interval_matches_analytic_cauchy_distribution() -> None:
 
 def test_unequal_clusters_keep_row_weighted_estimand() -> None:
     # Mean 4; cluster residual totals [-3, -2, 5]. G/(G-1)*38/36 = 19/12.
-    differences: NDArray[np.float64] = np.array([1, 2, 4, 3, 6, 8], dtype=np.float64)
-    clusters: NDArray[np.int64] = np.array([9, 4, 4, 7, 7, 7], dtype=np.int64)
+    differences = floats([1, 2, 4, 3, 6, 8])
+    clusters = ints([9, 4, 4, 7, 7, 7])
     plan = build_resampling(ResamplingUnit.CLUSTER, 6, clusters, 1)
     interval = paired_mean_difference(differences, plan, 0.95)
     assert interval["estimate"] == 4.0
@@ -94,7 +96,7 @@ def test_pooling_rejects_invalid_seed_values_and_errors() -> None:
 
 @pytest.mark.parametrize("invalid", [math.nan, math.inf])
 def test_paired_and_bootstrap_observations_must_be_finite(invalid: float) -> None:
-    values: NDArray[np.float64] = np.array([0.1, invalid], dtype=np.float64)
+    values = floats([0.1, invalid])
     groups: NDArray[np.int64] = np.arange(2, dtype=np.int64)
     plan = build_resampling(ResamplingUnit.ROW, 2, groups, 1)
     with pytest.raises(ValueError, match=ERR_INVALID_ARGUMENT):
@@ -104,7 +106,7 @@ def test_paired_and_bootstrap_observations_must_be_finite(invalid: float) -> Non
 
 
 def test_pairing_refuses_broadcasting_before_subtraction() -> None:
-    vector: NDArray[np.float64] = np.array([1.0, 2.0, 3.0])
+    vector = floats([1.0, 2.0, 3.0])
     column: NDArray[np.float64] = vector.reshape(3, 1)
     groups: NDArray[np.int64] = np.arange(3, dtype=np.int64)
     plan = build_resampling(ResamplingUnit.ROW, 3, groups, 1)
@@ -126,14 +128,14 @@ def test_paired_mean_refuses_too_few_rows_before_dividing(n_rows: int) -> None:
 
 @pytest.mark.parametrize("invalid", [-1, 2])
 def test_auc_rejects_nonbinary_labels(invalid: int) -> None:
-    labels: NDArray[np.int64] = np.array([0, 0, 1, 1, invalid], dtype=np.int64)
+    labels = ints([0, 0, 1, 1, invalid])
     scores: NDArray[np.float64] = np.arange(5, dtype=np.float64)
     with pytest.raises(ValueError, match="binary values"):
         delong_auc_difference(labels, scores, scores, 0.95)
 
 
 def test_auc_rejects_multidimensional_labels() -> None:
-    labels: NDArray[np.int64] = np.array([[0], [0], [1], [1]], dtype=np.int64)
+    labels: NDArray[np.int64] = ints([0, 0, 1, 1]).reshape(4, 1)
     scores: NDArray[np.float64] = np.arange(4, dtype=np.float64)
     with pytest.raises(ValueError, match="binary values"):
         delong_auc_difference(labels, scores, scores, 0.95)
@@ -141,8 +143,8 @@ def test_auc_rejects_multidimensional_labels() -> None:
 
 @pytest.mark.parametrize("invalid", [-0.01, 1.01, math.nan])
 def test_probability_comparison_does_not_clip_invalid_predictions(invalid: float) -> None:
-    labels: NDArray[np.int64] = np.array([0, 0, 1, 1], dtype=np.int64)
-    scores: NDArray[np.float64] = np.array([0.1, 0.2, 0.8, invalid])
+    labels = ints([0, 0, 1, 1])
+    scores = floats([0.1, 0.2, 0.8, invalid])
     plan = build_resampling(ResamplingUnit.ROW, 4, labels, 1)
     with pytest.raises(ValueError, match=ERR_INVALID_ARGUMENT):
         compare_probabilities(labels, scores, scores, "a", "b", plan, 2, 7, 0.95)
