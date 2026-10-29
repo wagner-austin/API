@@ -88,9 +88,7 @@ def test_compute_auc_random_baseline() -> None:
 
     auc = compute_auc(y_true, y_prob)
 
-    # When all probabilities are identical, AUC depends on tie-breaking
-    # Just verify it's between 0 and 1
-    assert 0.0 <= auc <= 1.0
+    assert auc == 0.5
 
 
 def test_compute_auc_inverted_predictions() -> None:
@@ -103,14 +101,13 @@ def test_compute_auc_inverted_predictions() -> None:
     assert auc == 0.0
 
 
-def test_compute_auc_all_same_class_returns_baseline() -> None:
-    """AUC returns 0.5 when only one class present."""
-    y_true = _make_int_array([1, 1, 1, 1])
+@pytest.mark.parametrize("labels", [[1, 1, 1, 1], [0, 0, 0, 0]])
+def test_compute_auc_single_class_is_undefined(labels: list[int]) -> None:
+    """Undefined evidence cannot become a plausible random-performance score."""
+    y_true = _make_int_array(labels)
     y_prob = _make_float_array([0.5, 0.6, 0.7, 0.8])
-
-    auc = compute_auc(y_true, y_prob)
-
-    assert auc == 0.5
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
+        compute_auc(y_true, y_prob)
 
 
 def test_compute_accuracy_all_correct() -> None:
@@ -452,12 +449,13 @@ def test_compute_average_precision_matches_hand_calculation() -> None:
     assert compute_average_precision(y_true, y_prob) == pytest.approx(expected)
 
 
-def test_compute_average_precision_without_positives_is_zero() -> None:
-    """Undefined without a positive case; reported as 0.0 rather than NaN."""
+def test_compute_average_precision_without_positives_is_refused() -> None:
+    """Undefined evidence is refused before any ranking arithmetic."""
     y_true = _make_int_array([0, 0, 0])
     y_prob = _make_float_array([0.1, 0.5, 0.9])
 
-    assert compute_average_precision(y_true, y_prob) == 0.0
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
+        compute_average_precision(y_true, y_prob)
 
 
 def test_compute_average_precision_all_positives_is_one() -> None:
@@ -508,3 +506,39 @@ def test_compute_brier_score_penalises_overconfidence_at_equal_ranking() -> None
 
     assert compute_auc(y_true, calibrated) == compute_auc(y_true, overconfident)
     assert compute_brier_score(y_true, calibrated) < compute_brier_score(y_true, overconfident)
+
+
+@pytest.mark.parametrize(
+    "case", ["labels_shape", "scores_shape", "length", "binary", "nan", "inf", "empty"]
+)
+def test_auc_refuses_malformed_evidence(case: str) -> None:
+    labels = _make_int_array([1, 0, 1, 0])
+    scores = _make_float_array([0.9, 0.1, 0.8, 0.2])
+    if case == "labels_shape":
+        labels = labels.reshape(4, 1)
+    elif case == "scores_shape":
+        scores = scores.reshape(4, 1)
+    elif case == "length":
+        scores = scores[:-1]
+    elif case == "binary":
+        labels[0] = 2
+    elif case == "nan":
+        scores[0] = math.nan
+    elif case == "inf":
+        scores[0] = math.inf
+    else:
+        labels, scores = labels[:0], scores[:0]
+    with pytest.raises(ValueError, match="CVML-METRIC-001"):
+        compute_auc(labels, scores)
+
+
+@pytest.mark.parametrize("reverse", [False, True])
+def test_average_precision_uses_distinct_score_thresholds(reverse: bool) -> None:
+    labels = _make_int_array([1, 0, 1, 0])
+    scores = _make_float_array([0.8, 0.8, 0.4, 0.1])
+    if reverse:
+        labels, scores = labels[::-1], scores[::-1]
+    # At .8: recall 1/2, precision 1/2. At .4: recall 1, precision 2/3.
+    assert compute_average_precision(labels, scores) == pytest.approx(7 / 12)
+    constant = _make_float_array([0.5, 0.5, 0.5, 0.5])
+    assert compute_average_precision(labels, constant) == 0.5
