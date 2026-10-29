@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from math import isfinite
 
-from platform_core.json_utils import JSONObject, require_float, require_int, require_list
+from platform_core.json_utils import (
+    JSONObject,
+    require_float,
+    require_int,
+    require_list,
+    require_str,
+)
 from typing_extensions import ReadOnly, TypedDict
 
 from .campaign_records import require_digest
@@ -20,6 +26,10 @@ class CrspProtocol(TypedDict):
     returns: ReadOnly[str]
     calendar: ReadOnly[str]
     delists: ReadOnly[str]
+    membership_columns: ReadOnly[tuple[str, ...]]
+    returns_columns: ReadOnly[tuple[str, ...]]
+    calendar_columns: ReadOnly[tuple[str, ...]]
+    delists_columns: ReadOnly[tuple[str, ...]]
     source_sha256: ReadOnly[str]
     history_start: ReadOnly[str]
     train_start: ReadOnly[str]
@@ -59,6 +69,10 @@ def encode_crsp_protocol(record: CrspProtocol) -> JSONObject:
         "returns": record["returns"],
         "calendar": record["calendar"],
         "delists": record["delists"],
+        "membership_columns": list(record["membership_columns"]),
+        "returns_columns": list(record["returns_columns"]),
+        "calendar_columns": list(record["calendar_columns"]),
+        "delists_columns": list(record["delists_columns"]),
         "source_sha256": record["source_sha256"],
         "history_start": record["history_start"],
         "train_start": record["train_start"],
@@ -123,6 +137,28 @@ def _require_codes(document: JSONObject, key: str, expected: tuple[int, ...]) ->
     return values
 
 
+def _require_columns(document: JSONObject, key: str, expected: tuple[str, ...]) -> tuple[str, ...]:
+    """Bind an extraction's exact ordered columns to the implemented field semantics.
+
+    Args:
+        document: Untrusted frozen design.
+        key: Required column list field.
+        expected: Columns consumed by this version of the evaluator.
+
+    Returns:
+        Exact ordered names, suitable for the extraction projection.
+
+    Raises:
+        ValueError: CRSP-001 if any column is absent, added, repeated or reordered.
+    """
+    columns = tuple(
+        require_str({"column": value}, "column") for value in require_list(document, key)
+    )
+    if columns != expected:
+        raise ValueError(f"[CRSP-001] {key} differs from the supported exact column set")
+    return columns
+
+
 def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
     """Refuse ambiguous sources, chronology, costs and unsupported conventions.
 
@@ -164,6 +200,41 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
         returns=_require_fixed(document, "returns", "stkdlysecuritydata"),
         calendar=_require_fixed(document, "calendar", "metaexchangecalendar"),
         delists=_require_fixed(document, "delists", "stkdelists"),
+        membership_columns=_require_columns(
+            document, "membership_columns", ("permno", "namedt", "nameendt", "shrcd", "exchcd")
+        ),
+        returns_columns=_require_columns(
+            document,
+            "returns_columns",
+            (
+                "permno",
+                "dlycaldt",
+                "dlyprevdt",
+                "dlyret",
+                "dlyretmissflg",
+                "dlyretdurflg",
+                "dlydelflg",
+                "dlyprc",
+                "dlyprcflg",
+                "dlyvol",
+            ),
+        ),
+        calendar_columns=_require_columns(
+            document, "calendar_columns", ("caldt", "exchangegroup", "tradingflg")
+        ),
+        delists_columns=_require_columns(
+            document,
+            "delists_columns",
+            (
+                "permno",
+                "delistingdt",
+                "deldlydt",
+                "delamtdt",
+                "delnextdt",
+                "delret",
+                "delretmisstype",
+            ),
+        ),
         source_sha256=require_digest(document, "source_sha256"),
         history_start=history,
         train_start=train,
