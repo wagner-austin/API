@@ -18,12 +18,12 @@ from tests.conftest import World, row
 
 
 def test_is_test_process_matches_the_three_shapes_and_nothing_else() -> None:
-    assert is_test_process(row(1, 0, "poetry.exe", "poetry run pytest -n auto"))
+    assert is_test_process(row(1, 0, "poetry", "poetry run pytest -n auto"))
     assert is_test_process(row(1, 0, "pytest", "pytest tests"))
     assert is_test_process(row(1, 0, "python3.11", 'python -u -c "import sys;exec(eval(...))"'))
-    assert not is_test_process(row(1, 0, "python.exe", "python -m http.server"))
-    assert not is_test_process(row(1, 0, "node.exe", "node pytest-lookalike.js"))
-    assert not is_test_process(row(1, 0, "python.exe", ""))
+    assert not is_test_process(row(1, 0, "python3", "python -m http.server"))
+    assert not is_test_process(row(1, 0, "node", "node pytest-lookalike.js"))
+    assert not is_test_process(row(1, 0, "python3", ""))
 
 
 def test_descendants_are_listed_deepest_first_and_bounded() -> None:
@@ -43,9 +43,9 @@ def test_ancestor_depth_counts_the_chain_and_caps() -> None:
 
 
 def test_in_project_resolves_membership_through_the_ancestry() -> None:
-    launcher = row(1, 0, "poetry.exe", "poetry run pytest", executable="C:/x/procart/.venv/p.exe")
-    worker = row(2, 1, "python.exe", 'python -u -c "exec(eval(sys.stdin.readline()))"')
-    stranger = row(3, 0, "python.exe", "python -m pytest")
+    launcher = row(1, 0, "poetry", "poetry run pytest", executable="/x/procart/.venv/bin/python")
+    worker = row(2, 1, "python3", 'python -u -c "exec(eval(sys.stdin.readline()))"')
+    stranger = row(3, 0, "python3", "python -m pytest")
     by_pid = {1: launcher, 2: worker, 3: stranger}
     assert in_project(by_pid, worker, "procart")
     assert in_project(by_pid, launcher, "procart")
@@ -60,7 +60,7 @@ def test_kill_targets_counts_gone_as_killed_and_alive_refusals_as_failed(world: 
     report = kill_targets([row(1, 0, commit_mb=10), row(2, 0, commit_mb=20), row(3, 0)])
     assert report == {"targets": 3, "killed": 2, "failed": 1, "commit_mb": 130.0}
     assert world.killed == [1, 2, 3]
-    assert world.errors == ["reap: could not kill pid=3 python.exe: refused to kill 3"]
+    assert world.errors == ["reap: could not kill pid=3 python3: refused to kill 3"]
     assert world.lines == ["reap: killed 2, failed 1, ~130 MB commit reclaimed"]
 
 
@@ -68,9 +68,9 @@ def test_reap_descendants_kills_only_test_processes_under_the_root(world: World)
     world.tables = [
         [
             row(4242, 1),
-            row(10, 4242, "poetry.exe", "poetry run pytest"),
+            row(10, 4242, "poetry", "poetry run pytest"),
             row(11, 10),
-            row(12, 10, "node.exe", "node"),
+            row(12, 10, "node", "node"),
         ]
     ]
     report = reap_descendants(4242)

@@ -105,95 +105,6 @@ MAKE_SHELL_FUNCTIONS: Final[Sequence[tuple[str, str]]] = (
     (r"^\s*\.SHELLFLAGS\s*[:?]?=", ".SHELLFLAGS is set only in " + SHELL_INCLUDE),
 )
 
-#: The one conditional that fences platform-specific recipes. Inside the
-#: Windows arm a recipe may use PowerShell, because it runs nowhere else;
-#: the ``else`` arm is portable and checked like any other line. A target
-#: that has no meaning off Windows (Task Scheduler registration) lives in
-#: such a block with an ``else`` arm that says so.
-#:
-#: Kept while two tracked Makefiles still fence a Windows arm,
-#: clients/RustedWarfareBot and services/grandma-api, whose own board tasks
-#: (0eae9619, 703fec5a) decide whether those arms run on loki. The last of
-#: the two to drop its arm deletes this fence and its cases (board task
-#: 3d612cad).
-WINDOWS_CONDITION: Final[re.Pattern[str]] = re.compile(
-    r"^(ifeq|ifneq)\s*\(\s*\$\(OS\)\s*,\s*Windows_NT\s*\)\s*(#.*)?$"
-)
-
-#: Any conditional directive, for the nesting stack.
-CONDITIONAL_OPEN: Final[re.Pattern[str]] = re.compile(r"^(ifeq|ifneq|ifdef|ifndef)\b")
-
-
-class ConditionalFrame(TypedDict):
-    """One open conditional, and whether its current arm is the Windows arm.
-
-    Attributes:
-        windows_first: The first arm is the Windows arm (``ifeq``); for
-            ``ifneq`` it is the ``else`` arm.
-        in_else: Whether the ``else`` has been passed.
-        fences_windows: Whether this conditional is the platform fence at
-            all; any other conditional exempts nothing.
-    """
-
-    windows_first: bool
-    in_else: bool
-    fences_windows: bool
-
-
-def frame_exempt(frame: ConditionalFrame) -> bool:
-    """Whether lines in a frame's current arm are exempt from the recipe grammar.
-
-    Args:
-        frame: The frame.
-
-    Returns:
-        True inside a Windows arm.
-    """
-    return frame["fences_windows"] and (frame["windows_first"] != frame["in_else"])
-
-
-class ConditionalStack:
-    """Tracks conditional nesting while a Makefile is read line by line."""
-
-    def __init__(self) -> None:
-        """Start outside every conditional."""
-        self._frames: list[ConditionalFrame] = []
-
-    def observe(self, line: str) -> bool:
-        """Feed one non-recipe line; consume it when it is a directive.
-
-        Args:
-            line: The line, without its leading tab.
-
-        Returns:
-            True when the line was a conditional directive.
-        """
-        stripped = line.strip()
-        if WINDOWS_CONDITION.match(stripped) is not None:
-            self._frames.append(
-                ConditionalFrame(
-                    windows_first=stripped.startswith("ifeq"), in_else=False, fences_windows=True
-                )
-            )
-            return True
-        if CONDITIONAL_OPEN.match(stripped):
-            self._frames.append(
-                ConditionalFrame(windows_first=False, in_else=False, fences_windows=False)
-            )
-            return True
-        if stripped == "else" and self._frames:
-            self._frames[-1]["in_else"] = True
-            return True
-        if stripped == "endif" and self._frames:
-            self._frames.pop()
-            return True
-        return False
-
-    @property
-    def exempt(self) -> bool:
-        """Whether the current line sits in a Windows arm at any depth."""
-        return any(frame_exempt(frame) for frame in self._frames)
-
 
 class Violation(TypedDict):
     """One line of one Makefile outside the grammar.
@@ -330,19 +241,15 @@ def check_makefile(repo_root: Path, path: Path, text: str) -> list[Violation]:
                 text=include,
             )
         )
-    conditionals = ConditionalStack()
     for number, line in enumerate(lines, start=1):
         if line.startswith("\t"):
-            if not conditionals.exempt:
-                found.extend(check_recipe_line(path, number, line))
+            found.extend(check_recipe_line(path, number, line))
             continue
         stripped = line.strip()
-        if stripped.startswith("#") or conditionals.observe(line):
+        if stripped.startswith("#"):
             continue
         for pattern, rule in MAKE_SHELL_FUNCTIONS:
-            if re.search(pattern, line) and not (
-                conditionals.exempt and rule.startswith("$(shell")
-            ):
+            if re.search(pattern, line):
                 found.append(Violation(path=path, line_number=number, rule=rule, text=stripped))
     return found
 
@@ -379,22 +286,17 @@ def lint_grammar(repo_root: Path) -> tuple[int, list[Violation]]:
 
 
 __all__ = [
-    "CONDITIONAL_OPEN",
     "DIVERGENT",
     "MAKEFILE_PATHSPEC",
     "MAKE_SHELL_FUNCTIONS",
     "POWERSHELL_ONLY",
     "SHELL_INCLUDE",
     "SH_ONLY",
-    "WINDOWS_CONDITION",
-    "ConditionalFrame",
-    "ConditionalStack",
     "Violation",
     "check_makefile",
     "check_recipe_line",
     "expected_include",
     "first_code_line",
-    "frame_exempt",
     "lint_grammar",
     "makefile_depth",
     "recipe_body",

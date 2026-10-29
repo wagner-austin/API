@@ -1,10 +1,8 @@
-"""The launcher: job on Windows, session elsewhere, sweep, token, caps, teardown."""
+"""The Linux launcher: new session, sweep, token, caps and teardown."""
 
 from __future__ import annotations
 
 from pathlib import Path
-
-from platform_core.testing_process_job import FakeJobApi
 
 from maketools.test_run import (
     NO_WORKER_RESTART,
@@ -64,31 +62,6 @@ def test_a_posix_run_starts_its_own_session_sweeps_caps_and_reaps(
     assert world.lines[0] == "run-tests: the suite runs in its own session and is reaped on exit"
     assert world.lines[1].startswith("reap: sweep stale (project '")
     assert world.killed == [50]
-    assert world.job.calls == []
-
-
-def test_a_windows_run_joins_the_job_and_does_not_ask_for_a_session(
-    world: World, tmp_path: Path
-) -> None:
-    world.platform_name = "win32"
-    code = run_tests(tmp_path, [], sweep=False)
-    assert code == 0
-    assert world.job.calls == ["create", "set", "assign"]
-    assert world.inheriting_calls[0]["new_session"] is False
-    assert (
-        world.lines[0] == "run-tests: joined kill-on-close job object (tree dies with this process)"
-    )
-    assert not any(line.startswith("reap: sweep") for line in world.lines)
-
-
-def test_a_windows_run_refuses_when_the_job_cannot_be_joined(world: World, tmp_path: Path) -> None:
-    world.platform_name = "win32"
-    world.job = FakeJobApi(handle=0)
-    assert run_tests(tmp_path, [], sweep=False) == 1
-    assert world.inheriting_calls == []
-    assert world.errors == [
-        "run-tests: could not join a kill-on-close job object: CreateJobObject returned NULL"
-    ]
 
 
 def test_this_runs_coverage_files_are_removed_after_the_suite(world: World, tmp_path: Path) -> None:

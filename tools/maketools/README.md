@@ -48,29 +48,23 @@ quotes around an argument. Banned, and refused by `lint-makefiles`:
 | `echo` whose text is not in double quotes (`@echo 'x'`, `@echo x`) | GNU Make 3.81 on serendipity runs a line holding no `"` or other shell character as a program, and `echo` is not one |
 | `SHELL :=`, `.SHELLFLAGS`, `$(shell ...)` outside `shell.mk` | the platform shell leaking into a Makefile |
 
-One fence is allowed: inside `ifeq ($(OS),Windows_NT)` ... `else` ... `endif`
-the Windows arm may use PowerShell, because a target that registers a Task
-Scheduler job has no meaning elsewhere; the `else` arm is checked like any
-other line and defines the same names so a Linux host gets a refusal that
-says why. Only `clients/RustedWarfareBot` and `services/grandma-api` still
-fence an arm, and their board tasks (`0eae9619`, `703fec5a`) decide whether
-it runs on loki; the last of the two to drop its arm deletes the fence.
+Conditional branches no longer exempt recipes or shell functions from the
+grammar. Both sides are checked, including historical Windows fences.
 
 ## The Windows arms were loki's
 
-loki was the last Windows fleet node, and its runner ran this package for
-the projects that required `windows`: `tools/fleet-execution`'s
-`test --host-execution` and `tools/ps-harness`'s `lint-makefiles` and
-`ps-harness`. Both projects, the `ps-harness` command and loki's place in
-dispatch left on 2026-10-25 (board task `e705f08c`; the operator: "so no
-windows shit then ok"). The launcher's job object, the CIM process table
-and the SIGTERM kill, each commented as loki's, now run on no node, and
-their removal is filed as board task `11a47bc4`. This
-package's own check requires no tag, and `windows` is an exclusive dispatch
-tag, so the check runs on Linux nodes only and its suite carries no `win32`
-arm: it walks loki's arms through the seams. Every other Windows arm went
-(board task `3d612cad`): no Windows node carries `rust`, so the uv venv
-commands read a Linux venv's `bin` only.
+The remaining Windows launcher and process-table arms were retained for
+Loki's former Windows installation. Loki now runs Linux, and board task
+`11a47bc4` removes the job-object binding, PowerShell/CIM snapshot, Windows
+signal choice and executable-suffix normalization. The launcher always starts
+a new process session and reaps descendants on exit; the pre-run sweep handles
+wreckage left by an uncatchable launcher kill. Real Linux process and failure
+tests remain in the suite.
+
+Neither RustedWarfareBot nor grandma-api keeps a Windows Makefile fence, so
+the grammar's conditional exemption and its state machine are removed too.
+This package change does not claim retirement of API's remaining standalone
+Windows CI workflows or other callers of platform_core's Windows APIs.
 
 ## The commands
 
@@ -79,7 +73,7 @@ commands read a Linux venv's `bin` only.
 | `align --repo PATH --commit SHA [--drop SHA,SHA]` | move a main checkout (this one, or a peer such as a session host's `../corvis-stick`) to a commit its origin's default branch contains, read from `origin/HEAD`; the route `make align-commit [REPO=<path>]` takes because the hub's hook refuses hand-run git verbs that move a checkout with linked trees; a local commit the target carries (patch-equivalent, or every path's blob equal) is dropped and named, one it does not carry is refused unless `--drop` names it, and tracked dirt or an untracked path the target tracks refuses the move |
 | `venv-check` | remove `.venv` when `poetry run mypy --version` cannot answer, so the `poetry sync` that follows builds a fresh one |
 | `guard` | run `poetry run python -m scripts.guard` when the package has a shim; say "not applicable, 0 rules run" when it has none |
-| `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a kill-on-close job object on Windows (loki), a new session and a descendant reap on POSIX, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
+| `test [--no-sweep] [pytest args...]` | the shared launcher, the port of `scripts/run-tests.ps1`: a new Linux session and a descendant reap, the pre-run sweep, `--max-worker-restart=0`, a per-run `COVERAGE_FILE` under `runs/` with a cleanup scoped to that token, and one BLAS thread per worker |
 | `reap-stale [--older-than-minutes N]` | the standalone sweep, the port of `scripts/reap-test-processes.ps1`: candidates older than N minutes whose ancestry names this project, reaped only when the whole set is idle across a 5-second CPU sample |
 | `lint-makefiles` | the grammar, the pass-banner rule and the budget rule over every tracked Makefile |
 | `check-budget` | run this package's `_check-unbudgeted` and time it: print `CHECK BUDGET` with its seconds, or exit 3 with a `CHECK OVER BUDGET` block when it passed but took over 300 s (below) |
@@ -126,8 +120,6 @@ the first (board task `28e47ae3`): on sedona at `c20080a69` its tests took
 
 ## Where the process table comes from
 
-The reaper's questions are the same on both platforms; the source differs.
-Windows (loki) answers through PowerShell's `Get-CimInstance Win32_Process`,
-rendered as JSON rows; Linux answers from `/proc`. Each reader takes its
-input through a seam (the command runner, a `/proc` root), so the parsing is
-exercised by the suite on the platform that cannot produce the real input.
+The reaper reads Linux `/proc`. Its parser accepts a proc root and a row
+reader through dependency injection; tests exercise real process discovery,
+termination, vanished processes and permission failures.

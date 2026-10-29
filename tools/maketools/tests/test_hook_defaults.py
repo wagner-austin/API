@@ -104,10 +104,6 @@ def test_draw_stays_inside_the_inclusive_range_and_covers_it() -> None:
     assert seen == {1, 2, 3}
 
 
-def test_platform_is_the_interpreters() -> None:
-    assert _test_hooks.platform() == sys.platform
-
-
 def test_the_writers_reach_the_streams(capsys: pytest.CaptureFixture[str]) -> None:
     _test_hooks.write_line("to stdout")
     _test_hooks.write_error("to stderr")
@@ -170,12 +166,6 @@ def test_tracked_files_asks_git_and_refuses_outside_a_repository(tmp_path: Path)
 
 def test_the_linux_table_reader_reads_the_real_proc_root() -> None:
     assert any(r["pid"] == _test_hooks.process_id() for r in _test_hooks._linux_table())
-
-
-def test_the_windows_table_reader_has_no_powershell_off_windows() -> None:
-    """loki's reader, run where this suite runs: a Linux node has no powershell."""
-    with pytest.raises(FileNotFoundError):
-        _test_hooks._windows_table()
 
 
 def test_the_launcher_runs_as_a_child_and_forwards_the_exit_code(tmp_path: Path) -> None:

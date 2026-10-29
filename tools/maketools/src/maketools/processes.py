@@ -1,17 +1,4 @@
-"""One shape for a process on either platform, and the two readers that fill it.
-
-The reaper's questions -- who is whose child, how old is it, is it burning
-CPU, how much commit does it hold -- are the same on both platforms; only
-the source differs. Windows answers through the CIM ``Win32_Process`` class,
-asked by PowerShell and returned as JSON, because nothing in the standard
-library reads a Windows process's parent, command line or CPU time. Linux
-answers from ``/proc``. Each reader takes its source through a parameter (a
-command runner, a ``/proc`` root) so the parsing is exercised on the
-platform that cannot produce the real input.
-
-THE WINDOWS READER IS LOKI'S. loki is the one Windows fleet node kept, and
-its runner's test launcher sweeps and reaps through this reader (board task
-3d612cad); the ``.exe`` names and ``Scripts`` paths below are its rows.
+"""The Linux process rows read by the test launcher and reaper.
 
 WHY ``/proc`` AND NOT ``ps``. ``ps`` output is a table for people, with
 columns that wrap and a command line that ``ps`` truncates and re-quotes;
@@ -20,24 +7,12 @@ columns that wrap and a command line that ``ps`` truncates and re-quotes;
 
 from __future__ import annotations
 
-import base64
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Final, Protocol, TypedDict
 
 from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
-from platform_core.json_utils import (
-    JSONValue,
-    load_json_str,
-    narrow_json_to_dict,
-    narrow_json_to_list,
-    require_float,
-    require_int,
-    require_str,
-)
-
-from maketools.commands import RunCapturingProtocol
 
 
 class ProcessRow(TypedDict):
@@ -46,17 +21,16 @@ class ProcessRow(TypedDict):
     Attributes:
         pid: The process id.
         parent_pid: Its parent's id at the time of the snapshot.
-        name: The executable's basename (``python.exe``, ``python3.11``).
+        name: The executable's basename (``python3``, ``python3.11``).
         command_line: The full command line, space-joined; empty when the
             platform would not show it.
         executable: The executable's path; empty when unknown. On Linux this
             is the command line's first word, which is what a venv
             interpreter's path is and is all the project test needs.
-        created_unix: When it started, seconds since the epoch; 0 when the
-            platform has no answer (the Windows idle process).
+        created_unix: When it started, seconds since the epoch, derived
+            from the boot instant and the process's start ticks.
         cpu_seconds: User plus kernel CPU time so far.
-        commit_mb: Committed memory in MiB (page-file usage on Windows,
-            ``VmSize`` on Linux).
+        commit_mb: Virtual memory in MiB, read from Linux ``VmSize``.
     """
 
     pid: int
@@ -76,81 +50,6 @@ LINUX_PROC_ROOT: Final[Path] = Path("/proc")
 #: the kernel's userspace ABI on every architecture Linux runs on; it is not
 #: the scheduler's ``HZ``, so it is written as the constant it is.
 LINUX_CLOCK_TICKS: Final[int] = 100
-
-#: The PowerShell program that renders every process as one JSON row in the
-#: shape :class:`ProcessRow` expects. Sent encoded so no shell between here
-#: and PowerShell reads its quotes. ``-InputObject`` on the array literal
-#: keeps a one-process answer an array rather than a bare object. A null
-#: ``CreationDate`` (the idle process) becomes 0 rather than an error.
-WINDOWS_SNAPSHOT_SCRIPT: Final[str] = (
-    "$rows = @(Get-CimInstance Win32_Process | ForEach-Object { [pscustomobject]@{"
-    " pid = [int]$_.ProcessId; parent_pid = [int]$_.ParentProcessId;"
-    " name = [string]$_.Name; command_line = [string]$_.CommandLine;"
-    " executable = [string]$_.ExecutablePath;"
-    " created_unix = $(if ($null -eq $_.CreationDate) { 0.0 } else {"
-    " [double]((($_.CreationDate).ToUniversalTime() - [datetime]'1970-01-01').TotalSeconds) });"
-    " cpu_seconds = [double](([int64]$_.UserModeTime + [int64]$_.KernelModeTime) / 10000000);"
-    " commit_mb = [double]($_.PageFileUsage / 1024) } });"
-    " ConvertTo-Json -InputObject $rows -Compress"
-)
-
-
-def windows_snapshot_argv() -> Sequence[str]:
-    """The command that runs :data:`WINDOWS_SNAPSHOT_SCRIPT`.
-
-    Returns:
-        ``powershell -NoProfile -EncodedCommand <base64 of UTF-16LE>``.
-    """
-    encoded = base64.b64encode(WINDOWS_SNAPSHOT_SCRIPT.encode("utf-16-le")).decode("ascii")
-    return ("powershell", "-NoProfile", "-NonInteractive", "-EncodedCommand", encoded)
-
-
-def decode_process_row(value: JSONValue) -> ProcessRow:
-    """Narrow one decoded JSON row.
-
-    Args:
-        value: The row.
-
-    Returns:
-        The row.
-
-    Raises:
-        JSONTypeError: On any field missing or of the wrong type.
-    """
-    row = narrow_json_to_dict(value)
-    return ProcessRow(
-        pid=require_int(row, "pid"),
-        parent_pid=require_int(row, "parent_pid"),
-        name=require_str(row, "name"),
-        command_line=require_str(row, "command_line"),
-        executable=require_str(row, "executable"),
-        created_unix=require_float(row, "created_unix"),
-        cpu_seconds=require_float(row, "cpu_seconds"),
-        commit_mb=require_float(row, "commit_mb"),
-    )
-
-
-def windows_process_table(run: RunCapturingProtocol) -> Sequence[ProcessRow]:
-    """Snapshot the Windows process table, which loki's runner reads.
-
-    Args:
-        run: The command runner that executes PowerShell.
-
-    Returns:
-        Every process the CIM query returned.
-
-    Raises:
-        AppError: ``MAKETOOLS_PROCESS_TABLE`` when PowerShell exits non-zero.
-        InvalidJsonError: When its answer is not JSON.
-        JSONTypeError: When its answer is not an array of rows.
-    """
-    result = run(windows_snapshot_argv(), cwd=Path.cwd())
-    if result["returncode"] != 0:
-        raise AppError(
-            MaketoolsErrorCode.PROCESS_TABLE,
-            f"the process snapshot exited {result['returncode']}: {result['stderr'].strip()}",
-        )
-    return [decode_process_row(row) for row in narrow_json_to_list(load_json_str(result["stdout"]))]
 
 
 def linux_boot_unix(proc_root: Path) -> float:
@@ -279,14 +178,10 @@ def linux_process_table(proc_root: Path, read_row: ReadRowProtocol) -> Sequence[
 __all__ = [
     "LINUX_CLOCK_TICKS",
     "LINUX_PROC_ROOT",
-    "WINDOWS_SNAPSHOT_SCRIPT",
     "ProcessRow",
     "ReadRowProtocol",
-    "decode_process_row",
     "linux_boot_unix",
     "linux_commit_mb",
     "linux_process_row",
     "linux_process_table",
-    "windows_process_table",
-    "windows_snapshot_argv",
 ]

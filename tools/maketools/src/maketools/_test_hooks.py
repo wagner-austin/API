@@ -10,23 +10,6 @@ STANDARD LIBRARY ONLY. The Makefiles launch this package with the SYSTEM
 interpreter before poetry has synced anything, so nothing here may import
 ``platform_core``: the seam is spelled out in full rather than lifted from
 ``fleet.core._test_hooks``, which is otherwise its model.
-
-THE PLATFORM IS A HOOK, and that is what lets one suite cover both arms of
-the launcher on either machine. ``platform`` answers ``sys.platform``; the
-launcher branches on it once, and a test rebinds it to walk the arm the
-machine it runs on would not take. The two real process-table readers are
-bound by a conditional EXPRESSION rather than an ``if`` statement so that
-the binding line carries no branch the other platform cannot execute, and
-each reader takes its input through a seam (the command runner, a ``/proc``
-root) so its parsing is exercised everywhere.
-
-EVERY WINDOWS ARM HERE IS LOKI'S. loki is the one Windows fleet node the
-operator keeps (2026-10-21: "we should keep loki in the fleet. as
-windows."), and its runner runs this launcher: tools/fleet-execution's
-``test --host-execution`` joins the job object and reads the CIM process
-table there (its log of 2026-10-21, board task 3d612cad). This package's
-own check needs no Windows tag, so it runs on Linux nodes only, and the
-suite covers loki's arms through the seams above.
 """
 
 from __future__ import annotations
@@ -42,8 +25,6 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Final, Protocol
 
-from platform_core.process_job import JobApi, kernel32_job_api
-
 from maketools.commands import (
     CommandResult,
     RunCapturingProtocol,
@@ -56,7 +37,6 @@ from maketools.processes import (
     ProcessRow,
     linux_process_row,
     linux_process_table,
-    windows_process_table,
 )
 
 
@@ -104,18 +84,6 @@ class EnvironProtocol(Protocol):
 
         Returns:
             A copy; mutating it changes nothing.
-        """
-        ...
-
-
-class PlatformProtocol(Protocol):
-    """Names the platform."""
-
-    def __call__(self) -> str:
-        """Name it.
-
-        Returns:
-            ``sys.platform``: ``win32``, ``linux``, ``darwin``.
         """
         ...
 
@@ -223,18 +191,6 @@ class DrawProtocol(Protocol):
 
         Returns:
             An integer in ``[low, high]``.
-        """
-        ...
-
-
-class JobApiFactoryProtocol(Protocol):
-    """Binds the Windows job-object calls."""
-
-    def __call__(self) -> JobApi:
-        """Bind them.
-
-        Returns:
-            The API.
         """
         ...
 
@@ -368,24 +324,6 @@ def _default_environ() -> dict[str, str]:
     return dict(os.environ)
 
 
-def _default_platform() -> str:
-    """Name the real platform.
-
-    Returns:
-        ``sys.platform``.
-    """
-    return sys.platform
-
-
-def _windows_table() -> Sequence[ProcessRow]:
-    """Snapshot the process table through PowerShell's CIM query, on loki.
-
-    Returns:
-        The rows.
-    """
-    return windows_process_table(run_capturing)
-
-
 def _linux_table() -> Sequence[ProcessRow]:
     """Snapshot the process table from ``/proc``.
 
@@ -400,15 +338,12 @@ def _default_kill(pid: int) -> None:
 
     ``SIGKILL`` on Linux, because a wedged xdist worker blocked in
     ``sys.stdin.readline()`` is the thing being reaped and a catchable
-    signal is a request it will not answer. ``SIGTERM`` on loki, where
-    ``os.kill`` maps every signal to ``TerminateProcess`` and ``SIGKILL`` is
-    not defined; the expression reads ``signal.SIGKILL`` only off win32.
+    signal is a request it will not answer.
 
     Args:
         pid: The process.
     """
-    # The win32 arm is loki's runner's: its reap kills with SIGTERM.
-    os.kill(pid, signal.SIGKILL if sys.platform != "win32" else signal.SIGTERM)
+    os.kill(pid, signal.SIGKILL)
 
 
 def _default_process_alive(pid: int) -> bool:
@@ -501,14 +436,7 @@ sleep: SleepProtocol = _default_sleep
 write_line: WriteLineProtocol = _default_write_line
 write_error: WriteLineProtocol = _default_write_error
 environ: EnvironProtocol = _default_environ
-platform: PlatformProtocol = _default_platform
-# A conditional expression, not an ``if``: the line has no branch a suite on
-# the other platform would leave uncovered, and both readers are exercised
-# through their own seams. The win32 arm is loki's runner's.
-_default_process_table: ProcessTableProtocol = (
-    _windows_table if sys.platform == "win32" else _linux_table
-)
-_default_job_api: JobApiFactoryProtocol = kernel32_job_api
+_default_process_table: ProcessTableProtocol = _linux_table
 process_table: ProcessTableProtocol = _default_process_table
 kill: KillProtocol = _default_kill
 process_alive: ProcessAliveProtocol = _default_process_alive
@@ -518,7 +446,6 @@ process_id: ProcessIdProtocol = _default_process_id
 token: TokenProtocol = _default_token
 draw: DrawProtocol = _default_draw
 tracked_files: TrackedFilesProtocol = _default_tracked_files
-job_api: JobApiFactoryProtocol = _default_job_api
 
 
 __all__ = [
@@ -526,10 +453,8 @@ __all__ = [
     "CommandResult",
     "DrawProtocol",
     "EnvironProtocol",
-    "JobApiFactoryProtocol",
     "KillProtocol",
     "NowProtocol",
-    "PlatformProtocol",
     "ProcessAliveProtocol",
     "ProcessIdProtocol",
     "ProcessTableProtocol",
@@ -544,10 +469,8 @@ __all__ = [
     "WriteLineProtocol",
     "draw",
     "environ",
-    "job_api",
     "kill",
     "now",
-    "platform",
     "process_alive",
     "process_id",
     "process_table",

@@ -20,8 +20,6 @@ from pathlib import Path
 from typing import TypedDict
 
 import pytest
-from platform_core.process_job import JobApi
-from platform_core.testing_process_job import FakeJobApi
 
 from maketools import _test_hooks
 from maketools.commands import CommandResult
@@ -79,7 +77,7 @@ def failed(returncode: int, stderr: str) -> CommandResult:
 def row(
     pid: int,
     parent_pid: int,
-    name: str = "python.exe",
+    name: str = "python3",
     command_line: str = "python -m pytest",
     *,
     executable: str = "",
@@ -127,7 +125,6 @@ class World:
         lines: Every stdout line.
         errors: Every stderr line.
         environment: What ``environ`` answers.
-        platform_name: What ``platform`` answers.
         tables: Process snapshots, consumed one per ``process_table`` call;
             the last one repeats.
         killed: Every pid ``kill`` received.
@@ -138,7 +135,6 @@ class World:
         pid: What ``process_id`` answers.
         token_value: What ``token`` answers.
         tracked: What ``tracked_files`` answers.
-        job: What ``job_api`` answers.
     """
 
     def __init__(self) -> None:
@@ -153,7 +149,6 @@ class World:
         self.lines: list[str] = []
         self.errors: list[str] = []
         self.environment: dict[str, str] = {"PATH": "/bin"}
-        self.platform_name = "linux"
         self.tables: list[list[ProcessRow]] = [[]]
         self.killed: list[int] = []
         self.refuse_kill: set[int] = set()
@@ -165,7 +160,6 @@ class World:
         self.drawn = 27777
         self.draws: list[tuple[int, int]] = []
         self.tracked: list[Path] = []
-        self.job = FakeJobApi()
 
     def run_inheriting(
         self,
@@ -211,9 +205,6 @@ class World:
     def environ(self) -> dict[str, str]:
         return dict(self.environment)
 
-    def platform(self) -> str:
-        return self.platform_name
-
     def process_table(self) -> Sequence[ProcessRow]:
         if len(self.tables) > 1:
             return self.tables.pop(0)
@@ -247,9 +238,6 @@ class World:
     def tracked_files(self, repo_root: Path, pathspec: str) -> Sequence[Path]:
         return [repo_root / path for path in self.tracked]
 
-    def job_api(self) -> JobApi:
-        return self.job
-
     def bind(self) -> None:
         """Point every hook at this world."""
         _test_hooks.run_inheriting = self.run_inheriting
@@ -259,7 +247,6 @@ class World:
         _test_hooks.write_line = self.write_line
         _test_hooks.write_error = self.write_error
         _test_hooks.environ = self.environ
-        _test_hooks.platform = self.platform
         _test_hooks.process_table = self.process_table
         _test_hooks.kill = self.kill
         _test_hooks.process_alive = self.process_alive
@@ -269,7 +256,6 @@ class World:
         _test_hooks.token = self.token
         _test_hooks.draw = self.draw
         _test_hooks.tracked_files = self.tracked_files
-        _test_hooks.job_api = self.job_api
 
 
 def restore_defaults() -> None:
@@ -282,7 +268,6 @@ def restore_defaults() -> None:
     _test_hooks.write_line = _test_hooks._default_write_line
     _test_hooks.write_error = _test_hooks._default_write_error
     _test_hooks.environ = _test_hooks._default_environ
-    _test_hooks.platform = _test_hooks._default_platform
     _test_hooks.process_table = _test_hooks._default_process_table
     _test_hooks.kill = _test_hooks._default_kill
     _test_hooks.process_alive = _test_hooks._default_process_alive
@@ -292,7 +277,6 @@ def restore_defaults() -> None:
     _test_hooks.token = _test_hooks._default_token
     _test_hooks.draw = _test_hooks._default_draw
     _test_hooks.tracked_files = _test_hooks._default_tracked_files
-    _test_hooks.job_api = _test_hooks._default_job_api
 
 
 @pytest.fixture()

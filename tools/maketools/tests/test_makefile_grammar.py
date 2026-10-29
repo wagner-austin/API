@@ -157,29 +157,26 @@ endif
 )
 
 
-def test_the_windows_arm_of_the_platform_fence_may_use_powershell(repo: Path) -> None:
-    assert check_makefile(repo, repo / "libs" / "Makefile", FENCED) == []
+@pytest.mark.parametrize("condition", ["ifeq", "ifneq"])
+def test_platform_conditions_no_longer_exempt_recipes(repo: Path, condition: str) -> None:
+    text = FENCED.replace("ifeq", condition)
+    rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", text)]
+    assert rules == [
+        "cmdlet parameter",
+        "powershell invocation",
+        "PowerShell script",
+        "backslash path separator",
+        "cmdlet",
+        "cmdlet parameter",
+        "cmdlet",
+        "cmdlet parameter",
+    ]
 
 
-def test_the_else_arm_of_the_platform_fence_is_checked(repo: Path) -> None:
-    text = FENCED.replace(
-        '\t@echo "register is Windows-only"', '\t@Write-Host "nope" -ForegroundColor Red'
-    )
+def test_shell_functions_are_checked_in_both_conditional_arms(repo: Path) -> None:
+    text = PORTABLE + "ifeq ($(OS),Windows_NT)\nX := $(shell dir)\nelse\nX := $(shell ls)\nendif\n"
     violations = check_makefile(repo, repo / "libs" / "Makefile", text)
-    assert [v["rule"] for v in violations] == ["cmdlet", "cmdlet parameter"]
-    assert violations[0]["text"] == 'Write-Host "nope" -ForegroundColor Red'
-
-
-def test_an_ifneq_fence_exempts_its_else_arm_instead(repo: Path) -> None:
-    text = PORTABLE + (
-        'ifneq ($(OS),Windows_NT)\nx:\n\t@echo "portable"\nelse\nx:\n\t@Write-Host win\nendif\n'
-    )
-    assert check_makefile(repo, repo / "libs" / "Makefile", text) == []
-    swapped = PORTABLE + (
-        'ifneq ($(OS),Windows_NT)\nx:\n\t@Write-Host win\nelse\nx:\n\t@echo "portable"\nendif\n'
-    )
-    rules = [v["rule"] for v in check_makefile(repo, repo / "libs" / "Makefile", swapped)]
-    assert rules == ["cmdlet"]
+    assert [v["text"] for v in violations] == ["X := $(shell dir)", "X := $(shell ls)"]
 
 
 def test_a_conditional_that_is_not_the_platform_fence_exempts_nothing(repo: Path) -> None:
@@ -188,14 +185,7 @@ def test_a_conditional_that_is_not_the_platform_fence_exempts_nothing(repo: Path
     assert rules == ["cmdlet", "cmdlet"]
 
 
-def test_the_shell_function_is_allowed_only_inside_the_windows_arm(repo: Path) -> None:
-    text = PORTABLE + "ifeq ($(OS),Windows_NT)\nX := $(shell dir)\nelse\nX := $(shell ls)\nendif\n"
-    (violation,) = check_makefile(repo, repo / "libs" / "Makefile", text)
-    assert violation["text"] == "X := $(shell ls)"
-
-
-def test_the_file_function_is_banned_even_inside_the_windows_arm(repo: Path) -> None:
-    """serendipity's make 3.81 is a Windows make, so the fence exempts nothing."""
+def test_the_file_function_is_banned_inside_conditionals(repo: Path) -> None:
     text = PORTABLE + "PIN := $(file <.githooks/mcps-harness.sha)\n"
     fenced = PORTABLE + "ifeq ($(OS),Windows_NT)\nPIN := $(file <pin.sha)\nendif\n"
     for case in (text, fenced):
@@ -203,7 +193,7 @@ def test_the_file_function_is_banned_even_inside_the_windows_arm(repo: Path) -> 
         assert violation["rule"] == "$(file ...) needs GNU make 4.0 (3.81 reads it as nothing)"
 
 
-def test_the_shell_variable_stays_banned_inside_the_windows_arm(repo: Path) -> None:
+def test_the_shell_variable_stays_banned_inside_conditionals(repo: Path) -> None:
     text = PORTABLE + "ifeq ($(OS),Windows_NT)\nSHELL := pwsh\nendif\n"
     (violation,) = check_makefile(repo, repo / "libs" / "Makefile", text)
     assert violation["rule"] == "SHELL is set only in scripts/make/shell.mk"
