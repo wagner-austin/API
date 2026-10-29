@@ -62,7 +62,7 @@ from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
 from fleet.contracts.machine import LedgerObserver, Machine
-from fleet.core import dialect, queue, remote
+from fleet.core import dialect, native_observe, queue, remote
 
 #: What the script is called on the node, before the dialect's extension,
 #: under the provisioned account's ``.fleet`` directory -- the same
@@ -356,7 +356,13 @@ def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> 
         for record in sessions["records"]
     ]
     detail = queue.observe_sessions(
-        board, machine=machine, observations=observations, identity=identity
+        board,
+        machine=machine,
+        observations=observations,
+        identity=identity,
+        native_observations=native_observe.observe_codex(
+            board, node["name"], user, machine, identity
+        ),
     )
     return NodeOutcome(node=node["name"], recorded=True, detail=detail)
 

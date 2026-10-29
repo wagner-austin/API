@@ -338,6 +338,7 @@ def observe_sessions(
     *,
     machine: str,
     observations: list[JSONValue],
+    native_observations: list[JSONValue],
     identity: JSONObject,
 ) -> str:
     """Record one node's session records in the board's session ledger.
@@ -361,7 +362,12 @@ def observe_sessions(
     Raises:
         AppError: Any transport or contract failure from the underlying call.
     """
-    arguments: JSONObject = {"machine": machine, "observations": observations, **identity}
+    arguments: JSONObject = {
+        "machine": machine,
+        "observations": observations,
+        "nativeObservations": native_observations,
+        **identity,
+    }
     return call_mcp_tool(_test_hooks.http_post, credentials, "task_session_observe", arguments)
 
 

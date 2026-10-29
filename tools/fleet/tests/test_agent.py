@@ -409,6 +409,9 @@ class TestObservingSessions:
             [
                 NOTHING_HELD,
                 dump_json_str({"claimed": None}),
+                dump_json_str(
+                    {"rows": [], "pagination": {"offset": 0, "limit": 200, "hasMore": False}}
+                ),
                 "observed 0 session(s) for win32:serendipity (0 new row(s)) at t",
             ]
         )
@@ -416,7 +419,12 @@ class TestObservingSessions:
 
         agent.main(agent_argv(_registry(tmp_path), repo))
 
-        assert endpoint.tools == ["dispatch_list", "dispatch_claim", "task_session_observe"]
+        assert endpoint.tools == [
+            "dispatch_list",
+            "dispatch_claim",
+            "task_sessions_list",
+            "task_session_observe",
+        ]
         assert endpoint.arguments[2]["machine"] == "win32:serendipity"
         assert endpoint.arguments[2]["agent"] == "fleet-hub-diphtheria"
 

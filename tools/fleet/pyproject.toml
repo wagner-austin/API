@@ -23,6 +23,7 @@ platform-core = { path = "../../libs/platform_core", develop = true }
 # real node when it did not.
 monorepo-guards = { path = "../../libs/monorepo_guards", develop = true }
 board-watch = {path = "../board-watch", develop = true}
+websockets = ">=15,<18"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^9.1.1"

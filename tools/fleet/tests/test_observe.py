@@ -34,6 +34,12 @@ UPDATED_MS = 1_789_000_030_500
 
 #: Where the observe script lands under the fleet's account on every node.
 SCRIPT_PATH = "/home/corvis/.fleet/observe-sessions.sh"
+EMPTY_IDENTITIES = dump_json_str(
+    {
+        "rows": [],
+        "pagination": {"offset": 0, "limit": 200, "hasMore": False},
+    }
+)
 
 
 def harness_record(*, without: tuple[str, ...] = (), **overrides: JSONValue) -> JSONObject:
@@ -294,7 +300,9 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
     document spells."""
     run = FakeRun([ok(""), ok(document(harness_record()))])
     _test_hooks.run = run
-    board = FakeQueue(["observed 1 session(s) for linux:colossus (1 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 1 session(s) for linux:colossus (1 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(BOARD, node("colossus", "worker"), IDENTITY)
@@ -313,7 +321,7 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
         dialect.WRITE_COMMAND.format(path=SCRIPT_PATH),
     )
     assert run.calls[1] == ("ssh", *SSH_OPTIONS, "colossus", *dialect.SH_INVOCATION, SCRIPT_PATH)
-    assert board.tools == ["task_session_observe"]
+    assert board.tools == ["task_sessions_list", "task_session_observe"]
     expected_observation: JSONObject = {
         "sessionId": SESSION,
         "pid": 4242,
@@ -329,22 +337,28 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
     expected_arguments: JSONObject = {
         "machine": MACHINE,
         "observations": [expected_observation],
+        "nativeObservations": [],
         **IDENTITY,
     }
-    assert board.arguments == [expected_arguments]
+    assert board.arguments == [
+        {**IDENTITY, "machine": MACHINE, "format": "json", "limit": 200, "offset": 0},
+        expected_arguments,
+    ]
 
 
 def test_observe_node_records_an_empty_pass_for_a_node_with_no_sessions() -> None:
     """Zero records is a fact worth recording: the machine answered and is idle."""
     _test_hooks.run = FakeRun([ok(""), ok(document(hostname="lacrymal"))])
-    board = FakeQueue(["observed 0 session(s) for linux:lacrymal (0 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 0 session(s) for linux:lacrymal (0 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(BOARD, node("lacrymal", "worker"), IDENTITY)
 
     assert outcome["recorded"] is True
     assert board.arguments[0]["machine"] == "linux:lacrymal"
-    assert board.arguments[0]["observations"] == []
+    assert board.arguments[1]["observations"] == []
 
 
 def test_observe_node_keys_a_2_1_294_node_by_its_hostname() -> None:
@@ -358,7 +372,9 @@ def test_observe_node_keys_a_2_1_294_node_by_its_hostname() -> None:
         ]
     )
     _test_hooks.run = run
-    board = FakeQueue(["observed 1 session(s) for linux:diphtheria (1 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 1 session(s) for linux:diphtheria (1 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY)
@@ -378,7 +394,9 @@ def test_observe_node_records_a_node_that_has_never_run_claude_code() -> None:
     _test_hooks.run = FakeRun(
         [ok(""), ok(document(hostname="diphtheria", pid_domain=DIPHTHERIA_PID_DOMAIN))]
     )
-    board = FakeQueue(["observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
 
     outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY)
@@ -386,7 +404,10 @@ def test_observe_node_records_a_node_that_has_never_run_claude_code() -> None:
     assert observe.render_outcome(outcome) == (
         "diphtheria: observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"
     )
-    assert board.arguments == [{"machine": "linux:diphtheria", "observations": [], **IDENTITY}]
+    assert board.arguments == [
+        {**IDENTITY, "machine": "linux:diphtheria", "format": "json", "limit": 200, "offset": 0},
+        {"machine": "linux:diphtheria", "observations": [], "nativeObservations": [], **IDENTITY},
+    ]
 
 
 def test_observe_node_reports_an_unreachable_node_as_an_outcome() -> None:
@@ -414,7 +435,9 @@ def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
     node after it instead of holding the tick."""
     run = FakeRun([timed_out(120), ok(""), ok(document(harness_record()))])
     _test_hooks.run = run
-    board = FakeQueue(["observed 1 session(s) for linux:colossus (0 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 1 session(s) for linux:colossus (0 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
     machines = (node("pendragon", "worker"), node("colossus", "worker"))
 
@@ -425,7 +448,7 @@ def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
         f"{SCRIPT_PATH}: timed out after 120 s",
         "colossus: observed 1 session(s) for linux:colossus (0 new row(s)) at t",
     ]
-    assert [a["machine"] for a in board.arguments] == ["linux:colossus"]
+    assert [a["machine"] for a in board.arguments] == ["linux:colossus", "linux:colossus"]
     # Every ssh the pass made carried the deadline that ended the first one.
     assert run.timeouts == [remote.SSH_TIMEOUT_SECONDS] * 3
 
@@ -460,7 +483,9 @@ def test_observe_pass_visits_enabled_fleet_arm_machines_in_name_order() -> None:
     )
     board = FakeQueue(
         [
+            EMPTY_IDENTITIES,
             "observed 1 session(s) for linux:colossus (0 new row(s)) at t",
+            EMPTY_IDENTITIES,
             "observed 0 session(s) for linux:viper (0 new row(s)) at t",
         ]
     )
@@ -478,13 +503,20 @@ def test_observe_pass_visits_enabled_fleet_arm_machines_in_name_order() -> None:
 
     assert [o["node"] for o in outcomes] == ["colossus", "lacrymal", "viper"]
     assert [o["recorded"] for o in outcomes] == [True, False, True]
-    assert [a["machine"] for a in board.arguments] == ["linux:colossus", "linux:viper"]
+    assert [a["machine"] for a in board.arguments] == [
+        "linux:colossus",
+        "linux:colossus",
+        "linux:viper",
+        "linux:viper",
+    ]
 
 
 def test_observe_pass_visits_a_session_host() -> None:
     # MCPs board task 701151b4: the node the operator's sessions run on.
     _test_hooks.run = FakeRun([ok(""), ok(document(hostname="ziggurat"))])
-    board = FakeQueue(["observed 0 session(s) for linux:ziggurat (0 new row(s)) at t"])
+    board = FakeQueue(
+        [EMPTY_IDENTITIES, "observed 0 session(s) for linux:ziggurat (0 new row(s)) at t"]
+    )
     _test_hooks.http_post = board
 
     registry = {
@@ -495,7 +527,7 @@ def test_observe_pass_visits_a_session_host() -> None:
     outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
 
     assert [(o["node"], o["recorded"]) for o in outcomes] == [("ziggurat", True)]
-    assert [a["machine"] for a in board.arguments] == ["linux:ziggurat"]
+    assert [a["machine"] for a in board.arguments] == ["linux:ziggurat", "linux:ziggurat"]
 
 
 def test_observable_follows_the_declared_observer_not_the_role() -> None:
