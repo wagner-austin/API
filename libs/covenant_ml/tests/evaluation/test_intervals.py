@@ -87,7 +87,7 @@ def _draws(values: list[float]) -> NDArray[np.float64]:
 
 def test_percentile_bounds_are_linear_quantiles() -> None:
     values = [0.5, -0.1, 0.2, 0.9, 0.3, 0.0, 0.7, 0.4, 0.1, 0.6]
-    interval = percentile_interval(0.35, _draws(values), 0.8, 30)
+    interval = percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.35, _draws(values), 0.8, 30)
     # Sorted: -0.1, 0.0, 0.1, ..., 0.7, 0.9. The 10th percentile sits at
     # position 0.9 (between -0.1 and 0.0), the 90th at 8.1 (0.7 to 0.9).
     assert interval["ci_low"] == pytest.approx(-0.01)
@@ -100,29 +100,29 @@ def test_percentile_bounds_are_linear_quantiles() -> None:
 def test_percentile_p_value_counts_the_smaller_tail_with_add_one() -> None:
     # Two of ten draws are at or below zero (-0.1 and 0.0), nine at or above.
     draws = _draws([0.5, -0.1, 0.2, 0.9, 0.3, 0.0, 0.7, 0.4, 0.1, 0.6])
-    interval = percentile_interval(0.35, draws, 0.95, 30)
+    interval = percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.35, draws, 0.95, 30)
     assert interval["p_value"] == pytest.approx(2.0 * 3 / 11)
 
 
 def test_percentile_p_value_never_reaches_zero() -> None:
     draws = _draws([0.1, 0.2, 0.3, 0.4])
-    interval = percentile_interval(0.25, draws, 0.95, 4)
+    interval = percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.25, draws, 0.95, 4)
     assert interval["p_value"] == pytest.approx(2.0 / 5)
 
 
 def test_percentile_p_value_caps_at_one() -> None:
     draws = _draws([0.0, 0.0, 0.0])
-    assert percentile_interval(0.0, draws, 0.95, 3)["p_value"] == 1.0
+    assert percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.0, draws, 0.95, 3)["p_value"] == 1.0
 
 
 def test_percentile_needs_two_draws() -> None:
     with pytest.raises(ValueError, match=ERR_INVALID_RESAMPLES):
-        percentile_interval(0.1, _draws([0.1]), 0.95, 3)
+        percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.1, _draws([0.1]), 0.95, 3)
 
 
 def test_percentile_refuses_a_bad_confidence() -> None:
     with pytest.raises(ValueError, match=ERR_INVALID_CONFIDENCE):
-        percentile_interval(0.1, _draws([0.1, 0.2]), 2.0, 3)
+        percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.1, _draws([0.1, 0.2]), 2.0, 3)
 
 
 def test_pooling_applies_the_nadeau_bengio_correction() -> None:

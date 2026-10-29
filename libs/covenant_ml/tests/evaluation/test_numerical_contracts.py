@@ -102,7 +102,7 @@ def test_paired_and_bootstrap_observations_must_be_finite(invalid: float) -> Non
     with pytest.raises(ValueError, match=ERR_INVALID_ARGUMENT):
         paired_mean_difference(values, plan, 0.95)
     with pytest.raises(ValueError, match=ERR_INVALID_ARGUMENT):
-        percentile_interval(0.1, values, 0.95, 2)
+        percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 0.1, values, 0.95, 2)
 
 
 def test_pairing_refuses_broadcasting_before_subtraction() -> None:
@@ -114,7 +114,7 @@ def test_pairing_refuses_broadcasting_before_subtraction() -> None:
         with pytest.raises(ValueError, match="one-dimensional"):
             compare_per_row(ComparisonMetric.UTILITY, "a", "b", arm, reference, plan, 0.95)
     with pytest.raises(ValueError, match="one-dimensional"):
-        percentile_interval(2.0, column, 0.95, 3)
+        percentile_interval(IntervalMethod.UNIT_BOOTSTRAP, 2.0, column, 0.95, 3)
 
 
 @pytest.mark.parametrize("n_rows", [0, 1])
