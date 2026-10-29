@@ -50,7 +50,7 @@ def encode_research_cluster(value: ResearchCluster) -> JSONObject:
 
 
 def decode_research_cluster(document: JSONObject) -> ResearchCluster:
-    """Require exact settings and absolute, non-traversing paths.
+    """Require native controller paths and POSIX cluster paths without traversal.
 
     Args:
         document: Operator configuration.
@@ -73,14 +73,15 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
         checksums=require_nonempty(document, "checksums"),
         report_task=require_nonempty(document, "report_task"),
     )
-    for path in (
-        value["python"],
-        value["workspace"],
-        value["root"],
-        value["entrypoint"],
-        value["image"],
-    ):
-        if not PurePosixPath(path).is_absolute() or ".." in PurePosixPath(path).parts:
+    paths = (
+        Path(value["python"]),
+        Path(value["workspace"]),
+        PurePosixPath(value["root"]),
+        PurePosixPath(value["entrypoint"]),
+        PurePosixPath(value["image"]),
+    )
+    for path in paths:
+        if not path.is_absolute() or ".." in path.parts:
             raise ValueError("RESEARCH_CLUSTER_CONFIG: absolute non-traversing paths required")
     return value
 
