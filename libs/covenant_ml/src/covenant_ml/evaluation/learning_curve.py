@@ -1,14 +1,14 @@
 """How held-out quality grows with training data.
 
-A model that is still improving at the full training set is limited by data,
-and its loss to a simpler model may be a budget result rather than a verdict
-on the method. A model that flattened early is not. The curve is what tells
-the two apart before anyone concludes that "simpler is better".
+This is a sample-size diagnostic at fixed model settings. Increasing or flat
+quality alone does not establish what limits a model, nor compare the best
+achievable performance of different methods.
 
 Fractions are NESTED within a seed: one permutation of the training fold is
 drawn per seed and every fraction takes a prefix of it, so a larger fraction
-always contains the smaller one's rows and a dip in the curve is the model,
-not a different draw. Validation and held-out folds are never subsampled.
+always contains the smaller one's rows. This controls subset nesting; it does
+not eliminate fitting variability. Validation and held-out folds are never
+subsampled. Random prefixes are not an expanding historical-window study.
 """
 
 from __future__ import annotations

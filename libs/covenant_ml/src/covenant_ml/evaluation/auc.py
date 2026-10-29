@@ -1,11 +1,7 @@
 """AUC as a rank statistic: DeLong's paired test and a weighted form for resampling.
 
-THE AUC HERE IS THE MANN-WHITNEY ONE, ties counted half. That is the quantity
-DeLong's variance is derived for, and it differs from
-:func:`covenant_ml.metrics.compute_auc` only where two rows share a score:
-that function walks rows in ``argsort`` order and so splits a tie in whatever
-order the sort left it. On untied scores the two agree to rounding, which the
-tests assert.
+The point estimate and tie-aware ranks share their owner with headline
+classification metrics in :mod:`covenant_ml.metrics`.
 
 DELONG (DeLong, DeLong and Clarke-Pearson 1988, in the midrank form of Sun
 and Xu 2014). Each positive row gets a placement, the share of negatives it
@@ -28,62 +24,16 @@ from typing import NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
-from .inputs import require_observations
+from ..metrics import compute_auc
+from ..ranking import binary_counts, midranks
 from .intervals import normal_interval, percentile_interval
 from .resampling import Resampling, bootstrap_weights
 from .types import (
     ERR_DEGENERATE_RESAMPLE,
-    ERR_INVALID_ARGUMENT,
-    ERR_LENGTH_MISMATCH,
     ERR_SINGLE_CLASS,
     IntervalEstimate,
     IntervalMethod,
 )
-
-
-def _require_aligned(labels: NDArray[np.int64], *scores: NDArray[np.float64]) -> None:
-    """Refuse score arrays that do not cover the labels.
-
-    Args:
-        labels: Binary labels.
-        *scores: Score arrays that must each have one entry per label.
-
-    Raises:
-        ValueError: If any score array differs in length from the labels.
-    """
-    negative: NDArray[np.bool_] = labels == 0
-    positive: NDArray[np.bool_] = labels == 1
-    binary: NDArray[np.bool_] = negative | positive
-    if labels.ndim != 1 or not bool(np.all(binary)):
-        raise ValueError(f"[{ERR_INVALID_ARGUMENT}] labels must be a vector of binary values")
-    for score in scores:
-        require_observations(score, "scores")
-    lengths = [len(score) for score in scores]
-    if any(length != len(labels) for length in lengths):
-        raise ValueError(
-            f"[{ERR_LENGTH_MISMATCH}] scores must cover {len(labels)} labels, got {lengths}"
-        )
-
-
-def midranks(values: NDArray[np.float64]) -> NDArray[np.float64]:
-    """Rank values from 1, giving tied values the mean of their ranks.
-
-    Args:
-        values: Values to rank.
-
-    Returns:
-        One rank per value, in the input's order.
-    """
-    order: NDArray[np.intp] = np.argsort(values, kind="mergesort")
-    ordered: NDArray[np.float64] = values[order]
-    unique_parts = np.unique(ordered, return_index=True, return_counts=True)
-    first: NDArray[np.intp] = unique_parts[1]
-    counts: NDArray[np.intp] = unique_parts[2]
-    mean_rank: NDArray[np.float64] = first.astype(np.float64) + (counts + 1) / 2.0
-    ranked_in_order: NDArray[np.float64] = np.repeat(mean_rank, counts)
-    ranks: NDArray[np.float64] = np.empty(len(values), dtype=np.float64)
-    ranks[order] = ranked_in_order
-    return ranks
 
 
 class _Placements(NamedTuple):
@@ -119,9 +69,8 @@ def _placements(labels: NDArray[np.int64], scores: NDArray[np.float64]) -> _Plac
     overall_neg: NDArray[np.float64] = overall[negative_mask]
     within_pos = midranks(scores[positive_mask])
     within_neg = midranks(scores[negative_mask])
-    auc = (float(np.sum(overall_pos)) - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
     return _Placements(
-        auc=auc,
+        auc=compute_auc(labels, scores),
         positive=(overall_pos - within_pos) / n_neg,
         negative=1.0 - (overall_neg - within_neg) / n_pos,
     )
@@ -176,9 +125,8 @@ def delong_auc_difference(
         ValueError: If the arrays differ in length, or either class has fewer
             than two rows, which leaves its placement variance undefined.
     """
-    _require_aligned(labels, scores_arm, scores_reference)
-    n_pos = int(np.sum(labels))
-    n_neg = len(labels) - n_pos
+    n_pos, n_neg = binary_counts(labels, scores_arm)
+    binary_counts(labels, scores_reference)
     if n_pos < 2 or n_neg < 2:
         raise ValueError(
             f"[{ERR_SINGLE_CLASS}] DeLong needs at least 2 rows of each class, "
@@ -304,7 +252,8 @@ def bootstrap_auc_difference(
             the interval on an event, and a class that rare is better
             served by more units than by a quietly biased interval.
     """
-    _require_aligned(labels, scores_arm, scores_reference)
+    binary_counts(labels, scores_arm)
+    binary_counts(labels, scores_reference)
     arm_bins = score_bins(scores_arm)
     reference_bins = score_bins(scores_reference)
     ones: NDArray[np.float64] = np.ones(len(labels), dtype=np.float64)
@@ -341,7 +290,6 @@ __all__ = [
     "ScoreBins",
     "bootstrap_auc_difference",
     "delong_auc_difference",
-    "midranks",
     "score_bins",
     "weighted_auc",
 ]
