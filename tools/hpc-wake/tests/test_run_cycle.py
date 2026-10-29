@@ -138,7 +138,15 @@ class TestMain:
         assert commands[:-1] == [
             (["poetry", "run", "hpc-wake", "--config", "../hpc3/runs/hpc3.json"], root.resolve()),
             (
-                ["poetry", "run", "ci-wake", "--enrolment", "runs/pushes.jsonl"],
+                [
+                    "poetry",
+                    "run",
+                    "ci-wake",
+                    "--source-host",
+                    "ziggurat",
+                    "--enrolment",
+                    "/home/corvis/PROJECTS/API/tools/ci-wake/runs/pushes.jsonl",
+                ],
                 (root / "../ci-wake").resolve(),
             ),
             (
