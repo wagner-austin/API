@@ -48,7 +48,7 @@ source_git_blobs:
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "0b9e475971872f3cc0d061ac22e1679aa71f474e"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
