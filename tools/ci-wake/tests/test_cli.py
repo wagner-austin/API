@@ -24,7 +24,7 @@ from platform_core.mcp_testing import (
     DECLARED_TASKBOARD_URL,
     FakeHttpPost,
     sent_arguments,
-    stack_endpoints_text,
+    stack_endpoint_files,
     tool_text_body,
 )
 from platform_core.session_label import (
@@ -34,7 +34,6 @@ from platform_core.session_label import (
     STACK_ENV_PATH,
     TENANT_ID_NAME,
 )
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from ci_wake import _test_hooks
 from ci_wake.cli import enrol as enrol_cli
@@ -81,13 +80,13 @@ SESSION = "4f8a2c1e-9b3d-4e7f-8a6b-1c2d3e4f5a6b"
 BOUND = "opus-rebuild-deadlock-0910"
 WRONG = "opus-dashboard-0911"
 
-#: The MCPs stack's two files the label resolution reads: its ``.env`` for
-#: the taskboard's credentials and its endpoint declaration for the url.
+#: The files the label resolution reads: the ones the taskboard's url is
+#: formed from, then the MCPs stack's ``.env`` for its credentials.
 STACK_FILES = {
+    **stack_endpoint_files(),
     STACK_ENV_PATH: (
         f"{API_KEY_NAME}=internal-key\n{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-00000000aa\n"
     ),
-    STACK_ENDPOINTS_PATH: stack_endpoints_text(),
 }
 
 
@@ -200,7 +199,7 @@ class TestEnrolMain:
 
         assert read_attempts(path)[0]["agent"] == BOUND
         assert emitted == [f"ci-wake: enrolled {SHA[:7]} in {REPO} for @{BOUND}{STARTS}"]
-        assert read == [STACK_ENDPOINTS_PATH, STACK_ENV_PATH]
+        assert read == [*STACK_FILES]
         assert post.urls == [DECLARED_TASKBOARD_URL]
         assert post.headers[0]["x-api-key"] == "internal-key"
         assert sent_arguments(post.bodies[0]) == {"session": SESSION}
