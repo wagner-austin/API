@@ -235,3 +235,11 @@ against cloudflared's own records (loki's connector through cloudflared tail,
 the hub's two tunnels) and found to start on the hub, in each per-call
 cloudflared's SHA-256 of its own executable on a starved CPU; the fix is MCPs
 board task 4c604f4d.
+
+## [2026-10-28] update | WRDS evaluator reuse boundaries
+Pages updated: wrds-equity-research-protocol
+Notes: Board task 8b19319c. Re-read the frozen equity study, complete-calendar
+outcomes, chronological split, resampling and paired-mean code. Pin their
+sources and distinguish fixed window costs from turnover, fixed blocks from
+moving blocks, and logical validation exclusion from permission isolation.
+Record the verified queue audits and reuse the existing coordinator and journal.
