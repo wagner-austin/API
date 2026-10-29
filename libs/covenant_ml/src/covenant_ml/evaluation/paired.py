@@ -29,10 +29,13 @@ from numpy.typing import NDArray
 
 from ..metrics import brier_per_row, log_loss_per_row
 from .auc import bootstrap_auc_difference, delong_auc_difference
+from .inputs import require_observations
 from .intervals import normal_interval, t_interval
 from .resampling import Resampling, unit_sums
 from .types import (
+    ERR_INVALID_ARGUMENT,
     ERR_LENGTH_MISMATCH,
+    ERR_TOO_FEW_UNITS,
     ComparisonMetric,
     IntervalEstimate,
     IntervalMethod,
@@ -120,12 +123,15 @@ def paired_mean_difference(
     Raises:
         ValueError: If ``differences`` does not cover the resampling's rows.
     """
+    require_observations(differences, "paired differences")
     n_rows = len(differences)
     if n_rows != len(resampling.groups):
         raise ValueError(
             f"[{ERR_LENGTH_MISMATCH}] differences must cover {len(resampling.groups)} rows, "
             f"got {n_rows}"
         )
+    if n_rows < 2:
+        raise ValueError(f"[{ERR_TOO_FEW_UNITS}] paired inference needs at least two rows")
     mean = _mean(differences)
     if resampling.unit is ResamplingUnit.CLUSTER:
         return t_interval(
@@ -183,18 +189,21 @@ def compare_per_row(
         ValueError: If the two arrays differ in length or do not cover the
             resampling's rows.
     """
+    require_observations(values_arm, "arm observations")
+    require_observations(values_reference, "reference observations")
     if len(values_arm) != len(values_reference):
         raise ValueError(
             f"[{ERR_LENGTH_MISMATCH}] both arms must be scored on the same rows, got "
             f"{len(values_arm)} and {len(values_reference)}"
         )
+    difference = paired_mean_difference(values_arm - values_reference, resampling, confidence)
     return {
         "metric": metric,
         "arm": arm,
         "reference": reference,
         "value_arm": _mean(values_arm),
         "value_reference": _mean(values_reference),
-        "difference": paired_mean_difference(values_arm - values_reference, resampling, confidence),
+        "difference": difference,
         "n_rows": len(values_arm),
     }
 
@@ -233,6 +242,10 @@ def compare_probabilities(
         ValueError: If the arrays are misaligned, a class has too few rows,
             or a bootstrap resample draws one class only.
     """
+    for probabilities in (proba_arm, proba_reference):
+        require_observations(probabilities, "probabilities")
+        if bool(np.any((probabilities < 0.0) | (probabilities > 1.0))):
+            raise ValueError(f"[{ERR_INVALID_ARGUMENT}] probabilities must lie in [0, 1]")
     if resampling.unit is ResamplingUnit.ROW:
         auc = delong_auc_difference(labels, proba_arm, proba_reference, confidence)
     else:

@@ -25,7 +25,9 @@ import numpy as np
 from numpy.typing import NDArray
 from platform_core.power_distributions import t_critical, two_sided_t_survival
 
+from .inputs import require_interval_inputs, require_observations
 from .types import (
+    ERR_INVALID_ARGUMENT,
     ERR_INVALID_CONFIDENCE,
     ERR_INVALID_RESAMPLES,
     ERR_LENGTH_MISMATCH,
@@ -60,9 +62,9 @@ def _degenerate(
 ) -> IntervalEstimate:
     """The interval of an estimate with zero spread.
 
-    Every unit agreed exactly, so the interval collapses onto the estimate:
-    a nonzero estimate with no spread is certain (p = 0), and a zero one is
-    no evidence of anything (p = 1).
+    The estimated spread is zero, so the interval collapses onto the estimate.
+    The limiting statistic gives p = 0 for a nonzero estimate and p = 1 at
+    zero. This convention does not establish certainty about the population.
 
     Args:
         method: How the spread was measured.
@@ -112,9 +114,10 @@ def t_interval(
             quantile.
     """
     require_confidence(confidence)
+    require_interval_inputs(estimate, std_error, n_units)
+    critical = t_critical(degrees_of_freedom, 1.0 - confidence)
     if std_error == 0.0:
         return _degenerate(method, estimate, confidence, n_units)
-    critical = t_critical(degrees_of_freedom, 1.0 - confidence)
     statistic = abs(estimate) / std_error
     return {
         "method": method,
@@ -151,6 +154,7 @@ def normal_interval(
         ValueError: If ``confidence`` is outside ``(0, 1)``.
     """
     require_confidence(confidence)
+    require_interval_inputs(estimate, std_error, n_units)
     if std_error == 0.0:
         return _degenerate(method, estimate, confidence, n_units)
     critical = _STANDARD_NORMAL.inv_cdf(0.5 + confidence / 2.0)
@@ -216,6 +220,8 @@ def percentile_interval(
             draws were given, which leaves no spread to measure.
     """
     require_confidence(confidence)
+    require_interval_inputs(estimate, 0.0, n_units)
+    require_observations(draws, "bootstrap draws")
     n_draws = len(draws)
     if n_draws < 2:
         raise ValueError(
@@ -291,6 +297,12 @@ def pool_across_seeds(
             f"[{ERR_LENGTH_MISMATCH}] one within-seed error per seed is needed, got "
             f"{len(within_seed_errors)} for {n_seeds} seeds"
         )
+    if not math.isfinite(test_train_ratio) or test_train_ratio < 0.0:
+        raise ValueError(
+            f"[{ERR_INVALID_ARGUMENT}] test/train ratio must be finite and nonnegative"
+        )
+    for estimate, error in zip(per_seed, within_seed_errors, strict=True):
+        require_interval_inputs(estimate, error, n_seeds)
     mean = sum(per_seed) / n_seeds
     variance = sum((value - mean) ** 2 for value in per_seed) / (n_seeds - 1)
     corrected = math.sqrt((1.0 / n_seeds + test_train_ratio) * variance)

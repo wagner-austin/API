@@ -28,10 +28,12 @@ from typing import NamedTuple
 import numpy as np
 from numpy.typing import NDArray
 
+from .inputs import require_observations
 from .intervals import normal_interval, percentile_interval
 from .resampling import Resampling, bootstrap_weights
 from .types import (
     ERR_DEGENERATE_RESAMPLE,
+    ERR_INVALID_ARGUMENT,
     ERR_LENGTH_MISMATCH,
     ERR_SINGLE_CLASS,
     IntervalEstimate,
@@ -49,6 +51,10 @@ def _require_aligned(labels: NDArray[np.int64], *scores: NDArray[np.float64]) ->
     Raises:
         ValueError: If any score array differs in length from the labels.
     """
+    if labels.ndim != 1 or not bool(np.all((labels == 0) | (labels == 1))):
+        raise ValueError(f"[{ERR_INVALID_ARGUMENT}] labels must be a vector of binary values")
+    for score in scores:
+        require_observations(score, "scores")
     lengths = [len(score) for score in scores]
     if any(length != len(labels) for length in lengths):
         raise ValueError(
