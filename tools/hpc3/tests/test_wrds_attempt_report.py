@@ -28,9 +28,12 @@ def test_completed_attempt_reports_what_collect_writes(tmp_path: pathlib.Path) -
     lines = body.splitlines()
     destination = tmp_path / "collected"
     collect(run, "one", destination, tmp_path / "ledger", NOW)
-    assert completion_digest == hashlib.sha256(
-        dump_json_str(load_json_str((destination / "completion.json").read_text())).encode()
-    ).hexdigest()
+    assert (
+        completion_digest
+        == hashlib.sha256(
+            dump_json_str(load_json_str((destination / "completion.json").read_text())).encode()
+        ).hexdigest()
+    )
     metrics = hashlib.sha256((destination / "outputs/metrics.json").read_bytes()).hexdigest()
     record = hashlib.sha256((destination / "results.runrecord.json").read_bytes()).hexdigest()
     assert lines[0] == (
