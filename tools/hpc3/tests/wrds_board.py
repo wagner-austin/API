@@ -9,9 +9,8 @@ from __future__ import annotations
 
 import pathlib
 
-from platform_core.mcp_testing import FakeHttpPost, posted_ok, stack_endpoints_text
+from platform_core.mcp_testing import FakeHttpPost, posted_ok, stack_endpoint_files
 from platform_core.session_label import API_KEY_NAME, STACK_ENV_PATH, TENANT_ID_NAME
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.core import _test_hooks as core_hooks
@@ -22,15 +21,13 @@ ENV_TEXT = f"{API_KEY_NAME}=internal-key\n{TENANT_ID_NAME}={TENANT}\n"
 
 
 def bind_stack_files(env_text: str) -> None:
-    """Answer the stack's ``.env`` and endpoint declaration.
+    """Answer the stack's ``.env`` and the files the taskboard's url is formed from.
 
     Args:
         env_text: What the stack's ``.env`` holds.
     """
-    stack = {
-        STACK_ENV_PATH: env_text.encode(),
-        STACK_ENDPOINTS_PATH: stack_endpoints_text().encode(),
-    }
+    stack = {path: text.encode() for path, text in stack_endpoint_files().items()}
+    stack[STACK_ENV_PATH] = env_text.encode()
     real_read_bytes = core_hooks.read_bytes
 
     def _read_bytes(path: pathlib.Path) -> bytes:

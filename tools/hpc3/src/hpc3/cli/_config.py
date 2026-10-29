@@ -27,7 +27,7 @@ from platform_core.session_label import (
     resolve_label,
     stack_credentials,
 )
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
+from platform_core.stack_endpoints import TASKBOARD_SERVICE, declared_url
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.contracts.workspace import (
@@ -137,7 +137,7 @@ def taskboard_credentials() -> McpCredentials:
         AppError: ``STACK_ENDPOINT_UNDECLARED`` or ``CREDENTIALS_MISSING``
             when either file does not carry its part.
     """
-    url = declared_url(_stack_file_text(STACK_ENDPOINTS_PATH), TASKBOARD_SERVICE)
+    url = declared_url(_stack_file_text, TASKBOARD_SERVICE)
     return stack_credentials(_stack_file_text(STACK_ENV_PATH), url)
 
 
