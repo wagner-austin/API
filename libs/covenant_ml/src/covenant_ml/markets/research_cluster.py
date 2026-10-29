@@ -126,11 +126,10 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
     checksums = cluster["checksums"].rstrip("\n") + f"\n{request_digest}  {remote}/request.json\n"
     files: list[StagedFile] = []
     for name, text in (("request.json", request), ("checksums.txt", checksums)):
-        (directory / name).write_text(text, encoding="utf-8")
+        payload = text.encode("utf-8")
+        (directory / name).write_bytes(payload)
         files.append(
-            StagedFile(
-                name=name, sha256=sha256(text.encode()).hexdigest(), size_bytes=len(text.encode())
-            )
+            StagedFile(name=name, sha256=sha256(payload).hexdigest(), size_bytes=len(payload))
         )
     manifest = StageManifest(
         destination=str(remote),
