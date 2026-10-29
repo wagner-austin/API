@@ -756,6 +756,51 @@ interface; filesystem isolation from agents with general SSH access remains a
 separate requirement. Hash chaining detects corruption, not deliberate rewriting
 by someone who can modify the journal database.
 
+## Frozen monthly CRSP contract
+
+`docs/crsp-monthly-v1.json` is the machine-readable design. Decode it through
+`markets.crsp_protocol.decode_crsp_protocol`, then bind its exact digest in the
+existing research policy. The codec rejects unknown fields and unsupported
+source/valuation conventions; proposals cannot replace the evaluator's policy.
+
+The 2026-10-29 compute probe `40544368` found legacy membership through
+2024-12-31 and CIZ returns/calendar through 2025-12-31. Before observing any
+expanded outcomes, the design therefore changed to training 2000–2014,
+validation 2015–2021 and 36 sealed decisions during 2022–2024. Read coverage
+through February 2025 for the final exit. Warm-up begins January 1998.
+Table extents do not prove every individual history is complete.
+
+The exact source fields are:
+
+- `crsp_a_stock.dsenames`: `permno,namedt,nameendt,shrcd,exchcd`.
+  Membership uses inclusive dates and exactly one active record, share codes
+  10/11 and exchange codes 1/2/3. Never extend membership beyond its ending date.
+- `crsp_a_stock.metaexchangecalendar`: `caldt,exchangegroup,tradingflg`.
+  Filter group `CIZ`; retain all calendar days and their `Y`/`N` flags.
+  `crsp_windows` checks contiguity and complete months before selecting the
+  month's last session and the following two months' first sessions.
+- `crsp_a_stock.stkdlysecuritydata`: `permno,dlycaldt,dlyprevdt,dlyret,
+  dlyretmissflg,dlyretdurflg,dlydelflg,dlyprc,dlyprcflg,dlyvol`.
+  Ordinary execution requires finite positive `TR` closing trades. Universe
+  liquidity uses 60 pre-decision sessions; eligibility requires 252 prior
+  sessions and decision price at least $5. Future entry prices cannot change
+  the ranked selection: an unexecutable selected trade makes the run incomplete.
+- `crsp_a_stock.stkdelists`: `permno,delistingdt,deldlydt,delamtdt,delnextdt,
+  delret,delretmisstype`. Require a finite return at least -1 with flag `NA`,
+  required amount date, and explicit nullable next-price date. The valuation
+  date is the latest of stored/amount/present next-price dates. Its multiplier
+  reconciles the CIZ terminal return once; do not multiply by both returns.
+
+The declared `dated-value-next-rebalance` convention treats a terminal value
+as a receivable until its recorded valuation date, then allows modeled
+reinvestment at the first scheduled rebalance strictly after that date.
+An unresolved value or one dated after the scored exit makes that outcome
+incomplete. This is a revised-history valuation and settlement assumption,
+not evidence of historical cash availability or an executable liquidation.
+Calendar, membership, price and terminal validators are implemented; the
+monthly holdings adapter and restricted holdout execution remain separate
+requirements before this design can produce a substantive study.
+
 ## Standards and regression checks
 
 This extends the package's existing Makefile, pyproject, and shared guard
