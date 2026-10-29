@@ -9,7 +9,7 @@ from datetime import date, timedelta
 from itertools import pairwise
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject, dump_json_str, require_list, require_str
+from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, require_list, require_str
 
 from .test_crsp_protocol import protocol_document
 
@@ -82,7 +82,8 @@ def write_sources(directory: Path, rows: dict[str, list[JSONObject]]) -> tuple[P
         writer = csv.writer(stream)
         writer.writerow(columns)
         for row in records:
-            writer.writerow([row[column] for column in columns])
+            values: list[JSONValue] = [row[column] for column in columns]
+            writer.writerow(values)
         sql = f"select {', '.join(columns)} from crsp_a_stock.{require_str(protocol, name)};"
         manifest[name] = {
             "csv": save_file(directory, name + ".csv", stream.getvalue().encode()),
