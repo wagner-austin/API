@@ -71,6 +71,7 @@ def test_real_compute_process_reports_missing_request(tmp_path: Path) -> None:
     )
     assert result.returncode != 0
     assert result.stderr.splitlines()[-1] == (
-        f"FileNotFoundError: [Errno 2] No such file or directory: {str(tmp_path / 'missing.json')!r}"
+        "FileNotFoundError: [Errno 2] No such file or directory: "
+        f"{str(tmp_path / 'missing.json')!r}"
     )
     assert not (tmp_path / "result").exists()
