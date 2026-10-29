@@ -1,0 +1,23 @@
+{
+  "task_id": "0a3132f8-dbd9-4350-acfd-1fdee405639c",
+  "job_id": "40544368",
+  "scheduler": "grid-engine",
+  "started_at": "2026-10-29T20:37:04.878344+00:00",
+  "completed_at": "2026-10-29T20:37:07.933233+00:00",
+  "query_sha256": "fa004da40181f023fdd8e6016f0e1bfae082ec64f72dc048a43bf7782170001e",
+  "artifact_sha256": "2c06c81e2e9d01f107ec3aea086748921743afef01b2ab7a02fba67c313600d6",
+  "private_directory": "/home/corvis/research-data/wrds/catalogs/2026-10-29",
+  "scope": "Table-level date extents only; no security observations or scoring",
+  "library": "crsp_a_stock",
+  "date_extents": {
+    "dsenames": ["1925-12-31", "2024-12-31", "2024-12-31"],
+    "stkdlysecuritydata": ["1925-12-31", "2025-12-31", "2025-12-31"],
+    "calendar-CIZ": ["1925-12-31", "2025-12-31", "2025-12-31"]
+  },
+  "limits": [
+    "Extents do not establish every security's completeness.",
+    "Legacy membership must not be extrapolated into 2025 decisions.",
+    "December 2025 decisions require an unavailable February 2026 exit.",
+    "Protocol dates changed before observing outcomes, to validation 2015-2021 and final decisions 2022-2024."
+  ]
+}
