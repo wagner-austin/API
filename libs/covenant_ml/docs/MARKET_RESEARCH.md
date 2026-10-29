@@ -722,6 +722,13 @@ entrypoint package initializer as well. The policy's dataset digest is the SHA-2
 of the evaluation manifest's exact bytes; that manifest pins the data and SQL.
 Its code digest names the external trial entrypoint; the image pins imported code.
 
+Controller portability was verified at API `effe49a2c9baf591547cc66875225bbdcc5d6d13`
+on 2026-10-29: fleet job `98aaf40c-680c-4bcd-938b-5ce4042d01d0` on Linux and
+[Windows workflow 40816617770](https://github.com/wagner-austin/API/actions/runs/40816617770)
+each passed all 4,524 tests with 100% coverage. The tests exercise native controller
+paths, relative/traversing path rejection, POSIX-only remote paths and real process
+failure reporting. These checks do not replace a native scheduler execution receipt.
+
 Submission freezes a request and recipe in a new directory, then uses `hpc3.cli.stage`
 and `hpc3.cli.submit --format json`. The recipe requests one CPU, 4 GiB, no GPU,
 the free partition and a rounded allocation deadline. `timeout` enforces the
