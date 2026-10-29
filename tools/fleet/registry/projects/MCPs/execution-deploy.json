@@ -22,7 +22,9 @@
         "phase": "workspace-build",
         "argv": [
           "node",
-          "scripts/ci-build-consumed-workspaces.mjs"
+          "scripts/ci-build-consumed-workspaces.mjs",
+          "execution",
+          "mcp-proxy"
         ]
       },
       {

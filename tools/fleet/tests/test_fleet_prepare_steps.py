@@ -42,7 +42,7 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
         name
         for name, steps in _steps().items()
         if name.startswith("MCPs/")
-        and any(step["argv"][-1] == "scripts/ci-build-consumed-workspaces.mjs" for step in steps)
+        and any("scripts/ci-build-consumed-workspaces.mjs" in step["argv"] for step in steps)
         and name not in prepared
     )
 
@@ -87,7 +87,21 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     assert unprepared == [
         "MCPs/execution-deploy",
         "MCPs/execution-linux",
+        "MCPs/phone-release-execution",
     ]
+    # Board task 007bfc7e: these lanes run execution and its nested proxy
+    # twin. The existing planner includes their dependencies and generated
+    # outputs; a bare invocation builds consumers from the entire repository.
+    for name in ("MCPs/execution-deploy", "MCPs/execution-linux"):
+        assert _steps()[name][1] == InstallStep(
+            phase="workspace-build",
+            argv=(
+                "node",
+                "scripts/ci-build-consumed-workspaces.mjs",
+                "execution",
+                "mcp-proxy",
+            ),
+        )
     for steps in prepared.values():
         assert [step["phase"] for step in steps[:2]] == ["install", "workspace-build"]
         assert [step["argv"][4] for step in steps[:2]] == ["install", "workspace-build"]
