@@ -427,6 +427,10 @@ Optimizes model weights on out-of-fold predictions. Supports three metrics: `neg
 
 ## WRDS extract evaluation
 
+The [evaluation contracts](docs/EVALUATION_CONTRACTS.md) describe paired
+comparisons, uncertainty, ablation, learning curves, chronology and provenance,
+including their regression evidence and interpretation limits.
+
 The existing paired benchmark also accepts `--wrds-manifest extract.json`
 instead of `--csv bankruptcy.csv`. It uses the same ClearGBM, LightGBM and
 XGBoost trainers, paired comparisons, benchmark manifest and shared RunRecord.
