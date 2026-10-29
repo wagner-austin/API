@@ -7,8 +7,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
-from numpy.typing import NDArray
 from platform_ml import RequestedDevice
 
 from covenant_ml.backends.registry import default_registry
@@ -20,22 +18,7 @@ from covenant_ml.types import (
     TrainProgress,
 )
 
-
-def _make_binary_dataset(
-    n_samples: int = 200,
-    n_features: int = 4,
-    pos_ratio: float = 0.3,
-    seed: int = 42,
-) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
-    """Create synthetic binary classification dataset."""
-    rng = np.random.default_rng(seed)
-    x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
-    n_pos = int(n_samples * pos_ratio)
-    y = np.zeros(n_samples, dtype=np.int64)
-    y[:n_pos] = 1
-    rng.shuffle(y)
-    feature_names = [f"f{i}" for i in range(n_features)]
-    return x, y, feature_names
+from ._classification_fixtures import make_binary_dataset
 
 
 def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
@@ -43,7 +26,7 @@ def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
     registry = default_registry()
     trainer = BaseTabularTrainer(registry)
 
-    x, y, names = _make_binary_dataset(n_samples=100)
+    x, y, names = make_binary_dataset(n_samples=100)
 
     config: TrainConfig = {
         "learning_rate": 0.1,
@@ -77,7 +60,7 @@ def test_base_trainer_with_xgboost(tmp_path: Path) -> None:
     assert outcome["samples_train"] == 60
     assert outcome["samples_val"] == 20
     assert outcome["samples_test"] == 20
-    # Verify model learned (loss decreased, AUC increased)
+    # Compare with a uniform-probability predictor, not an initial model loss.
     loss_final = outcome["val_metrics"]["loss"]
     loss_initial = 0.693  # log(2) - random binary classifier baseline
     assert loss_final < loss_initial, (
@@ -93,7 +76,7 @@ def test_base_trainer_xgboost_with_progress_callback(tmp_path: Path) -> None:
     registry = default_registry()
     trainer = BaseTabularTrainer(registry)
 
-    x, y, names = _make_binary_dataset(n_samples=80)
+    x, y, names = make_binary_dataset(n_samples=80)
 
     progress_calls: list[TrainProgress] = []
 
@@ -141,7 +124,7 @@ def test_base_trainer_xgboost_with_progress_callback(tmp_path: Path) -> None:
         assert 0.0 <= val_auc <= 1.0
         auc_values.append(val_auc)
 
-    # Verify model learned (loss decreased over training)
+    # Compare with a uniform-probability predictor, not an initial model loss.
     loss_final = outcome["val_metrics"]["loss"]
     loss_initial = 0.693  # log(2) - random binary classifier baseline
     assert loss_final < loss_initial, (
