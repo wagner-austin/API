@@ -87,6 +87,7 @@ class IntervalMethod(StrEnum):
 
     DELONG = "delong"
     UNIT_BOOTSTRAP = "unit_bootstrap"
+    MOVING_BLOCK_BOOTSTRAP = "moving_block_bootstrap"
     PAIRED_T = "paired_t"
     CLUSTER_ROBUST = "cluster_robust"
     NEWEY_WEST = "newey_west"

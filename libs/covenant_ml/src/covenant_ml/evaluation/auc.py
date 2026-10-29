@@ -327,6 +327,7 @@ def bootstrap_auc_difference(
         auc_arm=auc_arm,
         auc_reference=auc_reference,
         difference=percentile_interval(
+            IntervalMethod.UNIT_BOOTSTRAP,
             auc_arm - auc_reference,
             np.asarray(draws, dtype=np.float64),
             confidence,

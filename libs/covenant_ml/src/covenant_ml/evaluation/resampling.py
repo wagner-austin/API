@@ -168,4 +168,46 @@ def bootstrap_weights(
         yield weights
 
 
-__all__ = ["Resampling", "bootstrap_weights", "build_resampling", "unit_sums"]
+def moving_block_weights(
+    n_rows: int, block_length: int, n_resamples: int, seed: int
+) -> Generator[NDArray[np.float64], None, None]:
+    """Resample overlapping noncircular blocks, truncating only the final draw.
+
+    Args:
+        n_rows: Consecutive ordered observations, at least two full blocks.
+        block_length: Fixed length in observations, at least two.
+        n_resamples: Number of resamples, at least two.
+        seed: Deterministic generator seed.
+
+    Yields:
+        Counts per original row. Every vector sums to exactly n_rows. Start
+        positions are uniform over 0 through n_rows-block_length inclusive;
+        all overlapping blocks are eligible, and none wraps around the end.
+
+    Raises:
+        ValueError: CVML-EVAL-011 for an invalid block or too short a history;
+            CVML-EVAL-005 for too few draws.
+    """
+    if block_length < 2 or n_rows < 2 * block_length:
+        raise ValueError(f"[{ERR_INVALID_BLOCK}] moving blocks require at least two full blocks")
+    if n_resamples < 2:
+        raise ValueError(f"[{ERR_INVALID_RESAMPLES}] moving blocks require at least two draws")
+    rng = np.random.default_rng(seed)
+    blocks = (n_rows + block_length - 1) // block_length
+    offsets: NDArray[np.int64] = np.arange(block_length, dtype=np.int64)
+    for _ in range(n_resamples):
+        starts: NDArray[np.int64] = rng.integers(
+            0, n_rows - block_length + 1, size=blocks, dtype=np.int64
+        )
+        indices: NDArray[np.int64] = (starts[:, None] + offsets).reshape(-1)[:n_rows]
+        weights: NDArray[np.float64] = np.bincount(indices, minlength=n_rows).astype(np.float64)
+        yield weights
+
+
+__all__ = [
+    "Resampling",
+    "bootstrap_weights",
+    "build_resampling",
+    "moving_block_weights",
+    "unit_sums",
+]

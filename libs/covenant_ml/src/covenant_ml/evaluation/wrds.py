@@ -240,6 +240,7 @@ def load_wrds_evaluation(path: Path) -> WrdsEvaluationData:
         manifest["train_fraction"],
         manifest["validation_fraction"],
         manifest["embargo"],
+        label_available_at=np.asarray(days[1:], dtype=np.int64),
     )
     splits(0)  # Validate fold sizes before any learner is constructed.
     return WrdsEvaluationData(

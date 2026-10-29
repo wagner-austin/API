@@ -194,6 +194,7 @@ def _quantile(ordered: NDArray[np.float64], probability: float) -> float:
 
 
 def percentile_interval(
+    method: IntervalMethod,
     estimate: float,
     draws: NDArray[np.float64],
     confidence: float,
@@ -207,6 +208,7 @@ def percentile_interval(
     have, rather than a zero they cannot support.
 
     Args:
+        method: Bootstrap construction recorded with the interval.
         estimate: The point estimate on the original sample.
         draws: The statistic on each resample.
         confidence: Coverage in ``(0, 1)``.
@@ -236,7 +238,7 @@ def percentile_interval(
     tail = min(at_or_below, at_or_above)
     alpha = 1.0 - confidence
     return {
-        "method": IntervalMethod.UNIT_BOOTSTRAP,
+        "method": method,
         "estimate": estimate,
         "std_error": std_error,
         "ci_low": _quantile(ordered, alpha / 2.0),

@@ -30,8 +30,8 @@ from numpy.typing import NDArray
 from ..metrics import brier_per_row, log_loss_per_row
 from .auc import bootstrap_auc_difference, delong_auc_difference
 from .inputs import require_observations
-from .intervals import normal_interval, t_interval
-from .resampling import Resampling, unit_sums
+from .intervals import normal_interval, percentile_interval, t_interval
+from .resampling import Resampling, moving_block_weights, unit_sums
 from .types import (
     ERR_INVALID_ARGUMENT,
     ERR_LENGTH_MISMATCH,
@@ -208,6 +208,84 @@ def compare_per_row(
     }
 
 
+def compare_moving_block(
+    arm: str,
+    reference: str,
+    values_arm: NDArray[np.float64],
+    values_reference: NDArray[np.float64],
+    times_arm: NDArray[np.int64],
+    times_reference: NDArray[np.int64],
+    *,
+    block_length: int,
+    n_resamples: int,
+    seed: int,
+    confidence: float,
+) -> PairedComparison:
+    """Compare aligned monthly net returns with a paired moving-block interval.
+
+    Args:
+        arm: Candidate identity.
+        reference: Baseline identity.
+        values_arm: Candidate net returns, one per consecutive decision month.
+        values_reference: Baseline returns on exactly those months.
+        times_arm: Candidate month ordinals (12 * year + month).
+        times_reference: Baseline month ordinals; must match exactly.
+        block_length: Consecutive months per overlapping noncircular block.
+        n_resamples: Resamples to draw.
+        seed: Reproducible draw seed shared by both arms.
+        confidence: Percentile interval confidence level.
+
+    Returns:
+        Shared paired-comparison record. n_rows records months; n_units records
+        the number of complete blocks fitting in that history, not a claim of
+        independence. p_value is the existing uncentered sign-tail diagnostic,
+        not a calibrated null-bootstrap significance test.
+
+    Raises:
+        ValueError: CVML-EVAL-001 for misaligned data; CVML-EVAL-018 for gaps or
+            reordering. Moving-block length/draw and interval errors propagate.
+    """
+    require_observations(values_arm, "arm monthly returns")
+    require_observations(values_reference, "reference monthly returns")
+    count = len(values_arm)
+    if (
+        len(values_reference) != count
+        or times_arm.ndim != 1
+        or times_reference.ndim != 1
+        or len(times_arm) != count
+        or not np.array_equal(times_arm, times_reference)
+    ):
+        raise ValueError(f"[{ERR_LENGTH_MISMATCH}] paired months must match exactly")
+    gaps: NDArray[np.int64] = np.diff(times_arm)
+    consecutive: NDArray[np.bool_] = gaps == 1
+    if not bool(np.all(consecutive)):
+        raise ValueError(f"[{ERR_INVALID_ARGUMENT}] monthly observations must be consecutive")
+    differences: NDArray[np.float64] = values_arm - values_reference
+    draws: NDArray[np.float64] = np.asarray(
+        [
+            float(np.sum(weights * differences)) / count
+            for weights in moving_block_weights(count, block_length, n_resamples, seed)
+        ],
+        dtype=np.float64,
+    )
+    interval = percentile_interval(
+        IntervalMethod.MOVING_BLOCK_BOOTSTRAP,
+        _mean(differences),
+        draws,
+        confidence,
+        count // block_length,
+    )
+    return {
+        "metric": ComparisonMetric.UTILITY,
+        "arm": arm,
+        "reference": reference,
+        "value_arm": _mean(values_arm),
+        "value_reference": _mean(values_reference),
+        "difference": interval,
+        "n_rows": count,
+    }
+
+
 def compare_probabilities(
     labels: NDArray[np.int64],
     proba_arm: NDArray[np.float64],
@@ -290,4 +368,9 @@ def compare_probabilities(
     ]
 
 
-__all__ = ["compare_per_row", "compare_probabilities", "paired_mean_difference"]
+__all__ = [
+    "compare_moving_block",
+    "compare_per_row",
+    "compare_probabilities",
+    "paired_mean_difference",
+]

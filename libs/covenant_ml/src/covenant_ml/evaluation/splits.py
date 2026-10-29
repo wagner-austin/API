@@ -32,6 +32,7 @@ from ..benchmarking.splitting import (
     apply_split_masks,
     company_disjoint_masks,
 )
+from .temporal import purge_label_overlap
 from .types import (
     ERR_INVALID_EMBARGO,
     ERR_INVALID_FRACTION,
@@ -170,6 +171,8 @@ class ChronologicalGroupedSplits:
         train_fraction: float,
         val_fraction: float,
         embargo: int,
+        *,
+        label_available_at: NDArray[np.int64],
     ) -> None:
         """Order the dataset in time once.
 
@@ -182,12 +185,14 @@ class ChronologicalGroupedSplits:
             val_fraction: Share of distinct time keys after training for validation.
             embargo: Whole time keys dropped at each boundary. Callers must choose
                 keys and embargo to cover label availability; this is not a duration.
+            label_available_at: Actual label availability per row, in the same
+                unit as time_keys. Labels reaching a later fold are excluded.
 
         Raises:
             ValueError: If the arrays differ in length.
         """
         n_rows = len(features)
-        if len(labels) != n_rows or len(time_keys) != n_rows:
+        if len(labels) != n_rows or len(time_keys) != n_rows or len(label_available_at) != n_rows:
             raise ValueError(
                 f"[{ERR_LENGTH_MISMATCH}] features, labels and time_keys must have equal "
                 f"length, got {n_rows}, {len(labels)} and {len(time_keys)}"
@@ -196,6 +201,7 @@ class ChronologicalGroupedSplits:
         self._features: NDArray[np.float64] = features[order]
         self._labels: NDArray[np.int64] = labels[order]
         self._time_keys: NDArray[np.int64] = time_keys[order]
+        self._label_available_at: NDArray[np.int64] = label_available_at[order]
         self._train_fraction = train_fraction
         self._val_fraction = val_fraction
         self._embargo = embargo
@@ -267,6 +273,7 @@ class ChronologicalGroupedSplits:
             val=np.isin(self._time_keys, stopping),
             test=np.isin(self._time_keys, scoring),
         )
+        masks = purge_label_overlap(self._time_keys, self._label_available_at, masks)
         return GroupedSplit(
             split=apply_split_masks(self._features, self._labels, masks),
             test_groups=self._time_keys[masks.test],
