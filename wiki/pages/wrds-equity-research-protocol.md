@@ -109,8 +109,8 @@ the emitted bytes. `prepare_bundle` now writes, hashes and sizes the same byte
 payload. The existing execution test suite reads those files back and verifies
 their exact hashes, lengths and checksum content through the shared manifest
 codec. The repair adds no helper or second writer. Its full fleet check passed 4,525 tests
-with 100% coverage; Windows CI and the independent repair audit were pending
-when this review was published.[^bundle]
+with 100% coverage. Windows CI also passed 4,525 tests with 100% statement and
+branch coverage; the independent staging-repair audit closed VERIFIED.[^bundle]
 
 A fresh read of live queue job `fb62c111-f5c8-48f6-a790-899e68f76920` retained
 native job `58586013` and RunRecord digest
@@ -235,7 +235,7 @@ until admission, holdout isolation and append-only attempt recording are tested.
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 [^review]: `CODE_STANDARDS.md`, named guard-rule table; API functions cited in [^queue], [^controllers], [^admission] and [^records]. External MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6: `packages/db/src/fleet-dispatch/research.ts` functions `requireResearchRouting` and `existingResearchJob`, and `packages/db/migrations/877_fleet_dispatch_research_requests.sql` immutable reference constraints. Scope and findings: board task 79c9a370-763e-4fd0-a609-cd1a64080b19.
-[^bundle]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py` function `prepare_bundle`; `libs/platform_core/src/platform_core/stage_manifest.py` codecs; `libs/covenant_ml/tests/markets/test_research_execution.py` case `test_bundle_manifest_identifies_exact_written_bytes`. API source commit 6f98b519968ea5435119aec0d21105f6e3cb2997 and regression commit 1eb02136baa6b86938b73dbad3395e0a41d9ce5c; fleet job 748608d6-faf0-4cb2-ac45-50fe75e9a977 passed at the latter tip. Board repair db0ddd19-bd02-4941-ac09-f4a88a8361f0 maps the Windows result to GitHub check `check`, run 40820758612.
+[^bundle]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py` function `prepare_bundle`; `libs/platform_core/src/platform_core/stage_manifest.py` codecs; `libs/covenant_ml/tests/markets/test_research_execution.py` case `test_bundle_manifest_identifies_exact_written_bytes`. API source commit 6f98b519968ea5435119aec0d21105f6e3cb2997 and regression commit 1eb02136baa6b86938b73dbad3395e0a41d9ce5c; fleet job 748608d6-faf0-4cb2-ac45-50fe75e9a977 passed at the latter tip. Windows GitHub check `check`, run 40820758612, passed 4,525 tests in 209.66 seconds with 100% coverage. Board repair db0ddd19-bd02-4941-ac09-f4a88a8361f0 closed VERIFIED through audit 0fa4a1c5-7a6f-4975-8682-28c33448e5e2 at 2026-10-29T05:05:50Z.
 [^live-review]: Live `dispatch_get` and installed `research_proposals.py status` reads on 2026-10-29, preserved in board task 79c9a370 thread post 1a29cf1d-3ed9-4d47-a6a6-8a23c7c08bd3. `task_get 3261e090` records audit ed3e8e63 VERIFIED; `task_get 8b19319c` records its remaining wait on 671c2919. Earlier served replay case: MCPs `execution/tests/served/research-queue-replay.test.ts`, two submissions and three controller reads in served run c469a100-f103-4e26-a246-396d81b5ee04; the entire served suite was not green.
 [^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
 [^window]: `libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py:67` `evaluate_equity_window`, complete-calendar check and `net_selected = gross_selected - cost` arithmetic.
