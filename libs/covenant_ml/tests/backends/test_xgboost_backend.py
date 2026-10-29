@@ -22,6 +22,8 @@ from covenant_ml.types import (
     TrainOutcome,
 )
 
+from .._classification_fixtures import make_binary_dataset
+
 
 def _invoke_backend_train(
     backend: ClassifierBackend,
@@ -42,27 +44,10 @@ def _invoke_backend_train(
     )
 
 
-def _make_binary_dataset(
-    n_samples: int = 100,
-    n_features: int = 4,
-    pos_ratio: float = 0.3,
-    seed: int = 42,
-) -> tuple[NDArray[np.float64], NDArray[np.int64], list[str]]:
-    """Create synthetic binary classification dataset."""
-    rng = np.random.default_rng(seed)
-    x = rng.standard_normal((n_samples, n_features)).astype(np.float64)
-    n_pos = int(n_samples * pos_ratio)
-    y = np.zeros(n_samples, dtype=np.int64)
-    y[:n_pos] = 1
-    rng.shuffle(y)
-    feature_names = [f"f{i}" for i in range(n_features)]
-    return x, y, feature_names
-
-
 def test_xgboost_backend_train(tmp_path: Path) -> None:
     """XGBoost backend trains and returns outcome with metrics."""
     backend = create_xgboost_backend()
-    x, y, names = _make_binary_dataset()
+    x, y, names = make_binary_dataset()
 
     config: TrainConfig = {
         "learning_rate": 0.1,
@@ -96,7 +81,7 @@ def test_xgboost_backend_train(tmp_path: Path) -> None:
     assert outcome["samples_train"] == 60
     assert outcome["samples_val"] == 20
     assert outcome["samples_test"] == 20
-    # Verify model learned (loss decreased)
+    # Compare with a uniform-probability predictor, not an initial model loss.
     loss_final = outcome["val_metrics"]["loss"]
     loss_initial = 0.693  # log(2) - random binary classifier baseline
     assert loss_final < loss_initial, (
@@ -110,7 +95,7 @@ def test_xgboost_backend_train(tmp_path: Path) -> None:
 def test_xgboost_backend_train_generates_feature_names(tmp_path: Path) -> None:
     """XGBoost backend generates feature names when not provided."""
     backend = create_xgboost_backend()
-    x, y, _ = _make_binary_dataset(n_features=3)
+    x, y, _ = make_binary_dataset(n_features=3)
 
     config: TrainConfig = {
         "learning_rate": 0.1,
@@ -140,7 +125,7 @@ def test_xgboost_backend_train_generates_feature_names(tmp_path: Path) -> None:
 
     # Should complete without error and produce valid model
     assert outcome["samples_total"] == 100
-    # Verify model learned (loss decreased)
+    # Compare with a uniform-probability predictor, not an initial model loss.
     loss_final = outcome["val_metrics"]["loss"]
     loss_initial = 0.693  # log(2) - random binary classifier baseline
     assert loss_final < loss_initial, (
@@ -154,7 +139,7 @@ def test_xgboost_backend_train_generates_feature_names(tmp_path: Path) -> None:
 def test_xgboost_backend_config_type_validation(tmp_path: Path) -> None:
     """XGBoost backend raises RuntimeError when given MLPConfig instead of TrainConfig."""
     backend = create_xgboost_backend()
-    x, y, names = _make_binary_dataset()
+    x, y, names = make_binary_dataset()
 
     mlp_config: MLPConfig = {
         "device": RequestedDevice.CPU,
@@ -186,7 +171,7 @@ def _train_for_reload(backend: ClassifierBackend, tmp_path: Path) -> TrainOutcom
     Returns:
         The training outcome, whose model_path points at the saved booster.
     """
-    x, y, names = _make_binary_dataset()
+    x, y, names = make_binary_dataset()
     config: TrainConfig = {
         "learning_rate": 0.1,
         "max_depth": 3,
@@ -251,7 +236,7 @@ def test_xgboost_backend_load_and_predict(tmp_path: Path) -> None:
     """Load restores a trained model that predicts, rather than a placeholder."""
     backend = create_xgboost_backend()
     outcome = _train_for_reload(backend, tmp_path)
-    x, y, _ = _make_binary_dataset()
+    x, y, _ = make_binary_dataset()
 
     loaded = backend.load(path=outcome["model_path"])
     proba = loaded.predict_proba(x)
