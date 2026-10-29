@@ -6,6 +6,10 @@ related: ["[[model-trainer-run-record-provenance]]"]
 source_paths:
   - "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py"
   - "libs/covenant_ml/src/covenant_ml/markets/equity_study.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py"
+  - "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py"
+  - "libs/covenant_ml/src/covenant_ml/evaluation/paired.py"
+  - "libs/covenant_ml/src/covenant_ml/evaluation/splits.py"
   - "libs/platform_core/src/platform_core/run_record.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/platform_core/src/platform_core/event_journal.py"
@@ -21,6 +25,10 @@ source_paths:
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "fd06501a73c52a71e1b2e7734285bde3381fffca"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
+  "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
+  "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "e72d1e11e542cb9353f24142a40ae3029698c9b0"
+  "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "d039fbdb6910716d9f4b2b4eb7716083794e9049"
+  "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "4efca7be5d2ce636c20510223eb3c5bfc8379516"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4e4740d246c440f85c1a5ab12e89f383c5a56cab"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
@@ -56,8 +64,10 @@ it claims shared dispatch rows, uses existing resource leases during bounded
 controller operations, and polls native jobs through maintained controllers.
 Four requests may remain active, with the oldest renewed receipt polled each
 tick. Native scheduler waiting does not occupy a local execution slot.
-Deployment and live queue verification are tracked separately on board task
-`3dff6fbf`; code presence alone does not establish activation.[^queue]
+Board task `3dff6fbf` verified deployed automatic reconciliation, and task
+`f5e2befd` verified the queue contract. Their audits closed VERIFIED on
+2026-10-29 UTC. The hpc3 wiki page `wrds-installed-controller-verification`
+holds the runtime and live receipts; this page describes the code seams.[^queue]
 
 The queue reference contains backend, exact private specification digest and
 attempt. The native adapter checks tenant binding and input hashes on each
@@ -79,6 +89,27 @@ CRSP return/delisting semantics into a provider-adjusted-price record.[^equity][
 Keep the shared RunRecord and its comparison functions as the numerical evidence
 contract; a completed coordination task alone does not establish reproducibility
 or out-of-sample performance.[^records]
+
+### Reuse boundaries checked against source
+
+The existing implementations provide useful parts of the proposed study, but
+their current contracts differ from that study in specific ways:[^equity][^window][^sampling][^splits]
+
+| Existing seam | Verified behavior | Extension needed for the monthly study |
+|---|---|---|
+| `equity_study.load_equity_study` | Binds a verified snapshot, cohort, selected weights and independently supplied session calendar. | Bind effective-dated CRSP membership and decision/entry/exit dates, preserving its frozen-design checks. |
+| `equity_outcomes.evaluate_equity_window` | Requires the entire frozen cohort and every declared session; scores adjusted-price endpoints and subtracts one fixed round-trip cost. | Carry holdings between rebalances, charge absolute traded notional against drifted pre-trade weights, and represent return/delisting events explicitly. A fixed cost per window is not turnover accounting. |
+| `ChronologicalGroupedSplits` | Partitions whole distinct time keys; validation stopping rows come from training. | Freeze explicit date boundaries and purge labels by their actual exit/availability timestamps. The existing embargo counts keys, not elapsed time or label intervals. |
+| `build_resampling` / `bootstrap_weights` | Forms fixed, non-overlapping blocks by integer division and resamples their counts. | Add explicit overlapping moving-block semantics to the shared evaluation package for the proposed monthly statistic; retain the current diagnostic's declared semantics. |
+| `paired_mean_difference` | Uses Newey-West errors for block-unit means. | The proposed primary moving-block bootstrap interval needs a distinct measured method; selecting the existing block unit does not implement it. |
+
+The shared admission journal, queue, native scheduler adapters and RunRecord
+publisher already compose. Extending the numerical evaluator does not require
+another coordinator or another attempt ledger. The diagnostic source selects
+`validation_split`, but reads a manifest whose underlying snapshot still resides
+under the shared account. Final-period enforcement therefore also needs an
+execution identity that proposer tools cannot use to read the held-out files;
+the split function alone is not that boundary.[^execution][^controllers][^splits]
 
 ## Study design v1, before any expanded extraction
 
@@ -147,6 +178,9 @@ until admission, holdout isolation and append-only attempt recording are tested.
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 [^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
+[^window]: `libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py:67` `evaluate_equity_window`, complete-calendar check and `net_selected = gross_selected - cost` arithmetic.
+[^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py:53` `build_resampling` and `:135` `bootstrap_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py` function `paired_mean_difference`. These sources were read during board task 8b19319c-1aa0-4e6a-bc83-0c36bd3b50bb; the extension column is design synthesis, not an implementation claim.
+[^splits]: `libs/covenant_ml/src/covenant_ml/evaluation/splits.py` class `ChronologicalGroupedSplits`, methods `__call__` and `validation_split`.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
