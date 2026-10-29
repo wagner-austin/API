@@ -140,3 +140,14 @@ Notes: Board task 8b19319c. Automatic ticks submitted and reconciled allocation
 replay returned the same receipt and preserved all four earlier journal rows.
 Retained WRDS evidence revalidated without new extraction. Added metadata-only
 provenance and recorded that the diagnostic candidate/seed budget is consumed.
+
+## [2026-10-28] update | executable replay evidence and CRSP schema discovery
+Pages updated: pages/wrds-installed-controller-verification.md
+Notes: Board task 8b19319c. Replaced the rejected A2 evidence approach with a
+served case that actually repeats submission and reads the live controller journal.
+The case passed with two identical receipts and three identical journal readings;
+the broader served suite still has three unrelated failures and the board audit
+is not declared passed. Metadata-only WRDS job 40538087 returned 331 columns
+across 14 relations through existing grid helpers. Exact SQL and CSV stay private;
+the committed digest/count record identifies the monthly adapter's candidate
+inputs without claiming resolved return semantics or an implemented evaluator.
