@@ -21,7 +21,7 @@ from typing import Final
 from platform_core.error_codes_tooling import BoardWatchErrorCode
 from platform_core.errors import AppError
 from platform_core.mcp_client import McpCredentials
-from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH, TASKBOARD_SERVICE, declared_url
+from platform_core.stack_endpoints import TASKBOARD_SERVICE, declared_url
 
 from board_watch import _test_hooks
 
@@ -78,5 +78,5 @@ def load_credentials() -> McpCredentials:
         )
     url = _test_hooks.env(URL_VARIABLE)
     if url is None:
-        url = declared_url(_test_hooks.read_text(STACK_ENDPOINTS_PATH), TASKBOARD_SERVICE)
+        url = declared_url(_test_hooks.read_text, TASKBOARD_SERVICE)
     return McpCredentials(url=url, api_key=api_key, tenant_id=tenant_id)

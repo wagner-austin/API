@@ -12,7 +12,7 @@ import pytest
 from platform_core.error_codes_tooling import BoardWatchErrorCode, StackEndpointErrorCode
 from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
-from platform_core.mcp_testing import DECLARED_TASKBOARD_URL, stack_endpoints_text
+from platform_core.mcp_testing import DECLARED_TASKBOARD_URL, stack_endpoint_files
 from platform_core.stack_endpoints import STACK_ENDPOINTS_PATH
 
 from board_watch import _test_hooks
@@ -27,14 +27,14 @@ from tests.conftest import FakeEnv, FakeFiles, set_environment
 
 def _without_override() -> tuple[FakeEnv, FakeFiles]:
     """Bind the environment with no url override and a filesystem holding
-    only the stack's endpoint declaration.
+    only the files the taskboard's url is formed from.
 
     Returns:
         The bound environment and filesystem.
     """
     environment = set_environment()
     del environment.values[URL_VARIABLE]
-    files = FakeFiles({STACK_ENDPOINTS_PATH: stack_endpoints_text()})
+    files = FakeFiles(stack_endpoint_files())
     _test_hooks.read_text = files.read_text
     return environment, files
 
