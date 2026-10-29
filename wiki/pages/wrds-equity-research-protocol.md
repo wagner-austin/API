@@ -4,6 +4,11 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[model-trainer-run-record-provenance]]"]
 source_paths:
+  - "libs/covenant_ml/docs/crsp-monthly-v1.json"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_protocol.py"
+  - "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json"
   - "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
   - "CODE_STANDARDS.md"
   - "libs/platform_core/src/platform_core/stage_manifest.py"
@@ -28,6 +33,11 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
+  "libs/covenant_ml/docs/crsp-monthly-v1.json": "2927f9840dc660311e0c0dfe5c13ffbda236174e"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "ec1276449611853eb9c80e283f9dfcddcce9c6dd"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "664260549885a8826a454ac489757e9acde64dfd"
+  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "1389d0ba6ffee407de927e983fde8073001ed3b5"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "d1a69245c7fd39affab69216f78cde86374e67c3"
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
   "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
@@ -36,10 +46,10 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
   "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "e72d1e11e542cb9353f24142a40ae3029698c9b0"
-  "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "d039fbdb6910716d9f4b2b4eb7716083794e9049"
+  "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "402410874ac09c1889bbec98cb03d66dd37ac73f"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "4efca7be5d2ce636c20510223eb3c5bfc8379516"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "0250f01110cdc65fa60e5afd0ab57feb8652ecf9"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "eee4fd7306a8ba8e4fecd0d805407dc8ceb3861e"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
@@ -167,9 +177,10 @@ the split function alone is not that boundary.[^execution][^controllers][^splits
 
 ## Study design v1, before any expanded extraction
 
-These are proposed fixed rules for implementation, not measured facts or claims
-of profitability. Freeze their machine-readable form and tests before scoring;
-any change creates a new protocol version and preserves earlier attempts.[^request]
+The design is frozen in `libs/covenant_ml/docs/crsp-monthly-v1.json`. Its codec
+and calendar, membership, execution-price and terminal-value validators are
+implemented; holdings evaluation and holdout isolation remain integration work.
+These are study assumptions, not profitability findings.[^frozen]
 
 | Decision | Rule |
 |---|---|
@@ -178,16 +189,17 @@ any change creates a new protocol version and preserves earlier attempts.[^reque
 | Historical universe | At each decision date, common shares with effective share codes 10/11 and exchange codes 1/2/3, absolute closing price at least $5, and at least 252 prior sessions. Rank by trailing 60-session median absolute-price-times-volume; take at most 1,000. Resolve ties by PERMNO. Use effective-dated membership, including later-delisted securities; never today's constituent list. |
 | Historical availability | Preserve extraction vintage and source mappings. Effective dates govern membership. A current CRSP history is a revised historical backtest, not a proven as-published archive. Compustat stays outside v1; later financial features require report/publication availability and revision handling, not fiscal-period dates alone. |
 | Calendar and missingness | Establish an independent exchange-session calendar. No forward-filled return labels or silent dropping of held positions. Missing required prices, returns or delisting outcomes make the affected evaluation incomplete; log the failure. Eligibility excludes insufficient pre-decision history with counted reasons. |
-| Development and final period | Train 2000–2014; tune only on 2015–2022 through expanding chronological folds. Seal January 2023–December 2025 decisions as the final period, acquiring through the first trading-session close of February 2026 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Earlier data are feature warm-up only. |
+| Development and final period | Train 2000–2014; tune only on 2015–2021 through expanding chronological folds. Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
 | Baselines and model family | Equal-weight eligible universe and fixed 12-to-2-month momentum (compound months t-12 through t-2, then select the top decile). Candidate: fixed boosted-tree family using lagged returns, volatility and volume; compare ClearGBM/LightGBM on identical rows and seeds. No Compustat or LLM text signals in v1. |
 | Portfolio and costs | Long-only, no leverage, equal-weight top decile, deterministic PERMNO ties, monthly rebalance. Primary all-in cost is 10 basis points times absolute traded notional, including entry/exit and turnover; report fixed 5/25-bp sensitivities. Costs are declared assumptions, not calibrated capacity or actual execution claims. |
 | Primary measurement | Mean monthly net-return difference versus momentum on the same dates. Report annualized return, volatility, drawdown and turnover secondarily. Use paired 12-month moving-block bootstrap, 10,000 draws, seed 7, with intervals and sample length; 36 final decisions limit inference. |
 | Trial accounting | At most 20 distinct validation candidates under v1, five fixed seeds 11/23/37/53/71 each, identical candidate budget. Select one candidate on primary validation score, tie by fewer leaves then candidate id. Evaluate the selected candidate once on the sealed final period. Seeds are repetitions, not extra hypotheses or independent market histories. |
 
-Before acquisition expands, resolve the exact subscribed tables/columns, return
-and delisting conventions, calendar and retrospective-availability limitations.
-If required evidence cannot be represented, amend the protocol before results;
-do not quietly substitute fields or dates. Historical data may already be known
+The date change preceded outcome inspection: WRDS compute probe `40544368`
+found legacy membership only through December 2024 and CIZ returns/calendar
+through December 2025. The previous February 2026 exit was unavailable.
+Table extents do not prove individual-history completeness.[^coverage]
+Historical data may already be known
 to model pretraining or prior research: a sealed retrospective period limits
 this search process, but is not a pristine prospective test. Any claim of a new
 edge needs a later prospective frozen follow-up.[^request]
@@ -209,19 +221,19 @@ do not prove field semantics, historical completeness or publication availabilit
 | Use | Selected input and constraint |
 |---|---|
 | Target return | `crsp_a_stock.stkdlysecuritydata`: `permno`, `dlycaldt`, `dlyret`, `dlyretmissflg`, `dlyretdurflg`, `dlydelflg`. Compound the held interval `(entry close, exit close]`; never substitute vendor calendar-month returns. |
-| Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Retain original values and flags in the snapshot; resolve allowed execution-price kinds before claiming a tradable closing-price fill. |
+| Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Ordinary entry/exit requires a finite positive `TR` closing trade. A selected security without an executable price makes the run incomplete; future fill prices cannot change pre-decision selection. |
 | Ordinary daily completeness | Require finite return, missingness flag `NA`, nonterminal flag `N`, and duration in `D1,D2,D3,D4,DU`, with independent session and previous-date checks. An absent or unknown flag is an explicit validation error. |
-| Terminal reconciliation | Use `stkdelists` fields `permno`, `delistingdt`, `delret`, `delretmisstype`, `deldlydt` to explain the daily terminal record. Include its value once; never apply a second legacy delisting multiplier. Preserve conventional record date separately from event/valuation dates. Missing terminal value makes the held outcome incomplete. |
-| Membership evidence | Preserve `stksecurityinfohist` fields `secinfostartdt`, `secinfoenddt`, `securitytype`, `securitysubtype`, `sharetype`, `primaryexch`, `conditionaltype`, `tradingstatusflg`, keyed by `permno`. Do not substitute current headers or apply entry-eligibility filters to later held outcomes. Exact correspondence to the proposed numeric share/exchange rules must be established before expanded acquisition; mnemonic similarity is not equivalence. |
-| Session evidence | `metaexchangecalendar`: `caldt`, `exchangegroup`, `tradingflg`. Freeze the relevant exchange group and flag mapping before constructing decision, execution and exit dates. Never derive the complete session calendar from whichever stock rows happen to exist. |
+| Terminal reconciliation | `stkdelists`: `permno,delistingdt,delret,delretmisstype,deldlydt,delamtdt,delnextdt`. Require finite return at least -1 and missingness flag `NA`. Value once at the latest stored/amount/present next-price date; retain a receivable until modeled reinvestment at the next rebalance strictly after that date. Missing values or valuation dates after the scored exit make the outcome incomplete. |
+| Membership evidence | `dsenames`: `permno,namedt,nameendt,shrcd,exchcd`. Exactly one inclusive effective interval must apply at decision time. Preserve numeric codes 10/11 and 1/2/3 directly; do not infer equivalent mnemonic classifications or extrapolate after December 2024. Entry membership does not filter later held outcomes. |
+| Session evidence | `metaexchangecalendar`: `caldt,exchangegroup,tradingflg`. Select group `CIZ`; retain every calendar day and its `Y`/`N` flag. Validate contiguous full months and construct windows from declared sessions, including historical Saturday sessions. Never infer the calendar from stock rows. |
 | Incomplete observations | Exclude insufficient pre-decision history with counted reasons. A missing required held return or unresolved terminal event stops publication of a complete evaluation; no zero fill, forward fill or silent security removal. Aggregate flags serve diagnostics only and cannot override missing daily evidence. |
 | Historical availability | Preserve source capture, query, extraction timestamp, checksums and effective-date joins. The resulting study is a revised-history retrospective backtest. These dates do not establish when a vendor first published a value or what a historical subscriber actually saw. |
 
-The return semantics are now source-pinned. Exact universe classification,
-exchange-session mapping, execution-price acceptance and terminal-event cash
-timing still require frozen rules and tests before the substantive evaluator
-can run. Existing staging, RunRecord, admission, queue and native controllers
-remain the implementation owners; this contract introduces no parallel path.[^ciz-contract][^request][^controllers]
+The terminal rule is a declared retrospective valuation and settlement proxy.
+Neither DelDlyDt nor the amount/next-price dates establish actual spendable-cash
+availability. The frozen validators reject unresolved evidence; they do not
+establish executable historical fills or a complete monthly study. Existing
+staging, RunRecord, admission, queue and native controllers retain ownership.[^frozen][^ciz-contract][^controllers]
 
 ## Agent integration after the pilot
 
@@ -278,6 +290,8 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
 [^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
+[^frozen]: `libs/covenant_ml/docs/crsp-monthly-v1.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
+[^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544368 on 2026-10-29. No security observations were returned or scored.
 [^ciz-contract]: External tech-wiki pages `crsp-ciz-daily-return-contract`, `crsp-ciz-daily-return-quality`, `crsp-ciz-aggregate-return-quality`, field and flag dictionaries plus Application notes. Their single captured vendor guide is https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d, pp. 14-18, 49, 63, 81-82 and 90-92; text capture SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e. Application constraints here are proposed protocol rules, not vendor guarantees or implemented monthly behavior.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
