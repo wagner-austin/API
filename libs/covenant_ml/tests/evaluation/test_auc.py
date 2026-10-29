@@ -83,7 +83,7 @@ def test_delong_handles_ties_as_halves() -> None:
     result = delong_auc_difference(ints(LABELS), floats(tied), floats(SCORES_B), 0.95)
     assert result.auc_arm == pytest.approx(expected)
     assert compute_auc(ints(LABELS), floats(tied)) == pytest.approx(expected)
-    for order in (list(reversed(range(len(LABELS)))), list(range(1, len(LABELS))) + [0]):
+    for order in (list(reversed(range(len(LABELS)))), [*range(1, len(LABELS)), 0]):
         labels = ints([LABELS[index] for index in order])
         scores = floats([tied[index] for index in order])
         assert compute_auc(labels, scores) == pytest.approx(expected)
