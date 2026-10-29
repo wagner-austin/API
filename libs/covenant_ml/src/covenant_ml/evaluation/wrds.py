@@ -30,6 +30,7 @@ from platform_core.json_utils import (
 from typing_extensions import ReadOnly, TypedDict
 
 from ..benchmarking.types import DatasetInfo
+from .evidence import read_evidence, require_evidence_digest, require_evidence_filename
 from .splits import ChronologicalGroupedSplits
 
 
@@ -53,40 +54,6 @@ class WrdsEvaluationData(NamedTuple):
 
     splits: ChronologicalGroupedSplits
     info: DatasetInfo
-
-
-def _digest(value: str) -> str:
-    """Require a complete lowercase content digest.
-
-    Args:
-        value: Untrusted digest.
-
-    Returns:
-        Validated SHA256.
-
-    Raises:
-        ValueError: WRDS_DATA_DIGEST for malformed identity.
-    """
-    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
-        raise ValueError("WRDS_DATA_DIGEST: expected a lowercase SHA256")
-    return value
-
-
-def _filename(value: str) -> str:
-    """Require a sibling evidence file, independent of the machine's paths.
-
-    Args:
-        value: Untrusted file name.
-
-    Returns:
-        A plain file name.
-
-    Raises:
-        ValueError: WRDS_DATA_PATH for an empty or traversing path.
-    """
-    if not value or value in {".", ".."} or any(c in value for c in "/\\\n\r\x00"):
-        raise ValueError("WRDS_DATA_PATH: evidence must name a sibling file")
-    return value
 
 
 def decode_wrds_extract(value: JSONValue) -> WrdsExtract:
@@ -126,10 +93,10 @@ def decode_wrds_extract(value: JSONValue) -> WrdsExtract:
         source_table=table,
         security_id=security,
         extracted_at=extracted,
-        csv_file=_filename(require_str(obj, "csv_file")),
-        csv_sha256=_digest(require_str(obj, "csv_sha256")),
-        query_file=_filename(require_str(obj, "query_file")),
-        query_sha256=_digest(require_str(obj, "query_sha256")),
+        csv_file=require_evidence_filename(require_str(obj, "csv_file")),
+        csv_sha256=require_evidence_digest(require_str(obj, "csv_sha256")),
+        query_file=require_evidence_filename(require_str(obj, "query_file")),
+        query_sha256=require_evidence_digest(require_str(obj, "query_sha256")),
         train_fraction=train,
         validation_fraction=validation,
         embargo=embargo,
@@ -159,30 +126,6 @@ def encode_wrds_extract(value: WrdsExtract) -> JSONObject:
     }
 
 
-def _read_evidence(directory: Path, name: str, expected: str) -> bytes:
-    """Read evidence once and verify precisely the bytes consumed.
-
-    Args:
-        directory: Manifest directory.
-        name: Declared sibling file.
-        expected: Declared digest.
-
-    Returns:
-        Verified bytes.
-
-    Raises:
-        ValueError: WRDS_DATA_DRIFT for mismatched or escaping evidence.
-        OSError: Missing or unreadable original evidence.
-    """
-    path = directory / name
-    if path.resolve().parent != directory.resolve():
-        raise ValueError("WRDS_DATA_DRIFT: evidence symlink leaves the manifest directory")
-    payload = path.read_bytes()
-    if hashlib.sha256(payload).hexdigest() != expected:
-        raise ValueError(f"WRDS_DATA_DRIFT: {name} differs from the extract manifest")
-    return payload
-
-
 def load_wrds_evaluation(path: Path) -> WrdsEvaluationData:
     """Load explicit CRSP rows and reuse chronological grouped partitions.
 
@@ -202,8 +145,8 @@ def load_wrds_evaluation(path: Path) -> WrdsEvaluationData:
         OSError: Missing source evidence.
     """
     manifest = decode_wrds_extract(load_json_str(path.read_text(encoding="utf-8")))
-    payload = _read_evidence(path.parent, manifest["csv_file"], manifest["csv_sha256"])
-    query = _read_evidence(path.parent, manifest["query_file"], manifest["query_sha256"])
+    payload = read_evidence(path.parent, manifest["csv_file"], manifest["csv_sha256"])
+    query = read_evidence(path.parent, manifest["query_file"], manifest["query_sha256"])
     if not query.strip():
         raise ValueError("WRDS_DATA_ROWS: extraction SQL cannot be empty")
     reader = csv.reader(io.StringIO(payload.decode("utf-8")))
