@@ -132,3 +132,11 @@ Notes: Board task d43697b3. Added Grid Engine attempt lifecycle to tools/hpc3 wi
 ## [2026-10-28] update | automatic shared research queue verification
 Pages updated: pages/wrds-installed-controller-verification.md
 Notes: Board task 3dff6fbf. The existing fleet scheduler reconciled retained HPC3 58578878 and WRDS 40534563 through shared dispatch receipts, with zero-exit bounded ticks and automatic board outcomes. Repeat submission and native inspection preserved identities and result digests. The pinned metadata artifact records queue trails, scheduler rows and the frozen runtime; licensed data remains private. README now explains prepared research references alongside the maintained direct CLI routes.
+
+## [2026-10-28] update | fresh research queue submission
+Pages updated: pages/wrds-installed-controller-verification.md
+Notes: Board task 8b19319c. Automatic ticks submitted and reconciled allocation
+58586013 in 11 seconds, exit 0:0, from a fresh admitted queue request. Before/after
+replay returned the same receipt and preserved all four earlier journal rows.
+Retained WRDS evidence revalidated without new extraction. Added metadata-only
+provenance and recorded that the diagnostic candidate/seed budget is consumed.
