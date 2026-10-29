@@ -31,7 +31,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "d039fbdb6910716d9f4b2b4eb7716083794e9049"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "4efca7be5d2ce636c20510223eb3c5bfc8379516"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "950ab454c8eba6a544086f9b8b724e34d33748ea"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "0250f01110cdc65fa60e5afd0ab57feb8652ecf9"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
