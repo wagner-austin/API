@@ -83,6 +83,11 @@ name: packages
 
 on:
   push:
+    # Fleet source transport is checked by the submitting gate, not a CI branch.
+    branches-ignore:
+      - "pushed-tests/**"
+    tags:
+      - "**"
   pull_request:
 
 # NO WORKFLOW-LEVEL CONCURRENCY, BECAUSE THE UNIT OF WORK IS NOT THE BRANCH.

@@ -36,6 +36,11 @@ name: tankpitbot
 
 on:
   push:
+    # Fleet source transport is checked by the submitting gate, not a CI branch.
+    branches-ignore:
+      - "pushed-tests/**"
+    tags:
+      - "**"
     paths:
       - "clients/TankpitBot/**"
       - "libs/platform_core/**"

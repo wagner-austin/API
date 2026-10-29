@@ -7,6 +7,11 @@ name: turkic-api
 
 on:
   push:
+    # Fleet source transport is checked by the submitting gate, not a CI branch.
+    branches-ignore:
+      - "pushed-tests/**"
+    tags:
+      - "**"
     paths:
       - "services/turkic-api/**"
       - "libs/platform_core/**"
