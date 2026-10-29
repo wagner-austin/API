@@ -159,16 +159,32 @@ def test_cluster_codec_and_missing_pin(tmp_path: Path) -> None:
     assert decode_research_cluster(encode_research_cluster(cluster)) == cluster
     with pytest.raises(ValueError, match="exact fields"):
         decode_research_cluster({})
-    for value in ("relative", "/pub/../escape"):
-        document = encode_research_cluster(cluster)
-        document["root"] = value
-        with pytest.raises(ValueError, match="absolute non-traversing"):
-            decode_research_cluster(document)
     document = encode_research_cluster(cluster)
     document["checksums"] = "wrong"
     with pytest.raises(ValueError, match="require frozen runtime"):
         prepare_bundle(directory, decode_research_cluster(document), trial)
     assert not directory.exists()
+
+
+@pytest.mark.parametrize("field", ["python", "workspace", "root", "entrypoint", "image"])
+@pytest.mark.parametrize("value", ["relative", "/pub/../escape"])
+def test_cluster_refuses_relative_and_traversing_paths(
+    tmp_path: Path, field: str, value: str
+) -> None:
+    _path, _trial, cluster, _directory = setup(tmp_path)
+    document = encode_research_cluster(cluster)
+    document[field] = value
+    with pytest.raises(ValueError, match="absolute non-traversing"):
+        decode_research_cluster(document)
+
+
+@pytest.mark.parametrize("field", ["root", "entrypoint", "image"])
+def test_remote_paths_refuse_windows_drive_paths(tmp_path: Path, field: str) -> None:
+    _path, _trial, cluster, _directory = setup(tmp_path)
+    document = encode_research_cluster(cluster)
+    document[field] = "C:/research"
+    with pytest.raises(ValueError, match="absolute non-traversing"):
+        decode_research_cluster(document)
 
 
 def test_real_transport_failure_leaves_durable_intent(tmp_path: Path) -> None:

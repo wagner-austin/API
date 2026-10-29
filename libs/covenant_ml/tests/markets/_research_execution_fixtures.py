@@ -1,5 +1,6 @@
 """Frozen research execution fixtures with real journal and bundle persistence."""
 
+import sys
 from pathlib import Path
 
 from platform_core.json_utils import JSONObject, dump_json_str, require_dict
@@ -21,7 +22,7 @@ def setup(root: Path) -> tuple[Path, ResearchTrial, ResearchCluster, Path]:
     admit_proposal(path, trial["policy"], require_dict(trial_document(root), "proposal"), 0)
     cluster = decode_research_cluster(
         {
-            "python": "/usr/bin/python3",
+            "python": sys.executable,
             "workspace": str(root / "hpc3.json"),
             "project": "cleargbm",
             "root": "/pub/research",
