@@ -1,0 +1,15 @@
+{
+  "worker_ram_gb": 8.0,
+  "minimum_workers": 1,
+  "expected_minutes": 120,
+  "required_tags": [
+    "linux"
+  ],
+  "node": "loki",
+  "source": {
+    "remote": "https://github.com/wagner-austin/MCPs.git",
+    "path": "fleet-mcp/nixos",
+    "install": [],
+    "companions": []
+  }
+}
