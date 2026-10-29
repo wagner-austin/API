@@ -206,7 +206,9 @@ def run_cycle(enrolment: pathlib.Path, *, source_host: str = "") -> None:
     task_id = load_task_id()
 
     attempts = latest_attempts(
-        read_attempts(enrolment) if source_host == "" else read_remote_attempts(source_host, enrolment)
+        read_attempts(enrolment)
+        if source_host == ""
+        else read_remote_attempts(source_host, enrolment)
     )
     if attempts == ():
         _test_hooks.emit("enrolment record is empty; nothing has been pushed from this machine")

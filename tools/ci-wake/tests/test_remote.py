@@ -65,7 +65,7 @@ def test_missing_source_or_failed_transport_never_uses_local_file(
     poster = FakeHttpPost([])
     _test_hooks.http_post = poster
 
-    with pytest.raises(ValueError, match=f"CI_WAKE_ENROLMENT_UNREADABLE:.*{detail}"):
+    with pytest.raises(ValueError, match=rf"CI_WAKE_ENROLMENT_UNREADABLE:.*{detail}"):
         main(["--source-host", "ziggurat", "--enrolment", str(path)])
 
     assert read_announced(position_path(path)) == frozenset()
@@ -77,7 +77,7 @@ def test_malformed_remote_row_names_its_source(tmp_path: pathlib.Path) -> None:
     _test_hooks.run_process = FakeGh(
         {enrolment_argv("ziggurat", path): FakeCompleted(stdout="[]\n")}
     )
-    with pytest.raises(JSONTypeError, match="ziggurat:.*line 1"):
+    with pytest.raises(JSONTypeError, match=r"ziggurat:.*line 1"):
         read_remote_attempts("ziggurat", path)
 
 
@@ -89,7 +89,7 @@ def test_real_ssh_failure_propagates_without_delivery_marks(tmp_path: pathlib.Pa
     poster = FakeHttpPost([])
     _test_hooks.http_post = poster
 
-    with pytest.raises(ValueError, match="CI_WAKE_ENROLMENT_UNREADABLE:.*exit 255"):
+    with pytest.raises(ValueError, match=r"CI_WAKE_ENROLMENT_UNREADABLE:.*exit 255"):
         main(["--source-host", "ci-wake-unreachable.invalid", "--enrolment", str(path)])
 
     assert read_announced(position_path(path)) == frozenset()
