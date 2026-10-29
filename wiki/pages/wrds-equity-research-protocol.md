@@ -16,6 +16,7 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_execution.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
   - "tools/fleet/src/fleet/cli/research_queue.py"
   - "tools/fleet/src/fleet/core/research_control.py"
@@ -30,11 +31,12 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "d039fbdb6910716d9f4b2b4eb7716083794e9049"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "4efca7be5d2ce636c20510223eb3c5bfc8379516"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4e4740d246c440f85c1a5ab12e89f383c5a56cab"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "950ab454c8eba6a544086f9b8b724e34d33748ea"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "a14e864128b900ca67df11af1ce4b78a65973932"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "84af969117df4a38b47eaae30b25ddb14803d145"
@@ -44,7 +46,7 @@ source_git_blobs:
 provenance:
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
-fact_checked: 2026-10-28
+fact_checked: 2026-10-29
 confidence: medium
 ---
 
@@ -140,6 +142,12 @@ edge needs a later prospective frozen follow-up.[^request]
 
 ## Agent integration after the pilot
 
+The controller's `python` executable and `workspace` configuration use absolute
+native filesystem paths. HPC3 `root`, `entrypoint` and `image` use absolute POSIX
+paths regardless of the controller's operating system. All five fields reject
+parent-directory traversal. The execution command consumes the first two locally;
+the frozen staging manifest and compute recipe consume the remote paths.[^paths]
+
 The implemented typed proposal/admission boundary accepts a proposal that
 names its hypothesis, parent, protocol digest, allowed features, model parameters
 and resource budget. Admission records the attempt **before** extraction or job
@@ -188,3 +196,4 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^records]: `libs/platform_core/src/platform_core/run_record.py:309` `agree_across_runs`.
 [^admission]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py` frozen contracts; `libs/covenant_ml/src/covenant_ml/markets/research_journal.py` admission and lifecycle reducers; `libs/platform_core/src/platform_core/event_journal.py` transactional persistence; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 399048d8-b1d6-4e12-a4d3-a0ce2281c810.
 [^execution]: `libs/covenant_ml/src/covenant_ml/markets/research_execution.py` submission and reconciliation; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py` validation diagnostic; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", execution settings and limitations. Board task 6d2d086c-5242-482b-ac81-8a61dd8e354d.
+[^paths]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py:52` `decode_research_cluster` and `:101` `prepare_bundle`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py:70` `_command`. Board task 3261e090-1354-43ae-8703-a8cf5671f5f9 corrects the former use of POSIX validation for local controller paths.
