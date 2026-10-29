@@ -111,7 +111,7 @@ def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> No
     else:
         changed = list(reversed(columns))
     document[field] = changed
-    with pytest.raises(ValueError, match="CRSP-001.*exact column set"):
+    with pytest.raises(ValueError, match=r"CRSP-001.*exact column set"):
         decode_crsp_protocol(document)
 
 
