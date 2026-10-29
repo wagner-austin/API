@@ -119,7 +119,11 @@ def _decision(
             counts[result] = counts.get(result, 0) + 1
         else:
             features.append(result)
-    ordered = sorted(features, key=lambda row: (-row.liquidity, row.permno))
+    def rank(row: CrspFeature) -> tuple[float, int]:
+        """Order greatest liquidity first, breaking ties by permanent identifier."""
+        return -row.liquidity, row.permno
+
+    ordered = sorted(features, key=rank)
     excess = len(ordered) - protocol["max_universe"]
     if excess > 0:
         counts["liquidity_rank_limit"] = excess

@@ -51,6 +51,7 @@ def _cell(column: str, text: str) -> JSONValue:
 
 def _key(row: JSONObject, relation: str, extracted_day: str) -> tuple[str, ...]:
     """Require relation chronology and return its unique source key."""
+    key: tuple[str, ...]
     if relation == "calendar":
         day = require_str(row, "caldt")
         if require_str(row, "exchangegroup") != "CIZ" or require_str(row, "tradingflg") not in {
