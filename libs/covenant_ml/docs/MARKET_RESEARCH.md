@@ -713,7 +713,10 @@ poetry run python -m scripts.research_proposals --policy policy.json --ledger at
 settings, attempt number and absolute compute-side evaluation manifest path.
 `ResearchCluster` is operator-owned: the HPC3 Python executable, workspace,
 project, remote attempt root, entrypoint directory, image path, checksum text and
-board report task. The checksums must include the image, evaluation manifest and
+board report task. `python` and `workspace` are absolute paths on the controller's
+local filesystem. `root`, `entrypoint` and `image` are absolute POSIX paths on
+HPC3, even when the controller runs on Windows. All five reject parent-directory
+traversal. The checksums must include the image, evaluation manifest and
 `scripts/research_trial.py`; include every source data/query/receipt file and the
 entrypoint package initializer as well. The policy's dataset digest is the SHA-256
 of the evaluation manifest's exact bytes; that manifest pins the data and SQL.
