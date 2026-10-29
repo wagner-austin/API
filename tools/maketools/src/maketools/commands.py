@@ -48,8 +48,7 @@ class RunInheritingProtocol(Protocol):
             new_session: Start the child in its own session (POSIX
                 ``setsid``), so a signal aimed at this process's group does
                 not reach the suite and the suite's group can be named for
-                the reaper. Accepted and ignored by the standard library on
-                Windows, where the job object does the same work.
+                the reaper.
             timeout_seconds: Wall-clock bound on the child.
 
                 REQUIRED, AND NAMED BY THE CALLER RATHER THAN DEFAULTED,
