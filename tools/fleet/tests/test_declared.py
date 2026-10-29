@@ -175,7 +175,11 @@ class TestReadDeclared:
             declared.DeclaredProject(
                 project="MCPs/packages/wiki-check",
                 required_tags=(
-                    NodeTag.TESTDB, NodeTag.CXX, NodeTag.RUST, NodeTag.GPU, NodeTag.PDFTOTEXT
+                    NodeTag.TESTDB,
+                    NodeTag.CXX,
+                    NodeTag.RUST,
+                    NodeTag.GPU,
+                    NodeTag.PDFTOTEXT,
                 ),
                 dispatch_nodes=("sedona", "serendipity"),
             ),
