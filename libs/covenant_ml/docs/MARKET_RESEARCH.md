@@ -763,14 +763,16 @@ by someone who can modify the journal database.
 existing research policy. The codec rejects unknown fields and unsupported
 source/valuation conventions; proposals cannot replace the evaluator's policy.
 
-The 2026-10-29 compute probe `40544368` found legacy membership through
-2024-12-31 and CIZ returns/calendar through 2025-12-31. Before observing any
+The 2026-10-29 compute probes `40544368` and `40544470` found legacy membership
+through 2024-12-31, CIZ returns/calendar through 2025-12-31, and terminal events
+through 2025-12-30 with stored return dates through 2025-12-31. Before observing any
 expanded outcomes, the design therefore changed to training 2000–2014,
 validation 2015–2021 and 36 sealed decisions during 2022–2024. Read coverage
 through February 2025 for the final exit. Warm-up begins January 1998.
 Table extents do not prove every individual history is complete.
 
-The exact source fields are:
+The four ordered `*_columns` arrays in the frozen JSON are decoder-enforced.
+Changing, removing, adding or reordering a column is refused. The exact fields are:
 
 - `crsp_a_stock.dsenames`: `permno,namedt,nameendt,shrcd,exchcd`.
   Membership uses inclusive dates and exactly one active record, share codes
