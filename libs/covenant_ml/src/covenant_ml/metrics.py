@@ -11,6 +11,7 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 
+from .ranking import binary_counts, midranks
 from .types import AMEXMetricResult, EvalMetrics
 
 
@@ -158,45 +159,25 @@ def compute_auc(
     y_true: NDArray[np.int64],
     y_prob: NDArray[np.float64],
 ) -> float:
-    """Compute Area Under ROC Curve using trapezoidal rule.
-
-    This is a pure numpy implementation without sklearn dependency.
+    """Compute Mann-Whitney ROC AUC, assigning half credit to tied scores.
 
     Args:
-        y_true: True binary labels (0 or 1), shape (n_samples,)
-        y_prob: Predicted probabilities for class 1, shape (n_samples,)
+        y_true: One-dimensional binary labels containing both classes.
+        y_prob: Aligned finite ranking scores; probability bounds are not required.
 
     Returns:
-        AUC score (0.5 = random, 1.0 = perfect)
+        Fraction of positive-negative pairs correctly ranked, ties counted half.
+
+    Raises:
+        ValueError: CVML-METRIC-001 for malformed evidence or undefined AUC.
     """
-    # Sort by predicted probability descending
-    desc_score_indices: NDArray[np.intp] = np.argsort(y_prob)[::-1]
-    y_true_sorted: NDArray[np.int64] = y_true[desc_score_indices]
-
-    # Count positives and negatives
-    n_pos = int(np.sum(y_true))
-    n_neg = len(y_true) - n_pos
-
+    n_pos, n_neg = binary_counts(y_true, y_prob)
+    positive: NDArray[np.bool_] = y_true == 1
     if n_pos == 0 or n_neg == 0:
-        return 0.5  # Undefined, return random baseline
-
-    # Compute TPR and FPR at each threshold
-    tps: NDArray[np.int64] = np.cumsum(y_true_sorted)
-    fps: NDArray[np.int64] = np.cumsum(1 - y_true_sorted)
-
-    tpr: NDArray[np.float64] = tps.astype(np.float64) / n_pos
-    fpr: NDArray[np.float64] = fps.astype(np.float64) / n_neg
-
-    # Add origin point (0, 0) - use typed arrays for concatenation
-    origin: NDArray[np.float64] = np.zeros(1, dtype=np.float64)
-    tpr_with_origin: NDArray[np.float64] = np.concatenate([origin, tpr])
-    fpr_with_origin: NDArray[np.float64] = np.concatenate([origin, fpr])
-
-    # Trapezoidal integration for AUC
-    # Manual trapezoid rule: sum((y[i] + y[i+1]) * (x[i+1] - x[i]) / 2)
-    dx: NDArray[np.float64] = np.diff(fpr_with_origin)
-    avg_y: NDArray[np.float64] = (tpr_with_origin[:-1] + tpr_with_origin[1:]) / 2.0
-    return float(np.sum(dx * avg_y))
+        raise ValueError("[CVML-METRIC-001] AUC is undefined without both classes")
+    ranks = midranks(y_prob)
+    rank_sum = float(np.sum(ranks[positive]))
+    return (rank_sum - n_pos * (n_pos + 1) / 2.0) / (n_pos * n_neg)
 
 
 def compute_average_precision(
@@ -217,18 +198,28 @@ def compute_average_precision(
         y_prob: Predicted probabilities for class 1, shape (n_samples,)
 
     Returns:
-        Average precision. Returns 0.0 when the labels contain no positive
-        case, where the metric is otherwise undefined.
+        Recall-weighted precision at distinct score thresholds.
+
+    Raises:
+        ValueError: CVML-METRIC-001 for malformed evidence or no positive cases.
     """
-    n_pos = int(np.sum(y_true))
+    n_pos, _ = binary_counts(y_true, y_prob)
     if n_pos == 0:
-        return 0.0
+        raise ValueError("[CVML-METRIC-001] average precision needs positive cases")
 
     desc_score_indices: NDArray[np.intp] = np.argsort(y_prob)[::-1]
     y_true_sorted: NDArray[np.int64] = y_true[desc_score_indices]
 
-    tps: NDArray[np.int64] = np.cumsum(y_true_sorted)
-    ranks: NDArray[np.float64] = np.arange(1, len(y_true_sorted) + 1, dtype=np.float64)
+    ordered_scores: NDArray[np.float64] = y_prob[desc_score_indices]
+    changes: NDArray[np.bool_] = ordered_scores[:-1] != ordered_scores[1:]
+    last_index: list[int] = [len(y_true) - 1]
+    last: NDArray[np.int64] = np.asarray(last_index, dtype=np.int64)
+    changes_at: NDArray[np.int64] = np.flatnonzero(changes).astype(np.int64)
+    boundaries: list[NDArray[np.int64]] = [changes_at, last]
+    ends: NDArray[np.int64] = np.concatenate(boundaries)
+    cumulative: NDArray[np.int64] = np.cumsum(y_true_sorted)
+    tps: NDArray[np.int64] = cumulative[ends]
+    ranks: NDArray[np.float64] = ends.astype(np.float64) + 1.0
 
     precision: NDArray[np.float64] = tps.astype(np.float64) / ranks
     recall: NDArray[np.float64] = tps.astype(np.float64) / n_pos
