@@ -224,7 +224,7 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     )
 
 
-@pytest.mark.parametrize("host", ["diphtheria", "colossus", "demure"])
+@pytest.mark.parametrize("host", ["colossus", "demure"])
 def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     """MCPs/execution-served-<host> reads what that host's search container serves.
 
@@ -252,6 +252,39 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
         install=(
             InstallStep(phase="install", argv=(*prepare, "install")),
             InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(phase="served-lane", argv=(*prepare, "served-lane")),
+        ),
+        companions=(),
+    )
+
+
+def test_the_gateway_hosts_served_lane_holds_the_test_database() -> None:
+    """MCPs/execution-served-diphtheria is the served lane of the SMS gateway's host.
+
+    Besides what every served lane reads, its usage-limit case drives the
+    installed gateway release's notifier and pcsession-mcp's usage-limit pass
+    through a fleet halt and its resumption against ``corvis_test``, and
+    reads both texts the board recorded (MCPs board task ea46a7a4, A3). So
+    it migrates the node's test database before the served-lane marker is
+    written, which stays the last step, and holds that database
+    exclusively, as every lane writing ``corvis_test`` does.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/execution-served-diphtheria")
+    assert project["node"] == "diphtheria"
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
+    assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
+    prepare = ("make", "-s", "-C", "scripts/fleet-prepare")
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/MCPs.git",
+        path="execution",
+        install=(
+            InstallStep(phase="install", argv=(*prepare, "install")),
+            InstallStep(phase="workspace-build", argv=(*prepare, "workspace-build")),
+            InstallStep(
+                phase="test-database",
+                argv=(*prepare, "test-database", "CONTAINER=corvis-fleet-testdb"),
+            ),
             InstallStep(phase="served-lane", argv=(*prepare, "served-lane")),
         ),
         companions=(),

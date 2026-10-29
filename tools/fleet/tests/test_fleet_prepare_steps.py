@@ -167,8 +167,18 @@ def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None
         "MCPs/execution-served-demure",
         "MCPs/execution-served-diphtheria",
     ]
-    for steps in marking.values():
-        assert [step["phase"] for step in steps] == ["install", "workspace-build", "served-lane"]
+    # The gateway host's lane migrates corvis_test first, for its usage-limit
+    # case (MCPs board task ea46a7a4); the marker still comes last.
+    assert {name: [step["phase"] for step in steps] for name, steps in marking.items()} == {
+        "MCPs/execution-served-colossus": ["install", "workspace-build", "served-lane"],
+        "MCPs/execution-served-demure": ["install", "workspace-build", "served-lane"],
+        "MCPs/execution-served-diphtheria": [
+            "install",
+            "workspace-build",
+            "test-database",
+            "served-lane",
+        ],
+    }
 
 
 def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() -> None:
