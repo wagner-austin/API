@@ -243,3 +243,10 @@ outcomes, chronological split, resampling and paired-mean code. Pin their
 sources and distinguish fixed window costs from turnover, fixed blocks from
 moving blocks, and logical validation exclusion from permission isolation.
 Record the verified queue audits and reuse the existing coordinator and journal.
+
+## [2026-10-29] update | Research controller path ownership
+Pages updated: wrds-equity-research-protocol
+Notes: Board task 3261e090. The decoder now validates local Python and workspace
+paths with the controller's filesystem semantics, while keeping remote roots,
+entrypoints and images POSIX-only. Pin the repaired source and command reference;
+keep controller portability distinct from the installed Linux runtime's provenance.
