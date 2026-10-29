@@ -71,6 +71,14 @@ worker snymore."), and the machine contract refuses a server whose budget
 would take the fleet's pool, so every server the roster ships is offered
 only what is pinned to it.
 
+loki has one project pinned to it, MCPs/fleet-nixos, the fleet's NixOS flake
+(MCPs board task 3d7a9b7d): its checks build every Linux worker
+configuration and boot one in a VM, which needs Nix and /dev/kvm, and loki
+is the one dispatching worker running NixOS, measured on 2026-10-29 with
+/dev/kvm and the kvm and nixos-test system features. Unlike the stack hosts
+it takes the pool's other checks too, so the pin is what keeps the flake on
+loki: every other node refuses it before its tags are read.
+
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
 losing one is a change this file has to be told about.
@@ -319,3 +327,21 @@ def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
     for suite in ("MCPs/watcher", "MCPs/mcp-shared", "MCPs/packages/db"):
         refused = assess(node, _idle(node), workspace["projects"][suite], node_tags(node))
         assert refused["code"] == FleetErrorCode.NODE_NOT_PINNED
+
+
+def test_loki_alone_checks_the_nixos_flake() -> None:
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/fleet-nixos"]
+    codes = {
+        name: assess(node, _idle(node), project, node_tags(node))["code"]
+        for name, node in workspace["nodes"].items()
+        if node["enabled"]
+    }
+
+    assert codes == {
+        **dict.fromkeys(codes, FleetErrorCode.NODE_NOT_PINNED),
+        "loki": None,
+    }
+    # The workers that take the pool's checks refuse it too, not only the
+    # stack hosts that refuse everything unpinned.
+    assert {"colossus", "demure", "diphtheria", "lavender", "pendragon", "sedona"} < set(codes)
