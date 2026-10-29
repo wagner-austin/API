@@ -100,7 +100,7 @@ scheduled tasks — the random-task count goes down, not up.
 | publisher | source | posts to | mention target |
 |---|---|---|---|
 | hpc-wake | hpc3 slurm ledger | `f6b04193` | ledger `submitter` |
-| ci-wake | GitHub Actions + push enrolment | `c5593c56` | enrolment `agent` |
+| ci-wake | GitHub Actions + Ziggurat push enrolment over SSH; delivery positions remain on the hub | `c5593c56` | enrolment `agent` |
 | lock-wake | the hub's fleet-lock journal, where every deploy locks | `5d86be8d` | journal `agent` |
 | fleet-health-wake | MCPs fleet audit's health journal | `88b20894` | none: a fleet change has no actor to tag |
 | lock-wake-ziggurat | the session host's fleet-lock journal, over ssh (MCPs `03590bf9`, `c39ee056`: the sessions there lock in its checkout) | `5d86be8d` | journal `agent` |

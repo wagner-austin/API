@@ -145,7 +145,15 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         # CI_WAKE_TASK_ID beside the pump's other credentials.
         {
             "name": "ci-wake",
-            "args": ("poetry", "run", "ci-wake", "--enrolment", "runs/pushes.jsonl"),
+            "args": (
+                "poetry",
+                "run",
+                "ci-wake",
+                "--source-host",
+                SESSION_HOST,
+                "--enrolment",
+                str(pathlib.Path(SESSION_HOST_CHECKOUT).parent / "API/tools/ci-wake/runs/pushes.jsonl"),
+            ),
             "cwd": "../ci-wake",
         },
         # lock-wake (board 9406cfd9 publisher b): the hub's fleet-lock journal
