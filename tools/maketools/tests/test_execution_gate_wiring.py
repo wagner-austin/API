@@ -75,18 +75,22 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     # Every fleet tick is poetry running fleet.cli.tick (MCPs board task
     # 94ac1c4f; the MCPs hub runner's fleet rows run that, held by its table
     # suite since MCPs board task b27bd34a), and the tick runs its agent only
-    # through the rolled launcher: fleet-agent from the one plan every
-    # fleet-agent lane shares, hub, sessions and netboot (MCPs board tasks
-    # c39ee056, 83102d9d and af8b5662), fleet-node-agent from a node's. Each
-    # plan names its agent once, beside the launcher's flag.
+    # through the rolled launcher: the duty plan chooses fleet-research for
+    # research and fleet-agent for hub, sessions and netboot. A node plan
+    # names fleet-node-agent. Fleet's test_cli_tick checks the actual argv for
+    # each lane; this cross-package check pins their rolled-launcher wiring.
     tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
         encoding="utf-8"
     )
     assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
-    plans = {"fleet-agent": 1, "fleet-node-agent": 1}
-    for agent, count in plans.items():
-        assert len(list(re.finditer(rf'rolled_cli\.AGENT_FLAG,\s+"{agent}",', tick))) == count
-    assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == sum(plans.values())
+    assert (
+        'module = "fleet-research" if agent_lane is DispatchLane.RESEARCH else "fleet-agent"'
+        in tick
+    )
+    plans = ("module", '"fleet-node-agent"')
+    for agent in plans:
+        assert len(list(re.finditer(rf"rolled_cli\.AGENT_FLAG,\s+{re.escape(agent)},", tick))) == 1
+    assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == len(plans)
     # The registry is the roll's own; a tick naming one would run pinned code
     # against an unpinned configuration.
     assert "--config" not in tick
