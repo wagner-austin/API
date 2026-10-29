@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[model-trainer-run-record-provenance]]"]
 source_paths:
+  - "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
   - "CODE_STANDARDS.md"
   - "libs/platform_core/src/platform_core/stage_manifest.py"
   - "libs/covenant_ml/tests/markets/test_research_execution.py"
@@ -27,6 +28,7 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "d1a69245c7fd39affab69216f78cde86374e67c3"
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
   "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
@@ -50,6 +52,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
 provenance:
+  - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Ownership review 2026-10-29: MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6 is external to this API wiki's source_paths; live queue, installed controller and board reads are identified separately in the review footnotes."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
@@ -189,6 +192,37 @@ to model pretraining or prior research: a sealed retrospective period limits
 this search process, but is not a pristine prospective test. Any claim of a new
 edge needs a later prospective frozen follow-up.[^request]
 
+## CIZ data contract for the monthly implementation
+
+The vendor definitions live in the tech wiki's
+[daily return contract](https://github.com/wagner-austin/tech-wiki/blob/main/pages/crsp-ciz-daily-return-contract.md),
+[daily quality contract](https://github.com/wagner-austin/tech-wiki/blob/main/pages/crsp-ciz-daily-return-quality.md)
+and [aggregate quality contract](https://github.com/wagner-austin/tech-wiki/blob/main/pages/crsp-ciz-aggregate-return-quality.md).
+This protocol owns the application choices below. These choices specify the next
+adapter extension; they are not a claim that the existing `dsf` engineering pilot
+implements CIZ monthly outcomes.[^ciz-contract][^adapter]
+
+The read-only catalog probe established the subscribed `crsp_a_stock` relations
+and candidate columns. It downloaded metadata only. Column existence and type
+do not prove field semantics, historical completeness or publication availability.[^ciz-schema]
+
+| Use | Selected input and constraint |
+|---|---|
+| Target return | `crsp_a_stock.stkdlysecuritydata`: `permno`, `dlycaldt`, `dlyret`, `dlyretmissflg`, `dlyretdurflg`, `dlydelflg`. Compound the held interval `(entry close, exit close]`; never substitute vendor calendar-month returns. |
+| Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Retain original values and flags in the snapshot; resolve allowed execution-price kinds before claiming a tradable closing-price fill. |
+| Ordinary daily completeness | Require finite return, missingness flag `NA`, nonterminal flag `N`, and duration in `D1,D2,D3,D4,DU`, with independent session and previous-date checks. An absent or unknown flag is an explicit validation error. |
+| Terminal reconciliation | Use `stkdelists` fields `permno`, `delistingdt`, `delret`, `delretmisstype`, `deldlydt` to explain the daily terminal record. Include its value once; never apply a second legacy delisting multiplier. Preserve conventional record date separately from event/valuation dates. Missing terminal value makes the held outcome incomplete. |
+| Membership evidence | Preserve `stksecurityinfohist` fields `secinfostartdt`, `secinfoenddt`, `securitytype`, `securitysubtype`, `sharetype`, `primaryexch`, `conditionaltype`, `tradingstatusflg`, keyed by `permno`. Do not substitute current headers or apply entry-eligibility filters to later held outcomes. Exact correspondence to the proposed numeric share/exchange rules must be established before expanded acquisition; mnemonic similarity is not equivalence. |
+| Session evidence | `metaexchangecalendar`: `caldt`, `exchangegroup`, `tradingflg`. Freeze the relevant exchange group and flag mapping before constructing decision, execution and exit dates. Never derive the complete session calendar from whichever stock rows happen to exist. |
+| Incomplete observations | Exclude insufficient pre-decision history with counted reasons. A missing required held return or unresolved terminal event stops publication of a complete evaluation; no zero fill, forward fill or silent security removal. Aggregate flags serve diagnostics only and cannot override missing daily evidence. |
+| Historical availability | Preserve source capture, query, extraction timestamp, checksums and effective-date joins. The resulting study is a revised-history retrospective backtest. These dates do not establish when a vendor first published a value or what a historical subscriber actually saw. |
+
+The return semantics are now source-pinned. Exact universe classification,
+exchange-session mapping, execution-price acceptance and terminal-event cash
+timing still require frozen rules and tests before the substantive evaluator
+can run. Existing staging, RunRecord, admission, queue and native controllers
+remain the implementation owners; this contract introduces no parallel path.[^ciz-contract][^request][^controllers]
+
 ## Agent integration after the pilot
 
 The controller's `python` executable and `workspace` configuration use absolute
@@ -243,6 +277,8 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^splits]: `libs/covenant_ml/src/covenant_ml/evaluation/splits.py` class `ChronologicalGroupedSplits`, methods `__call__` and `validation_split`.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:186` `load_wrds_evaluation`.
+[^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
+[^ciz-contract]: External tech-wiki pages `crsp-ciz-daily-return-contract`, `crsp-ciz-daily-return-quality`, `crsp-ciz-aggregate-return-quality`, field and flag dictionaries plus Application notes. Their single captured vendor guide is https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d, pp. 14-18, 49, 63, 81-82 and 90-92; text capture SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e. Application constraints here are proposed protocol rules, not vendor guarantees or implemented monthly behavior.
 [^equity]: `libs/covenant_ml/src/covenant_ml/markets/equity_study.py:55` `decode_equity_study` and `:113` `load_equity_study`.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
 [^records]: `libs/platform_core/src/platform_core/run_record.py:309` `agree_across_runs`.
