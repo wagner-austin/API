@@ -275,7 +275,7 @@ class TestHostRunnerSpec:
     def test_the_base_decodes_with_the_host(self) -> None:
         decoded = decode_host_runner_spec(_host())
         assert decoded["base"]["apt_packages"] == ["ffmpeg", "golang-go"]
-        assert decoded["base"]["disk"]["ceiling_gb"] == 150
+        assert decoded["base"]["disk"]["ceiling_gb"] == 210
 
     @staticmethod
     def _with_ceiling(ceiling: int) -> dict[str, JSONValue]:

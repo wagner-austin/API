@@ -130,7 +130,7 @@ class TestExpectedChecks:
         ids = [check["check_id"] for check in runner_audit.expected_checks(_host(tmp_path))]
         assert ids == [
             "memory:31gb",
-            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20",
+            "disk:/:ceiling-210gb:baseline-18gb@2026-10-20",
             "cache:/home/gharunner/.cache:ceiling-60gb",
             f"cache:{base}/actions-runner-api-1/_work:ceiling-15gb",
             "gpu:wagner-austin/API:lavender",
@@ -149,7 +149,7 @@ class TestExpectedChecks:
         ids = [check["check_id"] for check in runner_audit.expected_checks(a_host())]
         assert ids == [
             "memory:31gb",
-            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20",
+            "disk:/:ceiling-210gb:baseline-18gb@2026-10-20",
             "cache:/home/gharunner/.cache:ceiling-60gb",
             "cache:/home/gharunner/actions-runner-api-1/_work:ceiling-15gb",
             "service:actions.runner.wagner-austin-API.lavender.service",
@@ -160,7 +160,7 @@ class TestExpectedChecks:
 
     def test_the_disk_row_carries_the_ceiling_and_the_idle_baseline(self) -> None:
         assert runner_audit_disk.disk_check_id(a_host()) == (
-            "disk:/:ceiling-150gb:baseline-18gb@2026-10-20"
+            "disk:/:ceiling-210gb:baseline-18gb@2026-10-20"
         )
 
     def test_the_memory_row_carries_the_declared_size(self) -> None:
@@ -197,10 +197,10 @@ class TestTheScriptRunsForReal:
 
     def test_a_root_past_its_ceiling_drifts(self, tmp_path: pathlib.Path) -> None:
         spec = _host(tmp_path)
-        rows = _audit(spec, tmp_path, df='echo "Used"; echo " 151G"')
+        rows = _audit(spec, tmp_path, df='echo "Used"; echo " 211G"')
         assert rows[runner_audit_disk.disk_check_id(spec)] == (
-            "DRIFT the root uses 151 GB against a ceiling of 150 GB; an idle rebuilt host used "
-            "18 GB on 2026-10-20; df said: Used  151G (exit 0)"
+            "DRIFT the root uses 211 GB against a ceiling of 210 GB; an idle rebuilt host used "
+            "18 GB on 2026-10-20; df said: Used  211G (exit 0)"
         )
 
     @pytest.mark.parametrize(
