@@ -124,7 +124,7 @@ def test_the_build_cache_is_bounded_by_age_then_by_size() -> None:
     ]
     assert docker_lines == [
         "docker builder prune -f --filter until=168h",
-        "docker builder prune -f --max-used-space 60gb",
+        "docker builder prune -f --max-used-space 20gb",
     ]
 
 

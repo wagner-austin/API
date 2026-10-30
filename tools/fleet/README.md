@@ -187,7 +187,7 @@ nothing: an install whose `.runner` exists is not configured twice.
 | `_work` trees, poetry venvs | Caches; the next job recreates them. ci-clean removes a venv whose recorded sources are all gone, while jobs run (MCPs board task ecb13d3d) |
 | npm's, pip's and poetry's download caches | `~/.cache/fleet-tools/<generation>`: the job-started hook (`runner_tool_caches`) reads or starts the generation, writes it into its runner install's marker under `~/.cache/fleet-jobs`, and hands the job its paths through `GITHUB_ENV`, npm's one per runner install because concurrent writers corrupted a shared one; ci-clean removes a generation whole once no marker names it, the fleet nodes' rule (`tool_caches`). Removing single files instead could part a poetry metadata file from its body and fail every later lock (MCPs board task 4b405239) |
 | Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
-| Docker build cache | What the jobs' `docker build` steps leave; ci-clean prunes daily what no build used for a week, then the reclaimable cache above 60 GB (MCPs board task 46c7b11b) |
+| Docker build cache | What the jobs' `docker build` steps leave; ci-clean prunes daily what no build used for a week, then the reclaimable cache above 20 GB, `BUILD_CACHE_BOUND_GIB` in `runner_base` (MCPs board task 46c7b11b; 60 GB until board task 621902c3) |
 | Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
 | ci-clean script, service and timer | Written in `ci_clean`, embedded by `runner_render` and installed by provision.sh |
 | ci-clean's report | `/var/lib/ci-clean/last-run`, in the state directory systemd makes for the service (`StateDirectory=ci-clean`), world-readable: each run writes the sha256 of the script that ran, when it started, every pass's closing line, the daemon's build cache records before the prunes and after them, which generation each runner install's last job read and what the current one holds. `test_runner_hygiene_host` reads it, because the runner account's home is closed to the fleet's user (MCPs board tasks 46c7b11b and 4b405239) |
@@ -198,11 +198,15 @@ nothing: an install whose `.runner` exists is not configured twice.
 **The disk ceiling.** The audit fails a host whose root uses more than
 `base.disk.ceiling_gb`, and the row's id carries both numbers, so every line,
 passing or failing, says what is allowed and what normal was:
-`disk:/:ceiling-150gb:baseline-18gb@2026-10-20`. The baseline is lavender's
+`disk:/:ceiling-210gb:baseline-18gb@2026-10-20`. The baseline is lavender's
 root after its reimage and the fleet node provision and before any runner,
-18 GB used of 915 GB at 2026-10-20T00:33Z. The 150 GB ceiling, kept from the
-WSL guest, leaves the working set (the image pull cache, one set of venvs per
-runner, the checkouts) far more room than the guest had and trips long
+18 GB used of 915 GB at 2026-10-20T00:33Z. The ceiling is at least what the
+host's own bounds let its root hold, `disk_bounds_gb` in `runner_base`: the
+baseline, the 20 GB build cache bound, `cache_ceiling_gb` and one
+`work_ceiling_gb` per install, 203 GB for lavender's seven, and the roster
+refuses a host whose ceiling sits under it. It was 150 GB, kept from the WSL
+guest, until the audit failed lavender at 190 GB on 2026-10-30 with every
+bounded area inside its bound (board task 621902c3). It still trips long
 before the 536 GB of leaked volumes that filled lavender's disk on
 2026-09-25.
 

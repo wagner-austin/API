@@ -112,7 +112,7 @@
           "inkscape"
         ],
         "disk": {
-          "ceiling_gb": 150,
+          "ceiling_gb": 210,
           "baseline_gb": 18,
           "baseline_measured": "2026-10-20",
           "cache_path": "/home/gharunner/.cache",

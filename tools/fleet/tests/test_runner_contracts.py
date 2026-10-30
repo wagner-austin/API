@@ -277,6 +277,32 @@ class TestHostRunnerSpec:
         assert decoded["base"]["apt_packages"] == ["ffmpeg", "golang-go"]
         assert decoded["base"]["disk"]["ceiling_gb"] == 150
 
+    @staticmethod
+    def _with_ceiling(ceiling: int) -> dict[str, JSONValue]:
+        """One install's host whose disk ceiling is ``ceiling``; its bounds are 113 GB."""
+        base = base_json()
+        base["disk"] = {
+            "ceiling_gb": ceiling,
+            "baseline_gb": 18,
+            "baseline_measured": "2026-10-20",
+            "cache_path": "/home/gharunner/.cache",
+            "cache_ceiling_gb": 60,
+            "work_ceiling_gb": 15,
+        }
+        return _host(base=base)
+
+    def test_a_ceiling_at_the_host_s_own_bounds_is_accepted(self) -> None:
+        decoded = decode_host_runner_spec(self._with_ceiling(113))
+        assert decoded["base"]["disk"]["ceiling_gb"] == 113
+
+    def test_a_ceiling_under_the_host_s_own_bounds_is_refused(self) -> None:
+        with pytest.raises(
+            JSONTypeError,
+            match=r"ceiling_gb 112 is under the 113 GB the host's own bounds let its root hold "
+            r"with 1 install\(s\)",
+        ):
+            decode_host_runner_spec(self._with_ceiling(112))
+
 
 class TestRunnerSpec:
     """decode_runner_spec's contract, and the shipped document."""

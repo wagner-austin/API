@@ -38,9 +38,9 @@ from platform_core.json_utils import (
     require_list,
 )
 
+from fleet.contracts.runner_base import BUILD_CACHE_BOUND_GIB
 from fleet.contracts.runners import HostRunnerSpec
 from fleet.core.ci_clean import (
-    BUILD_CACHE_BOUND_GIB,
     CI_CLEAN_REPORT,
     CI_CLEAN_SCRIPT,
     REPORT_BUILD_CACHE,

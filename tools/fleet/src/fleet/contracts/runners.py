@@ -44,7 +44,12 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
-from fleet.contracts.runner_base import HostBase, decode_host_base, encode_host_base
+from fleet.contracts.runner_base import (
+    HostBase,
+    decode_host_base,
+    disk_bounds_gb,
+    encode_host_base,
+)
 from fleet.contracts.runner_registration import (
     RunnerRegistration,
     decode_runner_registration,
@@ -353,8 +358,10 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, the memory or the job timeout is not positive, or the
-            payload directory is not an absolute POSIX path.
+            mistyped, the memory or the job timeout is not positive, the
+            payload directory is not an absolute POSIX path, or the disk
+            ceiling sits under what the host's own bounds let its root hold
+            (:func:`~fleet.contracts.runner_base.disk_bounds_gb`).
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"host must be a JSON object, got {type(value).__name__}")
@@ -376,6 +383,14 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
             "installs must be non-empty; a host with no runner installs is not a CI host "
             "and does not belong in this roster"
         )
+    base = decode_host_base(require_dict(value, "base"))
+    bounds = disk_bounds_gb(base["disk"], len(installs))
+    if base["disk"]["ceiling_gb"] < bounds:
+        raise JSONTypeError(
+            f"ceiling_gb {base['disk']['ceiling_gb']} is under the {bounds} GB the host's "
+            f"own bounds let its root hold with {len(installs)} install(s); the audit would "
+            "fail a host whose every bounded area is within its bound"
+        )
     return HostRunnerSpec(
         name=require_str(value, "name"),
         host=require_str(value, "host"),
@@ -386,7 +401,7 @@ def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:
         job_timeout_minutes=job_timeout,
         installs=installs,
         assets=[decode_file_asset(entry) for entry in require_list(value, "assets")],
-        base=decode_host_base(require_dict(value, "base")),
+        base=base,
         ci_slice=decode_ci_slice(require_dict(value, "ci_slice"), host_memory_gb=memory),
     )
 

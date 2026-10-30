@@ -14,9 +14,21 @@ THE DISK CEILING LIVES HERE TOO. A runner host is meant to sit essentially
 empty; the ceiling is the most its root may hold before the audit fails the
 host, written beside the baseline measured on an idle rebuilt host, so a
 failing row says both what is allowed and what normal looked like.
+
+THE CEILING ADMITS WHAT THE HOST'S OWN BOUNDS ALLOW (board task 621902c3).
+lavender's 150 GB was written on 2026-09-26 for a Windows host whose
+runners alone used its disk, and it was carried over to the Linux fleet
+worker of 2026-10-19 while the bounds beside it allowed 18 GB of baseline,
+60 GiB of build cache, a 60 GB runner cache and 15 GB for each of its
+installs' work trees: the audit failed the host at 190 GB with every one of
+those within its bound. So a host's ceiling is at least
+:func:`disk_bounds_gb`, and a roster whose ceiling sits under it is
+refused where the host decodes (:func:`fleet.contracts.runners.decode_host_runner_spec`).
 """
 
 from __future__ import annotations
+
+from typing import Final
 
 from platform_core.json_utils import (
     JSONObject,
@@ -28,6 +40,13 @@ from platform_core.json_utils import (
     require_str_list,
 )
 from typing_extensions import TypedDict
+
+#: The build cache a runner host's ci-clean leaves on its docker daemon, in
+#: docker's ``gb``, which counts 1024**3 bytes (:mod:`fleet.core.ci_clean`).
+#: It was 60, the bound diphtheria's stack prunes to; on 2026-10-30 lavender
+#: held 39 GB of build cache in 1171 records, none in use and 36.44 GB of it
+#: reclaimable, inside that bound and over a fifth of its root's ceiling.
+BUILD_CACHE_BOUND_GIB: Final = 20
 
 
 class DiskCeiling(TypedDict):
@@ -138,6 +157,26 @@ def decode_disk_ceiling(value: JSONValue) -> DiskCeiling:
     )
 
 
+def disk_bounds_gb(disk: DiskCeiling, installs: int) -> int:
+    """What a runner host's root may hold with every bounded area full.
+
+    Args:
+        disk: The host's ceiling and the bounds beside it.
+        installs: How many runner installs the host carries, each with a
+            work tree held to ``work_ceiling_gb``.
+
+    Returns:
+        The idle baseline, plus :data:`BUILD_CACHE_BOUND_GIB`, the runner
+        cache's ceiling and one work ceiling per install, in GB.
+    """
+    return (
+        disk["baseline_gb"]
+        + BUILD_CACHE_BOUND_GIB
+        + disk["cache_ceiling_gb"]
+        + disk["work_ceiling_gb"] * installs
+    )
+
+
 def encode_host_base(base: HostBase) -> JSONObject:
     """Encode a host's base.
 
@@ -183,10 +222,12 @@ def decode_host_base(value: JSONValue) -> HostBase:
 
 
 __all__ = [
+    "BUILD_CACHE_BOUND_GIB",
     "DiskCeiling",
     "HostBase",
     "decode_disk_ceiling",
     "decode_host_base",
+    "disk_bounds_gb",
     "encode_disk_ceiling",
     "encode_host_base",
 ]

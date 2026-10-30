@@ -6,8 +6,10 @@ import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from fleet.contracts.runner_base import (
+    BUILD_CACHE_BOUND_GIB,
     decode_disk_ceiling,
     decode_host_base,
+    disk_bounds_gb,
     encode_host_base,
 )
 from tests._runner_fixtures import a_base, base_json
@@ -130,3 +132,15 @@ class TestDiskCeiling:
         del raw[field]
         with pytest.raises(JSONTypeError, match=field):
             decode_disk_ceiling(raw)
+
+
+class TestDiskBounds:
+    """disk_bounds_gb: what a host's root holds with every bounded area full."""
+
+    def test_the_bound_is_the_one_ci_clean_prunes_to(self) -> None:
+        assert BUILD_CACHE_BOUND_GIB == 20
+
+    @pytest.mark.parametrize(("installs", "bounds"), [(1, 113), (7, 203)])
+    def test_each_install_adds_one_work_ceiling(self, installs: int, bounds: int) -> None:
+        """18 GB baseline, 20 GiB build cache, a 60 GB cache and 15 GB per work tree."""
+        assert disk_bounds_gb(a_base()["disk"], installs) == bounds

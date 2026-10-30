@@ -17,10 +17,12 @@ docker build fills BuildKit's cache and no other pass reaches it: on
 2026-10-18T07:32Z lavender's daemon held 103.7 GB of build cache, 98.55 GB of
 it reclaimable, while the three prunes before it reclaimed 0 B a day. So the
 cache no build has used for a week goes, and then the reclaimable cache above
-60 GB, least recently used first, the two passes and the bound diphtheria's
-corvis-docker-prune runs on its stack's daemon (MCPs
-scripts/host/diphtheria/docker-prune.sh). A record a running build holds is in
-use, so neither pass removes it.
+:data:`~fleet.contracts.runner_base.BUILD_CACHE_BOUND_GIB`, least recently
+used first, the two passes diphtheria's corvis-docker-prune runs on its
+stack's daemon (MCPs scripts/host/diphtheria/docker-prune.sh). The bound was
+that script's 60 GB until board task 621902c3 held it to 20, inside the
+runner host's disk ceiling. A record a running build holds is in use, so
+neither pass removes it.
 
 THE PYTHON CACHES, UNGATED TOO (MCPs board task ecb13d3d). Until then this half
 refused to run while any Runner.Worker executed, and on lavender one always
@@ -47,7 +49,7 @@ each run writes :data:`CI_CLEAN_REPORT` in the state directory systemd makes
 for the service: everything the passes printed, the instant it started, the
 sha256 of the script that ran, and the daemon's build cache records as its
 engine API counts them, in bytes, before the prunes and after them. The runner host's hygiene
-case reads it against the render and :data:`BUILD_CACHE_BOUND_GIB`, and reads
+case reads it against the render and the bound, and reads
 the jobs' use of the generations from it (:data:`GENERATION_READERS`), since
 the runner account's home is closed to the fleet's user.
 
@@ -61,13 +63,11 @@ from __future__ import annotations
 
 from typing import Final
 
+from fleet.contracts.runner_base import BUILD_CACHE_BOUND_GIB
 from fleet.core import names
 from fleet.core.runner_install import RUNNER_ACCOUNT
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
 from fleet.core.tool_caches import SH_REMOVE_UNUSED
-
-#: The size pass's bound, in docker's ``gb``, which counts 1024**3 bytes.
-BUILD_CACHE_BOUND_GIB: Final = 60
 
 #: The state directory systemd makes for the service, owned by its user.
 STATE_DIRECTORY_NAME: Final = "ci-clean"
@@ -245,7 +245,6 @@ WantedBy=timers.target
 """
 
 __all__ = [
-    "BUILD_CACHE_BOUND_GIB",
     "CI_CLEAN_CACHES",
     "CI_CLEAN_REPORT",
     "CI_CLEAN_SCRIPT",
