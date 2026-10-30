@@ -77,7 +77,7 @@ install:
 	@echo ""
 	@echo "=== install"
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	poetry run playwright install chromium
 	@echo "[install] done"
 
@@ -90,7 +90,7 @@ lint: _lint-prep _lint-guard _lint-mypy
 _deps:
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 
 # The quick gates, and the two steps that REWRITE sources (ruff's fixes and
 # its formatter), which must finish before anything reads the tree.
@@ -152,7 +152,7 @@ _check-unbudgeted: _lint-prep
 # skipped or none ran. Coverage is off because one case is not the suite;
 # ``make check`` holds the 100.
 execution:
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(MAKETOOLS) test --host-execution --no-cov
 
 # An empty OUTPUT unsets TANKPIT_OUTPUT (the sniffer then writes its default
@@ -507,5 +507,5 @@ sim-down:
 # sedona's end went with its 2026-10-19 reimage. scripts/colossus_move.py says
 # what it reads and why it refuses once the fleet is up.
 colossus-move-colossus:
-	poetry sync
+	poetry sync --no-cache
 	poetry run python -m scripts.colossus_move colossus
