@@ -131,6 +131,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
         "node_local_resources": [],
         "node_serve_seconds": 1200,
         "node_poll_seconds": 5,
+        "native_evidence_seconds": 600,
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
