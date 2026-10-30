@@ -686,8 +686,10 @@ These transitions are for a trusted evaluator with exclusive journal access;
 they do not authenticate a caller. The evaluator issues them through
 `markets.research_final`: `research_proposals select --trial T --final-manifest M`
 binds the named completed attempt's journal candidate and validation payload to
-the SHA-256 of `M`, and `research_trial --request T --out O --ledger L
---final-manifest M` runs `execute_final`. That run requires the journal row to be
+the SHA-256 of encrypted bundle `M`, and `research_trial --request T --out O
+--access A --scratch S --ledger L --final-manifest M` runs `execute_final`.
+`A` contains public recipients, the private key-directory path and a storage limit;
+`S` is Linux job-local scratch. That run requires the journal row to be
 selected and `M` to hash to the bound digest, rechecks the policy, protocol,
 code and image lineage, and only then commits `release_final`, before any final
 relation is read. A failure after release, including a missing data file, leaves
@@ -754,14 +756,14 @@ poetry run python -m scripts.research_proposals --policy policy.json --ledger at
 `ResearchTrial` contains the frozen policy, exact admitted proposal, evaluation
 settings, attempt number and absolute compute-side evaluation manifest path.
 `ResearchCluster` is operator-owned: the HPC3 Python executable, workspace,
-project, remote attempt root, entrypoint directory, image path, checksum text and
-board report task. `python` and `workspace` are absolute paths on the controller's
-local filesystem. `root`, `entrypoint` and `image` are absolute POSIX paths on
-HPC3, even when the controller runs on Windows. All five reject parent-directory
-traversal. The checksums must include the image, evaluation manifest and
-`scripts/research_trial.py`; include every source data/query/receipt file and the
-entrypoint package initializer as well. The policy's dataset digest is the SHA-256
-of the evaluation manifest's exact bytes; that manifest pins the data and SQL.
+project, remote attempt root, entrypoint directory, image path, checksum text,
+access-configuration path and digest, and board report task. `python` and
+`workspace` are absolute controller paths; remote paths use POSIX syntax and reject
+parent traversal. Encrypted scoring requires Linux private-storage semantics.
+The checksums must include the image, encrypted bundle metadata, access configuration
+and `scripts/research_trial.py`; include the ciphertext files and entrypoint package
+initializer as well. The policy's dataset digest is the SHA-256 of the encrypted
+bundle metadata's exact bytes; it pins ciphertext and plaintext data/SQL identities.
 Its code digest names the external trial entrypoint; the image pins imported code.
 
 Controller portability was verified at API `effe49a2c9baf591547cc66875225bbdcc5d6d13`
@@ -793,8 +795,9 @@ its validation period, using the existing baseline trainers and the shared
 `RunRecord` publisher. `ResearchEvaluation` is the decoded frozen design plus
 the declared stopping months, fold months and interval confidence; its protocol
 hash names `crsp-monthly-holdings-validation-v1` and all of those settings. The
-evaluation manifest is the CRSP extract manifest, and the worker refuses to fit
-unless the staged protocol bytes decode to exactly the admitted design. A
+evaluation manifest names the encrypted bundle. After authenticated decryption,
+the worker reads its CRSP extract manifest and refuses to fit unless the protocol
+decodes to exactly the admitted design. A
 validation run never constructs a final-period decision; only the evaluator's
 `--ledger`/`--final-manifest` mode above does, once. Hash chaining detects
 corruption, not deliberate rewriting by someone who can modify the journal
