@@ -68,7 +68,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "26f6b2ee40c9419fdbcd42418a4d31514a9253a7"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "3b74a91dfaeaea7eda2b860bbe791fa672ebcd8f"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
@@ -82,11 +82,11 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "82866fd54add43aed2961d6e353aa54fa98020c4"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "0f06ec829bb186560d70e8fcf36b9d21164919d8"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
-  "libs/covenant_ml/tests/markets/test_crsp_study.py": "34906e84d248d597ed8aca35aa8e68121cf1a825"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "1637ec192a1cf1e0f7b6a3a4eefda34a7a33ca3e"
+  "libs/covenant_ml/tests/markets/test_crsp_study.py": "f43867ba31ba0ed7ad7fc4a13f97a0db7eb746f1"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "2b0cd1e2362f58475205774e7dc320b2ae8991d2"
 provenance:
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Ownership review 2026-10-29: MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6 is external to this API wiki's source_paths; live queue, installed controller and board reads are identified separately in the review footnotes."
@@ -218,7 +218,7 @@ profitability findings.[^frozen][^holdings]
 | Historical universe | At each decision date, common shares with effective share codes 10/11 and exchange codes 1/2/3, absolute closing price at least $5, and at least 252 prior sessions. Rank by trailing 60-session median absolute-price-times-volume; take at most 1,000. Resolve ties by PERMNO. Use effective-dated membership, including later-delisted securities; never today's constituent list. |
 | Historical availability | Preserve extraction vintage and source mappings. Effective dates govern membership. A current CRSP history is a revised historical backtest, not a proven as-published archive. Compustat stays outside v1; later financial features require report/publication availability and revision handling, not fiscal-period dates alone. |
 | Calendar and missingness | Establish an independent exchange-session calendar. No forward-filled return labels or silent dropping of held positions. Missing required prices, returns or delisting outcomes make the affected evaluation incomplete; log the failure. Eligibility excludes insufficient pre-decision history with counted reasons. |
-| Development and final period | Train 2000–2014; tune only on 2015–2021 through expanding chronological folds. Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
+| Development and final period | Train 2000–2014; tune on 2015–2021 through expanding chronological folds, retaining only windows whose exit is before January 2022 (decisions through October 2021). Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
 | Baselines and model family | Equal-weight eligible universe and fixed 12-to-2-month momentum (compound months t-12 through t-2, then select the top decile). Candidate: fixed boosted-tree family using lagged returns, volatility and volume; compare ClearGBM/LightGBM on identical rows and seeds. No Compustat or LLM text signals in v1. |
 | Portfolio and costs | Long-only, no leverage, equal-weight top decile, deterministic PERMNO ties, monthly rebalance. Primary all-in cost is 10 basis points times absolute traded notional, including entry/exit and turnover; report fixed 5/25-bp sensitivities. Costs are declared assumptions, not calibrated capacity or actual execution claims. |
 | Primary measurement | Mean monthly net-return difference versus momentum on the same dates. Report annualized return, volatility, drawdown and turnover secondarily. Use paired 12-month moving-block bootstrap, 10,000 draws, seed 7, with intervals and sample length; 36 final decisions limit inference. |
@@ -319,9 +319,13 @@ bootstrap. On a seeded four-year fixture the tests check, by independent index
 arithmetic, that each fold drops exactly the decision before each boundary, and
 check independently selected momentum portfolios, raw-row label oracles and the
 frozen-seed interval. Using binary labels because the trainers are classifiers is
-a declared implementation choice, not part of the frozen design. The two
-validation months nearest the final period take their outcomes from the first
-final-period sessions because their exits fall there.[^holdings]
+a declared implementation choice, not part of the frozen design. Before labels
+are attached, windows whose exits fall on or after `holdout_start` are omitted.
+This corrects the earlier validation tail that consumed final-period outcomes;
+the committed design now ends validation decisions in October 2021 and exits in
+December 2021. Tests exclude an exit equal to the boundary and verify that
+changing later returns and prices leaves validation output unchanged. This
+temporal exclusion does not establish process or credential isolation.[^holdings]
 
 The controller's `python` executable and `workspace` configuration use absolute
 native filesystem paths. HPC3 `root`, `entrypoint` and `image` use absolute POSIX
