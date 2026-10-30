@@ -51,7 +51,7 @@ confidence: medium
 
 # WRDS admission and shared queue ownership
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The fleet research lane has an implementation in the existing fleet package:
 it claims shared dispatch rows, uses existing resource leases during bounded

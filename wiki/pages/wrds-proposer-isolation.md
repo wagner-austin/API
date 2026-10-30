@@ -36,7 +36,7 @@ confidence: medium
 
 # WRDS proposal-program isolation
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The coordinator can assign proposer, runner and reviewer work using its current
 tasks. The evaluator enforces dates, costs, permitted changes and trial limits.

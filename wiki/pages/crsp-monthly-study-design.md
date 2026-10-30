@@ -39,7 +39,7 @@ confidence: medium
 
 # Frozen CRSP monthly study design
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The design is frozen in `libs/covenant_ml/docs/crsp-monthly-v1.json`. Its codec
 and calendar, membership, execution-price and terminal-value validators are

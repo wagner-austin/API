@@ -44,7 +44,7 @@ confidence: medium
 
 # WRDS substantive baseline readiness
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The implementation and independent audits are complete for the process primitive,
 its admission integration and evaluator-owned one-shot final controls. At API

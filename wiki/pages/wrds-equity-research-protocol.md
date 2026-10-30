@@ -43,7 +43,4 @@ start with [[wrds-baseline-readiness]] for that boundary.[^contract]
   run and installed-controller evidence.
 - [Research index](../../docs/RESEARCH.md) lists registered projects.
 
-This is the navigation entry for the WRDS implementation. Detailed claims belong
-on the focused pages above; commands remain in their package references.
-
 [^contract]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission" and § "Monthly holdings and validation study"; numerical implementation and runtime evidence are separated in the linked pages.

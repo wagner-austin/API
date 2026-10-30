@@ -44,7 +44,7 @@ confidence: medium
 
 # CRSP monthly source and panel contract
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The vendor definitions live in the tech wiki's
 [daily return contract](https://github.com/wagner-austin/tech-wiki/blob/main/pages/crsp-ciz-daily-return-contract.md),

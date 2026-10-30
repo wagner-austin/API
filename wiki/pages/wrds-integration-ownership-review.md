@@ -60,7 +60,7 @@ confidence: medium
 
 # WRDS integration ownership review
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The 2026-10-29 review traced the research submission, recovery and result path,
 including its failure tests. It found no compatibility shim, alternate backend

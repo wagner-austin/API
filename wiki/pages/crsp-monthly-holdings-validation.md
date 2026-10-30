@@ -27,7 +27,7 @@ confidence: medium
 
 # CRSP monthly holdings and chronological validation
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 Monthly holdings start from one unit of cash. At each rebalance close the
 investable value, held positions plus terminal values dated strictly before

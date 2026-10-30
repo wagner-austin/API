@@ -59,7 +59,7 @@ confidence: medium
 
 # WRDS evaluation reuses the shared numerical contracts
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The existing WRDS adapter verifies the exact query and CSV, builds chronological
 splits with an embargo, and predicts next-observation return sign from one prior

@@ -35,7 +35,7 @@ confidence: medium
 
 # Evaluator-owned WRDS final scoring
 
-Research entry point: [[wrds-equity-research-protocol]].
+- Research entry point: [[wrds-equity-research-protocol]].
 
 The existing `research_journal` accepts evaluator-owned `select` and `release_final`
 transitions. Selection requires settled validation work, binds a completed
