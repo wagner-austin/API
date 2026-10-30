@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json"
   - ".github/workflows/covenant-ml.yml"
   - "libs/covenant_ml/src/covenant_ml/markets/research_keys.py"
@@ -32,6 +33,7 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json": "6f58fc955b6a9086564ea6a36f3028fcd2ac0ed6"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
   ".github/workflows/covenant-ml.yml": "14472de200c3c5cb4a41c28110a1739327ecce8c"
   "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "cda0fd178b9d1f7988df633b1067478db9d03af0"
@@ -101,7 +103,8 @@ Its matching image freezes API `44fa91cea1607660a45f29172d8564a465d40744` at
 `58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6`.
 Native build `58629212` completed with exit `0:0` in 78 seconds on
 `hpc3-22-05`; both generated selfchecks and the dependency check passed.
-This establishes runtime construction, not the complete rehearsal.[^encrypted-runtime]
+This establishes runtime construction; the subsequent encrypted validation
+rehearsal also completed through the shared queue.[^encrypted-runtime][^rehearsal]
 
 The shared library now implements age-encrypted files, separately named
 train-validation/final bundles, and both ciphertext and plaintext SHA-256
@@ -110,7 +113,8 @@ recipient. Decryption accepts an in-memory identity and yields the extraction
 manifest only after every file authenticates and matches its frozen identity.
 Plaintext lives in a new mode-0700 temporary directory, with a declared size
 limit, and is removed on ordinary exit or exception. The same API is intended
-for WRDS Cloud and HPC3; neither native integration is verified yet.[^bundle]
+for WRDS Cloud and HPC3. HPC3 validation is now measured; WRDS-native encrypted
+execution remains unverified.[^bundle][^rehearsal]
 
 The evaluator now requires encrypted inputs and separate private partition keys.
 Validation works without a final key. Final scoring acquires its key only after
@@ -125,17 +129,36 @@ be private regular files opened without following symlinks. These are Linux
 execution requirements, not Windows ACL guarantees. Same-user or administrative
 processes remain privileged. Native final-key delivery must still consult the
 authoritative journal; copying that journal to a compute node would create a
-second authority. Proposer-access and forced-kill scratch-reclamation probes
-also remain outstanding. The remaining sequence is:[^integrated]
+second authority. Forced-kill scratch reclamation still needs a native probe.[^integrated]
 
-1. Verify native encrypted scoring through existing staging, execution and
-   result reconciliation. Finish native final-key delivery and measure the
-   key-access boundary and allocation cleanup.
-2. Rehearse an allowed proposal through the real admission controller, shared
-   queue, native job and reconciled RunRecord in one chain. The existing installed
-   isolation test uses a recording admission stand-in; its result cannot stand
-   for that complete chain. Exercise final release only in a separate rehearsal
-   journal with synthetic final data, not the substantive holdout.
+The real isolated proposer produced an allowed synthetic proposal, which was
+transported manually to the installed admission controller and admitted into a
+fresh journal. Shared queue `a332dd13-11b8-470f-9871-211490a67a8b` was then
+claimed by the scheduled `fleet-research-diphtheria` runner. It submitted native
+job `58629261`, verified its result, and closed the queue entry automatically at
+2026-10-30T12:30:36Z. Native accounting reports `COMPLETED`, exit `0:0`, 54 seconds,
+one CPU on `free`, node `hpc3-22-05`. Sixteen input checksums were verified,
+including the image, ciphertexts, bundle metadata, access configuration and
+entrypoint. The result retains the admitted ciphertext-bundle identity and
+plaintext-manifest identity. This is a synthetic validation measurement, not a
+substantive study or a native final-scoring rehearsal.[^rehearsal]
+
+The live rootless proposer probe on Colossus could not read a real canary age
+identity or synthetic final CSV, including through `/proc/1/root`, access its
+host Docker socket, or connect to the network. It ran as uid 65534 with only
+`LC_CTYPE` and `PATH`; the host files existed, were readable by the evaluator,
+and remained byte-identical. This verifies that sandbox boundary against host
+canaries, not protection against the evaluator's administrators.[^key-probe]
+
+[^key-probe]: Live Colossus run on 2026-10-30 using `PROBE_PROGRAM` from `tools/fleet/tests/test_research_proposal_host.py` through installed `fleet.core.research_proposer.run_proposer`, with pinned image sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337. Private evidence `/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea/isolation-probe/result.json` has SHA-256 21eb46b323576db1d33f651b347a4c68c10624e43123e23c43f44e6ca80086e9; program SHA-256 127315f96d43024be4880c08266a7aec6d3d1cd563768c3bfd786c4266f5cd32. All four reads returned errno 2; network access returned errno 101. The separately generated canary identity was not the study's final key, and no secret bytes were emitted.
+
+The remaining sequence is:
+
+1. Finish native final-key delivery through the authoritative controller and
+   measure allocation cleanup after forced termination. Exercise final release
+   only in the separate synthetic rehearsal journal, not the substantive holdout.
+2. Verify encrypted execution on WRDS Cloud and automate the measured
+   cross-host proposer-to-admission handoff through the existing controller.
 3. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
    checksums and calendar coverage, then stage its verified manifest to HPC3.
    Keep final-period evidence confined to the evaluator.
@@ -144,7 +167,9 @@ also remain outstanding. The remaining sequence is:[^integrated]
    comparison first; seal the chosen candidate and use the one-shot final release
    afterward. The selection API enforces identity, not which candidate is best.
 
-[^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. All transport inputs for synthetic validation were verified by the existing stager. The isolated proposer ran on Colossus and the installed controller admitted its output into a fresh journal; shared queue job a332dd13-11b8-470f-9871-211490a67a8b was submitted on 2026-10-30. This submission is intent, not a completed evaluation. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
+[^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. This artifact records the runtime build; subsequent queue evidence is in [^rehearsal]. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
+
+[^rehearsal]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json`, queue closure, native accounting, verified_files, dataset identities, proposer isolation and private evidence hashes. Live dispatch_get on 2026-10-30 reported queue a332dd13-11b8-470f-9871-211490a67a8b passed with canonical RunRecord SHA-256 cfe6049eaf1431f68e73f8bc62c98dbf2da7a86f8a9ea04eb86b2c91b2d0087a. The native record file separately hashes to 8122346701a00789c9d17f626bca454481f7d39d2315e07d78f803d9c15a79da; these distinguish canonical record encoding from stored file bytes. Private observe-1.log SHA-256 3d49ad6aee7d1abafa6891063160ed73aa11474999cb2ebcdd166aac9cfbb550 retains the native evidence returned to the existing reconciliation controller. The source revision remains 44fa91cea; documentation publication at f17f7ba3 passed full fleet checks 2b00dfd6 (2,006 HPC3 tests) and e9a5322b (4,836 evaluator tests), both at 100% coverage.
 
 [^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. On main at 85e408c1c08cd3ff5faaf88416f4d62965ed64a3, job 8054c71b passed libs/covenant_ml on Colossus at 2026-10-30T05:57:25Z: 4,786 tests, 100.00% coverage. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 

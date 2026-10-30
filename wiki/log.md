@@ -317,5 +317,8 @@ storage, dataset-bound reconciliation and the separately installed encrypted
 runtime. Native build 58629212 and two Linux fleet checks passed; GitHub Ubuntu
 run 41054078619 passed all 4,836 cases at 100% coverage. The isolated proposer
 and real admission controller produced the synthetic request queued as a332dd13.
-Final-key delivery and isolation/cleanup probes remain open. Board task e6729a16;
-no new page or page-count change.
+The scheduled runner submitted native job 58629261 and automatically reconciled
+its verified result; the queue closed passed. The live canary isolation probe
+also passed. Native final-key delivery, forced-termination cleanup and WRDS-native
+encrypted execution remain open. Board task e6729a16; no new page or page-count
+change.
