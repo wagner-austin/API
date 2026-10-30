@@ -321,13 +321,18 @@ def machine_of(sessions: NodeSessions) -> str:
     return f"{sessions['platform']}:{sessions['hostname']}"
 
 
-def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> NodeOutcome:
+def observe_node(
+    board: McpCredentials, node: Machine, identity: JSONObject, evidence_seconds: int
+) -> NodeOutcome:
     """Read one node's records and record them on the board.
 
     Args:
         board: The taskboard's endpoint and headers.
         node: The machine, from the roster.
         identity: This runner's identity arguments.
+        evidence_seconds: The workspace's ``native_evidence_seconds``, the
+            lifetime of each native Codex observation
+            (:func:`fleet.core.native_observe.observe_codex`).
 
     Returns:
         The outcome -- recorded, or not reached and why.
@@ -361,7 +366,7 @@ def observe_node(board: McpCredentials, node: Machine, identity: JSONObject) -> 
         observations=observations,
         identity=identity,
         native_observations=native_observe.observe_codex(
-            board, node["name"], user, machine, identity
+            board, node["name"], user, machine, identity, evidence_seconds
         ),
     )
     return NodeOutcome(node=node["name"], recorded=True, detail=detail)
@@ -394,7 +399,10 @@ def observable(machines: Mapping[str, Machine]) -> tuple[Machine, ...]:
 
 
 def observe_pass(
-    board: McpCredentials, machines: tuple[Machine, ...], identity: JSONObject
+    board: McpCredentials,
+    machines: tuple[Machine, ...],
+    identity: JSONObject,
+    evidence_seconds: int,
 ) -> tuple[NodeOutcome, ...]:
     """Observe each machine :func:`observable` chose.
 
@@ -402,6 +410,7 @@ def observe_pass(
         board: The taskboard's endpoint and headers.
         machines: The machines to visit, in order.
         identity: This runner's identity arguments.
+        evidence_seconds: See :func:`observe_node`.
 
     Returns:
         One outcome per machine, in order.
@@ -409,7 +418,7 @@ def observe_pass(
     Raises:
         AppError: See :func:`observe_node`.
     """
-    return tuple(observe_node(board, machine, identity) for machine in machines)
+    return tuple(observe_node(board, machine, identity, evidence_seconds) for machine in machines)
 
 
 def render_outcome(outcome: NodeOutcome) -> str:

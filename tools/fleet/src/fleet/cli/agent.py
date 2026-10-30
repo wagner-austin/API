@@ -458,7 +458,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     if lane is not DispatchLane.HUB:
         return 0
     hub_passes.publish_pass(credentials, identity, repo_root=project_root)
-    hub_passes.observe_pass(loaded.workspace["machines"], identity)
+    hub_passes.observe_pass(
+        loaded.workspace["machines"], identity, loaded.workspace["native_evidence_seconds"]
+    )
     hub_passes.reap_pass(project_root)
     return 0
 

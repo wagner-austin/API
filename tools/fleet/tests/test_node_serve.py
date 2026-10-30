@@ -26,6 +26,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from fleet.cli import node_agent, node_serve, node_serve_claim
 from fleet.contracts.workspace import (
+    NATIVE_EVIDENCE_CEILING_SECONDS,
     NODE_POLL_CEILING_SECONDS,
     NODE_SERVE_CEILING_SECONDS,
     decode_fleet_workspace,
@@ -484,6 +485,12 @@ class TestTheDeclarations:
         assert workspace["node_serve_seconds"] == 1200
         assert workspace["node_poll_seconds"] == 5
 
+    def test_the_registry_keeps_codex_evidence_past_the_slowest_measured_pass_gap(self) -> None:
+        """MCPs board task 17f74771: ziggurat's observe passes ran up to 375 s
+        apart, and 300 s of evidence left every Codex row expired between them."""
+        workspace = decode_fleet_workspace(shipped_document())
+        assert workspace["native_evidence_seconds"] == 600
+
     @pytest.mark.parametrize(
         ("field", "seconds"),
         [
@@ -491,6 +498,8 @@ class TestTheDeclarations:
             ("node_serve_seconds", NODE_SERVE_CEILING_SECONDS + 1),
             ("node_poll_seconds", 0),
             ("node_poll_seconds", NODE_POLL_CEILING_SECONDS + 1),
+            ("native_evidence_seconds", 0),
+            ("native_evidence_seconds", NATIVE_EVIDENCE_CEILING_SECONDS + 1),
         ],
     )
     def test_a_value_outside_its_bounds_is_refused(self, field: str, seconds: int) -> None:
@@ -499,7 +508,9 @@ class TestTheDeclarations:
         with pytest.raises(JSONTypeError, match=f"{field} is {seconds}"):
             decode_fleet_workspace(document)
 
-    @pytest.mark.parametrize("field", ["node_serve_seconds", "node_poll_seconds"])
+    @pytest.mark.parametrize(
+        "field", ["node_serve_seconds", "node_poll_seconds", "native_evidence_seconds"]
+    )
     def test_a_workspace_without_one_is_refused(self, field: str) -> None:
         document = sourced_document((NPM_CI,))
         del document[field]

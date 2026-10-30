@@ -120,7 +120,12 @@ def thread_status(thread: JSONObject | str, session_id: str) -> tuple[str, str |
 
 
 def observe_codex(
-    board: McpCredentials, host: str, user: str, machine: str, identity: JSONObject
+    board: McpCredentials,
+    host: str,
+    user: str,
+    machine: str,
+    identity: JSONObject,
+    evidence_seconds: int,
 ) -> list[JSONValue]:
     """Produce bounded native evidence through the existing SSH route.
 
@@ -130,11 +135,14 @@ def observe_codex(
         user: Provisioned account running Codex.
         machine: Host's measured ledger key.
         identity: Existing fleet observer identity.
+        evidence_seconds: The workspace's ``native_evidence_seconds``, how
+            long each observation stays evidence: past the gap between two
+            observe passes, which runs longer than one tick's period.
 
     Returns:
         Native observations for task_session_observe. A failed runtime read
         explicitly produces unavailable evidence; an empty inventory does not
-        invoke a proxy. Evidence expires after five minutes, beyond one tick.
+        invoke a proxy. Each expires ``evidence_seconds`` after it was read.
 
     Raises:
         ValueError: A runtime response does not match registered identities.
@@ -165,7 +173,7 @@ def observe_codex(
             "status": status,
             "detail": detail,
             "observedAt": datetime.fromtimestamp(observed, UTC).isoformat(),
-            "expiresAt": datetime.fromtimestamp(observed + 300, UTC).isoformat(),
+            "expiresAt": datetime.fromtimestamp(observed + evidence_seconds, UTC).isoformat(),
         }
         for session, (status, detail) in zip(targets, statuses, strict=True)
     ]

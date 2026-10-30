@@ -11,7 +11,7 @@ from fleet.core import _test_hooks, _test_hooks_native, native_observe, observe
 from fleet.core.ssh_options import SSH_OPTIONS
 from tests._queue_fakes import FakeQueue
 from tests.conftest import FakeRun, ok
-from tests.test_observe import BOARD, IDENTITY, document, node
+from tests.test_observe import BOARD, EVIDENCE, IDENTITY, document, node
 
 SESSION = "11111111-1111-4111-8111-111111111111"
 MACHINE = "linux:ziggurat"
@@ -143,7 +143,9 @@ def test_empty_inventory_never_opens_proxy() -> None:
     _test_hooks.http_post = FakeQueue([inventory()])
     runtime = Runtime(())
     _test_hooks_native.read = runtime
-    assert native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY) == []
+    assert (
+        native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY, EVIDENCE) == []
+    )
     assert runtime.calls == []
 
 
@@ -155,7 +157,7 @@ def test_existing_observer_submits_native_evidence_with_bounded_expiry(failure: 
     _test_hooks.http_post = board
     runtime = Runtime(({"id": SESSION, "status": {"type": "active", "activeFlags": []}},), failure)
     _test_hooks_native.read = runtime
-    result = observe.observe_node(BOARD, node("ziggurat", "session-host"), IDENTITY)
+    result = observe.observe_node(BOARD, node("ziggurat", "session-host"), IDENTITY, EVIDENCE)
     assert result == {"node": "ziggurat", "recorded": True, "detail": "observed native evidence"}
     assert runtime.calls == [
         (
@@ -182,7 +184,7 @@ def test_existing_observer_submits_native_evidence_with_bounded_expiry(failure: 
                 "status": "active" if failure is None else "unavailable",
                 "detail": failure,
                 "observedAt": "1970-01-01T00:16:40+00:00",
-                "expiresAt": "1970-01-01T00:21:40+00:00",
+                "expiresAt": "1970-01-01T00:24:10+00:00",
             }
         ],
     }
@@ -192,7 +194,7 @@ def test_incomplete_runtime_batch_does_not_guess_idle() -> None:
     _test_hooks.http_post = FakeQueue([inventory(identity_row())])
     _test_hooks_native.read = Runtime(())
     with pytest.raises(ValueError, match="incomplete runtime response"):
-        native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY)
+        native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY, EVIDENCE)
 
 
 def test_missing_runtime_thread_is_unavailable_not_departed() -> None:
@@ -216,4 +218,4 @@ def test_excessive_inventory_fails_explicitly() -> None:
         ]
     )
     with pytest.raises(ValueError, match="CODEX_OBSERVE_LIMIT"):
-        native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY)
+        native_observe.observe_codex(BOARD, "ziggurat", "corvis", MACHINE, IDENTITY, EVIDENCE)

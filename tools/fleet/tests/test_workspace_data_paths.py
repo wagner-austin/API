@@ -69,6 +69,7 @@ def _document(
         "node_local_resources": [],
         "node_serve_seconds": 0,
         "node_poll_seconds": 180,
+        "native_evidence_seconds": 600,
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",

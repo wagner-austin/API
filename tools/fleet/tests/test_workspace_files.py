@@ -67,6 +67,7 @@ def test_the_shipped_registry_assembles_into_a_workspace_that_decodes() -> None:
         "data_paths",
         "node_serve_seconds",
         "node_poll_seconds",
+        "native_evidence_seconds",
         "ledger",
         "feed",
         "leases",

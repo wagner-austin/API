@@ -53,6 +53,11 @@ NODE_SERVE_CEILING_SECONDS = 1800
 #: every fire boundary already reads every held run at that rate.
 NODE_POLL_CEILING_SECONDS = 180
 
+#: The longest a native runtime observation may stay evidence: MCPs
+#: migration 879's check holds ``native_expires_at`` within 15 minutes of
+#: ``native_observed_at``, and the board refuses a row past it.
+NATIVE_EVIDENCE_CEILING_SECONDS = 900
+
 
 class FleetWorkspace(TypedDict):
     """Everything a fleet command needs that is not on the command line.
@@ -127,6 +132,18 @@ class FleetWorkspace(TypedDict):
             (:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_serve`), so
             how long an ended run or an arrived job can wait before the
             runner sees it. From 1 to :data:`NODE_POLL_CEILING_SECONDS`.
+        native_evidence_seconds: How long one native Codex observation the
+            hub's observe pass writes stays evidence
+            (:mod:`fleet.core.native_observe`), and so how long the ledger
+            keeps a Codex session's runtime state with no newer pass. It
+            must outlast the gap between two passes, not one tick's period:
+            the hub's tick starts every 180 s but only after the previous
+            one ends, and ziggurat's passes ran up to 375 s apart in the day
+            to 2026-10-30T09:50Z, so the 300 s it was left every Codex row
+            expired until the next pass (MCPs board task 17f74771).
+            DECLARED HERE because MCPs execution's served case reads the
+            same staged document to judge each row's window. From 1 to
+            :data:`NATIVE_EVIDENCE_CEILING_SECONDS`.
         ledger: Path to the append-only dispatch record. Relative paths
             resolve against the workspace document's own directory, so a
             workspace can be moved without editing it.
@@ -142,6 +159,7 @@ class FleetWorkspace(TypedDict):
     node_local_resources: tuple[str, ...]
     node_serve_seconds: int
     node_poll_seconds: int
+    native_evidence_seconds: int
     ledger: str
     feed: str
     leases: str
@@ -220,6 +238,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         "node_local_resources": encode_names(workspace["node_local_resources"]),
         "node_serve_seconds": workspace["node_serve_seconds"],
         "node_poll_seconds": workspace["node_poll_seconds"],
+        "native_evidence_seconds": workspace["native_evidence_seconds"],
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
@@ -332,6 +351,29 @@ def _decode_node_poll_seconds(value: JSONObject) -> int:
             f"{NODE_POLL_CEILING_SECONDS}: zero would read the node and the queue without "
             "pause, and a poll slower than a fire boundary sees nothing the boundary's "
             "collect pass does not"
+        )
+    return seconds
+
+
+def _decode_native_evidence_seconds(value: JSONObject) -> int:
+    """Read how long one native runtime observation stays evidence.
+
+    Args:
+        value: The workspace object.
+
+    Returns:
+        The lifetime in seconds.
+
+    Raises:
+        JSONTypeError: If the field is missing, is not an integer, or lies
+            outside 1 to :data:`NATIVE_EVIDENCE_CEILING_SECONDS`.
+    """
+    seconds = require_int(value, "native_evidence_seconds")
+    if not 1 <= seconds <= NATIVE_EVIDENCE_CEILING_SECONDS:
+        raise JSONTypeError(
+            f"native_evidence_seconds is {seconds}; it must lie between 1 and "
+            f"{NATIVE_EVIDENCE_CEILING_SECONDS}, the window MCPs migration 879 lets the "
+            "board record"
         )
     return seconds
 
@@ -489,6 +531,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         node_local_resources=_decode_node_local_resources(value, projects),
         node_serve_seconds=_decode_node_serve_seconds(value),
         node_poll_seconds=_decode_node_poll_seconds(value),
+        native_evidence_seconds=_decode_native_evidence_seconds(value),
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),
@@ -496,6 +539,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
 
 
 __all__ = [
+    "NATIVE_EVIDENCE_CEILING_SECONDS",
     "NODE_POLL_CEILING_SECONDS",
     "NODE_SERVE_CEILING_SECONDS",
     "FleetWorkspace",

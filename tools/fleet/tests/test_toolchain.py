@@ -82,6 +82,7 @@ def _workspace_document() -> JSONObject:
         },
         "node_serve_seconds": 0,
         "node_poll_seconds": 180,
+        "native_evidence_seconds": 600,
         "ledger": "ledger.jsonl",
         "feed": "feed.jsonl",
         "leases": "leases.json",

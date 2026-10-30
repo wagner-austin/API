@@ -27,6 +27,9 @@ IDENTITY: JSONObject = {
     "sessionId": "33333333-cccc-4ccc-8ccc-333333333333",
     "cwd": "/home/corvis/PROJECTS/API",
 }
+#: A native evidence lifetime no workspace declares, so a case reading it
+#: back proves the argument reached the observation.
+EVIDENCE = 450
 SESSION = "d31e5228-3269-4a22-a27f-e535cbef1894"
 MACHINE = "linux:colossus"
 STARTED_MS = 1_789_000_000_000
@@ -305,7 +308,7 @@ def test_observe_node_sends_the_script_runs_it_by_path_and_records_on_the_board(
     )
     _test_hooks.http_post = board
 
-    outcome = observe.observe_node(BOARD, node("colossus", "worker"), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("colossus", "worker"), IDENTITY, EVIDENCE)
 
     assert outcome == observe.NodeOutcome(
         node="colossus",
@@ -354,7 +357,7 @@ def test_observe_node_records_an_empty_pass_for_a_node_with_no_sessions() -> Non
     )
     _test_hooks.http_post = board
 
-    outcome = observe.observe_node(BOARD, node("lacrymal", "worker"), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("lacrymal", "worker"), IDENTITY, EVIDENCE)
 
     assert outcome["recorded"] is True
     assert board.arguments[0]["machine"] == "linux:lacrymal"
@@ -377,7 +380,7 @@ def test_observe_node_keys_a_2_1_294_node_by_its_hostname() -> None:
     )
     _test_hooks.http_post = board
 
-    outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY, EVIDENCE)
 
     assert outcome == observe.NodeOutcome(
         node="diphtheria",
@@ -399,7 +402,7 @@ def test_observe_node_records_a_node_that_has_never_run_claude_code() -> None:
     )
     _test_hooks.http_post = board
 
-    outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("diphtheria", "worker"), IDENTITY, EVIDENCE)
 
     assert observe.render_outcome(outcome) == (
         "diphtheria: observed 0 session(s) for linux:diphtheria (0 new row(s)) at t"
@@ -415,7 +418,7 @@ def test_observe_node_reports_an_unreachable_node_as_an_outcome() -> None:
     board = FakeQueue([])
     _test_hooks.http_post = board
 
-    outcome = observe.observe_node(BOARD, node("lacrymal", "worker"), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("lacrymal", "worker"), IDENTITY, EVIDENCE)
 
     assert outcome == observe.NodeOutcome(
         node="lacrymal",
@@ -441,7 +444,7 @@ def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
     _test_hooks.http_post = board
     machines = (node("pendragon", "worker"), node("colossus", "worker"))
 
-    outcomes = observe.observe_pass(BOARD, machines, IDENTITY)
+    outcomes = observe.observe_pass(BOARD, machines, IDENTITY, EVIDENCE)
 
     assert [observe.render_outcome(o) for o in outcomes] == [
         "pendragon: not observed -- ssh to pendragon timed out while sending "
@@ -455,7 +458,7 @@ def test_observe_pass_records_every_other_node_when_one_times_out() -> None:
 
 def test_observe_node_reports_a_node_without_a_provisioned_user() -> None:
     _test_hooks.run = FakeRun([])
-    outcome = observe.observe_node(BOARD, node("ghost", "worker", user=None), IDENTITY)
+    outcome = observe.observe_node(BOARD, node("ghost", "worker", user=None), IDENTITY, EVIDENCE)
     assert outcome == observe.NodeOutcome(
         node="ghost", recorded=False, detail="no provisioned user in the registry"
     )
@@ -466,7 +469,7 @@ def test_observe_node_raises_on_a_record_from_another_machine() -> None:
     board = FakeQueue([])
     _test_hooks.http_post = board
     with pytest.raises(AppError) as caught:
-        observe.observe_node(BOARD, node("colossus", "worker"), IDENTITY)
+        observe.observe_node(BOARD, node("colossus", "worker"), IDENTITY, EVIDENCE)
     assert caught.value.code is FleetErrorCode.SESSION_MACHINE_MISMATCH
     assert board.tools == []
 
@@ -499,7 +502,7 @@ def test_observe_pass_visits_enabled_fleet_arm_machines_in_name_order() -> None:
         "lacrymal": node("lacrymal", "worker"),
     }
 
-    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
+    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY, EVIDENCE)
 
     assert [o["node"] for o in outcomes] == ["colossus", "lacrymal", "viper"]
     assert [o["recorded"] for o in outcomes] == [True, False, True]
@@ -524,7 +527,7 @@ def test_observe_pass_visits_a_session_host() -> None:
         "hub": node("hub", "hub", observer=LedgerObserver.PCSESSION),
     }
 
-    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY)
+    outcomes = observe.observe_pass(BOARD, observe.observable(registry), IDENTITY, EVIDENCE)
 
     assert [(o["node"], o["recorded"]) for o in outcomes] == [("ziggurat", True)]
     assert [a["machine"] for a in board.arguments] == ["linux:ziggurat", "linux:ziggurat"]

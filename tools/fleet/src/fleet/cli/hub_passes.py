@@ -64,7 +64,9 @@ def publish_pass(
     )
 
 
-def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
+def observe_pass(
+    machines: Mapping[str, Machine], identity: JSONObject, evidence_seconds: int
+) -> None:
     """Record the Claude Code sessions of every enabled machine the arm observes.
 
     The board's credentials are read HERE, not at the top of the tick, and
@@ -75,6 +77,7 @@ def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
     Args:
         machines: The roster's machines, from the loaded workspace.
         identity: This runner's identity arguments.
+        evidence_seconds: The workspace's ``native_evidence_seconds``.
 
     Raises:
         AppError: The board-watch credential codes when the taskboard's
@@ -91,7 +94,7 @@ def observe_pass(machines: Mapping[str, Machine], identity: JSONObject) -> None:
         )
         return
     board = board_config.load_credentials()
-    for outcome in observe.observe_pass(board, observed, identity):
+    for outcome in observe.observe_pass(board, observed, identity, evidence_seconds):
         _log.info("%s", observe.render_outcome(outcome))
 
 
