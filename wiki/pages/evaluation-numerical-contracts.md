@@ -39,7 +39,11 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
   "libs/platform_core/tests/test_run_record.py": "5bd7f783973789c95e490238b34eec53d90e5237"
-fact_checked: 2026-10-29
+provenance:
+  - "fleet job 43e15f3c-c588-4bb8-a203-f4035975776a: make check for libs/covenant_ml at API 43c23e111a4888d387d1da9647be328bbb23ddf6 on lavender, exit 0, 4699 passed, 0 failed, coverage total 100.00%, ended 2026-10-30T00:48:12Z"
+  - "fleet job 172cc4e1-b31f-4dc9-b8db-ac2cdc60ee3e: make check for libs/platform_core at API 43c23e111a4888d387d1da9647be328bbb23ddf6 on sedona, exit 0, 1694 passed, 0 failed, coverage total 100.00%, ended 2026-10-30T00:44:55Z"
+  - "hand re-derivation 2026-10-30 for board task 82a072db: unequal-cluster variance 3/2 x 38/36 = 19/12; t(1) radius 0.5 tan(0.45 pi) and p = 1 - 2 atan(4)/pi; moving-block means 0.5, 2.5 and 6.5 have variance 56/9, so two draws give 28/9, and 1/9 tail masses put the 2.5 and 97.5 percentiles at 0.5 and 6.5; label purge keeps train times 0 and 1 and validation time 3 when availability must precede the next fold's first time"
+fact_checked: 2026-10-30
 confidence: medium
 ---
 
@@ -80,8 +84,16 @@ identities. RunRecord itself does not reread every source payload or prove
 historical publication availability. Restricted holdout execution remains a
 separate integration requirement in the linked WRDS protocol.[^provenance]
 
+At API `43c23e111` the covenant_ml check passed 4699 tests and the
+platform_core check passed 1694, each at 100% statement and branch coverage.
+The cluster, Cauchy, moving-block and label-purge expectations were
+re-derived by hand and agree with the tests. These results verify the
+instruments at that commit, not the monthly holdings study built on
+them.[^checks]
+
 [^contracts]: `libs/covenant_ml/docs/EVALUATION_CONTRACTS.md`, instrument table and Interpretation limits; board task 82a072db-6973-4b24-a76b-ed06166d1a02.
 [^numerics]: `tests/evaluation/test_numerical_contracts.py`, Cauchy and unequal-cluster cases; `test_moving_block.py`, enumerated distribution and paired cancellation; source `metrics.py`, `ranking.py`, `evaluation/auc.py`, `evaluation/temporal.py` and `evaluation/paired.py` under `libs/covenant_ml`.
 [^fits]: `libs/covenant_ml/tests/evaluation/test_ablation.py`, `test_removing_the_signal_costs_auc_and_removing_noise_does_not`; `test_learning_curve.py`, nested-prefix and real-fit cases; `evaluation/learning_curve.py`, `learning_curve_seed`.
 [^intervals]: `libs/covenant_ml/src/covenant_ml/evaluation/intervals.py`, `pool_across_seeds` and `percentile_interval`; `evaluation/paired.py`, `compare_moving_block`.
 [^provenance]: `libs/covenant_ml/tests/evaluation/test_wrds.py`, modified evidence and symlink cases; `tests/markets/test_research_trial.py`, frozen identity refusals; `test_research_execution.py`, exact-byte bundle test; `libs/platform_core/src/platform_core/run_record.py` and `tests/test_run_record.py`, observation round trips and incompatible comparison cases.
+[^checks]: fleet jobs `43e15f3c-c588-4bb8-a203-f4035975776a` (libs/covenant_ml) and `172cc4e1-b31f-4dc9-b8db-ac2cdc60ee3e` (libs/platform_core) at API `43c23e111`, with the hand re-derivation, all recorded under `provenance:`; board task 82a072db-6973-4b24-a76b-ed06166d1a02.
