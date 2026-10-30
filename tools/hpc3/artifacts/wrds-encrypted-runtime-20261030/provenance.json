@@ -1,0 +1,63 @@
+{
+  "kind": "wrds-encrypted-runtime-v1",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "source_commit": "44fa91cea1607660a45f29172d8564a465d40744",
+  "source_archive_sha256": "da51f7d889f4d4bfe5b1dcfdff8a62c66a5e3a9d9652b8128a35d1c5b944bf9f",
+  "private_build_directory": "/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea",
+  "controller_python": "/home/corvis/research-control/wrds-encrypted-44fa91cea/bin/python",
+  "controller_entrypoint": "/home/corvis/research-control/wrds-encrypted-44fa91cea/entrypoint",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "controller_entrypoint_hashes": {
+    "__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+    "research_proposals.py": "3e9b464761498a8236883ba1946a8e54ddbb1b2fb3e1b849475a4183c0289dc1",
+    "research_trial.py": "94e89ab597db7587658fa823143f1625c6ab089e7bb4ffec4276279d7fc0fc40"
+  },
+  "first_party_wheel_sha256": {
+    "board_watch-0.1.0-py3-none-any.whl": "5b29a3362857be3edb7372aad16b3ec54cc61ddc3e0addd65fdb60d230c6c64b",
+    "cleargbm-0.1.0-py3-none-any.whl": "e66aeafbcba41938062ede2c143996e710241fac5bd2233997850c1ce50e779d",
+    "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "covenant_domain-0.1.0-py3-none-any.whl": "b961095c84694b48d7c065110486da7f2e334cdd76a25628b51e7cf79b202fea",
+    "covenant_ml-0.1.0-py3-none-any.whl": "536e44197f3bb88ac85fa006b9c581689a5fae20c94db35cb5e9960c957a209c",
+    "fleet-0.1.0-py3-none-any.whl": "4e7883ce26baefcd560d3e30869760a8a0f18b73c011431e7d0723ed3e93b179",
+    "hpc3-0.1.0-py3-none-any.whl": "8c6e8d7233fe04c716cb021ae863a6781fefbf011a05a677e840e3f304e4d358",
+    "monorepo_guards-0.1.0-py3-none-any.whl": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+    "platform_core-0.1.0-py3-none-any.whl": "7e026756d2b41386088bac6c49c4be8b7543a2c844989fddd4e3f53d58088889",
+    "platform_ml-0.1.0-py3-none-any.whl": "4942b59b784e2990f53bab8bfa77ffa15407741800f35cce7c93e118a64a073e"
+  },
+  "reused_wheels_origin": "92719c060; git diff confirms other wheel source subtrees unchanged; covenant_ml rebuilt from the frozen source archive",
+  "image": {
+    "path": "/pub/wagnera3/images/research-encrypted-44fa91cea/research-encrypted.sif",
+    "sha256": "58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6",
+    "job_id": "58629212",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 78,
+    "cpus": 8,
+    "partition": "free",
+    "node": "hpc3-22-05",
+    "selfcheck_passes": 2,
+    "pip_check": "No broken requirements found."
+  },
+  "evidence_sha256": {
+    "image-spec.json": "14bb34a7a1a8ab74cde99d05d25ebad1b506fae3bc6b588ea045759b825a5d95",
+    "controller-requirements.txt": "bbd11b2dedb774f7cd3e4df95e833cd72d651ccfb627121fa8cce0e33cbf4740",
+    "controller-check.txt": "9261363b733079a641c2e4cc9bc46ffa1d8336945a87f807b6cf68847dbc9b09",
+    "native-build.out": "7f9faa2a1e90001ddb53c30150a7748d77fabc313ea89827e063597b4ff601db",
+    "native-accounting.txt": "95dcca45cff66dce689413e687d9111bf2e970563ad5d899eb5d065c4eb79cb4",
+    "build-stage.json": "0881f6470758e7b5e5d4ba0c307347e100ee005c60d0583fdcfa68d39f09225d",
+    "wheels-stage.json": "63ba008ced323161166e97d44e4b6d64b4c74bfa8cf92793c1dee59597039eef"
+  },
+  "verification": {
+    "fleet_job": "cd0d062a-c5b0-4a7d-acb5-f860b6a546de",
+    "fleet_commit": "90b03d7c8b6bc5c1ca1620d6fb4c4b13d9148994",
+    "tests_passed": 4836,
+    "coverage_percent": 100,
+    "platform": "Linux"
+  },
+  "limits": [
+    "Final-key delivery through the authoritative controller is still pending.",
+    "Native build selfchecks do not establish the complete research queue rehearsal.",
+    "Windows private storage is unsupported; no Windows ACL claim is made.",
+    "No licensed observations were extracted or staged."
+  ]
+}
