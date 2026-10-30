@@ -15,9 +15,11 @@ self-financing holdings accounting at every frozen cost, and each candidate
 and the equal-weight universe are compared with fixed momentum on identical
 consecutive months by the paired moving-block bootstrap the design freezes.
 
-Decisions on or after the final-period start are never constructed. The two
-validation months nearest that boundary take their outcomes from the first
-final-period sessions, because their exits fall there.
+Decisions on or after the final-period start are never constructed. Before
+attaching outcomes, discard every window whose exit is on or after that start.
+Thus validation selection consumes no final-period outcomes, including those
+of positions entered before the boundary. This is a temporal rule, not a
+process-level restriction on access to the source files.
 """
 
 from __future__ import annotations
@@ -267,7 +269,8 @@ def run_crsp_validation(
 
     Returns:
         Every arm's accounting at every frozen cost and, at the primary cost,
-        each candidate's and the universe's comparison with momentum.
+        each candidate's and the universe's comparison with momentum. All scored
+        exits are strictly before the frozen holdout start.
 
     Raises:
         ValueError: CRSP-009 for an unsupported schedule or incomplete evidence;
@@ -277,7 +280,11 @@ def run_crsp_validation(
     if stopping_months < 1 or fold_months < 1:
         raise ValueError("[CRSP-009] stopping and fold months must be positive")
     final = date.fromisoformat(protocol["holdout_start"]) - timedelta(days=1)
-    panel = build_crsp_panel(sources, protocol["train_start"], final.isoformat())
+    panel = tuple(
+        decision
+        for decision in build_crsp_panel(sources, protocol["train_start"], final.isoformat())
+        if decision.window.exit < protocol["holdout_start"]
+    )
     outcomes = index_crsp_outcomes(sources)
     rows = crsp_study_rows(outcomes, panel, features)
     first = _validation_start(panel, protocol["validation_start"])
