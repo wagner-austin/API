@@ -60,7 +60,7 @@ def _runtime(socket: str, image: str) -> tuple[str, ...]:
     ]
     if (
         "name=rootless" not in options
-        or any(info.get(key) is not True for key in ("MemoryLimit", "CPUCfsQuota", "PidsLimit"))
+        or any(info.get(key) is not True for key in ("MemoryLimit", "CpuCfsQuota", "PidsLimit"))
         or info.get("CgroupVersion") != "2"
     ):
         raise ValueError(
