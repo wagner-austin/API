@@ -43,14 +43,22 @@ def study_protocol() -> JSONObject:
     return protocol
 
 
-def study_rows() -> dict[str, list[JSONObject]]:
-    """Weekday sessions from 2016 through February 2020 and eight seeded securities.
+#: The last staged day of the validation extract; validation needs no later evidence.
+VALIDATION_END = date(2020, 2, 29)
+#: The last staged day of the final extract, covering the June 2020 decision's exit.
+FINAL_END = date(2020, 8, 31)
+
+
+def study_rows(end: date = VALIDATION_END) -> dict[str, list[JSONObject]]:
+    """Weekday sessions from 2016 through ``end`` and eight seeded securities.
 
     Liquidity rises with PERMNO, so the six most liquid form the universe until
     security 8 delists. Its daily delisting-flagged copy on 2019-03-15 carries
-    +30%, which must never be compounded; the terminal value is -25%.
+    +30%, which must never be compounded; the terminal value is -25%. Sessions
+    after ``VALIDATION_END`` draw from a second seeded stream, so a longer
+    extract repeats every validation-extract row exactly.
     """
-    start, end = date(2016, 1, 1), date(2020, 2, 29)
+    start = date(2016, 1, 1)
     days = [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
     calendar: list[JSONObject] = [
         {
@@ -61,7 +69,16 @@ def study_rows() -> dict[str, list[JSONObject]]:
         for day in days
     ]
     sessions = [day for day in days if day.weekday() < 5]
-    draws = np.random.default_rng(20261030).normal(0.0004, 0.02, size=8 * len(sessions))
+    base = sum(1 for day in sessions if day <= VALIDATION_END)
+    draws = np.random.default_rng(20261030).normal(0.0004, 0.02, size=8 * base)
+    later = np.random.default_rng(20261031).normal(0.0004, 0.02, size=8 * len(sessions))
+
+    def draw(permno: int, index: int) -> float:
+        """The validation stream before the boundary, the later stream after it."""
+        if index < base:
+            return round(float(draws.flat[(permno - 1) * base + index]), 6)
+        return round(float(later.flat[(permno - 1) * len(sessions) + index]), 6)
+
     returns: list[JSONObject] = []
     for permno in range(1, 9):
         for index, (previous, day) in enumerate(pairwise(sessions), start=1):
@@ -69,7 +86,7 @@ def study_rows() -> dict[str, list[JSONObject]]:
                 "permno": permno,
                 "dlycaldt": day.isoformat(),
                 "dlyprevdt": previous.isoformat(),
-                "dlyret": round(float(draws.flat[(permno - 1) * len(sessions) + index]), 6),
+                "dlyret": draw(permno, index),
                 "dlyretmissflg": "NA",
                 "dlyretdurflg": "DU",
                 "dlydelflg": "N",
@@ -111,4 +128,18 @@ def study_sources(directory: Path) -> CrspSources:
     return load_crsp_sources(path)
 
 
-__all__ = ["DELISTED", "study_protocol", "study_rows", "study_sources"]
+def final_manifest(directory: Path) -> Path:
+    """Stage the evaluator's extract through the final period's last exit."""
+    path, _ = write_sources(directory, study_rows(FINAL_END), study_protocol())
+    return path
+
+
+__all__ = [
+    "DELISTED",
+    "FINAL_END",
+    "VALIDATION_END",
+    "final_manifest",
+    "study_protocol",
+    "study_rows",
+    "study_sources",
+]

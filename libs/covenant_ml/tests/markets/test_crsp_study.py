@@ -22,7 +22,7 @@ from covenant_ml.markets.crsp_panel import CrspFeature, build_crsp_panel
 from covenant_ml.markets.crsp_study import (
     EQUAL_WEIGHT,
     MOMENTUM,
-    CrspValidation,
+    CrspScored,
     crsp_selected_count,
     crsp_study_rows,
     crsp_top,
@@ -37,7 +37,7 @@ ARMS = tuple(trainer.model_name.value for trainer in TRAINERS)
 FEATURES = ("momentum", "liquidity")
 
 
-def validate(sources: CrspSources, stopping: int, features: tuple[str, ...]) -> CrspValidation:
+def validate(sources: CrspSources, stopping: int, features: tuple[str, ...]) -> CrspScored:
     """Run the study with annual folds, seed 11 and 90% intervals."""
     return run_crsp_validation(
         sources,
