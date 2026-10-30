@@ -277,3 +277,26 @@ historical observations, missing-artifact disclosures and corrections without
 maintaining a second copy. Updated consumers to that historical evidence;
 the architecture page still pins the current registration list. The substantive
 WRDS baseline remains unrun. Board task 52668052.
+
+## [2026-10-30] verification | Research directory contracts
+Pages updated: Tankpit feature provenance citations; current-index source pin
+in Model-Trainer architecture.
+Notes: The directory is now 265 lines after registering the existing
+`hpc3.cli.execution_inspect` producer. Restored the exact headings required by
+the existing registration test. Fleet job a2f25960 passed all 2,006 HPC3 tests
+with 100% coverage at API dab06e0f4; independent audits closed both corrections
+(board tasks a6a1243c and 554d0455). The eight affected API pages and Tankpit
+feature-provenance page passed their published audits without errors or warnings.
+OrderedKernels check 2365a4c4 passed 87 tests at 100% in 76 seconds after removing
+repeated setup through the existing shared launcher and retaining lint as the
+default target (API f561db26d, independently verified board task e5f71187).
+The broader Model-Trainer check f6f71afb
+failed on Sedona's missing Python headers, converter and writable data path;
+its registration guard passed, but the suite is not green. Evidence is attached
+to existing infrastructure task 01d642bd. The live-search verification is a
+served case in the existing execution suite, not a second search mechanism.
+Tankpit Linux check f67122d8 passed 7,663 tests at 100%; Windows CI run
+41031155820 failed the previously reported cross-drive path handling, which is
+recorded on the board separately from citation validation.
+These checks establish documentation and registration behavior; they do not
+establish a completed substantive WRDS baseline. Board task 52668052.
