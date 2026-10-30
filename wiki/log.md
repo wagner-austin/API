@@ -322,3 +322,13 @@ its verified result; the queue closed passed. The live canary isolation probe
 also passed. Native final-key delivery, forced-termination cleanup and WRDS-native
 encrypted execution remain open. Board task e6729a16; no new page or page-count
 change.
+
+## 2026-10-30: reconcile encrypted research citations and scratch evidence
+
+Full published-tree audit 8efe35ea found 35 stale source pins across 61 pages,
+including 27 research pins. Re-read the changed sources and affected research
+claims, corrected access-path and encrypted reconciliation descriptions, and
+repinned ten research pages. Added native forced-kill and same-node follow-up
+receipts to readiness, distinguishing eventual absence from immediate cleanup.
+The eight non-research pin errors remain outside this correction; this entry
+does not claim the whole wiki is clean. Board task e6729a16; page count unchanged.
