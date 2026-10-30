@@ -1,8 +1,9 @@
 # Evaluation instruments and their limits
 
 The shared evaluation package owns these instruments. The CRSP monthly study
-must integrate them with its frozen holdings and data rules; passing their
-regressions does not establish portfolio performance or holdout isolation.
+(`markets.crsp_study`, run by the research worker) integrates them with its
+frozen holdings and data rules; passing their regressions does not establish
+portfolio performance or holdout isolation.
 
 | Instrument | Implemented contract | Independent check |
 |---|---|---|
@@ -11,12 +12,14 @@ regressions does not establish portfolio performance or holdout isolation.
 | Ranking metrics | One shared midrank kernel gives tied positive/negative pairs half credit. Average precision groups distinct score thresholds. AUC needs both classes; average precision needs positive cases. | Pairwise enumeration, row permutations, constant-score AUC 0.5 and AP equal to prevalence, mixed-tie AP 7/12. |
 | Feature ablation | Drop exactly the named feature columns from each partition, refit the real learner with paired seeds and unchanged labels, and compare to the full arm. | Real LightGBM on planted signal/noise data: removing signal reduces AUC; removing noise has bounded effect. Unknown, empty and all-feature removals fail. |
 | Learning curves | Each seed uses nested random prefixes of its training fold; validation and scoring rows stay fixed. | Exact prefix inclusion and unchanged held-out arrays, plus real fits at each fraction. This is sample-size behavior, not an expanding-history curve. |
-| Chronological splits | Partition distinct time keys and purge training labels unavailable before stopping decisions and stopping labels unavailable before scoring decisions. Embargo is measured in distinct keys. | Actual label endpoints cross both boundaries in `test_temporal.py`; reordering observations preserves their availability. The WRDS pilot supplies next-observation dates. |
+| Chronological splits | Partition distinct time keys and purge training labels unavailable before stopping decisions and stopping labels unavailable before scoring decisions. Embargo is measured in distinct keys. | Actual label endpoints cross both boundaries in `test_temporal.py`; reordering observations preserves their availability. The WRDS pilot supplies next-observation dates; the monthly study supplies each window's exit close, and `test_crsp_study.py` checks that exactly the decision before each fold boundary is purged. |
+| Monthly holdings | Equal-weight long-only positions drift with their own daily returns; turnover is absolute traded notional against drifted pre-trade positions, its cost paid from the portfolio; terminal values apply once, dated, and are reinvested only at a later rebalance. Incomplete evidence refuses the whole outcome. | Hand-calculated drift, turnover, liquidation and terminal-value months and a refusal per incomplete-evidence kind in `test_crsp_holdings.py`; the study's momentum series against an independently selected one. |
 | Moving-block uncertainty | Sample uniformly from overlapping, noncircular blocks; truncate only the final draw to retain exactly n months. Both arms share weights and must have identical consecutive month identities. | Enumerate all small-sample block combinations, hand-derived percentile endpoints and variance, paired market-movement cancellation, and exact-count repeatability. |
 | Provenance | The WRDS adapter verifies query and CSV bytes; shared staging binds exact byte lengths and hashes; RunRecord preserves numerical observations and runtime/configuration identities. | Changed query/data/manifest/code/image refusals, real written-bundle readback, round trips and incompatible-record comparisons. |
 
 `tests/evaluation/`, `tests/test_metrics.py`, `tests/test_ranking.py`,
-`tests/markets/test_research_trial.py` and `test_research_execution.py` contain
+`tests/markets/test_crsp_holdings.py`, `test_crsp_study.py`,
+`test_research_trial.py` and `test_research_execution.py` contain
 the executable checks. `libs/platform_core/tests/test_run_record.py` verifies
 shared observation and comparison records. Fleet `make check` includes the
 whole affected package, strict typing, guard rules and statement/branch coverage.

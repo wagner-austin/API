@@ -746,13 +746,15 @@ board. Only a successful measured allocation may complete; pending jobs remain
 running, and terminal failures consume the attempt. Repeated observations preserve
 separate logs. These are owner-writable files, not hostile-owner attestation.
 
-`scripts.research_trial` reuses existing trainers, per-seed comparisons and result
-publication. It scores chronological validation, taking early-stopping rows from
-training with the declared embargo. Final-test rows enter none of those three
-partitions. The fixed diagnostic is next-observed-return sign from `return_1`;
-it is not the monthly portfolio strategy. Its protocol hash includes that semantic
-version and all evaluation settings. The final partition is refused by this
-interface; filesystem isolation from agents with general SSH access remains a
+`scripts.research_trial` runs the frozen monthly CRSP study described below on
+its validation period, using the existing baseline trainers and the shared
+`RunRecord` publisher. `ResearchEvaluation` is the decoded frozen design plus
+the declared stopping months, fold months and interval confidence; its protocol
+hash names `crsp-monthly-holdings-validation-v1` and all of those settings. The
+evaluation manifest is the CRSP extract manifest, and the worker refuses to fit
+unless the staged protocol bytes decode to exactly the admitted design. The
+final partition is refused by this interface and its decisions are never
+constructed; filesystem isolation from agents with general SSH access remains a
 separate requirement. Hash chaining detects corruption, not deliberate rewriting
 by someone who can modify the journal database.
 
@@ -799,9 +801,44 @@ reinvestment at the first scheduled rebalance strictly after that date.
 An unresolved value or one dated after the scored exit makes that outcome
 incomplete. This is a revised-history valuation and settlement assumption,
 not evidence of historical cash availability or an executable liquidation.
-Calendar, membership, price and terminal validators are implemented; the
-monthly holdings adapter and restricted holdout execution remain separate
-requirements before this design can produce a substantive study.
+
+## Monthly holdings and validation study
+
+`markets.crsp_holdings.evaluate_crsp_holdings` accounts for a long-only
+equal-weight portfolio across consecutive windows, each entering at the
+previous exit. Value starts as one unit of cash. At each rebalance close the
+investable value (positions plus terminal values dated strictly before that
+close) is split equally across the selection; traded notional is
+`sum |target - drifted position|` and the cost, one of the frozen `cost_bps`,
+is paid from the portfolio. Positions compound their own ordinary daily returns
+over `(entry, exit]`. A position delisted inside the window stops at its
+delisting date and becomes a receivable worth its `stkdelists` multiplier,
+applied once; the daily delisting-flagged copy is never compounded. The last
+window also pays the cost of liquidating its positions at its exit close. Each
+period retains its selection, drifted end weights, receivables, turnover, cost
+and net return. A missing or non-ordinary held return, a missing or non-`TR`
+fill, an unresolved terminal event or a terminal value dated after the exit
+refuses the whole evaluation; no partial result is returned.
+
+`markets.crsp_study.run_crsp_validation` builds the panel from `train_start` to
+the day before `holdout_start`. A row's label is whether the security's window
+multiplier beats the eligible universe's equal-weight multiplier, available at
+the exit close. Validation decisions are scored in consecutive folds of the
+declared length; each fold fits on every earlier decision except the declared
+stopping months, which supply early stopping, and `purge_label_overlap` drops
+every training and stopping label not available strictly before the next
+boundary, which is exactly the decision immediately before each boundary.
+Candidates select the top `ceil(selection_fraction * eligible)` by predicted
+probability, momentum by its lagged return, ties by PERMNO; the equal-weight
+universe is reported beside them. Every arm is accounted at every frozen cost,
+and at the primary cost each candidate and the universe are compared with
+momentum on identical consecutive months by `compare_moving_block` with the
+frozen block length, draw count and seed. Labels are binary because the
+existing trainers are classifiers; the design's continuous excess return is
+ranked through the predicted probability of a positive one. The validation
+months nearest the final period take their outcomes from the first
+final-period sessions, because their exits fall there. Restricted holdout
+execution remains a separate requirement before any final-period score.
 
 ## Standards and regression checks
 
