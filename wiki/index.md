@@ -4,6 +4,11 @@
 
 **Known coverage shape, stated so nobody mistakes silence for absence:** 22 of these pages are ClearGBM. The clients and infrastructure hubs are thin relative to what the monorepo holds. Client depth is deliberate (three clients keep their own full wikis). Infrastructure reads thinner than it is: cluster submission — the largest single body of it — lives in the `hpc3` sibling wiki below, registered 2026-09-02. **Service depth is narrower than it was but still a real gap** (counted 2026-10-05): covenant-radar has 5 architecture pages and Model-Trainer has 5 plus 10 research-result pages; Art-Trainer has 1; the other 10 services have nothing beyond the port map.
 
+## Research entry points
+
+- [Research registration directory](../docs/RESEARCH.md): projects, producing commands and links to their detailed records.
+- [WRDS research](pages/wrds-equity-research-protocol.md): study/data contracts, evaluation, queue/admission, isolation, final scoring and baseline readiness.
+
 ## Hubs
 
 [Services](hubs/services.md) -- the FastAPI ML/NLP/media services (data-bank, Model-Trainer, Art-Trainer, transcript, turkic, covenant-radar, grandma, handwriting-ai, qr, music-wrapped, github-stats, opportunity-radar, procart) (22 pages)
@@ -13,8 +18,8 @@
 
 ## Sibling wikis in this repo
 
-Two trees under this repo maintain their own wikis rather than pages here.
-Both are registered and searchable by slug through `wiki_search_query`.
+The sibling trees below maintain their own wikis rather than pages here.
+They are registered and searchable by slug through `wiki_search_query`.
 
 - **`hpc3`** — [`tools/hpc3/wiki/`](../tools/hpc3/wiki/index.md), 4 hubs and
   31 pages: the design record and incident narrative behind every rule the

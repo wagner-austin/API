@@ -264,3 +264,16 @@ Notes: Lifted all detailed paragraphs and all 28 footnotes from the former
 dated evidence attached. The existing slug is now the navigation entry; no
 parallel wiki or repeated narrative. Replaced directional references with links
 and corrected two stale implementation-status phrases. Board task daca401b.
+
+## [2026-10-30] consolidation | Research index becomes a directory
+Pages updated: Model-Trainer architecture, provenance, cloze, composition,
+companioned training and trait instrument; Covenant Radar optimisation;
+cartridge-QA retraction; Tankpit feature provenance; index and services hub.
+Notes: Reduced docs/RESEARCH.md from 2,647 to 260 lines, retaining every
+registered heading, all nine reviewed markers, the generated table and the
+qualified producing commands. Detailed methods and findings stay in their
+existing wikis. Exact per-project ranges at immutable API 4a145beef preserve
+historical observations, missing-artifact disclosures and corrections without
+maintaining a second copy. Updated consumers to that historical evidence;
+the architecture page still pins the current registration list. The substantive
+WRDS baseline remains unrun. Board task 52668052.
