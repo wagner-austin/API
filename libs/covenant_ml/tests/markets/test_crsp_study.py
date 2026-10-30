@@ -53,9 +53,9 @@ def validate(sources: CrspSources, stopping: int, features: tuple[str, ...]) -> 
 def test_folds_drop_exactly_the_label_still_open_at_each_boundary(tmp_path: Path) -> None:
     sources = study_sources(tmp_path)
     result = validate(sources, 6, FEATURES)
-    panel = build_crsp_panel(sources, "2017-01-01", "2019-12-31")
+    panel = build_crsp_panel(sources, "2017-01-01", "2019-10-31")
     sizes = [len(decision.features) for decision in panel]
-    assert len(panel) == 36
+    assert len(panel) == 34
     # Validation starts at index 18 (July 2018); annual folds start at 18 and 30.
     for fold, start in zip(result.folds, (18, 30), strict=True):
         stop = start - 6
@@ -71,8 +71,9 @@ def test_folds_drop_exactly_the_label_still_open_at_each_boundary(tmp_path: Path
     assert [decision.window.decision for decision in result.decisions] == [
         decision.window.decision for decision in panel[18:]
     ]
-    # No final-period decision is ever constructed.
-    assert result.decisions[-1].window.decision == "2019-12-31"
+    # The November and December decisions need final-period outcomes and are omitted.
+    assert result.decisions[-1].window.decision == "2019-10-31"
+    assert result.decisions[-1].window.exit == "2019-12-02"
 
 
 def _oracle_top(features: tuple[CrspFeature, ...], scores: list[float]) -> tuple[int, ...]:
@@ -107,24 +108,24 @@ def test_baselines_costs_and_pairing_match_independent_oracles(tmp_path: Path) -
     assert sum(item.net_return for item in series[(MOMENTUM, 25)]) < sum(
         item.net_return for item in series[(MOMENTUM, 5)]
     )
-    # Every non-momentum arm is paired with momentum on the identical 18 months.
+    # Every non-momentum arm is paired with momentum on the identical 16 months.
     assert [comparison["arm"] for comparison in result.comparisons] == [EQUAL_WEIGHT, *ARMS]
     reference = [period.net_return for period in momentum]
     for comparison in result.comparisons:
         arm = [period.net_return for period in series[(comparison["arm"], 10)]]
         assert comparison["reference"] == MOMENTUM
         assert comparison["metric"] is ComparisonMetric.UTILITY
-        assert comparison["n_rows"] == 18
-        assert comparison["value_arm"] == pytest.approx(sum(arm) / 18)
-        assert comparison["value_reference"] == pytest.approx(sum(reference) / 18)
+        assert comparison["n_rows"] == 16
+        assert comparison["value_arm"] == pytest.approx(sum(arm) / 16)
+        assert comparison["value_reference"] == pytest.approx(sum(reference) / 16)
         difference = comparison["difference"]
         assert difference["method"] is IntervalMethod.MOVING_BLOCK_BOOTSTRAP
         assert difference["estimate"] == pytest.approx(
-            sum(a - b for a, b in zip(arm, reference, strict=True)) / 18
+            sum(a - b for a, b in zip(arm, reference, strict=True)) / 16
         )
-        assert difference["n_units"] == 6
+        assert difference["n_units"] == 5
     months = [crsp_month(period.window.decision) for period in momentum]
-    assert months == list(range(months[0], months[0] + 18))
+    assert months == list(range(months[0], months[0] + 16))
     # The interval is the frozen block length, draw count and seed applied to these months.
     frozen = sources.protocol
     universe_returns: list[float] = [period.net_return for period in universe]
@@ -153,6 +154,43 @@ def test_delisted_holding_is_valued_once_then_reinvested(tmp_path: Path) -> None
     assert DELISTED not in dict(delisting.held)
     assert months["2019-03-29"].receivables == ()
     assert DELISTED not in months["2019-03-29"].selected
+
+
+@pytest.mark.parametrize(
+    ("boundary", "last_decision", "last_exit"),
+    [
+        ("2020-01-01", "2019-10-31", "2019-12-02"),
+        ("2019-12-02", "2019-09-30", "2019-11-01"),
+        ("2019-12-03", "2019-10-31", "2019-12-02"),
+    ],
+)
+def test_holdout_boundary_excludes_equal_and_later_exits(
+    tmp_path: Path, boundary: str, last_decision: str, last_exit: str
+) -> None:
+    protocol = study_protocol()
+    protocol["holdout_start"] = boundary
+    path, _ = write_sources(tmp_path, study_rows(), protocol)
+    result = validate(load_crsp_sources(path), 6, FEATURES)
+    assert result.decisions[-1].window.decision == last_decision
+    assert result.decisions[-1].window.exit == last_exit
+    assert all(decision.window.exit < boundary for decision in result.decisions)
+
+
+def test_changed_holdout_outcomes_cannot_change_validation(tmp_path: Path) -> None:
+    (tmp_path / "original").mkdir()
+    (tmp_path / "changed").mkdir()
+    original = validate(study_sources(tmp_path / "original"), 6, FEATURES)
+    rows = study_rows()
+    changed = 0
+    for row in rows["returns"]:
+        if require_str(row, "dlycaldt") >= "2020-01-01":
+            row["dlyret"] = 0.9
+            row["dlyprc"] = 200.0
+            changed += 1
+    assert changed == 301  # Seven surviving securities over 43 weekday sessions.
+    path, _ = write_sources(tmp_path / "changed", rows, study_protocol())
+    result = validate(load_crsp_sources(path), 6, FEATURES)
+    assert result == original
 
 
 def test_rows_label_against_the_universe_and_date_availability(tmp_path: Path) -> None:

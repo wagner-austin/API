@@ -21,8 +21,9 @@ DELISTED = 8
 def study_protocol() -> JSONObject:
     """The committed design with dates, universe and bootstrap work fitted to the fixture.
 
-    Train decisions start January 2017, validation decisions run July 2018 to
-    December 2019 (18 months), and the final period starts January 2020.
+    Train decisions start January 2017 and the final period starts January 2020.
+    Validation retains July 2018 through October 2019 (16 months); November and
+    December decisions have exits in the final period and cannot be scored.
     """
     protocol = protocol_document()
     protocol.update(

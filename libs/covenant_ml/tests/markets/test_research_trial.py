@@ -56,6 +56,9 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     assert len(require_list(result, "folds")) == 2
     assert len(require_list(result, "results")) == 15
     first = narrow_json_to_dict(require_list(result, "results")[0])
+    months = [narrow_json_to_dict(item) for item in require_list(first, "months")]
+    assert len(months) == 16
+    assert (months[-1]["decision"], months[-1]["exit"]) == ("2019-10-31", "2019-12-02")
     month = narrow_json_to_dict(require_list(first, "months")[0])
     assert (first["arm"], first["cost_bps"], month["decision"]) == ("momentum", 10, "2018-07-31")
     assert len(require_list(month, "held")) == 3
