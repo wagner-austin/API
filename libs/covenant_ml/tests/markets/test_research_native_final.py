@@ -124,8 +124,7 @@ def test_final_submission_and_verified_result_leave_validation_unchanged(tmp_pat
         )
         + ":final"
     )
-    command = recipe["command"]
-    assert isinstance(command, str)
+    command = require_str(recipe, "command")
     assert "--final-grant /private/final" in command
     assert "--final-manifest /pub/final/bundle.json" in command
     assert "--access" not in command
