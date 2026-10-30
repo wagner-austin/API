@@ -1,0 +1,70 @@
+{
+  "kind": "wrds-final-runtime-v1",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "source_commit": "85f1d4d7521d4a189836f8ecca805f39c5c366df",
+  "tested_commit": "5ae042ef383718b206ca9caf07aa66574fbaae29",
+  "tested_commit_difference": "test assertion only; runtime sources identical",
+  "source_archive_sha256": "362167348bc12ab79fd2d6c2cf1db958bb925aa0828fe62242a23a2f2cc9cd11",
+  "controller_python": "/home/corvis/research-control/wrds-final-85f1d4d75/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "verified_installed_wheel_code_files": 859,
+  "controller_entrypoint_hashes": {
+    "__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+    "research_proposals.py": "c045a85feac4250f63cb03cf54168a2fdf15a972432cec5995f64fc6777aa01c",
+    "research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765"
+  },
+  "first_party_wheel_sha256": {
+    "board_watch-0.1.0-py3-none-any.whl": "759585c617cce6f16c320f4360b932c7efda153dc035d12d15cee99395782536",
+    "cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+    "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+    "covenant_ml-0.1.0-py3-none-any.whl": "a8c5cbcdefb3df4ac32cf3e6ec8c1e1dac9c03d23aad8f400cbc81c6f2b46ade",
+    "fleet-0.1.0-py3-none-any.whl": "b387657af53a8e51048a9d1896a5d1d3ccc22524123d8074349787e53d575cfe",
+    "hpc3-0.1.0-py3-none-any.whl": "a4a7a60ba4dd58fc9f1634bad2b771c9d6db3fde5c218f998af662a962fabe25",
+    "monorepo_guards-0.1.0-py3-none-any.whl": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+    "platform_core-0.1.0-py3-none-any.whl": "e7f98a38ba9c5c794ab7b5d81a3cef4b9f12e59ffedd1e77b987dafaff4b8a70",
+    "platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501"
+  },
+  "rust_wheel_origin": "44fa91cea runtime; cleargbm_rs source subtree unchanged",
+  "image": {
+    "path": "/data/homezvol1/wagnera3/research-images/final-85f1d4d75/research-final.sif",
+    "sha256": "eeedc89bbde5fde0e49c497da124526a51d31a1d7cb6fd605924697ac0813710",
+    "job_id": "58635077",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 113,
+    "cpus": 8,
+    "partition": "free",
+    "node": "hpc3-19-14",
+    "selfcheck": "passed during build and unprivileged re-verification",
+    "dependency_check": "passed"
+  },
+  "storage_choice": "Explicit home-backed build after /pub metadata stalled on login-i15 and login-i16; no automatic storage fallback",
+  "private_evidence_directory": "/home/corvis/research-data/wrds/runtime/final-85f1d4d75",
+  "evidence_sha256": {
+    "image-spec.json": "ee9438db0d3d916fddd33cd8f183d9addc62f4868d6f8e3b86a9e1d326c1b412",
+    "controller-requirements.txt": "d8a5edcf9d41799e371705e5a57fc78aa6115ed0c6a44030f3397790e14b008b",
+    "native-accounting.txt": "fdd86fa3359e454679dc51c9f5ccf9b950230010280f3ac36cf1f4a9d164d257",
+    "native-build.out": "9ebb7aa32c2a7c6fb93182b8a8699838586117489819911c4eb1a3188d4a73f6",
+    "build-home-stage.json": "dfee593450f9016a6e694822a6d9ab1b5f76aa7937d1e25d803478a96b0fb290",
+    "wheels-home-stage.json": "144b5599dc822ef32bbcc035d6afd9f09b7b322d0f5f272438a3298c8800f761",
+    "queue-placement.json": "d18c95467a2c4938dfdcb408d830e675a7f72ca743cd057ec6e6fb7c1cfd21ec"
+  },
+  "fleet_checks": {
+    "covenant_ml": {
+      "job": "ea123a1e-4c93-4dab-9c30-4b1a5f91e05c",
+      "tests_passed": 4874,
+      "coverage_percent": 100
+    },
+    "fleet": {
+      "job": "0b35a95c-6cd1-498f-ab6b-711daedb5056",
+      "tests_passed": 2528,
+      "coverage_percent": 100
+    }
+  },
+  "limitations": [
+    "Synthetic datasets only; no licensed extraction or substantive baseline",
+    "This artifact establishes runtime construction, not native final-scoring completion",
+    "WRDS private SSH delivery is measured separately; encrypted WRDS batch execution remains unverified"
+  ]
+}
