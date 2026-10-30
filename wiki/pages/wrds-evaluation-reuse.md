@@ -35,9 +35,9 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "01bd2d4443987b275bc58d71b6e127e2382c9f4a"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
@@ -46,7 +46,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "2b0cd1e2362f58475205774e7dc320b2ae8991d2"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "448c595406899be546fe79b550df921a6761dcd8"
   "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
   "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
   "tools/fleet/tests/test_research_proposal.py": "e3032d998c3d7e4b0951b2db7d1be643978ac2c5"
@@ -87,9 +87,11 @@ monthly study now uses or replaces each seam:[^equity][^window][^sampling][^spli
 
 The shared admission journal, queue, native scheduler adapters and RunRecord
 publisher compose with the monthly worker without another coordinator or
-attempt ledger. The worker never constructs a final-period decision, but its
-manifest's snapshot resides under the evaluator's account, so the date bound
-alone is not an access boundary. That boundary is the proposal process
+attempt ledger. The worker now requires an encrypted train-validation bundle,
+authenticates it into private job storage and publishes both ciphertext and
+plaintext identities. It never constructs a final-period decision. The evaluator
+account owns the decryption keys, so date bounds and encryption alone do not
+isolate a proposer sharing that account's privileges. The access boundary is the proposal process
 described in [[wrds-proposer-isolation]], which holds no path, credential or network route to those
 files.[^execution][^controllers][^splits][^holdings][^installed]
 

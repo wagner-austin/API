@@ -35,8 +35,8 @@ source_git_blobs:
   "libs/covenant_ml/tests/evaluation/test_learning_curve.py": "7b555bc91238c0b3e897695cbe6af66db1df549e"
   "libs/covenant_ml/tests/evaluation/test_moving_block.py": "3b797d26f5e65ddee1f4ad7472fd05ccf0549c28"
   "libs/covenant_ml/tests/evaluation/test_wrds.py": "638d804f3b8bdca4657cc6ac6832d5b51a757299"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "1637ec192a1cf1e0f7b6a3a4eefda34a7a33ca3e"
-  "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "448c595406899be546fe79b550df921a6761dcd8"
+  "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
   "libs/platform_core/tests/test_run_record.py": "5bd7f783973789c95e490238b34eec53d90e5237"
 provenance:

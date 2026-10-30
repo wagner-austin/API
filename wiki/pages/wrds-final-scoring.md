@@ -16,16 +16,16 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_final.py"
   - "libs/covenant_ml/tests/markets/test_crsp_final.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "854dd095f76364bc1a00ca0e9e35ca2e06ce88f7"
+  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "1b0c4fef1b761bb3971f875bab907da043d141bb"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
   "libs/covenant_ml/scripts/research_proposals.py": "f62f4f85739a00b2fbdc41f1e8724dd59188632f"
-  "libs/covenant_ml/scripts/research_trial.py": "3e8ead7063b2e1835bb59131d73b9df0095b25d5"
-  "libs/covenant_ml/tests/markets/test_research_final.py": "81e4a8f1f5220b502de59369c9a8ac1868f8ab77"
+  "libs/covenant_ml/scripts/research_trial.py": "00588479984e32ef9e640c76dd11ce4cfd5d78a1"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "75b95210bc5ae8e2069bcf27c97e6ab1a6322998"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
@@ -60,6 +60,18 @@ never be selected, so no request field authorizes final scoring.
 `holdout_end` with the validation study's shared fold, arm and record code. Changing every outcome
 after the last final decision changes no fit or selection in the tests.
 Choosing which attempt to select remains an evaluator decision.[^final]
+
+The manifest now identifies the encrypted final bundle. The entrypoint requires
+`--access` and `--scratch`; `execute_final` acquires the final key only after
+the journal commits release. A missing key therefore consumes the release,
+and the second invocation is refused before key acquisition. Verified plaintext
+exists only within the private decryption context, and the shared result
+publisher retains both ciphertext and plaintext identities. These are tested
+local evaluator controls. Native final-key delivery and an operational final
+rehearsal remain pending in [[wrds-baseline-readiness]]; the journal must stay
+with its authoritative controller.[^encrypted]
+
+[^encrypted]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `execute_final`; `libs/covenant_ml/scripts/research_trial.py`, `main`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `publish_monthly_record`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_final_key_is_acquired_only_after_irrevocable_release`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Rechecked after API 44fa91cea; full evaluator verification and the narrower native validation measurement are recorded in [[wrds-baseline-readiness]].
 
 [^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission".
 

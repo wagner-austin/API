@@ -23,13 +23,13 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "01bd2d4443987b275bc58d71b6e127e2382c9f4a"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "bd2c9fd8c7810948c0702ac5f9d5a502c7054289"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b898232007d5c14a3aa6acb1f79899a944c1a986"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
@@ -40,7 +40,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "2b0cd1e2362f58475205774e7dc320b2ae8991d2"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "448c595406899be546fe79b550df921a6761dcd8"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
@@ -71,10 +71,12 @@ Completion requires fresh native evidence and verified RunRecord metadata;
 no research rows or credentials are placed on the board.[^queue][^controllers]
 
 The controller's `python` executable and `workspace` configuration use absolute
-native filesystem paths. HPC3 `root`, `entrypoint` and `image` use absolute POSIX
-paths regardless of the controller's operating system. All five fields reject
+native filesystem paths. HPC3 `root`, `entrypoint`, `image` and `access` use absolute POSIX
+paths regardless of the controller's operating system. All six fields reject
 parent-directory traversal. The execution command consumes the first two locally;
-the frozen staging manifest and compute recipe consume the remote paths.[^paths]
+the frozen staging manifest and compute recipe consume the remote paths. The
+access configuration has its own required digest in the native checksum set;
+it names private evaluator keys without embedding their contents.[^paths]
 
 The implemented typed proposal/admission boundary accepts a proposal that
 names its hypothesis, parent, protocol digest, allowed features, model parameters
@@ -93,7 +95,9 @@ exposes init, propose, status, submit and reconcile operations. Submission uses 
 maintained cluster staging and job commands. The submission boundary compares typed
 proposal values, preserving raw admission bytes while accepting JSON key reordering;
 changed proposal values remain refused. Reconciliation requires native Slurm
-accounting and verified results through the cluster evidence command. Transport
+accounting and verified results through the cluster evidence command. It also
+requires the measured encrypted bundle digest and native manifest checksum to
+match admission, and the measured bundle partition to be train-validation. Transport
 ambiguity remains unresolved until exactly one matching ledger row is found; no
 automatic resubmission is allowed. The validation worker runs the monthly study
 in [[crsp-monthly-holdings-validation]] with the existing trainers and RunRecord
@@ -118,4 +122,4 @@ in a proposal.[^admission]
 
 [^holdings]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `evaluate_crsp_holdings` and `crsp_window_path`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation` and `crsp_study_rows`; `libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py`, `decode_research_evaluation`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_crsp_study.py` and `test_research_trial.py`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Monthly holdings and validation study". Initial integration evidence: fleet job 48a2d9c8-b9f6-4c6b-8a65-917bd3828f37 passed make check for libs/covenant_ml at API fd3f7723bd6eb7f5fbc5caa3157efed306bf3949: 4743 tests, 100% coverage. Board task 8f7247a1-aa1a-41d7-be0e-f2b8e97c1d2d. The substantive monthly CRSP study has not run.
 
-[^paths]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py:52` `decode_research_cluster` and `:101` `prepare_bundle`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py:70` `_command`. Board task 3261e090-1354-43ae-8703-a8cf5671f5f9 corrects the former use of POSIX validation for local controller paths.
+[^paths]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py`, `decode_research_cluster` and `prepare_bundle`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py`, `_command`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", encrypted access configuration. Board task 3261e090-1354-43ae-8703-a8cf5671f5f9 corrects the former use of POSIX validation for local controller paths.

@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json"
+  - "libs/covenant_ml/tests/markets/test_encrypted_process.py"
   - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json"
   - ".github/workflows/covenant-ml.yml"
@@ -33,6 +35,8 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json": "976cfc40fbaca4955084948061d6a2fcd90d54ab"
+  "libs/covenant_ml/tests/markets/test_encrypted_process.py": "63a3a2f34e7188ee307ce1ea1b178f44f1995854"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json": "6f58fc955b6a9086564ea6a36f3028fcd2ac0ed6"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
   ".github/workflows/covenant-ml.yml": "14472de200c3c5cb4a41c28110a1739327ecce8c"
@@ -129,7 +133,18 @@ be private regular files opened without following symlinks. These are Linux
 execution requirements, not Windows ACL guarantees. Same-user or administrative
 processes remain privileged. Native final-key delivery must still consult the
 authoritative journal; copying that journal to a compute node would create a
-second authority. Forced-kill scratch reclamation still needs a native probe.[^integrated]
+second authority.[^integrated]
+
+The forced-kill probe decrypted and verified ten synthetic files in a mode-0700
+directory on `hpc3-22-05`, then intentionally ended native job `58629286` with
+`FAILED`, exit `137:0`. A later allocation, `58630827`, required that same node
+and verified the earlier scratch path was absent, completing with `0:0`.
+The observation occurred several hours later: it establishes eventual absence
+for this one probe, not immediate reclamation, physical erasure or cleanup after
+node failure. Real-process regression cases separately confirm normal exit
+removes plaintext and SIGKILL leaves it for the scheduler.[^cleanup]
+
+[^cleanup]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json`, native accounting, receipts, recipe hashes and limits; `libs/covenant_ml/tests/markets/test_encrypted_process.py`, `PROBE_PROGRAM` and `test_real_process_exit_and_sigkill_have_distinct_cleanup`. Fleet job 42b48bdc-c31d-4436-b670-6efe4860c8f1 passed all 4,838 evaluator tests with 100% coverage at API 8dfc76f75003cdefdaa124e2a3b1e5f95670ce5a on Lavender, ending 2026-10-30T12:48:59Z. GitHub runs 41058285948 and 41058285858 also succeeded. The native runtime remains 44fa91cea; the probe program is extracted from the tested constant at 8dfc76f.
 
 The real isolated proposer produced an allowed synthetic proposal, which was
 transported manually to the installed admission controller and admitted into a
@@ -152,10 +167,10 @@ canaries, not protection against the evaluator's administrators.[^key-probe]
 
 [^key-probe]: Live Colossus run on 2026-10-30 using `PROBE_PROGRAM` from `tools/fleet/tests/test_research_proposal_host.py` through installed `fleet.core.research_proposer.run_proposer`, with pinned image sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337. Private evidence `/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea/isolation-probe/result.json` has SHA-256 21eb46b323576db1d33f651b347a4c68c10624e43123e23c43f44e6ca80086e9; program SHA-256 127315f96d43024be4880c08266a7aec6d3d1cd563768c3bfd786c4266f5cd32. All four reads returned errno 2; network access returned errno 101. The separately generated canary identity was not the study's final key, and no secret bytes were emitted.
 
-The remaining sequence follows these measured gaps:[^rehearsal][^integrated]
+The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cleanup]
 
-1. Finish native final-key delivery through the authoritative controller and
-   measure allocation cleanup after forced termination. Exercise final release
+1. Finish native final-key delivery through the authoritative controller.
+   Exercise final release
    only in the separate synthetic rehearsal journal, not the substantive holdout.
 2. Verify encrypted execution on WRDS Cloud and automate the measured
    cross-host proposer-to-admission handoff through the existing controller.
