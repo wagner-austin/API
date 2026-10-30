@@ -88,8 +88,9 @@ class FileAsset(TypedDict):
             without opening this file.
         manual: True when the asset can never be fetched by a script -- a
             licensed file, such as the game tree lavender once declared,
-            which must not enter the repo, its caches, or any hosted VM. ``render`` emits these as a loud REQUIRED
-            MANUAL STEP instead of a command.
+            which must not enter the repo, its caches, or any hosted VM.
+            ``render`` emits these as a loud REQUIRED MANUAL STEP instead
+            of a command.
         provision_command: The exact shell command that creates the asset on
             a new host, for an asset that is neither manual nor a writable
             directory -- e.g. the ``git clone`` for the llama.cpp checkout.
