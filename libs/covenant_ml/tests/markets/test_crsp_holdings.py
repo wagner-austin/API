@@ -114,8 +114,8 @@ def test_drifted_weights_turnover_and_final_liquidation_match_hand_arithmetic() 
     assert first.cost == pytest.approx(0.001)
     assert first.net_return == pytest.approx(0.4995 * 1.1 + 0.4995 - 1)
     assert [permno for permno, _ in first.held] == [1, 2]
-    weights = [weight for _, weight in first.held]
-    assert weights == pytest.approx([0.54945 / 1.04895, 0.4995 / 1.04895])
+    assert first.held[0][1] == pytest.approx(0.54945 / 1.04895)
+    assert first.held[1][1] == pytest.approx(0.4995 / 1.04895)
     assert first.receivables == ()
     # Rebalance from drifted 0.54945/0.4995 to 0.524475 each in stocks 2 and 3.
     traded = 0.54945 + (0.524475 - 0.4995) + 0.524475
@@ -134,9 +134,8 @@ def test_terminal_value_counts_once_and_waits_for_a_strictly_later_rebalance() -
     evidence = outcomes(rows, delists)
     path = crsp_window_path(evidence, 4, W1)
     assert path.growth == 1.0
-    assert path.terminal is not None
-    assert path.terminal[0] == "2020-03-02"
-    assert path.terminal[1] == pytest.approx(0.6)
+    # 1 + (-0.4) is exactly the double 0.6, valued at the latest recorded date.
+    assert path.terminal == ("2020-03-02", 0.6)
     selections = ((4, 5), (5,), (5,))
     first, second, third = evaluate_crsp_holdings(evidence, (W1, W2, W3), selections, 10)
     # The daily +50% delisting copy is ignored; -40% applies once.

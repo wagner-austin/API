@@ -127,10 +127,11 @@ def test_baselines_costs_and_pairing_match_independent_oracles(tmp_path: Path) -
     assert months == list(range(months[0], months[0] + 18))
     # The interval is the frozen block length, draw count and seed applied to these months.
     frozen = sources.protocol
+    universe_returns: list[float] = [period.net_return for period in universe]
     assert result.comparisons[0] == compare_moving_block(
         EQUAL_WEIGHT,
         MOMENTUM,
-        np.asarray([period.net_return for period in universe], dtype=np.float64),
+        np.asarray(universe_returns, dtype=np.float64),
         np.asarray(reference, dtype=np.float64),
         np.asarray(months, dtype=np.int64),
         np.asarray(months, dtype=np.int64),
