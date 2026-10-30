@@ -1,0 +1,57 @@
+{
+  "kind": "wrds-monthly-runtime-v1",
+  "board_task": "474c840b-d392-4a67-ab77-bc5c7e90f3b7",
+  "source_commit": "92719c0601c27d31fcd4338e9fd3e8fc3b85c656",
+  "source_archive_sha256": "8a59f28d941879e997fd0e1b006f1b8fb13322f12df6ac8afc1404a46c862cb2",
+  "private_build_directory": "/home/corvis/research-data/wrds/runtime/monthly-92719c060",
+  "controller_python": "/home/corvis/research-control/wrds-monthly-92719c060/bin/python",
+  "controller_entrypoint": "/home/corvis/research-control/wrds-monthly-92719c060/entrypoint",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "controller_entrypoint_hashes": {
+    "__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+    "research_proposals.py": "3e9b464761498a8236883ba1946a8e54ddbb1b2fb3e1b849475a4183c0289dc1",
+    "research_trial.py": "2d45b7b16a4f6081e61cb506c37f6ef1a61944ea83938200261b6305f7831f88"
+  },
+  "first_party_wheel_sha256": {
+    "board_watch-0.1.0-py3-none-any.whl": "5b29a3362857be3edb7372aad16b3ec54cc61ddc3e0addd65fdb60d230c6c64b",
+    "cleargbm-0.1.0-py3-none-any.whl": "e66aeafbcba41938062ede2c143996e710241fac5bd2233997850c1ce50e779d",
+    "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "covenant_domain-0.1.0-py3-none-any.whl": "b961095c84694b48d7c065110486da7f2e334cdd76a25628b51e7cf79b202fea",
+    "covenant_ml-0.1.0-py3-none-any.whl": "b1e313e8d4cf60f83fa7ed3b43ec887a4d3541bcb0f1e308ca4054f591eeb935",
+    "fleet-0.1.0-py3-none-any.whl": "4e7883ce26baefcd560d3e30869760a8a0f18b73c011431e7d0723ed3e93b179",
+    "hpc3-0.1.0-py3-none-any.whl": "8c6e8d7233fe04c716cb021ae863a6781fefbf011a05a677e840e3f304e4d358",
+    "monorepo_guards-0.1.0-py3-none-any.whl": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+    "platform_core-0.1.0-py3-none-any.whl": "7e026756d2b41386088bac6c49c4be8b7543a2c844989fddd4e3f53d58088889",
+    "platform_ml-0.1.0-py3-none-any.whl": "4942b59b784e2990f53bab8bfa77ffa15407741800f35cce7c93e118a64a073e"
+  },
+  "image": {
+    "path": "/pub/wagnera3/images/research-monthly-92719c060/research-monthly.sif",
+    "sha256": "5072a7a24b6dd2ae22e05c68d3691be400c49a8bc4a2be8ca27fc997b9e0a5fc",
+    "job_id": "58629088",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 83,
+    "cpus": 8,
+    "partition": "free",
+    "node": "hpc3-15-20",
+    "selfcheck_passes": 2,
+    "pip_check": "No broken requirements found."
+  },
+  "evidence_sha256": {
+    "image-spec.json": "9479ea1479cb9a448fb4bf55f1a1f564176345081893af3c9967b33425d7b4a0",
+    "controller-installed.txt": "0c5e3f47a995bea2eb9ef991ce9c2bffee575f647b76643ba07156743f6c0dc0",
+    "native-build.out": "7ad028b8c51af881be1e441d96a014d7776bc6297a4bc307bce0eb4c202f7b6c",
+    "native-accounting.txt": "4f048314205d2289dd84d31d94306085098e50d23d536fa04548e3ded3b93db6",
+    "build-stage.json": "8c5278e62913cd8264323dc0df963490932844a8862875492829c6305c33fe98",
+    "wheels-stage.json": "fadeb3f9770b8236f4df3c889f4d7da055ea54d495e8268a8c52282ad0f4c0a0"
+  },
+  "rust_wheel_origin": {
+    "commit": "2e445e25e3c27bce7e53134b0f621c2d7869bd1d",
+    "source_comparison": "git diff --name-only 2e445e25e HEAD -- libs/cleargbm_rs returned no paths at source_commit"
+  },
+  "limits": [
+    "No substantive baseline or licensed-data extract run under this revision.",
+    "Encryption and evaluator key delivery are tracked separately under e6729a16.",
+    "Native image build proves runtime selfchecks, not the complete research queue chain."
+  ]
+}
