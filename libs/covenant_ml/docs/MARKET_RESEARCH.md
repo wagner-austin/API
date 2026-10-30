@@ -837,8 +837,10 @@ and net return. A missing or non-ordinary held return, a missing or non-`TR`
 fill, an unresolved terminal event or a terminal value dated after the exit
 refuses the whole evaluation; no partial result is returned.
 
-`markets.crsp_study.run_crsp_validation` builds the panel from `train_start` to
-the day before `holdout_start`. A row's label is whether the security's window
+`markets.crsp_study.run_crsp_validation` considers decisions from `train_start`
+to the day before `holdout_start`, then retains only windows whose exit is
+strictly before `holdout_start`, before attaching any outcome. A row's label is
+whether the security's window
 multiplier beats the eligible universe's equal-weight multiplier, available at
 the exit close. Validation decisions are scored in consecutive folds of the
 declared length; each fold fits on every earlier decision except the declared
@@ -852,10 +854,16 @@ and at the primary cost each candidate and the universe are compared with
 momentum on identical consecutive months by `compare_moving_block` with the
 frozen block length, draw count and seed. Labels are binary because the
 existing trainers are classifiers; the design's continuous excess return is
-ranked through the predicted probability of a positive one. The validation
-months nearest the final period take their outcomes from the first
-final-period sessions, because their exits fall there. Restricted holdout
-execution remains a separate requirement before any final-period score.
+ranked through the predicted probability of a positive one. The two validation
+months nearest a January final-period start are omitted because their exits
+fall in that period: for the committed design, validation decisions end in
+October 2021, with the last exit in December 2021. The boundary uses actual
+calendar exits, not a fixed number of rows. Regression cases exclude an exit
+equal to the boundary and change later returns and prices without changing
+validation output. This corrects the earlier implementation that selected
+on outcomes extending into the final period. It is a temporal exclusion;
+restricted process, file and credential access remains a separate requirement
+before any final-period score.
 
 ## Standards and regression checks
 
