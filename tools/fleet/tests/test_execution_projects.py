@@ -463,7 +463,9 @@ def test_tankpits_move_is_measured_on_colossus_alone() -> None:
         install=(),
         companions=(),
     )
-    assert require_node(workspace, "colossus")["enabled"]
+    # colossus is held while it reinstalls as a NixOS worker (MCPs board
+    # task 7c8cb3e2), so the project waits there; the node stays declared.
+    assert require_node(workspace, "colossus")["host"] == "colossus"
     assert "clients/TankpitBot-sedona-execution" not in workspace["projects"]
 
 
