@@ -129,6 +129,11 @@
         "remote": "https://github.com/wagner-austin/creator-wiki.git",
         "ref": "main",
         "directory": "creator-wiki"
+      },
+      {
+        "remote": "https://github.com/wagner-austin/osrs-lab.git",
+        "ref": "main",
+        "directory": "osrs-lab"
       }
     ]
   }
