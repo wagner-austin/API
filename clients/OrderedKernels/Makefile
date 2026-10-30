@@ -12,14 +12,14 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 # the third-party closure lives in pyproject where the solver can see it.
 FIRST_PARTY_WHEELS := ../../libs/platform_core/dist/platform_core-0.1.0-py3-none-any.whl ../../libs/platform_ml/dist/platform_ml-0.1.0-py3-none-any.whl ../../libs/platform_workers/dist/platform_workers-0.1.0-py3-none-any.whl ../../services/Model-Trainer/dist/model_trainer_server-0.1.0-py3-none-any.whl
 
+lint: _deps
+	$(MAKETOOLS) concurrent _lint-ruff _lint-guard _lint-mypy
+
 _deps:
 	$(MAKETOOLS) venv-check
 	poetry sync --with dev
 	$(MAKETOOLS) poetry-build ../../libs/platform_core ../../libs/platform_ml ../../libs/platform_workers ../../services/Model-Trainer
 	poetry run pip install --quiet --force-reinstall --no-deps $(FIRST_PARTY_WHEELS)
-
-lint: _deps
-	$(MAKETOOLS) concurrent _lint-ruff _lint-guard _lint-mypy
 
 _lint-ruff:
 	poetry run ruff check .
