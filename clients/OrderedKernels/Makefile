@@ -17,7 +17,7 @@ lint: _deps
 
 _deps:
 	$(MAKETOOLS) venv-check
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(MAKETOOLS) poetry-build ../../libs/platform_core ../../libs/platform_ml ../../libs/platform_workers ../../services/Model-Trainer
 	poetry run pip install --quiet --force-reinstall --no-deps $(FIRST_PARTY_WHEELS)
 
