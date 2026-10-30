@@ -1413,15 +1413,16 @@ name appeared nowhere here — was mine, and another session bridged it.
 - **Runs:** `scripts.optimize -b cleargbm`, `scripts.benchmark_cleargbm_*`, and
   (since 2026-10-12, board task `80b6e6ea`) `libs/covenant_ml`'s
   `scripts.benchmark_paired_evaluation` and `scripts.benchmark_feature_ablation`
-- **Admitted validation diagnostics:** `scripts.research_proposals` admits,
-  submits and reconciles bounded requests; `scripts.research_trial` scores only
-  chronological validation, with early stopping drawn from training. The
-  existing trainers and RunRecord writer are shared with paired evaluation.
-  `hpc3.cli.execution_inspect` measures one recorded attempt from native Slurm
-  accounting and verified artifacts; `hpc3.cli.execution_report` measures a
-  paired replay. Both publish program-owned execution evidence. The diagnostic
-  predicts next-observed-return sign for a declared CRSP snapshot; it does not
-  implement the monthly portfolio protocol or provide filesystem holdout isolation.
+- **Admitted monthly CRSP research:** `scripts.research_proposals` admits,
+  submits and reconciles through the existing journal and HPC3 queue;
+  `scripts.research_trial` implements monthly validation. Isolated
+  `fleet.cli.research_propose` feeds that admission controller, while
+  evaluator-owned `research_proposals select` and
+  `research_trial --ledger --final-manifest` enforce one-shot final scoring.
+  The substantive baseline has not run: the measured October 28–29 jobs and
+  October 30 installed-file recheck concern the older one-security diagnostic.
+  See the [WRDS protocol and readiness record](../wiki/pages/wrds-equity-research-protocol.md)
+  for the implementation, evidence, boundary and remaining deployment work.
 - **Produces:** `libs/cleargbm/docs/BENCHMARK_MANIFEST_*.json` (41 of them) and
   `services/covenant-radar-api/models/optimization_history.jsonl`; the two
   paired families write a manifest and `RunRecord` wherever `--out` names
