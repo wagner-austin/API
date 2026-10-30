@@ -149,8 +149,19 @@ def test_actual_launch_failure_leaves_interrupted_evidence(
     campaign, root, digest = single_campaign(tmp_path)
     name = campaign["plans"][0]["name"]
 
-    def missing_executable(command: tuple[str, ...], directory: Path, log: Path) -> int:
-        return run_command((str(tmp_path / "absent.exe"), *command[1:]), directory, log)
+    def missing_executable(
+        command: tuple[str, ...],
+        directory: Path,
+        log: Path,
+        *,
+        stdin_bytes: bytes | None = None,
+    ) -> int:
+        return run_command(
+            (str(tmp_path / "absent.exe"), *command[1:]),
+            directory,
+            log,
+            stdin_bytes=stdin_bytes,
+        )
 
     with pytest.raises(FileNotFoundError):
         tick_campaign(

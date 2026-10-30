@@ -87,7 +87,15 @@ class Scheduler:
         self.state = "COMPLETED"
         self.change: JSONObject = {}
 
-    def __call__(self, command: tuple[str, ...], directory: Path, log: Path) -> int:
+    def __call__(
+        self,
+        command: tuple[str, ...],
+        directory: Path,
+        log: Path,
+        *,
+        stdin_bytes: bytes | None = None,
+    ) -> int:
+        assert stdin_bytes is None
         self.calls.append(command)
         module = command[2]
         if module.endswith(self.fail) and self.fail:

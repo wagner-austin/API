@@ -35,6 +35,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     pin()
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.research_cluster import decode_research_cluster
+    from covenant_ml.markets.research_delivery import deliver_final_grant
     from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
     from covenant_ml.markets.research_final import release_final, select_candidate
     from covenant_ml.markets.research_journal import (
@@ -69,6 +70,12 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     release.add_argument("--final-manifest", required=True, type=Path)
     release.add_argument("--access", required=True, type=Path)
     release.add_argument("--directory", required=True, type=Path)
+    deliver = commands.add_parser("deliver")
+    deliver.add_argument("--trial", required=True, type=Path)
+    deliver.add_argument("--final-manifest", required=True, type=Path)
+    deliver.add_argument("--cluster", required=True, type=Path)
+    deliver.add_argument("--directory", required=True, type=Path)
+    deliver.add_argument("--destination", required=True)
     args = parser.parse_args(argv)
     action: str = args.action
     policy_path: Path = args.policy
@@ -96,16 +103,30 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         trial = decode_research_trial(read_document(trial_path))
         if trial["policy"] != policy:
             raise ValueError("RESEARCH_EXECUTION_REQUEST: trial policy differs from journal")
-        if action in {"select", "release"}:
+        if action in {"select", "release", "deliver"}:
             final_manifest: Path = args.final_manifest
             if action == "select":
                 attempts = (select_candidate(ledger_path, trial, final_manifest),)
-            else:
+            elif action == "release":
                 access: Path = args.access
                 destination: Path = args.directory
                 keys = EvaluatorKeys(decode_research_access(read_document(access)))
                 attempts = (
                     release_final(ledger_path, trial, final_manifest, destination, keys=keys),
+                )
+            else:
+                delivery_cluster_path: Path = args.cluster
+                grant_directory: Path = args.directory
+                remote_destination: str = args.destination
+                attempts = (
+                    deliver_final_grant(
+                        ledger_path,
+                        trial,
+                        decode_research_cluster(read_document(delivery_cluster_path)),
+                        grant_directory.resolve(),
+                        final_manifest,
+                        remote_destination,
+                    ),
                 )
         else:
             cluster_path: Path = args.cluster

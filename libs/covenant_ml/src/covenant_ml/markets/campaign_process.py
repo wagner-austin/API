@@ -6,20 +6,36 @@ import subprocess
 from pathlib import Path
 from typing import Protocol
 
+from platform_core.process_input import process_input
+
 
 class CommandRunner(Protocol):
     """Launch one CLI process and return its exit status with a durable log."""
 
-    def __call__(self, command: tuple[str, ...], directory: Path, log: Path) -> int: ...
+    def __call__(
+        self,
+        command: tuple[str, ...],
+        directory: Path,
+        log: Path,
+        *,
+        stdin_bytes: bytes | None = None,
+    ) -> int: ...
 
 
-def run_command(command: tuple[str, ...], directory: Path, log: Path) -> int:
+def run_command(
+    command: tuple[str, ...],
+    directory: Path,
+    log: Path,
+    *,
+    stdin_bytes: bytes | None = None,
+) -> int:
     """Execute without a shell, preserving combined output and a five-minute limit.
 
     Args:
         command: Exact argument vector, including executable.
         directory: Package working directory.
         log: New log destination.
+        stdin_bytes: Private CLI input, delivered through an anonymous file.
 
     Returns:
         Actual process return code, including nonzero failure.
@@ -28,10 +44,11 @@ def run_command(command: tuple[str, ...], directory: Path, log: Path) -> int:
         OSError: Process launch or log persistence fails.
         TimeoutExpired: Child exceeds five minutes; its attempt remains started.
     """
-    with log.open("xb") as output:
+    with log.open("xb") as output, process_input(stdin_bytes) as source:
         completed = subprocess.run(
             command,
             cwd=directory,
+            stdin=source,
             stdout=output,
             stderr=subprocess.STDOUT,
             timeout=300,
