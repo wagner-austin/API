@@ -360,16 +360,21 @@ def observe_node(
         observation_json(to_observation(node["name"], sessions["pid_domain"], record))
         for record in sessions["records"]
     ]
+    native = native_observe.observe_codex(
+        board, node["name"], user, machine, identity, evidence_seconds
+    )
     detail = queue.observe_sessions(
         board,
         machine=machine,
         observations=observations,
         identity=identity,
-        native_observations=native_observe.observe_codex(
-            board, node["name"], user, machine, identity, evidence_seconds
-        ),
+        native_observations=native,
     )
-    return NodeOutcome(node=node["name"], recorded=True, detail=detail)
+    return NodeOutcome(
+        node=node["name"],
+        recorded=True,
+        detail=f"{detail}{native_observe.evidence_note(native, evidence_seconds)}",
+    )
 
 
 def observable(machines: Mapping[str, Machine]) -> tuple[Machine, ...]:
