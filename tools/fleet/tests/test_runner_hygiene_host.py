@@ -46,9 +46,12 @@ from fleet.core.ci_clean import (
     REPORT_BUILD_CACHE,
     REPORT_BUILD_CACHE_BEFORE,
     REPORT_DIGEST,
+    REPORT_HELD,
+    REPORT_RUNNING,
     REPORT_STARTED,
 )
 from fleet.core.runner_job_scope_render import JOB_HOOK_PATH, JOB_HOOK_SCRIPT
+from fleet.core.tool_caches import REMOVAL_GRACE_SECONDS
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
 #: Where the rendered provision installs the script.
@@ -268,6 +271,41 @@ def test_the_jobs_read_their_caches_from_the_generation_the_hook_chose(
         + ", ".join(f"{install} ({generation})" for install, generation in sorted(readers.items()))
         + "; it holds "
         + ", ".join(f"{tool} {size} bytes" for tool, size in sorted(held.items())),
+    )
+
+
+@pytest.mark.host_runner_units
+def test_the_runner_cache_holds_no_generation_a_running_job_does_not_read(
+    runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
+) -> None:
+    """MCPs board task 9ab83f4b: after ci-clean's sweep, every generation
+    left is the current one, one a job running as the sweep began read, or
+    one inside the removal's grace at the run's start. On lavender at
+    2026-10-30T19:46Z generation 1792891106 was none of these and stayed,
+    kept by the markers of idle and retired installs."""
+    lines = pathlib.Path(CI_CLEAN_REPORT).read_text(encoding="utf-8").splitlines()
+    started = int(_fields(lines, REPORT_STARTED)[0])
+    sweeps = _fields(lines, "cache-generations: ")
+    assert len(sweeps) == 1, f"{len(sweeps)} sweep lines in {CI_CLEAN_REPORT}"
+    current = sweeps[0].split(": generation ")[1].split(" ")[0]
+    running = set(_fields(lines, REPORT_RUNNING))
+    held = _fields(lines, REPORT_HELD)
+    unread = [
+        generation
+        for generation in held
+        if generation != current
+        and generation not in running
+        and started - max(int(generation), int(current)) > REMOVAL_GRACE_SECONDS
+    ]
+
+    assert current in held, f"the current generation {current} is not among {held}"
+    assert unread == [], f"generations no running job read, past the grace: {unread}"
+    record_property(
+        READING_PROPERTY,
+        f"{runner_host['name']}: the sweep left {len(held)} generation(s), "
+        f"{', '.join(held)}; {current} is current, running jobs read "
+        f"{', '.join(sorted(running)) or 'none'}, and none is left unread past "
+        f"{REMOVAL_GRACE_SECONDS} s",
     )
 
 

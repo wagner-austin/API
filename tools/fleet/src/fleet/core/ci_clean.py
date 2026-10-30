@@ -173,14 +173,34 @@ RUNNER_GENERATIONS_IN_USE: Final = (
     "}",
 )
 
+#: How the report names a generation a running job read when the sweep
+#: began, one line each.
+REPORT_RUNNING: Final = "cache-running: generation "
+
+#: How the report names each generation the sweep left, current included.
+REPORT_HELD: Final = "cache-held: generation "
+
 #: The removal rule over the runner account's generations, against the
-#: markers of the runner installs running a job.
+#: markers of the runner installs running a job. Around it the report names
+#: what the running jobs read before it and every generation left after it,
+#: which the runner host's hygiene case holds to the rule: the fleet's user
+#: cannot read the runner account's home (MCPs board task 9ab83f4b). A job
+#: that starts between the two reads the current generation or one inside
+#: the removal's grace, so neither line names a generation the rule kept
+#: for a job the first line missed.
 GENERATIONS_SWEEP: Final = "\n".join(
     (
         *SH_REMOVE_UNUSED,
         *RUNNER_GENERATIONS_IN_USE,
         "as=",
+        f'generations_in_use "{RUNNER_MARKERS}" | sort -u | sed "s/^/{REPORT_RUNNING}/"',
         f'remove_unused "{RUNNER_TOOLS}" "{RUNNER_MARKERS}"',
+        f'if [ -d "{RUNNER_TOOLS}" ]; then',
+        f'    for entry in $(ls "{RUNNER_TOOLS}"); do',
+        f'        [ "$entry" != {names.CURRENT_GENERATION_NAME} ] || continue',
+        f'        echo "{REPORT_HELD}$entry"',
+        "    done",
+        "fi",
     )
 )
 
@@ -296,6 +316,8 @@ __all__ = [
     "REPORT_BUILD_CACHE",
     "REPORT_BUILD_CACHE_BEFORE",
     "REPORT_DIGEST",
+    "REPORT_HELD",
+    "REPORT_RUNNING",
     "REPORT_STARTED",
     "RUNNER_GENERATIONS_IN_USE",
     "STATE_DIRECTORY_NAME",

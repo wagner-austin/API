@@ -53,8 +53,9 @@ def test_the_download_caches_go_only_by_whole_generations() -> None:
     caches = ci_clean.CI_CLEAN_CACHES
     assert caches.index(ci_clean.GENERATIONS_SWEEP) < caches.index(ci_clean.GENERATION_READERS)
     assert caches.endswith(ci_clean.GENERATION_READERS + "\n")
-    assert ci_clean.GENERATIONS_SWEEP.splitlines()[-1] == (
+    assert (
         'remove_unused "$HOME/.cache/fleet-tools" "$HOME/.cache/fleet-jobs"'
+        in ci_clean.GENERATIONS_SWEEP.splitlines()
     )
     assert "-atime" not in ci_clean.CI_CLEAN_SCRIPT
 
@@ -277,7 +278,10 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout.splitlines() == [
         "venv-sweep: removed 1 of 3 (2 MB)",
+        f"cache-running: generation {busy_read}",
         f"cache-generations: {tools}: generation {current} current, removed 2 of 4 (2 MB)",
+        f"cache-held: generation {busy_read}",
+        f"cache-held: generation {current}",
         *sorted(
             [
                 f"cache-reader: {busy} read generation {busy_read}",
@@ -321,12 +325,17 @@ def test_a_generation_a_running_job_reads_is_kept_by_its_marker_alone(
     after = _run_caches(tmp_path, home)
 
     assert (while_running.returncode, after.returncode) == (0, 0), after.stderr
-    assert while_running.stdout.splitlines()[1] == (
-        f"cache-generations: {tools}: generation {current} current, removed 0 of 2 (0 MB)"
-    )
-    assert after.stdout.splitlines()[1] == (
-        f"cache-generations: {tools}: generation {current} current, removed 1 of 2 (1 MB)"
-    )
+    assert while_running.stdout.splitlines()[1:5] == [
+        f"cache-running: generation {read}",
+        f"cache-generations: {tools}: generation {current} current, removed 0 of 2 (0 MB)",
+        f"cache-held: generation {read}",
+        f"cache-held: generation {current}",
+    ]
+    assert after.stdout.splitlines()[1:4] == [
+        f"cache-generations: {tools}: generation {current} current, removed 1 of 2 (1 MB)",
+        f"cache-held: generation {current}",
+        f"cache-reader: {install} read generation {read}",
+    ]
     assert not (tools / read).exists()
 
 
