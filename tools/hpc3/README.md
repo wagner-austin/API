@@ -626,6 +626,23 @@ dependencies, CPU-only, and job arrays (a sweep IS one `--array` call now,
 
 ## Commands
 
+Verify an existing image build without submitting another allocation:
+
+```bash
+python -m hpc3.cli.image_inspect --config C --job JOB_ID \
+    --checksums frozen-build.sha256 --report-task TASK_UUID
+```
+
+The checksum manifest uses absolute cluster paths. Pin the image, its
+`build-JOB_ID.out`, `build.sbatch`, `build.sh`, `image.def`, `requirements.txt`,
+`selfcheck.py`, `GIT_COMMIT`, and any staged wheels. Use identities captured
+when the build was frozen. The inspector verifies native success, all supplied
+digests, both generated selfcheck receipts, the dependency smoke check, and
+image/log modification times within the allocation. Only then does the existing
+HPC3 service reporter post metadata to the task. This checks the retained build
+evidence and current file identities; it does not rerun the image or establish
+scientific validity.
+
 | command | does |
 | --- | --- |
 | `hpc3-preflight --config C {--run R \| --sweep S}` | asks the scheduler whether it would start. Nothing is queued. |
