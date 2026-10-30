@@ -22,7 +22,7 @@ source_paths:
   - "libs/platform_core/src/platform_core/run_record.py"
   - "libs/platform_core/tests/test_run_record.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/EVALUATION_CONTRACTS.md": "ea4c704c2ea28a4fe188a52149826e01aa1c4237"
+  "libs/covenant_ml/docs/EVALUATION_CONTRACTS.md": "6b242c7bc3244b1078a0162f87ec6d90c548d21d"
   "libs/covenant_ml/src/covenant_ml/metrics.py": "5652fb6f2a94f6fd489c3e66f6fe8741ed9d3b65"
   "libs/covenant_ml/src/covenant_ml/ranking.py": "158cb9e9b19de478088f7b341b305f3c4adb5d13"
   "libs/covenant_ml/src/covenant_ml/evaluation/auc.py": "91166dbd6b12d79928b05401f5550e092e5337f1"
@@ -35,7 +35,7 @@ source_git_blobs:
   "libs/covenant_ml/tests/evaluation/test_learning_curve.py": "7b555bc91238c0b3e897695cbe6af66db1df549e"
   "libs/covenant_ml/tests/evaluation/test_moving_block.py": "3b797d26f5e65ddee1f4ad7472fd05ccf0549c28"
   "libs/covenant_ml/tests/evaluation/test_wrds.py": "638d804f3b8bdca4657cc6ac6832d5b51a757299"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "3c30041d1ae573e498a0a8f2ed77f0fecbd13e39"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "1637ec192a1cf1e0f7b6a3a4eefda34a7a33ca3e"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "6c83658eb2e0447a2a06fd12d23e6c3b138c1d30"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
   "libs/platform_core/tests/test_run_record.py": "5bd7f783973789c95e490238b34eec53d90e5237"

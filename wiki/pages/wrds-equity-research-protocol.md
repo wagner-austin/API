@@ -38,16 +38,22 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_hpc.py"
   - "tools/fleet/src/fleet/core/research_wrds.py"
   - "tools/fleet/src/fleet/cli/tick.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_holdings.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_study.py"
+  - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "3035c22326bc69ff6d06c5e5f72d6660290e270b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "838e19bcd90c3a99173409378160b14035d12b5d"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "97d5165abfe06c0989c5d72653f79979ec104aca"
-  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "310c620a4669e5d80891e15e5788e8b9711cede8"
-  "libs/covenant_ml/tests/markets/test_crsp_panel.py": "6d9f476a5dc05858e71e3f5350cf81cd0676018c"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "67792a2f1fd38cf8927a88d68adb04f1e8eb7c98"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "50c6414def75db3058cd7290f5b7da56b077ab53"
+  "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "e721684f962c297aa60e8c1ebc80c1f3376da02d"
   "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
@@ -61,24 +67,30 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "44dfcd58adde8408d1b34a558214ac70d36af563"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8270ce31e91120ce22a6668e43ebfdc478e15b89"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "bd2c9fd8c7810948c0702ac5f9d5a502c7054289"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "18737b9e2165b22b857b7a2221dd7f7f98733a61"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "ddf17de3078972eea9bd3cf12b7b5570a24b1008"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "84af969117df4a38b47eaae30b25ddb14803d145"
   "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "82866fd54add43aed2961d6e353aa54fa98020c4"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
+  "libs/covenant_ml/tests/markets/test_crsp_study.py": "34906e84d248d597ed8aca35aa8e68121cf1a825"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "1637ec192a1cf1e0f7b6a3a4eefda34a7a33ca3e"
 provenance:
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Ownership review 2026-10-29: MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6 is external to this API wiki's source_paths; live queue, installed controller and board reads are identified separately in the review footnotes."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
-fact_checked: 2026-10-29
+fact_checked: 2026-10-30
 confidence: medium
 ---
 
@@ -88,8 +100,9 @@ The implementation path is a bounded extension: Corvis owns task claims and revi
 the research libraries own evaluation rules and evidence; WRDS and HPC3 own jobs.
 There is no evidence here requiring a replacement coordinator or a second research
 framework. Frozen proposal admission, durable attempt recording and HPC3 submission
-and reconciliation are implemented in the existing libraries. The monthly study
-and restricted holdout identity below remain integration work.[^request][^admission][^execution]
+and reconciliation are implemented in the existing libraries, and the research
+worker now runs the frozen monthly study on its validation period. Restricted
+holdout identity remains integration work.[^request][^admission][^execution][^holdings]
 
 ## Shared queue integration
 
@@ -149,9 +162,8 @@ The earlier controller-path repair passed its Windows check and independent
 audit. The native replay case also passed, but its parent board task
 `8b19319c` remains waiting on the unrelated minutes-corpus root-cause task
 `671c2919`; that parent audit is not complete. Label-overlap exclusion and
-paired moving-block primitives now have implementations; their integration
-into monthly return accounting and restricted holdout access remains work
-described below.[^live-review][^sampling][^splits]
+paired moving-block primitives are integrated into the monthly holdings study
+described below; restricted holdout access remains work.[^live-review][^sampling][^splits][^holdings]
 
 ## What is already reusable
 
@@ -169,31 +181,33 @@ or out-of-sample performance.[^records]
 
 ### Reuse boundaries checked against source
 
-The existing implementations provide useful parts of the proposed study, but
-their current contracts differ from that study in specific ways:[^equity][^window][^sampling][^splits]
+The existing implementations provide useful parts of the study, but their
+contracts differ from it in specific ways. The right column records how the
+monthly study now uses or replaces each seam:[^equity][^window][^sampling][^splits][^holdings]
 
-| Existing seam | Verified behavior | Extension needed for the monthly study |
+| Existing seam | Verified behavior | Monthly study |
 |---|---|---|
-| `equity_study.load_equity_study` | Binds a verified snapshot, cohort, selected weights and independently supplied session calendar. | Bind effective-dated CRSP membership and decision/entry/exit dates, preserving its frozen-design checks. |
-| `equity_outcomes.evaluate_equity_window` | Requires the entire frozen cohort and every declared session; scores adjusted-price endpoints and subtracts one fixed round-trip cost. | Carry holdings between rebalances, charge absolute traded notional against drifted pre-trade weights, and represent return/delisting events explicitly. A fixed cost per window is not turnover accounting. |
-| `ChronologicalGroupedSplits` | Partitions whole distinct time keys and requires actual label availability strictly before stopping and scoring boundaries. Validation stopping rows come from training. | Bind the monthly study's fixed dates and actual outcome-availability timestamps. The separate embargo counts keys, not elapsed time. |
-| `build_resampling` / `bootstrap_weights` / `moving_block_weights` | The first two retain fixed, non-overlapping blocks. The new primitive samples overlapping, noncircular blocks and truncates the last block to preserve the exact observation count. | Integrate monthly return differences and the frozen block length into the study worker. |
-| `paired_mean_difference` / `compare_moving_block` | Newey-West errors remain available. The new paired comparison requires identical consecutive month identities and records a distinct moving-block percentile method. | Publish the monthly study's paired interval. Its uncentered bootstrap sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
+| `equity_study.load_equity_study` | Binds a verified snapshot, cohort, selected weights and independently supplied session calendar. | Not reused: `crsp_panel` binds effective-dated CRSP membership and decision/entry/exit dates from the frozen protocol. |
+| `equity_outcomes.evaluate_equity_window` | Requires the entire frozen cohort and every declared session; scores adjusted-price endpoints and subtracts one fixed round-trip cost. | Not reused: `crsp_holdings` carries drifted holdings between rebalances, charges absolute traded notional against drifted pre-trade positions and values each terminal event once on its own date. |
+| `purge_label_overlap` (also inside `ChronologicalGroupedSplits`) | Requires actual label availability strictly before the stopping and scoring boundaries. | `crsp_study` passes each window's exit close as availability, so each fold drops exactly the decision immediately before its stopping and scoring boundaries. |
+| `moving_block_weights` | Samples overlapping, noncircular blocks and truncates the last block to preserve the exact observation count. | Used through `compare_moving_block` with the frozen block length, draw count and seed. |
+| `compare_moving_block` | Requires identical consecutive month identities and records a distinct moving-block percentile method. | Compares each candidate and the equal-weight universe with momentum at the primary cost. Its uncentered sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
 
 The shared admission journal, queue, native scheduler adapters and RunRecord
-publisher already compose. Extending the numerical evaluator does not require
-another coordinator or another attempt ledger. The diagnostic source selects
-`validation_split`, but reads a manifest whose underlying snapshot still resides
-under the shared account. Final-period enforcement therefore also needs an
-execution identity that proposer tools cannot use to read the held-out files;
-the split function alone is not that boundary.[^execution][^controllers][^splits]
+publisher compose with the monthly worker without another coordinator or
+attempt ledger. The worker never constructs a final-period decision, but it
+reads a manifest whose underlying snapshot still resides under the shared
+account. Final-period enforcement therefore also needs an execution identity
+that proposer tools cannot use to read the held-out files; the date bound alone
+is not that boundary.[^execution][^controllers][^splits][^holdings]
 
 ## Study design v1, before any expanded extraction
 
 The design is frozen in `libs/covenant_ml/docs/crsp-monthly-v1.json`. Its codec
 and calendar, membership, execution-price and terminal-value validators are
-implemented; holdings evaluation and holdout isolation remain integration work.
-These are study assumptions, not profitability findings.[^frozen]
+implemented, and so are holdings evaluation and the validation study; holdout
+isolation remains integration work. These are study assumptions, not
+profitability findings.[^frozen][^holdings]
 
 | Decision | Rule |
 |---|---|
@@ -272,8 +286,40 @@ never filter this universe. Hand-computable fixture cases test −12% momentum,
 invariance under changed future returns, prices, volumes and new listings, and
 a nonconstant liquidity window whose median (2000) differs from its mean. A
 reordered CSV header with a valid checksum is refused as a projection change.
-This is input construction, not an executed monthly portfolio study; holdings,
-cost accounting, worker integration and enforced holdout isolation remain.[^panel]
+This is input construction; the holdings and validation study below consume it.[^panel]
+
+Monthly holdings start from one unit of cash. At each rebalance close the
+investable value, held positions plus terminal values dated strictly before
+that close, is split equally across the selection; traded notional is measured
+against the drifted pre-trade positions and its frozen cost is paid from the
+portfolio. Positions compound their own ordinary daily returns, checked against
+the declared predecessor session. A position delisted inside a window stops at
+its delisting date and becomes a receivable worth its `stkdelists` multiplier,
+applied once and never combined with the daily delisting-flagged row; it is
+reinvested only at a rebalance strictly after its valuation date. The last
+window pays the cost of liquidating its positions. A missing or non-ordinary
+held return, a missing or non-`TR` fill, an unresolved terminal event or a value
+dated after the scored exit refuses the whole evaluation. Hand-calculated cases
+check two-month drift, turnover and liquidation and a three-month delisting
+whose value waits one month before reinvestment.[^holdings]
+
+The validation study builds decisions only up to the day before the final
+period. Labels are whether a security's window multiplier, terminal value
+included, beats the eligible universe's equal-weight multiplier, available at
+the exit close. Validation decisions are scored in expanding folds of declared
+length; each fold fits the existing baseline trainers on earlier decisions,
+uses the declared stopping months for early stopping, and drops every label not
+available before the next boundary. Candidates take the top
+`ceil(selection_fraction × eligible)` by predicted probability; fixed momentum
+and the equal-weight universe run through the same accounting at all three
+frozen costs, and every arm is paired with momentum by the frozen moving-block
+bootstrap. On a seeded four-year fixture the tests check, by independent index
+arithmetic, that each fold drops exactly the decision before each boundary, and
+check independently selected momentum portfolios, raw-row label oracles and the
+frozen-seed interval. Using binary labels because the trainers are classifiers is
+a declared implementation choice, not part of the frozen design. The two
+validation months nearest the final period take their outcomes from the first
+final-period sessions because their exits fall there.[^holdings]
 
 The controller's `python` executable and `workspace` configuration use absolute
 native filesystem paths. HPC3 `root`, `entrypoint` and `image` use absolute POSIX
@@ -300,11 +346,13 @@ proposal values, preserving raw admission bytes while accepting JSON key reorder
 changed proposal values remain refused. Reconciliation requires native Slurm
 accounting and verified results through the cluster evidence command. Transport
 ambiguity remains unresolved until exactly one matching ledger row is found; no
-automatic resubmission is allowed. The validation worker reuses the existing
-trainers, metrics and RunRecord publisher, with early stopping drawn from training.
+automatic resubmission is allowed. The validation worker runs the monthly study
+above with the existing trainers and RunRecord publisher, after checking that the
+staged CRSP protocol is exactly the admitted design; it publishes every arm's
+monthly accounting, the fold counts and the paired intervals as observations.
 These are provenance checks over owner-writable evidence, not protection against
-an adversary controlling the account.[^execution] This control layer refuses final-partition proposals
-but does not implement filesystem isolation or the substantive monthly evaluator.
+an adversary controlling the account.[^execution][^holdings] This control layer refuses final-partition proposals
+but does not implement filesystem isolation.
 The CLI's policy is evaluator-owned configuration, not a field agents may replace
 in a proposal.[^admission]
 
@@ -323,7 +371,7 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^live-review]: Live `dispatch_get` and installed `research_proposals.py status` reads on 2026-10-29, preserved in board task 79c9a370 thread post 1a29cf1d-3ed9-4d47-a6a6-8a23c7c08bd3. `task_get 3261e090` records audit ed3e8e63 VERIFIED; `task_get 8b19319c` records its remaining wait on 671c2919. Earlier served replay case: MCPs `execution/tests/served/research-queue-replay.test.ts`, two submissions and three controller reads in served run c469a100-f103-4e26-a246-396d81b5ee04; the entire served suite was not green.
 [^queue]: `tools/fleet/src/fleet/cli/research_queue.py` functions `tick` and `reconcile`; `tools/fleet/src/fleet/cli/tick.py` function `plan_tick`. Board task 3dff6fbf-e09a-430f-b13e-5dccb505ba80 tracks rollout separately from implementation.
 [^window]: `libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py:67` `evaluate_equity_window`, complete-calendar check and `net_selected = gross_selected - cost` arithmetic.
-[^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py`, `build_resampling`, `bootstrap_weights` and `moving_block_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py`, `paired_mean_difference` and `compare_moving_block`. The monthly integration column remains design work; the listed numerical primitives are implemented.
+[^sampling]: `libs/covenant_ml/src/covenant_ml/evaluation/resampling.py`, `build_resampling`, `bootstrap_weights` and `moving_block_weights`; `libs/covenant_ml/src/covenant_ml/evaluation/paired.py`, `paired_mean_difference` and `compare_moving_block`. The monthly study's use of them is cited in the holdings footnote.
 [^splits]: `libs/covenant_ml/src/covenant_ml/evaluation/splits.py` class `ChronologicalGroupedSplits`, methods `__call__` and `validation_split`.
 [^controllers]: `tools/fleet/src/fleet/core/research_control.py` functions `read_specification` and `verified_input`; `tools/fleet/src/fleet/core/research_hpc.py` and `tools/fleet/src/fleet/core/research_wrds.py`, function `poll` in each.
 [^adapter]: `libs/covenant_ml/src/covenant_ml/evaluation/wrds.py:129` `load_wrds_evaluation`.
@@ -336,5 +384,6 @@ until admission, holdout isolation and append-only attempt recording are tested.
 [^market]: `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Evidence and arithmetic" and preceding command/plan contract.
 [^records]: `libs/platform_core/src/platform_core/run_record.py:309` `agree_across_runs`.
 [^admission]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py` frozen contracts; `libs/covenant_ml/src/covenant_ml/markets/research_journal.py` admission and lifecycle reducers; `libs/platform_core/src/platform_core/event_journal.py` transactional persistence; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 399048d8-b1d6-4e12-a4d3-a0ce2281c810.
-[^execution]: `libs/covenant_ml/src/covenant_ml/markets/research_execution.py` submission and reconciliation; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py` validation diagnostic; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", execution settings and limitations. Board task 6d2d086c-5242-482b-ac81-8a61dd8e354d.
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/research_execution.py` submission and reconciliation; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py` `execute_trial`, the monthly validation worker since board task 8f7247a1; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", execution settings and limitations. Board task 6d2d086c-5242-482b-ac81-8a61dd8e354d.
+[^holdings]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `evaluate_crsp_holdings` and `crsp_window_path`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation` and `crsp_study_rows`; `libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py`, `decode_research_evaluation`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_crsp_study.py` and `test_research_trial.py`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Monthly holdings and validation study". Fleet job 48a2d9c8-b9f6-4c6b-8a65-917bd3828f37 passed make check for libs/covenant_ml at API fd3f7723bd6eb7f5fbc5caa3157efed306bf3949: 4743 tests, 100% coverage. Board task 8f7247a1-aa1a-41d7-be0e-f2b8e97c1d2d. No real CRSP outcome has been scored.
 [^paths]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py:52` `decode_research_cluster` and `:101` `prepare_bundle`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py:70` `_command`. Board task 3261e090-1354-43ae-8703-a8cf5671f5f9 corrects the former use of POSIX validation for local controller paths.
