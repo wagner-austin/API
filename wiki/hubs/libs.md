@@ -39,6 +39,24 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->
 
-[WRDS equity research extends the existing systems](../pages/wrds-equity-research-protocol.md) -- bounded pilot versus the proposed monthly study; reusable evaluation contracts and the agent admission/holdout boundary
+[WRDS equity research extends the existing systems](../pages/wrds-equity-research-protocol.md) -- navigation to the study, implementation boundaries and measured readiness
+
+[WRDS baseline readiness](../pages/wrds-baseline-readiness.md) -- installed pilot versus tested implementation, and prerequisites for the substantive study
+
+[Frozen CRSP monthly study design](../pages/crsp-monthly-study-design.md) -- target, historical universe, split dates, baselines, costs and trial budget
+
+[CRSP source and panel contract](../pages/crsp-monthly-data-contract.md) -- relation projections, daily and terminal evidence, membership and decision construction
+
+[CRSP holdings and validation](../pages/crsp-monthly-holdings-validation.md) -- drifted positions, turnover, terminal reinvestment and purged monthly folds
+
+[WRDS evaluation reuse](../pages/wrds-evaluation-reuse.md) -- where shared numerical contracts apply and where CRSP requires its own accounting
+
+[WRDS admission and shared queue](../pages/wrds-research-queue-admission.md) -- proposal recording, resource ownership, native execution and reconciliation
+
+[WRDS integration ownership review](../pages/wrds-integration-ownership-review.md) -- bounded review, staging-byte repair and dated native replay evidence
+
+[WRDS proposer isolation](../pages/wrds-proposer-isolation.md) -- rootless process boundary, installed admission handoff and actual-host denial evidence
+
+[WRDS final scoring](../pages/wrds-final-scoring.md) -- evaluator selection, sealed admissions and consumed one-shot final release
 
 [Evaluation numerical contracts](../pages/evaluation-numerical-contracts.md) -- paired comparisons, tie-aware scores, uncertainty, ablation, learning curves, chronology and provenance limits
