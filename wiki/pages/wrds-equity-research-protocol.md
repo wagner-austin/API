@@ -43,8 +43,8 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "838e19bcd90c3a99173409378160b14035d12b5d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "97d5165abfe06c0989c5d72653f79979ec104aca"
-  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "f72d46be4c3785c41a9db45f410f76167e6e2b09"
-  "libs/covenant_ml/tests/markets/test_crsp_panel.py": "3cd98e3a523dbc2575bbae4254c6bb0f6f881bdf"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "b38f758fde58a0161678dfaf17b801a482c83fc7"
+  "libs/covenant_ml/tests/markets/test_crsp_panel.py": "6d9f476a5dc05858e71e3f5350cf81cd0676018c"
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "8d3e0b6a7ebb84dd44d62bfb3c4acdc557678cb8"
@@ -268,8 +268,10 @@ price times volume; equal liquidity sorts by PERMNO. Momentum skips the entire
 decision month and compounds the preceding eleven calendar months, with every
 required daily predecessor checked against the independent session calendar.
 The 252-session history window ends at the decision close. Future fill prices
-never filter this universe. Hand-computable fixture cases test −12% momentum
-and invariance under changed future returns, prices, volumes and new listings.
+never filter this universe. Hand-computable fixture cases test −12% momentum,
+invariance under changed future returns, prices, volumes and new listings, and
+a nonconstant liquidity window whose median (2000) differs from its mean. A
+reordered CSV header with a valid checksum is refused as a projection change.
 This is input construction, not an executed monthly portfolio study; holdings,
 cost accounting, worker integration and enforced holdout isolation remain.[^panel]
 
