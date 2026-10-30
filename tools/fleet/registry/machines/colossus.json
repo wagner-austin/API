@@ -9,9 +9,12 @@
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.111.149.33",
   "reachKey": null,
-  "bootMac": null,
+  "bootMac": "30:56:0f:84:2e:f0",
   "netbootWifi": false,
-  "installDisk": null,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Inland_TN320_NVMe_SSD_IB26AI0001P00436_1"
+  },
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
@@ -20,7 +23,7 @@
   },
   "notes": "Enrolled by fleet-enroll. A dispatch worker since 2026-10-09 (board task 28c43011), provisioned by scripts/host/fleet-node/provision.sh with the fleet test database and the isolated docker lane; its Arc Pro B60 runs glimmer.service and is not a CUDA device, so gpu stays null.",
   "dispatch": {
-    "held": null,
+    "held": "Reinstalling as a NixOS worker by netboot (MCPs board task 7c8cb3e2): its disk is wiped by the install, so it takes no check until it checks in on NixOS and a fleet check passes there.",
     "stage_root": "/home/user/fleet/stage",
     "logical_cores": 12,
     "ram_gb": 31.3,
