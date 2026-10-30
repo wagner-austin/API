@@ -20,9 +20,9 @@ probe hook, the hook's environment carries ``GITHUB_ENV`` and ``RUNNER_TEMP``,
 and ``RUNNER_NAME`` reads ``lavender-wsl`` for the API and the MCPs runners
 alike, so the marker is named by the runner install's directory, which
 ``RUNNER_TEMP`` lies under, never by ``RUNNER_NAME``. A runner runs one job at
-a time, so its marker names the generation its job reads, and ci-clean
-removes a generation only whole, when no runner's marker names it
-(:data:`fleet.core.tool_caches.SH_REMOVE_UNUSED`).
+a time, so its marker names the generation its last job read, and ci-clean
+removes a generation only whole, when no marker of an install running a job
+names it (:data:`fleet.core.ci_clean.RUNNER_GENERATIONS_IN_USE`).
 
 npm's cache inside the generation is one per runner install, because the
 runners on a host run jobs at once under one account and npm's cache is not

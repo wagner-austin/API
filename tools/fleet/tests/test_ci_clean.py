@@ -2,7 +2,8 @@
 
 Its Python half is executed for real against a home this suite lays out:
 virtualenvs whose recorded sources are gone or alive, and cache generations
-that runner installs' markers name or do not, because a string assertion
+that the markers of runner installs name or do not, beside a real process
+standing as one install's running Runner.Worker, because a string assertion
 would pass a script that deletes everything or nothing.
 """
 
@@ -11,6 +12,7 @@ from __future__ import annotations
 import pathlib
 import shlex
 import subprocess
+import sys
 import time
 from typing import Final
 
@@ -30,8 +32,12 @@ MIB: Final = 1024 * 1024
 def test_no_pass_waits_for_the_runners_to_be_idle() -> None:
     # The gate this replaced skipped the whole Python half while any
     # Runner.Worker ran, and lavender always runs one (MCPs board task
-    # ecb13d3d): 30 days of 'skipping this pass' and no reclaim.
-    assert "Runner.Worker" not in ci_clean.CI_CLEAN_SCRIPT
+    # ecb13d3d): 30 days of 'skipping this pass' and no reclaim. The process
+    # table is read only to know which generations the running jobs read
+    # (MCPs board task 9ab83f4b).
+    in_use = "\n".join(ci_clean.RUNNER_GENERATIONS_IN_USE)
+    assert in_use in ci_clean.CI_CLEAN_SCRIPT
+    assert "Runner.Worker" not in ci_clean.CI_CLEAN_SCRIPT.replace(in_use, "")
     assert "skipping this pass" not in ci_clean.CI_CLEAN_SCRIPT
 
 
@@ -160,6 +166,38 @@ def _generation(tools: pathlib.Path, *, days_ago: int) -> str:
     return name
 
 
+def _marker(home: pathlib.Path, install: str, generation: str) -> None:
+    """Write the marker the job-started hook leaves for one runner install.
+
+    Args:
+        home: The runner account's home.
+        install: The install's directory name.
+        generation: The generation its last job read.
+    """
+    directory = home / ".cache" / "fleet-jobs" / install
+    directory.mkdir(parents=True)
+    (directory / names.GENERATION_MARKER_NAME).write_text(f"{generation}\n", encoding="utf-8")
+
+
+def _worker(install: pathlib.Path) -> subprocess.Popen[bytes]:
+    """Start a real process whose first argument is a Runner.Worker of an install.
+
+    The Listener starts each Worker by its updated path,
+    ``bin.<version>/Runner.Worker``. The process is this interpreter, reached
+    through a link at that path, sleeping until the case kills it.
+
+    Args:
+        install: The install's root.
+
+    Returns:
+        The running process.
+    """
+    path = install / "bin.2.338.0" / "Runner.Worker"
+    path.parent.mkdir(parents=True)
+    path.symlink_to(pathlib.Path(sys.executable).resolve())
+    return subprocess.Popen([str(path), "-c", "import time; time.sleep(600)"])
+
+
 def _virtualenv(venvs: pathlib.Path, name: str, sources: list[str]) -> pathlib.Path:
     """Lay out one poetry virtualenv recording these source paths.
 
@@ -209,37 +247,87 @@ def test_the_python_half_removes_only_orphans_and_generations_no_runner_reads(
     unknown = _virtualenv(venvs, "unknown-py3.11", ["import _virtualenv"])
     tools = home / ".cache" / "fleet-tools"
     unread = _generation(tools, days_ago=30)
-    marked = _generation(tools, days_ago=16)
+    idle_read = _generation(tools, days_ago=20)
+    busy_read = _generation(tools, days_ago=16)
     current = _generation(tools, days_ago=1)
     (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
-    idle_runner = home / ".cache" / "fleet-jobs" / "actions-runner-treebot-1"
-    idle_runner.mkdir(parents=True)
-    (idle_runner / names.GENERATION_MARKER_NAME).write_text(f"{marked}\n", encoding="utf-8")
-    busy_runner = home / ".cache" / "fleet-jobs" / "actions-runner-api-1"
-    busy_runner.mkdir(parents=True)
-    (busy_runner / names.GENERATION_MARKER_NAME).write_text(f"{current}\n", encoding="utf-8")
-    npm = tools / current / "npm" / "actions-runner-api-1" / "_cacache"
+    # The install names carry the case's own directory, so a real runner on
+    # the host running this suite owns none of these markers.
+    busy, idle, retired, fresh = (
+        f"actions-runner-{role}-{tmp_path.name}" for role in ("busy", "idle", "retired", "fresh")
+    )
+    _marker(home, busy, busy_read)
+    _marker(home, idle, idle_read)
+    _marker(home, retired, idle_read)
+    _marker(home, fresh, current)
+    npm = tools / current / "npm" / fresh / "_cacache"
     npm.mkdir(parents=True)
     (npm / "index").write_bytes(bytes(3000))
+    # The idle install is on disk and runs nothing; the retired one is gone,
+    # as actions-runner-mcps-3 was on lavender (MCPs board task 9ab83f4b).
+    (tmp_path / idle / "bin").mkdir(parents=True)
+    worker = _worker(tmp_path / busy)
 
-    ran = _run_caches(tmp_path, home)
+    try:
+        ran = _run_caches(tmp_path, home)
+    finally:
+        worker.kill()
+        worker.wait(timeout=10)
 
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout.splitlines() == [
         "venv-sweep: removed 1 of 3 (2 MB)",
-        f"cache-generations: {tools}: generation {current} current, removed 1 of 3 (1 MB)",
-        f"cache-reader: actions-runner-api-1 read generation {current}",
-        f"cache-reader: actions-runner-treebot-1 read generation {marked}",
+        f"cache-generations: {tools}: generation {current} current, removed 2 of 4 (2 MB)",
+        *sorted(
+            [
+                f"cache-reader: {busy} read generation {busy_read}",
+                f"cache-reader: {fresh} read generation {current}",
+                f"cache-reader: {idle} read generation {idle_read}",
+                f"cache-reader: {retired} read generation {idle_read}",
+            ]
+        ),
         f"cache-tool: generation {current} holds npm (3000 bytes of files)",
-        f"cache-tool: generation {current} holds npm/actions-runner-api-1 (3000 bytes of files)",
+        f"cache-tool: generation {current} holds npm/{fresh} (3000 bytes of files)",
         f"cache-tool: generation {current} holds pypoetry ({MIB} bytes of files)",
     ]
     assert not orphan.exists()
     assert [serving.exists(), unknown.exists()] == [True, True]
     assert sorted(entry.name for entry in tools.iterdir()) == sorted(
-        [marked, current, names.CURRENT_GENERATION_NAME]
+        [busy_read, current, names.CURRENT_GENERATION_NAME]
     )
-    assert not (tools / unread).exists()
+    assert [(tools / unread).exists(), (tools / idle_read).exists()] == [False, False]
+
+
+@pytest.mark.host_linux
+def test_a_generation_a_running_job_reads_is_kept_by_its_marker_alone(
+    tmp_path: pathlib.Path,
+) -> None:
+    # Once the Worker ends, the same marker keeps nothing.
+    home = tmp_path / "home"
+    (home / ".cache" / "pypoetry" / "virtualenvs").mkdir(parents=True)
+    tools = home / ".cache" / "fleet-tools"
+    read = _generation(tools, days_ago=16)
+    current = _generation(tools, days_ago=1)
+    (tools / names.CURRENT_GENERATION_NAME).write_text(f"{current}\n", encoding="utf-8")
+    install = f"actions-runner-busy-{tmp_path.name}"
+    _marker(home, install, read)
+    worker = _worker(tmp_path / install)
+    try:
+        while_running = _run_caches(tmp_path, home)
+    finally:
+        worker.kill()
+        worker.wait(timeout=10)
+
+    after = _run_caches(tmp_path, home)
+
+    assert (while_running.returncode, after.returncode) == (0, 0), after.stderr
+    assert while_running.stdout.splitlines()[1] == (
+        f"cache-generations: {tools}: generation {current} current, removed 0 of 2 (0 MB)"
+    )
+    assert after.stdout.splitlines()[1] == (
+        f"cache-generations: {tools}: generation {current} current, removed 1 of 2 (1 MB)"
+    )
+    assert not (tools / read).exists()
 
 
 @pytest.mark.host_linux

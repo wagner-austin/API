@@ -7,8 +7,10 @@ root, and under execdocker's on a node that runs docker projects' builds as
 that user (:func:`fleet.core.retire.runs_isolated`), that is not current,
 that no run directory still on the node names in its marker, and that has
 not been current for :data:`~fleet.core.tool_caches.REMOVAL_GRACE_SECONDS`,
-by :data:`~fleet.core.tool_caches.SH_REMOVE_UNUSED`, the rule ci-clean runs
-over the CI runner hosts' caches too.
+by :data:`~fleet.core.tool_caches.SH_REMOVE_UNUSED` over
+:data:`~fleet.core.tool_caches.SH_STAGE_GENERATIONS_IN_USE`. ci-clean runs
+the same rule over the CI runner hosts' caches, against the runner installs
+running a job.
 """
 
 from __future__ import annotations
@@ -22,7 +24,11 @@ from platform_core.logging import get_logger
 from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, names, remote, retire
 from fleet.core.linux_isolated_build import EXEC_CACHE, EXEC_HOME_LINE, EXEC_STAGE
-from fleet.core.tool_caches import SH_REMOVE_UNUSED, tool_caches_directory
+from fleet.core.tool_caches import (
+    SH_REMOVE_UNUSED,
+    SH_STAGE_GENERATIONS_IN_USE,
+    tool_caches_directory,
+)
 
 _log = get_logger(__name__)
 
@@ -51,6 +57,7 @@ def removal_script(stage_root: str, *, isolated: bool) -> str:
     tools = tool_caches_directory(names.cache_root(stage_root))
     lines = (
         *SH_REMOVE_UNUSED,
+        *SH_STAGE_GENERATIONS_IN_USE,
         "as=",
         f"remove_unused {shlex.quote(tools)} {shlex.quote(stage_root)}",
     )

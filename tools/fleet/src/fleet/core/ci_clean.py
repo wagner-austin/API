@@ -34,12 +34,14 @@ its own reason a running job is safe from it:
   gone, and a running job's checkout is not (:func:`orphan_sweep_lines`); one
   recording no path is kept, since poetry may still be creating it.
 - poetry's, pip's and npm's download caches go only a whole generation at a
-  time, one no runner install's marker names
+  time, one no running job reads
   (:data:`fleet.core.tool_caches.SH_REMOVE_UNUSED`, MCPs board task
   4b405239): each job reads the generation its job-started hook chose
   (:mod:`fleet.core.runner_tool_caches`). Until then this pass removed single
   files nothing had read for 14 days, which could part a poetry metadata
   file from its body and fail every later lock with ``IncompleteRead``.
+  Which jobs run is read from the process table, never from the markers
+  alone (:data:`RUNNER_GENERATIONS_IN_USE`, MCPs board task 9ab83f4b).
 
 EVERY RUN REPORTS ITSELF (MCPs board tasks 46c7b11b and ecb13d3d, A2). A
 service's last result says nothing of which copy of the script ran, and the
@@ -66,6 +68,7 @@ from typing import Final
 from fleet.contracts.runner_base import BUILD_CACHE_BOUND_GIB
 from fleet.core import names
 from fleet.core.runner_install import RUNNER_ACCOUNT
+from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, WORKER_CASE_PATTERN
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
 from fleet.core.tool_caches import SH_REMOVE_UNUSED
 
@@ -138,10 +141,47 @@ def orphan_sweep_lines(venvs: str) -> tuple[str, ...]:
 #: The orphan rule over the runner account's poetry virtualenvs.
 ORPHAN_SWEEP: Final = "\n".join(orphan_sweep_lines(f'"{RUNNER_VIRTUALENVS}"'))
 
-#: The removal rule over the runner account's generations, against each
-#: runner install's marker.
+#: The runner host's ``generations_in_use MARKERS``: the marker of each
+#: runner install a ``Runner.Worker`` runs from now, so the generation each
+#: running job reads.
+#:
+#: A marker alone names the generation of its install's LAST job, running or
+#: long finished, since the job-started hook writes it and nothing clears it.
+#: On lavender on 2026-10-30T19:46Z markers kept generation 1792891106, 18
+#: GB, for three installs that had run no job since it stopped being current
+#: and for two (``actions-runner-mcps-3`` and ``-4``) that board task 49d1a916
+#: had retired, which would have kept it forever (MCPs board task 9ab83f4b).
+#: The hook that writes a marker runs under its job's Worker, so a job whose
+#: marker this pass skips started after the pass read the processes, and
+#: reads the current generation or one inside the removal's grace.
+RUNNER_GENERATIONS_IN_USE: Final = (
+    "proc_root=/proc",
+    PROCESS_FUNCTIONS.rstrip("\n"),
+    "generations_in_use() {",
+    "    local process argv0 install marker",
+    '    for process in "$proc_root"/[0-9]*/cmdline; do',
+    "        process=${process%/cmdline}",
+    '        argv0=$(argv0_of "${process##*/}") || continue',
+    '        case "$argv0" in',
+    f"            {WORKER_CASE_PATTERN}) ;;",
+    "            *) continue ;;",
+    "        esac",
+    "        install=${argv0%/*/Runner.Worker}",
+    f'        marker="$1/${{install##*/}}/{names.GENERATION_MARKER_NAME}"',
+    '        if [ -f "$marker" ]; then cat "$marker"; fi',
+    "    done",
+    "}",
+)
+
+#: The removal rule over the runner account's generations, against the
+#: markers of the runner installs running a job.
 GENERATIONS_SWEEP: Final = "\n".join(
-    (*SH_REMOVE_UNUSED, "as=", f'remove_unused "{RUNNER_TOOLS}" "{RUNNER_MARKERS}"')
+    (
+        *SH_REMOVE_UNUSED,
+        *RUNNER_GENERATIONS_IN_USE,
+        "as=",
+        f'remove_unused "{RUNNER_TOOLS}" "{RUNNER_MARKERS}"',
+    )
 )
 
 #: What each runner install's last job read and what the current generation
@@ -257,6 +297,7 @@ __all__ = [
     "REPORT_BUILD_CACHE_BEFORE",
     "REPORT_DIGEST",
     "REPORT_STARTED",
+    "RUNNER_GENERATIONS_IN_USE",
     "STATE_DIRECTORY_NAME",
     "orphan_sweep_lines",
 ]
