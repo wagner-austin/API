@@ -23,6 +23,27 @@ from fleet.contracts.research import ResearchRequest, require_digest
 from fleet.core import _test_hooks
 
 
+def read_pinned(root: pathlib.Path, digest: str, name: str) -> JSONObject:
+    """Read one content-addressed private document and require its exact bytes.
+
+    Args:
+        root: Operator-provisioned specification directory for this tenant.
+        digest: Validated SHA-256 naming the document's directory and bytes.
+        name: Document file name inside that directory.
+
+    Returns:
+        The decoded document.
+
+    Raises:
+        ValueError: RESEARCH_SPEC_DRIFT when the bytes no longer match the digest.
+        OSError: Missing or unreadable specification; no native operation occurs.
+    """
+    payload = _test_hooks.read_bytes(root / digest / name)
+    if hashlib.sha256(payload).hexdigest() != digest:
+        raise ValueError("RESEARCH_SPEC_DRIFT: private specification bytes changed")
+    return narrow_json_to_dict(load_json_str(payload.decode()))
+
+
 def read_specification(root: pathlib.Path, request: ResearchRequest, tenant: str) -> JSONObject:
     """Resolve exact private bytes and enforce tenant, backend and attempt binding.
 
@@ -38,10 +59,7 @@ def read_specification(root: pathlib.Path, request: ResearchRequest, tenant: str
         ValueError: RESEARCH_SPEC_DRIFT or RESEARCH_SPEC_OWNER on a mismatch.
         OSError: Missing or unreadable specification; no native operation occurs.
     """
-    payload = _test_hooks.read_bytes(root / request["spec_sha256"] / "request.json")
-    if hashlib.sha256(payload).hexdigest() != request["spec_sha256"]:
-        raise ValueError("RESEARCH_SPEC_DRIFT: private specification bytes changed")
-    document = narrow_json_to_dict(load_json_str(payload.decode()))
+    document = read_pinned(root, request["spec_sha256"], "request.json")
     if (
         require_str(document, "tenant") != tenant
         or require_str(document, "backend") != request["backend"].value
@@ -99,6 +117,7 @@ def invoke(
     log: pathlib.Path,
     timeout_seconds: int,
     environment: tuple[tuple[str, str], ...] = (),
+    accepted: tuple[int, ...] = (0,),
 ) -> JSONObject:
     """Run an existing controller with durable private output and a hard deadline.
 
@@ -107,12 +126,14 @@ def invoke(
         log: Private append-only transcript; never placed on the shared board.
         timeout_seconds: Per-command bound, shorter than the scheduled tick.
         environment: Explicit private credentials, excluded from the transcript.
+        accepted: Exit codes on which the controller reported structured
+            metadata, e.g. admission's 2 for a recorded policy refusal.
 
     Returns:
-        Decoded controller metadata on successful process completion.
+        Decoded controller metadata on an accepted process completion.
 
     Raises:
-        ValueError: RESEARCH_CONTROLLER_PROCESS on timeout or a nonzero exit;
+        ValueError: RESEARCH_CONTROLLER_PROCESS on timeout or any other exit;
             the queue must retain its native receipt for the next reconciliation.
         OSError: A process or log could not be started or recorded.
     """
@@ -129,11 +150,11 @@ def invoke(
             }
         ),
     )
-    if result["returncode"] != 0:
+    if result["returncode"] not in accepted:
         raise ValueError(
             f"RESEARCH_CONTROLLER_PROCESS: exit {result['returncode']}; private transcript {log}"
         )
     return narrow_json_to_dict(load_json_str(result["stdout"]))
 
 
-__all__ = ["invoke", "read_specification", "require_path", "verified_input"]
+__all__ = ["invoke", "read_pinned", "read_specification", "require_path", "verified_input"]
