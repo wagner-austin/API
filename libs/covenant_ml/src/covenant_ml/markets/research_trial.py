@@ -1,4 +1,8 @@
-"""Execute one admitted monthly validation trial and publish shared evidence."""
+"""Execute one admitted monthly validation trial and publish shared evidence.
+
+The lineage checks and record publication here are shared with the single
+final-period run in ``research_final``, which releases the selected candidate first.
+"""
 
 from __future__ import annotations
 
@@ -14,9 +18,15 @@ from ..benchmarking.harness import write_observed_manifest
 from ..benchmarking.types_codec import encode_benchmark_config
 from ..evaluation.codec_records import encode_comparison
 from ..evaluation.types import PairedComparison
-from .crsp_extract import encode_crsp_extract, load_crsp_sources
+from .crsp_extract import CrspSources, encode_crsp_extract, load_crsp_sources
 from .crsp_protocol import encode_crsp_protocol
-from .crsp_study import CrspFold, CrspSeries, require_crsp_features, run_crsp_validation
+from .crsp_study import (
+    CrspFold,
+    CrspScored,
+    CrspSeries,
+    require_crsp_features,
+    run_crsp_validation,
+)
 from .research_journal import research_policy_digest
 from .research_limits import policy_refusal
 from .research_records import candidate_digest
@@ -110,6 +120,127 @@ def _observations(
     return tuple(observations)
 
 
+def require_trial_lineage(
+    trial: ResearchTrial,
+    fingerprint: RunFingerprint,
+    code_digest: str,
+    manifest: Path,
+    manifest_digest: str,
+) -> None:
+    """Recheck the admitted request and every frozen identity before reading study data.
+
+    Only the manifest's own bytes are hashed here; no source relation is read.
+
+    Args:
+        trial: Frozen controller request.
+        fingerprint: Runtime measured by the existing benchmark fingerprint builder.
+        code_digest: Digest of the actual entrypoint source, measured by that entrypoint.
+        manifest: Staged CRSP extract manifest this run will read.
+        manifest_digest: The evaluator-bound SHA-256 of that manifest's bytes.
+
+    Raises:
+        ValueError: RESEARCH_TRIAL_REFUSED for a proposal the policy refuses;
+            RESEARCH_TRIAL_LINEAGE for a changed protocol, code, image or manifest;
+            CRSP-009 for a feature the monthly panel cannot construct.
+        OSError: The manifest cannot be read.
+    """
+    policy, proposal, evaluation = trial["policy"], trial["proposal"], trial["evaluation"]
+    reason = policy_refusal(policy, proposal)
+    if reason:
+        raise ValueError(f"RESEARCH_TRIAL_REFUSED: {reason}")
+    if (
+        evaluation_digest(evaluation) != policy["protocol_digest"]
+        or code_digest != policy["code_digest"]
+        or fingerprint["image_digest"] != policy["image_digest"]
+        or sha256(manifest.read_bytes()).hexdigest() != manifest_digest
+    ):
+        raise ValueError("RESEARCH_TRIAL_LINEAGE: frozen protocol, code, image or manifest changed")
+    require_crsp_features(proposal["features"])
+
+
+def load_trial_sources(trial: ResearchTrial, manifest: Path) -> CrspSources:
+    """Load verified CRSP evidence and require its protocol to be the admitted design.
+
+    Args:
+        trial: Frozen controller request whose lineage was already checked.
+        manifest: Staged CRSP extract manifest.
+
+    Returns:
+        Verified sources carrying exactly the frozen design.
+
+    Raises:
+        ValueError: RESEARCH_TRIAL_LINEAGE for a different staged protocol;
+            extract verification refusals propagate.
+        OSError: Staged evidence cannot be read.
+    """
+    sources = load_crsp_sources(manifest)
+    if encode_crsp_protocol(sources.protocol) != encode_crsp_protocol(
+        trial["evaluation"]["design"]
+    ):
+        raise ValueError("RESEARCH_TRIAL_LINEAGE: staged CRSP protocol differs from the design")
+    return sources
+
+
+def publish_monthly_record(
+    trial: ResearchTrial,
+    fingerprint: RunFingerprint,
+    sources: CrspSources,
+    output: Path,
+    *,
+    partition: str,
+    label: str,
+    study: CrspScored,
+) -> Path:
+    """Write one monthly study's complete accounting and its shared numerical record.
+
+    Args:
+        trial: Frozen controller request.
+        fingerprint: Measured runtime identity.
+        sources: The verified evidence the study read.
+        output: Result path in a directory created for this run.
+        partition: ``validation`` or ``final``, naming the evaluated period.
+        label: RunRecord label identifying the run within the admitted protocol.
+        study: Scored decisions, fold counts, series and paired comparisons.
+
+    Returns:
+        Shared numerical record sidecar.
+
+    Raises:
+        ValueError: Invalid results or shared numerical record.
+        OSError: Either artifact cannot be written.
+    """
+    policy, proposal = trial["policy"], trial["proposal"]
+    exclusions: list[JSONValue] = []
+    for decision in study.decisions:
+        counts: JSONObject = dict(decision.exclusions)
+        entry: JSONObject = {"decision": decision.window.decision, "counts": counts}
+        exclusions.append(entry)
+    encoded: JSONObject = {
+        "kind": f"research-monthly-{partition}-v1",
+        "attempt": trial["number"],
+        "policy_digest": research_policy_digest(policy),
+        "candidate_digest": candidate_digest(proposal),
+        "partition": partition,
+        "source": encode_crsp_extract(sources.manifest),
+        "config": encode_benchmark_config(proposal["config"]),
+        "evaluation": encode_research_evaluation(trial["evaluation"]),
+        "features": list(proposal["features"]),
+        "folds": [_encode_fold(fold) for fold in study.folds],
+        "exclusions": exclusions,
+        "results": [_encode_series(item, proposal["seed"]) for item in study.series],
+        "comparisons": [encode_comparison(item) for item in study.comparisons],
+        "fingerprint": encode_run_fingerprint(fingerprint),
+    }
+    return write_observed_manifest(
+        encoded,
+        fingerprint,
+        output,
+        policy["protocol_digest"],
+        label,
+        _observations(study.series, study.comparisons),
+    )
+
+
 def execute_trial(
     trial: ResearchTrial, fingerprint: RunFingerprint, code_digest: str, output: Path
 ) -> Path:
@@ -130,22 +261,12 @@ def execute_trial(
         FileExistsError: Attempt output directory already exists; never overwrite a trial.
         OSError: Frozen data or result storage is unavailable.
     """
-    policy, proposal, evaluation = trial["policy"], trial["proposal"], trial["evaluation"]
-    reason = policy_refusal(policy, proposal)
-    if reason:
-        raise ValueError(f"RESEARCH_TRIAL_REFUSED: {reason}")
+    proposal, evaluation = trial["proposal"], trial["evaluation"]
     manifest = Path(trial["manifest"])
-    if (
-        evaluation_digest(evaluation) != policy["protocol_digest"]
-        or code_digest != policy["code_digest"]
-        or fingerprint["image_digest"] != policy["image_digest"]
-        or sha256(manifest.read_bytes()).hexdigest() != policy["dataset_digest"]
-    ):
-        raise ValueError("RESEARCH_TRIAL_LINEAGE: frozen protocol, code, image or manifest changed")
-    require_crsp_features(proposal["features"])
-    sources = load_crsp_sources(manifest)
-    if encode_crsp_protocol(sources.protocol) != encode_crsp_protocol(evaluation["design"]):
-        raise ValueError("RESEARCH_TRIAL_LINEAGE: staged CRSP protocol differs from the design")
+    require_trial_lineage(
+        trial, fingerprint, code_digest, manifest, trial["policy"]["dataset_digest"]
+    )
+    sources = load_trial_sources(trial, manifest)
     output.parent.mkdir(parents=True, exist_ok=False)
     validation = run_crsp_validation(
         sources,
@@ -156,35 +277,20 @@ def execute_trial(
         fold_months=evaluation["fold_months"],
         confidence=evaluation["confidence"],
     )
-    exclusions: list[JSONValue] = []
-    for decision in validation.decisions:
-        counts: JSONObject = dict(decision.exclusions)
-        entry: JSONObject = {"decision": decision.window.decision, "counts": counts}
-        exclusions.append(entry)
-    encoded: JSONObject = {
-        "kind": "research-monthly-validation-v1",
-        "attempt": trial["number"],
-        "policy_digest": research_policy_digest(policy),
-        "candidate_digest": candidate_digest(proposal),
-        "partition": "validation",
-        "source": encode_crsp_extract(sources.manifest),
-        "config": encode_benchmark_config(proposal["config"]),
-        "evaluation": encode_research_evaluation(evaluation),
-        "features": list(proposal["features"]),
-        "folds": [_encode_fold(fold) for fold in validation.folds],
-        "exclusions": exclusions,
-        "results": [_encode_series(item, proposal["seed"]) for item in validation.series],
-        "comparisons": [encode_comparison(item) for item in validation.comparisons],
-        "fingerprint": encode_run_fingerprint(fingerprint),
-    }
-    return write_observed_manifest(
-        encoded,
+    return publish_monthly_record(
+        trial,
         fingerprint,
+        sources,
         output,
-        policy["protocol_digest"],
-        str(trial["number"]),
-        _observations(validation.series, validation.comparisons),
+        partition="validation",
+        label=str(trial["number"]),
+        study=validation,
     )
 
 
-__all__ = ["execute_trial"]
+__all__ = [
+    "execute_trial",
+    "load_trial_sources",
+    "publish_monthly_record",
+    "require_trial_lineage",
+]

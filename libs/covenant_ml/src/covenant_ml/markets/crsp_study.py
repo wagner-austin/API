@@ -24,7 +24,7 @@ process-level restriction on access to the source files.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import date, timedelta
 from fractions import Fraction
 from math import ceil
@@ -95,8 +95,11 @@ class CrspSeries(NamedTuple):
     periods: tuple[CrspPeriod, ...]
 
 
-class CrspValidation(NamedTuple):
-    """Scored validation decisions, their folds, every series and paired comparisons."""
+class CrspScored(NamedTuple):
+    """Scored decisions, their folds, every series and paired comparisons.
+
+    The validation study scores expanding folds; the final study one fit.
+    """
 
     decisions: tuple[CrspDecision, ...]
     folds: tuple[CrspFold, ...]
@@ -234,6 +237,54 @@ def _fold_masks(rows: CrspRows, start: int, end: int, stopping_months: int) -> S
     )
 
 
+def crsp_fold(
+    rows: CrspRows,
+    panel: tuple[CrspDecision, ...],
+    scored: range,
+    stopping_months: int,
+    trainers: Sequence[TrainerProto],
+    seed: int,
+) -> tuple[CrspFold, dict[str, tuple[float, ...]]]:
+    """Fit every trainer on earlier purged decisions and score one decision range.
+
+    Args:
+        rows: Model rows for ``panel`` with their decision indexes.
+        panel: Decisions in calendar order.
+        scored: Consecutive decision indexes scored by this fold.
+        stopping_months: Decisions immediately before the range used for stopping.
+        trainers: Distinctly named candidate trainers.
+        seed: Model seed shared by every trainer.
+
+    Returns:
+        The fold's boundaries and purged counts, and each trainer's predicted
+        probability per scored row in row order.
+
+    Raises:
+        ValueError: CRSP-009 when no training decision precedes the stopping
+            months; label-overlap refusals propagate.
+    """
+    masks = _fold_masks(rows, scored.start, scored.stop, stopping_months)
+    purged = purge_label_overlap(rows.times, rows.available, masks)
+    split = apply_split_masks(rows.features, rows.labels, purged)
+    scores: dict[str, tuple[float, ...]] = {}
+    for trainer in trainers:
+        proba = trainer.fit(split, seed).predict_positive_proba(split.x_test)
+        scores[trainer.model_name.value] = tuple(
+            float(proba.flat[index]) for index in range(len(proba))
+        )
+    train, stopping = int(np.count_nonzero(purged.train)), int(np.count_nonzero(purged.val))
+    candidates = int(np.count_nonzero(masks.train)) + int(np.count_nonzero(masks.val))
+    fold = CrspFold(
+        panel[scored.start - stopping_months].window.decision,
+        panel[scored.start].window.decision,
+        train,
+        stopping,
+        candidates - train - stopping,
+        int(np.count_nonzero(purged.test)),
+    )
+    return fold, scores
+
+
 def _validation_start(decisions: tuple[CrspDecision, ...], first: str) -> int:
     """Locate the first validation decision.
 
@@ -255,7 +306,7 @@ def run_crsp_validation(
     stopping_months: int,
     fold_months: int,
     confidence: float,
-) -> CrspValidation:
+) -> CrspScored:
     """Score the validation period with purged expanding folds and paired holdings.
 
     Args:
@@ -279,43 +330,69 @@ def run_crsp_validation(
     protocol = sources.protocol
     if stopping_months < 1 or fold_months < 1:
         raise ValueError("[CRSP-009] stopping and fold months must be positive")
-    final = date.fromisoformat(protocol["holdout_start"]) - timedelta(days=1)
-    panel = tuple(
-        decision
-        for decision in build_crsp_panel(sources, protocol["train_start"], final.isoformat())
-        if decision.window.exit < protocol["holdout_start"]
-    )
+    panel = crsp_known_panel(sources)
     outcomes = index_crsp_outcomes(sources)
     rows = crsp_study_rows(outcomes, panel, features)
     first = _validation_start(panel, protocol["validation_start"])
     scores: dict[str, list[float]] = {trainer.model_name.value: [] for trainer in trainers}
     folds: list[CrspFold] = []
     for start in range(first, len(panel), fold_months):
-        masks = _fold_masks(rows, start, min(start + fold_months, len(panel)), stopping_months)
-        purged = purge_label_overlap(rows.times, rows.available, masks)
-        split = apply_split_masks(rows.features, rows.labels, purged)
-        for trainer in trainers:
-            proba = trainer.fit(split, seed).predict_positive_proba(split.x_test)
-            scores[trainer.model_name.value].extend(
-                float(proba.flat[index]) for index in range(len(proba))
-            )
-        train, stopping = int(np.count_nonzero(purged.train)), int(np.count_nonzero(purged.val))
-        candidates = int(np.count_nonzero(masks.train)) + int(np.count_nonzero(masks.val))
-        folds.append(
-            CrspFold(
-                panel[start - stopping_months].window.decision,
-                panel[start].window.decision,
-                train,
-                stopping,
-                candidates - train - stopping,
-                int(np.count_nonzero(purged.test)),
-            )
-        )
+        scored_range = range(start, min(start + fold_months, len(panel)))
+        fold, fold_scores = crsp_fold(rows, panel, scored_range, stopping_months, trainers, seed)
+        for arm, values in fold_scores.items():
+            scores[arm].extend(values)
+        folds.append(fold)
     scored = panel[first:]
+    series, comparisons = crsp_arms(outcomes, scored, scores, protocol, confidence)
+    return CrspScored(scored, tuple(folds), series, comparisons)
+
+
+def crsp_known_panel(sources: CrspSources) -> tuple[CrspDecision, ...]:
+    """Build every decision whose outcome is known before the final period starts.
+
+    Args:
+        sources: Verified CRSP evidence carrying the frozen design.
+
+    Returns:
+        Decisions from the training start whose window exits strictly before
+        ``holdout_start``; a window exiting on or after it is never labelled.
+    """
+    protocol = sources.protocol
+    last = date.fromisoformat(protocol["holdout_start"]) - timedelta(days=1)
+    return tuple(
+        decision
+        for decision in build_crsp_panel(sources, protocol["train_start"], last.isoformat())
+        if decision.window.exit < protocol["holdout_start"]
+    )
+
+
+def crsp_arms(
+    outcomes: CrspOutcomes,
+    decisions: tuple[CrspDecision, ...],
+    scores: Mapping[str, Sequence[float]],
+    protocol: CrspProtocol,
+    confidence: float,
+) -> tuple[tuple[CrspSeries, ...], tuple[PairedComparison, ...]]:
+    """Select, account and pair every arm on the same scored decisions.
+
+    Args:
+        outcomes: Indexed verified evidence covering every scored window.
+        decisions: Scored decisions in calendar order.
+        scores: Each candidate's score per eligible security, decisions concatenated.
+        protocol: Frozen selection fraction, costs and moving-block settings.
+        confidence: Coverage of each moving-block interval.
+
+    Returns:
+        Momentum, the equal-weight universe and each candidate at every frozen
+        cost, and each non-momentum arm paired with momentum at the primary cost.
+
+    Raises:
+        ValueError: Holdings and moving-block refusals propagate.
+    """
     selections: dict[str, list[tuple[int, ...]]] = {MOMENTUM: [], EQUAL_WEIGHT: []}
     selections.update({arm: [] for arm in scores})
     offset = 0
-    for decision in scored:
+    for decision in decisions:
         members = decision.features
         count = crsp_selected_count(protocol["selection_fraction"], len(members))
         selections[MOMENTUM].append(crsp_top(members, [item.momentum for item in members], count))
@@ -323,13 +400,13 @@ def run_crsp_validation(
         for arm, values in scores.items():
             selections[arm].append(crsp_top(members, values[offset : offset + len(members)], count))
         offset += len(members)
-    windows = tuple(decision.window for decision in scored)
+    windows = tuple(decision.window for decision in decisions)
     series = tuple(
         CrspSeries(arm, cost, evaluate_crsp_holdings(outcomes, windows, tuple(chosen), cost))
         for arm, chosen in selections.items()
         for cost in protocol["cost_bps"]
     )
-    return CrspValidation(scored, tuple(folds), series, _comparisons(series, protocol, confidence))
+    return series, _comparisons(series, protocol, confidence)
 
 
 def _net_returns(periods: tuple[CrspPeriod, ...]) -> NDArray[np.float64]:
@@ -381,8 +458,11 @@ __all__ = [
     "MOMENTUM",
     "CrspFold",
     "CrspRows",
+    "CrspScored",
     "CrspSeries",
-    "CrspValidation",
+    "crsp_arms",
+    "crsp_fold",
+    "crsp_known_panel",
     "crsp_selected_count",
     "crsp_study_rows",
     "crsp_top",
