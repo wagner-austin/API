@@ -14,6 +14,7 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, require_int, require_str
 from typing_extensions import ReadOnly, TypedDict
 
+from ..evaluation.evidence import require_private_directory
 from . import _test_hooks_encryption as hooks
 
 
@@ -91,9 +92,7 @@ class EvaluatorKeys:
         if partition not in {"train-validation", "final"}:
             raise ValueError("RESEARCH_KEYS_ACCESS: unknown partition")
         root = Path(self.access["directory"])
-        metadata = root.lstat()
-        if not stat.S_ISDIR(metadata.st_mode) or metadata.st_mode & 0o077:
-            raise ValueError("RESEARCH_KEYS_ACCESS: require a private, non-symlink directory")
+        require_private_directory(root)
         expected = (
             self.access["validation_recipient"]
             if partition == "train-validation"
@@ -139,6 +138,7 @@ def create_evaluator_keys(directory: Path, max_plaintext_bytes: int) -> Research
         }
     )
     directory.mkdir(mode=0o700, exist_ok=False)
+    require_private_directory(directory)
     for partition, identity in (("train-validation", validation), ("final", final)):
         descriptor = os.open(
             directory / (partition + ".agekey"), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600

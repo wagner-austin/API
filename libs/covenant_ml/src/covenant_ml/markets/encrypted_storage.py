@@ -18,7 +18,7 @@ from typing import BinaryIO
 from platform_core.json_utils import dump_json_str, load_json_str
 from platform_core.stage_manifest import StagedFile, StageManifest
 
-from ..evaluation.evidence import require_evidence_path
+from ..evaluation.evidence import require_evidence_path, require_private_directory
 from . import _test_hooks_encryption as hooks
 from .encrypted_records import (
     EncryptedBundle,
@@ -195,6 +195,7 @@ def decrypted_bundle(
         raise ValueError("ENCRYPTED_LIMIT: plaintext exceeds the job's storage limit")
     with TemporaryDirectory(prefix="research-plaintext-", dir=scratch) as temporary:
         private = Path(temporary)
+        require_private_directory(private)
         for item in bundle["files"]:
             plain, cipher = item["plaintext"], item["ciphertext"]
             with require_evidence_path(path.parent, cipher["name"]).open("rb") as source:

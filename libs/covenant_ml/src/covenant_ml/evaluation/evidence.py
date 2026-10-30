@@ -3,7 +3,25 @@
 from __future__ import annotations
 
 import hashlib
+import stat
 from pathlib import Path
+
+
+def require_private_directory(path: Path) -> None:
+    """Require the Linux evaluator's actual private-directory permissions.
+
+    Args:
+        path: Evaluator-owned directory to check before opening keys or plaintext.
+
+    Raises:
+        ValueError: WRDS_PRIVATE_STORAGE for symlinks or permissions other than 0700.
+        OSError: The directory cannot be inspected.
+
+    Windows ACLs are not POSIX modes; this contract does not certify them.
+    """
+    metadata = path.lstat()
+    if not stat.S_ISDIR(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o700:
+        raise ValueError("WRDS_PRIVATE_STORAGE: require a non-symlink mode-0700 directory")
 
 
 def require_evidence_digest(value: str) -> str:
