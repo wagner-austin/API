@@ -252,3 +252,15 @@ entrypoints and images POSIX-only. Pin the repaired source and command reference
 keep controller portability distinct from the installed Linux runtime's provenance.
 
 - 2026-10-29: Added evaluation-numerical-contracts: shared ranking correction, independent numerical tests, and explicit uncertainty/learning-curve/provenance limits (board 82a072db).
+
+## [2026-10-30] decomposition | WRDS research navigation
+Pages written: wrds-research-queue-admission, wrds-integration-ownership-review,
+wrds-evaluation-reuse, crsp-monthly-study-design, crsp-monthly-data-contract,
+crsp-monthly-holdings-validation, wrds-final-scoring, wrds-proposer-isolation,
+wrds-baseline-readiness.
+Pages updated: wrds-equity-research-protocol; libs hub and index.
+Notes: Lifted all detailed paragraphs and all 28 footnotes from the former
+555-line protocol at API 14b60b861 into focused pages, with source pins and
+dated evidence attached. The existing slug is now the navigation entry; no
+parallel wiki or repeated narrative. Replaced directional references with links
+and corrected two stale implementation-status phrases. Board task daca401b.
