@@ -57,20 +57,20 @@ EXPAND_PROGRAM: Final = (
 )
 
 
-def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
-    """Bash lines that hold the CI slice to whole cores, as many as the roster reserves.
+def render_ci_cpu_select_lines(reserved_cores: int) -> list[str]:
+    """Bash lines that choose the CI slice's CPUs from the host's ``lscpu`` and change nothing.
 
-    Run after the slice unit is written and started
-    (:func:`fleet.core.runner_slice_render.render_slice_unit_lines`).
+    The provision runs them first (:func:`render_ci_cpuset_lines`), and
+    ``tools/fleet-execution-runners`` runs them alone on the runner host to
+    say which set its live slice must hold.
 
     Args:
         reserved_cores: The host's ``dispatch.budget.reserved_cores``, the
             logical cores its roster file reserves for its runners.
 
     Returns:
-        The lines. They print the set and the slice's measured
-        ``EffectiveCPUs``, and exit 1 naming why when the host cannot give
-        the set or the slice does not take it.
+        The lines. They leave the set in ``ci_cpus``, comma-separated and
+        ascending, and exit 1 naming why when the host cannot give it.
 
     Raises:
         ValueError: When ``reserved_cores`` is below 1: a runner host whose
@@ -88,6 +88,30 @@ def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
         "leave the host any other CPU' >&2",
         "    exit 1",
         "}",
+    ]
+
+
+def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
+    """Bash lines that hold the CI slice to whole cores, as many as the roster reserves.
+
+    Run after the slice unit is written and started
+    (:func:`fleet.core.runner_slice_render.render_slice_unit_lines`).
+
+    Args:
+        reserved_cores: The host's ``dispatch.budget.reserved_cores``, the
+            logical cores its roster file reserves for its runners.
+
+    Returns:
+        The lines. They print the set and the slice's measured
+        ``EffectiveCPUs``, and exit 1 naming why when the host cannot give
+        the set or the slice does not take it.
+
+    Raises:
+        ValueError: When ``reserved_cores`` is below 1, as
+            :func:`render_ci_cpu_select_lines` raises it.
+    """
+    return [
+        *render_ci_cpu_select_lines(reserved_cores),
         f'systemctl set-property {CI_SLICE_NAME} "AllowedCPUs=$ci_cpus"',
         f"effective=$(systemctl show {CI_SLICE_NAME} -p EffectiveCPUs --value "
         f"| awk '{EXPAND_PROGRAM}')",
@@ -101,4 +125,9 @@ def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
     ]
 
 
-__all__ = ["EXPAND_PROGRAM", "SELECT_PROGRAM", "render_ci_cpuset_lines"]
+__all__ = [
+    "EXPAND_PROGRAM",
+    "SELECT_PROGRAM",
+    "render_ci_cpu_select_lines",
+    "render_ci_cpuset_lines",
+]

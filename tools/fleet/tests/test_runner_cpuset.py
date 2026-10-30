@@ -14,7 +14,7 @@ import subprocess
 import pytest
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME
-from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
+from fleet.core.runner_cpuset_render import render_ci_cpu_select_lines, render_ci_cpuset_lines
 from tests._runner_fixtures import RESERVED_CORES
 from tests._stand_ins import run_with_stand_ins
 
@@ -108,6 +108,21 @@ class TestTheSet:
             "host any other CPU\n"
         )
         assert calls == []
+
+    def test_the_selection_alone_leaves_the_set_and_asks_systemd_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """What tools/fleet-execution-runners runs on the runner host to say
+        which set its live slice must hold, and the provision's first lines."""
+        selection = render_ci_cpu_select_lines(RESERVED_CORES)
+        assert render_ci_cpuset_lines(RESERVED_CORES)[: len(selection)] == selection
+        ran = run_with_stand_ins(
+            tmp_path,
+            [*selection, 'printf "%s" "$ci_cpus"'],
+            {"lscpu": f"printf '%s' '{LAVENDER}'", "systemctl": "exit 9"},
+            options=["-euo", "pipefail"],
+        )
+        assert (ran.returncode, ran.stdout, ran.stderr) == (0, LAVENDER_SET, "")
 
     def test_no_reservation_is_refused_at_render(self) -> None:
         with pytest.raises(ValueError) as refused:

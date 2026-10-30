@@ -21,6 +21,12 @@ as a ``host_reading`` the run's summary prints.
    the fleet user's own systemd manager, whose ``user@.service`` has the
    memory controller delegated, so it touches no runner unit and needs no
    root.
+3. The CI slice runs on exactly the CPUs the host's roster file reserves
+   for its runners (``dispatch.budget.reserved_cores``), chosen from this
+   host's own ``lscpu`` by the provision's own program, and every live
+   ``Runner.Worker`` may run on none but those (MCPs board task 349e25ee,
+   as its audit of 2026-10-30T06:52Z asked: a stand-in ``lscpu`` shows the
+   code, not the host).
 """
 
 from __future__ import annotations
@@ -34,10 +40,13 @@ from typing import Final
 import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_int
 
+from fleet.cli.runners import load_reserved_cores
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec
+from fleet.core.runner_cpuset_render import render_ci_cpu_select_lines
 from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, is_runner_worker
 from tests._host import READING_PROPERTY, command_output, unit_properties
+from tests._runner_roster_files import REGISTRY
 
 #: The cgroup filesystem and the process table.
 CGROUP_ROOT: Final[pathlib.Path] = pathlib.Path("/sys/fs/cgroup")
@@ -297,4 +306,66 @@ def test_a_slice_over_its_high_stalls_its_own_tasks_and_not_an_unbounded_sibling
         f"a probe in it made {inside_count} 1 MiB allocations in {PROBE_SECONDS} s and stalled "
         f"{inside_stall} us; one in the unbounded sibling {sibling} made {outside_count} and "
         f"stalled {outside_stall} us",
+    )
+
+
+def _cpus(listed: str) -> frozenset[int]:
+    """The CPUs a list names, as systemd (``4-7 12-15``) or the kernel (``4-7,12-15``) writes it.
+
+    Args:
+        listed: The list.
+
+    Returns:
+        Each CPU it names.
+    """
+    cpus: set[int] = set()
+    for part in listed.replace(",", " ").split():
+        low, _, high = part.partition("-")
+        cpus.update(range(int(low), int(high or low) + 1))
+    return frozenset(cpus)
+
+
+def _worker_cpus(pids: list[int]) -> dict[int, frozenset[int]]:
+    """The CPUs each Worker may run on, from its ``Cpus_allowed_list``.
+
+    Args:
+        pids: The Workers.
+
+    Returns:
+        Each live one's CPUs, by pid.
+    """
+    allowed: dict[int, frozenset[int]] = {}
+    for pid in pids:
+        try:
+            status = (PROC_ROOT / str(pid) / "status").read_text(encoding="utf-8")
+        except (FileNotFoundError, ProcessLookupError):
+            # The job ended between the listing and the read: it runs nowhere.
+            continue
+        line = next(line for line in status.splitlines() if line.startswith("Cpus_allowed_list:"))
+        allowed[pid] = _cpus(line.split(":", 1)[1])
+    return allowed
+
+
+@pytest.mark.host_runner_units
+def test_the_ci_slice_runs_on_the_cpus_the_roster_reserves_and_every_job_inside_them(
+    runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
+) -> None:
+    reserved = load_reserved_cores(REGISTRY, runner_host["name"])
+    select = "\n".join(render_ci_cpu_select_lines(reserved))
+    chosen = command_output(["bash", "-c", f'{select}\nprintf "%s" "$ci_cpus"']).strip()
+    expected = _cpus(chosen)
+    assert len(expected) == reserved, f"lscpu gave {chosen!r} for {reserved} reserved core(s)"
+
+    shown = unit_properties(CI_SLICE_NAME, ("AllowedCPUs", "EffectiveCPUs"))
+    assert (_cpus(shown["AllowedCPUs"]), _cpus(shown["EffectiveCPUs"])) == (expected, expected)
+
+    workers = _worker_cpus(sorted(_workers()))
+    outside = {pid: sorted(cpus - expected) for pid, cpus in workers.items() if cpus - expected}
+    assert outside == {}
+    record_property(
+        READING_PROPERTY,
+        f"{runner_host['name']}: the roster reserves {reserved} core(s) for its runners, lscpu's "
+        f"whole cores from the top give {chosen}; {CI_SLICE_NAME} AllowedCPUs="
+        f"{shown['AllowedCPUs']} EffectiveCPUs={shown['EffectiveCPUs']}; {len(workers)} live "
+        f"Runner.Worker(s), each allowed only CPUs of that set",
     )
