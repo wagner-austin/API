@@ -5,7 +5,7 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -25,7 +25,7 @@ lint:
 # 2026-08-19 incident that motivated both.
 test:
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
 check:
