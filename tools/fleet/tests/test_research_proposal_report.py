@@ -15,6 +15,7 @@ from platform_core.mcp_testing import (
 
 from fleet.cli import research_propose
 from fleet.core import _test_hooks
+from tests._queue_fakes import FakeEnv
 from tests.conftest import FakeRun, ok
 from tests.test_research_proposal import PROPOSAL, report, specification
 from tests.test_research_proposer import replies
@@ -33,10 +34,10 @@ def test_service_publishes_the_controller_outcome(tmp_path: Path) -> None:
     poster = FakeHttpPost([posted_ok(), posted_ok()])
     _test_hooks.http_post = poster
     original = board_hooks.env
-    board_hooks.env = {
+    board_hooks.env = FakeEnv({
         "TASKBOARD_MCP_API_KEY": "test-key", "CORVIS_TENANT_ID": "tenant",
         "BOARD_WATCH_URL": DECLARED_TASKBOARD_URL,
-    }.get
+    })
     try:
         assert research_propose.main([
             "--root", str(tmp_path), "--digest", digest, "--report-task", TASK,
