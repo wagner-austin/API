@@ -10,10 +10,12 @@ source_paths:
   - libs/cleargbm_rs/src/histogram/mod.rs
   - libs/cleargbm_rs/src/types/mod.rs
   - libs/cleargbm_rs/Cargo.toml
+  - libs/cleargbm_rs/Makefile
 source_git_blobs:
   "libs/cleargbm_rs/src/histogram/mod.rs": c5f91b51728ff6113c38acdf9b894591fb7ea27c
   "libs/cleargbm_rs/src/types/mod.rs": 0b4b29b916c245cdcfed4641a4d8254ebb58eae6
-  "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
+  "libs/cleargbm_rs/Cargo.toml": edbdabf5d1138a7955dfdde75ccf1ab28d7509d3
+  "libs/cleargbm_rs/Makefile": 818cd3f958abd06580a6bf3b479438b4e7de7b35
 fact_checked: "2026-07-30"
 confidence: medium
 hubs: [libs]
@@ -58,7 +60,7 @@ That reframes the whole item. The remaining raw gap is mostly a tree-shape artif
 ## Testing strategy (if it is attempted anyway)
 
 1. Assert bit-identical output against the current loop for random `(sample_indices, ordered_gradients, ordered_hessians, bins, n_bins)` — the equivalence-test pattern already in `src/histogram/tests/unit_tests.rs` covers simple / subset / large-unrolled / tail-remainder / permuted-indices cases.
-2. Keep `cargo test --all-features` green and segment coverage at 100% (`make rust-cov` enforces the threshold).
+2. Keep `make rust-test` (`cargo test --features python`, never `--all-features`, which turns on `extension-module` and leaves the test binary unable to link libpython on Linux) green and segment coverage at 100% (`make rust-cov` enforces the threshold)[^11].
 3. Benchmark with the median-of-repeats harness at `libs/covenant_ml/scripts/benchmark_cleargbm_vs_lightgbm.py`, baseline measured in the same session — not carried forward from a manifest[^7].
 
 ## What NOT to change
@@ -77,3 +79,4 @@ That reframes the whole item. The remaining raw gap is mostly a tree-shape artif
 [^8]: `libs/cleargbm/docs/BENCHMARK_RESULTS_2026-07-21.md:60` — the roadmap entry this page derives from, verbatim: "**SIMD histogram accumulator** — Rust `wide` crate or nightly `std::simd`. AVX2/AVX-512 accumulation. Expected: 2-3× faster on the histogram phase, which is where most of cleargbm's remaining runtime lives." Listed under fixes not yet applied; "Expected" marks it a projection, never a measurement.
 [^9]: This page's own pre-rewrite revision, commit `35700d41` "wiki: cleargbm perf roadmap — 4 atomic pages, each implementation-ready" [synthesis] — the Approach 1 / Approach 2 decomposition, the "what's wrong today" claims, and the bin-first proposal are that revision's text, superseded by commit `3166ebe4`. The original Approach 2 read: "Instead of 'for each sample, add to its bin', flip to 'for each bin, sum the samples that landed in it'. This requires a bin-first pass that groups sample indices by bin (radix-sort by bin, O(N)) before accumulation. Once samples are grouped by bin, the per-bin accumulation is a straight SIMD `reduce` — every op is contiguous. LightGBM's fast path is a variant of this." Recover with `git show 35700d41:wiki/pages/cleargbm-perf-simd-histogram-accumulator.md`.
 [^10]: [synthesis] — read off the loop shape at `libs/cleargbm_rs/src/histogram/mod.rs:109-186`[^1]: the accumulate is `gradient_sums[b] += g` for a `b` derived from data, i.e. an indexed read-modify-write whose target is not known until the gather completes, and nothing in the loop constrains two lanes of one 8-wide block to distinct bins. The AVX-512CD (conflict-detection) reference is architectural background, not a measurement on this codebase; no SIMD variant of this loop has been benchmarked here.
+[^11]: `libs/cleargbm_rs/Makefile:21-24` -- "All three name ``--features python``, never ``--all-features``: that would"; `:36` -- `$(MAKETOOLS) venv-embed cargo test --features python`; `libs/cleargbm_rs/Cargo.toml:24-25` -- `python = []`, `extension-module = ["python", "pyo3/extension-module"]`.

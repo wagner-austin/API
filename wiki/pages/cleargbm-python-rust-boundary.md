@@ -9,6 +9,7 @@ source_paths:
   - libs/cleargbm/src/cleargbm/_rust.py
   - libs/cleargbm_rs/pyproject.toml
   - libs/cleargbm_rs/Cargo.toml
+  - libs/cleargbm_rs/src/lib.rs
   - libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py
   - libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py
   - libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py
@@ -16,12 +17,14 @@ source_git_blobs:
   "libs/cleargbm/src/cleargbm/ensemble.py": d855968ef0fd5be83716ae0a331765004dee690f
   "libs/cleargbm/src/cleargbm/_rust.py": 5f8ba08dec7197ffe2a203a44385d3337f0b47db
   "libs/cleargbm_rs/pyproject.toml": 4082850e2dbc7a7d9b962066ac5d1b44d46ac2b2
-  "libs/cleargbm_rs/Cargo.toml": 472c6cc568ce46dba53caba924b7fa1b7a3cf0d8
+  "libs/cleargbm_rs/Cargo.toml": edbdabf5d1138a7955dfdde75ccf1ab28d7509d3
+  "libs/cleargbm_rs/src/lib.rs": 739b827758521649c4f8691de0c3a33dd7af4192
   "libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py": e01f44ad8a2432e4f3fa478cd8f94d8822c67fd8
   "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap.py": b1b17fa189ff6fae7a1af1527e186aff840802e5
   "libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py": f755b920e4403228596c7df83164dd6bb16f881c
 provenance:
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. backend.py changed only by type (2821e0fae made BackendName a StrEnum, 6766777fd typed growth_strategy by cleargbm's GrowthStrategy). The re-read found two footnotes that had drifted before that, both corrected: [^6] cited backend.py:121, where the __import__ line has been at 129 since at least the previous pin, and cleargbm_shap.py:72 for a line that left that file when bb4d5360e (2026-08-21) split it, so the explainer's import is now cleargbm_shap_decode.py:49 and that module joins source_paths; [^5] cited ensemble.py's import, converter and call at 24-29, 63 and 139-141 and called it the single hand-off, but ensemble.py now has two training entry points, classification at 190-192 and regression at 251-253"
+  - "Cargo.toml re-read 2026-10-30 for MCPs board task c76eb277: its features gained `python`, which alone compiles the bindings (lib.rs gates pyo3_module on it), and `extension-module` now enables it beside pyo3/extension-module; [^2] and its sentence were rewritten to say so and lib.rs joined source_paths"
   - "backend.py repinned 2026-09-11 on a mechanical argument rather than a re-reading: its diff from the pinned blob to HEAD is +4/-2, the whole of which is a type alias being inlined -- ProgressCallback became Callable[[TrainProgress], None] on one parameter. Same signature, no logic, and no page in this wiki cites the removed name. Check with: git diff 6f29219931d6bb9d551b5bb779732244686d2dcf fc13f65bf30747f8d9f7b3a2b3df405babb84b78"
 fact_checked: "2026-10-08"
 confidence: high
@@ -43,7 +46,7 @@ as a top-level module and generate its own wrapper into site-packages[^2].
 
 The crate does not need Python as a library consumer: `crate-type = ["cdylib", "rlib"]`
 makes it both an extension module and a plain Rust lib[^1], with the pyo3 dependency at
-0.27.2 and `extension-module` as an opt-in feature[^2]. The *Python* package hard-needs
+0.27.2 and the bindings compiled only under the `python` feature, which maturin's opt-in `extension-module` feature turns on[^2]. The *Python* package hard-needs
 the Rust: `_rust.py` states that if `cleargbm_rs` is not installed the module raises
 `ImportError` at import time, and that "there is no Python fallback"[^3].
 
@@ -77,7 +80,7 @@ through a nested `cleargbm_rs.cleargbm_rs` path any more; that spelling died wit
 shim.
 
 [^1]: libs/cleargbm_rs/Cargo.toml:14 — `crate-type = ["cdylib", "rlib"]`.
-[^2]: libs/cleargbm_rs/Cargo.toml:18,21 — `extension-module = ["pyo3/extension-module"]`; `pyo3 = { version = "0.27.2" }`. Build backend and module name: libs/cleargbm_rs/pyproject.toml:3,32-33 — `build-backend = "maturin"`, `features = ["extension-module"]`, `module-name = "cleargbm_rs"`, with no `python-source` key remaining.
+[^2]: libs/cleargbm_rs/Cargo.toml:24-25,28 -- `python = []`, `extension-module = ["python", "pyo3/extension-module"]`; `pyo3 = { version = "0.27.2" }`; libs/cleargbm_rs/src/lib.rs:49-50 -- `#[cfg(feature = "python")]` on `pub mod pyo3_module;`. Build backend and module name: libs/cleargbm_rs/pyproject.toml:3,32-33 — `build-backend = "maturin"`, `features = ["extension-module"]`, `module-name = "cleargbm_rs"`, with no `python-source` key remaining.
 [^3]: libs/cleargbm/src/cleargbm/_rust.py:10-11 — the docstring's guarantee, verbatim on line 11: "there is no Python fallback".
 [^4]: libs/cleargbm/src/cleargbm/_rust.py:1-15 — module docstring: built by maturin as a top-level module, imported exactly once, each callable pinned to a Protocol; strict typing, no `Any`, no `cast`.
 [^6]: libs/covenant_ml/src/covenant_ml/backends/cleargbm/backend.py:129 and libs/covenant_ml/src/covenant_ml/explainers/cleargbm_shap_decode.py:49 — both read `_native_mod: types.ModuleType = __import__("cleargbm_rs")`. (Cited as backend.py:121 and cleargbm_shap.py:72 until 2026-10-08.)

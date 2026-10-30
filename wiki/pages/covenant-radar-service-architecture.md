@@ -23,7 +23,7 @@ source_paths:
   - services/covenant-radar-api/README.md
 source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/api/main.py": b9b2dfc969687cc4bb6a578279cf5c017af6fd65
-  "services/covenant-radar-api/src/covenant_radar_api/core/container.py": ed8fa72fdb1b5a86b649a6ca2be8ba7896353332
+  "services/covenant-radar-api/src/covenant_radar_api/core/container.py": 31a494a56801ad91a7b034f374145c69050188e7
   "services/covenant-radar-api/src/covenant_radar_api/core/model_paths.py": 323fb99967f7affadda00519ef3df6b2d9a76dd3
   "services/covenant-radar-api/src/covenant_radar_api/worker_entry.py": b5efe0cf5061309837c9f991380e8ed2487eb168
   "services/covenant-radar-api/src/covenant_radar_api/api/routes/ml.py": 037a5368517af92277438abe3e211ae5ba8a63aa
@@ -35,6 +35,7 @@ source_git_blobs:
   "services/covenant-radar-api/pyproject.toml": 15a4bee017f291001ca546a6e8b72648c671b120
   "services/covenant-radar-api/README.md": 34f48ed308cbe2cbffc9e867e2b4a41748c9a90b
 provenance:
+  - "container.py re-read 2026-10-30 for MCPs board task c76eb277: API 69ae0b79f and 6820fc2d8 moved both data-bank downloads from /tmp/models into the container's model output directory and changed nothing else (git diff ed8fa72fd 31a494a56: 8 lines each way, all in those two branches); the download sentence was rewritten to say so"
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: pyproject.toml's only change is db91ba401, pytest addopts distributing with --dist loadgroup instead of loadscope plus the comment saying why. The [tool.poetry.scripts] block this page cites at :68-70 is unchanged and still on those lines"
   - "every claim read from code at API commit 2e0511ee7 on 2026-10-05; no process was started to observe it"
   - "'nothing enqueues run_batch_evaluation' is a grep over services/ and libs/ for the symbol outside tests/, which found only its definition and __all__"
@@ -78,8 +79,9 @@ or `lightgbm` deployment reads its artifact from the setting named for MLP.[^con
 The README states this as "derived from `APP__ML_BACKEND` plus
 `APP__ACTIVE_MODEL_PATH_XGB` / `_MLP`", which is accurate and easy to misread
 as one path per backend.[^readme] If the model is absent locally and data-bank
-is configured, both `load_model_now` and `get_model` try a download into
-`/tmp/models` first.[^container]
+is configured, both `load_model_now` and `get_model` try a download into the
+container's own model output directory first, never a shared `/tmp`
+directory another user may own.[^container]
 
 ## Rules are exact; risk is learned — and they never share a code path
 

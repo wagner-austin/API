@@ -8,15 +8,15 @@ source_paths:
   - tools/fleet/registry/machines/loki.json
 source_git_blobs:
   "tools/fleet/src/fleet/core/ssh_options.py": afa311f94fa24e74a5733b34ffcca1f4b4273885
-  "tools/fleet/registry/machines/loki.json": 8ffb6113efc368735e9ccc825639c74bb55cff1f
-fact_checked: "2026-10-25"
+  "tools/fleet/registry/machines/loki.json": 9aa8a3bdca64b9a58f0e8fc77975f96e865fc7ca
+fact_checked: "2026-10-30"
 confidence: high
 hubs: [infrastructure]
 ---
 
 # loki's tunnel stall is the hub starting cloudflared, not the tunnel
 
-The hub reaches loki only through loki's Cloudflare tunnel, `loki-ssh`, while loki holds the UCI VPN.[^tunnel] Every ssh and scp the fleet sends there is a fresh connection with `ConnectTimeout=10`.[^opts] Now and then one gave no banner within that limit. That closed or gave back the job as `NODE_UNREACHABLE: ... Connection timed out during banner exchange`: 12 of 274 loki claims in the three days after the per-call roll, 9 of them that message.[^a3] Read against the tunnel's own records, the stall is not in the tunnel. It is the hub (diphtheria) starting a fresh `cloudflared` for every call on a CPU it cannot get.
+Until loki's NixOS reinstall on 2026-10-26 the hub reached it only through loki's Cloudflare tunnel, `loki-ssh`, while loki held the UCI VPN.[^tunnel] Since then loki declares no tunnel and is reached at its tailnet address, so the stall below is a record of that route, and of any other tunnel node's.[^now] Every ssh and scp the fleet sends there is a fresh connection with `ConnectTimeout=10`.[^opts] Now and then one gave no banner within that limit. That closed or gave back the job as `NODE_UNREACHABLE: ... Connection timed out during banner exchange`: 12 of 274 loki claims in the three days after the per-call roll, 9 of them that message.[^a3] Read against the tunnel's own records, the stall is not in the tunnel. It is the hub (diphtheria) starting a fresh `cloudflared` for every call on a CPU it cannot get.
 
 ## What the tunnel recorded
 
@@ -40,7 +40,8 @@ Across the whole window, 08:25Z to 09:52Z, 17 of 1158 logins stalled past 5 s. I
 
 The shared ssh connection tried first (`ControlMaster`) also removed this start, but it carried every call on one session, so a single stall held them all.[^opts] One long-lived cloudflared per tunnel node keeps a fresh ssh connection per call and removes the per-call start. That change is MCPs board task 4c604f4d.
 
-[^tunnel]: `tools/fleet/registry/machines/loki.json:15-27` -- `"hostname": "loki-ssh.austinwagner.org"` and the boot unit's purpose: "the Cloudflare tunnel, this vpn-jump's only way in while it holds the UCI VPN".
+[^tunnel]: [synthesis] -- API commit 31a1638ba, the last before ec95b830f deleted loki's Windows machine file: its tools/fleet/registry/machines/loki.json held, on lines 18 and 27, the tunnel hostname "loki-ssh.austinwagner.org" and the boot unit's purpose "the Cloudflare tunnel, this vpn-jump's only way in while it holds the UCI VPN". Read with `git show 31a1638ba:tools/fleet/registry/machines/loki.json`.
+[^now]: `tools/fleet/registry/machines/loki.json:18` -- `"tunnel": null,`; `:10` -- `"tailnetIp": "100.120.151.28",`; `:24` -- the notes open "INSTALLED WITH NIXOS 2026-10-26 by the fleet's netboot install".
 [^opts]: `tools/fleet/src/fleet/core/ssh_options.py:14-31` and `:42` -- "ONE CONNECTION PER CALL, NEVER A SHARED ONE (MCPs board task ee3d6cdc)." and `"ConnectTimeout=10",`.
 [^a3]: [synthesis] -- MCPs board task 8b70921f, RECHECK note 01e77d44 (2026-10-25T08:19Z): `fleet_dispatch_events` from 2026-10-21T05:48:09Z to 2026-10-24T05:48:09Z, 274 claims by fleet-node-loki*, 11 launches given back NODE_UNREACHABLE (9 banner-exchange timeouts) and 1 job closed NODE_UNREACHABLE.
 [^tail]: [synthesis] -- MCPs board task 8b70921f, notes d3569c34 (probe design) and 0873fe81 (2026-10-25T09:13Z): `correlate.py` over diphtheria:~/diag/stall-1025/loki.jsonl, hub-chat.jsonl, hub-search.jsonl, loki-metrics.tsv and login.tsv, 08:25Z to 09:02Z.
