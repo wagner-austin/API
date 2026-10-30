@@ -34,6 +34,7 @@ from __future__ import annotations
 import os
 import pathlib
 import subprocess
+import time
 from collections.abc import Callable
 from typing import Final
 
@@ -137,6 +138,39 @@ def _workers() -> dict[int, str]:
     return found
 
 
+#: How long a Worker may run before it is in its job scope. The job-started
+#: hook moves it there before the job's first step, so a Worker read in its
+#: first seconds is still in its listener's slice: fleet job f6d62d45 read
+#: one 5 s after it started, on all 16 CPUs, and found it in its scope on
+#: the CI slice's 8 a minute later (board task 621902c3).
+SETTLE_SECONDS: Final[int] = 60
+
+
+def _in_its_scope(pid: int, cgroup: str) -> bool:
+    """Whether a Worker runs in a job scope of the CI slice named for its pid."""
+    return cgroup.startswith(f"/{CI_SLICE_NAME}/{JOB_SCOPE_PREFIX}") and cgroup.endswith(
+        f"-{pid}.scope"
+    )
+
+
+def _settled_workers() -> dict[int, str]:
+    """Every live Runner.Worker, once none is still on its way into its job scope.
+
+    Returns:
+        Each Worker's cgroup path, by pid, from the first read in which every
+        Worker is in its scope, or the read at :data:`SETTLE_SECONDS`, whose
+        Workers outside their scope the caller's assertion names.
+    """
+    deadline = time.monotonic() + SETTLE_SECONDS
+    workers = _workers()
+    while not all(_in_its_scope(pid, cgroup) for pid, cgroup in workers.items()):
+        if time.monotonic() >= deadline:
+            break
+        time.sleep(1)
+        workers = _workers()
+    return workers
+
+
 @pytest.mark.host_runner_units
 def test_every_runner_unit_runs_in_the_listener_slice_and_every_job_in_its_scope(
     runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
@@ -161,7 +195,7 @@ def test_every_runner_unit_runs_in_the_listener_slice_and_every_job_in_its_scope
     budget = runner_host["ci_slice"]["memory_high_gb"] * GIB
     assert (listener_high, ci_high) == ("max", str(budget))
 
-    workers = _workers()
+    workers = _settled_workers()
     prefix = f"/{CI_SLICE_NAME}/{JOB_SCOPE_PREFIX}"
     scopes = [f"{prefix}{unit.removesuffix('.service')}" for unit in declared]
     misplaced = {
@@ -359,7 +393,7 @@ def test_the_ci_slice_runs_on_the_cpus_the_roster_reserves_and_every_job_inside_
     shown = unit_properties(CI_SLICE_NAME, ("AllowedCPUs", "EffectiveCPUs"))
     assert (_cpus(shown["AllowedCPUs"]), _cpus(shown["EffectiveCPUs"])) == (expected, expected)
 
-    workers = _worker_cpus(sorted(_workers()))
+    workers = _worker_cpus(sorted(_settled_workers()))
     outside = {pid: sorted(cpus - expected) for pid, cpus in workers.items() if cpus - expected}
     assert outside == {}
     record_property(
