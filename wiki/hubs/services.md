@@ -14,7 +14,7 @@ The FastAPI ML/NLP/media services that make up the api platform surface. Each se
 
 [Covenant Radar's Kafka path](../pages/covenant-radar-kafka-streaming.md) -- two streaming workers, and the hardened one (dead-letter topic, explicit offset commits that exclude buffered messages) is the covenant worker no script or container starts; the generic worker the container runs never commits, with auto-commit off and offset reset `earliest` by default, and has no dead-letter path -- derived from code, not observed on a broker
 
-[Covenant Radar's Optuna search](../pages/covenant-radar-optuna-optimisation.md) -- `/ml/optimize` and `scripts.optimize` share one TPE strategy; only the CLI writes a history row and a `RunRecord`, all 3,068 history rows on disk are still `fingerprint: null`, and the CLI's determinism pin (2026-08-29) is discarded while every fingerprint is built as UNPINNED, contradicting RESEARCH.md
+[Covenant Radar's Optuna search](../pages/covenant-radar-optuna-optimisation.md) -- shared TPE strategy, the CLI's record writer and discarded determinism pin; distinguishes the dated 3,068-row local observation from current fleet state and corrects the historical research-index claim
 
 [Model-Trainer's three ways in](../pages/model-trainer-service-architecture.md) -- the HTTP service (API enqueues eight job kinds to RQ), the compute-node composition root that hands the same payload to the same `process_train_job` and decides resume itself, and the measurement CLIs RESEARCH.md registers; `llama` and `qwen` are registered as unavailable stubs, so everything HuggingFace goes through `hf_lm`
 
