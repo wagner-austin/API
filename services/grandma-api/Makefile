@@ -7,7 +7,7 @@ MAKETOOLS := $(PYTHON) ../../tools/maketools/scripts/run.py
 lint:
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(MAKETOOLS) guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -19,7 +19,7 @@ lint:
 # runs through its own Makefile.
 test:
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(MAKETOOLS) test
 	make -C web test
 
