@@ -8,7 +8,13 @@ from typing import NamedTuple
 
 from platform_core.json_utils import JSONObject, require_float, require_int, require_str
 
-from .crsp_calendar import CrspWindow, crsp_member_on, crsp_windows
+from .crsp_calendar import (
+    CrspWindow,
+    crsp_member_on,
+    crsp_month,
+    crsp_ordinary_return,
+    crsp_windows,
+)
 from .crsp_extract import CrspSources
 from .crsp_protocol import CrspProtocol
 
@@ -29,22 +35,6 @@ class CrspDecision(NamedTuple):
     exclusions: tuple[tuple[str, int], ...]
 
 
-def _month(day: str) -> int:
-    """Map a canonical ISO date to a consecutive month number."""
-    return int(day[:4]) * 12 + int(day[5:7]) - 1
-
-
-def _ordinary(row: JSONObject, previous: str) -> bool:
-    """Accept a one-session ordinary return only with independent predecessor evidence."""
-    return (
-        row["dlyret"] is not None
-        and row["dlyprevdt"] == previous
-        and row["dlyretmissflg"] == "NA"
-        and row["dlydelflg"] == "N"
-        and row["dlyretdurflg"] in ("D1", "D2", "D3", "D4", "DU")
-    )
-
-
 def _history_failure(
     history: dict[str, JSONObject], sessions: tuple[str, ...], required: set[str]
 ) -> str | None:
@@ -55,7 +45,7 @@ def _history_failure(
         observed = history.get(day)
         if observed is None:
             return "daily_history_missing"
-        if not _ordinary(observed, sessions[index - 1]):
+        if not crsp_ordinary_return(observed, sessions[index - 1]):
             return "daily_history_invalid"
     return None
 
@@ -75,9 +65,9 @@ def _feature(
         return "decision_price_below_minimum"
     # For entry month t, t-12 through t-2 are the eleven months before
     # the decision month. The decision month's entire return is skipped.
-    lower, upper = _month(decision) - 11, _month(decision) - 1
-    momentum_days = tuple(day for day in sessions if lower <= _month(day) <= upper)
-    if len(sessions) <= protocol["min_history"] or _month(sessions[0]) >= lower:
+    lower, upper = crsp_month(decision) - 11, crsp_month(decision) - 1
+    momentum_days = tuple(day for day in sessions if lower <= crsp_month(day) <= upper)
+    if len(sessions) <= protocol["min_history"] or crsp_month(sessions[0]) >= lower:
         return "calendar_history_insufficient"
     required = set(sessions[-protocol["min_history"] :]) | set(momentum_days)
     failure = _history_failure(history, sessions, required)

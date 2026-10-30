@@ -55,6 +55,38 @@ def _calendar_months(calendar: tuple[tuple[str, str], ...]) -> tuple[list[str], 
     return tuple(months.values())
 
 
+def crsp_month(day: str) -> int:
+    """Map a canonical ISO date to a consecutive month number.
+
+    Args:
+        day: Canonical ``YYYY-MM-DD`` date.
+
+    Returns:
+        ``12 * year + month - 1``, so consecutive months differ by exactly one.
+    """
+    return int(day[:4]) * 12 + int(day[5:7]) - 1
+
+
+def crsp_ordinary_return(row: JSONObject, previous: str) -> bool:
+    """Accept a one-session ordinary return only with independent predecessor evidence.
+
+    Args:
+        row: Daily security record for one declared session.
+        previous: The independently declared preceding session.
+
+    Returns:
+        Whether the row carries a present, nonterminal, one-session return whose
+        recorded predecessor is exactly that preceding session.
+    """
+    return (
+        row["dlyret"] is not None
+        and row["dlyprevdt"] == previous
+        and row["dlyretmissflg"] == "NA"
+        and row["dlydelflg"] == "N"
+        and row["dlyretdurflg"] in ("D1", "D2", "D3", "D4", "DU")
+    )
+
+
 def crsp_windows(
     calendar: tuple[tuple[str, str], ...], first_decision: str, last_decision: str
 ) -> tuple[CrspWindow, ...]:

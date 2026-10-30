@@ -1,4 +1,4 @@
-"""Frozen validation diagnostic settings and compute request codecs."""
+"""Frozen monthly validation settings and compute request codecs."""
 
 from __future__ import annotations
 
@@ -8,14 +8,8 @@ from pathlib import Path
 from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_float
 from typing_extensions import ReadOnly, TypedDict
 
-from ..evaluation.arguments import resampling_settings
-from ..evaluation.codec_records import (
-    decode_alert_costs,
-    decode_resampling,
-    encode_alert_costs,
-    encode_resampling,
-)
-from ..evaluation.types import AlertCosts, ResamplingSettings, ResamplingUnit
+from ..evaluation.intervals import require_confidence
+from .crsp_protocol import CrspProtocol, decode_crsp_protocol, encode_crsp_protocol
 from .research_records import (
     ResearchPolicy,
     ResearchProposal,
@@ -28,12 +22,12 @@ from .validation import require_bounded_int, require_nonempty
 
 
 class ResearchEvaluation(TypedDict):
-    """A diagnostic protocol, distinct from the substantive monthly experiment."""
+    """The frozen monthly CRSP design and its validation fold schedule."""
 
-    reference: ReadOnly[str]
-    inner_train_fraction: ReadOnly[float]
-    resampling: ReadOnly[ResamplingSettings]
-    costs: ReadOnly[AlertCosts]
+    design: ReadOnly[CrspProtocol]
+    stopping_months: ReadOnly[int]
+    fold_months: ReadOnly[int]
+    confidence: ReadOnly[float]
 
 
 class ResearchTrial(TypedDict):
@@ -50,69 +44,55 @@ def encode_research_evaluation(value: ResearchEvaluation) -> JSONObject:
     """Encode every frozen evaluation choice.
 
     Args:
-        value: Validated diagnostic protocol.
+        value: Validated monthly validation protocol.
 
     Returns:
         Canonical protocol document.
     """
     return {
-        "reference": value["reference"],
-        "inner_train_fraction": value["inner_train_fraction"],
-        "resampling": encode_resampling(value["resampling"]),
-        "costs": encode_alert_costs(value["costs"]),
+        "design": encode_crsp_protocol(value["design"]),
+        "stopping_months": value["stopping_months"],
+        "fold_months": value["fold_months"],
+        "confidence": value["confidence"],
     }
 
 
 def decode_research_evaluation(value: JSONObject) -> ResearchEvaluation:
-    """Require a chronological validation protocol with finite sampling work.
+    """Require the frozen monthly design and a bounded expanding fold schedule.
 
     Args:
         value: Untrusted protocol.
 
     Returns:
-        Validated fixed diagnostic settings.
+        Validated fixed evaluation settings.
 
     Raises:
-        ValueError: RESEARCH_TRIAL_PROTOCOL for unsupported or excessive settings.
+        ValueError: RESEARCH_TRIAL_PROTOCOL for unknown fields or settings;
+            CRSP-001 and interval validation propagate from the shared decoders.
     """
     if set(value) != set(ResearchEvaluation.__annotations__):
         raise ValueError("RESEARCH_TRIAL_PROTOCOL: exact protocol fields required")
-    reference = require_nonempty(value, "reference")
-    inner = require_float(value, "inner_train_fraction")
-    settings = decode_resampling(require_dict(value, "resampling"))
-    settings = resampling_settings(
-        settings["unit"],
-        settings["block_length"],
-        settings["n_resamples"],
-        settings["resample_seed"],
-        settings["confidence"],
-    )
-    costs = decode_alert_costs(require_dict(value, "costs"))
-    if (
-        reference != "lightgbm"
-        or not 0 < inner < 1
-        or settings["unit"] != ResamplingUnit.BLOCK
-        or settings["n_resamples"] > 10000
-    ):
-        raise ValueError(
-            "RESEARCH_TRIAL_PROTOCOL: require bounded block validation against lightgbm"
-        )
+    confidence = require_float(value, "confidence")
+    require_confidence(confidence)
     return ResearchEvaluation(
-        reference=reference, inner_train_fraction=inner, resampling=settings, costs=costs
+        design=decode_crsp_protocol(require_dict(value, "design")),
+        stopping_months=require_bounded_int(value, "stopping_months", 1, 60),
+        fold_months=require_bounded_int(value, "fold_months", 1, 60),
+        confidence=confidence,
     )
 
 
 def evaluation_digest(value: ResearchEvaluation) -> str:
-    """Bind the diagnostic semantics as well as its numerical settings.
+    """Bind the study semantics as well as its frozen settings.
 
     Args:
         value: Validated fixed evaluation choices.
 
     Returns:
-        Digest naming a validation-only next-return-sign diagnostic.
+        Digest naming the validation-only monthly holdings study.
     """
     document: JSONObject = {
-        "kind": "crsp-next-return-sign-validation-v1",
+        "kind": "crsp-monthly-holdings-validation-v1",
         "settings": encode_research_evaluation(value),
     }
     return sha256(dump_json_str(document).encode()).hexdigest()
