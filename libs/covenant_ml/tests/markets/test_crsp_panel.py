@@ -10,14 +10,14 @@ from platform_core.json_utils import JSONObject, JSONValue, require_str
 from covenant_ml.markets.crsp_extract import load_crsp_sources
 from covenant_ml.markets.crsp_panel import build_crsp_panel
 
-from ._crsp_fixtures import source_rows, write_sources
+from ._crsp_fixtures import panel_protocol, source_rows, write_sources
 
 
 def test_decision_features_have_independent_arithmetic_and_deterministic_ties(
     tmp_path: Path,
 ) -> None:
     rows = source_rows()
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     panel = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")
     decision = panel[0]
     assert decision.window == ("2019-12-31", "2020-01-01", "2020-02-03")
@@ -35,7 +35,7 @@ def test_decision_features_have_independent_arithmetic_and_deterministic_ties(
     )
     rows["membership"].reverse()
     rows["returns"].reverse()
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     assert build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31") == panel
 
 
@@ -59,7 +59,7 @@ def test_each_ineligible_security_has_one_counted_reason(
     for row in rows["returns"]:
         if row["permno"] == 1 and row["dlycaldt"] == "2019-12-31":
             row[field] = value
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     decision = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")[0]
     assert decision.exclusions == ((reason, 1),)
     assert [feature.permno for feature in decision.features] == [2, 3]
@@ -76,7 +76,7 @@ def test_missing_history_and_membership_are_counted_without_silently_dropping_da
         for row in rows["returns"]
         if not (row["permno"] == 3 and row["dlycaldt"] == "2019-06-03")
     ]
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     decision = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")[0]
     assert decision.features == ()
     assert decision.exclusions == (
@@ -88,14 +88,14 @@ def test_missing_history_and_membership_are_counted_without_silently_dropping_da
 
 def test_history_calendar_and_liquidity_evidence_are_not_imputed(tmp_path: Path) -> None:
     rows = source_rows()
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     short = build_crsp_panel(load_crsp_sources(path), "2019-02-01", "2019-02-28")[0]
     assert short.features == ()
     assert short.exclusions == (("calendar_history_insufficient", 3),)
     for row in rows["returns"]:
         if row["permno"] == 1 and row["dlycaldt"] == "2019-12-30":
             row["dlyprc"] = None
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     result = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")[0]
     assert result.exclusions == (("liquidity_missing", 1),)
 
@@ -116,7 +116,7 @@ def test_panel_refuses_ambiguous_or_impossible_sources(tmp_path: Path, mutation:
         first = "2018-12-01"
     else:
         last = "2025-01-01"
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     with pytest.raises(ValueError, match=r"CRSP-003|CRSP-008"):
         build_crsp_panel(load_crsp_sources(path), first, last)
 
@@ -135,7 +135,7 @@ def test_liquidity_is_trailing_median_of_absolute_dollar_volume(tmp_path: Path) 
     # The session before the window and the decision's negative quote.
     history[-61]["dlyvol"] = 1e9
     history[-1]["dlyprc"] = -10.0
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     decision = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")[0]
     assert [feature.permno for feature in decision.features] == [1, 2]
     assert [feature.liquidity for feature in decision.features] == [2000.0, 1000.0]

@@ -16,7 +16,7 @@ from covenant_ml.markets.crsp_extract import (
 )
 from covenant_ml.markets.crsp_rows import decode_crsp_rows
 
-from ._crsp_fixtures import save_file, source_rows, write_sources
+from ._crsp_fixtures import panel_protocol, save_file, source_rows, write_sources
 
 
 def test_manifest_roundtrip_and_missing_terminal_values_remain_null(tmp_path: Path) -> None:
@@ -33,7 +33,7 @@ def test_manifest_roundtrip_and_missing_terminal_values_remain_null(tmp_path: Pa
         }
     ]
     rows["returns"][0]["dlyprevdt"] = None
-    path, document = write_sources(tmp_path, rows)
+    path, document = write_sources(tmp_path, rows, panel_protocol())
     assert encode_crsp_extract(decode_crsp_extract(document)) == document
     loaded = load_crsp_sources(path)
     assert loaded.membership == tuple(rows["membership"])
@@ -57,7 +57,7 @@ def test_manifest_roundtrip_and_missing_terminal_values_remain_null(tmp_path: Pa
     ],
 )
 def test_changed_artifact_is_refused_before_consumption(tmp_path: Path, name: str) -> None:
-    path, _ = write_sources(tmp_path, source_rows())
+    path, _ = write_sources(tmp_path, source_rows(), panel_protocol())
     with (tmp_path / name).open("ab") as stream:
         stream.write(b"changed")
     with pytest.raises(ValueError, match="WRDS_DATA_DRIFT"):
@@ -68,7 +68,7 @@ def test_changed_artifact_is_refused_before_consumption(tmp_path: Path, name: st
     "mutation", ["extra", "time", "relation", "repeated", "size", "empty_query", "newline"]
 )
 def test_ambiguous_manifest_is_refused(tmp_path: Path, mutation: str) -> None:
-    path, document = write_sources(tmp_path, source_rows())
+    path, document = write_sources(tmp_path, source_rows(), panel_protocol())
     membership = narrow_json_to_dict(document["membership"])
     if mutation == "extra":
         document["unexpected"] = 1
@@ -104,7 +104,7 @@ def test_duplicate_natural_keys_fail(tmp_path: Path, relation: str) -> None:
         }
     ]
     rows[relation].append(rows[relation][0].copy())
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     with pytest.raises(ValueError, match=r"CRSP-007.*duplicate"):
         load_crsp_sources(path)
 
@@ -130,13 +130,13 @@ def test_malformed_source_cells_fail(
 ) -> None:
     rows = source_rows()
     rows[relation][0][field] = value
-    path, _ = write_sources(tmp_path, rows)
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
     with pytest.raises(ValueError, match="CRSP-007"):
         load_crsp_sources(path)
 
 
 def test_reordered_projection_with_valid_checksum_fails(tmp_path: Path) -> None:
-    path, document = write_sources(tmp_path, source_rows())
+    path, document = write_sources(tmp_path, source_rows(), panel_protocol())
     stream = io.StringIO()
     writer = csv.writer(stream)
     for values in csv.reader(io.StringIO((tmp_path / "membership.csv").read_text("utf-8"))):

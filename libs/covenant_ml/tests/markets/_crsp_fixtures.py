@@ -64,13 +64,20 @@ def source_rows() -> dict[str, list[JSONObject]]:
     return {"membership": membership, "returns": returns, "calendar": calendar, "delists": []}
 
 
-def write_sources(directory: Path, rows: dict[str, list[JSONObject]]) -> tuple[Path, JSONObject]:
-    """Write real protocol, SQL and CSV bytes and checksum all nine evidence files."""
+def panel_protocol() -> JSONObject:
+    """The committed design with dates and universe size fitted to ``source_rows``."""
     protocol = protocol_document()
     protocol["max_universe"] = 2
     protocol["history_start"] = "2018-01-01"
     protocol["train_start"] = "2019-01-01"
     protocol["validation_start"] = "2020-01-01"
+    return protocol
+
+
+def write_sources(
+    directory: Path, rows: dict[str, list[JSONObject]], protocol: JSONObject
+) -> tuple[Path, JSONObject]:
+    """Write real protocol, SQL and CSV bytes and checksum all nine evidence files."""
     manifest: JSONObject = {"extracted_at": "2026-10-29T00:00:00+00:00"}
     manifest["protocol"] = save_file(directory, "protocol.json", dump_json_str(protocol).encode())
     for name, records in rows.items():
