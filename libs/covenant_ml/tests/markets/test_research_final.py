@@ -14,7 +14,7 @@ from platform_core.json_utils import (
 from platform_core.run_record import decode_run_record
 from platform_core.testing import sample_run_fingerprint
 
-from covenant_ml.markets.research_final import execute_final, select_candidate
+from covenant_ml.markets.research_final import execute_final, release_final, select_candidate
 from covenant_ml.markets.research_journal import admit_proposal, research_journal
 from covenant_ml.markets.research_records import encode_research_proposal
 from covenant_ml.markets.research_trial_records import (
@@ -29,14 +29,15 @@ from ._research_final_fixtures import completed_study
 
 def _final(path: Path, trial: ResearchTrial, manifest: Path, output: Path, code: str = "c") -> Path:
     """Run the evaluator's final score under the fixture's pinned image."""
+    grant = path.parent / "grant"
+    release_final(path, trial, manifest, grant, keys=evaluator_keys(path.parent / "validation"))
     return execute_final(
-        path,
         trial,
         manifest,
         sample_run_fingerprint(image_digest="d" * 64),
         code * 64,
         output,
-        keys=evaluator_keys(path.parent / "validation"),
+        grant_directory=grant,
         scratch=path.parent,
     )
 
@@ -99,7 +100,6 @@ def _changed(trial: ResearchTrial) -> ResearchTrial:
     [
         ("unselected", "RESEARCH-009"),
         ("manifest", "RESEARCH_TRIAL_LINEAGE"),
-        ("code", "RESEARCH_TRIAL_LINEAGE"),
         ("request", "RESEARCH_EXECUTION_REQUEST"),
     ],
 )
@@ -113,9 +113,31 @@ def test_final_refusals_before_release_keep_the_selection(
     staged = Path(trial["manifest"]) if case == "manifest" else manifest
     requested = _changed(trial) if case == "request" else trial
     with pytest.raises(ValueError, match=message):
-        _final(path, requested, staged, tmp_path / "out" / "r.json", "e" if case == "code" else "c")
+        _final(path, requested, staged, tmp_path / "out" / "r.json")
     assert research_journal(trial["policy"]).read(path) == before
     assert not (tmp_path / "out").exists()
+
+
+def test_native_runtime_drift_consumes_the_grant_without_scoring(tmp_path: Path) -> None:
+    path, trial, manifest = completed_study(tmp_path)
+    select_candidate(path, trial, manifest)
+    with pytest.raises(ValueError, match="RESEARCH_TRIAL_LINEAGE"):
+        _final(path, trial, manifest, tmp_path / "out/r.json", "e")
+    assert research_journal(trial["policy"]).read(path)[0]["selection"] == "released"
+    assert (tmp_path / "grant/consumed").read_bytes() == b"released\n"
+    assert not (tmp_path / "grant/final.agekey").exists()
+    assert not (tmp_path / "out").exists()
+
+
+def test_changed_evaluation_is_refused_before_releasing_a_key(tmp_path: Path) -> None:
+    path, trial, manifest = completed_study(tmp_path)
+    select_candidate(path, trial, manifest)
+    document = encode_research_trial(trial)
+    require_dict(document, "evaluation")["confidence"] = 0.8
+    with pytest.raises(ValueError, match="RESEARCH_TRIAL_LINEAGE"):
+        _final(path, decode_research_trial(document), manifest, tmp_path / "out/r.json")
+    assert research_journal(trial["policy"]).read(path)[0]["selection"] == "selected"
+    assert not (tmp_path / "grant").exists()
 
 
 def test_release_is_consumed_before_any_final_relation_is_read(tmp_path: Path) -> None:
@@ -143,6 +165,22 @@ def test_final_key_is_acquired_only_after_irrevocable_release(tmp_path: Path) ->
     with pytest.raises(ValueError, match="RESEARCH-009"):
         _final(path, trial, manifest, tmp_path / "out/r.json")
     assert list(tmp_path.glob("research-plaintext-*")) == []
+
+
+def test_failed_grant_creation_cannot_restore_journal_permission(tmp_path: Path) -> None:
+    path, trial, manifest = completed_study(tmp_path)
+    select_candidate(path, trial, manifest)
+    grant = tmp_path / "grant"
+    grant.mkdir(mode=0o700)
+    with pytest.raises(FileExistsError):
+        release_final(path, trial, manifest, grant, keys=evaluator_keys(tmp_path / "validation"))
+    assert research_journal(trial["policy"]).read(path)[0]["selection"] == "released"
+    assert list(grant.iterdir()) == []
+    with pytest.raises(ValueError, match="RESEARCH-009"):
+        release_final(
+            path, trial, manifest, tmp_path / "retry", keys=evaluator_keys(tmp_path / "validation")
+        )
+    assert not (tmp_path / "retry").exists()
 
 
 def test_a_partition_field_never_authorizes_final_scoring(tmp_path: Path) -> None:

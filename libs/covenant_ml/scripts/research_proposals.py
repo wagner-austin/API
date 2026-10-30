@@ -3,7 +3,8 @@
 Every operation here is the evaluator's: a proposer's program runs only inside
 the isolated process boundary, whose output reaches ``propose`` as a file. The
 ``select`` operation seals admission on one completed attempt and binds its
-final manifest; the final-period run itself is ``research_trial --ledger``.
+final manifest; ``release`` consumes its one-shot authorization and writes a
+private grant for ``research_trial --final-grant`` on the compute node.
 """
 
 from __future__ import annotations
@@ -35,13 +36,14 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.research_cluster import decode_research_cluster
     from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
-    from covenant_ml.markets.research_final import select_candidate
+    from covenant_ml.markets.research_final import release_final, select_candidate
     from covenant_ml.markets.research_journal import (
         admit_proposal,
         encode_research_attempt,
         research_journal,
         research_policy_digest,
     )
+    from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
     from covenant_ml.markets.research_records import decode_research_policy
     from covenant_ml.markets.research_trial_records import decode_research_trial
     from covenant_ml.markets.validation import parse_timestamp, read_document
@@ -62,6 +64,11 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     select = commands.add_parser("select")
     select.add_argument("--trial", required=True, type=Path)
     select.add_argument("--final-manifest", required=True, type=Path)
+    release = commands.add_parser("release")
+    release.add_argument("--trial", required=True, type=Path)
+    release.add_argument("--final-manifest", required=True, type=Path)
+    release.add_argument("--access", required=True, type=Path)
+    release.add_argument("--directory", required=True, type=Path)
     args = parser.parse_args(argv)
     action: str = args.action
     policy_path: Path = args.policy
@@ -89,9 +96,17 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         trial = decode_research_trial(read_document(trial_path))
         if trial["policy"] != policy:
             raise ValueError("RESEARCH_EXECUTION_REQUEST: trial policy differs from journal")
-        if action == "select":
+        if action in {"select", "release"}:
             final_manifest: Path = args.final_manifest
-            attempts = (select_candidate(ledger_path, trial, final_manifest),)
+            if action == "select":
+                attempts = (select_candidate(ledger_path, trial, final_manifest),)
+            else:
+                access: Path = args.access
+                destination: Path = args.directory
+                keys = EvaluatorKeys(decode_research_access(read_document(access)))
+                attempts = (
+                    release_final(ledger_path, trial, final_manifest, destination, keys=keys),
+                )
         else:
             cluster_path: Path = args.cluster
             directory: Path = args.directory

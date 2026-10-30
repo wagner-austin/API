@@ -1,5 +1,6 @@
 """Compute CLI uses real files and checks its own source and numerical startup."""
 
+import os
 import runpy
 import subprocess
 import sys
@@ -14,9 +15,10 @@ from platform_core.json_utils import dump_json_str, load_json_str, require_dict
 from platform_core.run_record import decode_run_record, run_record_sidecar
 from scripts import research_trial
 
-from covenant_ml.markets.research_final import select_candidate
+from covenant_ml.markets.research_final import release_final, select_candidate
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
+from ._encrypted_fixtures import evaluator_keys
 from ._research_final_fixtures import completed_study, write_trial
 from ._trial_fixtures import trial_document
 
@@ -71,15 +73,15 @@ def test_final_mode_scores_the_selected_attempt_once(
     code = sha256(Path(research_trial.__file__).read_bytes()).hexdigest()
     ledger, trial, manifest = completed_study(tmp_path, code)
     select_candidate(ledger, trial, manifest)
+    grant = tmp_path / "grant"
+    release_final(ledger, trial, manifest, grant, keys=evaluator_keys(tmp_path / "validation"))
     request = write_trial(trial, tmp_path / "request.json")
     output = tmp_path / "score" / "result.json"
     final = [
-        "--ledger",
-        str(ledger),
+        "--final-grant",
+        str(grant),
         "--final-manifest",
         str(manifest),
-        "--access",
-        str(tmp_path / "validation/access.json"),
         "--scratch",
         str(tmp_path),
     ]
@@ -89,11 +91,11 @@ def test_final_mode_scores_the_selected_attempt_once(
     assert record["label"] == "final-1"
     assert capsys.readouterr().out.splitlines()[-1] == f"run record -> {run_record_sidecar(output)}"
     again = ["--request", str(request), "--out", str(tmp_path / "again" / "r.json"), *final]
-    with pytest.raises(ValueError, match="RESEARCH-009"):
+    with pytest.raises(FileExistsError):
         research_trial.main(again, stand_in_pin)
 
 
-@pytest.mark.parametrize("flag", ["--ledger", "--final-manifest"])
+@pytest.mark.parametrize("flag", ["--final-grant", "--final-manifest"])
 def test_final_mode_needs_both_its_flags(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], flag: str
 ) -> None:
@@ -102,16 +104,65 @@ def test_final_mode_needs_both_its_flags(
         str(tmp_path / "unread.json"),
         "--out",
         str(tmp_path / "o.json"),
-        "--access",
-        str(tmp_path / "access.json"),
         "--scratch",
         str(tmp_path),
     ]
+    if flag == "--final-manifest":
+        call.extend(["--access", str(tmp_path / "access.json")])
     with pytest.raises(SystemExit) as stopped:
         research_trial.main([*call, flag, str(tmp_path / "x")], stand_in_pin)
     assert stopped.value.code == 2
     _, message = capsys.readouterr().err.splitlines()[-1].split(": error: ")
-    assert message == "--ledger and --final-manifest are required together"
+    assert message == "--final-grant and --final-manifest are required together"
+
+
+def test_real_final_worker_needs_neither_journal_nor_long_lived_keys(tmp_path: Path) -> None:
+    code = sha256(Path(research_trial.__file__).read_bytes()).hexdigest()
+    ledger, trial, manifest = completed_study(tmp_path, code)
+    select_candidate(ledger, trial, manifest)
+    grant = tmp_path / "grant"
+    release_final(ledger, trial, manifest, grant, keys=evaluator_keys(tmp_path / "validation"))
+    request = write_trial(trial, tmp_path / "request.json")
+    ledger.unlink()
+    (tmp_path / "validation/keys/final.agekey").unlink()
+    output = tmp_path / "native/result.json"
+    command = [
+        sys.executable,
+        "-m",
+        "scripts.research_trial",
+        "--request",
+        str(request),
+        "--out",
+        str(output),
+        "--final-grant",
+        str(grant),
+        "--final-manifest",
+        str(manifest),
+        "--scratch",
+        str(tmp_path),
+    ]
+    environment = dict(os.environ, IMAGE_DIGEST="d" * 64)
+    result = subprocess.run(
+        command, env=environment, capture_output=True, text=True, timeout=60, check=False
+    )
+    assert (result.returncode, result.stderr) == (0, "")
+    assert result.stdout.splitlines() == [
+        f"manifest -> {output}",
+        f"run record -> {run_record_sidecar(output)}",
+    ]
+    assert decode_run_record(load_json_str(run_record_sidecar(output).read_text()))["label"] == (
+        "final-1"
+    )
+    assert not ledger.exists()
+    assert not (grant / "final.agekey").exists()
+    replay = subprocess.run(
+        command, env=environment, capture_output=True, text=True, timeout=60, check=False
+    )
+    assert replay.returncode == 1
+    assert replay.stdout == ""
+    assert replay.stderr.splitlines()[-1] == (
+        f"FileExistsError: [Errno 17] File exists: {str(grant / 'consumed')!r}"
+    )
 
 
 def test_entrypoint_refuses_a_late_numerical_pin() -> None:

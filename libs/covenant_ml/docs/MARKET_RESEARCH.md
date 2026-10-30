@@ -686,14 +686,27 @@ These transitions are for a trusted evaluator with exclusive journal access;
 they do not authenticate a caller. The evaluator issues them through
 `markets.research_final`: `research_proposals select --trial T --final-manifest M`
 binds the named completed attempt's journal candidate and validation payload to
-the SHA-256 of encrypted bundle `M`, and `research_trial --request T --out O
---access A --scratch S --ledger L --final-manifest M` runs `execute_final`.
-`A` contains public recipients, the private key-directory path and a storage limit;
-`S` is Linux job-local scratch. That run requires the journal row to be
-selected and `M` to hash to the bound digest, rechecks the policy, protocol,
-code and image lineage, and only then commits `release_final`, before any final
-relation is read. A failure after release, including a missing data file, leaves
-the release consumed; a second run is refused with RESEARCH-009. The candidate,
+the SHA-256 of encrypted bundle `M`. The controller then invokes
+`research_proposals release --trial T --final-manifest M --access A --directory G`
+under the same `--policy` and `--ledger`. It checks admission and frozen protocol,
+commits `release_final`, and only then acquires the final identity and creates
+private grant `G`. `A` contains public recipients, the private key-directory path
+and a storage limit. Grant metadata binds the exact canonical request and final
+ciphertext digests; the separate key file has mode 0600 beneath a mode-0700
+directory. Failed grant creation leaves the journal release consumed.
+
+The worker invokes `research_trial --request T --out O --final-grant G
+--scratch S --final-manifest M`, without a journal or long-lived key directory.
+It checks the grant bindings, exclusively creates and fsyncs its consumption
+marker and directory, then reads and removes the delivered key. It checks the
+actual code/image lineage before decrypting into private Linux scratch `S`.
+A second grant consumption fails even across competing processes. A failure
+after consumption, including runtime drift or a missing data file, restores
+neither the journal release nor the grant. Native delivery must preserve one
+grant location and its spent marker; copying it into independently redeemable
+locations would defeat that property. Delivery automation remains operational
+work tracked in the [readiness page](../../../wiki/pages/wrds-baseline-readiness.md).
+The candidate,
 seed and features come from the journal's own admitted request, which still
 names the validation partition: no proposal field authorizes final scoring, and
 a proposal naming another partition is refused at admission and can never be
@@ -799,7 +812,7 @@ evaluation manifest names the encrypted bundle. After authenticated decryption,
 the worker reads its CRSP extract manifest and refuses to fit unless the protocol
 decodes to exactly the admitted design. A
 validation run never constructs a final-period decision; only the evaluator's
-`--ledger`/`--final-manifest` mode above does, once. Hash chaining detects
+`--final-grant`/`--final-manifest` mode above does, once. Hash chaining detects
 corruption, not deliberate rewriting by someone who can modify the journal
 database.
 

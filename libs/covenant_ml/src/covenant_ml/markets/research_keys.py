@@ -92,26 +92,41 @@ class EvaluatorKeys:
         if partition not in {"train-validation", "final"}:
             raise ValueError("RESEARCH_KEYS_ACCESS: unknown partition")
         root = Path(self.access["directory"])
-        require_private_directory(root)
         expected = (
             self.access["validation_recipient"]
             if partition == "train-validation"
             else self.access["final_recipient"]
         )
-        key_path = root / (partition + ".agekey")
-        descriptor = os.open(key_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-        with os.fdopen(descriptor, "r", encoding="ascii") as source:
-            details = os.fstat(source.fileno())
-            if not stat.S_ISREG(details.st_mode) or details.st_mode & 0o077:
-                raise ValueError("RESEARCH_KEYS_ACCESS: require an evaluator-owned private key")
-            secret = source.read(256)
-        # Refuse malformed lengths without including private file contents.
-        if not secret.startswith("AGE-SECRET-KEY-1") or len(secret.strip()) != 74:
-            raise ValueError("RESEARCH_KEYS_ACCESS: invalid private identity encoding")
-        identity = hooks.x25519.Identity.from_str(secret.strip())
-        if str(identity.to_public()) != expected:
-            raise ValueError("RESEARCH_KEYS_ACCESS: private identity differs from its recipient")
-        return identity
+        return read_private_identity(root / (partition + ".agekey"), expected)
+
+
+def read_private_identity(path: Path, recipient: str) -> hooks.AgeIdentity:
+    """Read a private regular key beneath checked evaluator storage without following links.
+
+    Args:
+        path: Evaluator-owned key, including a single-use final grant's key.
+        recipient: Expected public recipient.
+
+    Returns:
+        Verified in-memory identity; secret bytes never enter an error message.
+
+    Raises:
+        ValueError: RESEARCH_KEYS_ACCESS for permissions, encoding or recipient drift.
+        OSError: Missing, symlinked or inaccessible key.
+    """
+    require_private_directory(path.parent)
+    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(descriptor, "r", encoding="ascii") as source:
+        details = os.fstat(source.fileno())
+        if not stat.S_ISREG(details.st_mode) or details.st_mode & 0o077:
+            raise ValueError("RESEARCH_KEYS_ACCESS: require an evaluator-owned private key")
+        secret = source.read(256)
+    if not secret.startswith("AGE-SECRET-KEY-1") or len(secret.strip()) != 74:
+        raise ValueError("RESEARCH_KEYS_ACCESS: invalid private identity encoding")
+    identity = hooks.x25519.Identity.from_str(secret.strip())
+    if str(identity.to_public()) != recipient:
+        raise ValueError("RESEARCH_KEYS_ACCESS: private identity differs from its recipient")
+    return identity
 
 
 def create_evaluator_keys(directory: Path, max_plaintext_bytes: int) -> ResearchAccess:
@@ -157,4 +172,5 @@ __all__ = [
     "create_evaluator_keys",
     "decode_research_access",
     "encode_research_access",
+    "read_private_identity",
 ]

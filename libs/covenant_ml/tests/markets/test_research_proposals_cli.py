@@ -102,6 +102,24 @@ def test_evaluator_selection_seals_the_journal(
     assert (row["status"], row["selection"]) == ("complete", "selected")
     with pytest.raises(ValueError, match="RESEARCH-008"):
         main([*args, *selection], stand_in_pin)
+    release = [
+        "release",
+        "--trial",
+        str(request),
+        "--final-manifest",
+        str(manifest),
+        "--access",
+        str(tmp_path / "validation/access.json"),
+        "--directory",
+        str(tmp_path / "grant"),
+    ]
+    assert main([*args, *release], stand_in_pin) == 0
+    released = narrow_json_to_dict(load_json_str(capsys.readouterr().out))
+    assert narrow_json_to_dict(require_list(released, "attempts")[0])["selection"] == "released"
+    assert (tmp_path / "grant/final.agekey").is_file()
+    assert set(released) == {"policy_digest", "attempts"}
+    with pytest.raises(ValueError, match="RESEARCH-009"):
+        main([*args, *release], stand_in_pin)
 
 
 def test_entry_refuses_late_numeric_pin() -> None:

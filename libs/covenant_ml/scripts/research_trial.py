@@ -1,7 +1,7 @@
 """Compute entrypoint for a frozen, admitted monthly validation trial.
 
-Given ``--ledger`` and ``--final-manifest`` together it instead runs the
-evaluator's single final-period score of the journal's selected attempt.
+Given ``--final-grant`` and ``--final-manifest`` together it consumes the
+evaluator's released private grant; the authoritative journal stays off-node.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         Zero only after manifest and shared record publication.
 
     Raises:
-        SystemExit: Exit 2 when only one of ``--ledger`` and ``--final-manifest``
+        SystemExit: Exit 2 when only one of ``--final-grant`` and ``--final-manifest``
             is given.
     """
     determinism = pin()
@@ -40,35 +40,35 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--request", required=True, type=Path)
     parser.add_argument("--out", required=True, type=Path)
-    parser.add_argument("--access", required=True, type=Path)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--access", type=Path)
+    mode.add_argument("--final-grant", type=Path)
     parser.add_argument("--scratch", required=True, type=Path)
-    parser.add_argument("--ledger", type=Path)
     parser.add_argument("--final-manifest", type=Path)
     args = parser.parse_args(argv)
     request: Path = args.request
     output: Path = args.out
-    ledger: Path | None = args.ledger
+    grant: Path | None = args.final_grant
     final_manifest: Path | None = args.final_manifest
-    access: Path = args.access
     scratch: Path = args.scratch
-    if (ledger is None) != (final_manifest is None):
-        parser.error("--ledger and --final-manifest are required together")
+    if (grant is None) != (final_manifest is None):
+        parser.error("--final-grant and --final-manifest are required together")
     trial = decode_research_trial(read_document(request))
-    keys = EvaluatorKeys(decode_research_access(read_document(access)))
     fingerprint = benchmark_fingerprint(determinism, config_test_hooks.get_env)
     code_digest = sha256(Path(__file__).read_bytes()).hexdigest()
-    if ledger is not None and final_manifest is not None:
+    if grant is not None and final_manifest is not None:
         record = execute_final(
-            ledger,
             trial,
             final_manifest,
             fingerprint,
             code_digest,
             output,
-            keys=keys,
+            grant_directory=grant,
             scratch=scratch,
         )
     else:
+        access: Path = args.access
+        keys = EvaluatorKeys(decode_research_access(read_document(access)))
         record = execute_trial(trial, fingerprint, code_digest, output, keys=keys, scratch=scratch)
     sys.stdout.write(f"manifest -> {output}\nrun record -> {record}\n")
     return 0
