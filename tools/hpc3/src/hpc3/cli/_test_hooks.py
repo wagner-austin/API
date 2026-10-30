@@ -15,11 +15,15 @@ from __future__ import annotations
 
 import datetime
 import pathlib
+import sys
 import time
 from collections.abc import Callable
+from typing import BinaryIO
 
 from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 from platform_core.report_line import EmitProtocol, emit_error_line, emit_line
+
+_binary_stdin: BinaryIO = sys.stdin.buffer
 
 
 def _default_now_iso() -> str:
@@ -68,17 +72,19 @@ http_post: McpPostProtocol = urllib_mcp_post
 #: tree: the command WRITES both, and a test writing the real ones would race
 #: every test reading them.
 monorepo_root: Callable[[], pathlib.Path] = _default_monorepo_root
+read_stdin: Callable[[int], bytes] = _binary_stdin.read
 
 
 def reset_hooks() -> None:
     """Rebind every hook to its production implementation."""
-    global emit, emit_error, now_iso, sleep, http_post, monorepo_root
+    global emit, emit_error, now_iso, sleep, http_post, monorepo_root, read_stdin
     emit = emit_line
     emit_error = emit_error_line
     now_iso = _default_now_iso
     sleep = _default_sleep
     http_post = urllib_mcp_post
     monorepo_root = _default_monorepo_root
+    read_stdin = _binary_stdin.read
 
 
 __all__ = [
@@ -87,6 +93,7 @@ __all__ = [
     "http_post",
     "monorepo_root",
     "now_iso",
+    "read_stdin",
     "reset_hooks",
     "sleep",
 ]

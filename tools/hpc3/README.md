@@ -326,6 +326,16 @@ Grid Engine receipts remain distinct from the Slurm job ledger.
 
 ### HPC3 research runs
 
+Private evaluator grants use `hpc3-private-stage --config runs/hpc3.json
+--manifest delivery.json`, with concatenated file bytes supplied on binary stdin
+in manifest order. It reuses the staging manifest and SSH route, limits input to
+one MiB, requires an existing `0700` parent, creates the destination exclusively,
+and verifies `0600` file modes and SHA-256 readback. It never overwrites a grant.
+A failed or uncertain delivery must not be retried with consumed authorization.
+The research controller's `research_proposals deliver` consumes its local grant
+before invoking this transport; keys belong neither in ordinary staging nor in
+image contents, command arguments or logs.
+
 Three files, one directory:
 
 ```

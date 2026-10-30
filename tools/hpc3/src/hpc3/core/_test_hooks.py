@@ -17,11 +17,11 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
-import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from typing import IO, Final, Protocol
 
 from platform_core.logging import get_logger
+from platform_core.process_input import process_input
 from typing_extensions import TypedDict
 
 _logger = get_logger("hpc3")
@@ -125,12 +125,8 @@ def _default_run(argv: Sequence[str], *, stdin_bytes: bytes | None = None) -> Co
     Returns:
         The command's exit status and captured streams.
     """
-    if stdin_bytes is None:
-        return _awaited(argv, stdin_source=subprocess.DEVNULL)
-    with tempfile.TemporaryFile() as payload:
-        payload.write(stdin_bytes)
-        payload.seek(0)
-        return _awaited(argv, stdin_source=payload)
+    with process_input(stdin_bytes) as source:
+        return _awaited(argv, stdin_source=source)
 
 
 class LogEventProtocol(Protocol):
