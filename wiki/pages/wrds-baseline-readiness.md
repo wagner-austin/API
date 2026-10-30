@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
+  - "libs/covenant_ml/scripts/research_storage_probe.py"
+  - "libs/covenant_ml/tests/markets/test_research_storage_probe.py"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json"
   - "libs/covenant_ml/src/covenant_ml/markets/research_release.py"
@@ -40,6 +43,9 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
+  "libs/covenant_ml/scripts/research_storage_probe.py": "8dc13973868bdefb3e3cf26c452871ce6d072235"
+  "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "ce083a45f3100c51e049c85eae865fde345c8034"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json": "2ef67b9d8ea85e09cf92c99d7ec56b96b07cb609"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json": "1d1fd48609fe278db5adbd9ded31746c01c94df4"
   "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
@@ -174,6 +180,27 @@ another allocation. Two prelaunch failures remain recorded, including the
 refused older entrypoint pin. This is a synthetic operational measurement,
 not a substantive baseline or a scientific comparison.[^final-rehearsal]
 
+WRDS Cloud also passed encrypted validation-storage jobs `40550023` and
+`40550033` on `wrds-sas46-w` and `wrds-sas34-w`. The existing shared queue closed
+both passed after native accounting, input/runtime verification and verified
+collection. Both authenticated ten files into mode-0700 plaintext directories
+under the scheduler's mode-0755 scratch, measured normal-exit removal, and
+reproduced the HPC3 validation plaintext-manifest digest. Their observation
+files were byte-identical; host-specific receipts and RunRecords differ.
+Resubmitting the completed queue reference returned the same job. Failed job
+`40550007` remains recorded: the initial probe unnecessarily required the parent
+scratch directory to be 0700 and stopped before decryption.[^wrds-native]
+
+This WRDS deployment uses a private Python 3.11.16 runtime, with 488 application
+files compared against six frozen wheels at installation. The native worker
+checks interpreter bytes/version and 61 distribution versions before and after
+each allocation; it does not rehash all installed package files. The probe
+reuses `EvaluatorKeys`, `decrypted_bundle` and shared observations. It establishes
+normal validation-storage execution, not WRDS final-grant scoring, forced-kill
+scratch reclamation, or execution of the HPC3 Apptainer image. The published
+probe passed 4,877 evaluator tests at 100% coverage with typing and guards clean.
+No licensed rows were involved.[^wrds-native]
+
 The forced-kill probe decrypted and verified ten synthetic files in a mode-0700
 directory on `hpc3-22-05`, then intentionally ended native job `58629286` with
 `FAILED`, exit `137:0`. A later allocation, `58630827`, required that same node
@@ -208,10 +235,12 @@ canaries, not protection against the evaluator's administrators.[^key-probe]
 
 [^grant]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `release_final` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/research_release.py`, `write_final_grant` and `consume_final_grant`; `libs/covenant_ml/tests/markets/test_research_release.py`, competing real consumers and failure cases; `libs/covenant_ml/tests/markets/test_research_trial_cli.py`, `test_real_final_worker_needs_neither_journal_nor_long_lived_keys`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_failed_grant_creation_cannot_restore_journal_permission`. Full fleet gate f428dec3-aeb3-4bc4-9b5e-e7f9f3e1acd9 at API 9783dcd84dbc6ba6a5033e05fb1ca6c1085d1f66 passed on Serendipity at 2026-10-30T17:33:05Z: 4,850 tests, 100% coverage, 191 seconds of 300. Earlier acb42784 at 66b17108f passed all tests but failed env-access-banned in the subprocess test; 9783dcd84 uses the existing shared environment reader and passes the complete gate. The authoritative journal and existing numerical evaluator are reused; no native grant transport is claimed by these process tests.
 
-The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cleanup][^grant]
+The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant]
 
-1. Verify encrypted execution on WRDS Cloud and automate the measured
-   cross-host proposer-to-admission handoff through the existing controller.
+1. Automate the measured cross-host proposer-to-admission handoff through the
+   existing controller. Verify WRDS forced-kill scratch reclamation, which the
+   normal-exit measurements do not establish; native final scoring is currently
+   rehearsed on HPC3 only.
 2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
    checksums and calendar coverage, then stage its verified manifest to HPC3.
    Keep final-period evidence confined to the evaluator.
@@ -223,6 +252,8 @@ The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cl
 [^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. This artifact records the runtime build; subsequent queue evidence is in [^rehearsal]. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
 
 [^final-runtime]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json`, frozen source archive, installed wheel readback, native build accounting, image digest, fleet gates and private evidence hashes. Source `85f1d4d75` and tested revision `5ae042ef3` differ only in one test assertion. This is a construction and installation measurement, not a final-scoring execution receipt.
+
+[^wrds-native]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json`, `runtime`, `dataset`, `measurements`, `repeatability`, `preserved_failure`, `verification` and hashed private evidence; `libs/covenant_ml/scripts/research_storage_probe.py`, `main`; `libs/covenant_ml/tests/markets/test_research_storage_probe.py`, real encrypted files and subprocess success/refusal. Queue jobs `836d7d24-ac43-42eb-8e1d-f4723a061532` and `120da295-8f12-4b90-ba0e-a2af14d5d3b6` closed passed on 2026-10-30. Probe publication `bbd989810` passed fleet job `8ed8468c`; its source bytes match the earlier tested snapshot used by both allocations. This session explicitly invoked existing queue ticks for submission and reconciliation.
 
 [^final-rehearsal]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json`, `validation`, `final`, `grant`, `recorded_failures` and hashed private evidence. Queue closure digests are `bd9fcef7219a2d9b4e6840324c41e327a24e8ca1e08b3aff18d0da9e86416139` and `43ba8b73ca203fb5bf6843cacd92f444337516a1fdaa7e96de88395dd806cd86`. The scheduled runner claimed the requests and submitted the final allocation; this session explicitly invoked existing ticks for validation submission and prompt reconciliation. The proposer ran in the existing Colossus sandbox, with its output transported by this session before admission; a fully automated cross-host proposal handoff is not established.
 
