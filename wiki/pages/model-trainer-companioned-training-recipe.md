@@ -16,7 +16,6 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py
   - services/Model-Trainer/src/model_trainer/cli/cartridge_crowd_adapters.py
-  - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_companion_sweep.py": 645ac50af73bf5e238f2e804ca26122b8552c9c2
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_companioned.py": 9cb8dec410c4bb82a4a5dfddb693a46d18a02252
@@ -29,8 +28,8 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_content_lora.py": c025bde31da408347a62197b3d7d6e72ba7f062e
   "services/Model-Trainer/src/model_trainer/cli/cartridge_content_lora_sweep.py": 48e89e20b28aa3aad5e54547a47788c88ee1c7bc
   "services/Model-Trainer/src/model_trainer/cli/cartridge_crowd_adapters.py": be82e631f14401274b743e53ad1cd07c72b2d393
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 305-854. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. The base-LoRA and content-LoRA sweeps lost their inline adapter construction to cli/cartridge_crowd_adapters.py in 6c5a2b293 (board task 83c25b86), which now owns LORA_TRAIN_SEED 53, POOL_SEED_BASE 61 and the pool-teacher-wrap-distil order, so the trait-repair sweep builds the same adapters; its commit says the corpus records are row-for-row what they were, and the module joins source_paths. The other moves are type-only: setup_logging takes LogLevel and LogFormat members in all five sweeps (7db06d411), optimizer is typed OptimizerName in cartridge_content_lora.py (03b337867), and cartridge_varied.py gains companioned_replicates with an explicit seed_stride (d2ac35525). docs/RESEARCH.md was re-read at the epochs line this page quotes (e48 mean -0.240, nine of nine seeds negative), unchanged in substance"
   - "the three sweep pins repinned 2026-09-11 after establishing that their deletions are a MOVE rather than a removal. Each lost 100-150 non-comment lines to cartridge_lora_families.py, whose own docstring records why: the companion-cross arms, the two cell families and the per-family floors were byte-identical between the base-LoRA and content-LoRA sweeps, and two copies of a measurement are two copies of its ARM NAMES -- which is what pairs a run against this page's ladder. The identifiers this page names, train_on and train_composition_lora_invariant, both resolve at HEAD, and all three sweeps still expose measure_grid and main."
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
@@ -75,7 +74,7 @@ from **-45.4% to +44.6%** -- a +0.78 swing on the composed mean against a
 0.049 noise floor, from the grid's tightest cell -- while two-compartment
 retention rises from 62.8% to 78.3% and solo performance costs four
 hundredths of gain. The record is bit-identical across two full-grid
-processes.
+processes.[^history]
 
 ## The grid and the dose curve
 
@@ -83,7 +82,7 @@ Two companion kinds crossed with presence probability and compartment count,
 every cartridge in a cell trained companioned, measured by the same arms and
 controls as [[model-trainer-composition-ceiling]] (untrained-composed
 control, cross-gain relatedness arms, solo-cost axis mandatory), so every
-row below subtracts cleanly against that page's baseline:
+row below subtracts cleanly against that page's baseline:[^history]
 
 | recipe | alone (solo cost) | n2 retention | n4 retention |
 |---|---|---|---|
@@ -101,7 +100,7 @@ company never learns to stand alone (noise -0.68; trained -0.32, and the
 trained-p1.0 artifact's composed arms BEAT its alone arm, a cartridge
 adapted to company). The companion corpus is held out from every
 composition partner and the CLI refuses the overlap, so the robustness is
-generalised, not partner memorisation.
+generalised, not partner memorisation.[^history]
 
 ## What the machinery guarantees
 
@@ -115,7 +114,7 @@ companion machinery included, which is what the bit-identity certificate
 rests on. A cell whose alone arm did not improve on the base carries its
 raw arm means but no retention ratio, because a ratio against a non-gain
 has no reading -- the p=1.0 collapse is a real cell every full grid hits,
-and the first version of the CLI died on it.
+and the first version of the CLI died on it.[^history]
 
 ## Varied-count exposure, refuted at its target
 
@@ -134,7 +133,7 @@ count-decay is CONTENT interference, confirming from the opposite
 direction that content-companionship is the load-bearing ingredient. A
 pool of three same-corpus companions cannot teach content diversity; a
 content-DIVERSE pool is the motivated follow-on, with this record as its
-baseline.
+baseline.[^history]
 
 ## The recipe under seven strangers
 
@@ -153,7 +152,7 @@ erased, where noise-trained cartridges lose -0.39/-0.46 to real
 content. The seventh partner (plant-eco, chosen over the two corpora the
 baseline caught leaking) measured +0.05 cross-gain against a 0.048
 spread -- clean, verified in-run. Dose and kind orderings replicate from
-the n2/n4 grid.
+the n2/n4 grid.[^history]
 
 ## The diverse pool: best recipe, and the decay's cause settled
 
@@ -172,7 +171,7 @@ arc: the n8 composed arm EQUALS its untrained-composed control (+0.2323
 vs +0.2431), so content interference at eight compartments is fully
 trained away and the residual count-decay is STRUCTURAL slot dilution --
 seven 64-slot strangers are 448 foreign positions against 64 own, a cost
-with no content component left for any companionship recipe to remove.
+with no content component left for any companionship recipe to remove.[^history]
 
 ## The scale rung inverts the ceiling
 
@@ -192,7 +191,7 @@ four compartments (+0.44) on medium, and only the crowded-prefix regime
 fails. Depth compounds prefix interference: scale alone COSTS
 many-compartment composition rather than buying it, and the larger-base
 path runs through base-side adaptation. Four-compartment deployment,
-by contrast, is scale-robust at ~55% on both bases.
+by contrast, is scale-robust at ~55% on both bases.[^history]
 
 ## The base learns the crowd, and the two levers stack
 
@@ -218,7 +217,7 @@ n4 sets a new medium best (+59.3%), but real-content composition at n8
 still collapses (-79.4%, composed a full 1.04 below the repaired noise
 control, cell floor 0.53 -- seed-chaotic). Depth amplifies CONTENT
 interference in a way neither lever touches; structure is solved at both
-scales.
+scales.[^history]
 
 ## The objective is the measured quantity: crowd-invariance closes depth
 
@@ -235,7 +234,7 @@ is drawable as target, so no positional shortcut exists and every
 compartment stays live; counts draw one to eight, so the alone case is
 distilled too. The plan rows are pinned equal to their base-LoRA twins
 field for field, by test and by image smoke, so the two records isolate
-exactly the objective.
+exactly the objective.[^history]
 
 At gpt2-medium the depth collapse is repaired and surpassed: diverse n8
 retains +38.1% where the LM objective recorded -79.4% -- clearing its
@@ -245,7 +244,7 @@ both counts, the composed-below-noise-control content gap shrinks from
 1.04 to 0.30, and the alone arms RISE, so the objective is free at solo
 -- the count-one anchor working as designed. Both interference
 mechanisms the arc named now have a working lever, and both levers are
-base-side: the cartridges themselves need nothing.
+base-side: the cartridges themselves need nothing.[^history]
 
 ## The ladder verdict: the collapse is a mid-depth valley
 
@@ -272,7 +271,7 @@ invariance objective's remaining margin there is plain cartridges
 ladder-wide fact that it collapses nowhere. The n8
 composed-below-noise-control content gap reads ~0.21 under both
 objectives at 48 layers, so depth's content amplification at 24 layers
-(1.04) does not extrapolate either direction.
+(1.04) does not extrapolate either direction.[^history]
 
 ## What this binds, and what is still open
 
@@ -346,5 +345,7 @@ compartmental question belongs to base adaptation or retrieval. Still
 open, filed rather than implied: the mechanism of the mid-depth valley,
 the remaining 0.30 content gap at medium n8, the budget slot policy,
 and the unswept pool size K=3 (the sweep family's registered
-frozen-by-copy knob, a gpt2-scale question). The RESEARCH.md entry
-under `mi` carries all the run summaries and the extension list.
+frozen-by-copy knob, a gpt2-scale question). The immutable investigation
+record retains the run summaries and extension list.[^history]
+
+[^history]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L305-L854 § dated investigation record, lines 305–854 [synthesis] — run identities, controls, observations and uncertainty limits recorded before index consolidation. The detailed record is historical; later corrections remain on this page.

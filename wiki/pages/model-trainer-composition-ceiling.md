@@ -9,13 +9,12 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/cartridge_composition_sweep.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py
   - services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py
-  - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/cartridge_composition_sweep.py": 281190e9df51e93f7d305c8f0acba487623bb8d6
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_measurement.py": 944ff9cfe755ed0d0968fed698d20d3852d50bc0
   "services/Model-Trainer/src/model_trainer/core/services/model/cartridge_plans.py": 8311628f7d7c217293518e7d77a12a0a486c0889
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 261-304. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: cartridge_composition_sweep.py changed only by 7db06d411 (setup_logging with LogLevel and LogFormat members). cartridge_measurement.py's composed_replicates now takes an explicit seed_stride, the plan's seed count, so the trait sweep can measure in seed blocks (d2ac35525, board task 83c25b86); the k-th other cartridge still draws from seed + (k + 1) * seed_stride, and its docstring records that every recorded sweep passed len(seeds), which is what the offsets always were, so no number on this page moves. docs/RESEARCH.md still carries the run summaries under mi"
   - "measured 2026-09-04 on austinpc, RTX 3090 Ti, driver 591.86, HF_HUB_OFFLINE=1"
   - "v2 record bit-identical across two processes: sha256 aa61330b9692f4c4bc13b410f4bf1874 (truncated), plan label gpt2-compartments-gpt2-w256-s4-e12-lr0.01-n2.4.8-f64-b512-seeds7.8.9"
@@ -41,7 +40,7 @@ policy is 62.8% at two compartments, negative (-45.4%) at four, and erased
 roster, and n8 erases the gain under both policies. The measurement is
 `cartridge_composition_sweep` (source pinned above) and the numbers carry a
 bit-identity certificate: two separate processes produced sha256-identical
-records.
+records.[^history]
 
 ## The cost decomposes, and the attribution flips with scale
 
@@ -53,7 +52,7 @@ trained strangers costing more than noise (-0.29 trained vs -0.12 untrained
 at fixed-n4). Corpus identity modulates amplitude (n2 ranges 59-73% across
 three different partner corpora) but never the shape, and a corpus's
 hostility alone does not predict its composition damage: the most hostile
-cross-gain corpus (-0.42) composed as benignly at n2 as the friendliest.
+cross-gain corpus (-0.42) composed as benignly at n2 as the friendliest.[^history]
 
 ## The run caught two of its own artifacts
 
@@ -67,7 +66,7 @@ compartments is measured, never assumed. The second artifact was
 operational: MSYS path conversion rewrites only the first `/c/...` path in a
 comma-joined argument, and the mangled remainder reached the corpus reader
 as a directory that globs empty, which the reader refused loudly rather
-than training on nothing.
+than training on nothing.[^history]
 
 ## What this binds, and the way past it, which has since been measured
 
@@ -85,5 +84,8 @@ companion pool measured on 2026-09-05 is the recipe of record (n4 +55.5%,
 n8 +28.0% on gpt2), and the scale ladder that followed finds the
 eight-compartment penalty is a mid-depth valley that is gone at 48 layers.
 Read that page for the current operating point rather than this sentence,
-which was last brought up to date on 2026-09-14.
-`docs/RESEARCH.md` carries every run summary under the `mi` project.
+which was last brought up to date on 2026-09-14.[^recipe]
+The dated run summaries remain in the immutable investigation record.[^history]
+
+[^history]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L261-L304 § dated investigation record, lines 261–304 [synthesis] — run identities, controls, observations and uncertainty limits recorded before index consolidation. The detailed record is historical; later corrections remain on this page.
+[^recipe]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L305-L854 § companioned training and scale ladder [synthesis] — subsequent improvements over this page's naive composition baseline.

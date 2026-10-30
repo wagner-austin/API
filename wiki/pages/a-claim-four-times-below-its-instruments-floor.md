@@ -5,15 +5,13 @@ related:
   - "[[model-trainer-trait-composition-instrument]]"
   - "[[code-style-qlora-terminates-worse-conforms-better]]"
 source_paths:
-  - docs/RESEARCH.md
   - tools/hpc3/runs/qa-full-wiki-gpt2-v52.json
-  - tools/hpc3/runs/ledger.jsonl
 source_git_blobs:
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
   "tools/hpc3/runs/qa-full-wiki-gpt2-v52.json": fa3fa9a9a37c9530a9b5e7648c0ba329f1feb913
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 1015-1216. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1. docs/RESEARCH.md moved from blob 57567069 by six commits (b2c82ca2a, 1c11a6da2, 82dd38dc5, 8d71b732c, c0c80420b, 24b4ad65b). One moves what [^1] cites: 1c11a6da2 registered cartridge-qa as its own project through hpc3-register, so the `cartridge_qa_benchmark` entry under `mi` is now the `cartridge-qa` project section, and [^1] names it that way. 82dd38dc5 and 8d71b732c rewrote that section's cluster-path bullet for the v56 run documents and their 2026-10-05 submission, not the paragraphs [^1] summarises: the 0 of 571 registration gap, the a98769b5 and dc5f2408 retraction, require_resolvable_question_set and the 9b011256 guard rule corrected in bd4dfb97 all still read as cited. The ledger still holds exactly the four rows [^3] names, re-read in the hub checkout's 16064-row ledger, with no later row on any of the four jobs"
-  - "`tools/hpc3/runs/ledger.jsonl` is in source_paths but NOT in source_git_blobs, and that is deliberate rather than an omission the all-or-nothing rule missed: `git ls-files --error-unmatch` reports it untracked, so it is an untracked artifact and exempt by nature. Pinning it would also be the wrong instrument even if it were tracked -- it is append-only and grows on every cluster submission, so its hash would go red within hours for reasons unrelated to any claim on this page. Read against API HEAD 15562dbb."
+  - "The ledger is machine-local and absent from the published wiki mirror. Its 2026-10-08 reading remains historical provenance, not a source file a fresh checkout can open; later failed/preempted job outcomes are retained by the immutable investigation record."
   - "THE 24-ITEM RUN IS NOT A SOURCE_PATH AND CANNOT BE ONE. It is recorded only in the closure of agent-board task 1fc5afed by session opus-weight-injection-0902, which is a self-report on an append-only coordination surface with no artifact behind it and no mechanism for marking itself superseded. It is cited on this page as a second under-powered reading, never as a result."
   - "This page was first written in the `personal` wiki on 2026-09-11 and moved here the same day. The move is the point: `personal` is a pdf-corvis wiki, which pins PDFs, and every factual claim here is about files in this repository. Measured before moving -- 0 of the personal wiki's pages pin a repo file, so its citations of docs/RESEARCH.md were paths in a footnote with nothing detecting a change."
 fact_checked: "2026-10-08"
@@ -54,10 +52,10 @@ At the same rungs, cartridge against the **un-augmented base** moved 8.7 and
 > *Cartridges improve the model over the un-augmented base from 774M* stands.
 > *Cartridges beat retrieval* does not, and is withdrawn rather than softened.[^1]
 
-Two claims from one run, one supportable and one not, is the ordinary case.
+Two claims from this run have different evidential support.[^1]
 Retracting the whole run would have discarded a real result; softening the
 unsupportable half to "suggests" would have kept an unreachable claim in
-circulation wearing a hedge.
+circulation wearing a hedge.[^1]
 
 ## The same question was also answered in the opposite direction
 
@@ -103,20 +101,18 @@ or a staged corpus.
 Nothing checked. The `research-registration` guard rule now fails `make lint` on
 any entry point that builds a `RunRecord` and is named nowhere in the index.[^1]
 
-## The re-run, and what is not yet known
+## Replacement measurements remain separate from the retracted claim
 
-A replacement measurement is registered: **3,740 items** over the full 841-page
-corpus, a resolvable floor of **0.00134** against a declared effect of **0.02**,
-across base, cartridge, oracle, BM25, dense, fused, expanded, reranked and
-long-context arms, three seeds, on one A100.[^2] Its own `why` field reads
-`the-retracted-headline-re-run-on-an-instrument-that-can-resolve-it`, and its
-`supersedes` field names the 32-item runs.
+The v52 run document registered the replacement measurement with a declared
+0.02 effect, a larger item set and explicit `why` / `supersedes` fields.[^2]
+It was a plan, not a successful result. The historical submission account later
+records failed v50 and v51 jobs and a preempted v52 attempt; those earlier
+submissions produced no comparison to rehabilitate the retracted claim.[^3]
 
-**Its results are not in the committed record.** Four jobs were submitted on
-2026-09-10 and their artifacts are on cluster storage under `/pub/wagnera3`, so
-whether the properly-powered instrument reproduces either direction is, as of
-this page's date, unknown here.[^3] The question is open, and that is a
-different state from either of the answers previously given for it.
+The October 5 v56 plan used a newly staged full-wiki snapshot and explicit
+cell names. Its historical submission entry said no cell had yet produced a
+record. Current outcomes must be read from the committed records and queue,
+not inferred from either dated submission narrative.[^3]
 
 ## Scope
 
@@ -128,7 +124,7 @@ different state from either of the answers previously given for it.
 - Nothing here evaluates whether cartridges beat retrieval. It is about what the
   runs to date could and could not establish.
 
-[^1]: `docs/RESEARCH.md` § "`cartridge-qa` — can the model USE what the cartridge carries, and does it beat retrieval" (the `cartridge_qa_benchmark` entry under `mi` until 2026-10-05). Records the
+[^1]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1015-L1216 § "`cartridge-qa` — can the model USE what the cartridge carries, and does it beat retrieval" (the `cartridge_qa_benchmark` entry under `mi` until 2026-10-05). Records the
     retraction (commits `a98769b5`, `dc5f2408`, dated 2026-09-09), the 0.0521
     and 0.0417 differences over 32 items, the five-discordant-pair floor, the
     surviving 8.7 and 8.3 item gains against base, the
@@ -141,12 +137,7 @@ different state from either of the answers previously given for it.
     `gpt2-full-wiki-qa`, corpus `me-wiki-full-841-pages` digest `dccd3375f54d`,
     3,740 items, resolvable floor 0.00134, declared effect 0.02, seeds 7/8/9,
     A100, and the `why` / `supersedes` fields quoted above.
-[^3]: `tools/hpc3/runs/ledger.jsonl` — four rows naming
-    `mi.qa-full-wiki-gpt2-v50` (twice), `-v51` and `-v52`, jobs 55898417,
-    55898551, 55901956 and 55914185, submitted 2026-09-10, each writing to
-    `/pub/wagnera3/mi/cartridge/results/`. No terminal state, exit code or
-    result is recorded in those rows. Untracked and therefore unpinned; see
-    `provenance:`.
+[^3]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1169-L1214 § "The cluster path", "v55 never ran" and "The earlier full-wiki submissions never produced a number" — dated corpus/image provenance, v56 submission and earlier failures/preemption; no current ledger access is claimed.
 [^4]: Agent-board task `1fc5afed`, closure by session
     `opus-weight-injection-0902`: 24 held-out items over the 12 public me-wiki
     pages, gpt2, three seeds, RTX 3090 Ti — base 0.5417, base+cartridge 0.6389

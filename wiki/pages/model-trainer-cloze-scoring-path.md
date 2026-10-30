@@ -14,7 +14,6 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/cli/score_run.py
   - services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py
   - services/Model-Trainer/src/model_trainer/worker/cloze_job.py
-  - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cloze/score.py": 8c6dc9f6e0575ef110b3b7ddccb11ce778591fe5
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
@@ -22,8 +21,8 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/cli/score_run.py": 7da2bc858f6ed213b0e19d54deabcd4915170697
   "services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py": 4d2eedae3cb07a886317d9b1618bd005f7b49c43
   "services/Model-Trainer/src/model_trainer/worker/cloze_job.py": 5d914f43283c0c04cea638cfa73a77153f5a53d9
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 1608-1762. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section under mi. The floor section [^research] cites, its Provenance: bullet and its generation table, is untouched"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the floor section, its Provenance bullet and generation table that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05"
@@ -105,7 +104,7 @@ compared against, since records from different experiments refuse to compare
 the difference you expect before reading one —
 [[a-claim-four-times-below-its-instruments-floor]] is what happens otherwise.[^research]
 
-[^research]: `docs/RESEARCH.md` § "`floor` — cloze floor scoring" (the `Provenance:` bullet and the generation table).
+[^research]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1608-L1762 § "`floor` — cloze floor scoring" (the `Provenance:` bullet and the generation table).
 [^score]: `services/Model-Trainer/src/model_trainer/core/services/model/cloze/score.py` / `score_cloze_items`, `sequence_nll` (`MIN_SCOREABLE_TOKENS`), and the module docstring.
 [^tie]: `services/Model-Trainer/src/model_trainer/core/contracts/cloze.py` / `answer_wins_outright`.
 [^jobs]: `services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py` and `services/Model-Trainer/src/model_trainer/worker/cloze_job.py` — each calls `_test_hooks.apply_determinism_hook(remove_split_k=True, math_attention=True)`.

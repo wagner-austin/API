@@ -24,8 +24,9 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/queue/rq_adapter.py": 09a397ac1ad9036bde1c5889f8d1214c6d7b0957
   "services/Model-Trainer/src/model_trainer/core/services/container.py": e3165ede22b989b0679c5b8b3122a95785e107fc
   "services/Model-Trainer/src/model_trainer/cluster/entry.py": 67c8783d843179348bfdcd6b59641fa4cbab6a27
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
+  "docs/RESEARCH.md": 62e1bb016bff74d3e3523e530ba740b36b4a2e13
 provenance:
+  - "2026-10-30: checked the compact registry: all four project sections and the full qualified producing-command list remain. Only the registry pin changes; all six implementation pins match HEAD."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: Model-Trainer's pyproject.toml changed only its pytest addopts, --dist loadgroup instead of loadscope with the comment saying why (06956410e, MCPs board task 2f90d785), and the [tool.poetry.scripts] block this page cites at :54-59 is unchanged on those lines. docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section and added cartridge_trait_repair_sweep to the mi runs list; the mi Runs: bullet [^research] cites, and the floor, mi-cu128 and cartridge-qa projects this page names, all still stand"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the mi section and its Runs bullet that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05; the CLI module count is a listing of src/model_trainer/cli/ (42 .py files besides __init__, including report and hook modules that are not entry points)"
@@ -98,4 +99,4 @@ indexed from [[corpus-attachment-program]].
 [^rq]: `services/Model-Trainer/src/model_trainer/core/services/queue/rq_adapter.py` / `RQEnqueuer.enqueue_train`, `enqueue_eval`, `enqueue_tokenizer`, `enqueue_cloze`, `enqueue_baseline_cloze`, `enqueue_score`, `enqueue_generate`, `enqueue_chat`.
 [^container]: `services/Model-Trainer/src/model_trainer/core/services/container.py` / `_create_model_registry` (five registrations, `UnavailableBackend("llama")`, `UnavailableBackend("qwen")`), `_create_enqueuer` ("RQ queue must be trainer per platform alignment").
 [^cluster]: `services/Model-Trainer/src/model_trainer/cluster/entry.py` — module docstring, and `_resume_for_execution`.
-[^research]: `docs/RESEARCH.md` § "`mi` — Model-Trainer probes and benchmarks", the `Runs:` bullet.
+[^research]: `docs/RESEARCH.md` § "`mi` — Model-Trainer probes and benchmarks", the `Runs:` command list and registered project headings.

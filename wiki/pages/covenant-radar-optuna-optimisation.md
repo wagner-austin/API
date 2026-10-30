@@ -18,7 +18,6 @@ source_paths:
   - services/covenant-radar-api/scripts/optimize/history.py
   - libs/platform_core/src/platform_core/determinism_record.py
   - libs/covenant_ml/src/covenant_ml/optimizer/search_spaces/config.py
-  - docs/RESEARCH.md
 source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/worker/optimize_job.py": f301bd2b9e23ec95f39fde30497a7d281ad48cdf
   "services/covenant-radar-api/src/covenant_radar_api/worker/_optimize_common.py": 68c3a7eaa7a8a72b0249cfa0764e82f86d96b933
@@ -30,8 +29,8 @@ source_git_blobs:
   "services/covenant-radar-api/scripts/optimize/history.py": f7eefd5f3fa9bc64b0c8e673e37a203ab06bf0f6
   "libs/platform_core/src/platform_core/determinism_record.py": 1b098cb9098ce0db9079a87f3e3e9b39dd00f250
   "libs/covenant_ml/src/covenant_ml/optimizer/search_spaces/config.py": 7aef2d032b17daaa8b98c00cf5eb4487b2c7373d
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 1406-1530. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section under mi. The cleargbm section this page cites, including the Provenance: bullet beginning that scripts/optimize HAS pinned since 2026-08-29, is untouched"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the cleargbm section and its Provenance bullet that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "measured 2026-10-05 on austinpc: ~/PROJECTS/API/services/covenant-radar-api/models/optimization_history.jsonl is 3,068 lines, all 3,068 carry \"fingerprint\":null, last modified 2026-08-28 02:25; no *.runrecords.jsonl file exists beside it. The file is machine-local and untracked, so this reading is not reproducible from the repository."
@@ -68,7 +67,8 @@ and nothing about what it ran on.
 
 ## Door 2: `python -m scripts.optimize` (CLI)
 
-This is the door `docs/RESEARCH.md` registers for the `cleargbm` project.[^research]
+The research index registers this CLI under `cleargbm`; the historical
+registration records its provenance limits.[^research]
 Each completed run appends one row to `optimization_history.jsonl` and one
 `RunRecord` to the sibling `*.runrecords.jsonl`:[^runners]
 
@@ -83,9 +83,9 @@ Each completed run appends one row to `optimization_history.jsonl` and one
 - a `null`-fingerprint row is never turned into a record: `optimization_run_record`
   raises rather than synthesise one.[^records]
 
-On disk, **all 3,068 history rows are still `null` and no records file
-exists** — the capture landed 2026-08-28 and the CLI has not completed a run
-on this machine since.[^disk]
+The dated workstation reading on **2026-10-05** found 3,068 history rows,
+all with `null` fingerprints, and no records file. It is a historical local
+observation, not a query of the current fleet.[^disk]
 
 ## The pin the record denies
 
@@ -101,9 +101,9 @@ under a comment written the day before the pin ("this entry point pins
 nothing").[^runners][^unpinned] So the first fingerprinted run will record a
 single-threaded process as unpinned, and `compare_configurations` will treat
 it as differing on the `determinism` axis from every honestly-pinned
-`covenant_ml` benchmark. `docs/RESEARCH.md`'s `cleargbm` entry says "the
-fingerprint a run writes now names the pinned stack"; the code says
-otherwise.[^research] `run_records.py`'s module docstring carries the same
+`covenant_ml` benchmark. The historical `cleargbm` entry incorrectly said "the
+fingerprint a run writes now names the pinned stack"; this code disproves
+that sentence, and the compact index now links this correction.[^research][^runners] `run_records.py`'s module docstring carries the same
 stale "still pins nothing".[^records]
 
 The repair is to thread the record from `run` into `_run_backend_with_progress`
@@ -113,7 +113,7 @@ instead of constructing one; nothing has to be invented.[^main][^runners]
 [^split]: `libs/covenant_ml/src/covenant_ml/optimizer/search_spaces/config.py` / `make_default_optimization_config` — `random_state: int = 42`, `"val_ratio": 0.15`, `"test_ratio": 0.15`; called by `services/covenant-radar-api/src/covenant_radar_api/worker/_optimize_common.py` / `build_optimization_config`.
 [^route]: `services/covenant-radar-api/src/covenant_radar_api/api/routes/ml_analysis.py` / `_register_optimize`.
 [^save]: `services/covenant-radar-api/src/covenant_radar_api/worker/_optimize_common.py` / `save_optimization_results`.
-[^research]: `docs/RESEARCH.md` § "`cleargbm` — ClearGBM benchmarks and covenant-radar optimisation", the `Provenance:` bullet beginning "`scripts/optimize` HAS pinned since 2026-08-29".
+[^research]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1406-L1530 § "`cleargbm` — ClearGBM benchmarks and covenant-radar optimisation", the `Provenance:` bullet beginning "`scripts/optimize` HAS pinned since 2026-08-29".
 [^runners]: `services/covenant-radar-api/scripts/optimize/_runners.py:156` — `benchmark_fingerprint(determinism_record(UNPINNED_STACK, {}), config_env.get_env)`, then `history.append(entry)` and `append_optimization_record(history.path, entry)`.
 [^history]: `services/covenant-radar-api/scripts/optimize/history.py` / `UnifiedHistoryEntry`, `_require_fingerprint_or_null`.
 [^records]: `services/covenant-radar-api/scripts/optimize/run_records.py` / `OPTIMIZATION_EXPERIMENT`, `optimization_observations`, `optimization_run_record`, and the module docstring's "WHAT THIS DOES NOT FIX" paragraph.

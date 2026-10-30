@@ -11,13 +11,12 @@ source_paths:
   - services/Model-Trainer/src/model_trainer/core/run_fingerprint.py
   - libs/platform_core/src/platform_core/comparability.py
   - libs/platform_core/src/platform_core/run_record.py
-  - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/run_fingerprint.py": a89531ba9d2a08d0f0705850333bd982d9565ca8
   "libs/platform_core/src/platform_core/comparability.py": eec82a133f44877523c06c45a182bb6cf7a21741
   "libs/platform_core/src/platform_core/run_record.py": 7d3ca55d81674311342b179cbf476a3d61b14dd6
-  "docs/RESEARCH.md": 0a08b4f35dd2dc12852613006ee76f47a3e06ba0
 provenance:
+  - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 77-1762. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: run_fingerprint.py now names the program the driver version is read from, NVIDIA_SMI = nvidia-smi, and passes it to cuda_driver_version (655125598), which bounds its own query; driver_version is still read only on cuda and is NO_GPU otherwise, as the table below says. docs/RESEARCH.md changed only by 24b4ad65b, the cartridge_trait_sweep section; the six-axes sentence and both bullets [^research] cites are unchanged"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the mi and floor sections and the bullets this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
   - "read from code at API commit 2e0511ee7 on 2026-10-05"
@@ -28,10 +27,9 @@ hubs: [services, libs]
 
 # RunRecord and RunFingerprint as Model-Trainer emits them
 
-`docs/RESEARCH.md` calls Model-Trainer's records "the only surface here that
-carries all six axes".[^research] This page is what those axes are, where
-Model-Trainer fills them, and what the comparability layer does with them —
-the reference a new research entry point should copy.
+Model-Trainer emits the shared record with six configuration axes.[^mt][^fp]
+This page describes where it fills them and how the comparability layer uses
+them. Reuse the existing writer when adding a research entry point.
 
 ## The record
 
@@ -103,7 +101,7 @@ by eye until the baseline was re-scored under the campaign's name.[^research]
 **Choose the experiment name for what you will compare against, not for the
 command that produced it.**
 
-[^research]: `docs/RESEARCH.md` § "`mi` — Model-Trainer probes and benchmarks" (`Provenance:` bullet) and § "`floor` — cloze floor scoring" (the bullet beginning "The finding was real and not instrumented until 2026-09-13").
+[^research]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L77-L1762 § "`mi` — Model-Trainer probes and benchmarks" (`Provenance:` bullet) and § "`floor` — cloze floor scoring" (the bullet beginning "The finding was real and not instrumented until 2026-09-13").
 [^rr]: `libs/platform_core/src/platform_core/run_record.py` / `RunRecord`, `Observation`, `compare_run_records`.
 [^fp]: `libs/platform_core/src/platform_core/comparability.py` / `RunFingerprint` (docstring).
 [^mt]: `services/Model-Trainer/src/model_trainer/core/run_fingerprint.py` / `capture_run_fingerprint`, `FINGERPRINT_DISTRIBUTIONS`, `NO_GPU`, and the module docstring.
