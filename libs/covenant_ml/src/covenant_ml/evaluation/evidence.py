@@ -20,6 +20,14 @@ def require_evidence_filename(value: str) -> str:
     return value
 
 
+def require_evidence_path(directory: Path, name: str) -> Path:
+    """Resolve a safe sibling path, refusing symlinks outside its evidence directory."""
+    path = directory / require_evidence_filename(name)
+    if path.resolve().parent != directory.resolve():
+        raise ValueError("WRDS_DATA_DRIFT: evidence symlink leaves the manifest directory")
+    return path
+
+
 def read_evidence(directory: Path, name: str, expected: str) -> bytes:
     """Read once and verify precisely the bytes consumed.
 
@@ -35,9 +43,7 @@ def read_evidence(directory: Path, name: str, expected: str) -> bytes:
         ValueError: WRDS_DATA_DRIFT for changed or escaping evidence.
         OSError: Missing or unreadable evidence.
     """
-    path = directory / name
-    if path.resolve().parent != directory.resolve():
-        raise ValueError("WRDS_DATA_DRIFT: evidence symlink leaves the manifest directory")
+    path = require_evidence_path(directory, name)
     payload = path.read_bytes()
     if hashlib.sha256(payload).hexdigest() != expected:
         raise ValueError(f"WRDS_DATA_DRIFT: {name} differs from the extract manifest")
