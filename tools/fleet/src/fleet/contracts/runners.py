@@ -75,7 +75,8 @@ class FileAsset(TypedDict):
     Attributes:
         path: Absolute path on the host.
         sha256: Content pin for a file whose exact bytes are load-bearing
-            (the RustedWarfareBot provenance jar), or ``None`` for a path
+            (RustedWarfareBot's provenance jar was one until MCPs board task
+            faec98a5 dropped it), or ``None`` for a path
             whose presence is the whole requirement. Explicitly null rather
             than absent -- an unpinned asset is a decision, not an oversight.
         writable: Whether runner jobs write under it (``/data``). Presence
@@ -85,9 +86,9 @@ class FileAsset(TypedDict):
         reason: One sentence naming the job class that needs it. The audit
             prints it beside a drift line so the reader learns what breaks
             without opening this file.
-        manual: True when the asset can never be fetched by a script -- the
-            licensed game tree, which must not enter the repo, its caches,
-            or any hosted VM. ``render`` emits these as a loud REQUIRED
+        manual: True when the asset can never be fetched by a script -- a
+            licensed file, such as the game tree lavender once declared,
+            which must not enter the repo, its caches, or any hosted VM. ``render`` emits these as a loud REQUIRED
             MANUAL STEP instead of a command.
         provision_command: The exact shell command that creates the asset on
             a new host, for an asset that is neither manual nor a writable
