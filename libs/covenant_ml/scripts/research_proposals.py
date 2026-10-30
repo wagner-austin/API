@@ -1,4 +1,10 @@
-"""Admit validation proposals under a frozen policy and inspect durable attempts."""
+"""Admit validation proposals under a frozen policy and inspect durable attempts.
+
+Every operation here is the evaluator's: a proposer's program runs only inside
+the isolated process boundary, whose output reaches ``propose`` as a file. The
+``select`` operation seals admission on one completed attempt and binds its
+final manifest; the final-period run itself is ``research_trial --ledger``.
+"""
 
 from __future__ import annotations
 
@@ -11,7 +17,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 
 def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) -> int:
-    """Initialize or inspect the journal, or record one validation proposal.
+    """Initialize or inspect the journal, record a proposal, run it or select it.
 
     Args:
         argv: Explicit arguments or process arguments.
@@ -29,6 +35,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.markets import _test_hooks
     from covenant_ml.markets.research_cluster import decode_research_cluster
     from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
+    from covenant_ml.markets.research_final import select_candidate
     from covenant_ml.markets.research_journal import (
         admit_proposal,
         encode_research_attempt,
@@ -52,6 +59,9 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         execution.add_argument("--trial", required=True, type=Path)
         execution.add_argument("--cluster", required=True, type=Path)
         execution.add_argument("--directory", required=True, type=Path)
+    select = commands.add_parser("select")
+    select.add_argument("--trial", required=True, type=Path)
+    select.add_argument("--final-manifest", required=True, type=Path)
     args = parser.parse_args(argv)
     action: str = args.action
     policy_path: Path = args.policy
@@ -76,14 +86,18 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
             code = 2
     else:
         trial_path: Path = args.trial
-        cluster_path: Path = args.cluster
-        directory: Path = args.directory
         trial = decode_research_trial(read_document(trial_path))
         if trial["policy"] != policy:
             raise ValueError("RESEARCH_EXECUTION_REQUEST: trial policy differs from journal")
-        cluster = decode_research_cluster(read_document(cluster_path))
-        operation = submit_attempt if action == "submit" else reconcile_attempt
-        attempts = (operation(ledger_path, trial, cluster, directory.resolve()),)
+        if action == "select":
+            final_manifest: Path = args.final_manifest
+            attempts = (select_candidate(ledger_path, trial, final_manifest),)
+        else:
+            cluster_path: Path = args.cluster
+            directory: Path = args.directory
+            cluster = decode_research_cluster(read_document(cluster_path))
+            operation = submit_attempt if action == "submit" else reconcile_attempt
+            attempts = (operation(ledger_path, trial, cluster, directory.resolve()),)
     report: JSONObject = {
         "policy_digest": research_policy_digest(policy),
         "attempts": [encode_research_attempt(row) for row in attempts],
