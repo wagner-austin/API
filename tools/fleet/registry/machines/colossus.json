@@ -1,7 +1,7 @@
 {
   "role": "worker",
   "platform": "linux",
-  "user": "user",
+  "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
   "duties": [],
@@ -21,10 +21,10 @@
   "boot": {
     "units": []
   },
-  "notes": "INSTALLED WITH NIXOS 2026-10-30 by the fleet's netboot install (MCPs board task 7c8cb3e2, arm e0b67f26), checked in at 03:58:52Z and adopted at 100.111.149.33 at 04:00:41Z. Measured over ssh as user just after 04:00:41Z: NixOS 26.05.20261025.1f607aa running nixos-system-colossus, Secure Boot enabled in user mode with Microsoft's and the fleet's keys, tag:corvis-node, docker 29.9.1 and g++ 15.3.0. A dispatch worker since 2026-10-09 (board task 28c43011) with the fleet test database; its Arc Pro B60 is not a CUDA device, so gpu stays null. Its Ubuntu install also held TankPit's game host and a hand-made llama-server unit; their files are on emerald at /srv/keep/colossus (MCPs board task 7c8cb3e2).",
+  "notes": "INSTALLED WITH NIXOS 2026-10-30 by the fleet's netboot install (MCPs board task 7c8cb3e2, arm e0b67f26), checked in at 03:58:52Z and adopted at 100.111.149.33 at 04:00:41Z. Its account is corvis, the fleet's one account, since MCPs board task c09d4d29; the install had made the Ubuntu install's user, which the hub's reimage job could not reach. Measured over ssh as user just after 04:00:41Z: NixOS 26.05.20261025.1f607aa running nixos-system-colossus, Secure Boot enabled in user mode with Microsoft's and the fleet's keys, tag:corvis-node, docker 29.9.1 and g++ 15.3.0. A dispatch worker since 2026-10-09 (board task 28c43011) with the fleet test database; its Arc Pro B60 is not a CUDA device, so gpu stays null. Its Ubuntu install also held TankPit's game host and a hand-made llama-server unit; their files are on emerald at /srv/keep/colossus (MCPs board task 7c8cb3e2).",
   "dispatch": {
     "held": null,
-    "stage_root": "/home/user/fleet/stage",
+    "stage_root": "/home/corvis/fleet/stage",
     "logical_cores": 12,
     "ram_gb": 31.3,
     "gpu": null,
