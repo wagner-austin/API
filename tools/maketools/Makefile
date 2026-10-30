@@ -8,7 +8,7 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) scripts/run.py venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -22,7 +22,7 @@ lint:
 # scoped cleanup; see src/maketools/test_run.py.
 test:
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) scripts/run.py test
 
 # Every package's check runs under the five-minute budget (MCPs board task
@@ -63,5 +63,5 @@ lift-refresh:
 # board task 90c135ac). --durations=0 prints each case's time in the fleet
 # log, which is where a slow image build shows up by service.
 execution:
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) scripts/run.py test --host-execution --no-cov --dist load --durations=0

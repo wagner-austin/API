@@ -107,7 +107,7 @@ def test_every_service_deploy_asks_for_a_passed_deploy_run_at_head() -> None:
         "make -C ../maketools execution"
     ]
     assert _recipe("tools/maketools/Makefile", "execution") == [
-        "poetry sync --with dev",
+        "poetry sync --no-cache --with dev",
         "$(PYTHON) scripts/run.py test --host-execution --no-cov --dist load --durations=0",
     ]
 
@@ -117,7 +117,7 @@ def test_the_execution_project_runs_tools_fleet_host_cases() -> None:
     assert "\n_check-unbudgeted: lint test\n" in makefile.replace("\r\n", "\n")
     assert _recipe("tools/fleet-execution/Makefile", "test") == ["make -C ../fleet execution"]
     assert _recipe("tools/fleet/Makefile", "execution") == [
-        "poetry sync --with dev",
+        "poetry sync --no-cache --with dev",
         "$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov",
     ]
 
