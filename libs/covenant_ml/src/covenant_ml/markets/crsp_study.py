@@ -325,6 +325,12 @@ def run_crsp_validation(
     return CrspValidation(scored, tuple(folds), series, _comparisons(series, protocol, confidence))
 
 
+def _net_returns(periods: tuple[CrspPeriod, ...]) -> NDArray[np.float64]:
+    """Collect one series' monthly net returns in window order."""
+    values: list[float] = [period.net_return for period in periods]
+    return np.asarray(values, dtype=np.float64)
+
+
 def _comparisons(
     series: tuple[CrspSeries, ...], protocol: CrspProtocol, confidence: float
 ) -> tuple[PairedComparison, ...]:
@@ -341,17 +347,14 @@ def _comparisons(
     primary = protocol["cost_bps"][0]
     at_primary = {item.arm: item.periods for item in series if item.cost_bps == primary}
     reference = at_primary[MOMENTUM]
-    months: NDArray[np.int64] = np.asarray(
-        [crsp_month(period.window.decision) for period in reference], dtype=np.int64
-    )
-    baseline: NDArray[np.float64] = np.asarray(
-        [period.net_return for period in reference], dtype=np.float64
-    )
+    ordinals: list[int] = [crsp_month(period.window.decision) for period in reference]
+    months: NDArray[np.int64] = np.asarray(ordinals, dtype=np.int64)
+    baseline = _net_returns(reference)
     return tuple(
         compare_moving_block(
             arm,
             MOMENTUM,
-            np.asarray([period.net_return for period in periods], dtype=np.float64),
+            _net_returns(periods),
             baseline,
             months,
             months,
