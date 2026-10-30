@@ -1,0 +1,145 @@
+{
+  "kind": "wrds-native-encrypted-storage-rehearsal-v1",
+  "observed_date": "2026-10-30",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "runtime_source_commit": "85f1d4d7521d4a189836f8ecca805f39c5c366df",
+  "probe_tested_commit": "a1fff6307829ef5237321471b3bfe26329136c5a",
+  "probe_source_blob": "8dc13973868bdefb3e3cf26c452871ce6d072235",
+  "probe_sha256": "558147096bc778f4e426aa4f5826f2979a233882b554e1abf6d07b0d42ac69e3",
+  "controller_python": "/home/corvis/research-control/wrds-final-85f1d4d75/bin/python",
+  "runtime": {
+    "python": "/home/uci/awagner14/research-runtime-final-85f1d4d75/cpython-3.11.16-linux-x86_64-gnu/bin/python3.11",
+    "python_sha256": "e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b",
+    "python_version": "3.11.16",
+    "installed_distributions": 61,
+    "installed_first_party_files_verified": 488,
+    "archive_sha256": "be709e89739559f7b73ff337223f957cb83ddd270f647348f2786b8705fab39b",
+    "installed_wheel_sha256": {
+      "cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "covenant_ml-0.1.0-py3-none-any.whl": "a8c5cbcdefb3df4ac32cf3e6ec8c1e1dac9c03d23aad8f400cbc81c6f2b46ade",
+      "platform_core-0.1.0-py3-none-any.whl": "e7f98a38ba9c5c794ab7b5d81a3cef4b9f12e59ffedd1e77b987dafaff4b8a70",
+      "platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501"
+    },
+    "pip_check": "No broken requirements found.",
+    "installation": "New evaluator-owned prefix; application wheels replaced only in this private copied interpreter with no network dependency resolution."
+  },
+  "dataset": {
+    "kind": "synthetic train-validation only",
+    "encrypted_bundle_sha256": "7e5c804d834510250e962d2253a36661f43a0dd0bbd17aac1d8cea6231246d5c",
+    "plaintext_manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+    "transported_ciphertext_and_metadata_files": 11,
+    "native_pinned_inputs": 12,
+    "key_transport": "Existing private SSH-stdin receiver, mode-0700 directory and mode-0600 validation key; no final key delivered"
+  },
+  "measurements": [
+    {
+      "attempt": "second",
+      "queue_job": "836d7d24-ac43-42eb-8e1d-f4723a061532",
+      "queue_closed_at": "2026-10-30T20:04:34.019Z",
+      "native_job": "40550023",
+      "native_identity": "dc09f1121838158056a17052463f01c7007d3a9699513cb63f169c08f51b4aa0",
+      "record_sha256": "4b2a76710392008590904c53d03bbdb5a9018affaf1039c4736667736d33834d",
+      "worker_sha256": "5587ac450e7b5bae37a955e39467a86370dc636aa4c3c3b203f7bf9ee7e19aea",
+      "receipt": {
+        "node": "wrds-sas46-w.wharton.private",
+        "scratch": "/tmp/40550023.1.all.q",
+        "scratch_mode": 493,
+        "private": "/tmp/40550023.1.all.q/research-plaintext-kz5s2r60",
+        "mode": 448,
+        "manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+        "files": 10,
+        "plaintext_removed": true
+      }
+    },
+    {
+      "attempt": "repeat",
+      "queue_job": "120da295-8f12-4b90-ba0e-a2af14d5d3b6",
+      "queue_closed_at": "2026-10-30T20:07:39.257Z",
+      "native_job": "40550033",
+      "native_identity": "dc09f1121838158056a17052463f01c7007d3a9699513cb63f169c08f51b4aa0",
+      "record_sha256": "3ebe3a4af30422eac6de10701ceaeaa663a66f8fef405e63a375dc822862eff9",
+      "worker_sha256": "5587ac450e7b5bae37a955e39467a86370dc636aa4c3c3b203f7bf9ee7e19aea",
+      "receipt": {
+        "node": "wrds-sas34-w.wharton.private",
+        "scratch": "/tmp/40550033.1.all.q",
+        "scratch_mode": 493,
+        "private": "/tmp/40550033.1.all.q/research-plaintext-xsmib5xj",
+        "mode": 448,
+        "manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+        "files": 10,
+        "plaintext_removed": true
+      }
+    }
+  ],
+  "repeatability": {
+    "observation_file_byte_identical": true,
+    "matched_fields": [
+      "scratch_mode",
+      "mode",
+      "manifest_sha256",
+      "files",
+      "plaintext_removed"
+    ],
+    "idempotent_resubmit_job": "120da295-8f12-4b90-ba0e-a2af14d5d3b6",
+    "idempotent_resubmit_status": "passed"
+  },
+  "preserved_failure": {
+    "queue_job": "ab151723-f66b-448c-8a9a-d2d7bc319fec",
+    "native_job": "40550007",
+    "status": "failed",
+    "exit_status": 1,
+    "reason": "Probe required scheduler scratch parent to be 0700; stopped before decryption. Corrected probe measures the existing decryptor private child and records parent mode.",
+    "old_probe_commit": "ae90c13d889d20978f5d51ddb5c5988b146e136e"
+  },
+  "verification": {
+    "fleet_job": "43d80652-236c-4c65-9b99-be4732f038ac",
+    "tests_passed": 4877,
+    "coverage_percent": 100,
+    "node": "colossus",
+    "published_commit_gate": {
+      "job": "8ed8468c-c6b0-45b8-b1d8-a400dbd6c535",
+      "tests_passed": 4877,
+      "coverage_percent": 100,
+      "node": "lacrymal"
+    }
+  },
+  "private_evidence_directories": {
+    "runtime": "/home/corvis/research-data/wrds/runtime/final-85f1d4d75",
+    "experiment": "/home/corvis/research-data/wrds/experiments/wrds-encrypted-85f1d4d75"
+  },
+  "evidence_sha256": {
+    "experiment/preparation.json": "188da452362c7bb31c858895282eec402bea29bb422ced7aac33e681c0e04ed0",
+    "experiment/stage.json": "8e3d87a3834cfa74a4ef87e6b79e029a69d56d8409df10a8635a86939e13c9c4",
+    "experiment/runtime.json": "8291147022b55d959bff9174188d81bbf2bb74a54c6ddceaabb48f0e177e4bc3",
+    "experiment/access.json": "469ebe40e8c52288c5e65628fc756e4d30fa308c251521996615f4851ac5954e",
+    "experiment/first-payload.err": "21f00a14c24e737c4bdee2aed9eae53068771ddc89fbc7c3af103b1cca5e7c4d",
+    "experiment/native-accounting.txt": "8e1624f283c38a875ea75ef88528b59adeebe10fe8a5d386e1d2b504b8da3ac5",
+    "experiment/second-native-accounting.txt": "fff71f2122c90b84a21f72ec270e4a01780c8f0548e84ecba79050e37732a2c5",
+    "experiment/queue-result-2.json": "7a42cc7589412a9f9bbe4c25440c9a24ec6023c62dda2f331b9e1ca83f3bb5ae",
+    "experiment/queue-result-repeat.json": "08a5185a0c381fbb0971513457ec699af96256db418959b5146502ee725f002f",
+    "experiment/queue-idempotent.json": "963be2f0379dd8629d6cb59abe66d709615485177872ace586e49c9c0186903a",
+    "experiment/collected-2/completion.json": "07468db1c2b0787bfd60456e294e1eb0762d1d01c06c6e80536d30c4b0845ff3",
+    "experiment/collected-2/outputs/receipt.json": "4e52d8bed93770d3927bf964bdc7932cb18771e694111cb97bf21f49caf42149",
+    "experiment/collected-2/outputs/metrics.json": "3021531d4cf3e3cd44ba47511755914f60a12d21e43513b2b021080a93ee8b22",
+    "experiment/collected-repeat/completion.json": "edd65d68724962c4f652218c964f0fe9372ead28765a5743294fbe83e6c22bac",
+    "experiment/collected-repeat/outputs/receipt.json": "bcf4f363dfa9809df14da443c81ac78f4d5da4a4ad809e44f6f6845b73ad22a1",
+    "experiment/collected-repeat/outputs/metrics.json": "3021531d4cf3e3cd44ba47511755914f60a12d21e43513b2b021080a93ee8b22",
+    "runtime/wrds-runtime-archive.sha256": "01cb250f8d9cdccedc1d0f3cad12543c271d54aafdc47ed854f21da5b6a272a2",
+    "runtime/wrds-wheels.sha256": "b1f90f8a5de454a83d97498390a5ad9daf97922a6253ce6d9d6305dc822e327f",
+    "runtime/wrds-unpack.log": "a653f483c16545a1c15153c784d7cf4e2d13dcda5a0668977e56d27b98c41eb3",
+    "runtime/wrds-install.log": "150494b1aaa548d6114d1b441808bc74f098bd29b58104eba8404ff622229031",
+    "runtime/wrds-install-private-copy.log": "ca67923d5e7bf5bdac51979732eb8e001027fefe4ac805905ca11bac5625698f",
+    "runtime/wrds-installed-files.json": "1276b827f2d6c80a6ad1baa6413e2ab31ceec673f1a91a2f266ceda335a946c9"
+  },
+  "limits": [
+    "Normal process exit measured; WRDS SIGKILL scratch reclamation is not verified.",
+    "This is encrypted validation storage, not the monthly scientific evaluator or a WRDS final-grant scoring rehearsal.",
+    "WRDS uses a private portable Python runtime; no Apptainer-image execution is claimed.",
+    "Per-allocation runtime checks cover interpreter bytes/version and installed distribution versions; the 488-file wheel-byte comparison is an installation measurement.",
+    "Evaluator-account administrators remain privileged; the isolated proposer receives neither keys nor plaintext.",
+    "No licensed CRSP rows or substantive baseline results. Existing queue ticks were explicitly invoked by this session."
+  ],
+  "probe_published_commit": "bbd989810b43db0b4f80fb431d6aa1f6e4bd1dec"
+}
