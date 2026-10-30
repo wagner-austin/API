@@ -704,8 +704,10 @@ A second grant consumption fails even across competing processes. A failure
 after consumption, including runtime drift or a missing data file, restores
 neither the journal release nor the grant. Native delivery must preserve one
 grant location and its spent marker; copying it into independently redeemable
-locations would defeat that property. Delivery automation remains operational
-work tracked in the [readiness page](../../../wiki/pages/wrds-baseline-readiness.md).
+locations would defeat that property. The `deliver`, `submit-final` and
+`reconcile-final` commands implement that handoff through the existing native
+controllers. Their contracts are in the [final-scoring wiki page](../../../wiki/pages/wrds-final-scoring.md);
+measured deployment status stays in the [readiness page](../../../wiki/pages/wrds-baseline-readiness.md).
 The candidate,
 seed and features come from the journal's own admitted request, which still
 names the validation partition: no proposal field authorizes final scoring, and
