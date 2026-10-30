@@ -119,3 +119,25 @@ def test_panel_refuses_ambiguous_or_impossible_sources(tmp_path: Path, mutation:
     path, _ = write_sources(tmp_path, rows)
     with pytest.raises(ValueError, match=r"CRSP-003|CRSP-008"):
         build_crsp_panel(load_crsp_sources(path), first, last)
+
+
+def test_liquidity_is_trailing_median_of_absolute_dollar_volume(tmp_path: Path) -> None:
+    rows = source_rows()
+    history = [
+        row
+        for row in rows["returns"]
+        if row["permno"] == 1 and require_str(row, "dlycaldt") <= "2019-12-31"
+    ]
+    # Dollars 29 x 1000, 2 x 2000, 29 x 5000: median 2000, mean 2966.67.
+    volumes = [100.0] * 29 + [200.0] * 2 + [500.0] * 29
+    for row, volume in zip(history[-60:], volumes, strict=True):
+        row["dlyvol"] = volume
+    # The session before the window and the decision's negative quote.
+    history[-61]["dlyvol"] = 1e9
+    history[-1]["dlyprc"] = -10.0
+    path, _ = write_sources(tmp_path, rows)
+    decision = build_crsp_panel(load_crsp_sources(path), "2019-12-01", "2019-12-31")[0]
+    assert [feature.permno for feature in decision.features] == [1, 2]
+    assert [feature.liquidity for feature in decision.features] == [2000.0, 1000.0]
+    assert decision.features[0].momentum == pytest.approx(-0.12)
+    assert decision.exclusions == (("liquidity_rank_limit", 1),)

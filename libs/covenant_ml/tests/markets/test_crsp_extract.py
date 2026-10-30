@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import csv
+import io
 from pathlib import Path
 
 import pytest
@@ -130,6 +132,19 @@ def test_malformed_source_cells_fail(
     rows[relation][0][field] = value
     path, _ = write_sources(tmp_path, rows)
     with pytest.raises(ValueError, match="CRSP-007"):
+        load_crsp_sources(path)
+
+
+def test_reordered_projection_with_valid_checksum_fails(tmp_path: Path) -> None:
+    path, document = write_sources(tmp_path, source_rows())
+    stream = io.StringIO()
+    writer = csv.writer(stream)
+    for values in csv.reader(io.StringIO((tmp_path / "membership.csv").read_text("utf-8"))):
+        writer.writerow([values[1], values[0], *values[2:]])
+    membership = narrow_json_to_dict(document["membership"])
+    membership["csv"] = save_file(tmp_path, "membership.csv", stream.getvalue().encode())
+    path.write_text(dump_json_str(document), encoding="utf-8")
+    with pytest.raises(ValueError, match=r"CRSP-007.*projection"):
         load_crsp_sources(path)
 
 
