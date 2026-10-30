@@ -70,7 +70,7 @@ def test_interpreter_cannot_redirect_subject(tmp_path: Path, fake_run: FakeRun, 
 def test_nonzero_checks_propagate(tmp_path: Path, fake_run: FakeRun, command: str) -> None:
     fake_run.add(command, returncode=7, stderr="deliberate failure")
     provenance = prepare(tmp_path, fake_run)
-    with pytest.raises(ValueError, match="CONTROLLER_CHECK_FAILED.*exit 7: deliberate failure"):
+    with pytest.raises(ValueError, match=r"CONTROLLER_CHECK_FAILED.*exit 7: deliberate failure"):
         measure(tmp_path, provenance)
 
 
@@ -135,9 +135,11 @@ def test_duplicate_members_empty_application_or_wrong_size(
 ) -> None:
     provenance = prepare(tmp_path, fake_run)
     if shape == "duplicate":
-        with zipfile.ZipFile(tmp_path / WHEEL, "a") as archive:
-            with pytest.warns(UserWarning, match="Duplicate name"):
-                archive.writestr("example.py", CONTENT)
+        with (
+            zipfile.ZipFile(tmp_path / WHEEL, "a") as archive,
+            pytest.warns(UserWarning, match="Duplicate name"),
+        ):
+            archive.writestr("example.py", CONTENT)
     elif shape == "empty":
         with zipfile.ZipFile(tmp_path / WHEEL, "w") as archive:
             archive.writestr(RECORD, RECORD + ",,\n")
