@@ -140,7 +140,8 @@ def test_reordered_projection_with_valid_checksum_fails(tmp_path: Path) -> None:
     stream = io.StringIO()
     writer = csv.writer(stream)
     for values in csv.reader(io.StringIO((tmp_path / "membership.csv").read_text("utf-8"))):
-        writer.writerow([values[1], values[0], *values[2:]])
+        reordered: list[str] = [values[1], values[0], *values[2:]]
+        writer.writerow(reordered)
     membership = narrow_json_to_dict(document["membership"])
     membership["csv"] = save_file(tmp_path, "membership.csv", stream.getvalue().encode())
     path.write_text(dump_json_str(document), encoding="utf-8")
