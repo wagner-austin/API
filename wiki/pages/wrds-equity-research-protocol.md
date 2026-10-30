@@ -84,7 +84,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/core/research_proposer.py": "bd5fd21260663875a363265c935f961773986ab9"
-  "tools/fleet/tests/test_research_proposer.py": "3625ee2b3874116a13bdb701b1a1333f551a5411"
+  "tools/fleet/tests/test_research_proposer.py": "be097d47578910937d731e4efcd012ad2bb7e118"
   "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
@@ -397,7 +397,9 @@ program on the existing rootless Docker lane. The trusted caller supplies an
 already-present immutable image ID and approved context. The process receives no
 host mounts, an empty environment, no network, a read-only root, no capabilities,
 and a non-root user. The decoder requires rootless operation and cgroup-v2 memory,
-CPU and process limits; its JSON field is `CpuCfsQuota`. Limits are one CPU,
+CPU and process limits; its JSON field is `CpuCfsQuota`, and an info carrying
+only another spelling of that key (`CPUCfsQuota`, `cpuCfsQuota`, `CpuCFSQuota`,
+`cpu_cfs_quota`) is refused, so no fallback can pass. Limits are one CPU,
 256 MiB, 64 processes, a caller-selected program deadline of 1–120 seconds,
 and 8,192 bytes each for source, context and returned JSON. Daemon operations
 have separate 30-second deadlines, so the program deadline is not an overall
@@ -426,7 +428,7 @@ At that same commit the full `tools/fleet` check passed 2,463 tests with
 selection/release correction also passed independent audit `27406acc` on
 2026-10-30; final scoring remains separate integration work.[^proposer][^selection]
 
-[^proposer]: `tools/fleet/src/fleet/core/research_proposer.py`, `run_proposer`, `_runtime` and `_remove_owned`; `tools/fleet/tests/test_research_proposer.py`, policy and lifecycle cases; `tools/fleet/tests/test_research_proposer_host.py`, actual process denial and failure cases. Component task 7c71808d-4328-471e-81c2-0fb40453d561; verification repair 1e555057-c0cf-40a0-8642-781406b4df6c. Initial strict check 4e65d678 rejected discarded denial errors; initial real-host check df645d67 rejected the incorrect CPU JSON key before launching any proposal. Neither is passing evidence. Corrected real host check 60942856-9290-41e2-aa4f-086df60599a4 passed at the cited API commit on 2026-10-30T03:11:41Z, 78 passed, zero skipped, 30 seconds of a 300-second budget; the host lane intentionally runs without coverage because the separate complete package check owns that requirement. Full check a74cf4a3-93bb-4bdf-ab4e-0d6ea640ac36 passed at the same commit on Pendragon on 2026-10-30T03:16:17Z, 2,463 passed, 100.00% coverage, 38 seconds of 300.
+[^proposer]: `tools/fleet/src/fleet/core/research_proposer.py`, `run_proposer`, `_runtime` and `_remove_owned`; `tools/fleet/tests/test_research_proposer.py`, policy and lifecycle cases; `tools/fleet/tests/test_research_proposer_host.py`, actual process denial and failure cases. Component task 7c71808d-4328-471e-81c2-0fb40453d561; verification repair 1e555057-c0cf-40a0-8642-781406b4df6c. Initial strict check 4e65d678 rejected discarded denial errors; initial real-host check df645d67 rejected the incorrect CPU JSON key before launching any proposal. Neither is passing evidence. Corrected real host check 60942856-9290-41e2-aa4f-086df60599a4 passed at the cited API commit on 2026-10-30T03:11:41Z, 78 passed, zero skipped, 30 seconds of a 300-second budget; the host lane intentionally runs without coverage because the separate complete package check owns that requirement. Full check a74cf4a3-93bb-4bdf-ab4e-0d6ea640ac36 passed at the same commit on Pendragon on 2026-10-30T03:16:17Z, 2,463 passed, 100.00% coverage, 38 seconds of 300. Its audit found no check that would fail if an alternate key spelling were accepted, so `test_only_dockers_json_cpu_quota_key_is_accepted` was added at API 629be28f6; there, check de6506a9-360f-45ba-a153-cfd4818b9097 passed on Loki at 2026-10-30T05:24:31Z (2,467 passed, 100.00% coverage) and host check 557b9c97-ddc7-4c41-a205-776356c32546 passed on Serendipity at 2026-10-30T05:24:06Z (78 passed, 0 failed).
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 [^review]: `CODE_STANDARDS.md`, named guard-rule table; API functions cited in [^queue], [^controllers], [^admission] and [^records]. External MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6: `packages/db/src/fleet-dispatch/research.ts` functions `requireResearchRouting` and `existingResearchJob`, and `packages/db/migrations/877_fleet_dispatch_research_requests.sql` immutable reference constraints. Scope and findings: board task 79c9a370-763e-4fd0-a609-cd1a64080b19.
