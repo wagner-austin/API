@@ -72,6 +72,7 @@ def test_each_range_is_checked_on_the_fleet_from_a_session_host_or_here_elsewher
         "ZERO",
         "pt_local_sha",
         "pt_remote_sha",
+        "published_status",
         "session_host_status",
     ]
 
