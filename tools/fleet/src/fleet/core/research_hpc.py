@@ -40,13 +40,37 @@ def _attempt(report: JSONObject, number: int) -> JSONObject:
     return selected[0]
 
 
+def _require_phase(document: JSONObject) -> str:
+    """Require explicit validation/final routing and its exact private input fields."""
+    expected = {
+        "phase",
+        "tenant",
+        "backend",
+        "attempt",
+        "python",
+        "script",
+        "policy",
+        "trial",
+        "cluster",
+        "ledger",
+        "directory",
+    }
+    phase = require_str(document, "phase")
+    if phase not in {"validation", "final"}:
+        raise ValueError("RESEARCH_HPC_PHASE: require validation or final")
+    expected.add("remote_manifest" if phase == "final" else "native_attempt")
+    if set(document) != expected:
+        raise ValueError("RESEARCH_HPC_FIELDS: unexpected private controller fields")
+    return phase
+
+
 def poll(
     document: JSONObject,
     log: pathlib.Path,
     task_id: str,
     environment: tuple[tuple[str, str], ...] = (),
 ) -> JSONObject:
-    """Submit an admitted trial once, reconcile it, or verify its completed receipt.
+    """Submit or reconcile validation/final work through its existing controller.
 
     Args:
         document: Tenant-authorized content-addressed private specification.
@@ -61,21 +85,7 @@ def poll(
         ValueError: Frozen input drift, invalid lifecycle or mismatched receipt.
         OSError: Missing input or process failure; journal state remains authoritative.
     """
-    expected = {
-        "tenant",
-        "backend",
-        "attempt",
-        "python",
-        "script",
-        "policy",
-        "trial",
-        "cluster",
-        "ledger",
-        "directory",
-        "native_attempt",
-    }
-    if set(document) != expected:
-        raise ValueError("RESEARCH_HPC_FIELDS: unexpected private controller fields")
+    phase = _require_phase(document)
     python = str(research_control.require_path(document, "python"))
     script = research_control.verified_input(document, "script")
     policy = research_control.verified_input(document, "policy")
@@ -88,6 +98,32 @@ def poll(
     if number < 1:
         raise ValueError("RESEARCH_ATTEMPT_MISSING: trial number must be positive")
     prefix = (python, str(script), "--policy", str(policy), "--ledger", str(ledger))
+    if phase == "final":
+        cluster = narrow_json_to_dict(load_json_str(_test_hooks.read_text(cluster_path)))
+        if require_str(cluster, "report_task") != task_id:
+            raise ValueError("RESEARCH_HPC_FINAL_TASK: final report must name the queue task")
+        action = (
+            "reconcile-final"
+            if _test_hooks.directory_exists(directory / "native")
+            else "submit-final"
+        )
+        return research_control.invoke(
+            (
+                *prefix,
+                action,
+                "--trial",
+                str(trial),
+                "--cluster",
+                str(cluster_path),
+                "--directory",
+                str(directory),
+                "--remote-manifest",
+                require_str(document, "remote_manifest"),
+            ),
+            log,
+            300,
+            environment,
+        )
     row = _attempt(research_control.invoke((*prefix, "status"), log, 60, environment), number)
     state = require_str(row, "status")
     if state in {"admitted", "submitting", "running"}:

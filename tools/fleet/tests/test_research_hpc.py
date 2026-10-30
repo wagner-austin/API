@@ -26,6 +26,7 @@ def _document(directory: pathlib.Path) -> JSONObject:
     document: JSONObject = {
         "tenant": "ours",
         "backend": "hpc3",
+        "phase": "validation",
         "attempt": "trial-1",
         "python": "/runtime/python",
         "ledger": str(directory / "journal.sqlite"),

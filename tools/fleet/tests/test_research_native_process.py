@@ -7,7 +7,15 @@ import pathlib
 import sys
 
 import pytest
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict, require_int
+from platform_core.json_utils import (
+    JSONObject,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_int,
+    require_str,
+)
 
 from fleet.cli import research_queue
 from fleet.contracts.dispatch import decode_job
@@ -18,17 +26,36 @@ from tests.test_research_hpc import _document, _row
 
 
 @pytest.mark.parametrize("exit_code", [0, 7])
+@pytest.mark.parametrize("phase", ["validation", "final"])
 def test_rendered_shell_and_native_cli_run_real_controller_children(
-    tmp_path: pathlib.Path, exit_code: int
+    tmp_path: pathlib.Path, exit_code: int, phase: str
 ) -> None:
     """The rendered shell is executed, not merely searched for command text."""
     document = _document(tmp_path)
+    row = research_job(
+        project="research/hpc3",
+        researchRequest={"backend": "hpc3", "specSha256": "a" * 64, "attempt": "trial-1"},
+    )
+    response: JSONObject = {"attempts": [_row("running")]}
+    expected = [0, 0] if exit_code == 0 else [7]
+    if phase == "final":
+        document["phase"] = "final"
+        del document["native_attempt"]
+        document["remote_manifest"] = "/pub/final/bundle.json"
+        cluster = tmp_path / "cluster"
+        cluster.write_text(
+            dump_json_str(
+                {"workspace": "/shared/hpc3.json", "report_task": require_str(row, "taskId")}
+            )
+        )
+        require_dict(document, "cluster")["sha256"] = hashlib.sha256(
+            cluster.read_bytes()
+        ).hexdigest()
+        response = {"state": "running", "native_job_id": "12345", "record_sha256": None}
+        expected = [exit_code]
     controller = tmp_path / "script"
     controller.write_text(
-        "print("
-        + repr(dump_json_str({"attempts": [_row("running")]}))
-        + ")\n"
-        + f"raise SystemExit({exit_code})\n"
+        "print(" + repr(dump_json_str(response)) + ")\n" + f"raise SystemExit({exit_code})\n"
     )
     document["python"] = sys.executable
     document["script"] = {
@@ -46,10 +73,7 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
     placed.update(
         {"python": sys.executable, "root": str(tmp_path), "env_file": str(env), "tenant": "ours"}
     )
-    row = research_job(
-        project="research/hpc3",
-        researchRequest={"backend": "hpc3", "specSha256": digest, "attempt": "trial-1"},
-    )
+    row["researchRequest"] = {"backend": "hpc3", "specSha256": digest, "attempt": "trial-1"}
     script = tmp_path / "poll.sh"
     script.write_text(research_queue._script(decode_worker(placed), decode_job(row, answer="")))
     result = _test_hooks._default_run(("/bin/sh", str(script)), timeout_seconds=30)
@@ -68,4 +92,4 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
     assert [
         require_int(narrow_json_to_dict(load_json_str(line)), "exit")
         for line in transcript.splitlines()
-    ] == ([0, 0] if exit_code == 0 else [7])
+    ] == expected
