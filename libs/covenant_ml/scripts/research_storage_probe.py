@@ -17,7 +17,6 @@ from platform_core.config import config_test_hooks
 from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.run_record import Observation, encode_observation
 
-from covenant_ml.evaluation.evidence import require_private_directory
 from covenant_ml.markets.encrypted_storage import decrypted_bundle
 from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
 from covenant_ml.markets.validation import read_document
@@ -35,7 +34,7 @@ def main(argv: list[str] | None = None) -> int:
 
     Raises:
         KeyError: A required scheduler environment variable is absent.
-        ValueError: Scratch is not private, or bundle authentication fails.
+        ValueError: Bundle authentication or private plaintext validation fails.
         OSError: Input access, cleanup or exclusive output creation fails.
     """
     parser = argparse.ArgumentParser(description=__doc__)
@@ -53,7 +52,6 @@ def main(argv: list[str] | None = None) -> int:
     environment = config_test_hooks.get_environment()
     scratch = Path(environment[scratch_variable])
     output = Path(environment[output_variable])
-    require_private_directory(scratch)
     keys = EvaluatorKeys(decode_research_access(read_document(access)))
     with decrypted_bundle(
         bundle,
@@ -69,6 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         receipt: JSONObject = {
             "node": socket.gethostname(),
             "scratch": str(scratch),
+            "scratch_mode": stat.S_IMODE(scratch.stat().st_mode),
             "private": str(private),
             "mode": mode,
             "manifest_sha256": sha256(manifest.read_bytes()).hexdigest(),

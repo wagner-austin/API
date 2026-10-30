@@ -21,6 +21,7 @@ def allocation(tmp_path: Path) -> Generator[dict[str, str], None, None]:
     """Supply actual temporary directories through the existing environment seam."""
     scratch = tmp_path / "scratch"
     scratch.mkdir(mode=0o700)
+    scratch.chmod(0o755)
     output = tmp_path / "outputs"
     output.mkdir()
     environment = config_test_hooks.get_environment()
@@ -60,6 +61,7 @@ def test_measurement_authenticates_files_and_confirms_cleanup(
     assert receipt == {
         "node": socket.gethostname(),
         "scratch": allocation["PROBE_SCRATCH"],
+        "scratch_mode": 0o755,
         "private": str(private),
         "mode": 0o700,
         "manifest_sha256": sha256((tmp_path / "source/manifest.json").read_bytes()).hexdigest(),
