@@ -311,15 +311,17 @@ class TestRunnerSpec:
         assert lavender["name"] == "lavender"
         # The Linux runners lavender's WSL guest carried until its reimage to
         # Ubuntu on 2026-10-19 (MCPs board task 1e9ab738), now on the host
-        # itself: 2 API, 4 MCPs, corvis-stick and tree-bot, every one
+        # itself: 2 API, MCPs, corvis-stick and tree-bot, every one
         # answering the host's own label, and chat's since its CI left loki
         # with the rest of the Windows runners (board task e705f08c).
         # corvis-stick was portable-claude until its rename, and registering
-        # against the old URL 404s.
+        # against the old URL 404s. MCPs went from 4 to 2 when four of its
+        # check jobs at once oversubscribed the CI slice's eight threads
+        # (board task 49d1a916).
         per_repo = [install["repo"] for install in lavender["installs"]]
         assert {repo: per_repo.count(repo) for repo in per_repo} == {
             "wagner-austin/API": 2,
-            "wagner-austin/MCPs": 4,
+            "wagner-austin/MCPs": 2,
             "wagner-austin/corvis-stick": 1,
             "wagner-austin/tree-bot": 1,
             "wagner-austin/chat": 1,
