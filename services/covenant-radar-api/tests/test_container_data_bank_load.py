@@ -84,8 +84,8 @@ def test_container_load_model_now_tries_data_bank_when_configured(
         redis=fake_kv_client,
         db_conn=InMemoryConnection(in_memory_store),
         redis_rq=fake_rq_client,
-        model_path=str(tmp_path / "nonexistent_model.ubj"),
-        model_output_dir=tmp_path,
+        model_path=str(tmp_path / "active" / "nonexistent_model.ubj"),
+        model_output_dir=tmp_path / "models",
         sector_encoder={"Technology": 0},
         region_encoder={"North America": 0},
         ml_backend=MLBackend.XGBOOST,
@@ -98,6 +98,8 @@ def test_container_load_model_now_tries_data_bank_when_configured(
 
     assert result is True
     assert container.get_model_info()["is_loaded"] is True
+    assert (tmp_path / "models" / "nonexistent_model.ubj").read_bytes() == model_bytes
+    assert not (tmp_path / "active").exists()
 
     container.close()
     fake_kv_client.assert_only_called({"sadd", "close"})
@@ -258,8 +260,8 @@ def test_container_get_model_tries_data_bank_when_configured(
         redis=fake_kv_client,
         db_conn=InMemoryConnection(in_memory_store),
         redis_rq=fake_rq_client,
-        model_path=str(tmp_path / "nonexistent_model.ubj"),
-        model_output_dir=tmp_path,
+        model_path=str(tmp_path / "active" / "nonexistent_model.ubj"),
+        model_output_dir=tmp_path / "models",
         sector_encoder={"Technology": 0},
         region_encoder={"North America": 0},
         ml_backend=MLBackend.XGBOOST,
@@ -274,6 +276,9 @@ def test_container_get_model_tries_data_bank_when_configured(
     prediction = loaded_model.predict_proba(x_test)
     assert prediction.shape == (1, 2)
     assert container.get_model_info()["is_loaded"] is True
+    downloaded_path = tmp_path / "models" / "nonexistent_model.ubj"
+    assert container.get_model_info()["model_path"] == str(downloaded_path)
+    assert downloaded_path.read_bytes() == model_bytes
 
     container.close()
     fake_kv_client.assert_only_called({"sadd", "close"})
