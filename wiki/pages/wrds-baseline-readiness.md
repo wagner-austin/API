@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/fleet/tests/_host.py"
+  - "tools/fleet/tests/test_research_proposer_host.py"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
   - "libs/covenant_ml/scripts/research_storage_probe.py"
   - "libs/covenant_ml/tests/markets/test_research_storage_probe.py"
@@ -43,6 +45,8 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
+  "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
   "libs/covenant_ml/scripts/research_storage_probe.py": "8dc13973868bdefb3e3cf26c452871ce6d072235"
   "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "ce083a45f3100c51e049c85eae865fde345c8034"
@@ -82,6 +86,7 @@ source_git_blobs:
   "tools/fleet/tests/test_research_proposal.py": "e3032d998c3d7e4b0951b2db7d1be643978ac2c5"
   "tools/fleet/tests/test_research_proposal_host.py": "177c817e1992334468ed07142a01df4f71908aa6"
 provenance:
+  - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "2026-10-30 readiness recheck, board cda5d102-9f26-4c2a-bfbe-cfdbe17b33c6: live task_get reports 1e555057, 7c71808d and 364a4ba8 done after independent audit; dispatch_list at API e12eb1c8312b9d4ae57e38906ca787e02e0e094c reports research check b37025f3 (4786 passed, 100%), fleet check a4f8cdc8 (2495 passed, 100%) and real host check 16b62830 (79 passed). Local-file inspection of /home/corvis/research-control/wrds-validation-bda8ca2af/lib/python3.11/site-packages/covenant_ml/markets/research_trial.py still finds load_wrds_evaluation at lines 18 and 58, SHA-256 98e11f10c1a28dcaeaeec9fde9e21c22f93be0c8c8cd0add5c50e23e4805d271. Its entrypoint/scripts/research_proposals.py exposes init/status/propose/submit/reconcile and no select, SHA-256 ed2272d101c645375ada9cc46caa4f2c288f9cefd196c634827a81ca7d0785ef. These are local installed-file readings, not a new cluster execution."
 fact_checked: 2026-10-30
@@ -92,6 +97,16 @@ confidence: medium
 
 
 - Research entry point: [[wrds-equity-research-protocol]].
+
+The encrypted-bundle closure was reopened by independent audit `02c6e4a1` on
+October 30. Its submitted evidence omitted the real container-isolation lane
+and read queue status without retained input identities. The corrected mapping
+uses `tools/fleet-execution-linux` for proposer isolation, evaluator tests for
+dataset binding, and the service-generated native report joined to the queue's
+RunRecord digest. This is an evidence correction; independent acceptance remains
+outstanding.[^audit-mapping]
+
+[^audit-mapping]: Live board audit `02c6e4a1-669d-43db-99c8-bedfc0f9754a`, check review `9312e8df-7856-4b3a-b77b-d15f31d43cb7`; service-written native report `548e2973-d926-44bb-98fc-016ab7f375b7` for WRDS job `40550033` and queue `120da295-8f12-4b90-ba0e-a2af14d5d3b6`. `tools/fleet/tests/_host.py`, execution-only marker selection; `tools/fleet/tests/test_research_proposer_host.py`, `test_actual_proposer_denies_private_data_credentials_policy_and_network` and real timeout/cleanup cases. `libs/covenant_ml/tests/markets/test_research_execution.py`, `test_changed_dataset_cannot_complete`, refuses mismatched bundle digests, verified inputs and partitions. The ordinary fleet suite skips the rootless Docker cases; only its execution lane runs them.
 
 The implementation and independent audits are complete for the process primitive,
 its admission integration and evaluator-owned one-shot final controls. At API
@@ -132,9 +147,9 @@ identities using the existing staging records. Extraction needs only the public
 recipient. Decryption accepts an in-memory identity and yields the extraction
 manifest only after every file authenticates and matches its frozen identity.
 Plaintext lives in a new mode-0700 temporary directory, with a declared size
-limit, and is removed on ordinary exit or exception. The same API is intended
-for WRDS Cloud and HPC3. HPC3 validation is now measured; WRDS-native encrypted
-execution remains unverified.[^bundle][^rehearsal]
+limit, and is removed on ordinary exit or exception. HPC3 validation and final
+scoring, and WRDS-native validation storage, are measured below. WRDS final
+scoring and forced-kill scratch reclamation remain unverified.[^bundle][^final-rehearsal][^wrds-native]
 
 The evaluator now requires encrypted inputs and separate private partition keys.
 Validation works without a final key. Final scoring acquires its key only after
