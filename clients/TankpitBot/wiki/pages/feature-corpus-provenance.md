@@ -31,7 +31,7 @@ hubs: [architecture]
 
 *Established 2026-09-02. `tankpit-feature-rows` shipped the tick-level
 table on 2026-09-01 and wrote it with nothing attached saying what
-produced it.*
+produced it.*[^1]
 
 ## What was wrong
 
@@ -50,7 +50,7 @@ then.
 
 ## The two configurations, and why only one is recorded
 
-The whole design turns on a distinction that is easy to blur:
+The derivation records two different kinds of information:[^derivation]
 
 | | knowable? | how it is recorded |
 |---|---|---|
@@ -68,7 +68,7 @@ only by `tankpit-events`, a digest of what was read.
 Inventing a bot version for the first column is exactly the failure
 `docs/RESEARCH.md` exists to prevent, and the same gap it states
 plainly for `turkic-lstm`: results already on disk have no sidecar and
-cannot be given an honest one retroactively.
+cannot be given an honest one retroactively.[^derivation]
 
 **Stamping the build at emission time is the fix for FUTURE runs.** It
 belongs in the runtime logging path, not in the derivation, and it
@@ -112,12 +112,12 @@ table is `\n` on Linux and `\r\n` on this workstation. Digesting the
 file as it sits on disk would fingerprint a Windows export and its
 identical Linux copy differently — and every cluster-versus-workstation
 comparison, which is the comparison the corpus exists for, would report
-a changed input that did not change.
+a changed input that did not change.[^derivation]
 
 **The record is written by the one write path, not a second command.**
 An opt-in provenance step is provenance nobody runs. The corpus would
 refill with unattributable rows the first time somebody exported in a
-hurry.
+hurry.[^write-path]
 
 ## Status against the research index
 
@@ -131,13 +131,13 @@ Playwright against live tankpit.com and is not cluster work; `sim/`
 needs no browser and no network, which is what made it the
 cluster-shaped payload. Offline modelling over these rows is still
 better served by the already-registered `cleargbm` than by a project of
-its own.
+its own.[^registration]
 
 **The record's own limit is unchanged by any of that.** It still
 describes the derivation and identifies the live run only by a digest:
 the 539 archived runs carry no build stamp, registration did not make
 them attributable, and nothing will. Runs since 2026-09-04 carry the
-`session_build` stamp, which no derivation reads yet.
+`session_build` stamp, which this derivation does not read.[^derivation][^6]
 
 [^1]: `src/tankpit_bot/diagnostics/feature_rows.py`, `write_feature_rows` before 2026-09-02 — the body was joined and written with no sidecar. Shipped in commit `3c961bef`.
 [^2]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1447-L1465 § historical `cleargbm` provenance: "The 3,068 rows written before that state `"fingerprint": null` explicitly."
@@ -145,3 +145,6 @@ them attributable, and nothing will. Runs since 2026-09-04 carry the
 [^4]: `clients/RustedWarfareBot/src/rw_bot/provenance.py`, `arm_run_record` / `sweep_fingerprint`.
 [^6]: `src/tankpit_bot/runtime_logging.py:98-142`, `configure_bot_runtime_logging`, whose `emit_diagnostic(diagnostic_kind="session_build", ...)` call is at `:136-142` beside the comment "The account name is DELIBERATELY absent"; the build ref comes from `_real_resolve_build_ref` at `src/tankpit_bot/_test_hooks/runtime.py:271`, which asks `git rev-parse HEAD` under the 60-second `GIT_HEAD_WALL_SECONDS` bound. `src/tankpit_bot/diagnostics/feature_provenance.py:17-27` states the same split in its module doc.
 [^5]: `docs/RESEARCH.md`, "Adding a research project" — register in `tools/hpc3/runs/`, add a section, emit `RunRecord`s, submit through the CLI.
+[^derivation]: `src/tankpit_bot/diagnostics/feature_provenance.py:1-48`, module documentation: the historical corpus, the distinction between events and derivation, and the decoded-text digest contract.
+[^write-path]: `src/tankpit_bot/diagnostics/feature_rows.py:305-335`, `_build_and_write`: writes the rows and their `RunRecord` sidecar in the same CLI path.
+[^registration]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L2067-L2310 § historical `tankpit`: the registered headless simulation, its cluster execution, and the separate live-browser bot.
