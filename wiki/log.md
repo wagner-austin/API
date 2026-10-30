@@ -309,3 +309,13 @@ selfchecks and the image dependency check passed. The complete queue rehearsal,
 substantive extraction and baseline remain outstanding. The operator's encrypted
 bundle and evaluator key-custody requirement now precedes licensed staging.
 Board tasks 474c840b and e6729a16; no new page or page-count change.
+
+## 2026-10-30: bind encrypted inputs to monthly scoring
+
+Updated `wrds-baseline-readiness` with required partition keys, checked private
+storage, dataset-bound reconciliation and the separately installed encrypted
+runtime. Native build 58629212 and two Linux fleet checks passed; GitHub Ubuntu
+run 41054078619 passed all 4,836 cases at 100% coverage. The isolated proposer
+and real admission controller produced the synthetic request queued as a332dd13.
+Final-key delivery and isolation/cleanup probes remain open. Board task e6729a16;
+no new page or page-count change.

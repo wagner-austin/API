@@ -4,6 +4,13 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json"
+  - ".github/workflows/covenant-ml.yml"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_keys.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_execution.py"
+  - "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py"
+  - "libs/covenant_ml/tests/markets/test_research_keys.py"
+  - "libs/covenant_ml/tests/markets/test_research_execution.py"
   - "libs/covenant_ml/src/covenant_ml/markets/encrypted_records.py"
   - "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py"
   - "libs/covenant_ml/tests/markets/test_encrypted_storage.py"
@@ -25,21 +32,28 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
+  ".github/workflows/covenant-ml.yml": "14472de200c3c5cb4a41c28110a1739327ecce8c"
+  "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "cda0fd178b9d1f7988df633b1067478db9d03af0"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
+  "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
+  "libs/covenant_ml/tests/markets/test_research_keys.py": "ceb7f3b58753e99d7a559b8e471c46d1abb28067"
+  "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_records.py": "6b3826b16f265301ec9923070cc89322427f8bc6"
-  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "fad9820f53a021aa41df1d50b176f4af7d41a7bc"
-  "libs/covenant_ml/tests/markets/test_encrypted_storage.py": "8f7e4479acae5a2ff6f38d88fb9368ceac7811b5"
+  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "d53e02a8e707198a6d5c35f214d0fd557ee995e3"
+  "libs/covenant_ml/tests/markets/test_encrypted_storage.py": "de361bb8f31d40eecacea21a0e493d3eba2abe30"
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "854dd095f76364bc1a00ca0e9e35ca2e06ce88f7"
+  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "1b0c4fef1b761bb3971f875bab907da043d141bb"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
   "libs/covenant_ml/scripts/research_proposals.py": "f62f4f85739a00b2fbdc41f1e8724dd59188632f"
-  "libs/covenant_ml/scripts/research_trial.py": "3e8ead7063b2e1835bb59131d73b9df0095b25d5"
-  "libs/covenant_ml/tests/markets/test_research_final.py": "81e4a8f1f5220b502de59369c9a8ac1868f8ab77"
+  "libs/covenant_ml/scripts/research_trial.py": "00588479984e32ef9e640c76dd11ce4cfd5d78a1"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "75b95210bc5ae8e2069bcf27c97e6ab1a6322998"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
   "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
   "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
@@ -53,6 +67,7 @@ confidence: medium
 ---
 
 # WRDS substantive baseline readiness
+
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
@@ -78,8 +93,15 @@ not the complete queue rehearsal or a substantive baseline.[^monthly-runtime]
 The operator additionally requires encrypted, checksum-verified data bundles,
 evaluator-only decryption into private job storage, keys absent from images,
 logs and proposer-visible files, and a separately sealed final bundle. This is
-a prerequisite for licensed staging, tracked in board task `e6729a16`.
-It is not a capability of the installed runtime.[^encryption]
+a prerequisite for licensed staging, tracked in board task `e6729a16`.[^encryption]
+The encrypted evaluator is installed separately at
+`/home/corvis/research-control/wrds-encrypted-44fa91cea/bin/python`.
+Its matching image freezes API `44fa91cea1607660a45f29172d8564a465d40744` at
+`/pub/wagnera3/images/research-encrypted-44fa91cea/research-encrypted.sif`, SHA-256
+`58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6`.
+Native build `58629212` completed with exit `0:0` in 78 seconds on
+`hpc3-22-05`; both generated selfchecks and the dependency check passed.
+This establishes runtime construction, not the complete rehearsal.[^encrypted-runtime]
 
 The shared library now implements age-encrypted files, separately named
 train-validation/final bundles, and both ciphertext and plaintext SHA-256
@@ -90,16 +112,25 @@ Plaintext lives in a new mode-0700 temporary directory, with a declared size
 limit, and is removed on ordinary exit or exception. The same API is intended
 for WRDS Cloud and HPC3; neither native integration is verified yet.[^bundle]
 
-This library does not supply key custody or grant final access. Cluster key
-delivery must enforce the journal's existing sealed selection and single final
-release. Same-user or administrative processes remain privileged; a private
-directory alone is not an isolation boundary against them. Cluster scratch
-reclamation after a forced kill also needs a native probe. The remaining
-sequence is:[^bundle]
+The evaluator now requires encrypted inputs and separate private partition keys.
+Validation works without a final key. Final scoring acquires its key only after
+the existing journal commits its one-shot release; a missing key consumes that
+release rather than permitting a retry. Both paths reuse the CRSP reader and
+shared result publisher. Results retain ciphertext and plaintext identities,
+and reconciliation refuses a dataset digest or partition inconsistent with the
+admitted request and native checksum evidence.[^integrated]
 
-1. Integrate encrypted bundle delivery with existing staging, native execution
-   and result verification. Preserve verifiable plaintext identities after
-   private job storage is removed, and measure the key-access boundary.
+Key directories and decrypted storage must actually have mode 0700; keys must
+be private regular files opened without following symlinks. These are Linux
+execution requirements, not Windows ACL guarantees. Same-user or administrative
+processes remain privileged. Native final-key delivery must still consult the
+authoritative journal; copying that journal to a compute node would create a
+second authority. Proposer-access and forced-kill scratch-reclamation probes
+also remain outstanding. The remaining sequence is:[^integrated]
+
+1. Verify native encrypted scoring through existing staging, execution and
+   result reconciliation. Finish native final-key delivery and measure the
+   key-access boundary and allocation cleanup.
 2. Rehearse an allowed proposal through the real admission controller, shared
    queue, native job and reconciled RunRecord in one chain. The existing installed
    isolation test uses a recording admission stand-in; its result cannot stand
@@ -113,6 +144,8 @@ sequence is:[^bundle]
    comparison first; seal the chosen candidate and use the one-shot final release
    afterward. The selection API enforces identity, not which candidate is best.
 
+[^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. All transport inputs for synthetic validation were verified by the existing stager. The isolated proposer ran on Colossus and the installed controller admitted its output into a fresh journal; shared queue job a332dd13-11b8-470f-9871-211490a67a8b was submitted on 2026-10-30. This submission is intent, not a completed evaluation. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
+
 [^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. On main at 85e408c1c08cd3ff5faaf88416f4d62965ed64a3, job 8054c71b passed libs/covenant_ml on Colossus at 2026-10-30T05:57:25Z: 4,786 tests, 100.00% coverage. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 
 [^readiness]: `tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json`, controller_source_commit, controller_python and attempts; the October 30 local-file and live-tool reads recorded in this page's provenance. Implementation and test sources are cited in [^installed] and [^final]. Remaining steps are operational prerequisites, not completed jobs or performance findings.
@@ -124,3 +157,5 @@ sequence is:[^bundle]
 [^bundle]: `libs/covenant_ml/src/covenant_ml/markets/encrypted_records.py`, `decode_encrypted_bundle`; `libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py`, `encrypt_bundle`, `encrypted_stage_manifest` and `decrypted_bundle`; `libs/covenant_ml/tests/markets/test_encrypted_storage.py` and `test_encrypted_records.py`. Fleet job 76a1c77b-cd31-40d1-ad3d-2ae4b447f219 passed the full libs/covenant_ml make check at API e8c4358f29a834d8c98cc098a082f7b99ce3a0db on Loki, ending 2026-10-30T11:45:25Z: 4,815 tests, 100% coverage, lint and strict typing passed. Its 29 new cases cover the existing CRSP reader, wrong keys, altered/truncated ciphertext, traversal, output bounds and cleanup after an evaluator exception. This is a library measurement, not native key delivery, final authorization, forced-kill reclamation or a completed queue rehearsal. Board task e6729a16.
 
 [^installed]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/src/fleet/core/research_control.py`, `read_pinned` and `invoke`; `tools/fleet/tests/test_research_proposal.py`, admitted and refused recording, no evaluator path in any daemon argument, drifted-input and isolation refusals; `tools/fleet/tests/test_research_proposal_host.py`, `test_installed_proposer_cannot_reach_evaluator_assets`. Host lane job fc8bc3c5-ad1b-479e-b44c-ddfcd40152ad passed tools/fleet-execution-linux at API 06636dbbebd56771e170b45a7f190309f396cde1 on Sedona at 2026-10-30T05:46:34Z: 79 cases ran, 0 skipped, 0 failed. Full check b01963a6-2105-49a3-a81a-8551982ca23d passed tools/fleet at the same commit on Sedona at 2026-10-30T05:43:08Z: 2,479 tests, 100.00% coverage. Commit 06636dbbe was staged on a pushed-tests ref and rebased unchanged onto main as part of 85e408c1c08cd3ff5faaf88416f4d62965ed64a3; there, host lane job 6833f095-6fe8-48c5-a464-548cf228597b passed on Colossus at 2026-10-30T05:58:34Z (79 cases, 0 failed, 0 skipped) and full check f7581b88 passed tools/fleet on Loki at 2026-10-30T05:55:25Z (2,495 tests, 100.00% coverage). The admission controller in the host case is a recording stand-in for `research_proposals propose`; the real controller's recording of proposals and refusals is the covenant_ml suite's. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
+
+[^integrated]: `libs/covenant_ml/src/covenant_ml/markets/research_keys.py`, `EvaluatorKeys.acquire` and `create_evaluator_keys`; `libs/covenant_ml/src/covenant_ml/evaluation/evidence.py`, `require_private_directory`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py`, `reconcile_attempt`; the trial/final implementations and `test_research_keys.py`, `test_research_execution.py`, and `test_research_final.py` cited in source_paths. API 2e3a5cfebea38db752aa4bfb281104337cb6baee passed fleet job f8020224-a82c-42d7-9b3e-cf2fc084689a on Loki: 4,836 tests, 100% coverage. The permission check in 44fa91cea1607660a45f29172d8564a465d40744 passed the full suite again at API 90b03d7c8b6bc5c1ca1620d6fb4c4b13d9148994, job cd0d062a-c5b0-4a7d-acb5-f860b6a546de on Lacrymal, ending 2026-10-30T12:15:55Z: 4,836 tests, 100% coverage, lint, typing and guards passed. These are Linux suite measurements, not a completed native encrypted-data rehearsal. GitHub run 41050434226 at the earlier e8c4358f revision failed its Windows 0700 assertion; the workflow now targets Linux without omitting security cases. GitHub Ubuntu run 41054078619 at 90b03d7c also passed all 4,836 tests at 100% coverage on 2026-10-30.
