@@ -1,0 +1,64 @@
+{
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "synthetic": true,
+  "runtime_source_commit": "44fa91cea1607660a45f29172d8564a465d40744",
+  "probe_source_commit": "8dfc76f75003cdefdaa124e2a3b1e5f95670ce5a",
+  "probe_source": "libs/covenant_ml/tests/markets/test_encrypted_process.py:PROBE_PROGRAM",
+  "probe_program_sha256": "a0e2aecd11ce690a7060429763efe30cbd603f458dc0bfb8603208af7e167e3a",
+  "image_sha256": "58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6",
+  "kill_job": {
+    "job_id": "58629286",
+    "submitted_at": "2026-10-30T12:45:35.062039+00:00",
+    "state": "FAILED",
+    "exit_code": "137:0",
+    "node": "hpc3-22-05",
+    "elapsed_seconds": 6,
+    "expected_sigkill": true,
+    "receipt": {
+      "node": "hpc3-22-05",
+      "scratch": "/tmp/wagnera3/58629286",
+      "private": "/tmp/wagnera3/58629286/research-plaintext-r1u0eihm",
+      "mode": 448,
+      "manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+      "files": 10
+    }
+  },
+  "observer_job": {
+    "job_id": "58630827",
+    "submitted_at": "2026-10-30T16:31:28.778863+00:00",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "node": "hpc3-22-05",
+    "elapsed_seconds": 0,
+    "placement": "Existing exclude_nodes excludes all 257 other sinfo nodes; payload requires the exact probe hostname.",
+    "receipt": {
+      "probe_job": "58629286",
+      "node": "hpc3-22-05",
+      "scratch": "/tmp/wagnera3/58629286",
+      "scratch_absent": true,
+      "decrypted_receipt_sha256": "817e151ec1ff87861fe5c9479c97f340a29b65cbbc43a2fa87881157b6ed7b76"
+    }
+  },
+  "private_evidence_directory": "/home/corvis/research-data/wrds/experiments/encrypted-cleanup-20261030",
+  "evidence_sha256": {
+    "probe.py": "a0e2aecd11ce690a7060429763efe30cbd603f458dc0bfb8603208af7e167e3a",
+    "checksums.txt": "c72ce5d3582575f197e850b0a133fadf9a9edecd174f7fc3b09b5795bc4e871e",
+    "run.json": "e40ade8b942f4ff76bac0f01ecb889d2979a2b41f11cb9c9530d44eb42bfd110",
+    "submit.json": "745adb7dd9eb167b108cb76f59f8abd3774be2f20158c3b6186f650c04b625a3",
+    "watch.log": "6694be3e56805359c4415c87cff53f159da9aab9e70fe86f99ab920834838adf",
+    "decrypted.json": "817e151ec1ff87861fe5c9479c97f340a29b65cbbc43a2fa87881157b6ed7b76",
+    "observer-run.json": "cccc2730773bb6f900ee85d68a1763f35b956e0b8cf237b0178af7f1fbd444fe",
+    "observer-submit.json": "d3295b444200647d9bafb00c07e16a985609acf8d66491ab88305cd598601850",
+    "observer-watch.log": "118ad927a0f60b480e30ecc553057a36b5d7a3109fc958d4dee74b14eea826ee",
+    "reclaimed.json": "bd2358520af2e078f3f9c4245bb326c237f933667dc8e07944095e2bbf7035bd",
+    "accounting.txt": "86e89ce23e6b7bb3ce08421126fe63c37266c42360fb932f5ee909f82d0ec81b"
+  },
+  "limits": [
+    "One forced-kill probe and one later allocation on the same HPC3 node; synthetic validation only.",
+    "The observation occurred several hours after termination: eventual absence, not immediate cleanup or a measured reclamation deadline.",
+    "Filesystem absence does not establish physical secure erasure, cleanup after node failure, or behavior on every node.",
+    "The real-process regression demonstrates that SIGKILL skips Python cleanup; native scratch lifecycle remains a scheduler dependency.",
+    "Both allocations use the existing HPC3 preflight, submit and watch controllers; no new scheduler adapter.",
+    "WRDS-native cleanup and final-key delivery remain unverified."
+  ]
+}
