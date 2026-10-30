@@ -56,12 +56,12 @@ from fleet.core.runner_install import (
 from fleet.core.runner_job_scope_render import render_job_hook_lines, render_job_scope_lines
 from fleet.core.runner_reaper_render import render_kill_mode_lines, render_reaper_lines
 from fleet.core.runner_recovery import render_recovery_lines
+from fleet.core.runner_retire_render import render_retire_lines
 from fleet.core.runner_slice_render import (
     render_runner_slice_drop_in_lines,
     render_runner_slice_move_lines,
     render_slice_unit_lines,
 )
-from fleet.core.runner_retire_render import render_retire_lines
 from fleet.core.runner_unit_files import render_unit_file_lines
 from fleet.core.script_values import scriptable
 
