@@ -213,7 +213,9 @@ def _attempt_ssh_within(host: str, argv: tuple[str, ...], *, timeout_seconds: in
     return RemoteOutcome(output="" if failure is not None else result["stdout"], failure=failure)
 
 
-def run_ssh(host: str, argv: tuple[str, ...]) -> str:
+def run_ssh(
+    host: str, argv: tuple[str, ...], *, timeout_seconds: int = SSH_TIMEOUT_SECONDS
+) -> str:
     """Run one argv on a node and return its standard output.
 
     The raising boundary over :func:`attempt_ssh`, for callers that have
@@ -222,6 +224,8 @@ def run_ssh(host: str, argv: tuple[str, ...]) -> str:
     Args:
         host: SSH destination, an alias from the user's ssh config.
         argv: The remote command as a list of words.
+        timeout_seconds: Whole-command bound; callers with shorter operations
+            can tighten the existing transport deadline.
 
     Returns:
         The command's standard output.
@@ -233,7 +237,7 @@ def run_ssh(host: str, argv: tuple[str, ...]) -> str:
             fixes -- one is the tailnet, the other is the work -- and ssh
             reports its own failures with status 255.
     """
-    outcome = attempt_ssh(host, argv)
+    outcome = _attempt_ssh_within(host, argv, timeout_seconds=timeout_seconds)
     _raise_on(outcome["failure"])
     return outcome["output"]
 

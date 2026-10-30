@@ -23,6 +23,7 @@ from platform_core.json_utils import (
     dump_json_str,
     load_json_str,
     narrow_json_to_dict,
+    narrow_json_to_str,
     require_int,
     require_list,
     require_str,
@@ -32,7 +33,8 @@ from fleet.core import _test_hooks, research_control
 from fleet.core.research_proposer import run_proposer
 
 _FIELDS = frozenset(
-    {"python", "script", "policy", "ledger", "socket", "image", "program", "context", "timeout"}
+    {"python", "script", "policy", "ledger", "host", "socket", "image",
+     "program", "context", "timeout"}
 )
 
 
@@ -70,6 +72,7 @@ def propose(document: JSONObject, directory: pathlib.Path, log: pathlib.Path) ->
         require_str(document, "image"),
         program,
         context,
+        host=None if document["host"] is None else narrow_json_to_str(document["host"]),
         timeout=require_int(document, "timeout"),
     )
     payload = dump_json_str(proposal)

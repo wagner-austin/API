@@ -10,6 +10,7 @@ An administrative caller or a compromised kernel is outside this boundary.
 from __future__ import annotations
 
 import re
+import shlex
 from uuid import uuid4
 
 from platform_core.json_utils import (
@@ -22,14 +23,19 @@ from platform_core.json_utils import (
 )
 
 from fleet.contracts.research import require_digest
-from fleet.core import _test_hooks
-from fleet.core.linux_isolated_build import EXEC_PATH
+from fleet.core import _test_hooks, remote
+from fleet.core.linux_isolated_build import EXEC_PATH, EXEC_USER
 
 MAX_BYTES = 8192
 
 
-def _checked(prefix: tuple[str, ...], args: tuple[str, ...], timeout: int = 30) -> str:
+def _checked(
+    prefix: tuple[str, ...], args: tuple[str, ...], host: str | None, timeout: int = 30
+) -> str:
     """Run a bounded daemon operation and propagate its actual failure."""
+    if host is not None:
+        command = shlex.join(("sudo", "-n", "-u", EXEC_USER, *prefix, *args))
+        return remote.run_ssh(host, (command,), timeout_seconds=timeout)
     result = _test_hooks.run((*prefix, *args), timeout_seconds=timeout)
     if result["returncode"] != 0:
         raise ValueError(
@@ -38,8 +44,10 @@ def _checked(prefix: tuple[str, ...], args: tuple[str, ...], timeout: int = 30) 
     return result["stdout"]
 
 
-def _runtime(socket: str, image: str) -> tuple[str, ...]:
-    """Require the local rootless daemon and enforceable cgroup resource limits."""
+def _runtime(socket: str, image: str, host: str | None) -> tuple[str, ...]:
+    """Require a declared rootless daemon and enforceable cgroup resource limits."""
+    if host is not None and re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]*", host) is None:
+        raise ValueError("RESEARCH_PROPOSER_HOST: require an explicit SSH host alias")
     if re.fullmatch(r"/run/user/[1-9][0-9]*/docker.sock", socket) is None:
         raise ValueError("RESEARCH_PROPOSER_SOCKET: require a local user daemon socket")
     require_digest(image.removeprefix("sha256:"))
@@ -54,7 +62,9 @@ def _runtime(socket: str, image: str) -> tuple[str, ...]:
         "--host",
         f"unix://{socket}",
     )
-    info = narrow_json_to_dict(load_json_str(_checked(prefix, ("info", "--format", "{{json .}}"))))
+    info = narrow_json_to_dict(
+        load_json_str(_checked(prefix, ("info", "--format", "{{json .}}"), host))
+    )
     options = [
         require_str({"item": item}, "item") for item in require_list(info, "SecurityOptions")
     ]
@@ -67,32 +77,33 @@ def _runtime(socket: str, image: str) -> tuple[str, ...]:
             "RESEARCH_PROPOSER_RUNTIME: require rootless cgroup-v2 resource enforcement"
         )
     volumes = load_json_str(
-        _checked(prefix, ("image", "inspect", "--format", "{{json .Config.Volumes}}", image))
+        _checked(prefix, ("image", "inspect", "--format", "{{json .Config.Volumes}}", image), host)
     )
     if volumes not in (None, {}):
         raise ValueError("RESEARCH_PROPOSER_IMAGE: implicit image volumes are forbidden")
     return prefix
 
 
-def _owned(prefix: tuple[str, ...], label: str) -> tuple[str, ...]:
+def _owned(prefix: tuple[str, ...], label: str, host: str | None) -> tuple[str, ...]:
     """Read the full IDs of containers bearing this invocation's private nonce."""
     output = _checked(
-        prefix, ("container", "ls", "--all", "--quiet", "--no-trunc", "--filter", f"label={label}")
+        prefix, ("container", "ls", "--all", "--quiet", "--no-trunc", "--filter", f"label={label}"),
+        host,
     )
     return tuple(require_digest(item) for item in output.split())
 
 
-def _remove_owned(prefix: tuple[str, ...], label: str) -> None:
+def _remove_owned(prefix: tuple[str, ...], label: str, host: str | None) -> None:
     """Remove only this invocation's containers and verify none remain."""
-    owned = _owned(prefix, label)
+    owned = _owned(prefix, label, host)
     if owned:
-        _checked(prefix, ("container", "rm", "--force", *owned))
-    if _owned(prefix, label):
+        _checked(prefix, ("container", "rm", "--force", *owned), host)
+    if _owned(prefix, label, host):
         raise ValueError("RESEARCH_PROPOSER_CLEANUP: owned container remains after removal")
 
 
 def run_proposer(
-    socket: str, image: str, program: str, context: JSONObject, *, timeout: int
+    socket: str, image: str, program: str, context: JSONObject, *, host: str | None, timeout: int
 ) -> JSONObject:
     """Execute a bounded offline proposal program under the existing rootless lane.
 
@@ -101,6 +112,8 @@ def run_proposer(
         image: Evaluator-approved local sha256 image ID containing Python and env.
         program: Python source; receives approved JSON context in sys.argv[1].
         context: Approved public/validation context, never credentials or holdout.
+        host: Explicit SSH host alias for the existing execdocker lane, or None
+            to use the caller's local rootless daemon. No automatic placement.
         timeout: Wall-clock seconds allowed for the program, between 1 and 120.
 
     Returns:
@@ -118,7 +131,7 @@ def run_proposer(
         or any(len(value.encode()) > MAX_BYTES for value in (program, payload))
     ):
         raise ValueError("RESEARCH_PROPOSER_BOUNDS: bounded program, context and deadline required")
-    prefix = _runtime(socket, image)
+    prefix = _runtime(socket, image, host)
     label = f"corvis.research.proposer={uuid4().hex}"
     try:
         identifier = _checked(
@@ -152,18 +165,19 @@ def run_proposer(
                 program,
                 payload,
             ),
+            host,
         ).strip()
         require_digest(identifier)
-        _checked(prefix, ("container", "start", identifier))
-        status = _checked(prefix, ("container", "wait", identifier), timeout).strip()
+        _checked(prefix, ("container", "start", identifier), host)
+        status = _checked(prefix, ("container", "wait", identifier), host, timeout).strip()
         if status != "0":
             raise ValueError(f"RESEARCH_PROPOSER_EXIT: program exited {status}")
-        output = _checked(prefix, ("container", "logs", identifier))
+        output = _checked(prefix, ("container", "logs", identifier), host)
         if len(output.encode()) > MAX_BYTES:
             raise ValueError("RESEARCH_PROPOSER_OUTPUT: proposal exceeds the output limit")
         return narrow_json_to_dict(load_json_str(output))
     finally:
-        _remove_owned(prefix, label)
+        _remove_owned(prefix, label, host)
 
 
 __all__ = ["MAX_BYTES", "run_proposer"]
