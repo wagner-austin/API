@@ -23,7 +23,7 @@ _deps: native-deps
 	$(MAKETOOLS) require-tool poetry "Install it with pipx: pip install pipx, then pipx install poetry"
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 
 # The two steps that REWRITE sources (ruff's fixes and its formatter), which
 # must finish before anything reads the tree.
