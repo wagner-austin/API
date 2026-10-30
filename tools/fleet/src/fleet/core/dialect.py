@@ -54,6 +54,7 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
+from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines, sh_ci_load_start_lines
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
@@ -423,7 +424,9 @@ def build_script(
         lines.extend(sh_phase_lines(phase=step["phase"], command=command, log=log))
         lines.append(f'if [ "$status" -ne 0 ]; then {written}; exit 0; fi')
     lines.append(f"cd '{names.recipe_directory(target, path)}'")
+    lines.extend(sh_ci_load_start_lines(CI_CPU_STAT))
     lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log))
+    lines.extend(sh_ci_load_end_lines(CI_CPU_STAT, log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"
 

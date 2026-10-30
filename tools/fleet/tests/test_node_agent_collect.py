@@ -68,7 +68,7 @@ class TestCollecting:
             "exit=0 banner=yes tests=887p/0f coverage=statements=100% branches=100% "
             "budget=unread ended=2025-09-04T15:34:20Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
-            "workers=7"
+            "workers=7 slowest=unread ci=unread"
         )
         # Retired after the tail was read and the job closed (fleet.cli.node_settle):
         # the fifth and sixth calls send the retire to the stage root and run it.

@@ -21,6 +21,7 @@ from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.core import dialect, names, recipe, tool_caches
+from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
 from fleet.core.phase_markers import SH_UTC_STAMP
@@ -178,11 +179,13 @@ class TestIsolatedText:
 
     def test_the_copy_is_removed_before_the_status_is_written_last(self) -> None:
         lines = _isolated().splitlines()
+        ci_load = sh_ci_load_end_lines(CI_CPU_STAT, names.log_path(TARGET))
 
-        assert lines[-4] == "set -e"
-        assert lines[-3].startswith(
+        assert lines[-4 - len(ci_load)] == "set -e"
+        assert lines[-3 - len(ci_load)].startswith(
             "printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'check'"
         )
+        assert lines[-2 - len(ci_load) : -2] == ci_load
         assert lines[-2:] == [
             'sudo -n rm -rf "$exec_root"',
             f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'",

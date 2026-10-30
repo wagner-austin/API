@@ -27,6 +27,7 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
+from fleet.core.ci_load import read_ci_load
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
 
 #: The line every package's ``make check`` prints last when it passed.
@@ -89,6 +90,23 @@ BUDGET_OVER: Final[re.Pattern[str]] = re.compile(
     r"CHECK OVER BUDGET: \S+ took (\d+)s, over the (\d+)s budget"
 )
 
+#: A terminal's colour codes, which vitest writes into the transcript too.
+ANSI: Final[re.Pattern[str]] = re.compile(r"\x1b\[[0-9;]*m")
+
+#: vitest's line for one finished test file, colours stripped: a check mark,
+#: then ``host  tests/passkey-twin.test.ts (1 test) 139101ms``, its
+#: project's label optional, and a failed file marked with a cross or an
+#: arrow instead (U+2713, U+00D7, U+276F). A single test's line is indented
+#: further and never matches.
+VITEST_FILE_MARKS: Final = "".join(chr(point) for point in (0x2713, 0x00D7, 0x276F))
+VITEST_FILE: Final[re.Pattern[str]] = re.compile(
+    rf"^ [{VITEST_FILE_MARKS}] +(?:\S+ +)?(\S+\.test\.[a-z]+) \(\d+ tests?[^)]*\) (\d+)ms$",
+    re.MULTILINE,
+)
+
+#: How many of the slowest files a verdict names.
+SLOWEST_FILES: Final = 3
+
 
 class Verdict(TypedDict):
     """One check's outcome, as the thread line carries it.
@@ -116,6 +134,13 @@ class Verdict(TypedDict):
             total must not depend on, and until MCPs board task 022efecf
             no record said what it was: packages/db's total changed with
             it, and nothing on the thread could show two runs differed.
+        slowest: The slowest test files and their seconds read off the
+            tail (:func:`read_slowest`), or ``unread``: where a total's
+            time went, which the total alone does not say (MCPs board
+            task 349e25ee).
+        ci: The host's CI load over the check
+            (:func:`fleet.core.ci_load.read_ci_load`): what else the
+            machine ran while the total was taken.
     """
 
     job_id: str
@@ -131,6 +156,31 @@ class Verdict(TypedDict):
     log_path: str
     run_id: str
     workers: int
+    slowest: str
+    ci: str
+
+
+def read_slowest(tail: str) -> str:
+    """Read the slowest test files off a transcript tail.
+
+    Args:
+        tail: The transcript's last lines.
+
+    Returns:
+        ``<file>:<s>s,...`` for the :data:`SLOWEST_FILES` slowest files
+        vitest timed, slowest first and seconds rounded, else ``unread``
+        (a pytest suite, which times no file, or a run that stopped before
+        any file finished).
+    """
+    # Each file as (-milliseconds, name), so the natural order is slowest
+    # first and a tie is broken by name.
+    ranked: list[tuple[int, str]] = sorted(
+        (-int(match.group(2)), str(match.group(1)))
+        for match in VITEST_FILE.finditer(ANSI.sub("", tail))
+    )
+    if not ranked:
+        return "unread"
+    return ",".join(f"{name}:{round(-ms / 1000)}s" for ms, name in ranked[:SLOWEST_FILES])
 
 
 def read_tests(tail: str) -> str:
@@ -272,6 +322,8 @@ def judge(
         log_path=log_path,
         run_id=run_id,
         workers=workers,
+        slowest=read_slowest(tail),
+        ci=read_ci_load(tail),
     )
 
 
@@ -284,10 +336,11 @@ def render_verdict(verdict: Verdict) -> str:
     Returns:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
-        ended=<time> log=<node>:<path> run=<run id> workers=<n>``, one
-        line, so a closure can quote it and a reader can grep a thread for
-        the prefix. ``workers`` comes last, after every field the readers
-        in MCPs' maketools and session-audit match one by one.
+        ended=<time> log=<node>:<path> run=<run id> workers=<n>
+        slowest=<...> ci=<...>``, one line, so a closure can quote it and a
+        reader can grep a thread for the prefix. ``workers``, ``slowest``
+        and ``ci`` come after every field the readers in MCPs' maketools
+        and session-audit match, each of which they match one by one.
     """
     return (
         f"{VERDICT_PREFIX} {verdict['job_id'][:8]} {verdict['project']} "
@@ -295,11 +348,13 @@ def render_verdict(verdict: Verdict) -> str:
         f"banner={'yes' if verdict['banner'] else 'no'} tests={verdict['tests']} "
         f"coverage={verdict['coverage']} budget={verdict['budget']} "
         f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
-        f"run={verdict['run_id']} workers={verdict['workers']}"
+        f"run={verdict['run_id']} workers={verdict['workers']} "
+        f"slowest={verdict['slowest']} ci={verdict['ci']}"
     )
 
 
 __all__ = [
+    "ANSI",
     "BUDGET_OVER",
     "BUDGET_WITHIN",
     "CHECK_BANNER",
@@ -307,13 +362,17 @@ __all__ = [
     "LOG_TAIL_LINES",
     "PASSED",
     "PYTEST_TOTAL",
+    "SLOWEST_FILES",
     "VERDICT_PREFIX",
     "VITEST_ALL_FILES",
+    "VITEST_FILE",
+    "VITEST_FILE_MARKS",
     "VITEST_THRESHOLD",
     "Verdict",
     "judge",
     "read_budget",
     "read_coverage",
+    "read_slowest",
     "read_tests",
     "read_unit_end",
     "render_verdict",

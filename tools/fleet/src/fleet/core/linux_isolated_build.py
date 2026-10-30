@@ -63,6 +63,7 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
+from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines, sh_ci_load_start_lines
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -205,6 +206,7 @@ def isolated_build_lines(
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
     shared = f"flock --shared '{EXEC_LANE_LOCK}'"
+    lines.extend(sh_ci_load_start_lines(CI_CPU_STAT))
     lines.extend(
         sh_phase_lines(
             phase=MAKE_TARGET,
@@ -212,6 +214,7 @@ def isolated_build_lines(
             log=log,
         )
     )
+    lines.extend(sh_ci_load_end_lines(CI_CPU_STAT, log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
     return lines
