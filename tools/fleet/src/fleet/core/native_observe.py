@@ -180,20 +180,22 @@ def observe_codex(
 
 
 def evidence_note(observations: list[JSONValue], evidence_seconds: int) -> str:
-    """The clause the observe pass's log line carries for its native evidence.
+    """The clause the observe pass's log line opens with for its native evidence.
 
     MCPs execution's served observe-pass-gaps case reads it from the hub's
     day logs and holds each gap between two passes to the lifetime the
     earlier one stamped (MCPs board task 17f74771): the ledger keeps one row
-    per session, so only the log records every pass.
+    per session, so only the log records every pass. It goes before the
+    board's answer, whose text runs over several lines, so it shares the
+    line that names the node.
 
     Args:
         observations: What :func:`observe_codex` produced for one pass.
         evidence_seconds: The lifetime each was stamped with.
 
     Returns:
-        ``""`` for a pass with none, else ``; native evidence for <n> Codex
-        session(s) read at <instant> lasts <seconds> s``.
+        ``""`` for a pass with none, else ``native evidence for <n> Codex
+        session(s) read at <instant> lasts <seconds> s; ``.
 
     Raises:
         JSONTypeError: An observation without its ``observedAt``.
@@ -202,8 +204,8 @@ def evidence_note(observations: list[JSONValue], evidence_seconds: int) -> str:
         return ""
     read_at = require_str(narrow_json_to_dict(observations[0]), "observedAt")
     return (
-        f"; native evidence for {len(observations)} Codex session(s) read at {read_at} "
-        f"lasts {evidence_seconds} s"
+        f"native evidence for {len(observations)} Codex session(s) read at {read_at} "
+        f"lasts {evidence_seconds} s; "
     )
 
 

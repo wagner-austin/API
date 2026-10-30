@@ -161,8 +161,8 @@ def test_existing_observer_submits_native_evidence_with_bounded_expiry(failure: 
     assert result == {
         "node": "ziggurat",
         "recorded": True,
-        "detail": "observed native evidence; native evidence for 1 Codex session(s) read at "
-        "1970-01-01T00:16:40+00:00 lasts 450 s",
+        "detail": "native evidence for 1 Codex session(s) read at "
+        "1970-01-01T00:16:40+00:00 lasts 450 s; observed native evidence",
     }
     assert runtime.calls == [
         (

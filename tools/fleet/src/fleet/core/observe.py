@@ -373,7 +373,7 @@ def observe_node(
     return NodeOutcome(
         node=node["name"],
         recorded=True,
-        detail=f"{detail}{native_observe.evidence_note(native, evidence_seconds)}",
+        detail=f"{native_observe.evidence_note(native, evidence_seconds)}{detail}",
     )
 
 
