@@ -5,7 +5,7 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -25,7 +25,7 @@ lint:
 # 2026-08-19 incident that motivated both.
 test:
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
 check:
@@ -41,7 +41,7 @@ _check-unbudgeted: lint | test
 # Coverage is off because the subset is not the suite; ``make check`` holds
 # the 100.
 execution:
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --no-cov
 
 # The runner host's cases (MCPs board task 715b9ec5): where lavender's
@@ -50,7 +50,7 @@ execution:
 # tools/fleet-execution-runners, pinned to that node; --runner-host names the
 # runners.json host the cases read, and no other run has their capability.
 execution-runners:
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --runner-host=lavender --no-cov
 
 # The hub's cases (MCPs board task 3d9eec0d): every enabled node's stage root,
@@ -59,7 +59,7 @@ execution-runners:
 # tools/fleet-execution-hub, pinned to the hub; --fleet-hub names that
 # checkout, and no other run has its records.
 execution-hub:
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test --host-execution --fleet-hub=$(HOME)/PROJECTS/API --no-cov
 
 # The committed JSON copies of the pins readers outside this package need:
