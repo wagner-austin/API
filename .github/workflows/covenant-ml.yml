@@ -1,21 +1,10 @@
 name: covenant-ml
 
-# covenant_ml's suite asserts the REAL Win32 boundary, so it runs on Windows.
-#
-# Its benchmarking layer opts the process out of Windows power throttling
-# (EcoQoS) through ctypes.WinDLL, and the tests exercise that boundary for
-# real rather than through a fake: `test_the_real_win32_boundary_accepts_the
-# _opt_out`, `test_state_struct_is_three_ulongs_wide` (12 bytes -- ulong is 4
-# on Win32 and 8 on Linux, so the same struct reads 24 there), and every
-# runner test that reaches the power opt-out on the way to a measurement.
-# On ubuntu in the shared `packages` matrix that is 8+ failures of the shape
-# `AttributeError: module 'ctypes' has no attribute 'WinDLL'` and
-# `assert 24 == 12` -- the platform, not the code. Same finding navprobe.yml
-# records (whose product is literally this boundary, one directory over),
-# same remedy: run the suite where its assumptions hold.
-#
-# The Windows verdict is real: 2026-09-08, this suite on Windows is green at
-# 100.00% statements AND branches (see the commit adding this file).
+# The encrypted WRDS/HPC3 evaluator executes on Linux and requires actual
+# POSIX private-directory modes and no-follow key opens. Run its entire suite
+# on the deployment platform, without skipping security cases. The former
+# WinDLL/EcoQoS tests cited here no longer live in covenant_ml; CPU determinism
+# is supplied by platform_core. Windows ACLs are not certified by this lane.
 #
 # The RUSTFLAGS baseline is copied from packages.yml for the same reason it
 # exists there: covenant_ml path-depends on cleargbm -> cleargbm_rs, whose
@@ -64,7 +53,7 @@ concurrency:
 
 jobs:
   check:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     # Bounds a hang, not a slow run: 11m is the slowest of the last ten
     # successes, so this is ~3x headroom. The default is 360 minutes, and
     # an unbounded job on a frozen runner holds its concurrency slot for

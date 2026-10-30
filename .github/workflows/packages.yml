@@ -38,12 +38,9 @@ name: packages
 #     is written against Windows separators and a case-insensitive filesystem
 #     -- 17 failures on ubuntu, none of them a defect in the bot, all of them
 #     a Windows path separator, which is an ordinary character on Linux.
-#   * libs/covenant_ml gets its own workflow on windows-latest (2026-09-08):
-#     its benchmarking tests exercise the REAL Win32 EcoQoS boundary through
-#     ctypes.WinDLL, which does not exist on Linux, and its struct-width
-#     assertion (12 bytes) reads 24 there because ulong doubles. The suite
-#     asserts a Windows contract; covenant-ml.yml runs it where that
-#     contract exists.
+#   * libs/covenant_ml keeps its own workflow on ubuntu-latest. Its encrypted
+#     WRDS/HPC3 evaluator requires Linux private-storage semantics; the entire
+#     suite, including those security cases, runs in covenant-ml.yml.
 #   * libs/cleargbm_rs is not a poetry project at all. It is a maturin/PEP-621
 #     Rust extension built with uv (`uv pip install -e ".[dev]"`), and its gate
 #     is cargo fmt, cargo clippy, cargo test and cargo llvm-cov at 100% SEGMENT
