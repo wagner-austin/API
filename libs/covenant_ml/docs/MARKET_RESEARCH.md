@@ -672,6 +672,23 @@ the bounded demo execution path, not a profitable signal or production readiness
 
 ## Frozen research proposal admission
 
+Evaluator-owned journal transitions `select` and `release_final` reserve final
+evaluation without adding a second queue or journal. Selection requires a
+completed validation attempt, no unsettled admitted work, and no earlier selection.
+It binds the candidate, the validation RunRecord's payload digest and the exact
+final-manifest digest. Later proposals remain recorded but receive `study_sealed`.
+Release must match all three identities and is consumed transactionally once;
+reopening the journal does not reset it. The original validation request and
+result remain attached to the selected attempt. The stored candidate identifies
+the benchmark configuration and feature set, not a separately selected learner.
+
+These transitions are for a trusted evaluator with exclusive journal access.
+They do not authenticate a caller, isolate a process, choose the winning candidate,
+or execute final scoring. No proposer-facing CLI grants these transitions, and the
+current compute worker still refuses final-partition proposals. An isolated
+controller must consume the release before accessing final data; interrupted
+release requires reconciliation, never automatic reauthorization.
+
 `scripts.research_proposals` records validation proposals under an evaluator-owned
 policy. It uses `platform_core.event_journal.EventJournal`, lifted from the
 execution rehearsal; those rehearsal callers now use the same persistence code.
