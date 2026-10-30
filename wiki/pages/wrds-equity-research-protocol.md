@@ -43,7 +43,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "838e19bcd90c3a99173409378160b14035d12b5d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "97d5165abfe06c0989c5d72653f79979ec104aca"
-  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "b38f758fde58a0161678dfaf17b801a482c83fc7"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "310c620a4669e5d80891e15e5788e8b9711cede8"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "6d9f476a5dc05858e71e3f5350cf81cd0676018c"
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
