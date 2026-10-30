@@ -350,3 +350,8 @@ in the new subprocess test, despite all 4,850 tests passing. Reused the existing
 shared environment reader in 9783dcd84; fleet gate f428dec3 on Serendipity passed
 all 4,850 tests, 100% coverage, typing and guards. This is test/code evidence;
 the grant extension has not received independent adequacy review.
+
+## [2026-10-30] new page | Runner job trees and the on-host runner audit
+Pages written: fleet-runner-disk-hygiene
+Pages updated: fleet-runner-listener-isolation-and-dropped-jobs, hubs/infrastructure, index
+Notes: records lavender's job-completed hook, the reaper's hook restarts, ci-clean's update and venv passes, and the lane's on-host runner audit (MCPs board tasks 621902c3 and faec98a5); repins the listener page's five stale sources after re-reading each cited line.
