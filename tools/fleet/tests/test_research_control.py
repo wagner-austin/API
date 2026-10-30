@@ -80,4 +80,9 @@ def test_real_controller_process_success_failure_and_timeout(tmp_path: pathlib.P
         research_control.invoke((sys.executable, "-c", "raise SystemExit(7)"), log, 10)
     with pytest.raises(ValueError, match="RESEARCH_CONTROLLER_PROCESS"):
         research_control.invoke((sys.executable, "-c", "import time; time.sleep(60)"), log, 1)
-    assert len(log.read_text().splitlines()) == 3
+    refusal = "print('{\"attempts\":[]}'); raise SystemExit(2)"
+    accepted = research_control.invoke((sys.executable, "-c", refusal), log, 10, accepted=(0, 2))
+    assert accepted == {"attempts": []}
+    with pytest.raises(ValueError, match="RESEARCH_CONTROLLER_PROCESS: exit 2"):
+        research_control.invoke((sys.executable, "-c", refusal), log, 10)
+    assert len(log.read_text().splitlines()) == 5
