@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal
 
 from platform_core.json_utils import (
     JSONObject,
@@ -70,7 +71,7 @@ def require_trial_attempt(path: Path, trial: ResearchTrial) -> ResearchAttempt:
     return rows[number - 1]
 
 
-def _command(
+def cluster_command(
     cluster: ResearchCluster, directory: Path, module: str, args: tuple[str, ...], log: str
 ) -> Path:
     """Run a maintained HPC3 CLI with durable output and real failure propagation.
@@ -104,13 +105,20 @@ def _command(
     return output
 
 
-def _require_receipt(document: JSONObject, trial: ResearchTrial, directory: Path) -> str:
+def require_receipt(
+    document: JSONObject,
+    trial: ResearchTrial,
+    directory: Path,
+    *,
+    final: bool = False,
+) -> str:
     """Bind a returned ledger row to the frozen recipe and request.
 
     Args:
         document: HPC3 ledger encoding.
         trial: Expected admission.
         directory: Persisted recipe.
+        final: Require the final allocation identity instead of validation.
 
     Returns:
         Numeric Slurm allocation id.
@@ -124,7 +132,7 @@ def _require_receipt(document: JSONObject, trial: ResearchTrial, directory: Path
     request_digest = sha256(dump_json_str(encode_research_trial(trial)).encode()).hexdigest()
     if (
         not job.isdecimal()
-        or experiment.get("research_attempt") != attempt_identity(trial)
+        or experiment.get("research_attempt") != attempt_identity(trial, final=final)
         or experiment.get("request_sha256") != request_digest
         or document.get("artifact") != recipe["artifact"]
         or document.get("image_digest") != trial["policy"]["image_digest"]
@@ -154,7 +162,33 @@ def submit_attempt(
     require_trial_attempt(path, trial)
     trial_event(path, trial, "submit", {})
     prepare_bundle(directory, cluster, trial)
-    _command(
+    job = stage_and_submit(trial, cluster, directory)
+    return trial_event(path, trial, "scheduled", {"job_id": job})
+
+
+def stage_and_submit(
+    trial: ResearchTrial,
+    cluster: ResearchCluster,
+    directory: Path,
+    *,
+    final: bool = False,
+) -> str:
+    """Stage a reserved immutable recipe, submit it and verify its native receipt.
+
+    Args:
+        trial: Frozen request with an already-reserved submission intent.
+        cluster: Maintained transport settings.
+        directory: Prepared recipe and checksum bundle.
+        final: Bind a final allocation rather than validation.
+
+    Returns:
+        Numeric job identity from the existing HPC3 ledger.
+
+    Raises:
+        RuntimeError: Transport failed; caller retains its submission intent.
+        ValueError: Native receipt differs from the reserved request.
+    """
+    cluster_command(
         cluster,
         directory,
         "stage",
@@ -168,15 +202,54 @@ def submit_attempt(
         ),
         "stage.log",
     )
-    output = _command(
+    output = cluster_command(
         cluster,
         directory,
         "submit",
         ("--run", str(directory / "run.json"), "--format", "json"),
         "submit.log",
     )
-    job = _require_receipt(read_document(output), trial, directory)
-    return trial_event(path, trial, "scheduled", {"job_id": job})
+    return require_receipt(read_document(output), trial, directory, final=final)
+
+
+def observe_attempt(
+    trial: ResearchTrial,
+    cluster: ResearchCluster,
+    directory: Path,
+    *,
+    final: bool = False,
+) -> JSONObject:
+    """Retain a fresh observation from the existing native ledger and evidence verifier.
+
+    Args:
+        trial: Exact frozen request.
+        cluster: Original transport and report settings.
+        directory: Existing reserved recipe directory.
+        final: Observe the final allocation identity.
+
+    Returns:
+        Native accounting and, on completion, measured data/result evidence.
+
+    Raises:
+        RuntimeError: Observation process failed; earlier receipts remain intact.
+        ValueError: Native CLI refuses missing, ambiguous or changed evidence.
+    """
+    log = f"observe-{len(tuple(directory.glob('observe-*.log')))}.log"
+    output = cluster_command(
+        cluster,
+        directory,
+        "execution_inspect",
+        (
+            "--attempt",
+            attempt_identity(trial, final=final),
+            "--checksums",
+            str(directory / "checksums.txt"),
+            "--report-task",
+            cluster["report_task"],
+        ),
+        log,
+    )
+    return read_document(output)
 
 
 def reconcile_attempt(
@@ -200,24 +273,8 @@ def reconcile_attempt(
     row = require_trial_attempt(path, trial)
     if row["status"] not in {"submitting", "running"}:
         raise ValueError("RESEARCH_EXECUTION_STATE: require submitting or running attempt")
-    # Every observation is preserved, including failures, across controller restarts.
-    log = f"observe-{len(tuple(directory.glob('observe-*.log')))}.log"
-    output = _command(
-        cluster,
-        directory,
-        "execution_inspect",
-        (
-            "--attempt",
-            attempt_identity(trial),
-            "--checksums",
-            str(directory / "checksums.txt"),
-            "--report-task",
-            cluster["report_task"],
-        ),
-        log,
-    )
-    report = read_document(output)
-    job = _require_receipt(require_dict(report, "ledger"), trial, directory)
+    report = observe_attempt(trial, cluster, directory)
+    job = require_receipt(require_dict(report, "ledger"), trial, directory)
     if row["status"] == "submitting":
         row = trial_event(path, trial, "scheduled", {"job_id": job})
     if row["job_id"] != job:
@@ -226,18 +283,9 @@ def reconcile_attempt(
     native = require_dict(accounting, "job")
     state = require_str(native, "state")
     if state == "COMPLETED":
-        measurement = require_dict(report, "measurement")
-        if require_dict(measurement, "accounting") != accounting:
-            raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured accounting differs")
-        dataset = require_dict(measurement, "dataset")
-        bundle = decode_encrypted_bundle(require_dict(dataset, "bundle"))
-        verified = require_dict(measurement, "verified_files")
-        if (
-            dataset.get("bundle_sha256") != trial["policy"]["dataset_digest"]
-            or verified.get(trial["manifest"]) != trial["policy"]["dataset_digest"]
-            or bundle["partition"] != "train-validation"
-        ):
-            raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured dataset differs from admission")
+        require_measured_dataset(
+            report, trial["manifest"], trial["policy"]["dataset_digest"], "train-validation"
+        )
         return trial_event(
             path,
             trial,
@@ -257,4 +305,45 @@ def reconcile_attempt(
     return row
 
 
-__all__ = ["reconcile_attempt", "require_trial_attempt", "submit_attempt", "trial_event"]
+def require_measured_dataset(
+    report: JSONObject,
+    manifest: str,
+    digest: str,
+    partition: Literal["train-validation", "final"],
+) -> None:
+    """Verify native accounting and exact encrypted input identities for either split.
+
+    Args:
+        report: Existing native execution inspection response.
+        manifest: Expected ciphertext manifest path.
+        digest: Expected ciphertext manifest hash.
+        partition: Authorized validation or final partition.
+
+    Raises:
+        ValueError: RESEARCH_EXECUTION_RECEIPT for mismatched measured evidence.
+    """
+    measurement = require_dict(report, "measurement")
+    if require_dict(measurement, "accounting") != require_dict(report, "accounting"):
+        raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured accounting differs")
+    dataset = require_dict(measurement, "dataset")
+    bundle = decode_encrypted_bundle(require_dict(dataset, "bundle"))
+    verified = require_dict(measurement, "verified_files")
+    if (
+        dataset.get("bundle_sha256") != digest
+        or verified.get(manifest) != digest
+        or bundle["partition"] != partition
+    ):
+        raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured dataset differs from admission")
+
+
+__all__ = [
+    "cluster_command",
+    "observe_attempt",
+    "reconcile_attempt",
+    "require_measured_dataset",
+    "require_receipt",
+    "require_trial_attempt",
+    "stage_and_submit",
+    "submit_attempt",
+    "trial_event",
+]

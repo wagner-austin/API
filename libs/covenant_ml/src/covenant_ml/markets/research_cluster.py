@@ -31,6 +31,40 @@ class ResearchCluster(TypedDict):
     report_task: ReadOnly[str]
 
 
+class FinalExecution(TypedDict):
+    """Exact final ciphertext and delivered grant used by the native worker."""
+
+    manifest: ReadOnly[str]
+    manifest_digest: ReadOnly[str]
+    grant_directory: ReadOnly[str]
+
+
+def encode_final_execution(value: FinalExecution) -> JSONObject:
+    """Encode public final execution paths and ciphertext identity."""
+    return {
+        "manifest": value["manifest"],
+        "manifest_digest": value["manifest_digest"],
+        "grant_directory": value["grant_directory"],
+    }
+
+
+def decode_final_execution(document: JSONObject) -> FinalExecution:
+    """Require exact fields, ciphertext digest and absolute non-traversing paths."""
+    if set(document) != set(FinalExecution.__annotations__):
+        raise ValueError("RESEARCH_FINAL_EXECUTION: exact fields required")
+    manifest = require_nonempty(document, "manifest")
+    directory = require_nonempty(document, "grant_directory")
+    for value in (manifest, directory):
+        path = PurePosixPath(value)
+        if not path.is_absolute() or ".." in path.parts:
+            raise ValueError("RESEARCH_FINAL_EXECUTION: absolute non-traversing paths required")
+    return FinalExecution(
+        manifest=manifest,
+        grant_directory=directory,
+        manifest_digest=require_evidence_digest(require_nonempty(document, "manifest_digest")),
+    )
+
+
 def encode_research_cluster(value: ResearchCluster) -> JSONObject:
     """Encode all execution settings.
 
@@ -94,25 +128,34 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
     return value
 
 
-def attempt_identity(trial: ResearchTrial) -> str:
+def attempt_identity(trial: ResearchTrial, *, final: bool = False) -> str:
     """Bind one attempt number to its entire frozen policy.
 
     Args:
         trial: Admitted trial request.
+        final: Identify the selected attempt's single final native allocation.
 
     Returns:
         Unique experiment identity within this study's journal.
     """
-    return f"{research_policy_digest(trial['policy'])}:{trial['number']}"
+    suffix = ":final" if final else ""
+    return f"{research_policy_digest(trial['policy'])}:{trial['number']}{suffix}"
 
 
-def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTrial) -> None:
+def prepare_bundle(
+    directory: Path,
+    cluster: ResearchCluster,
+    trial: ResearchTrial,
+    *,
+    final: FinalExecution | None = None,
+) -> None:
     """Freeze a new request, checksum file, staging manifest and bounded recipe.
 
     Args:
         directory: Exclusive new local attempt directory.
         cluster: Operator-owned runtime and pre-staged input identities.
         trial: Request reconstructed from the admission journal.
+        final: Released final ciphertext and private grant, or validation access.
 
     Raises:
         ValueError: RESEARCH_CLUSTER_INPUTS for unpinned code, runtime or manifest.
@@ -122,14 +165,27 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
     lines = set(cluster["checksums"].splitlines())
     required = {
         f"{policy['image_digest']}  {cluster['image']}",
-        f"{policy['dataset_digest']}  {trial['manifest']}",
         f"{policy['code_digest']}  {cluster['entrypoint']}/scripts/research_trial.py",
-        f"{cluster['access_digest']}  {cluster['access']}",
     }
+    access = ["--access", cluster["access"]]
+    if final is None:
+        required.update(
+            {
+                f"{policy['dataset_digest']}  {trial['manifest']}",
+                f"{cluster['access_digest']}  {cluster['access']}",
+            }
+        )
+    else:
+        final = decode_final_execution(encode_final_execution(final))
+        required.add(f"{final['manifest_digest']}  {final['manifest']}")
+        access = ["--final-manifest", final["manifest"], "--final-grant", final["grant_directory"]]
     if not required <= lines:
         raise ValueError("RESEARCH_CLUSTER_INPUTS: require frozen runtime, manifest and entrypoint")
     directory.mkdir(parents=True, exist_ok=False)
     remote = PurePosixPath(cluster["root"]) / research_policy_digest(policy) / str(trial["number"])
+    if final is not None:
+        remote = remote / "final"
+    identity = attempt_identity(trial, final=final is not None)
     request = dump_json_str(encode_research_trial(trial))
     request_digest = sha256(request.encode()).hexdigest()
     checksums = cluster["checksums"].rstrip("\n") + f"\n{request_digest}  {remote}/request.json\n"
@@ -144,7 +200,7 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
         destination=str(remote),
         files=files,
         provenance={
-            "research_attempt": attempt_identity(trial),
+            "research_attempt": identity,
             "policy": research_policy_digest(policy),
         },
     )
@@ -165,8 +221,7 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
             str(remote / "request.json"),
             "--out",
             output,
-            "--access",
-            cluster["access"],
+            *access,
         ]
     )
     command = (
@@ -179,11 +234,14 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
     )
     recipe: JSONObject = {
         "project": cluster["project"],
-        "name": "research-" + research_policy_digest(policy)[:12] + f"-{trial['number']}",
+        "name": "research-"
+        + research_policy_digest(policy)[:12]
+        + f"-{trial['number']}"
+        + ("-final" if final is not None else ""),
         "command": shlex.join(["bash", "-c", command]),
         "artifact": output,
         "experiment": {
-            "research_attempt": attempt_identity(trial),
+            "research_attempt": identity,
             "request_sha256": request_digest,
         },
         "cpus": 1,
@@ -198,9 +256,12 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
 
 
 __all__ = [
+    "FinalExecution",
     "ResearchCluster",
     "attempt_identity",
+    "decode_final_execution",
     "decode_research_cluster",
+    "encode_final_execution",
     "encode_research_cluster",
     "prepare_bundle",
 ]

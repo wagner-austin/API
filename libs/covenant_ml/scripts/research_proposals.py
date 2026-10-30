@@ -17,6 +17,40 @@ from platform_core.determinism_cpu import PinProtocol, pin_single_thread
 from platform_core.json_utils import JSONObject, dump_json_str
 
 
+def _arguments(argv: list[str] | None) -> argparse.Namespace:
+    """Parse explicit controller actions before reading any evaluator input."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--policy", required=True, type=Path)
+    parser.add_argument("--ledger", required=True, type=Path)
+    commands = parser.add_subparsers(dest="action", required=True)
+    commands.add_parser("init")
+    commands.add_parser("status")
+    propose = commands.add_parser("propose")
+    propose.add_argument("--proposal", required=True, type=Path)
+    for name in ("submit", "reconcile", "submit-final", "reconcile-final"):
+        execution = commands.add_parser(name)
+        execution.add_argument("--trial", required=True, type=Path)
+        execution.add_argument("--cluster", required=True, type=Path)
+        execution.add_argument("--directory", required=True, type=Path)
+        if name.endswith("-final"):
+            execution.add_argument("--remote-manifest", required=True)
+    select = commands.add_parser("select")
+    select.add_argument("--trial", required=True, type=Path)
+    select.add_argument("--final-manifest", required=True, type=Path)
+    release = commands.add_parser("release")
+    release.add_argument("--trial", required=True, type=Path)
+    release.add_argument("--final-manifest", required=True, type=Path)
+    release.add_argument("--access", required=True, type=Path)
+    release.add_argument("--directory", required=True, type=Path)
+    deliver = commands.add_parser("deliver")
+    deliver.add_argument("--trial", required=True, type=Path)
+    deliver.add_argument("--final-manifest", required=True, type=Path)
+    deliver.add_argument("--cluster", required=True, type=Path)
+    deliver.add_argument("--directory", required=True, type=Path)
+    deliver.add_argument("--destination", required=True)
+    return parser.parse_args(argv)
+
+
 def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) -> int:
     """Initialize or inspect the journal, record a proposal, run it or select it.
 
@@ -25,7 +59,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         pin: Numerical initializer before importing covenant_ml.
 
     Returns:
-        Zero on initialization/status/admission, two for a policy refusal.
+        Zero on successful operations, two for a policy refusal.
 
     Raises:
         ValueError: Malformed policy/proposal or altered journal evidence.
@@ -45,38 +79,15 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         research_policy_digest,
     )
     from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
+    from covenant_ml.markets.research_native_final import (
+        reconcile_final_attempt,
+        submit_final_attempt,
+    )
     from covenant_ml.markets.research_records import decode_research_policy
     from covenant_ml.markets.research_trial_records import decode_research_trial
     from covenant_ml.markets.validation import parse_timestamp, read_document
 
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--policy", required=True, type=Path)
-    parser.add_argument("--ledger", required=True, type=Path)
-    commands = parser.add_subparsers(dest="action", required=True)
-    commands.add_parser("init")
-    commands.add_parser("status")
-    propose = commands.add_parser("propose")
-    propose.add_argument("--proposal", required=True, type=Path)
-    for name in ("submit", "reconcile"):
-        execution = commands.add_parser(name)
-        execution.add_argument("--trial", required=True, type=Path)
-        execution.add_argument("--cluster", required=True, type=Path)
-        execution.add_argument("--directory", required=True, type=Path)
-    select = commands.add_parser("select")
-    select.add_argument("--trial", required=True, type=Path)
-    select.add_argument("--final-manifest", required=True, type=Path)
-    release = commands.add_parser("release")
-    release.add_argument("--trial", required=True, type=Path)
-    release.add_argument("--final-manifest", required=True, type=Path)
-    release.add_argument("--access", required=True, type=Path)
-    release.add_argument("--directory", required=True, type=Path)
-    deliver = commands.add_parser("deliver")
-    deliver.add_argument("--trial", required=True, type=Path)
-    deliver.add_argument("--final-manifest", required=True, type=Path)
-    deliver.add_argument("--cluster", required=True, type=Path)
-    deliver.add_argument("--directory", required=True, type=Path)
-    deliver.add_argument("--destination", required=True)
-    args = parser.parse_args(argv)
+    args = _arguments(argv)
     action: str = args.action
     policy_path: Path = args.policy
     ledger_path: Path = args.ledger
@@ -132,6 +143,16 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
             cluster_path: Path = args.cluster
             directory: Path = args.directory
             cluster = decode_research_cluster(read_document(cluster_path))
+            if action in {"submit-final", "reconcile-final"}:
+                final_operation = (
+                    submit_final_attempt if action == "submit-final" else reconcile_final_attempt
+                )
+                remote_manifest: str = args.remote_manifest
+                native_report = final_operation(
+                    ledger_path, trial, cluster, directory.resolve(), remote_manifest
+                )
+                sys.stdout.write(dump_json_str(native_report) + "\n")
+                return 0
             operation = submit_attempt if action == "submit" else reconcile_attempt
             attempts = (operation(ledger_path, trial, cluster, directory.resolve()),)
     report: JSONObject = {
