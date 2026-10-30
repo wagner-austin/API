@@ -47,10 +47,19 @@ from fleet.core.ci_clean import (
     REPORT_BUILD_CACHE_BEFORE,
     REPORT_DIGEST,
     REPORT_HELD,
+    REPORT_RUNNER_UPDATE,
     REPORT_RUNNING,
     REPORT_STARTED,
+    REPORT_WORK_TREE,
 )
-from fleet.core.runner_job_scope_render import JOB_HOOK_PATH, JOB_HOOK_SCRIPT
+from fleet.core.runner_job_scope_render import (
+    HOOK_DROP_IN,
+    HOOK_DROP_IN_NAME,
+    JOB_HOOK_PATH,
+    JOB_HOOK_SCRIPT,
+)
+from fleet.core.runner_unit_files import drop_in_path
+from fleet.core.runner_work_clear import JOB_COMPLETED_HOOK_PATH, JOB_COMPLETED_SCRIPT
 from fleet.core.tool_caches import REMOVAL_GRACE_SECONDS
 from tests._host import READING_PROPERTY, command_output, unit_properties
 
@@ -337,4 +346,73 @@ def test_the_job_started_hook_that_hands_each_job_its_cache_generation_is_the_re
         READING_PROPERTY,
         f"{runner_host['name']}: {JOB_HOOK_PATH} is the render of JOB_HOOK_SCRIPT, "
         f"{len(JOB_HOOK_SCRIPT.splitlines())} lines",
+    )
+
+
+class WorkTree(NamedTuple):
+    """One install's job trees as ci-clean's report reads them."""
+
+    state: str
+    started: str
+    cleared: str
+    files: int
+    megabytes: int
+
+
+@pytest.mark.host_runner_units
+def test_each_idle_runner_install_s_job_trees_are_empty_once_its_hook_has_run(
+    runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
+) -> None:
+    """MCPs board task 621902c3: on lavender on 2026-10-30 the API installs
+    each kept the 6 GB torch venv their last job built until their next job.
+    The job-completed hook empties a job's trees as it ends, so every unit's
+    drop-in must name it and the installed hook be the render, and ci-clean's
+    report, read here since the runner account's home is closed to the
+    fleet's user, must find no file in the job trees of an idle install its
+    hook cleared after its last job started."""
+    assert pathlib.Path(JOB_COMPLETED_HOOK_PATH).read_text(encoding="utf-8") == (
+        JOB_COMPLETED_SCRIPT
+    )
+    for install in runner_host["installs"]:
+        drop_in = pathlib.Path(drop_in_path(install, HOOK_DROP_IN_NAME))
+        assert drop_in.read_text(encoding="utf-8") == HOOK_DROP_IN, f"{drop_in} is not the render"
+    lines = pathlib.Path(CI_CLEAN_REPORT).read_text(encoding="utf-8").splitlines()
+    trees: dict[str, WorkTree] = {}
+    for line in _fields(lines, REPORT_WORK_TREE):
+        install_name, rest = line.split(" ", 1)
+        state, started, cleared, held = rest.split(", ", 3)
+        files, megabytes = held.removesuffix(" MB) in its job trees").split(" files (")
+        trees[install_name] = WorkTree(
+            state,
+            started.removeprefix("started "),
+            cleared.removeprefix("cleared "),
+            int(files),
+            int(megabytes),
+        )
+    roster = sorted(
+        pathlib.PurePosixPath(install["workdir"]).parent.name for install in runner_host["installs"]
+    )
+    owed = [
+        name
+        for name, tree in sorted(trees.items())
+        if tree.state == "idle"
+        and tree.cleared != "never"
+        and (tree.started == "never" or int(tree.cleared) >= int(tree.started))
+    ]
+
+    assert sorted(trees) == roster, f"{CI_CLEAN_REPORT} reports the installs {sorted(trees)}"
+    assert [f"{name}: {trees[name].files} files" for name in owed if trees[name].files] == []
+    record_property(
+        READING_PROPERTY,
+        f"{runner_host['name']}: {JOB_COMPLETED_HOOK_PATH} is the render and "
+        f"{len(runner_host['installs'])} units' {HOOK_DROP_IN_NAME} name it; ci-clean read "
+        f"{len(trees)} install(s), {len(owed)} idle and cleared after their last job, each "
+        "0 files; "
+        + "; ".join(
+            f"{name} {tree.state}, started {tree.started}, cleared {tree.cleared}, "
+            f"{tree.files} files ({tree.megabytes} MB)"
+            for name, tree in sorted(trees.items())
+        )
+        + "; "
+        + ("; ".join(_fields(lines, REPORT_RUNNER_UPDATE)) or "no runner update on disk"),
     )

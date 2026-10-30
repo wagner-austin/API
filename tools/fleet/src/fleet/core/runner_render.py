@@ -53,7 +53,11 @@ from fleet.core.runner_install import (
     install_root_for,
     token_variable,
 )
-from fleet.core.runner_job_scope_render import render_job_hook_lines, render_job_scope_lines
+from fleet.core.runner_job_scope_render import (
+    render_hooks_live_lines,
+    render_job_hook_lines,
+    render_job_scope_lines,
+)
 from fleet.core.runner_reaper_render import render_kill_mode_lines, render_reaper_lines
 from fleet.core.runner_recovery import render_recovery_lines
 from fleet.core.runner_retire_render import render_retire_lines
@@ -256,6 +260,7 @@ def render_install_lines(install: RunnerInstall) -> list[str]:
         f"(cd '{directory}' && ./svc.sh start)",
         *render_cache_adopt_now_lines(install),
         *render_runner_slice_move_lines(install),
+        *render_hooks_live_lines(install),
     ]
 
 

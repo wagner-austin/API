@@ -54,9 +54,11 @@ RUNNER_MARKERS: Final = "$HOME/.cache/fleet-jobs"
 #: Where the runner account's poetry virtualenvs live, outside the generations.
 RUNNER_VIRTUALENVS: Final = "$HOME/.cache/pypoetry/virtualenvs"
 
-#: The hook's lines, before it moves the job into its scope. A ``RUNNER_TEMP``
-#: outside a runner install's ``_work/_temp`` fails the job by name.
-HOOK_LINES: Final = (
+#: The lines that name the job's runner install, ``install_root``, and its
+#: marker directory, ``marker_dir``, which both job hooks open with. A
+#: ``RUNNER_TEMP`` outside a runner install's ``_work/_temp`` fails the job by
+#: name.
+INSTALL_LINES: Final = (
     'case "$RUNNER_TEMP" in',
     "    */_work/_temp) ;;",
     '    *) echo "FLEET_RUNNER_CACHES_REFUSED: RUNNER_TEMP $RUNNER_TEMP is no runner'
@@ -65,6 +67,11 @@ HOOK_LINES: Final = (
     'install_root="${RUNNER_TEMP%/_work/_temp}"',
     f'marker_dir="{RUNNER_MARKERS}/${{install_root##*/}}"',
     'mkdir -p "$marker_dir"',
+)
+
+#: The job-started hook's lines, before it moves the job into its scope.
+HOOK_LINES: Final = (
+    *INSTALL_LINES,
     *sh_build_lines(
         tools=f'"{RUNNER_TOOLS}"',
         marker=f'"$marker_dir/{names.GENERATION_MARKER_NAME}"',
@@ -79,4 +86,4 @@ HOOK_LINES: Final = (
     'echo "fleet-runner-job-started: npm, pip and poetry read cache generation $generation"',
 )
 
-__all__ = ["HOOK_LINES", "RUNNER_MARKERS", "RUNNER_TOOLS", "RUNNER_VIRTUALENVS"]
+__all__ = ["HOOK_LINES", "INSTALL_LINES", "RUNNER_MARKERS", "RUNNER_TOOLS", "RUNNER_VIRTUALENVS"]

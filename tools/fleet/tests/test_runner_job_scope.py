@@ -535,6 +535,8 @@ class TestTheRenderedPieces:
         assert runner_job_scope_render.HOOK_DROP_IN == (
             "[Service]\nEnvironment=ACTIONS_RUNNER_HOOK_JOB_STARTED="
             "/usr/local/bin/fleet-runner-job-started.sh\n"
+            "Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED="
+            "/usr/local/bin/fleet-runner-job-completed.sh\n"
         )
         assert runner_job_scope_render.render_job_hook_lines(_install()) == render_drop_in_lines(
             _install(),

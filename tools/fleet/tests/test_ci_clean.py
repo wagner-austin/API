@@ -9,6 +9,7 @@ would pass a script that deletes everything or nothing.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import shlex
 import subprocess
@@ -52,7 +53,9 @@ def test_the_download_caches_go_only_by_whole_generations() -> None:
     could part a poetry metadata file from its body."""
     caches = ci_clean.CI_CLEAN_CACHES
     assert caches.index(ci_clean.GENERATIONS_SWEEP) < caches.index(ci_clean.GENERATION_READERS)
-    assert caches.endswith(ci_clean.GENERATION_READERS + "\n")
+    assert caches.index(ci_clean.GENERATION_READERS) < caches.index(ci_clean.WORK_TREES)
+    assert caches.endswith(ci_clean.WORK_TREES + "\n")
+    assert ci_clean.WORK_TREES == "\n".join(ci_clean.work_trees_lines(60))
     assert (
         'remove_unused "$HOME/.cache/fleet-tools" "$HOME/.cache/fleet-jobs"'
         in ci_clean.GENERATIONS_SWEEP.splitlines()
@@ -369,3 +372,121 @@ def test_the_python_half_stops_on_a_pth_it_cannot_read(tmp_path: pathlib.Path) -
 
     assert (ran.returncode, ran.stderr) == (1, f"venv-sweep: cannot read {pth}\n")
     assert venv.exists()
+
+
+def _install(home: pathlib.Path, install: str, *, job_files: int) -> pathlib.Path:
+    """Lay out one runner install's ``_work`` under the runner account's home.
+
+    Its repository's tree holds the workspace, and ``job_files`` files of one
+    MiB each in a clone beside it; ``_update`` holds a 2 MiB runner archive
+    unpacked now, and ``_tool`` a 1 MiB toolchain.
+
+    Args:
+        home: The runner account's home.
+        install: The install's directory name.
+        job_files: How many files its last job left.
+
+    Returns:
+        The install's ``_work``.
+    """
+    work = home / install / "_work"
+    (work / "repo" / "repo").mkdir(parents=True)
+    clone = work / "repo" / "wiki"
+    clone.mkdir()
+    for index in range(job_files):
+        (clone / f"page-{index}.md").write_bytes(bytes(MIB))
+    (work / "_update" / "bin").mkdir(parents=True)
+    (work / "_update" / "bin" / "Runner.Listener").write_bytes(bytes(2 * MIB))
+    (work / "_tool").mkdir()
+    (work / "_tool" / "python.tar").write_bytes(bytes(MIB))
+    return work
+
+
+def _run_work_trees(
+    tmp_path: pathlib.Path, home: pathlib.Path, grace_minutes: int
+) -> subprocess.CompletedProcess[str]:
+    """Execute the work-tree lines, after the running-install lookup, for one home.
+
+    Args:
+        tmp_path: Where the script is written.
+        home: The runner account's home.
+        grace_minutes: The update's grace.
+
+    Returns:
+        The finished run.
+    """
+    script = tmp_path / "work.sh"
+    lines = (*ci_clean.RUNNER_GENERATIONS_IN_USE, *ci_clean.work_trees_lines(grace_minutes))
+    header = f"set -euo pipefail\nHOME={shlex.quote(str(home))}\n"
+    script.write_text(header + "".join(f"{line}\n" for line in lines), encoding="utf-8")
+    return subprocess.run(
+        [host_bash(), str(script)], capture_output=True, text=True, check=False, timeout=120
+    )
+
+
+@pytest.mark.host_linux
+def test_a_settled_update_goes_and_every_install_s_job_trees_are_reported(
+    tmp_path: pathlib.Path,
+) -> None:
+    """MCPs board task 621902c3: the update goes whole, the job trees and the
+    toolchain stay, and each install's line says whether a job runs from it,
+    when its hook last emptied it and what its job trees hold."""
+    home = tmp_path / "home"
+    busy, cleared, fresh = (
+        f"actions-runner-{role}-{tmp_path.name}" for role in ("busy", "cleared", "fresh")
+    )
+    works = {
+        busy: _install(home, busy, job_files=3),
+        cleared: _install(home, cleared, job_files=0),
+        fresh: _install(home, fresh, job_files=2),
+    }
+    # Its last job started at 1793380000 and its hook emptied its trees after.
+    _marker(home, cleared, "1793300000")
+    markers = home / ".cache" / "fleet-jobs" / cleared
+    os.utime(markers / names.GENERATION_MARKER_NAME, (0, 1793380000))
+    (markers / "work-cleared").write_text("1793390000 48 6389\n", encoding="utf-8")
+    worker = _worker(home / busy)
+
+    try:
+        ran = _run_work_trees(tmp_path, home, 0)
+    finally:
+        worker.kill()
+        worker.wait(timeout=10)
+
+    assert ran.returncode == 0, ran.stderr
+    assert ran.stdout.splitlines() == [
+        f"runner-update: removed {busy}'s _update (2 MB)",
+        f"work-tree: {busy} running, started never, cleared never, 3 files (3 MB) in its job "
+        "trees",
+        f"runner-update: removed {cleared}'s _update (2 MB)",
+        f"work-tree: {cleared} idle, started 1793380000, cleared 1793390000, 0 files (0 MB) in "
+        "its job trees",
+        f"runner-update: removed {fresh}'s _update (2 MB)",
+        f"work-tree: {fresh} idle, started never, cleared never, 2 files (2 MB) in its job trees",
+    ]
+    assert [(work / "_update").exists() for work in works.values()] == [False] * 3
+    assert [len(list((work / "repo" / "wiki").iterdir())) for work in works.values()] == [3, 0, 2]
+    assert [(work / "_tool" / "python.tar").stat().st_size for work in works.values()] == [MIB] * 3
+
+
+@pytest.mark.host_linux
+def test_an_update_unpacked_within_the_grace_is_kept(tmp_path: pathlib.Path) -> None:
+    """An archive keeps its own modification times when unpacked, so the
+    change time, which is the unpacking's, is what the grace reads."""
+    home = tmp_path / "home"
+    install = f"actions-runner-updating-{tmp_path.name}"
+    work = _install(home, install, job_files=0)
+    archived = time.time() - 30 * DAY
+    listener = work / "_update" / "bin" / "Runner.Listener"
+    for path in (listener, listener.parent, listener.parent.parent):
+        os.utime(path, (archived, archived))
+
+    ran = _run_work_trees(tmp_path, home, 60)
+
+    assert ran.returncode == 0, ran.stderr
+    assert ran.stdout.splitlines() == [
+        f"runner-update: kept {install}'s _update, changed within 3600 s",
+        f"work-tree: {install} idle, started never, cleared never, 0 files (0 MB) in its job "
+        "trees",
+    ]
+    assert listener.stat().st_size == 2 * MIB

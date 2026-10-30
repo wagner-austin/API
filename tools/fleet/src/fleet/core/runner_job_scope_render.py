@@ -19,7 +19,9 @@ which carries no bound, and each job is moved into a scope of
    :data:`JOB_HOOK_PATH`, which the runner runs, before the job's steps, as
    a descendant of the job's ``Runner.Worker``. It first hands the job its
    package caches' generation (:mod:`fleet.core.runner_tool_caches`, MCPs
-   board task 4b405239).
+   board task 4b405239). The same drop-in sets
+   ``ACTIONS_RUNNER_HOOK_JOB_COMPLETED``, which empties the job's trees as it
+   ends (:mod:`fleet.core.runner_work_clear`, MCPs board task 621902c3).
 2. The hook runs :data:`JOB_SCOPE_PATH` as root through a sudoers rule that
    permits that one command with no argument.
 3. The helper walks its own ancestors to the ``Runner.Worker``, refuses one
@@ -53,6 +55,11 @@ from fleet.core.runner_proc_bash import (
 )
 from fleet.core.runner_tool_caches import HOOK_LINES
 from fleet.core.runner_unit_files import render_drop_in_lines
+from fleet.core.runner_work_clear import (
+    COMPLETED_HOOK_VARIABLE,
+    JOB_COMPLETED_HOOK_PATH,
+    JOB_COMPLETED_SCRIPT,
+)
 from fleet.core.runner_workspace_unlock import UNLOCK_LINES
 from fleet.core.script_values import scriptable
 
@@ -69,8 +76,13 @@ HOOK_VARIABLE = "ACTIONS_RUNNER_HOOK_JOB_STARTED"
 #: The runner drop-in's file name inside ``<unit>.d``.
 HOOK_DROP_IN_NAME = "fleet-job-scope.conf"
 
-#: The drop-in's body.
-HOOK_DROP_IN = f"[Service]\nEnvironment={HOOK_VARIABLE}={JOB_HOOK_PATH}\n"
+#: The drop-in's body: the job-started hook, and the job-completed hook that
+#: empties the job's trees (:mod:`fleet.core.runner_work_clear`, MCPs board task
+#: 621902c3).
+HOOK_DROP_IN = (
+    f"[Service]\nEnvironment={HOOK_VARIABLE}={JOB_HOOK_PATH}\n"
+    f"Environment={COMPLETED_HOOK_VARIABLE}={JOB_COMPLETED_HOOK_PATH}\n"
+)
 
 #: The sudoers file. No dot in the name: sudo skips such files in sudoers.d.
 SUDOERS_PATH = "/etc/sudoers.d/fleet-runner-job-scope"
@@ -257,10 +269,10 @@ fi
 
 
 def render_job_scope_lines() -> list[str]:
-    """Bash lines that install the helper, the hook and the sudoers rule.
+    """Bash lines that install the helper, both hooks and the sudoers rule.
 
     Returns:
-        The lines. The helper and the hook are written whole on every run, as
+        The lines. The helper and the hooks are written whole on every run, as
         the reaper is. The rule is written beside its final name, checked with
         ``visudo -cf`` and only then moved over it, so a rule sudo would
         refuse never reaches sudoers.d and fails the provision instead.
@@ -275,6 +287,10 @@ def render_job_scope_lines() -> list[str]:
         JOB_HOOK_SCRIPT.rstrip("\n"),
         "JOB_HOOK_EOF",
         f"chmod 0755 {JOB_HOOK_PATH}",
+        f"cat > {JOB_COMPLETED_HOOK_PATH} <<'JOB_COMPLETED_EOF'",
+        JOB_COMPLETED_SCRIPT.rstrip("\n"),
+        "JOB_COMPLETED_EOF",
+        f"chmod 0755 {JOB_COMPLETED_HOOK_PATH}",
         f"cat > {staged} <<'SUDOERS_EOF'",
         SUDOERS_RULE.rstrip("\n"),
         "SUDOERS_EOF",
@@ -309,6 +325,47 @@ def render_job_hook_lines(install: RunnerInstall) -> list[str]:
             f"job hook set for {install['service']}: each job runs in a scope of {CI_SLICE_NAME}"
         ),
     )
+
+
+def render_hooks_live_lines(install: RunnerInstall) -> list[str]:
+    """Bash lines that restart an idle unit whose listener predates its hooks.
+
+    A runner reads its hooks from its environment when it starts, so a
+    drop-in a later provision changed (the job-completed hook, MCPs board task
+    621902c3) reaches a running unit only through a restart. Run after the
+    unit has started and been placed
+    (:func:`fleet.core.runner_slice_render.render_runner_slice_move_lines`).
+
+    Args:
+        install: The install; its ``service`` is the unit's name.
+
+    Returns:
+        The lines. They read the unit's main process's environment and do
+        nothing when it already names every hook :data:`HOOK_DROP_IN` sets.
+        Otherwise the unit is restarted when the helper's ``--workers`` mode
+        finds no ``Runner.Worker`` of it, in its cgroup or its job scopes,
+        and else left running a job and named, for the next provision.
+
+    Raises:
+        ValueError: When the unit name cannot be embedded verbatim.
+    """
+    unit = scriptable(install["service"], label="service")
+    wanted = [line.removeprefix("Environment=") for line in HOOK_DROP_IN.splitlines()[1:]]
+    return [
+        f"pid=$(systemctl show -p MainPID --value {unit})",
+        'environ=$(tr "\\0" "\\n" < "/proc/$pid/environ")',
+        "hooks=live",
+        *(f'case "$environ" in *"{variable}"*) ;; *) hooks=stale ;; esac' for variable in wanted),
+        'if [ "$hooks" = stale ]; then',
+        f'    if [ "$({JOB_SCOPE_PATH} --workers {unit})" = "{unit} -" ]; then',
+        f"        systemctl restart {unit}",
+        f"        echo 'job hooks live: {unit} restarted to read {HOOK_DROP_IN_NAME}'",
+        "    else",
+        f"        echo 'job hooks pending: {unit} is running a job; a later provision "
+        "restarts it once it is idle'",
+        "    fi",
+        "fi",
+    ]
 
 
 #: Why the placement row matters, printed beside a drift line.
@@ -370,6 +427,7 @@ __all__ = [
     "SUDOERS_PATH",
     "SUDOERS_RULE",
     "placement_check_id",
+    "render_hooks_live_lines",
     "render_job_hook_lines",
     "render_job_scope_lines",
     "render_placement_check_lines",

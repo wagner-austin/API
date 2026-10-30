@@ -55,10 +55,16 @@ case reads it against the render and the bound, and reads
 the jobs' use of the generations from it (:data:`GENERATION_READERS`), since
 the runner account's home is closed to the fleet's user.
 
+THE WORK TREES ARE THE JOBS' OWN (MCPs board task 621902c3). The runners'
+job-completed hook empties each job's trees as the job ends
+(:mod:`fleet.core.runner_work_clear`); this pass, which runs beside the jobs,
+removes only the runners' unpacked self-updates and reports what every
+install's job trees hold (:data:`WORK_TREES`).
+
 WHAT IT DELIBERATELY KEEPS: hashed poetry venvs whose source project still
-exists (per-package working state the runners share, not duplicates),
-everything under any _work tree (in-project venvs persist there by design),
-named docker volumes, and every tagged image, which is the pull cache.
+exists (per-package working state the runners share, not duplicates), the
+job trees under any _work, the actions and tool caches beside them, named
+docker volumes, and every tagged image, which is the pull cache.
 """
 
 from __future__ import annotations
@@ -70,7 +76,8 @@ from fleet.core import names
 from fleet.core.runner_install import RUNNER_ACCOUNT
 from fleet.core.runner_proc_bash import PROCESS_FUNCTIONS, WORKER_CASE_PATTERN
 from fleet.core.runner_tool_caches import RUNNER_MARKERS, RUNNER_TOOLS, RUNNER_VIRTUALENVS
-from fleet.core.tool_caches import SH_REMOVE_UNUSED
+from fleet.core.runner_work_clear import WORK_CLEARED_NAME
+from fleet.core.tool_caches import REMOVAL_GRACE_SECONDS, SH_REMOVE_UNUSED
 
 #: The state directory systemd makes for the service, owned by its user.
 STATE_DIRECTORY_NAME: Final = "ci-clean"
@@ -154,11 +161,13 @@ ORPHAN_SWEEP: Final = "\n".join(orphan_sweep_lines(f'"{RUNNER_VIRTUALENVS}"'))
 #: The hook that writes a marker runs under its job's Worker, so a job whose
 #: marker this pass skips started after the pass read the processes, and
 #: reads the current generation or one inside the removal's grace.
+#: ``running_installs`` beside it prints the directory name of each install a
+#: ``Runner.Worker`` runs from, which :data:`WORK_TREES` reads too.
 RUNNER_GENERATIONS_IN_USE: Final = (
     "proc_root=/proc",
     PROCESS_FUNCTIONS.rstrip("\n"),
-    "generations_in_use() {",
-    "    local process argv0 install marker",
+    "running_installs() {",
+    "    local process argv0 install",
     '    for process in "$proc_root"/[0-9]*/cmdline; do',
     "        process=${process%/cmdline}",
     '        argv0=$(argv0_of "${process##*/}") || continue',
@@ -167,7 +176,13 @@ RUNNER_GENERATIONS_IN_USE: Final = (
     "            *) continue ;;",
     "        esac",
     "        install=${argv0%/*/Runner.Worker}",
-    f'        marker="$1/${{install##*/}}/{names.GENERATION_MARKER_NAME}"',
+    '        echo "${install##*/}"',
+    "    done",
+    "}",
+    "generations_in_use() {",
+    "    local install marker",
+    "    for install in $(running_installs); do",
+    f'        marker="$1/$install/{names.GENERATION_MARKER_NAME}"',
     '        if [ -f "$marker" ]; then cat "$marker"; fi',
     "    done",
     "}",
@@ -232,6 +247,84 @@ GENERATION_READERS: Final = "\n".join(
     )
 )
 
+#: How the report names each install's work trees, one line each.
+REPORT_WORK_TREE: Final = "work-tree: "
+
+#: How the report names each runner self-update it removed or kept.
+REPORT_RUNNER_UPDATE: Final = "runner-update: "
+
+def work_trees_lines(grace_minutes: int) -> tuple[str, ...]:
+    """Each runner install's ``_work`` under the runner account's home, as bash lines.
+
+    MCPs board task 621902c3. The runner unpacks a self-update into
+    ``_work/_update`` and never removes it: on lavender each install held 682
+    MB of the 2026-10-25 update five days on. One no file of which changed
+    within the grace is removed whole; a later update unpacks its own. A file's
+    change time is the instant it was unpacked whatever time the archive gave
+    it, so an update being unpacked is kept. Then each install's job trees,
+    everything under ``_work`` not named with a leading ``_``, are reported
+    with whether a job runs from the install, the instant its last job started
+    (its generation marker's, which the job-started hook writes), the instant
+    its job-completed hook last emptied them
+    (:data:`fleet.core.runner_work_clear.WORK_CLEARED_NAME`, ``never`` before
+    its first job under the hook) and the files and MB they hold. An idle
+    install its hook cleared after its last job started holds none; one whose
+    last job started after the clear started it while these lines ran, or
+    lost it before the hook could run. These lines remove no job tree: the hook does, in the job, where no
+    other job of its runner can start.
+
+    Args:
+        grace_minutes: How recently a file of an update may have changed for
+            the update to be kept.
+
+    Returns:
+        The lines, to run after :data:`GENERATIONS_SWEEP` has defined
+        ``running_installs``. They print one ``runner-update:`` line for each
+        update and one ``work-tree:`` line for each install.
+    """
+    return (
+        "running=$(running_installs | sort -u | tr '\\n' ' ')",
+        'for work in "$HOME"/*/_work; do',
+        '    [ -d "$work" ] || continue',
+        "    install=${work%/_work}",
+        "    install=${install##*/}",
+        '    update="$work/_update"',
+        '    if [ -d "$update" ]; then',
+        f'        changed=$(find "$update" -cmin -{grace_minutes} -print -quit)',
+        '        if [ -z "$changed" ]; then',
+        '            size=$(($(du -sk "$update" | cut -f1) / 1024))',
+        '            rm -rf "$update"',
+        f'            echo "{REPORT_RUNNER_UPDATE}removed $install\'s _update ($size MB)"',
+        "        else",
+        f'            echo "{REPORT_RUNNER_UPDATE}kept $install\'s _update, changed within'
+        f' {grace_minutes * 60} s"',
+        "        fi",
+        "    fi",
+        "    state=idle",
+        '    case " $running" in *" $install "*) state=running ;; esac',
+        "    started=never",
+        f'    marker="{RUNNER_MARKERS}/$install/{names.GENERATION_MARKER_NAME}"',
+        '    if [ -f "$marker" ]; then started=$(stat -c %Y "$marker"); fi',
+        "    cleared=never",
+        f'    record="{RUNNER_MARKERS}/$install/{WORK_CLEARED_NAME}"',
+        '    if [ -f "$record" ]; then read -r cleared _ < "$record"; fi',
+        "    files=0",
+        "    kb=0",
+        '    for tree in "$work"/[!_]*; do',
+        '        [ -d "$tree" ] || continue',
+        '        files=$((files + $(find "$tree" -xdev ! -type d | wc -l)))',
+        '        kb=$((kb + $(du -xsk "$tree" | cut -f1)))',
+        "    done",
+        f'    echo "{REPORT_WORK_TREE}$install $state, started $started, cleared $cleared,'
+        ' $files files ($((kb / 1024)) MB) in its job trees"',
+        "done",
+    )
+
+
+#: The runner installs' work trees, an update kept while any file of it
+#: changed within the generations' removal grace.
+WORK_TREES: Final = "\n".join(work_trees_lines(REMOVAL_GRACE_SECONDS // 60))
+
 #: The Python half of :data:`CI_CLEAN_SCRIPT`, separate so a test executes it
 #: against a home of its own without a docker daemon.
 CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source path stays
@@ -243,6 +336,9 @@ CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source
 
 # Which generation the jobs read, and what they wrote into the current one.
 {GENERATION_READERS}
+
+# The runners' self-updates, and what each install's job trees hold.
+{WORK_TREES}
 """
 
 #: The daily hygiene script, installed to /usr/local/bin/ci-clean.
@@ -317,9 +413,13 @@ __all__ = [
     "REPORT_BUILD_CACHE_BEFORE",
     "REPORT_DIGEST",
     "REPORT_HELD",
+    "REPORT_RUNNER_UPDATE",
     "REPORT_RUNNING",
     "REPORT_STARTED",
+    "REPORT_WORK_TREE",
     "RUNNER_GENERATIONS_IN_USE",
     "STATE_DIRECTORY_NAME",
+    "WORK_TREES",
     "orphan_sweep_lines",
+    "work_trees_lines",
 ]
