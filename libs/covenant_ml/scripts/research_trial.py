@@ -1,4 +1,4 @@
-"""Compute entrypoint for a frozen, admitted validation diagnostic."""
+"""Compute entrypoint for a frozen, admitted monthly validation trial."""
 
 from __future__ import annotations
 
