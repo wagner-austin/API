@@ -284,9 +284,14 @@ class TestHostRunnerSpec:
         # the audit's root row is its own requirement, so a host whose every
         # area is inside its bound can still fail it, and should.
         base = base_json()
-        disk = base["disk"]
-        assert isinstance(disk, dict)
-        disk["ceiling_gb"] = 100
+        base["disk"] = {
+            "ceiling_gb": 100,
+            "baseline_gb": 18,
+            "baseline_measured": "2026-10-20",
+            "cache_path": "/home/gharunner/.cache",
+            "cache_ceiling_gb": 60,
+            "work_ceiling_gb": 15,
+        }
         decoded = decode_host_runner_spec(_host(base=base))
         bounds = disk_bounds_gb(decoded["base"]["disk"], len(decoded["installs"]))
         assert (decoded["base"]["disk"]["ceiling_gb"], bounds) == (100, 103)
