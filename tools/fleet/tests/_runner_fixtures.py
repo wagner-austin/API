@@ -89,13 +89,13 @@ def a_base() -> HostBase:
 
     Returns:
         The base: ffmpeg and golang-go as the packages a fleet worker lacks,
-        and a 210 GB ceiling over an 18 GB baseline, lavender's since board
-        task 621902c3, which admits the bounds of up to seven installs.
+        and a 150 GB ceiling over an 18 GB baseline, lavender's, which board
+        task 621902c3 holds its root under.
     """
     return HostBase(
         apt_packages=["ffmpeg", "golang-go"],
         disk=DiskCeiling(
-            ceiling_gb=210,
+            ceiling_gb=150,
             baseline_gb=18,
             baseline_measured="2026-10-20",
             cache_path="/home/gharunner/.cache",
@@ -115,7 +115,7 @@ def base_json() -> dict[str, JSONValue]:
     return {
         "apt_packages": ["ffmpeg", "golang-go"],
         "disk": {
-            "ceiling_gb": 210,
+            "ceiling_gb": 150,
             "baseline_gb": 18,
             "baseline_measured": "2026-10-20",
             "cache_path": "/home/gharunner/.cache",

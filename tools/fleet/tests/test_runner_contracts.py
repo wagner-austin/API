@@ -13,6 +13,7 @@ import pathlib
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue, load_json_str
 
+from fleet.contracts.runner_base import disk_bounds_gb
 from fleet.contracts.runners import (
     FileAsset,
     HostRunnerSpec,
@@ -275,33 +276,20 @@ class TestHostRunnerSpec:
     def test_the_base_decodes_with_the_host(self) -> None:
         decoded = decode_host_runner_spec(_host())
         assert decoded["base"]["apt_packages"] == ["ffmpeg", "golang-go"]
-        assert decoded["base"]["disk"]["ceiling_gb"] == 210
+        assert decoded["base"]["disk"]["ceiling_gb"] == 150
 
-    @staticmethod
-    def _with_ceiling(ceiling: int) -> dict[str, JSONValue]:
-        """One install's host whose disk ceiling is ``ceiling``; its bounds are 103 GB."""
+    def test_a_ceiling_under_the_host_s_own_bounds_is_accepted(self) -> None:
+        # The operator holds lavender's root under 150 GB ('Get it under
+        # 150', board task 621902c3) although its areas' bounds add to 193:
+        # the audit's root row is its own requirement, so a host whose every
+        # area is inside its bound can still fail it, and should.
         base = base_json()
-        base["disk"] = {
-            "ceiling_gb": ceiling,
-            "baseline_gb": 18,
-            "baseline_measured": "2026-10-20",
-            "cache_path": "/home/gharunner/.cache",
-            "cache_ceiling_gb": 60,
-            "work_ceiling_gb": 15,
-        }
-        return _host(base=base)
-
-    def test_a_ceiling_at_the_host_s_own_bounds_is_accepted(self) -> None:
-        decoded = decode_host_runner_spec(self._with_ceiling(103))
-        assert decoded["base"]["disk"]["ceiling_gb"] == 103
-
-    def test_a_ceiling_under_the_host_s_own_bounds_is_refused(self) -> None:
-        with pytest.raises(
-            JSONTypeError,
-            match=r"ceiling_gb 102 is under the 103 GB the host's own bounds let its root hold "
-            r"with 1 install\(s\)",
-        ):
-            decode_host_runner_spec(self._with_ceiling(102))
+        disk = base["disk"]
+        assert isinstance(disk, dict)
+        disk["ceiling_gb"] = 100
+        decoded = decode_host_runner_spec(_host(base=base))
+        bounds = disk_bounds_gb(decoded["base"]["disk"], len(decoded["installs"]))
+        assert (decoded["base"]["disk"]["ceiling_gb"], bounds) == (100, 103)
 
 
 class TestRunnerSpec:

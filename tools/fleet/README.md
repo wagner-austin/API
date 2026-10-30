@@ -198,17 +198,18 @@ nothing: an install whose `.runner` exists is not configured twice.
 **The disk ceiling.** The audit fails a host whose root uses more than
 `base.disk.ceiling_gb`, and the row's id carries both numbers, so every line,
 passing or failing, says what is allowed and what normal was:
-`disk:/:ceiling-210gb:baseline-18gb@2026-10-20`. The baseline is lavender's
+`disk:/:ceiling-150gb:baseline-18gb@2026-10-20`. The baseline is lavender's
 root after its reimage and the fleet node provision and before any runner,
-18 GB used of 915 GB at 2026-10-20T00:33Z. The ceiling is at least what the
-host's own bounds let its root hold, `disk_bounds_gb` in `runner_base`: the
-baseline, the 10 GB build cache bound, `cache_ceiling_gb` and one
-`work_ceiling_gb` per install, 193 GB for lavender's seven, and the roster
-refuses a host whose ceiling sits under it. It was 150 GB, kept from the WSL
-guest, until the audit failed lavender at 190 GB on 2026-10-30 with every
-bounded area inside its bound (board task 621902c3). It still trips long
-before the 536 GB of leaked volumes that filled lavender's disk on
-2026-09-25.
+18 GB used of 915 GB at 2026-10-20T00:33Z. The ceiling is the operator's
+figure, 'Get it under 150' (board task 621902c3), and sits under what the
+host's own bounds would let its root hold, `disk_bounds_gb` in
+`runner_base`: the baseline, the 10 GB build cache bound, `cache_ceiling_gb`
+and one `work_ceiling_gb` per install, 193 GB for lavender's seven. So the
+root row is its own requirement, which a host can fail with every area
+inside its bound; the runner host's disk case
+(`tests/test_runner_disk_host.py`) reads the same figure on the host and
+names both. It trips long before the 536 GB of leaked volumes that filled
+lavender's disk on 2026-09-25.
 
 ## `fleet-agent`: serving the corvis dispatch queue
 

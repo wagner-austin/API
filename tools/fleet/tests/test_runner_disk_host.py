@@ -4,11 +4,13 @@ The audit's disk row (:mod:`fleet.core.runner_audit_disk`) reads ``df -BG``
 of ``/`` against ``base.disk.ceiling_gb``, but fleet-runners runs that audit
 from a session, and nothing the board can run again recorded it. On
 2026-10-30 that row failed lavender at 190 GB against 150 while every
-bounded area was inside its own bound, and the roster now holds the ceiling
-at least at :func:`~fleet.contracts.runner_base.disk_bounds_gb`. This case
-takes the same reading on the host: ``tools/fleet-execution-runners`` runs
-it there as the fleet's own user, and its ``host_reading`` names the figure,
-the ceiling and the bounds.
+bounded area was inside its own bound. The ceiling stays the operator's 150
+('Get it under 150'), under the 193 GB
+:func:`~fleet.contracts.runner_base.disk_bounds_gb` gives lavender's seven
+installs, so this case fails a root over it whatever its areas hold. It
+takes the audit's reading on the host: ``tools/fleet-execution-runners``
+runs it there as the fleet's own user, and its ``host_reading`` names the
+figure, the ceiling and the bounds.
 """
 
 from __future__ import annotations
