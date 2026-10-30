@@ -22,7 +22,9 @@ from .research_trial_records import ResearchTrial, encode_research_trial
 from .validation import parse_timestamp, read_document
 
 
-def _event(path: Path, trial: ResearchTrial, action: str, extra: JSONObject) -> ResearchAttempt:
+def trial_event(
+    path: Path, trial: ResearchTrial, action: str, extra: JSONObject
+) -> ResearchAttempt:
     """Commit a lifecycle transition under the existing journal's writer lock.
 
     Args:
@@ -43,7 +45,7 @@ def _event(path: Path, trial: ResearchTrial, action: str, extra: JSONObject) -> 
     return research_journal(trial["policy"]).transact(path, lambda _: event)[trial["number"] - 1]
 
 
-def _require_trial(path: Path, trial: ResearchTrial) -> ResearchAttempt:
+def require_trial_attempt(path: Path, trial: ResearchTrial) -> ResearchAttempt:
     """Require the admitted proposal's typed values before any external operation.
 
     Args:
@@ -148,8 +150,8 @@ def submit_attempt(
         ValueError: Refused, duplicate or altered attempt; never submits it.
         RuntimeError: Failed transport; intent remains submitting for explicit recovery.
     """
-    _require_trial(path, trial)
-    _event(path, trial, "submit", {})
+    require_trial_attempt(path, trial)
+    trial_event(path, trial, "submit", {})
     prepare_bundle(directory, cluster, trial)
     _command(
         cluster,
@@ -173,7 +175,7 @@ def submit_attempt(
         "submit.log",
     )
     job = _require_receipt(read_document(output), trial, directory)
-    return _event(path, trial, "scheduled", {"job_id": job})
+    return trial_event(path, trial, "scheduled", {"job_id": job})
 
 
 def reconcile_attempt(
@@ -194,7 +196,7 @@ def reconcile_attempt(
         ValueError: Altered lineage, missing/ambiguous job or invalid lifecycle.
         RuntimeError: Remote observation failure; prior state remains intact.
     """
-    row = _require_trial(path, trial)
+    row = require_trial_attempt(path, trial)
     if row["status"] not in {"submitting", "running"}:
         raise ValueError("RESEARCH_EXECUTION_STATE: require submitting or running attempt")
     # Every observation is preserved, including failures, across controller restarts.
@@ -216,7 +218,7 @@ def reconcile_attempt(
     report = read_document(output)
     job = _require_receipt(require_dict(report, "ledger"), trial, directory)
     if row["status"] == "submitting":
-        row = _event(path, trial, "scheduled", {"job_id": job})
+        row = trial_event(path, trial, "scheduled", {"job_id": job})
     if row["job_id"] != job:
         raise ValueError("RESEARCH_EXECUTION_RECEIPT: observed job changed")
     accounting = require_dict(report, "accounting")
@@ -226,7 +228,7 @@ def reconcile_attempt(
         measurement = require_dict(report, "measurement")
         if require_dict(measurement, "accounting") != accounting:
             raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured accounting differs")
-        return _event(
+        return trial_event(
             path,
             trial,
             "complete",
@@ -239,10 +241,10 @@ def reconcile_attempt(
         )
     if state in {"FAILED", "CANCELLED", "TIMEOUT", "PREEMPTED", "NODE_FAIL", "OUT_OF_MEMORY"}:
         action = "timeout" if state == "TIMEOUT" else "failed"
-        return _event(path, trial, action, {"reason": dump_json_str(accounting)})
+        return trial_event(path, trial, action, {"reason": dump_json_str(accounting)})
     if state not in {"PENDING", "RUNNING", "SUSPENDED", "COMPLETING", "REQUEUED"}:
         raise ValueError("RESEARCH_EXECUTION_STATE: unknown native scheduler state")
     return row
 
 
-__all__ = ["reconcile_attempt", "submit_attempt"]
+__all__ = ["reconcile_attempt", "require_trial_attempt", "submit_attempt", "trial_event"]
