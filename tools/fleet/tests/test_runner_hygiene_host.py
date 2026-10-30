@@ -73,8 +73,15 @@ DAY_SECONDS: Final[int] = 24 * 3600
 #: ``DOCKER_HOST`` in the run's environment points at.
 HOST_DOCKER: Final[str] = "unix:///var/run/docker.sock"
 
-#: How ``docker buildx du`` opens the lines of its totals.
-CACHE_TOTALS: Final[tuple[str, ...]] = ("Private:", "Reclaimable:", "Total:")
+#: How ``docker buildx du`` opens the lines of its totals. Its
+#: ``printSummary`` prints ``Shared:`` and ``Private:`` only when some record
+#: is shared (buildx v0.38.1 ``commands/diskusage.go``): on lavender on
+#: 2026-10-30T19:57Z none was, and du printed ``Reclaimable:`` and ``Total:``
+#: alone (MCPs board task 9ab83f4b).
+CACHE_TOTALS: Final[tuple[str, ...]] = ("Shared:", "Private:", "Reclaimable:", "Total:")
+
+#: The totals du prints when no record is shared.
+UNSHARED_TOTALS: Final[tuple[str, ...]] = ("Reclaimable:", "Total:")
 
 #: The size pass's bound in bytes: docker's ``gb`` counts 1024**3.
 BOUND_BYTES: Final[int] = BUILD_CACHE_BOUND_GIB * 1024**3
@@ -130,7 +137,8 @@ def test_ci_clean_is_the_render_and_its_daily_run_succeeded(
     report = _last_run()
     du = command_output(["docker", "-H", HOST_DOCKER, "buildx", "du"], timeout=300)
     totals = [line.split() for line in du.splitlines() if line.startswith(CACHE_TOTALS)]
-    assert [total[0] for total in totals] == list(CACHE_TOTALS)
+    opened = tuple(total[0] for total in totals)
+    assert opened in {CACHE_TOTALS, UNSHARED_TOTALS}, f"buildx du printed totals {opened}"
     record_property(
         READING_PROPERTY,
         f"{runner_host['name']}: {CI_CLEAN_PATH} is the render of CI_CLEAN_SCRIPT, "
