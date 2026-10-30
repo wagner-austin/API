@@ -88,7 +88,7 @@ jobs:
       - name: Install dependencies
         run: |
           poetry config virtualenvs.in-project true
-          poetry sync --with dev
+          poetry sync --no-cache --with dev
 
       # Chromium only, and only the browser -- `--with-deps` runs apt and is
       # meaningless here. The bot drives Chromium; installing all three

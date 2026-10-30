@@ -63,7 +63,7 @@ jobs:
       - name: Install dependencies
         run: |
           poetry config virtualenvs.in-project true
-          poetry sync --with dev
+          poetry sync --no-cache --with dev
 
       - name: Guards
         run: poetry run python -m scripts.guard

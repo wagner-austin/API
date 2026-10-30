@@ -379,7 +379,7 @@ jobs:
       # the check started (run 36311134636).
       - name: Install dependencies
         if: ${{ hashFiles(format('{0}/pyproject.toml', matrix.package)) != '' }}
-        run: poetry sync --with dev
+        run: poetry sync --no-cache --with dev
 
       # grandma-api only: ffmpeg for the real-conversion audio tests. The
       # package's converter shells out to the real binary by design (no
