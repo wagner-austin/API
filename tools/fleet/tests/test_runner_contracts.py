@@ -349,9 +349,11 @@ class TestRunnerSpec:
         assert {label for install in lavender["installs"] for label in install["labels"]} == {
             "lavender"
         }
-        pinned = [asset for asset in lavender["assets"] if asset["sha256"] is not None]
-        assert len(pinned) == 1
-        assert pinned[0]["manual"] is True
+        # Every asset is one the provision places. The one placed by hand,
+        # RustedWarfareBot's licensed game jar, had no reader once its CI left
+        # lavender (board task 4f228608) and was dropped (MCPs board task
+        # faec98a5).
+        assert [asset["path"] for asset in lavender["assets"] if asset["manual"]] == []
         assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]
 
     def test_a_runner_host_installs_every_tagged_tool_apt_supplies(self) -> None:
