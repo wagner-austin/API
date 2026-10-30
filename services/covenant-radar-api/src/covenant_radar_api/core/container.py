@@ -449,8 +449,7 @@ class ServiceContainer:
 
         # If model doesn't exist locally, try downloading from data-bank
         if not model_path.exists():
-            # Download into the container's own model directory: a fixed
-            # shared /tmp path belongs to whichever account created it first
+            # Download into this container's model dir, never a /tmp dir another user owns
             if self._data_bank_url and self._data_bank_key:
                 downloaded_path = self._model_output_dir / model_path.name
                 downloaded = self._download_model_from_data_bank(downloaded_path)
@@ -503,8 +502,7 @@ class ServiceContainer:
 
             # If model doesn't exist locally, try downloading from data-bank
             if not model_path.exists():
-                # Download into the container's own model directory: a fixed
-                # shared /tmp path belongs to whichever account created it first
+                # Download into this container's model dir, never a /tmp dir another user owns
                 if self._data_bank_url and self._data_bank_key:
                     downloaded_path = self._model_output_dir / model_path.name
                     downloaded = self._download_model_from_data_bank(downloaded_path)
