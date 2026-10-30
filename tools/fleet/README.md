@@ -76,6 +76,28 @@ to answer one question.
 
 ## Commands
 
+Run an evaluator-pinned proposal and record admission through its existing controller:
+
+```bash
+python -m fleet.cli.research_propose --root PRIVATE_SPEC_ROOT --digest SPEC_SHA256 \
+    --report-task TASK_UUID
+```
+
+`proposal.json` requires an explicit `host`: `null` for the caller's local
+rootless daemon, or an SSH alias such as `colossus` for that node's existing
+`execdocker` lane. The remaining frozen fields are `python`, `script`, `policy`,
+`ledger`, `socket`, `image`, `program`, `context` and `timeout`. Only the pinned
+program and approved context enter the sandbox. Policy, journal, credentials and
+admission stay on the evaluator host. Remote operations use the shared bounded
+SSH transport with individually quoted arguments; placement is never retried on
+another host. Cleanup verifies removal of this invocation's containers and
+propagates a transport failure if cleanup cannot be confirmed.
+
+The optional report flag publishes metadata from the completed admission under
+the maintained service identity. Publication failure propagates after admission;
+inspect the journal before rerunning. This command records a proposal; submission,
+reconciliation and final authorization retain their existing controllers.
+
 ```bash
 fleet-nodes     --config registry                   # what is free right now, and why each lane claims nothing
 fleet-preflight --config registry --project P       # would it run, and where
