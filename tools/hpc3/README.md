@@ -643,6 +643,25 @@ HPC3 service reporter post metadata to the task. This checks the retained build
 evidence and current file identities; it does not rerun the image or establish
 scientific validity.
 
+Verify an installed controller against its frozen runtime provenance:
+
+```bash
+python -m hpc3.cli.controller_inspect --provenance provenance.json \
+    --wheels-dir frozen-wheels --selfcheck frozen-build/selfcheck.py \
+    --selfcheck-sha256 FROZEN_CHECK_DIGEST --report-task TASK_UUID
+```
+
+The provenance supplies `source_commit`, `controller_python`,
+`controller_python_sha256`, and `first_party_wheel_sha256`. Use the original
+runtime record and build-time selfcheck digest. The command verifies wheel
+archives, their RECORD hashes and every installed application member, then runs
+the pinned generated selfcheck and `pip check` using the installed interpreter
+in isolated mode. It publishes counts and identities through the same service
+reporter only after all checks pass. Wheel metadata is authenticated inside the
+archive; installed metadata is not compared byte-for-byte. Relocated `.data`
+wheel layouts are explicitly refused. This measures the declared frozen wheels,
+not arbitrary extra packages or scientific validity.
+
 | command | does |
 | --- | --- |
 | `hpc3-preflight --config C {--run R \| --sweep S}` | asks the scheduler whether it would start. Nothing is queued. |
