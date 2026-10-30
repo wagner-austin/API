@@ -5,7 +5,7 @@ include ../../scripts/make/shell.mk
 lint:
 	$(PYTHON) ../../tools/maketools/scripts/run.py venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py guard
 	poetry run ruff check . --fix
 	poetry run ruff format .
@@ -39,7 +39,7 @@ test: export KAGGLE_USERNAME ?= ci
 test: export KAGGLE_KEY ?= not-a-real-key
 test:
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 	$(PYTHON) ../../tools/maketools/scripts/run.py test
 
 check:
