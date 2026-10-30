@@ -14,8 +14,10 @@ from platform_core.json_utils import dump_json_str, load_json_str, require_dict
 from platform_core.run_record import decode_run_record, run_record_sidecar
 from scripts import research_trial
 
+from covenant_ml.markets.research_final import select_candidate
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
+from ._research_final_fixtures import completed_study, write_trial
 from ._trial_fixtures import trial_document
 
 
@@ -46,6 +48,36 @@ def test_compute_cli_measures_its_entrypoint_source(
         f"manifest -> {output}",
         f"run record -> {run_record_sidecar(output)}",
     ]
+
+
+def test_final_mode_scores_the_selected_attempt_once(
+    tmp_path: Path, image_environment: None, capsys: pytest.CaptureFixture[str]
+) -> None:
+    code = sha256(Path(research_trial.__file__).read_bytes()).hexdigest()
+    ledger, trial, manifest = completed_study(tmp_path, code)
+    select_candidate(ledger, trial, manifest)
+    request = write_trial(trial, tmp_path / "request.json")
+    output = tmp_path / "score" / "result.json"
+    final = ["--ledger", str(ledger), "--final-manifest", str(manifest)]
+    call = ["--request", str(request), "--out", str(output), *final]
+    assert research_trial.main(call, stand_in_pin) == 0
+    record = decode_run_record(load_json_str(run_record_sidecar(output).read_text()))
+    assert record["label"] == "final-1"
+    assert capsys.readouterr().out.splitlines()[-1] == f"run record -> {run_record_sidecar(output)}"
+    again = ["--request", str(request), "--out", str(tmp_path / "again" / "r.json"), *final]
+    with pytest.raises(ValueError, match="RESEARCH-009"):
+        research_trial.main(again, stand_in_pin)
+
+
+@pytest.mark.parametrize("flag", ["--ledger", "--final-manifest"])
+def test_final_mode_needs_both_its_flags(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], flag: str
+) -> None:
+    call = ["--request", str(tmp_path / "unread.json"), "--out", str(tmp_path / "o.json")]
+    with pytest.raises(SystemExit) as stopped:
+        research_trial.main([*call, flag, str(tmp_path / "x")], stand_in_pin)
+    assert stopped.value.code == 2
+    assert "--ledger and --final-manifest are required together" in capsys.readouterr().err
 
 
 def test_entrypoint_refuses_a_late_numerical_pin() -> None:

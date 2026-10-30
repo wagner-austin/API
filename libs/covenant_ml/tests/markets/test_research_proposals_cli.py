@@ -18,6 +18,7 @@ from scripts.research_proposals import main
 from covenant_ml.markets.research_records import encode_research_policy
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
+from ._research_final_fixtures import completed_study, write_trial
 from ._research_fixtures import policy, proposal
 
 
@@ -84,6 +85,23 @@ def test_real_process_refusal_and_restart(tmp_path: Path) -> None:
         timeout=30,
     )
     assert narrow_json_to_dict(load_json_str(restarted.stdout)) == report
+
+
+def test_evaluator_selection_seals_the_journal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    ledger, trial, manifest = completed_study(tmp_path)
+    policy_path = tmp_path / "policy.json"
+    policy_path.write_text(dump_json_str(encode_research_policy(trial["policy"])), "utf-8")
+    request = write_trial(trial, tmp_path / "request.json")
+    args = ["--policy", str(policy_path), "--ledger", str(ledger)]
+    selection = ["select", "--trial", str(request), "--final-manifest", str(manifest)]
+    assert main([*args, *selection], stand_in_pin) == 0
+    report = narrow_json_to_dict(load_json_str(capsys.readouterr().out))
+    row = narrow_json_to_dict(require_list(report, "attempts")[0])
+    assert (row["status"], row["selection"]) == ("complete", "selected")
+    with pytest.raises(ValueError, match="RESEARCH-008"):
+        main([*args, *selection], stand_in_pin)
 
 
 def test_entry_refuses_late_numeric_pin() -> None:
