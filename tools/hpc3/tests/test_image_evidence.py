@@ -70,7 +70,10 @@ def test_remote_native_failure_propagates_real_process_exit() -> None:
     ) -> _test_hooks.CommandResult:
         assert argv[0] == "ssh"
         return real_run(
-            [sys.executable, "-c", "import sys; sys.stderr.write('build-read-failed'); sys.exit(7)"],
+            [
+                sys.executable, "-c",
+                "import sys; sys.stderr.write('build-read-failed'); sys.exit(7)",
+            ],
             stdin_bytes=stdin_bytes,
         )
 
