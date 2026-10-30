@@ -28,7 +28,9 @@ def test_verified_build_reads_all_pins_accounting_and_native_checks(fake_run: Fa
 
 
 @pytest.mark.parametrize(
-    "changes", [{"experiment": {}}, {"artifact": None}, {"artifact": "/other/runtime.sif"}]
+    "changes",
+    [{"experiment": {"kind": "evaluation"}}, {"artifact": None},
+     {"artifact": "/other/runtime.sif"}],
 )
 def test_non_build_or_unrelated_artifact_refused(changes: dict[str, JSONValue]) -> None:
     with pytest.raises(ValueError, match="require a recorded image build"):
