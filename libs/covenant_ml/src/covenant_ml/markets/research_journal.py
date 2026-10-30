@@ -47,6 +47,7 @@ class ResearchAttempt(TypedDict):
     job_id: ReadOnly[str]
     record: ReadOnly[str]
     observed_ms: ReadOnly[int]
+    final_manifest_digest: ReadOnly[str]
 
 
 def encode_research_attempt(attempt: ResearchAttempt) -> JSONObject:
@@ -67,6 +68,7 @@ def encode_research_attempt(attempt: ResearchAttempt) -> JSONObject:
         "job_id": attempt["job_id"],
         "record": attempt["record"],
         "observed_ms": attempt["observed_ms"],
+        "final_manifest_digest": attempt["final_manifest_digest"],
     }
 
 
@@ -94,8 +96,15 @@ def decode_research_attempt(document: JSONObject) -> ResearchAttempt:
         "failed",
         "timeout",
         "interrupted",
+        "selected",
+        "final_released",
     }:
         raise ValueError("[RESEARCH-004] unknown attempt status")
+    final_digest = require_str(document, "final_manifest_digest")
+    if status in {"selected", "final_released"}:
+        final_digest = require_digest(document, "final_manifest_digest")
+    elif final_digest:
+        raise ValueError("[RESEARCH-004] only a selected attempt can bind final evidence")
     return ResearchAttempt(
         number=require_bounded_int(document, "number", 1, 2**31 - 1),
         request=require_nonempty(document, "request"),
@@ -105,6 +114,7 @@ def decode_research_attempt(document: JSONObject) -> ResearchAttempt:
         job_id=require_str(document, "job_id"),
         record=require_str(document, "record"),
         observed_ms=require_bounded_int(document, "observed_ms", 0, 2**63 - 1),
+        final_manifest_digest=final_digest,
     )
 
 
@@ -121,6 +131,8 @@ def _refusal(
     Returns:
         Named refusal, or empty for an admissible proposal.
     """
+    if any(row["status"] in {"selected", "final_released"} for row in history):
+        return "study_sealed"
     reason = policy_refusal(policy, proposal)
     if reason:
         return reason
@@ -214,6 +226,7 @@ def _transition(
                 job_id="",
                 record="",
                 observed_ms=observed,
+                final_manifest_digest="",
             ),
         )
     number = require_int(event, "number")
@@ -240,6 +253,18 @@ def _transition(
     elif action == "complete" and row["status"] == "running":
         updated["record"] = _complete(policy, event, row)
         updated["status"] = "complete"
+    elif action == "select" and row["status"] == "complete":
+        if any(
+            prior["status"] in {"admitted", "submitting", "running", "selected", "final_released"}
+            for prior in history
+        ):
+            raise ValueError("[RESEARCH-008] selection requires settled, unsealed validation")
+        updated["final_manifest_digest"] = _final_identity(event, row)
+        updated["status"] = "selected"
+    elif action == "release_final" and row["status"] == "selected":
+        if _final_identity(event, row) != row["final_manifest_digest"]:
+            raise ValueError("[RESEARCH-009] final evidence differs from the selected manifest")
+        updated["status"] = "final_released"
     elif action in {"failed", "timeout", "interrupted"} and row["status"] in {
         "admitted",
         "submitting",
@@ -249,6 +274,41 @@ def _transition(
     else:
         raise ValueError("[RESEARCH-006] invalid attempt transition")
     return (*history[: number - 1], decode_research_attempt(updated), *history[number:])
+
+
+def _final_identity(event: JSONObject, row: ResearchAttempt) -> str:
+    """Bind evaluator-only selection/release to completed validation evidence.
+
+    The journal must be inaccessible to proposers: this validates state and
+    identity, not caller authority. Release is consumed before external work;
+    a crash cannot turn it back into permission to inspect the final data again.
+
+    Args:
+        event: Evaluator-owned selection or release, never a proposal.
+        row: Completed or selected validation attempt with its original record.
+
+    Returns:
+        Exact final-manifest digest to bind before any final execution.
+
+    Raises:
+        ValueError: RESEARCH-009 for extra fields or mismatched lineage.
+    """
+    if set(event) != {
+        "action",
+        "number",
+        "observed_ms",
+        "candidate",
+        "validation_payload_digest",
+        "final_manifest_digest",
+    }:
+        raise ValueError("[RESEARCH-009] require exact evaluator selection/release fields")
+    candidate = require_digest(event, "candidate")
+    payload = require_digest(event, "validation_payload_digest")
+    final_digest = require_digest(event, "final_manifest_digest")
+    record = decode_run_record(narrow_json_to_dict(load_json_str(row["record"])))
+    if (candidate, payload) != (row["candidate"], record["payload_digest"]):
+        raise ValueError("[RESEARCH-009] selected candidate or validation evidence changed")
+    return final_digest
 
 
 def research_journal(policy: ResearchPolicy) -> EventJournal[tuple[ResearchAttempt, ...]]:
