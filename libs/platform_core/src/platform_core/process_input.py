@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import subprocess
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import IO
 
 
 @contextmanager
-def process_input(payload: bytes | None) -> Iterator[int | IO[bytes]]:
+def process_input(payload: bytes | None) -> Generator[int | IO[bytes], None, None]:
     """Provide closed stdin or an anonymous file positioned at its first byte.
 
     A child that never reads stdin must still be governed by subprocess timeout.
