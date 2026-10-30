@@ -1,0 +1,107 @@
+{
+  "kind": "wrds-encrypted-rehearsal-v1",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "synthetic": true,
+  "source_commit": "44fa91cea1607660a45f29172d8564a465d40744",
+  "queue": {
+    "id": "a332dd13-11b8-470f-9871-211490a67a8b",
+    "status": "passed",
+    "controller": "fleet-research-diphtheria",
+    "spec_sha256": "342e315ab00f51c6b527fca7d10b9d9fdb1363daa5cb176d534bb49c6841733e",
+    "closed_at": "2026-10-30T12:30:36.005Z",
+    "canonical_record_sha256": "cfe6049eaf1431f68e73f8bc62c98dbf2da7a86f8a9ea04eb86b2c91b2d0087a"
+  },
+  "native": {
+    "job": {
+      "job_id": "58629261",
+      "name": "cleargbm.research-19713b856e8e-1",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 54,
+      "billing_tres": 1,
+      "gpu_count": 0,
+      "cpu_count": 1,
+      "node_list": "hpc3-22-05"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-10-30T12:28:12",
+    "ended_at": "2026-10-30T12:29:06"
+  },
+  "policy_sha256": "19713b856e8e989dc7c70d2d30738082c61a586e44d9c1f0bf3ea7c13955e403",
+  "request_sha256": "d9922f3a7d49a2737ba8f062917dddd536aeab02d239bdd6b610d1366414b8d6",
+  "image_sha256": "58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6",
+  "result_sha256": "af67060add4f663cb5f62111f4bb5e051868a149574633290dfe83638374a9ee",
+  "native_record_file_sha256": "8122346701a00789c9d17f626bca454481f7d39d2315e07d78f803d9c15a79da",
+  "stdout_sha256": "1725a68374304f57937195daf8619327f808cbf0a4e59090c8022030196a62c4",
+  "verified_files": {
+    "/pub/wagnera3/images/research-encrypted-44fa91cea/research-encrypted.sif": "58b87a0ef12df5a1e061b9924353884aa31b5d70b5117fa7c911466d1426eba6",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/bundle.json": "7e5c804d834510250e962d2253a36661f43a0dd0bbd17aac1d8cea6231246d5c",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/calendar.csv.age": "958138ba21d9e1afbbc387cb1667f7c61eeda96fa0529489fe7fd946cd92636e",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/calendar.sql.age": "852e3b78db228b4f6f2e395c33e8b76758c82f1e499c9515b36c90c4b47bf10f",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/delists.csv.age": "f488ea61923766d1d87e2ee2448938e113c14c69027daa815cc92c10a7f46952",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/delists.sql.age": "2db9a5e5d581c0b0e2c71b236683c85a13833e01783ed48f49149911c6c5c137",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/manifest.json.age": "59c2b8596413aee30d1617ddedd2c9a6bfb44413ab8f1da1eb4ea4e7d6d48fc4",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/membership.csv.age": "3dfdcee833670e839ccf1ac285578ab40d696746a7eb054360da9fd6273ec68d",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/membership.sql.age": "0f1c49d168615824f976180ff87875866d17a16bf6d7ff164c557490cb588103",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/protocol.json.age": "74cc9dc77d4fc00a3ba8e0b030c601ca71cdef72c5b75a5644175967248db7f0",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/returns.csv.age": "bf64c013086c57a93b76193d35167dbbcd6124898e5da4f55a586ccff537b239",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/validation/returns.sql.age": "5972e5d869a41a60127c15cc1c6ffe82dfd7085aa7a914c6749f14074b35d2bb",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/entrypoint/scripts/research_trial.py": "94e89ab597db7587658fa823143f1625c6ab089e7bb4ffec4276279d7fc0fc40",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/access-native.json": "a544fdde11367bf554487c90ddabf8dc95ca6e99e98a2df32f2653dcc8d0c763",
+    "/pub/wagnera3/research/encrypted-synthetic-44fa91cea/attempts/19713b856e8e989dc7c70d2d30738082c61a586e44d9c1f0bf3ea7c13955e403/1/request.json": "d9922f3a7d49a2737ba8f062917dddd536aeab02d239bdd6b610d1366414b8d6"
+  },
+  "dataset": {
+    "bundle_sha256": "7e5c804d834510250e962d2253a36661f43a0dd0bbd17aac1d8cea6231246d5c",
+    "plaintext_manifest": {
+      "name": "manifest.json",
+      "sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+      "size_bytes": 1221
+    },
+    "partition": "train-validation"
+  },
+  "private_evidence_directory": "/home/corvis/research-data/wrds/experiments/encrypted-synthetic-44fa91cea",
+  "evidence_sha256": {
+    "context.json": "ba6c0e45290f6479f184248a816ce0a59e0902c9e9f8ac158a5412c87bc9be7f",
+    "proposal.json": "92706185d8ce0159995a7aebfa768abf6fef4cd6c4818e7ea82247cc510e0cff",
+    "admission.json": "71375e81ca5397a7b44919cd275da1c014955055917726f961577a5548fe2cb0",
+    "policy.json": "19713b856e8e989dc7c70d2d30738082c61a586e44d9c1f0bf3ea7c13955e403",
+    "trial.json": "d9922f3a7d49a2737ba8f062917dddd536aeab02d239bdd6b610d1366414b8d6",
+    "cluster.json": "31c8914ff7b26069c8fb1bb06d0bca3dea49516af2b1f575e63e7dfd4ec8861b",
+    "attempt-1/stage.log": "4780042e7d004d8139355ffab0d4863a8b160d272cdb82e758619f7d5d5ff4bf",
+    "attempt-1/submit.log": "97a072ebfb7491a471c4e27bb78037e105e44a78f53f4b99fe46a58820473dcc",
+    "attempt-1/observe-1.log": "3d49ad6aee7d1abafa6891063160ed73aa11474999cb2ebcdd166aac9cfbb550"
+  },
+  "proposer_isolation": {
+    "evidence_path": "/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea/isolation-probe/result.json",
+    "sha256": "21eb46b323576db1d33f651b347a4c68c10624e43123e23c43f44e6ca80086e9",
+    "result": {
+      "result": {
+        "read": {
+          "/home/execdocker/research-key-probe-44fa91cea/final.agekey": 2,
+          "/home/execdocker/research-key-probe-44fa91cea/final.csv": 2,
+          "/proc/1/root/home/execdocker/research-key-probe-44fa91cea/final.agekey": 2,
+          "/run/user/1001/docker.sock": 2
+        },
+        "write": {},
+        "network": 101,
+        "environment": [
+          "LC_CTYPE",
+          "PATH"
+        ],
+        "uid": 65534,
+        "proposal": {
+          "partition": "validation"
+        }
+      },
+      "host_files_existed_and_unchanged": true,
+      "key_material_emitted": false
+    }
+  },
+  "limits": [
+    "Synthetic validation only; no substantive research finding or licensed extraction.",
+    "Proposer output was manually transported from Colossus to the real admission controller; native submission and reconciliation used the scheduled shared-queue runner.",
+    "Only the validation identity was delivered to HPC3; final key delivery is pending.",
+    "Forced-termination scratch reclamation and WRDS-native encrypted execution remain unverified."
+  ]
+}
