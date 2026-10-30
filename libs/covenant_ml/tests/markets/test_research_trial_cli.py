@@ -1,6 +1,5 @@
 """Compute CLI uses real files and checks its own source and numerical startup."""
 
-import os
 import runpy
 import subprocess
 import sys
@@ -141,7 +140,8 @@ def test_real_final_worker_needs_neither_journal_nor_long_lived_keys(tmp_path: P
         "--scratch",
         str(tmp_path),
     ]
-    environment = dict(os.environ, IMAGE_DIGEST="d" * 64)
+    environment = config_test_hooks.get_environment()
+    environment["IMAGE_DIGEST"] = "d" * 64
     result = subprocess.run(
         command, env=environment, capture_output=True, text=True, timeout=60, check=False
     )
