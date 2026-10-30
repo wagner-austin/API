@@ -43,6 +43,8 @@ provenance:
   - "fleet job 43e15f3c-c588-4bb8-a203-f4035975776a: make check for libs/covenant_ml at API 43c23e111a4888d387d1da9647be328bbb23ddf6 on lavender, exit 0, 4699 passed, 0 failed, coverage total 100.00%, ended 2026-10-30T00:48:12Z"
   - "fleet job 172cc4e1-b31f-4dc9-b8db-ac2cdc60ee3e: make check for libs/platform_core at API 43c23e111a4888d387d1da9647be328bbb23ddf6 on sedona, exit 0, 1694 passed, 0 failed, coverage total 100.00%, ended 2026-10-30T00:44:55Z"
   - "hand re-derivation 2026-10-30 for board task 82a072db: unequal-cluster variance 3/2 x 38/36 = 19/12; t(1) radius 0.5 tan(0.45 pi) and p = 1 - 2 atan(4)/pi; moving-block means 0.5, 2.5 and 6.5 have variance 56/9, so two draws give 28/9, and 1/9 tail masses put the 2.5 and 97.5 percentiles at 0.5 and 6.5; label purge keeps train times 0 and 1 and validation time 3 when availability must precede the next fold's first time"
+  - "fleet job 4953b4ff-a185-4903-ac1d-fc9895370a5a: make check for libs/platform_core at API ae500dd64bd4fa4c94fcf8b5e61d0a4cf9c91964 on pendragon, exit 0, 1694 passed, 0 failed, coverage total 100.00%"
+  - "fleet job 548f499e-8500-4ec8-a2e1-bae7256a6f50: make check for libs/covenant_ml at API ae500dd64bd4fa4c94fcf8b5e61d0a4cf9c91964 on serendipity, 4743 passed, 0 failed, coverage total 100.00%, but exit 2 on lint. The test-quality guard and five mypy list[Any] errors were all in the monthly study files crsp_study.py, test_crsp_holdings.py and test_crsp_study.py, which board task 8f7247a1 added beneath that commit. Its 4be96fa8b and fd3f7723b fixed them. No instrument this page cites was involved"
 fact_checked: 2026-10-30
 confidence: medium
 ---
