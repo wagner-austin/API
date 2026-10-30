@@ -58,7 +58,7 @@ install:
 	@echo ""
 	@echo "=== install"
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	@echo "[install] done"
 
 lint:
@@ -66,7 +66,7 @@ lint:
 	@echo "=== lint"
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	@echo ""
 	@echo "  -- guard"
 	$(MAKETOOLS) guard
@@ -94,7 +94,7 @@ test:
 	@echo ""
 	@echo "=== test"
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	$(MAKETOOLS) test
 	@echo ""
 	@echo "[test] passed"
