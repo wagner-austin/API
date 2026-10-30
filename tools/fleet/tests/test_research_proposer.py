@@ -125,7 +125,18 @@ def test_daemon_must_enforce_rootless_resource_limits(key: str, value: JSONValue
     assert len(fake.calls) == 1
 
 
-@pytest.mark.parametrize("volume", ['{"/data":{}}', "[]"])
+@pytest.mark.parametrize("spelling", ["CPUCfsQuota", "cpuCfsQuota", "CpuCFSQuota", "cpu_cfs_quota"])
+def test_only_dockers_json_cpu_quota_key_is_accepted(spelling: str) -> None:
+    info: JSONObject = {key: value for key, value in INFO.items() if key != "CpuCfsQuota"}
+    info[spelling] = True
+    fake = FakeRun([ok(dump_json_str(info))])
+    _test_hooks.run = fake
+    with pytest.raises(ValueError, match="PROPOSER_RUNTIME"):
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+    assert len(fake.calls) == 1
+
+
+@pytest.mark.parametrize("volume",['{"/data":{}}', "[]"])
 def test_image_cannot_add_implicit_mounts(volume: str) -> None:
     _test_hooks.run = FakeRun([ok(dump_json_str(INFO)), ok(volume)])
     with pytest.raises(ValueError, match="PROPOSER_IMAGE"):
