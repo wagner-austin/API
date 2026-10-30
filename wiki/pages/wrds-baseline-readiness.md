@@ -98,15 +98,16 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-The encrypted-bundle closure was reopened by independent audit `02c6e4a1` on
-October 30. Its submitted evidence omitted the real container-isolation lane
-and read queue status without retained input identities. The corrected mapping
-uses `tools/fleet-execution-linux` for proposer isolation, evaluator tests for
-dataset binding, and the service-generated native report joined to the queue's
-RunRecord digest. This is an evidence correction; independent acceptance remains
-outstanding.[^audit-mapping]
+The encrypted-bundle implementation passed independent audit `acd2c6c4` on
+October 30 at 21:38 UTC: all three criteria were verified. The earlier audit
+`02c6e4a1` reopened its evidence mapping because it omitted the real
+container-isolation lane and read queue status without retained input
+identities. The accepted mapping uses `tools/fleet-execution-linux` for
+proposer isolation, evaluator tests for dataset binding, and the service-generated
+native report joined to the queue's RunRecord digest. This accepts the encrypted
+synthetic workflow; the substantive baseline remains unrun.[^audit-mapping]
 
-[^audit-mapping]: Live board audit `02c6e4a1-669d-43db-99c8-bedfc0f9754a`, check review `9312e8df-7856-4b3a-b77b-d15f31d43cb7`; service-written native report `548e2973-d926-44bb-98fc-016ab7f375b7` for WRDS job `40550033` and queue `120da295-8f12-4b90-ba0e-a2af14d5d3b6`. `tools/fleet/tests/_host.py`, execution-only marker selection; `tools/fleet/tests/test_research_proposer_host.py`, `test_actual_proposer_denies_private_data_credentials_policy_and_network` and real timeout/cleanup cases. `libs/covenant_ml/tests/markets/test_research_execution.py`, `test_changed_dataset_cannot_complete`, refuses mismatched bundle digests, verified inputs and partitions. The ordinary fleet suite skips the rootless Docker cases; only its execution lane runs them.
+[^audit-mapping]: Live board audit `acd2c6c4-6534-4144-ad5a-f7e68a216436`, computed VERIFIED result at 2026-10-30T21:38:54Z, supersedes rejected audit `02c6e4a1-669d-43db-99c8-bedfc0f9754a` and check review `9312e8df-7856-4b3a-b77b-d15f31d43cb7`; service-written native report `548e2973-d926-44bb-98fc-016ab7f375b7` for WRDS job `40550033` and queue `120da295-8f12-4b90-ba0e-a2af14d5d3b6`. Fresh fleet execution job `ecf1339b` passed 95 actual host cases with zero skips at API `a813b1ebe`. `tools/fleet/tests/_host.py`, execution-only marker selection; `tools/fleet/tests/test_research_proposer_host.py`, `test_actual_proposer_denies_private_data_credentials_policy_and_network` and real timeout/cleanup cases. `libs/covenant_ml/tests/markets/test_research_execution.py`, `test_changed_dataset_cannot_complete`, refuses mismatched bundle digests, verified inputs and partitions. The ordinary fleet suite skips the rootless Docker cases; only its execution lane runs them.
 
 The implementation and independent audits are complete for the process primitive,
 its admission integration and evaluator-owned one-shot final controls. At API
@@ -180,7 +181,8 @@ this home-backed build followed observed `/pub` metadata stalls on two login
 nodes. At `5ae042ef3`, a test-only correction over that runtime source, the full
 gates passed 4,874 evaluator and 2,528 fleet tests with 100% coverage, typing
 and guards clean. The subsequent synthetic final-scoring rehearsal completed
-through the shared queue; an independent adequacy audit remains pending.
+through the shared queue; the encrypted-workflow adequacy audit subsequently
+passed as recorded above.
 The image build and execution receipts establish different parts of that
 claim.[^final-runtime][^final-rehearsal][^grant]
 
