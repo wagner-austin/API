@@ -29,6 +29,7 @@ source_paths:
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/platform_core/src/platform_core/event_journal.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
+  - "libs/covenant_ml/tests/markets/test_research_selection.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_execution.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py"
@@ -67,9 +68,10 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8270ce31e91120ce22a6668e43ebfdc478e15b89"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "26f6b2ee40c9419fdbcd42418a4d31514a9253a7"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "ca09fde6b7e9615b802b58fd98345fa936ab809d"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "acc4bee9d340f7a8bc7f6345340ce399cc9722ec"
+  "libs/covenant_ml/tests/markets/test_research_selection.py": "d1a30a30d3dfac994d2fbe0bdd8c979237b61018"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "bd2c9fd8c7810948c0702ac5f9d5a502c7054289"
@@ -355,6 +357,17 @@ an adversary controlling the account.[^execution][^holdings] This control layer 
 but does not implement filesystem isolation.
 The CLI's policy is evaluator-owned configuration, not a field agents may replace
 in a proposal.[^admission]
+
+The same journal now accepts evaluator-owned `select` and `release_final`
+transitions. Selection requires settled validation work, binds a completed
+candidate and its validation payload to an exact final manifest, and seals
+further admissions. Release is consumed once against those identities while
+preserving the validation record. These are state invariants, not caller
+authentication or filesystem isolation: the journal must remain evaluator-owned,
+and no proposer-facing CLI exposes final release. Winner selection and final
+execution still require the isolated controller integration.[^selection]
+
+[^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba remains open for process isolation and final execution.
 
 The coordinator can assign proposer, runner and reviewer work using its current
 tasks. The evaluator enforces dates, costs, permitted changes and trial limits.
