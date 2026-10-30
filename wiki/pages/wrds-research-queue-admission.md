@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/fleet/tests/test_research_hpc.py"
+  - "tools/fleet/tests/test_research_hpc_final.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/platform_core/src/platform_core/event_journal.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
@@ -23,16 +25,18 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "11de7483f512a977862f5eb27322622bbf2e73d7"
+  "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
+  "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "284621906d62f97da2080ca823bdc971aa9a0454"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b898232007d5c14a3aa6acb1f79899a944c1a986"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
+  "tools/fleet/src/fleet/core/research_hpc.py": "daead9502e635ddc7abf3243eac2b7b838714094"
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
@@ -69,6 +73,19 @@ poll. HPC3 keeps proposal admission and its attempt journal; WRDS keeps held
 submission and its durable receipt. Transport failures retain those identities.
 Completion requires fresh native evidence and verified RunRecord metadata;
 no research rows or credentials are placed on the board.[^queue][^controllers]
+
+The private HPC3 document requires explicit `phase: "validation"` with
+`native_attempt`, or `phase: "final"` with `remote_manifest`. Old documents
+without a phase are refused; rebuilding and re-pinning them is explicit.
+Final polling calls the maintained `submit-final`/`reconcile-final` commands
+against the delivered grant's fixed directory. Its exclusive `native` directory
+records submission intent, and the cluster report task must match the shared
+queue task. The queue grants no final authority: [[wrds-final-scoring]] describes
+the original journal and consumed grant checks performed by those commands.
+Both phases retain the same content-addressed queue reference and resource lease
+mechanism.[^phase]
+
+[^phase]: `tools/fleet/src/fleet/core/research_hpc.py`, `_require_phase` and `poll`; `tools/fleet/tests/test_research_hpc.py` and `test_research_hpc_final.py`, routing, strict fields, task binding and real rendered queue-shell process cases.
 
 The controller's `python` executable and `workspace` configuration use absolute
 native filesystem paths. HPC3 `root`, `entrypoint`, `image` and `access` use absolute POSIX

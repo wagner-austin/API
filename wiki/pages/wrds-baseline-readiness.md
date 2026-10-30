@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
+  - "tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json"
   - "libs/covenant_ml/src/covenant_ml/markets/research_release.py"
   - "libs/covenant_ml/tests/markets/test_research_release.py"
   - "libs/covenant_ml/tests/markets/test_research_trial_cli.py"
@@ -38,6 +40,8 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json": "2ef67b9d8ea85e09cf92c99d7ec56b96b07cb609"
+  "tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json": "1d1fd48609fe278db5adbd9ded31746c01c94df4"
   "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
   "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
   "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
@@ -45,9 +49,9 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_encrypted_process.py": "63a3a2f34e7188ee307ce1ea1b178f44f1995854"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json": "6f58fc955b6a9086564ea6a36f3028fcd2ac0ed6"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
-  ".github/workflows/covenant-ml.yml": "14472de200c3c5cb4a41c28110a1739327ecce8c"
+  ".github/workflows/covenant-ml.yml": "3dd4022a0f4e46cddaccec3be16188fbdc275dae"
   "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "8cb56c464b77f760375b512fd17159c3a2d9a9f3"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/tests/markets/test_research_keys.py": "ceb7f3b58753e99d7a559b8e471c46d1abb28067"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
@@ -57,13 +61,13 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "11de7483f512a977862f5eb27322622bbf2e73d7"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "284621906d62f97da2080ca823bdc971aa9a0454"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "e38e6523456dec8a5359789a6bbb0b4a9c3dc3b7"
+  "libs/covenant_ml/scripts/research_proposals.py": "f23c7f9e828d129ffc1a1d55188094dc998aea50"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
@@ -142,13 +146,33 @@ authoritative journal before creating a private request-bound grant. The worker
 consumes that grant durably and removes its delivered key before decryption,
 without a journal copy. Real subprocess tests cover successful synthetic scoring
 without the journal or long-lived key, replay refusal and competing consumers.
-The installed controller/image remain at `44fa91cea`; native grant transport,
-final-job submission/reconciliation and their cluster rehearsal are still
-pending. [[wrds-final-scoring]] describes
-the new tested boundary and its privileged-account limits. The full package
-gate at API `9783dcd84` passed 4,850 tests with 100% statement and branch
-coverage, typing and guards clean; this grant change has not yet received an
-independent adequacy audit.[^integrated][^grant]
+Native grant transport and final-job submission/reconciliation now reuse the
+existing controllers and shared queue, as described in [[wrds-final-scoring]].
+The controller at `/home/corvis/research-control/wrds-final-85f1d4d75/bin/python`
+and image freeze runtime source `85f1d4d7521d4a189836f8ecca805f39c5c366df`.
+All 859 installed wheel code files match their frozen wheels. Image build
+`58635077` completed on `hpc3-19-14` in 113 seconds, exit `0:0`, and passed
+both selfchecks and dependency verification. The image is explicitly stored at
+`/data/homezvol1/wagnera3/research-images/final-85f1d4d75/research-final.sif`,
+SHA-256 `eeedc89bbde5fde0e49c497da124526a51d31a1d7cb6fd605924697ac0813710`;
+this home-backed build followed observed `/pub` metadata stalls on two login
+nodes. At `5ae042ef3`, a test-only correction over that runtime source, the full
+gates passed 4,874 evaluator and 2,528 fleet tests with 100% coverage, typing
+and guards clean. The subsequent synthetic final-scoring rehearsal completed
+through the shared queue; an independent adequacy audit remains pending.
+The image build and execution receipts establish different parts of that
+claim.[^final-runtime][^final-rehearsal][^grant]
+
+Fresh validation job `58635333` and final job `58635492` each completed in nine
+seconds with exit `0:0` on `hpc3-l18-05`. Shared queue entries `9ee4c5a8` and
+`50a1fb4e` closed passed after fresh native inspection verified 27 inputs per
+allocation, the correct partition and canonical RunRecord. The original
+validation request and record stayed byte-identical through final release and
+execution. The delivered final key was absent afterward, with its durable
+consumed marker present; delivery and submission replays both failed before
+another allocation. Two prelaunch failures remain recorded, including the
+refused older entrypoint pin. This is a synthetic operational measurement,
+not a substantive baseline or a scientific comparison.[^final-rehearsal]
 
 The forced-kill probe decrypted and verified ten synthetic files in a mode-0700
 directory on `hpc3-22-05`, then intentionally ended native job `58629286` with
@@ -186,21 +210,21 @@ canaries, not protection against the evaluator's administrators.[^key-probe]
 
 The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cleanup][^grant]
 
-1. Integrate native final-key delivery and final-job submission/reconciliation
-   with the existing controllers, preserving a single grant location and its
-   durable spent marker; freeze/install that controller and image. Exercise final release
-   only in the separate synthetic rehearsal journal, not the substantive holdout.
-2. Verify encrypted execution on WRDS Cloud and automate the measured
+1. Verify encrypted execution on WRDS Cloud and automate the measured
    cross-host proposer-to-admission handoff through the existing controller.
-3. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
+2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
    checksums and calendar coverage, then stage its verified manifest to HPC3.
    Keep final-period evidence confined to the evaluator.
-4. Declare candidate/seed aggregation, the selection criterion and tie handling
+3. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
    comparison first; seal the chosen candidate and use the one-shot final release
    afterward. The selection API enforces identity, not which candidate is best.
 
 [^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. This artifact records the runtime build; subsequent queue evidence is in [^rehearsal]. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
+
+[^final-runtime]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json`, frozen source archive, installed wheel readback, native build accounting, image digest, fleet gates and private evidence hashes. Source `85f1d4d75` and tested revision `5ae042ef3` differ only in one test assertion. This is a construction and installation measurement, not a final-scoring execution receipt.
+
+[^final-rehearsal]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json`, `validation`, `final`, `grant`, `recorded_failures` and hashed private evidence. Queue closure digests are `bd9fcef7219a2d9b4e6840324c41e327a24e8ca1e08b3aff18d0da9e86416139` and `43ba8b73ca203fb5bf6843cacd92f444337516a1fdaa7e96de88395dd806cd86`. The scheduled runner claimed the requests and submitted the final allocation; this session explicitly invoked existing ticks for validation submission and prompt reconciliation. The proposer ran in the existing Colossus sandbox, with its output transported by this session before admission; a fully automated cross-host proposal handoff is not established.
 
 [^rehearsal]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json`, queue closure, native accounting, verified_files, dataset identities, proposer isolation and private evidence hashes. Live dispatch_get on 2026-10-30 reported queue a332dd13-11b8-470f-9871-211490a67a8b passed with canonical RunRecord SHA-256 cfe6049eaf1431f68e73f8bc62c98dbf2da7a86f8a9ea04eb86b2c91b2d0087a. The native record file separately hashes to 8122346701a00789c9d17f626bca454481f7d39d2315e07d78f803d9c15a79da; these distinguish canonical record encoding from stored file bytes. Private observe-1.log SHA-256 3d49ad6aee7d1abafa6891063160ed73aa11474999cb2ebcdd166aac9cfbb550 retains the native evidence returned to the existing reconciliation controller. The source revision remains 44fa91cea; documentation publication at f17f7ba3 passed full fleet checks 2b00dfd6 (2,006 HPC3 tests) and e9a5322b (4,836 evaluator tests), both at 100% coverage.
 
