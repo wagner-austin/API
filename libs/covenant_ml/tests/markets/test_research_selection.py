@@ -55,14 +55,14 @@ def test_selection_preserves_validation_and_consumes_one_final_release(tmp_path:
     before = journal.read(path)
     selected = journal.transact(path, lambda _: event)
     assert selected[0] == before[0]
-    assert selected[1]["status"] == "selected"
+    assert (selected[1]["status"], selected[1]["selection"]) == ("complete", "selected")
     assert selected[1]["final_manifest_digest"] == "f" * 64
     assert selected[1]["record"] == before[1]["record"]
     assert selected[1]["request"] == before[1]["request"]
     assert decode_research_attempt(encode_research_attempt(selected[1])) == selected[1]
     release: JSONObject = {**event, "action": "release_final", "observed_ms": 2002}
     released = journal.transact(path, lambda _: release)
-    assert released[1]["status"] == "final_released"
+    assert (released[1]["status"], released[1]["selection"]) == ("complete", "released")
     assert released[1]["final_manifest_digest"] == "f" * 64
     assert released[1]["candidate"] == before[1]["candidate"]
     assert released[1]["record"] == before[1]["record"]
@@ -70,7 +70,7 @@ def test_selection_preserves_validation_and_consumes_one_final_release(tmp_path:
     assert research_journal(policy()).read(path) == released
     for repeated in (event, release):
         repeated["observed_ms"] = 2003
-        with pytest.raises(ValueError, match="RESEARCH-006"):
+        with pytest.raises(ValueError, match=r"RESEARCH-00[89]"):
             journal.transact(path, lambda _, repeated=repeated: repeated)
         assert journal.read(path) == released
 
@@ -165,7 +165,7 @@ def test_release_requires_prior_selection_and_its_exact_manifest(tmp_path: Path)
     journal = research_journal(policy())
     release: JSONObject = {**selection, "action": "release_final"}
     before = journal.read(path)
-    with pytest.raises(ValueError, match="RESEARCH-006"):
+    with pytest.raises(ValueError, match="RESEARCH-009"):
         journal.transact(path, lambda _: release)
     assert journal.read(path) == before
     selected = journal.transact(path, lambda _: selection)
@@ -182,3 +182,24 @@ def test_attempt_codec_cannot_attach_final_evidence_to_an_unselected_row(tmp_pat
     row["final_manifest_digest"] = "f" * 64
     with pytest.raises(ValueError, match="RESEARCH-004"):
         decode_research_attempt(row)
+
+
+@pytest.mark.parametrize("selection", ["invented", "selected"])
+def test_attempt_codec_refuses_invalid_selection_state(tmp_path: Path, selection: str) -> None:
+    path = tmp_path / "study.sqlite"
+    research_journal(policy()).initialize(path)
+    row = encode_research_attempt(admit_proposal(path, policy(), proposal(), 1000))
+    row["selection"] = selection
+    row["final_manifest_digest"] = "f" * 64
+    with pytest.raises(ValueError, match="RESEARCH-004"):
+        decode_research_attempt(row)
+
+
+def test_unfinished_attempt_cannot_be_selected(tmp_path: Path) -> None:
+    path = tmp_path / "study.sqlite"
+    journal = research_journal(policy())
+    journal.initialize(path)
+    admitted = admit_proposal(path, policy(), proposal(), 1000)
+    with pytest.raises(ValueError, match="RESEARCH-008"):
+        journal.transact(path, lambda _: {"action": "select", "number": 1, "observed_ms": 1001})
+    assert journal.read(path) == (admitted,)
