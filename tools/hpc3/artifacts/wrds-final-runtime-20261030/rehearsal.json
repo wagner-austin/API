@@ -1,0 +1,103 @@
+{
+  "kind": "wrds-final-synthetic-rehearsal-v1",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "source_commit": "85f1d4d7521d4a189836f8ecca805f39c5c366df",
+  "study": "final-synthetic-85f1d4d75-v2",
+  "policy_sha256": "832b5b9a663d7f3acc8ad42f58dabb65bc591d32219fa077171d3bae05f3c4d7",
+  "attempt": 2,
+  "seed": 23,
+  "data_origin": "Synthetic ciphertexts from encrypted-synthetic-44fa91cea; no licensed rows",
+  "proposal_origin": "Existing isolated proposer on Colossus returned the validation proposal; controller transport performed by this session; seed 23 admitted after the recorded prelaunch failure",
+  "queue_operation": "Scheduled fleet-research-diphtheria runner; existing tick invoked explicitly for validation submission and prompt result reconciliation; final submission claimed by scheduled tick",
+  "validation": {
+    "queue_id": "9ee4c5a8-5812-4c45-9f01-f2697545342b",
+    "queue_status": "passed",
+    "accounting": {
+      "job": {
+        "job_id": "58635333",
+        "name": "cleargbm.research-832b5b9a663d-2",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 9,
+        "billing_tres": 1,
+        "gpu_count": 0,
+        "cpu_count": 1,
+        "node_list": "hpc3-l18-05"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-30T19:36:25",
+      "ended_at": "2026-10-30T19:36:34"
+    },
+    "verified_files": 27,
+    "bundle_sha256": "7e5c804d834510250e962d2253a36661f43a0dd0bbd17aac1d8cea6231246d5c",
+    "partition": "train-validation",
+    "canonical_record_sha256": "bd9fcef7219a2d9b4e6840324c41e327a24e8ca1e08b3aff18d0da9e86416139",
+    "plaintext_manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330"
+  },
+  "final": {
+    "queue_id": "50a1fb4e-8584-4fac-9161-db553722b88d",
+    "queue_status": "passed",
+    "accounting": {
+      "job": {
+        "job_id": "58635492",
+        "name": "cleargbm.research-832b5b9a663d-2-final",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 9,
+        "billing_tres": 1,
+        "gpu_count": 0,
+        "cpu_count": 1,
+        "node_list": "hpc3-l18-05"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-30T19:39:21",
+      "ended_at": "2026-10-30T19:39:30"
+    },
+    "verified_files": 27,
+    "bundle_sha256": "3a40be2e4a4a88315b469f8f04ae82ad99591b2f956a382f3d3587e1b999321f",
+    "partition": "final",
+    "canonical_record_sha256": "43ba8b73ca203fb5bf6843cacd92f444337516a1fdaa7e96de88395dd806cd86",
+    "plaintext_manifest_sha256": "8403ba77690c627bef60631983500d3767d3c9643da29d9c957ed4ca342208d9"
+  },
+  "grant": {
+    "local_consumed": true,
+    "local_delivered_key_absent": true,
+    "remote_consumed_and_key_absent": true,
+    "delivery_replay_exit": 1,
+    "submission_replay_exit": 1,
+    "validation_record_preserved": true
+  },
+  "recorded_failures": [
+    {
+      "queue_id": "ccb1bacf-f88d-4bd2-be05-91409270b97e",
+      "reason": "Old entrypoint pin refused before native submission; journal and queue closed failed"
+    },
+    {
+      "queue_id": "953d31fd-82b8-4aea-afa9-ed1c35d4d98d",
+      "reason": "Admitted attempt explicitly failed during prelaunch review of /pub workspace; no native submission"
+    }
+  ],
+  "evidence_directory": "/home/corvis/research-data/wrds/experiments/final-synthetic-85f1d4d75-v2",
+  "evidence_sha256": {
+    "policy.json": "832b5b9a663d7f3acc8ad42f58dabb65bc591d32219fa077171d3bae05f3c4d7",
+    "trial-2.json": "54320481e1fdd30794f5d23bbdbed3ca95d0ab58beb00378c46e8cef3c34f706",
+    "cluster-home.json": "534630803c9ddd4ec5eae71c3058cbf0486cda89b80be39ff1f506e97db7bc8c",
+    "hpc3-home.json": "a3f1452accc37530ec4bfd0f1c79f1c595bb1d480dcfc9c07142e5bc77c3f09e",
+    "attempt-2/observe-0.log": "9b0adbf7c3220455da5dfbed42bde061cca9b5d76b9da53b32ed9e9fd6a032cd",
+    "grant-2/native/observe-0.log": "64b70661d0fa54aec934a4aadf206cb0001e84f5c85dae2f16724ad89d88d824",
+    "grant-2/delivery.json": "409d04d7ce8e547af05bbf255f77433357ba0684adcae4ed4d0992dc09b4cbe1",
+    "grant-2/delivery.log": "73c77b8dd0efcde2790ed3689235c969959ce340d6d831324dce2e1c8f32be7c",
+    "selection.json": "5e8193390198b04979ece1f1d5ac5d859e69d2895339a4b90a6d38839f93adfd",
+    "release.json": "7fc1f9259001ba2b00223fb302930d06d70f3cd1d676e40463f7e24a7cf6f535",
+    "completed-status.json": "b7e0a625fa45b0a7bfbc02d2b1e866bbf7e069850a18e91ecef10bb64a42be87",
+    "delivery-replay.log": "7d894e69ddf19abefcf568163db4d8f38d2422b07af77a025175c3ebb36ea79a",
+    "submission-replay.log": "c96ada45a060172b2b6bd6341ac5aba13913bf517820039f08df3d6bbf51c75d",
+    "final-key-readback.txt": "144c11abc79309152a7b9fa50a15a9c518aca377e88583675c0c666b6390a90d"
+  },
+  "limitations": [
+    "Synthetic operations measurement, not scientific performance or the substantive baseline",
+    "Final selection is the predeclared successful synthetic attempt; substantive candidate/seed aggregation rules remain to be declared",
+    "Trusted evaluator and scheduler accounts remain privileged",
+    "Encrypted WRDS scheduler execution remains unverified"
+  ]
+}
