@@ -48,6 +48,16 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_holdings.py"
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_final.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py"
+  - "libs/covenant_ml/scripts/research_proposals.py"
+  - "libs/covenant_ml/scripts/research_trial.py"
+  - "libs/covenant_ml/tests/markets/test_research_final.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_final.py"
+  - "tools/fleet/src/fleet/core/research_proposal.py"
+  - "tools/fleet/src/fleet/cli/research_propose.py"
+  - "tools/fleet/tests/test_research_proposal.py"
+  - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "3035c22326bc69ff6d06c5e5f72d6660290e270b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
@@ -71,16 +81,16 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "3b74a91dfaeaea7eda2b860bbe791fa672ebcd8f"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "8aa230d8f7be88a7d5a968f8bd00d008c5cd2ac9"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "01bd2d4443987b275bc58d71b6e127e2382c9f4a"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "bd2c9fd8c7810948c0702ac5f9d5a502c7054289"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "ddf17de3078972eea9bd3cf12b7b5570a24b1008"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
-  "tools/fleet/src/fleet/core/research_control.py": "84af969117df4a38b47eaae30b25ddb14803d145"
+  "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "ac4a658ffe4ca6beae15ce56df08f712e7bddca2"
   "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
   "tools/fleet/src/fleet/core/research_proposer.py": "bd5fd21260663875a363265c935f961773986ab9"
@@ -88,11 +98,21 @@ source_git_blobs:
   "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "0f06ec829bb186560d70e8fcf36b9d21164919d8"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
-  "libs/covenant_ml/tests/markets/test_crsp_study.py": "f43867ba31ba0ed7ad7fc4a13f97a0db7eb746f1"
+  "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
   "libs/covenant_ml/tests/markets/test_research_trial.py": "2b0cd1e2362f58475205774e7dc320b2ae8991d2"
+  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "854dd095f76364bc1a00ca0e9e35ca2e06ce88f7"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
+  "libs/covenant_ml/scripts/research_proposals.py": "f62f4f85739a00b2fbdc41f1e8724dd59188632f"
+  "libs/covenant_ml/scripts/research_trial.py": "3e8ead7063b2e1835bb59131d73b9df0095b25d5"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "81e4a8f1f5220b502de59369c9a8ac1868f8ab77"
+  "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
+  "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
+  "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
+  "tools/fleet/tests/test_research_proposal.py": "e3032d998c3d7e4b0951b2db7d1be643978ac2c5"
+  "tools/fleet/tests/test_research_proposal_host.py": "177c817e1992334468ed07142a01df4f71908aa6"
 provenance:
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Ownership review 2026-10-29: MCPs source snapshot 06512f6450c960e52409448f306c1254ed633fb6 is external to this API wiki's source_paths; live queue, installed controller and board reads are identified separately in the review footnotes."
@@ -109,8 +129,10 @@ the research libraries own evaluation rules and evidence; WRDS and HPC3 own jobs
 There is no evidence here requiring a replacement coordinator or a second research
 framework. Frozen proposal admission, durable attempt recording and HPC3 submission
 and reconciliation are implemented in the existing libraries, and the research
-worker now runs the frozen monthly study on its validation period. Restricted
-holdout identity remains integration work.[^request][^admission][^execution][^holdings]
+worker now runs the frozen monthly study on its validation period. Proposal
+programs run only in an isolated process whose output enters that admission,
+and the final period is scored once, after the journal consumes the selected
+attempt's release.[^request][^admission][^execution][^holdings][^final]
 
 ## Shared queue integration
 
@@ -171,7 +193,8 @@ audit. The native replay case also passed, but its parent board task
 `8b19319c` remains waiting on the unrelated minutes-corpus root-cause task
 `671c2919`; that parent audit is not complete. Label-overlap exclusion and
 paired moving-block primitives are integrated into the monthly holdings study
-described below; restricted holdout access remains work.[^live-review][^sampling][^splits][^holdings]
+described below, and the final-period boundary is the one documented under
+"Proposal-program execution boundary".[^live-review][^sampling][^splits][^holdings]
 
 ## What is already reusable
 
@@ -203,11 +226,11 @@ monthly study now uses or replaces each seam:[^equity][^window][^sampling][^spli
 
 The shared admission journal, queue, native scheduler adapters and RunRecord
 publisher compose with the monthly worker without another coordinator or
-attempt ledger. The worker never constructs a final-period decision, but it
-reads a manifest whose underlying snapshot still resides under the shared
-account. Final-period enforcement therefore also needs an execution identity
-that proposer tools cannot use to read the held-out files; the date bound alone
-is not that boundary.[^execution][^controllers][^splits][^holdings]
+attempt ledger. The worker never constructs a final-period decision, but its
+manifest's snapshot resides under the evaluator's account, so the date bound
+alone is not an access boundary. That boundary is the proposal process
+described below, which holds no path, credential or network route to those
+files.[^execution][^controllers][^splits][^holdings][^installed]
 
 ## Study design v1, before any expanded extraction
 
@@ -363,32 +386,47 @@ above with the existing trainers and RunRecord publisher, after checking that th
 staged CRSP protocol is exactly the admitted design; it publishes every arm's
 monthly accounting, the fold counts and the paired intervals as observations.
 These are provenance checks over owner-writable evidence, not protection against
-an adversary controlling the account.[^execution][^holdings] This control layer refuses final-partition proposals
-but does not implement filesystem isolation.
+an adversary controlling the account.[^execution][^holdings] This control layer refuses final-partition proposals;
+the access boundary is the proposal process below.
 The CLI's policy is evaluator-owned configuration, not a field agents may replace
 in a proposal.[^admission]
 
-The same journal now accepts evaluator-owned `select` and `release_final`
+The same journal accepts evaluator-owned `select` and `release_final`
 transitions. Selection requires settled validation work, binds a completed
 candidate and its validation payload to an exact final manifest, and seals
 further admissions. Release is consumed once against those identities while
 preserving the validation record and its `complete` execution status for queue
 reconciliation; `selection` records the separate final-release state.
-These are state invariants, not caller
-authentication or filesystem isolation: the journal must remain evaluator-owned,
-and no proposer-facing CLI exposes final release. Winner selection and final
-execution still require the isolated controller integration.[^selection]
+These are state invariants, not caller authentication: the journal must remain
+evaluator-owned.[^selection]
 
-[^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba remains open for process isolation and final execution.
+`research_final` issues them. `research_proposals select` binds the named
+completed attempt's journal candidate and payload to the final manifest's
+SHA-256. `research_trial --ledger --final-manifest` requires that selection and
+those bytes, rechecks policy, protocol, code and image lineage, and commits
+`release_final` before reading any final-period relation. A later failure,
+even a missing data file, leaves the release consumed, and a second run is
+refused. The candidate, seed and features come from the journal's own admitted
+request; a proposal naming another partition is refused at admission and can
+never be selected, so no request field authorizes final scoring.
+`crsp_final.run_crsp_final` fits once on every decision whose exit precedes
+`holdout_start` and scores every decision from `holdout_start` through
+`holdout_end` with the validation study's shared fold, arm and record code. Changing every outcome
+after the last final decision changes no fit or selection in the tests.
+Choosing which attempt to select remains an evaluator decision.[^final]
+
+[^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission".
+
+[^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 
 The coordinator can assign proposer, runner and reviewer work using its current
 tasks. The evaluator enforces dates, costs, permitted changes and trial limits.
-The proposer receives development/validation evidence only. Final-period data
-and scoring need a restricted evaluator identity and filesystem/tool permissions;
-a prompt telling an agent with unrestricted SSH to avoid a directory is not
-isolation. That capability boundary is a focused integration requirement, not
-an implemented guarantee today. Do not autonomously launch this research loop
-until admission, holdout isolation and append-only attempt recording are tested.[^request]
+The proposer receives development/validation evidence only. A prompt telling an
+agent with unrestricted SSH to avoid a directory is not isolation, so a
+proposer is a program, not a session: the boundary below is what a proposer
+holds. An agent session that holds the evaluator's account, SSH or WRDS
+credentials is privileged administrative access, outside any boundary here,
+and must not be described as a restricted proposer.[^request][^installed]
 
 ### Proposal-program execution boundary
 
@@ -406,27 +444,53 @@ have separate 30-second deadlines, so the program deadline is not an overall
 request deadline. An invocation-specific label scopes removal, followed by a
 query requiring no matching container to remain.[^proposer]
 
-This component returns an untrusted object. The caller must still pass it through
-the existing proposal admission controller; it exposes no new queue or public
-submission tool. It does not isolate the operator's privileged agent session,
-authenticate evaluator calls, select a winner or execute final scoring. The
-trusted image and approved context must exclude held-out data. Kernel compromise,
-administrator access and termination of the trusted controller itself remain
-outside this component's tested boundary. Connecting it to restricted agent
-tools and final-period evaluation remains parent task `364a4ba8`.[^proposer][^selection]
+This component returns an untrusted object. `fleet.core.research_proposal`
+is its one caller and the installed path: `python -m fleet.cli.research_propose
+--root R --digest D` reads the evaluator's `R/D/proposal.json` by digest, verifies
+the pinned program, context, policy and controller bytes, runs the program,
+writes the returned object to `R/D/proposals/<sha256>.json` and passes that file
+to the maintained `research_proposals propose`. Admission records it before
+decoding, keeps refusals (exit 2 is accepted as a recorded refusal), and an
+admitted attempt then reaches HPC3 through the existing queue unchanged; there
+is no new queue or public submission tool. A drifted input or an isolation
+refusal writes no proposal and invokes no admission.[^installed]
+
+Enforced boundary, by what the proposer holds: the program text and approved
+context only; no host path (the evaluator's policy, journal, final extract,
+controller code, daemon socket and `~/.ssh` are absent inside the process), no
+writable root, no inherited environment, so no WRDS, SSH or database credential,
+no network route, and no capability or root user. It cannot replace evaluator
+code or policy: those files are absent where it runs, and the evaluator rejects
+any changed bytes by digest before running. Outside it: an administrator or an
+agent session on the evaluator's account, kernel or daemon compromise, and the
+trusted image and context the evaluator chooses, which must exclude held-out
+data.[^proposer][^installed]
 
 The actual host suite passed on Colossus at API
 `a9be5c1ee955b9bc576268b8183df3b6f619a836`: 78 cases, zero failures and zero
 skips. Its five proposer cases verify missing host-private paths, denied root
 writes, absent inherited credentials, unreachable network, exact cgroup limits
 and an allowed JSON result, plus cleanup after nonzero exit, timeout, malformed
-JSON and oversized output. This is component evidence; it does not establish
-an installed restricted agent-to-admission path.[^proposer]
+JSON and oversized output. That was component evidence.[^proposer]
 
 At that same commit the full `tools/fleet` check passed 2,463 tests with
 100% statement and branch coverage, strict typing and guards clean. The earlier
 selection/release correction also passed independent audit `27406acc` on
-2026-10-30; final scoring remains separate integration work.[^proposer][^selection]
+2026-10-30.[^proposer][^selection]
+
+Measured denial on the installed path, API `06636dbbe`, host lane on Sedona as
+the `execdocker` user: the installed CLI ran a probe program against real
+evaluator files at their host paths. Reading the policy, journal, final-period
+CSV, a WRDS `.pgpass`, the daemon socket, `~/.ssh` and the final CSV through
+`/proc/1/root` each failed with errno 2; overwriting the controller code and the
+policy failed with errno 2; connecting out failed with errno 101; the process
+ran as uid 65534 with only `LC_CTYPE` and `PATH` in its environment, so a
+`PGPASSWORD` canary set in the evaluator's environment was absent. All five
+host files kept their exact bytes. Allowed path, same run: the returned object
+was written content-addressed and handed to the controller, whose transcript
+records one invocation, exit 2 accepted as a recorded refusal.[^installed]
+
+[^installed]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/src/fleet/core/research_control.py`, `read_pinned` and `invoke`; `tools/fleet/tests/test_research_proposal.py`, admitted and refused recording, no evaluator path in any daemon argument, drifted-input and isolation refusals; `tools/fleet/tests/test_research_proposal_host.py`, `test_installed_proposer_cannot_reach_evaluator_assets`. Host lane job fc8bc3c5-ad1b-479e-b44c-ddfcd40152ad passed tools/fleet-execution-linux at API 06636dbbebd56771e170b45a7f190309f396cde1 on Sedona at 2026-10-30T05:46:34Z: 79 cases ran, 0 skipped, 0 failed. Full check b01963a6-2105-49a3-a81a-8551982ca23d passed tools/fleet at the same commit on Sedona at 2026-10-30T05:43:08Z: 2,479 tests, 100.00% coverage. The admission controller in the host case is a recording stand-in for `research_proposals propose`; the real controller's recording of proposals and refusals is the covenant_ml suite's. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 
 [^proposer]: `tools/fleet/src/fleet/core/research_proposer.py`, `run_proposer`, `_runtime` and `_remove_owned`; `tools/fleet/tests/test_research_proposer.py`, policy and lifecycle cases; `tools/fleet/tests/test_research_proposer_host.py`, actual process denial and failure cases. Component task 7c71808d-4328-471e-81c2-0fb40453d561; verification repair 1e555057-c0cf-40a0-8642-781406b4df6c. Initial strict check 4e65d678 rejected discarded denial errors; initial real-host check df645d67 rejected the incorrect CPU JSON key before launching any proposal. Neither is passing evidence. Corrected real host check 60942856-9290-41e2-aa4f-086df60599a4 passed at the cited API commit on 2026-10-30T03:11:41Z, 78 passed, zero skipped, 30 seconds of a 300-second budget; the host lane intentionally runs without coverage because the separate complete package check owns that requirement. Full check a74cf4a3-93bb-4bdf-ab4e-0d6ea640ac36 passed at the same commit on Pendragon on 2026-10-30T03:16:17Z, 2,463 passed, 100.00% coverage, 38 seconds of 300. Its audit found no check that would fail if an alternate key spelling were accepted, so `test_only_dockers_json_cpu_quota_key_is_accepted` was added at API 629be28f6; there, check de6506a9-360f-45ba-a153-cfd4818b9097 passed on Loki at 2026-10-30T05:24:31Z (2,467 passed, 100.00% coverage) and host check 557b9c97-ddc7-4c41-a205-776356c32546 passed on Serendipity at 2026-10-30T05:24:06Z (78 passed, 0 failed).
 
