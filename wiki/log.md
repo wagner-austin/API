@@ -300,3 +300,12 @@ Tankpit Linux check f67122d8 passed 7,663 tests at 100%; Windows CI run
 recorded on the board separately from citation validation.
 These checks establish documentation and registration behavior; they do not
 establish a completed substantive WRDS baseline. Board task 52668052.
+
+## 2026-10-30: freeze the monthly research runtime
+
+Updated `wrds-baseline-readiness` with the separate installed monthly controller,
+source and wheel identities, and native image build 58629088. Both generated
+selfchecks and the image dependency check passed. The complete queue rehearsal,
+substantive extraction and baseline remain outstanding. The operator's encrypted
+bundle and evaluator key-custody requirement now precedes licensed staging.
+Board tasks 474c840b and e6729a16; no new page or page-count change.
