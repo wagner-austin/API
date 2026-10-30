@@ -15,6 +15,7 @@ from platform_core.json_utils import (
 )
 
 from . import _test_hooks
+from .encrypted_records import decode_encrypted_bundle
 from .research_cluster import ResearchCluster, attempt_identity, prepare_bundle
 from .research_journal import ResearchAttempt, research_journal
 from .research_records import decode_research_proposal
@@ -228,6 +229,15 @@ def reconcile_attempt(
         measurement = require_dict(report, "measurement")
         if require_dict(measurement, "accounting") != accounting:
             raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured accounting differs")
+        dataset = require_dict(measurement, "dataset")
+        bundle = decode_encrypted_bundle(require_dict(dataset, "bundle"))
+        verified = require_dict(measurement, "verified_files")
+        if (
+            dataset.get("bundle_sha256") != trial["policy"]["dataset_digest"]
+            or verified.get(trial["manifest"]) != trial["policy"]["dataset_digest"]
+            or bundle["partition"] != "train-validation"
+        ):
+            raise ValueError("RESEARCH_EXECUTION_RECEIPT: measured dataset differs from admission")
         return trial_event(
             path,
             trial,

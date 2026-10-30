@@ -149,6 +149,14 @@ def encrypted_stage_manifest(
     )
 
 
+def read_encrypted_bundle(path: Path, expected_digest: str) -> EncryptedBundle:
+    """Decode only metadata bytes matching the evaluator's frozen digest."""
+    payload = path.read_bytes()
+    if sha256(payload).hexdigest() != expected_digest:
+        raise ValueError("ENCRYPTED_MANIFEST: bundle differs from admission")
+    return decode_encrypted_bundle(load_json_str(payload.decode("utf-8")))
+
+
 @contextmanager
 def decrypted_bundle(
     path: Path,
@@ -180,10 +188,7 @@ def decrypted_bundle(
     SIGKILL cannot run Python cleanup. The cluster must reclaim job-local scratch
     after allocation termination; this API does not claim secure physical erasure.
     """
-    payload = path.read_bytes()
-    if sha256(payload).hexdigest() != expected_digest:
-        raise ValueError("ENCRYPTED_MANIFEST: bundle differs from admission")
-    bundle = decode_encrypted_bundle(load_json_str(payload.decode("utf-8")))
+    bundle = read_encrypted_bundle(path, expected_digest)
     if bundle["partition"] != partition or str(identity.to_public()) != bundle["recipient"]:
         raise ValueError("ENCRYPTED_ACCESS: partition or identity is not authorized")
     if sum(item["plaintext"]["size_bytes"] for item in bundle["files"]) > max_plaintext_bytes:
@@ -202,4 +207,9 @@ def decrypted_bundle(
         yield private / bundle["manifest"]["name"]
 
 
-__all__ = ["decrypted_bundle", "encrypt_bundle", "encrypted_stage_manifest"]
+__all__ = [
+    "decrypted_bundle",
+    "encrypt_bundle",
+    "encrypted_stage_manifest",
+    "read_encrypted_bundle",
+]

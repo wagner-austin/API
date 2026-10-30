@@ -27,7 +27,10 @@ from .crsp_study import (
     require_crsp_features,
     run_crsp_validation,
 )
+from .encrypted_records import EncryptedBundle, encode_encrypted_bundle
+from .encrypted_storage import decrypted_bundle, read_encrypted_bundle
 from .research_journal import research_policy_digest
+from .research_keys import EvaluatorKeys
 from .research_limits import policy_refusal
 from .research_records import candidate_digest
 from .research_trial_records import ResearchTrial, encode_research_evaluation, evaluation_digest
@@ -190,6 +193,8 @@ def publish_monthly_record(
     partition: str,
     label: str,
     study: CrspScored,
+    bundle: EncryptedBundle,
+    bundle_digest: str,
 ) -> Path:
     """Write one monthly study's complete accounting and its shared numerical record.
 
@@ -201,6 +206,8 @@ def publish_monthly_record(
         partition: ``validation`` or ``final``, naming the evaluated period.
         label: RunRecord label identifying the run within the admitted protocol.
         study: Scored decisions, fold counts, series and paired comparisons.
+        bundle: Verified encrypted transport and plaintext identities.
+        bundle_digest: Admission-pinned digest of that bundle's metadata.
 
     Returns:
         Shared numerical record sidecar.
@@ -221,6 +228,7 @@ def publish_monthly_record(
         "policy_digest": research_policy_digest(policy),
         "candidate_digest": candidate_digest(proposal),
         "partition": partition,
+        "dataset": {"bundle_sha256": bundle_digest, "bundle": encode_encrypted_bundle(bundle)},
         "source": encode_crsp_extract(sources.manifest),
         "config": encode_benchmark_config(proposal["config"]),
         "evaluation": encode_research_evaluation(trial["evaluation"]),
@@ -242,7 +250,13 @@ def publish_monthly_record(
 
 
 def execute_trial(
-    trial: ResearchTrial, fingerprint: RunFingerprint, code_digest: str, output: Path
+    trial: ResearchTrial,
+    fingerprint: RunFingerprint,
+    code_digest: str,
+    output: Path,
+    *,
+    keys: EvaluatorKeys,
+    scratch: Path,
 ) -> Path:
     """Run the frozen monthly study on the validation period and emit shared evidence.
 
@@ -251,6 +265,8 @@ def execute_trial(
         fingerprint: Runtime measured by the existing benchmark fingerprint builder.
         code_digest: Digest of the actual entrypoint source, measured by that entrypoint.
         output: Result path in a new, per-attempt directory.
+        keys: Evaluator key custody; validation never acquires the final identity.
+        scratch: Private job-local temporary storage supplied by the scheduler.
 
     Returns:
         Shared numerical record sidecar.
@@ -262,30 +278,42 @@ def execute_trial(
         OSError: Frozen data or result storage is unavailable.
     """
     proposal, evaluation = trial["proposal"], trial["evaluation"]
-    manifest = Path(trial["manifest"])
+    encrypted = Path(trial["manifest"])
     require_trial_lineage(
-        trial, fingerprint, code_digest, manifest, trial["policy"]["dataset_digest"]
+        trial, fingerprint, code_digest, encrypted, trial["policy"]["dataset_digest"]
     )
-    sources = load_trial_sources(trial, manifest)
-    output.parent.mkdir(parents=True, exist_ok=False)
-    validation = run_crsp_validation(
-        sources,
-        make_baseline_trainers(proposal["config"]),
-        proposal["seed"],
-        features=proposal["features"],
-        stopping_months=evaluation["stopping_months"],
-        fold_months=evaluation["fold_months"],
-        confidence=evaluation["confidence"],
-    )
-    return publish_monthly_record(
-        trial,
-        fingerprint,
-        sources,
-        output,
-        partition="validation",
-        label=str(trial["number"]),
-        study=validation,
-    )
+    digest = trial["policy"]["dataset_digest"]
+    bundle = read_encrypted_bundle(encrypted, digest)
+    with decrypted_bundle(
+        encrypted,
+        digest,
+        partition="train-validation",
+        identity=keys.acquire("train-validation"),
+        scratch=scratch,
+        max_plaintext_bytes=keys.access["max_plaintext_bytes"],
+    ) as manifest:
+        sources = load_trial_sources(trial, manifest)
+        output.parent.mkdir(parents=True, exist_ok=False)
+        validation = run_crsp_validation(
+            sources,
+            make_baseline_trainers(proposal["config"]),
+            proposal["seed"],
+            features=proposal["features"],
+            stopping_months=evaluation["stopping_months"],
+            fold_months=evaluation["fold_months"],
+            confidence=evaluation["confidence"],
+        )
+        return publish_monthly_record(
+            trial,
+            fingerprint,
+            sources,
+            output,
+            partition="validation",
+            label=str(trial["number"]),
+            study=validation,
+            bundle=bundle,
+            bundle_digest=digest,
+        )
 
 
 __all__ = [

@@ -23,13 +23,21 @@ from covenant_ml.markets.research_trial_records import (
     encode_research_trial,
 )
 
+from ._encrypted_fixtures import evaluator_keys
 from ._research_final_fixtures import completed_study
 
 
 def _final(path: Path, trial: ResearchTrial, manifest: Path, output: Path, code: str = "c") -> Path:
     """Run the evaluator's final score under the fixture's pinned image."""
     return execute_final(
-        path, trial, manifest, sample_run_fingerprint(image_digest="d" * 64), code * 64, output
+        path,
+        trial,
+        manifest,
+        sample_run_fingerprint(image_digest="d" * 64),
+        code * 64,
+        output,
+        keys=evaluator_keys(path.parent / "validation"),
+        scratch=path.parent,
     )
 
 
@@ -56,7 +64,8 @@ def test_selected_candidate_is_released_once_and_scored_on_the_final_period(
         1,
     )
     assert require_dict(result, "source")["protocol"] == require_dict(
-        narrow_json_to_dict(load_json_str(manifest.read_text())), "protocol"
+        narrow_json_to_dict(load_json_str((tmp_path / "final/manifest.json").read_text())),
+        "protocol",
     )
     (fit,) = [narrow_json_to_dict(item) for item in require_list(result, "folds")]
     assert fit["first_scored"] == "2020-01-31"
@@ -112,13 +121,28 @@ def test_final_refusals_before_release_keep_the_selection(
 def test_release_is_consumed_before_any_final_relation_is_read(tmp_path: Path) -> None:
     path, trial, manifest = completed_study(tmp_path)
     select_candidate(path, trial, manifest)
-    (manifest.parent / "returns.csv").unlink()
+    (manifest.parent / "returns.csv.age").unlink()
     with pytest.raises(FileNotFoundError):
         _final(path, trial, manifest, tmp_path / "out" / "r.json")
     assert research_journal(trial["policy"]).read(path)[0]["selection"] == "released"
     with pytest.raises(ValueError, match="RESEARCH-009"):
         _final(path, trial, manifest, tmp_path / "out" / "r.json")
     assert not (tmp_path / "out").exists()
+
+
+def test_final_key_is_acquired_only_after_irrevocable_release(tmp_path: Path) -> None:
+    path, trial, manifest = completed_study(tmp_path)
+    (tmp_path / "validation/keys/final.agekey").unlink()
+    with pytest.raises(ValueError, match="RESEARCH-009"):
+        _final(path, trial, manifest, tmp_path / "out/r.json")
+    assert research_journal(trial["policy"]).read(path)[0]["selection"] == ""
+    select_candidate(path, trial, manifest)
+    with pytest.raises(FileNotFoundError):
+        _final(path, trial, manifest, tmp_path / "out/r.json")
+    assert research_journal(trial["policy"]).read(path)[0]["selection"] == "released"
+    with pytest.raises(ValueError, match="RESEARCH-009"):
+        _final(path, trial, manifest, tmp_path / "out/r.json")
+    assert list(tmp_path.glob("research-plaintext-*")) == []
 
 
 def test_a_partition_field_never_authorizes_final_scoring(tmp_path: Path) -> None:

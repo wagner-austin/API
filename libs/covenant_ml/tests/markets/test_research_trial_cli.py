@@ -40,7 +40,22 @@ def test_compute_cli_measures_its_entrypoint_source(
     request = tmp_path / "request.json"
     request.write_text(dump_json_str(document))
     output = tmp_path / "trial" / "result.json"
-    assert research_trial.main(["--request", str(request), "--out", str(output)], stand_in_pin) == 0
+    assert (
+        research_trial.main(
+            [
+                "--request",
+                str(request),
+                "--out",
+                str(output),
+                "--access",
+                str(tmp_path / "access.json"),
+                "--scratch",
+                str(tmp_path),
+            ],
+            stand_in_pin,
+        )
+        == 0
+    )
     record = decode_run_record(load_json_str(run_record_sidecar(output).read_text()))
     assert record["label"] == "1"
     assert record["fingerprint"]["image_digest"] == "d" * 64
@@ -58,7 +73,16 @@ def test_final_mode_scores_the_selected_attempt_once(
     select_candidate(ledger, trial, manifest)
     request = write_trial(trial, tmp_path / "request.json")
     output = tmp_path / "score" / "result.json"
-    final = ["--ledger", str(ledger), "--final-manifest", str(manifest)]
+    final = [
+        "--ledger",
+        str(ledger),
+        "--final-manifest",
+        str(manifest),
+        "--access",
+        str(tmp_path / "validation/access.json"),
+        "--scratch",
+        str(tmp_path),
+    ]
     call = ["--request", str(request), "--out", str(output), *final]
     assert research_trial.main(call, stand_in_pin) == 0
     record = decode_run_record(load_json_str(run_record_sidecar(output).read_text()))
@@ -73,7 +97,16 @@ def test_final_mode_scores_the_selected_attempt_once(
 def test_final_mode_needs_both_its_flags(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], flag: str
 ) -> None:
-    call = ["--request", str(tmp_path / "unread.json"), "--out", str(tmp_path / "o.json")]
+    call = [
+        "--request",
+        str(tmp_path / "unread.json"),
+        "--out",
+        str(tmp_path / "o.json"),
+        "--access",
+        str(tmp_path / "access.json"),
+        "--scratch",
+        str(tmp_path),
+    ]
     with pytest.raises(SystemExit) as stopped:
         research_trial.main([*call, flag, str(tmp_path / "x")], stand_in_pin)
     assert stopped.value.code == 2
@@ -96,6 +129,10 @@ def test_real_compute_process_reports_missing_request(tmp_path: Path) -> None:
             str(tmp_path / "missing.json"),
             "--out",
             str(tmp_path / "result" / "out.json"),
+            "--access",
+            str(tmp_path / "access.json"),
+            "--scratch",
+            str(tmp_path),
         ],
         capture_output=True,
         text=True,

@@ -10,6 +10,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from platform_core.stage_manifest import StagedFile, StageManifest, encode_stage_manifest
 from typing_extensions import ReadOnly, TypedDict
 
+from ..evaluation.evidence import require_evidence_digest
 from .research_journal import research_policy_digest
 from .research_trial_records import ResearchTrial, encode_research_trial
 from .validation import require_nonempty
@@ -25,6 +26,8 @@ class ResearchCluster(TypedDict):
     entrypoint: ReadOnly[str]
     image: ReadOnly[str]
     checksums: ReadOnly[str]
+    access: ReadOnly[str]
+    access_digest: ReadOnly[str]
     report_task: ReadOnly[str]
 
 
@@ -45,6 +48,8 @@ def encode_research_cluster(value: ResearchCluster) -> JSONObject:
         "entrypoint": value["entrypoint"],
         "image": value["image"],
         "checksums": value["checksums"],
+        "access": value["access"],
+        "access_digest": value["access_digest"],
         "report_task": value["report_task"],
     }
 
@@ -71,6 +76,8 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
         entrypoint=require_nonempty(document, "entrypoint"),
         image=require_nonempty(document, "image"),
         checksums=require_nonempty(document, "checksums"),
+        access=require_nonempty(document, "access"),
+        access_digest=require_evidence_digest(require_nonempty(document, "access_digest")),
         report_task=require_nonempty(document, "report_task"),
     )
     paths = (
@@ -79,6 +86,7 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
         PurePosixPath(value["root"]),
         PurePosixPath(value["entrypoint"]),
         PurePosixPath(value["image"]),
+        PurePosixPath(value["access"]),
     )
     for path in paths:
         if not path.is_absolute() or ".." in path.parts:
@@ -116,6 +124,7 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
         f"{policy['image_digest']}  {cluster['image']}",
         f"{policy['dataset_digest']}  {trial['manifest']}",
         f"{policy['code_digest']}  {cluster['entrypoint']}/scripts/research_trial.py",
+        f"{cluster['access_digest']}  {cluster['access']}",
     }
     if not required <= lines:
         raise ValueError("RESEARCH_CLUSTER_INPUTS: require frozen runtime, manifest and entrypoint")
@@ -156,6 +165,8 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
             str(remote / "request.json"),
             "--out",
             output,
+            "--access",
+            cluster["access"],
         ]
     )
     command = (
@@ -164,6 +175,7 @@ def prepare_bundle(directory: Path, cluster: ResearchCluster, trial: ResearchTri
         + shlex.quote(cluster["entrypoint"])
         + " && "
         + invocation
+        + ' --scratch "${TMPDIR:?RESEARCH_SCRATCH: scheduler must provide private scratch}"'
     )
     recipe: JSONObject = {
         "project": cluster["project"],

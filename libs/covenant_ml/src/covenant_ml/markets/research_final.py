@@ -24,8 +24,10 @@ from platform_core.run_record import decode_run_record
 
 from ..benchmarking import make_baseline_trainers
 from .crsp_final import run_crsp_final
+from .encrypted_storage import decrypted_bundle, read_encrypted_bundle
 from .research_execution import require_trial_attempt, trial_event
 from .research_journal import ResearchAttempt
+from .research_keys import EvaluatorKeys
 from .research_trial import load_trial_sources, publish_monthly_record, require_trial_lineage
 from .research_trial_records import ResearchTrial
 
@@ -81,6 +83,9 @@ def execute_final(
     fingerprint: RunFingerprint,
     code_digest: str,
     output: Path,
+    *,
+    keys: EvaluatorKeys,
+    scratch: Path,
 ) -> Path:
     """Consume the selected attempt's one release, then score the final period once.
 
@@ -91,6 +96,8 @@ def execute_final(
         fingerprint: Runtime measured by the existing benchmark fingerprint builder.
         code_digest: Digest of the actual entrypoint source, measured by that entrypoint.
         output: Result path in a new directory for this run.
+        keys: Evaluator key custody, consulted only after the one-shot release commits.
+        scratch: Scheduler-owned job-local temporary storage.
 
     Returns:
         Shared numerical record sidecar, labelled ``final-<attempt>``.
@@ -110,26 +117,37 @@ def execute_final(
     digest = row["final_manifest_digest"]
     require_trial_lineage(trial, fingerprint, code_digest, final_manifest, digest)
     trial_event(path, trial, "release_final", _final_identity(row, digest))
-    sources = load_trial_sources(trial, final_manifest)
-    output.parent.mkdir(parents=True, exist_ok=False)
-    proposal, evaluation = trial["proposal"], trial["evaluation"]
-    final = run_crsp_final(
-        sources,
-        make_baseline_trainers(proposal["config"]),
-        proposal["seed"],
-        features=proposal["features"],
-        stopping_months=evaluation["stopping_months"],
-        confidence=evaluation["confidence"],
-    )
-    return publish_monthly_record(
-        trial,
-        fingerprint,
-        sources,
-        output,
+    bundle = read_encrypted_bundle(final_manifest, digest)
+    with decrypted_bundle(
+        final_manifest,
+        digest,
         partition="final",
-        label=f"final-{trial['number']}",
-        study=final,
-    )
+        identity=keys.acquire("final"),
+        scratch=scratch,
+        max_plaintext_bytes=keys.access["max_plaintext_bytes"],
+    ) as manifest:
+        sources = load_trial_sources(trial, manifest)
+        output.parent.mkdir(parents=True, exist_ok=False)
+        proposal, evaluation = trial["proposal"], trial["evaluation"]
+        final = run_crsp_final(
+            sources,
+            make_baseline_trainers(proposal["config"]),
+            proposal["seed"],
+            features=proposal["features"],
+            stopping_months=evaluation["stopping_months"],
+            confidence=evaluation["confidence"],
+        )
+        return publish_monthly_record(
+            trial,
+            fingerprint,
+            sources,
+            output,
+            partition="final",
+            label=f"final-{trial['number']}",
+            study=final,
+            bundle=bundle,
+            bundle_digest=digest,
+        )
 
 
 __all__ = ["execute_final", "select_candidate"]

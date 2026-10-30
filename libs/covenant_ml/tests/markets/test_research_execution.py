@@ -156,6 +156,27 @@ def test_changed_job_or_measurement_cannot_complete(tmp_path: Path) -> None:
         reconcile_attempt(path, trial, cluster, directory)
 
 
+@pytest.mark.parametrize("changed", ["digest", "verified", "partition"])
+def test_changed_dataset_cannot_complete(tmp_path: Path, changed: str) -> None:
+    path, trial, cluster, directory = setup(tmp_path)
+    scheduler = Scheduler(trial)
+    _test_hooks.campaign_runner = scheduler
+    submit_attempt(path, trial, cluster, directory)
+    report = observation(directory, trial)
+    measurement = require_dict(report, "measurement")
+    dataset = require_dict(measurement, "dataset")
+    if changed == "digest":
+        dataset["bundle_sha256"] = "0" * 64
+    elif changed == "verified":
+        require_dict(measurement, "verified_files")[trial["manifest"]] = "0" * 64
+    else:
+        require_dict(dataset, "bundle")["partition"] = "final"
+    scheduler.change = report
+    with pytest.raises(ValueError, match="measured dataset differs"):
+        reconcile_attempt(path, trial, cluster, directory)
+    assert research_journal(trial["policy"]).read(path)[0]["status"] == "running"
+
+
 def test_cluster_codec_and_missing_pin(tmp_path: Path) -> None:
     _path, trial, cluster, directory = setup(tmp_path)
     assert decode_research_cluster(encode_research_cluster(cluster)) == cluster

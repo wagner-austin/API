@@ -25,6 +25,7 @@ from covenant_ml.markets.research_trial_records import (
 )
 
 from ._crsp_study_fixtures import final_manifest
+from ._encrypted_fixtures import evaluator_keys, seal_extract
 from ._trial_fixtures import trial_document
 
 
@@ -59,6 +60,8 @@ def completed_study(root: Path, code_digest: str = "c" * 64) -> tuple[Path, Rese
         sample_run_fingerprint(image_digest="d" * 64),
         code_digest,
         root / "validation-1" / "result.json",
+        keys=evaluator_keys(root / "validation"),
+        scratch=root,
     )
     _commit(journal, path, {"action": "submit", "number": 1, "observed_ms": 1001})
     _commit(
@@ -79,7 +82,11 @@ def completed_study(root: Path, code_digest: str = "c" * 64) -> tuple[Path, Rese
             "record": narrow_json_to_dict(load_json_str(record.read_text())),
         },
     )
-    return path, trial, final_manifest(root / "final")
+    manifest = final_manifest(root / "final")
+    encrypted = seal_extract(
+        manifest, root / "encrypted-final", evaluator_keys(root / "validation").access, "final"
+    )
+    return path, trial, encrypted
 
 
 def write_trial(trial: ResearchTrial, path: Path) -> Path:

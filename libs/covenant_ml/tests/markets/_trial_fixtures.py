@@ -12,6 +12,7 @@ from covenant_ml.markets.research_trial_records import decode_research_evaluatio
 
 from ._crsp_fixtures import write_sources
 from ._crsp_study_fixtures import study_protocol, study_rows
+from ._encrypted_fixtures import create_access, seal_extract
 from ._research_fixtures import policy, proposal
 
 
@@ -52,14 +53,18 @@ def trial_document(root: Path) -> JSONObject:
     Returns:
         Complete request document.
     """
-    path, _ = write_sources(root, study_rows(), study_protocol())
+    source = root / "source"
+    source.mkdir()
+    path, _ = write_sources(source, study_rows(), study_protocol())
+    access = create_access(root)
+    encrypted = seal_extract(path, root / "encrypted", access, "train-validation")
     evaluation: JSONObject = {
         "design": study_protocol(),
         "stopping_months": 6,
         "fold_months": 12,
         "confidence": 0.9,
     }
-    return frozen_request(evaluation, path, ["momentum", "liquidity"])
+    return frozen_request(evaluation, encrypted, ["momentum", "liquidity"])
 
 
 __all__ = ["frozen_request", "trial_document"]

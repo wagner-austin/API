@@ -16,10 +16,11 @@ from ._trial_fixtures import trial_document
 
 
 def setup(root: Path) -> tuple[Path, ResearchTrial, ResearchCluster, Path]:
-    trial = decode_research_trial(trial_document(root))
+    document = trial_document(root)
+    trial = decode_research_trial(document)
     path = root / "journal.sqlite"
     research_journal(trial["policy"]).initialize(path)
-    admit_proposal(path, trial["policy"], require_dict(trial_document(root), "proposal"), 0)
+    admit_proposal(path, trial["policy"], require_dict(document, "proposal"), 0)
     cluster = decode_research_cluster(
         {
             "python": sys.executable,
@@ -28,10 +29,13 @@ def setup(root: Path) -> tuple[Path, ResearchTrial, ResearchCluster, Path]:
             "root": "/pub/research",
             "entrypoint": "/pub/entrypoint",
             "image": "/pub/runtime.sif",
+            "access": "/home/evaluator/access.json",
+            "access_digest": "f" * 64,
             "report_task": "6d2d086c-5242-482b-ac81-8a61dd8e354d",
             "checksums": (
                 f"{'d' * 64}  /pub/runtime.sif\n"
                 f"{'c' * 64}  /pub/entrypoint/scripts/research_trial.py\n"
+                f"{'f' * 64}  /home/evaluator/access.json\n"
                 f"{trial['policy']['dataset_digest']}  {trial['manifest']}\n"
             ),
         }
@@ -61,7 +65,14 @@ def observation(directory: Path, trial: ResearchTrial, state: str = "COMPLETED")
     return {
         "ledger": receipt(directory),
         "accounting": accounting,
-        "measurement": {"accounting": accounting},
+        "measurement": {
+            "accounting": accounting,
+            "dataset": {
+                "bundle_sha256": trial["policy"]["dataset_digest"],
+                "bundle": read_document(Path(trial["manifest"])),
+            },
+            "verified_files": {trial["manifest"]: trial["policy"]["dataset_digest"]},
+        },
         "record": encode_run_record(record),
     }
 

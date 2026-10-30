@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str, load_json_str
-from platform_core.stage_manifest import StagedFile, decode_stage_manifest, encode_stage_manifest
+from platform_core.stage_manifest import decode_stage_manifest, encode_stage_manifest
 
 from covenant_ml.markets import _test_hooks_encryption as hooks
 from covenant_ml.markets.crsp_extract import load_crsp_sources
@@ -23,11 +23,7 @@ from covenant_ml.markets.encrypted_storage import (
 )
 
 from ._crsp_fixtures import panel_protocol, source_rows, write_sources
-
-
-def _record(path: Path) -> StagedFile:
-    payload = path.read_bytes()
-    return StagedFile(name=path.name, sha256=sha256(payload).hexdigest(), size_bytes=len(payload))
+from ._encrypted_fixtures import file_record
 
 
 def _bundle(tmp_path: Path) -> tuple[Path, EncryptedBundle, hooks.AgeIdentity]:
@@ -38,8 +34,8 @@ def _bundle(tmp_path: Path) -> tuple[Path, EncryptedBundle, hooks.AgeIdentity]:
     bundle = encrypt_bundle(
         source,
         tmp_path / "encrypted",
-        files=tuple(_record(path) for path in sorted(source.iterdir())),
-        manifest=_record(manifest),
+        files=tuple(file_record(path) for path in sorted(source.iterdir())),
+        manifest=file_record(manifest),
         recipient=str(identity.to_public()),
         partition="train-validation",
     )
@@ -80,7 +76,7 @@ def test_real_crsp_round_trip_stage_identity_and_cleanup(tmp_path: Path) -> None
         assert plaintext.parent.stat().st_mode & 0o777 == 0o700
         assert load_crsp_sources(plaintext) == load_crsp_sources(tmp_path / "source/manifest.json")
         for item in bundle["files"]:
-            assert _record(plaintext.parent / item["plaintext"]["name"]) == item["plaintext"]
+            assert file_record(plaintext.parent / item["plaintext"]["name"]) == item["plaintext"]
     assert list(scratch.iterdir()) == []
     assert len(list(path.parent.iterdir())) == 11
 
@@ -194,8 +190,8 @@ def test_multichunk_file_and_distinct_ciphertext_on_reencryption(tmp_path: Path)
         encrypt_bundle(
             source,
             tmp_path / name,
-            files=(_record(path),),
-            manifest=_record(path),
+            files=(file_record(path),),
+            manifest=file_record(path),
             recipient=str(identity.to_public()),
             partition="final",
         )
@@ -223,7 +219,7 @@ def test_changed_source_and_changed_published_metadata_are_refused(tmp_path: Pat
     with pytest.raises(ValueError, match="ENCRYPTED_MANIFEST"):
         encrypted_stage_manifest(bundle, path, "/pub/study")
     plain = tmp_path / "source/manifest.json"
-    expected = _record(plain)
+    expected = file_record(plain)
     plain.write_bytes(b"changed")
     with pytest.raises(ValueError, match="ENCRYPTED_DIGEST"):
         encrypt_bundle(

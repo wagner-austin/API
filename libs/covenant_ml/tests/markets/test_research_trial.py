@@ -22,6 +22,7 @@ from covenant_ml.markets.research_trial_records import (
     encode_research_trial,
 )
 
+from ._encrypted_fixtures import evaluator_keys
 from ._trial_fixtures import frozen_request, trial_document
 
 
@@ -32,6 +33,8 @@ def _run(document: JSONObject, output: Path) -> Path:
         sample_run_fingerprint(image_digest="d" * 64),
         "c" * 64,
         output,
+        keys=evaluator_keys(output.parent.parent),
+        scratch=output.parent.parent,
     )
 
 
@@ -63,9 +66,19 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     assert (first["arm"], first["cost_bps"], month["decision"]) == ("momentum", 10, "2018-07-31")
     assert len(require_list(month, "held")) == 3
     assert require_dict(result, "source")["extracted_at"] == "2026-10-29T00:00:00+00:00"
+    assert require_dict(result, "dataset")["bundle_sha256"] == trial["policy"]["dataset_digest"]
+    assert list(tmp_path.glob("research-plaintext-*")) == []
     with pytest.raises(FileExistsError):
         _run(document, output)
     assert decode_run_record(load_json_str(record_path.read_text())) == record
+
+
+def test_validation_succeeds_without_any_final_identity(tmp_path: Path) -> None:
+    document = trial_document(tmp_path)
+    (tmp_path / "keys/final.agekey").unlink()
+    result = _run(document, tmp_path / "result/out.json")
+    assert decode_run_record(load_json_str(result.read_text()))["label"] == "1"
+    assert list(tmp_path.glob("research-plaintext-*")) == []
 
 
 @pytest.mark.parametrize("field", ["protocol", "code", "image", "dataset"])
@@ -82,6 +95,8 @@ def test_worker_rechecks_frozen_identities_before_fitting(tmp_path: Path, field:
             fingerprint,
             ("e" if field == "code" else "c") * 64,
             tmp_path / "result" / "out.json",
+            keys=evaluator_keys(tmp_path),
+            scratch=tmp_path,
         )
     assert not (tmp_path / "result").exists()
 
