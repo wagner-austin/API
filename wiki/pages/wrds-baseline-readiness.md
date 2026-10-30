@@ -4,6 +4,11 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json"
+  - "tools/hpc3/src/hpc3/core/image_evidence.py"
+  - "tools/hpc3/src/hpc3/cli/image_inspect.py"
+  - "tools/hpc3/tests/test_image_evidence.py"
+  - "tools/hpc3/tests/test_image_inspect.py"
   - "tools/fleet/tests/_host.py"
   - "tools/fleet/tests/test_research_proposer_host.py"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
@@ -45,6 +50,11 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json": "f27ad04239492a0e30637ccb454e9492f0b9e101"
+  "tools/hpc3/src/hpc3/core/image_evidence.py": "95f74bbdf2fca54380504c91053f86cddee16138"
+  "tools/hpc3/src/hpc3/cli/image_inspect.py": "b88cbc6388a5a97c447835dc00f11d9a48e548f3"
+  "tools/hpc3/tests/test_image_evidence.py": "f9c4ec90fcd2aab342d05c3749820b0392270a55"
+  "tools/hpc3/tests/test_image_inspect.py": "290e29766a55958aa9025930b3630aaa4f05cdb8"
   "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
   "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
@@ -185,6 +195,20 @@ through the shared queue; the encrypted-workflow adequacy audit subsequently
 passed as recorded above.
 The image build and execution receipts establish different parts of that
 claim.[^final-runtime][^final-rehearsal][^grant]
+
+On October 30, the maintained `hpc3.cli.image_inspect` command re-read builds
+`58629088` and `58635077` from the existing ledger and native accounting. Each
+verified 14 frozen files, both generated selfcheck receipts, dependency-check
+success and image/log modification times within its allocation. The service
+posted these measurements directly to the runtime task. A deliberately incorrect
+image checksum was refused with `DIGEST_MISMATCH` and exit 2. Separate controller
+readback matched 856 and 868 installed non-metadata wheel files respectively;
+both controllers passed their generated symbol/version selfchecks and `pip check`.
+The newer count includes resources as well as the 859 code files checked at
+installation. These are integrity measurements of existing runtimes, not new
+builds or a substantive study.[^runtime-inspection]
+
+[^runtime-inspection]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json`, native reports, controller readback, negative probe and private evidence hashes; `tools/hpc3/src/hpc3/core/image_evidence.py`, `measure_build`; `tools/hpc3/src/hpc3/cli/image_inspect.py`, `main`; `tools/hpc3/tests/test_image_evidence.py` and `test_image_inspect.py`, missing pins, incorrect artifact identity, incomplete native receipts, real failed process and refusal before publication. Inspection source API `6326093c3` passed fleet `626bb7b7` on Colossus: 2,053 tests, 100% coverage. The program-authored reports are `f3670415-c99c-4c3c-adf1-863c7c738650` and `1fcd7480-1d43-4094-a60c-e9c82d9ead90`, posted as `hpc-report-474c840b` on the runtime task. The reader verifies the retained build log and current frozen files; it does not rerun the native image.
 
 Fresh validation job `58635333` and final job `58635492` each completed in nine
 seconds with exit `0:0` on `hpc3-l18-05`. Shared queue entries `9ee4c5a8` and
