@@ -332,3 +332,21 @@ repinned ten research pages. Added native forced-kill and same-node follow-up
 receipts to readiness, distinguishing eventual absence from immediate cleanup.
 The eight non-research pin errors remain outside this correction; this entry
 does not claim the whole wiki is clean. Board task e6729a16; page count unchanged.
+
+## 2026-10-30: separate authoritative final release from compute consumption
+
+Updated final-scoring and readiness pages for the private single-use grant at
+API 66b17108f, replacing the compute-side journal interface. The existing
+journal commits release before key acquisition; the worker consumes a durable
+marker before opening and removing its delivered key. Added citations to real
+subprocess scoring, concurrent consumption and failure tests. Rechecked seven
+other research pages against the changed admission documentation and repinned
+their unchanged numerical, validation and isolation claims. Native transport
+and cluster final rehearsal remain open; installed runtime is still 44fa91cea.
+Board task e6729a16; no new page or page-count change.
+
+Verification: the first full gate at 66b17108f caught direct environment access
+in the new subprocess test, despite all 4,850 tests passing. Reused the existing
+shared environment reader in 9783dcd84; fleet gate f428dec3 on Serendipity passed
+all 4,850 tests, 100% coverage, typing and guards. This is test/code evidence;
+the grant extension has not received independent adequacy review.

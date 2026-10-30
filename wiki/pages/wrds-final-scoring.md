@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/research_release.py"
+  - "libs/covenant_ml/tests/markets/test_research_release.py"
+  - "libs/covenant_ml/tests/markets/test_research_trial_cli.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/covenant_ml/src/covenant_ml/markets/research_journal.py"
   - "libs/covenant_ml/tests/markets/test_research_selection.py"
@@ -16,16 +19,19 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_final.py"
   - "libs/covenant_ml/tests/markets/test_crsp_final.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
+  "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
+  "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
+  "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "11de7483f512a977862f5eb27322622bbf2e73d7"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "1b0c4fef1b761bb3971f875bab907da043d141bb"
+  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "f62f4f85739a00b2fbdc41f1e8724dd59188632f"
-  "libs/covenant_ml/scripts/research_trial.py": "00588479984e32ef9e640c76dd11ce4cfd5d78a1"
-  "libs/covenant_ml/tests/markets/test_research_final.py": "75b95210bc5ae8e2069bcf27c97e6ab1a6322998"
+  "libs/covenant_ml/scripts/research_proposals.py": "e38e6523456dec8a5359789a6bbb0b4a9c3dc3b7"
+  "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
@@ -48,11 +54,11 @@ evaluator-owned.[^selection]
 
 `research_final` issues them. `research_proposals select` binds the named
 completed attempt's journal candidate and payload to the final manifest's
-SHA-256. `research_trial --ledger --final-manifest` requires that selection and
-those bytes, rechecks policy, protocol, code and image lineage, and commits
-`release_final` before reading any final-period relation. A later failure,
-even a missing data file, leaves the release consumed, and a second run is
-refused. The candidate, seed and features come from the journal's own admitted
+SHA-256. The controller's `research_proposals release` checks admission and
+protocol, commits `release_final`, and then acquires the final key and writes
+a private grant bound to the canonical request and encrypted manifest digests.
+A failure during key access or grant creation leaves the release consumed.
+The candidate, seed and features come from the journal's own admitted
 request; a proposal naming another partition is refused at admission and can
 never be selected, so no request field authorizes final scoring.
 `crsp_final.run_crsp_final` fits once on every decision whose exit precedes
@@ -61,17 +67,27 @@ never be selected, so no request field authorizes final scoring.
 after the last final decision changes no fit or selection in the tests.
 Choosing which attempt to select remains an evaluator decision.[^final]
 
-The manifest now identifies the encrypted final bundle. The entrypoint requires
-`--access` and `--scratch`; `execute_final` acquires the final key only after
-the journal commits release. A missing key therefore consumes the release,
-and the second invocation is refused before key acquisition. Verified plaintext
-exists only within the private decryption context, and the shared result
-publisher retains both ciphertext and plaintext identities. These are tested
-local evaluator controls. Native final-key delivery and an operational final
-rehearsal remain pending in [[wrds-baseline-readiness]]; the journal must stay
-with its authoritative controller.[^encrypted]
+The worker uses `research_trial --final-grant G --final-manifest M --scratch S`
+with its request and output paths. It requires no journal or long-lived key
+directory. After verifying the grant bindings, it exclusively creates and fsyncs
+the consumption marker and its directory, then opens and removes the private
+key. It checks actual code/image lineage before decrypting. Concurrent consumers
+and replays are refused; runtime drift or a later data failure leaves permission
+consumed. Verified plaintext exists within the private decryption context, and
+the shared result publisher retains ciphertext and plaintext identities.[^encrypted]
 
-[^encrypted]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `execute_final`; `libs/covenant_ml/scripts/research_trial.py`, `main`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `publish_monthly_record`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_final_key_is_acquired_only_after_irrevocable_release`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Rechecked after API 44fa91cea; full evaluator verification and the narrower native validation measurement are recorded in [[wrds-baseline-readiness]].
+The grant is an evaluator-private capability, not a second admission journal.
+Native delivery must preserve one grant location and its spent marker; copying
+it into independently consumable locations defeats single use. An evaluator
+administrator remains privileged. Real subprocess tests score synthetic data
+after removing the controller journal and long-lived key, reject replay, and
+allow exactly one of two competing consumers. This tests the worker boundary;
+native transport, final-job submission/reconciliation, installation and a cluster rehearsal remain
+pending in [[wrds-baseline-readiness]].[^grant]
+
+[^encrypted]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `release_final` and `execute_final`; `libs/covenant_ml/scripts/research_trial.py`, `main`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `publish_monthly_record`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_final_key_is_acquired_only_after_irrevocable_release`, `test_failed_grant_creation_cannot_restore_journal_permission` and `test_native_runtime_drift_consumes_the_grant_without_scoring`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission".
+
+[^grant]: `libs/covenant_ml/src/covenant_ml/markets/research_release.py`, `write_final_grant` and `consume_final_grant`; `libs/covenant_ml/tests/markets/test_research_release.py`, `test_two_real_processes_cannot_redeem_the_same_grant`; `libs/covenant_ml/tests/markets/test_research_trial_cli.py`, `test_real_final_worker_needs_neither_journal_nor_long_lived_keys`. These are Linux process tests using synthetic data, not native scheduler runs.
 
 [^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission".
 

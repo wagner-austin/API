@@ -16,7 +16,7 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "11de7483f512a977862f5eb27322622bbf2e73d7"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"

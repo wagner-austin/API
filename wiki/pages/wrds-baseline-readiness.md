@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/research_release.py"
+  - "libs/covenant_ml/tests/markets/test_research_release.py"
+  - "libs/covenant_ml/tests/markets/test_research_trial_cli.py"
   - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json"
   - "libs/covenant_ml/tests/markets/test_encrypted_process.py"
   - "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json"
@@ -35,12 +38,15 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
+  "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
+  "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json": "976cfc40fbaca4955084948061d6a2fcd90d54ab"
   "libs/covenant_ml/tests/markets/test_encrypted_process.py": "63a3a2f34e7188ee307ce1ea1b178f44f1995854"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json": "6f58fc955b6a9086564ea6a36f3028fcd2ac0ed6"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
   ".github/workflows/covenant-ml.yml": "14472de200c3c5cb4a41c28110a1739327ecce8c"
-  "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "cda0fd178b9d1f7988df633b1067478db9d03af0"
+  "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "8cb56c464b77f760375b512fd17159c3a2d9a9f3"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "92bab2e0f2d2c371a1d1003cddc1bbf3e0cd69ca"
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/tests/markets/test_research_keys.py": "ceb7f3b58753e99d7a559b8e471c46d1abb28067"
@@ -51,15 +57,15 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8cfeae2c102164539246bd6ea99b93051e8ccb2b"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "11de7483f512a977862f5eb27322622bbf2e73d7"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "1b0c4fef1b761bb3971f875bab907da043d141bb"
+  "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "f62f4f85739a00b2fbdc41f1e8724dd59188632f"
-  "libs/covenant_ml/scripts/research_trial.py": "00588479984e32ef9e640c76dd11ce4cfd5d78a1"
-  "libs/covenant_ml/tests/markets/test_research_final.py": "75b95210bc5ae8e2069bcf27c97e6ab1a6322998"
+  "libs/covenant_ml/scripts/research_proposals.py": "e38e6523456dec8a5359789a6bbb0b4a9c3dc3b7"
+  "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
   "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
   "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
@@ -131,9 +137,18 @@ admitted request and native checksum evidence.[^integrated]
 Key directories and decrypted storage must actually have mode 0700; keys must
 be private regular files opened without following symlinks. These are Linux
 execution requirements, not Windows ACL guarantees. Same-user or administrative
-processes remain privileged. Native final-key delivery must still consult the
-authoritative journal; copying that journal to a compute node would create a
-second authority.[^integrated]
+processes remain privileged. The new controller `release` command consumes the
+authoritative journal before creating a private request-bound grant. The worker
+consumes that grant durably and removes its delivered key before decryption,
+without a journal copy. Real subprocess tests cover successful synthetic scoring
+without the journal or long-lived key, replay refusal and competing consumers.
+The installed controller/image remain at `44fa91cea`; native grant transport,
+final-job submission/reconciliation and their cluster rehearsal are still
+pending. [[wrds-final-scoring]] describes
+the new tested boundary and its privileged-account limits. The full package
+gate at API `9783dcd84` passed 4,850 tests with 100% statement and branch
+coverage, typing and guards clean; this grant change has not yet received an
+independent adequacy audit.[^integrated][^grant]
 
 The forced-kill probe decrypted and verified ten synthetic files in a mode-0700
 directory on `hpc3-22-05`, then intentionally ended native job `58629286` with
@@ -167,10 +182,13 @@ canaries, not protection against the evaluator's administrators.[^key-probe]
 
 [^key-probe]: Live Colossus run on 2026-10-30 using `PROBE_PROGRAM` from `tools/fleet/tests/test_research_proposal_host.py` through installed `fleet.core.research_proposer.run_proposer`, with pinned image sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337. Private evidence `/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea/isolation-probe/result.json` has SHA-256 21eb46b323576db1d33f651b347a4c68c10624e43123e23c43f44e6ca80086e9; program SHA-256 127315f96d43024be4880c08266a7aec6d3d1cd563768c3bfd786c4266f5cd32. All four reads returned errno 2; network access returned errno 101. The separately generated canary identity was not the study's final key, and no secret bytes were emitted.
 
-The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cleanup]
+[^grant]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `release_final` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/research_release.py`, `write_final_grant` and `consume_final_grant`; `libs/covenant_ml/tests/markets/test_research_release.py`, competing real consumers and failure cases; `libs/covenant_ml/tests/markets/test_research_trial_cli.py`, `test_real_final_worker_needs_neither_journal_nor_long_lived_keys`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_failed_grant_creation_cannot_restore_journal_permission`. Full fleet gate f428dec3-aeb3-4bc4-9b5e-e7f9f3e1acd9 at API 9783dcd84dbc6ba6a5033e05fb1ca6c1085d1f66 passed on Serendipity at 2026-10-30T17:33:05Z: 4,850 tests, 100% coverage, 191 seconds of 300. Earlier acb42784 at 66b17108f passed all tests but failed env-access-banned in the subprocess test; 9783dcd84 uses the existing shared environment reader and passes the complete gate. The authoritative journal and existing numerical evaluator are reused; no native grant transport is claimed by these process tests.
 
-1. Finish native final-key delivery through the authoritative controller.
-   Exercise final release
+The remaining sequence follows these measured gaps:[^rehearsal][^integrated][^cleanup][^grant]
+
+1. Integrate native final-key delivery and final-job submission/reconciliation
+   with the existing controllers, preserving a single grant location and its
+   durable spent marker; freeze/install that controller and image. Exercise final release
    only in the separate synthetic rehearsal journal, not the substantive holdout.
 2. Verify encrypted execution on WRDS Cloud and automate the measured
    cross-host proposer-to-admission handoff through the existing controller.
