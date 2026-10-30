@@ -129,7 +129,7 @@ def accounting(entry: LedgerEntry, cluster: ClusterFacts) -> ExecutionEvidence:
     return decode_execution_evidence(allocation_document(entry, cluster), cluster)
 
 
-def _artifact_time(host: str, path: str, evidence: ExecutionEvidence) -> int:
+def artifact_time(host: str, path: str, evidence: ExecutionEvidence) -> int:
     """Require the artifact's modification instant to fall inside this allocation.
 
     Args:
@@ -184,8 +184,8 @@ def measure(entry: LedgerEntry, cluster: ClusterFacts, checksums: dict[str, str]
         "fingerprint",
     ):
         raise ValueError("HPC_EVIDENCE_RESULT: manifest and record fingerprints differ")
-    output_time = _artifact_time(entry["host"], artifact, evidence)
-    record_time = _artifact_time(entry["host"], record_path, evidence)
+    output_time = artifact_time(entry["host"], artifact, evidence)
+    record_time = artifact_time(entry["host"], record_path, evidence)
     log = artifacts.download(entry["host"], log_path(entry))
     logged = set(log["text"].splitlines())
     for path, digest in checksums.items():
@@ -266,6 +266,7 @@ __all__ = [
     "MeasuredRun",
     "accounting",
     "allocation_document",
+    "artifact_time",
     "measure",
     "parse_checksums",
     "replay_report",
