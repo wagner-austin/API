@@ -38,20 +38,26 @@ def frozen_runtime() -> tuple[str, str]:
 
 
 DENIAL_PROGRAM = """
-import errno, json, os, pathlib, socket, sys
+import json, os, pathlib, socket, sys
 context = json.loads(sys.argv[1])
 blocked = []
 for name in context['private']:
     try:
         pathlib.Path(name).read_bytes()
-    except OSError:
-        blocked.append(name)
+    except OSError as error:
+        blocked.append({'path': name, 'errno': error.errno})
 try:
     pathlib.Path(context['policy']).write_text('changed')
-except OSError:
-    policy_denied = True
+except OSError as error:
+    policy_errno = error.errno
 else:
-    policy_denied = False
+    policy_errno = 0
+try:
+    pathlib.Path('/proposer-probe').write_text('changed')
+except OSError as error:
+    root_write_errno = error.errno
+else:
+    root_write_errno = 0
 try:
     socket.create_connection(('1.1.1.1', 443), timeout=0.2)
 except OSError as error:
@@ -61,7 +67,8 @@ else:
 status = pathlib.Path('/proc/self/status').read_text().splitlines()
 fields = dict(line.split(':', 1) for line in status)
 print(json.dumps({
-    'blocked': blocked, 'policy_denied': policy_denied,
+    'blocked': blocked, 'policy_errno': policy_errno,
+    'root_write_errno': root_write_errno,
     'credential_absent': 'WRDS_PROPOSER_CANARY' not in os.environ,
     'uid': os.getuid(), 'capabilities': fields['CapEff'].strip(),
     'no_new_privileges': fields['NoNewPrivs'].strip(),
@@ -99,8 +106,9 @@ def test_actual_proposer_denies_private_data_credentials_policy_and_network(
     finally:
         config_test_hooks.get_environment = original
     assert result == {
-        "blocked": private,
-        "policy_denied": True,
+        "blocked": [{"path": name, "errno": 2} for name in private],
+        "policy_errno": 2,
+        "root_write_errno": 30,
         "credential_absent": True,
         "uid": 65534,
         "capabilities": "0000000000000000",

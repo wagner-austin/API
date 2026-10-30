@@ -7,7 +7,7 @@ from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.core import _test_hooks
 from fleet.core.research_proposer import MAX_BYTES, run_proposer
-from tests.conftest import FakeRun
+from tests.conftest import FakeRun, failed, ok, timed_out
 
 SOCKET = "/run/user/1001/docker.sock"
 IMAGE = "sha256:" + "b" * 64
@@ -15,24 +15,16 @@ CID = "a" * 64
 INFO: JSONObject = {
     "SecurityOptions": ["name=rootless"],
     "MemoryLimit": True,
-    "CPUCfsQuota": True,
+    "CpuCfsQuota": True,
     "PidsLimit": True,
     "CgroupVersion": "2",
 }
 
 
-def answer(stdout: str, code: int = 0) -> _test_hooks.CommandResult:
-    """Produce one explicit daemon answer for the injected command boundary."""
-    return _test_hooks.CommandResult(
-        returncode=code, stdout=stdout, stderr="failure" if code else "", timed_out=code == -1
-    )
-
-
 def replies(output: str = "{}") -> list[_test_hooks.CommandResult]:
     """A successful rootless daemon lifecycle, with configurable proposal output."""
     return [
-        answer(value)
-        for value in (dump_json_str(INFO), "null", CID, CID, "0", output, CID, CID, "")
+        ok(value) for value in (dump_json_str(INFO), "null", CID, CID, "0", output, CID, CID, "")
     ]
 
 
@@ -119,14 +111,14 @@ def test_unsafe_endpoint_or_mutable_image_is_refused(socket: str, image: str, er
     [
         ("SecurityOptions", ["name=seccomp"]),
         ("MemoryLimit", False),
-        ("CPUCfsQuota", False),
+        ("CpuCfsQuota", False),
         ("PidsLimit", False),
         ("CgroupVersion", "1"),
     ],
 )
 def test_daemon_must_enforce_rootless_resource_limits(key: str, value: JSONValue) -> None:
     info: JSONObject = {**INFO, key: value}
-    fake = FakeRun([answer(dump_json_str(info))])
+    fake = FakeRun([ok(dump_json_str(info))])
     _test_hooks.run = fake
     with pytest.raises(ValueError, match="PROPOSER_RUNTIME"):
         run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
@@ -135,7 +127,7 @@ def test_daemon_must_enforce_rootless_resource_limits(key: str, value: JSONValue
 
 @pytest.mark.parametrize("volume", ['{"/data":{}}', "[]"])
 def test_image_cannot_add_implicit_mounts(volume: str) -> None:
-    _test_hooks.run = FakeRun([answer(dump_json_str(INFO)), answer(volume)])
+    _test_hooks.run = FakeRun([ok(dump_json_str(INFO)), ok(volume)])
     with pytest.raises(ValueError, match="PROPOSER_IMAGE"):
         run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
 
@@ -154,17 +146,17 @@ def test_lifecycle_failures_refuse_and_cleanup_is_verified(case: str) -> None:
     values = replies()
     error = "PROPOSER_PROCESS"
     if case == "create":
-        values = [*values[:2], answer("", 1), answer(""), answer("")]
+        values = [*values[:2], failed(1, "creation failed"), ok(""), ok("")]
     elif case == "wait":
-        values = [*values[:4], answer("", -1), *values[6:]]
+        values = [*values[:4], timed_out(10), *values[6:]]
     elif case == "exit":
-        values = [*values[:4], answer("7"), *values[6:]]
+        values = [*values[:4], ok("7"), *values[6:]]
         error = "PROPOSER_EXIT"
     elif case == "identity":
-        values = [*values[:2], answer("malformed"), *values[6:]]
+        values = [*values[:2], ok("malformed"), *values[6:]]
         error = "REFERENCE_DIGEST"
     else:
-        values[-1] = answer(CID)
+        values[-1] = ok(CID)
         error = "PROPOSER_CLEANUP"
     fake = FakeRun(values)
     _test_hooks.run = fake
