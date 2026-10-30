@@ -1,0 +1,41 @@
+{
+  "kind": "private-delivery-native-probe-v1",
+  "observed_date": "2026-10-30",
+  "board_task": "e6729a16-3d8b-4f0f-9d68-73ea5d56b95d",
+  "source_commit": "8f590c3ea6b888ef5ae0dbb9039b7ead52db28de",
+  "payload_kind": "synthetic text, no secret or licensed data",
+  "payload_bytes": 27,
+  "payload_sha256": "b953c25a3bae44bbbf5e159841c03a35e1549c8344b65579d0f9566e7fce9e06",
+  "measurements": [
+    {
+      "host": "hpc3",
+      "destination": "/data/homezvol1/wagnera3/.research-keys/delivery-20261030-1908/synthetic.txt",
+      "transport": "hpc3.cli.private_stage over authenticated SSH stdin",
+      "receiver_python": "3.9.25",
+      "directory_mode": "0700",
+      "file_mode": "0600",
+      "delivery": "verified",
+      "replay": "receiver exit 1; destination remained unchanged",
+      "readback": "hpc3-private-readback.txt",
+      "readback_sha256": "0ad6532c4763c2b07ef3051942af1e9d895b58df9dfdd0889f66b2332108a92a"
+    },
+    {
+      "host": "wrds",
+      "destination": "/home/uci/awagner14/private-delivery-20261030-1908/synthetic.txt",
+      "transport": "same hpc3.core.private_delivery.deliver_private_bundle over authenticated SSH stdin",
+      "receiver_python": "3.14.5",
+      "directory_mode": "0700",
+      "file_mode": "0600",
+      "delivery": "verified",
+      "replay": "receiver exit 1; destination remained unchanged",
+      "readback": "wrds-private-readback.txt",
+      "readback_sha256": "62946ef03f13cde8594e9013475dfcd98d8e7a54c5ce537bfad08b534cb4362a"
+    }
+  ],
+  "private_evidence_directory": "/home/corvis/research-data/wrds/runtime/final-85f1d4d75",
+  "limitations": [
+    "Verifies private SSH reception, digest readback and refusal to overwrite; no native scheduler allocation",
+    "WRDS delivery uses the shared core API; the existing CLI takes an HPC3 workspace",
+    "No final capability was transferred in this probe; encrypted WRDS batch execution remains unverified"
+  ]
+}
