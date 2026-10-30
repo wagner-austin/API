@@ -140,7 +140,7 @@ them attributable, and nothing will. Runs since 2026-09-04 carry the
 `session_build` stamp, which no derivation reads yet.
 
 [^1]: `src/tankpit_bot/diagnostics/feature_rows.py`, `write_feature_rows` before 2026-09-02 — the body was joined and written with no sidecar. Shipped in commit `3c961bef`.
-[^2]: `docs/RESEARCH.md`, the `cleargbm` entry: "The 3,068 rows written before that state `"fingerprint": null` explicitly."
+[^2]: https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1447-L1465 § historical `cleargbm` provenance: "The 3,068 rows written before that state `"fingerprint": null` explicitly."
 [^3]: `runs/bot/artax/bot-20260806-210413.events.jsonl` line 1, read 2026-09-02: keys are `timestamp`, `level`, `logger`, `mode`, `channel`, `message`, `diagnostic_kind`, `room_id`, `field_image`.
 [^4]: `clients/RustedWarfareBot/src/rw_bot/provenance.py`, `arm_run_record` / `sweep_fingerprint`.
 [^6]: `src/tankpit_bot/runtime_logging.py:98-142`, `configure_bot_runtime_logging`, whose `emit_diagnostic(diagnostic_kind="session_build", ...)` call is at `:136-142` beside the comment "The account name is DELIBERATELY absent"; the build ref comes from `_real_resolve_build_ref` at `src/tankpit_bot/_test_hooks/runtime.py:271`, which asks `git rev-parse HEAD` under the 60-second `GIT_HEAD_WALL_SECONDS` bound. `src/tankpit_bot/diagnostics/feature_provenance.py:17-27` states the same split in its module doc.
