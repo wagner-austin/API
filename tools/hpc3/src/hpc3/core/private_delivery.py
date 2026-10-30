@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import inspect
 import shlex
 from hashlib import sha256
+from pathlib import Path
 
 from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.stage_manifest import StageManifest, decode_stage_manifest, encode_stage_manifest
@@ -32,7 +32,7 @@ def private_delivery_command(manifest: StageManifest) -> str:
     if sum(length for _, length, _ in entries) > PRIVATE_DELIVERY_MAX_BYTES:
         raise ValueError("PRIVATE_DELIVERY_LIMIT: private transfer exceeds one MiB")
     program = (
-        inspect.getsource(_private_receive)
+        _test_hooks.read_bytes(Path(_private_receive.__file__)).decode("utf-8")
         + "\nimport sys\n"
         + f"receive_private({manifest['destination']!r}, {entries!r}, sys.stdin.buffer)\n"
         + "sys.stdout.write('delivered\\n')\n"
