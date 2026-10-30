@@ -4,6 +4,10 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/src/hpc3/core/controller_evidence.py"
+  - "tools/hpc3/src/hpc3/cli/controller_inspect.py"
+  - "tools/hpc3/tests/test_controller_evidence.py"
+  - "tools/hpc3/tests/test_controller_inspect.py"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json"
   - "tools/hpc3/src/hpc3/core/image_evidence.py"
   - "tools/hpc3/src/hpc3/cli/image_inspect.py"
@@ -50,6 +54,10 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/src/hpc3/core/controller_evidence.py": "0e60c262f722a55d11cfaf25d00696b271d4c9ef"
+  "tools/hpc3/src/hpc3/cli/controller_inspect.py": "9a4d5a9d26c5319dbc037afbbbd62ea137923a70"
+  "tools/hpc3/tests/test_controller_evidence.py": "e67e103689e440d90ba42147c00619116b692ecc"
+  "tools/hpc3/tests/test_controller_inspect.py": "38eac26d35cf356c486fdfbcf5e5adc1bdb508c8"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json": "f27ad04239492a0e30637ccb454e9492f0b9e101"
   "tools/hpc3/src/hpc3/core/image_evidence.py": "95f74bbdf2fca54380504c91053f86cddee16138"
   "tools/hpc3/src/hpc3/cli/image_inspect.py": "b88cbc6388a5a97c447835dc00f11d9a48e548f3"
@@ -209,6 +217,23 @@ installation. These are integrity measurements of existing runtimes, not new
 builds or a substantive study.[^runtime-inspection]
 
 [^runtime-inspection]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json`, native reports, controller readback, negative probe and private evidence hashes; `tools/hpc3/src/hpc3/core/image_evidence.py`, `measure_build`; `tools/hpc3/src/hpc3/cli/image_inspect.py`, `main`; `tools/hpc3/tests/test_image_evidence.py` and `test_image_inspect.py`, missing pins, incorrect artifact identity, incomplete native receipts, real failed process and refusal before publication. Inspection source API `6326093c3` passed fleet `626bb7b7` on Colossus: 2,053 tests, 100% coverage. The program-authored reports are `f3670415-c99c-4c3c-adf1-863c7c738650` and `1fcd7480-1d43-4094-a60c-e9c82d9ead90`, posted as `hpc-report-474c840b` on the runtime task. The reader verifies the retained build log and current frozen files; it does not rerun the native image.
+
+Runtime audit `a9529ef5` reopened the milestone at 22:14 UTC because the
+controller measurements were session-authored, while the accepted image readings
+were program-authored; its file checks also omitted the monthly runtime and
+remaining rehearsal requirements. The maintained `hpc3.cli.controller_inspect`
+now verifies each frozen wheel archive and its RECORD hashes against installed
+application files, checks the interpreter digest, and runs the pinned generated
+selfcheck and `pip check` with that interpreter in isolated mode. At 22:22 UTC
+it published service reports for both controllers: 856 and 868 application files
+across ten wheels each, with both checks passing. A wrong selfcheck digest was
+refused with exit 2 before publication. The controller audit query returned two
+matched runtimes and one after changing the monthly count to 855. This supplies
+the missing program evidence; independent acceptance of the corrected milestone
+remains pending. Installed metadata and undeclared extra packages are outside
+the byte-comparison scope.[^controller-inspection]
+
+[^controller-inspection]: `tools/hpc3/src/hpc3/core/controller_evidence.py`, `measure_controller`; `tools/hpc3/src/hpc3/cli/controller_inspect.py`, `main`; `tools/hpc3/tests/test_controller_evidence.py`, frozen-file drift, malformed RECORD, escaping paths, explicit relocated-layout refusal, actual isolated interpreter/pip success and real selfcheck exit 7; `tools/hpc3/tests/test_controller_inspect.py`, refusal before publication. Published inspection source API `51d409346d799ae0b5149b56283074d4440d3ce2` passed fleet `16a2eb36-4c59-4081-b801-fd4354e5c0e2`: 2,090 tests, 100% statement/branch coverage. Program-authored board reports `66fbe2dd-8212-477b-b99f-68ca308155a0` and `8b865f32-bead-42c8-92ca-4722a6352591` on task `474c840b`, author `hpc-report-474c840b`, bind the original provenance files by SHA-256 `a6ab86111468fdc643933c410b278881b115423f47c1ded42e25e0b1d7523f88` and `e7ae526bb0b0494527272a00119167d77c5b8cdd4eb6b0701c2d8d87916ff3c3`. Check review `c9852508-a6f7-4c6c-853a-c36fe961f662` identifies the earlier evidence gaps. Its seven monthly-runtime and prerequisite substring checks all matched the published page; removing each full string from an in-memory copy made its check fail.
 
 Fresh validation job `58635333` and final job `58635492` each completed in nine
 seconds with exit `0:0` on `hpc3-l18-05`. Shared queue entries `9ee4c5a8` and
