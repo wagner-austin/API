@@ -26,9 +26,10 @@ from fleet.core import (
     runner_render,
     runner_slice_render,
 )
+from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
 from fleet.core.runner_unit_files import render_unit_file_lines
 from tests._host_bash import bash_path
-from tests._runner_fixtures import a_host, an_install
+from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
 from tests._stand_ins import run_with_stand_ins
 
 #: The base's line once it has done everything.
@@ -227,19 +228,24 @@ class TestTheProvision:
         self, tmp_path: pathlib.Path
     ) -> None:
         tokens = {"wagner-austin/MCPs": "TWO", "wagner-austin/API": "ONE"}
-        lines = runner_render.render_provision_script(_two_repos(tmp_path), tokens).splitlines()
+        script = runner_render.render_provision_script(_two_repos(tmp_path), tokens, RESERVED_CORES)
+        lines = script.splitlines()
         assert lines[:2] == list(runner_render.SCRIPT_HEADER)
         assert lines[4:6] == ["export RUNNER_TOKEN_API='ONE'", "export RUNNER_TOKEN_MCPS='TWO'"]
 
     def test_a_token_that_cannot_be_embedded_is_refused(self, tmp_path: pathlib.Path) -> None:
         with pytest.raises(ValueError, match="registration token"):
             runner_render.render_provision_script(
-                _two_repos(tmp_path), {"wagner-austin/API": "a'b"}
+                _two_repos(tmp_path), {"wagner-austin/API": "a'b"}, RESERVED_CORES
             )
+
+    def test_a_host_reserving_its_runners_no_cores_is_refused(self, tmp_path: pathlib.Path) -> None:
+        with pytest.raises(ValueError, match=r"reserved_cores is 0; a runner host's roster file"):
+            runner_render.render_provision(_two_repos(tmp_path), 0)
 
     def test_every_section_is_its_renderer_s_lines_in_order(self, tmp_path: pathlib.Path) -> None:
         spec = _two_repos(tmp_path)
-        lines = runner_render.render_provision_script(spec, {}).splitlines()
+        lines = runner_render.render_provision_script(spec, {}, RESERVED_CORES).splitlines()
         assets = spec["assets"]
         assert _in_order(
             lines,
@@ -258,6 +264,7 @@ class TestTheProvision:
             runner_render.render_asset_lines(assets[1]),
             runner_render.render_asset_lines(assets[2]),
             runner_slice_render.render_slice_unit_lines(spec["ci_slice"]),
+            render_ci_cpuset_lines(RESERVED_CORES),
             runner_reaper_render.render_reaper_lines(spec),
             runner_job_scope_render.render_job_scope_lines(),
             runner_action_cache.render_fill_lines(spec),
@@ -267,7 +274,7 @@ class TestTheProvision:
         assert lines[-1] == runner_render.FIRST_HYGIENE_PASS
 
     def test_a_manual_asset_appears_in_no_script(self, tmp_path: pathlib.Path) -> None:
-        rendered = runner_render.render_provision(_two_repos(tmp_path))
+        rendered = runner_render.render_provision(_two_repos(tmp_path), RESERVED_CORES)
         assert "rw-game" not in rendered["provision_script"]
         assert "rw-game" not in rendered["base_script"]
 
@@ -435,9 +442,10 @@ class TestTheRender:
         self, tmp_path: pathlib.Path
     ) -> None:
         spec = _two_repos(tmp_path)
-        assert runner_render.render_provision(spec) == runner_render.RenderedProvision(
+        rendered = runner_render.render_provision(spec, RESERVED_CORES)
+        assert rendered == runner_render.RenderedProvision(
             base_script=runner_render.render_base_script(spec),
-            provision_script=runner_render.render_provision_script(spec, {}),
+            provision_script=runner_render.render_provision_script(spec, {}, RESERVED_CORES),
             manual_steps=[
                 "PLACE BY HAND: /opt/corvis/rw-game/game-lib.jar -- the provenance jar. This "
                 "asset can never be fetched by a script; place it, then re-run fleet-runners "

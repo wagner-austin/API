@@ -176,12 +176,14 @@ def _base(spec: HostRunnerSpec, steps: list[str]) -> None:
         )
 
 
-def _provision(spec: HostRunnerSpec, steps: list[str]) -> None:
+def _provision(spec: HostRunnerSpec, steps: list[str], reserved_cores: int) -> None:
     """Mint tokens and run the roster's own provision with them.
 
     Args:
         spec: The host.
         steps: The report's step lines, appended to.
+        reserved_cores: The logical cores its roster file reserves for its
+            runners, as the provision takes them.
 
     Raises:
         AppError: ``RUNNER_TOKEN_UNAVAILABLE`` from the mint, and the remote
@@ -193,17 +195,19 @@ def _provision(spec: HostRunnerSpec, steps: list[str]) -> None:
     remote.run_root_script(
         spec["host"],
         payload_path(spec, "fleet-rebuild-provision"),
-        runner_render.render_provision_script(spec, tokens),
+        runner_render.render_provision_script(spec, tokens, reserved_cores),
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     steps.append(f"provision: ran for {len(spec['installs'])} runners")
 
 
-def rebuild(spec: HostRunnerSpec) -> RebuildReport:
+def rebuild(spec: HostRunnerSpec, reserved_cores: int) -> RebuildReport:
     """Rebuild one runner host end to end and audit it.
 
     Args:
         spec: The host's roster entry.
+        reserved_cores: The logical cores its roster file reserves for its
+            runners, as the provision takes them.
 
     Returns:
         What each stage did, the manual steps left, and the audit's verdicts.
@@ -215,7 +219,7 @@ def rebuild(spec: HostRunnerSpec) -> RebuildReport:
     """
     steps: list[str] = []
     _base(spec, steps)
-    _provision(spec, steps)
+    _provision(spec, steps, reserved_cores)
     outcome = runner_audit.attempt_audit_host(spec)
     findings = outcome["findings"]
     if findings is None:

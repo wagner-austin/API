@@ -3,12 +3,17 @@
 Usage:
     fleet-runners --spec runners.json
     fleet-runners --spec runners.json --host lavender
-    fleet-runners --spec runners.json --host lavender --render /tmp/provision
+    fleet-runners --spec runners.json --host lavender --render /tmp/provision --config registry
     fleet-runners --spec runners.json --host lavender --sample load.jsonl
     fleet-runners --spec runners.json --report load.jsonl --cores 16
-    fleet-runners --spec runners.json --host lavender --onboard owner/repo
-    fleet-runners --spec runners.json --host lavender --rebuild yes
+    fleet-runners --spec runners.json --host lavender --onboard owner/repo --config registry
+    fleet-runners --spec runners.json --host lavender --rebuild yes --config registry
     fleet-runners --spec runners.json --prune yes
+
+``--config`` names the fleet's registry directory, as it does for every fleet
+command, for the three modes that run the provision: the provision holds the
+host's runners to the cores its roster file reserves for them
+(:func:`load_reserved_cores`, MCPs board task 349e25ee).
 
 This module parses the flags and refuses what it cannot honour; each mode's
 act is :mod:`fleet.cli._runner_acts`.
@@ -66,12 +71,16 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.errors import AppError, FleetErrorCode
+from platform_core.json_utils import load_json_str
 from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _runner_acts
+from fleet.cli._config import CONFIG_FLAG
+from fleet.contracts.machine import decode_machine
 from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, parse_runner_spec
 from fleet.core import _test_hooks
+from fleet.core.workspace_files import MACHINES_DIRECTORY
 
 SPEC_FLAG = "--spec"
 
@@ -101,7 +110,40 @@ _FLAGS = (
     ONBOARD_FLAG,
     REBUILD_FLAG,
     PRUNE_FLAG,
+    CONFIG_FLAG,
 )
+
+
+def load_reserved_cores(registry: str, host_name: str) -> int:
+    """The logical cores a host's roster file reserves for its runners.
+
+    The fleet's roster (``registry/machines/<name>.json``) is the one place
+    a machine's split between its owner and dispatch is written; dispatch
+    takes ``logical_cores - reserved_cores`` and on a runner host the rest
+    is the runners'. The provision holds the CI slice to that many CPUs
+    (:mod:`fleet.core.runner_cpuset_render`, MCPs board task 349e25ee).
+
+    Args:
+        registry: The registry directory ``--config`` names.
+        host_name: The runner host, a machine of that roster.
+
+    Returns:
+        Its ``dispatch.budget.reserved_cores``.
+
+    Raises:
+        ValueError: When the machine's file declares no dispatch budget, so
+            it reserves its runners nothing to hold them to.
+        JSONTypeError: When the file does not decode as a machine.
+    """
+    path = pathlib.Path(registry) / MACHINES_DIRECTORY / f"{host_name}.json"
+    machine = decode_machine(host_name, load_json_str(_test_hooks.read_text(path)))
+    dispatch = machine["dispatch"]
+    if dispatch is None:
+        raise ValueError(
+            f"{path} declares no dispatch budget, so it reserves its runners no cores; a runner "
+            "host's roster file must give dispatch.budget.reserved_cores"
+        )
+    return dispatch["budget"]["reserved_cores"]
 
 
 def load_runner_spec(path: str) -> RunnerSpec:
@@ -169,8 +211,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             names a different act and a combined invocation would do one
             silently), ``--render`` or ``--rebuild`` was given without
             ``--host``, ``--prune`` with it, ``--rebuild`` or ``--prune``
-            with any value but ``yes``, ``--report`` without ``--cores``, or
-            ``--cores`` is not a positive integer.
+            with any value but ``yes``, ``--report`` without ``--cores``,
+            ``--cores`` is not a positive integer, ``--render``,
+            ``--onboard`` or ``--rebuild`` was given without ``--config``,
+            or the host's roster file declares no dispatch budget.
+        JSONTypeError: When the host's roster file does not decode.
         AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
             ``RUNNER_AUDIT_UNPARSABLE``, ``RUNNER_TOKEN_UNAVAILABLE``,
             ``RUNNER_GITHUB_UNREADABLE``, ``RUNNER_DEREGISTRATION_REFUSED``,
@@ -219,11 +264,12 @@ def _change(
     onboard_repo = parsed.get(ONBOARD_FLAG)
     if onboard_repo is not None:
         _require_host(parsed, ONBOARD_FLAG, "onboarding registers a runner on one machine")
-        return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo)
+        reserved = _reserved_cores(parsed, ONBOARD_FLAG, hosts[0])
+        return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo, reserved)
     if REBUILD_FLAG in parsed:
         _require_confirmation(parsed, REBUILD_FLAG, "it lays a machine's whole runner host")
         _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
-        return _runner_acts.rebuild(hosts[0])
+        return _runner_acts.rebuild(hosts[0], _reserved_cores(parsed, REBUILD_FLAG, hosts[0]))
     _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
     if HOST_FLAG in parsed:
         raise ValueError(
@@ -250,7 +296,8 @@ def _read(parsed: dict[str, str], spec: RunnerSpec, hosts: list[HostRunnerSpec])
     render_dir = parsed.get(RENDER_FLAG)
     if render_dir is not None:
         _require_host(parsed, RENDER_FLAG, "a render is for one machine")
-        return _runner_acts.render(hosts[0], render_dir)
+        reserved = _reserved_cores(parsed, RENDER_FLAG, hosts[0])
+        return _runner_acts.render(hosts[0], render_dir, reserved)
     sample_path = parsed.get(SAMPLE_FLAG)
     if sample_path is not None:
         return _runner_acts.sample(hosts, sample_path)
@@ -275,6 +322,32 @@ def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
     """
     if parsed.get(HOST_FLAG) is None:
         raise ValueError(f"{flag} requires {HOST_FLAG}: {why}, and defaulting one would be a guess")
+
+
+def _reserved_cores(parsed: dict[str, str], flag: str, host: HostRunnerSpec) -> int:
+    """The cores a mode that runs the provision holds the host's runners to.
+
+    Args:
+        parsed: The parsed flags.
+        flag: ``--render``, ``--onboard`` or ``--rebuild``.
+        host: The host the mode provisions.
+
+    Returns:
+        Its roster file's ``dispatch.budget.reserved_cores``
+        (:func:`load_reserved_cores`).
+
+    Raises:
+        ValueError: When ``--config`` is absent: the provision's CPU set is
+            the roster's reservation, and the registry's path is passed,
+            never searched for; and as :func:`load_reserved_cores` describes.
+    """
+    registry = parsed.get(CONFIG_FLAG)
+    if registry is None:
+        raise ValueError(
+            f"{flag} requires {CONFIG_FLAG}, the fleet's registry directory: the provision "
+            "holds the host's runners to the cores its roster file reserves for them"
+        )
+    return load_reserved_cores(registry, host["name"])
 
 
 def _require_confirmation(parsed: dict[str, str], flag: str, act: str) -> None:
@@ -349,6 +422,7 @@ __all__ = [
     "SAMPLE_FLAG",
     "SPEC_FLAG",
     "entrypoint",
+    "load_reserved_cores",
     "load_runner_spec",
     "main",
     "select_hosts",

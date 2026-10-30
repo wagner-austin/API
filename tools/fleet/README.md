@@ -140,10 +140,18 @@ lacks for them. `fleet-runners` holds the hosts to it:
 
 ```bash
 fleet-runners --spec runners.json                                   # audit every host
-fleet-runners --spec runners.json --host lavender --render <dir>    # write base.sh and provision.sh
-fleet-runners --spec runners.json --host lavender --onboard owner/repo
-fleet-runners --spec runners.json --host lavender --rebuild yes     # rebuild the host
+fleet-runners --spec runners.json --host lavender --render <dir> --config registry
+fleet-runners --spec runners.json --host lavender --onboard owner/repo --config registry
+fleet-runners --spec runners.json --host lavender --rebuild yes --config registry
 ```
+
+The three modes that run the provision take the registry with `--config`,
+because the provision holds the runners to the CPUs the host's roster file
+reserves for them (`dispatch.budget.reserved_cores`): whole physical cores,
+the highest-numbered first, set as the CI slice's `AllowedCPUs` and read back
+from its `EffectiveCPUs` (MCPs board task 349e25ee). A weight alone let CI
+take every core on lavender, and a check sharing a core with it ran past its
+budget.
 
 The operator, on 2026-09-26, while lavender was being recovered by hand from a
 full disk: "it justcis a github runner". A machine whose only job is running

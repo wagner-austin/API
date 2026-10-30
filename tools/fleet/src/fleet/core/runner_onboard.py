@@ -113,7 +113,9 @@ def plan_onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
     return OnboardPlan(repo=repo, install=install)
 
 
-def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFinding]]:
+def onboard(
+    spec: HostRunnerSpec, repo: str, reserved_cores: int
+) -> tuple[OnboardPlan, list[AuditFinding]]:
     """Onboard one repository onto one host, end to end.
 
     Args:
@@ -123,6 +125,9 @@ def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFin
             audit then see the new state -- the whole point of onboarding
             being one act.
         repo: The repository, ``owner/name``.
+        reserved_cores: The logical cores the host's roster file reserves
+            for its runners, as the provision takes them
+            (:func:`fleet.core.runner_render.render_provision_script`).
 
     Returns:
         The executed plan and the post-onboarding audit findings for the
@@ -142,7 +147,7 @@ def onboard(spec: HostRunnerSpec, repo: str) -> tuple[OnboardPlan, list[AuditFin
     remote.run_root_script(
         spec["host"],
         payload_path(spec, f"fleet-onboard-{_repo_slug(repo)}"),
-        runner_render.render_provision_script(spec, {repo: token}),
+        runner_render.render_provision_script(spec, {repo: token}, reserved_cores),
         timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
     )
     outcome = runner_audit.attempt_audit_host(spec)

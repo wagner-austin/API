@@ -44,6 +44,7 @@ from fleet.core.runner_cache_adopt import (
     render_cache_adopt_now_lines,
     render_cache_drop_in_lines,
 )
+from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
 from fleet.core.runner_install import (
     RUNNER_ACCOUNT,
     RUNNER_VERSION,
@@ -255,7 +256,9 @@ def render_install_lines(install: RunnerInstall) -> list[str]:
     ]
 
 
-def render_provision_script(spec: HostRunnerSpec, tokens: dict[str, str]) -> str:
+def render_provision_script(
+    spec: HostRunnerSpec, tokens: dict[str, str], reserved_cores: int
+) -> str:
     """The provision for one host, run as root.
 
     Args:
@@ -263,12 +266,16 @@ def render_provision_script(spec: HostRunnerSpec, tokens: dict[str, str]) -> str
         tokens: Registration tokens by repository, exported at the head of
             the script; empty when whoever runs it exports them, as the
             render's run order says.
+        reserved_cores: The logical cores the host's roster file reserves
+            for its runners (``dispatch.budget.reserved_cores``), the size
+            of the CI slice's CPU set (:mod:`fleet.core.runner_cpuset_render`).
 
     Returns:
         The complete ``provision.sh`` text.
 
     Raises:
-        ValueError: When a token or a roster value cannot be embedded
+        ValueError: When ``reserved_cores`` is below 1, or a token or a
+            roster value cannot be embedded
             verbatim.
     """
     lines: list[str] = [
@@ -302,6 +309,7 @@ def render_provision_script(spec: HostRunnerSpec, tokens: dict[str, str]) -> str
             lines += render_asset_lines(asset)
     lines += ["", "# --- the runners' share of the host (MCPs board task 45a4f22b) ---"]
     lines += render_slice_unit_lines(spec["ci_slice"])
+    lines += render_ci_cpuset_lines(reserved_cores)
     lines += ["", "# --- what a finished job leaves behind (MCPs board task 53528106) ---"]
     lines += render_reaper_lines(spec)
     lines += ["", "# --- each job outside its runner's listener (MCPs board task 715b9ec5) ---"]
@@ -337,19 +345,24 @@ def manual_steps(spec: HostRunnerSpec) -> list[str]:
     ]
 
 
-def render_provision(spec: HostRunnerSpec) -> RenderedProvision:
+def render_provision(spec: HostRunnerSpec, reserved_cores: int) -> RenderedProvision:
     """Everything needed to converge a host onto its roster entry.
 
     Args:
         spec: The host's roster entry.
+        reserved_cores: The logical cores its roster file reserves for its
+            runners, as :func:`render_provision_script` takes them.
 
     Returns:
         Both scripts, the provision expecting its tokens exported, and the
         manual steps no script can perform.
+
+    Raises:
+        ValueError: As :func:`render_provision_script` describes.
     """
     return RenderedProvision(
         base_script=render_base_script(spec),
-        provision_script=render_provision_script(spec, {}),
+        provision_script=render_provision_script(spec, {}, reserved_cores),
         manual_steps=manual_steps(spec),
     )
 

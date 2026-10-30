@@ -18,8 +18,9 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.cli import runners
 from fleet.core import _test_hooks, runner_render
 from fleet.core.runner_registrations import REGISTRATIONS_REASON
-from tests._runner_fixtures import all_declared, no_dropped_jobs
+from tests._runner_fixtures import RESERVED_CORES, all_declared, no_dropped_jobs
 from tests._runner_roster_files import (
+    REGISTRY,
     clean_transcript,
     manual_asset,
     raw_host,
@@ -40,6 +41,19 @@ class TestFlags:
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
         with pytest.raises(ValueError, match="--render requires --host"):
             runners.main(["--spec", spec_path, "--render", str(tmp_path / "out")])
+
+    def test_render_without_the_registry_is_refused_writing_nothing(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        out = tmp_path / "out"
+        with pytest.raises(ValueError) as refused:
+            runners.main(["--spec", spec_path, "--host", "lavender", "--render", str(out)])
+        assert str(refused.value) == (
+            "--render requires --config, the fleet's registry directory: the provision holds "
+            "the host's runners to the cores its roster file reserves for them"
+        )
+        assert not out.exists()
 
     def test_an_unknown_host_is_a_typed_error_naming_the_declared_ones(
         self, tmp_path: pathlib.Path
@@ -215,11 +229,22 @@ class TestRender:
         _test_hooks.run = runner
         with caplog.at_level("INFO"):
             code = runners.main(
-                ["--spec", spec_path, "--host", "lavender", "--render", str(out_dir)]
+                [
+                    "--spec",
+                    spec_path,
+                    "--host",
+                    "lavender",
+                    "--render",
+                    str(out_dir),
+                    "--config",
+                    REGISTRY,
+                ]
             )
         assert code == 0
         assert runner.calls == []
-        rendered = runner_render.render_provision(roster_host(spec_path, "lavender"))
+        rendered = runner_render.render_provision(
+            roster_host(spec_path, "lavender"), RESERVED_CORES
+        )
         assert (out_dir / "base.sh").read_text(encoding="utf-8") == rendered["base_script"]
         assert (out_dir / "provision.sh").read_text(encoding="utf-8") == (
             rendered["provision_script"]
@@ -236,6 +261,27 @@ class TestRender:
         ]
 
 
+class TestReservation:
+    """The cores a provision holds the runners to, read from the fleet's roster."""
+
+    def test_lavender_s_roster_file_reserves_its_runners_eight_cores(self) -> None:
+        """Read from the real registry, so the fixture every render case
+        passes is the number lavender's own file gives."""
+        assert runners.load_reserved_cores(REGISTRY, "lavender") == RESERVED_CORES == 8
+
+    def test_a_machine_whose_dispatch_is_a_reason_reserves_nothing_and_is_refused(
+        self,
+    ) -> None:
+        """ziggurat takes no fleet work, so its file declares no budget to read."""
+        with pytest.raises(ValueError) as refused:
+            runners.load_reserved_cores(REGISTRY, "ziggurat")
+        assert str(refused.value) == (
+            f"{pathlib.Path(REGISTRY) / 'machines' / 'ziggurat.json'} declares no dispatch "
+            "budget, so it reserves its runners no cores; a runner host's roster file must give "
+            "dispatch.budget.reserved_cores"
+        )
+
+
 class TestEntrypoint:
     """The console script boundary."""
 
@@ -249,7 +295,8 @@ class TestEntrypoint:
             The arguments after the program name.
         """
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
-        return ["--spec", spec_path, "--host", "lavender", "--render", str(tmp_path / "out")]
+        out = str(tmp_path / "out")
+        return ["--spec", spec_path, "--host", "lavender", "--render", out, "--config", REGISTRY]
 
     def test_entrypoint_exits_with_mains_code(self, tmp_path: pathlib.Path) -> None:
         saved = sys.argv
@@ -277,7 +324,7 @@ class TestEntrypoint:
         assert capsys.readouterr().out == (
             "usage: --spec <value> --host <value> --render <value> --sample <value> "
             "--report <value> --cores <value> --onboard <value> --rebuild <value> "
-            "--prune <value>\n"
+            "--prune <value> --config <value>\n"
         )
 
     def test_a_refusal_is_one_line_on_stderr_and_exit_two(

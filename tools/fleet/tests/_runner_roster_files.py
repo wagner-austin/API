@@ -17,6 +17,11 @@ from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import runner_audit
 from tests._runner_fixtures import base_json, ci_slice_json
 
+#: The fleet's own registry directory, which ``--config`` names for the
+#: modes that run the provision: the CLI reads lavender's reservation from
+#: its real roster file, so a change to that file reaches these cases.
+REGISTRY = str(pathlib.Path(__file__).parent.parent / "registry")
+
 
 def raw_host(name: str) -> dict[str, JSONValue]:
     """A valid raw host entry with one install, API's.
@@ -124,4 +129,11 @@ def clean_transcript(spec: HostRunnerSpec) -> str:
     )
 
 
-__all__ = ["clean_transcript", "manual_asset", "raw_host", "roster_host", "write_roster"]
+__all__ = [
+    "REGISTRY",
+    "clean_transcript",
+    "manual_asset",
+    "raw_host",
+    "roster_host",
+    "write_roster",
+]

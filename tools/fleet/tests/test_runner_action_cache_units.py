@@ -18,7 +18,7 @@ from fleet.contracts.runners import RunnerInstall
 from fleet.core import runner_action_cache, runner_cache_adopt, runner_render
 from fleet.core.runner_unit_files import render_unit_file_lines
 from tests._cache_host import FOURTH, OTHER, SECOND, SETTING, SETTLE, UNIT, Host
-from tests._runner_fixtures import a_host, an_install
+from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
 
 
 def _restarted(unit: str) -> str:
@@ -133,7 +133,9 @@ class TestTheAdoptUnits:
         assert "OnUnitActiveSec=1min" in runner_cache_adopt.ADOPT_TIMER
 
     def test_provision_installs_the_script_before_the_installs_that_call_it(self) -> None:
-        script = runner_render.render_provision(a_host([FOURTH]))["provision_script"]
+        script = runner_render.render_provision(a_host([FOURTH]), RESERVED_CORES)[
+            "provision_script"
+        ]
         installed = script.index(f"cat > {runner_cache_adopt.ADOPT_PATH} <<'ADOPT_EOF'")
         called = script.index(f"\n{runner_cache_adopt.ADOPT_PATH} {SETTLE} {UNIT}\n")
         assert installed < script.index("# --- runner installs ---") < called

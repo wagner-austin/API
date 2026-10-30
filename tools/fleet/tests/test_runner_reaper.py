@@ -25,7 +25,7 @@ from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_reaper_render, runner_render
 from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from tests._host_bash import host_bash
-from tests._runner_fixtures import an_install
+from tests._runner_fixtures import RESERVED_CORES, an_install
 
 #: The unit every case runs.
 UNIT = "actions.runner.wagner-austin-API.lavender.service"
@@ -509,7 +509,7 @@ class TestTheRender:
 
     def test_the_provision_installs_the_reaper_before_any_runner(self) -> None:
         spec = _lavender()
-        script = runner_render.render_provision(spec)["provision_script"]
+        script = runner_render.render_provision(spec, RESERVED_CORES)["provision_script"]
         assert script.index("enable --now fleet-runner-reaper.timer") < script.index(
             "# --- runner installs ---"
         )

@@ -24,9 +24,10 @@ from fleet.contracts.runner_slice import (
 )
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import runner_render, runner_slice_render
+from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
 from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from tests._host_bash import host_bash
-from tests._runner_fixtures import a_ci_slice, a_host, an_install, ci_slice_json
+from tests._runner_fixtures import RESERVED_CORES, a_ci_slice, a_host, an_install, ci_slice_json
 
 #: The unit every case places.
 UNIT = "actions.runner.wagner-austin-MCPs.lavender.service"
@@ -231,13 +232,22 @@ class TestSliceUnit:
         assert "-" not in LISTENER_SLICE_NAME
 
     def test_the_slice_is_laid_before_any_runner_is_placed_in_it(self) -> None:
-        script = runner_render.render_provision(_roster_host())["provision_script"]
+        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
         assert script.index(f"systemctl start {CI_SLICE_NAME}") < script.index(
             runner_slice_render.SLICE_DROP_IN_NAME
         )
 
+    def test_the_slice_s_cpus_are_set_once_it_is_started_and_before_any_runner(self) -> None:
+        """set-property needs the slice loaded, and a runner placed first
+        would run a job on every CPU (MCPs board task 349e25ee)."""
+        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
+        cpus = "\n".join(render_ci_cpuset_lines(RESERVED_CORES))
+        assert cpus in script
+        assert script.index(f"systemctl start {CI_SLICE_NAME}") < script.index(cpus)
+        assert script.index(cpus) < script.index(runner_slice_render.SLICE_DROP_IN_NAME)
+
     def test_the_whole_provision_parses_as_bash(self, tmp_path: pathlib.Path) -> None:
-        script = runner_render.render_provision(_roster_host())["provision_script"]
+        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
         (tmp_path / "provision.sh").write_bytes(script.encode())
         parsed = subprocess.run(
             [host_bash(), "-n", "provision.sh"],

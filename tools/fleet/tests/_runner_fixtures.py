@@ -18,6 +18,11 @@ from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks
 from tests.conftest import ok
 
+#: lavender's ``dispatch.budget.reserved_cores``: the logical cores its roster
+#: file reserves for its runners, which the provision holds the CI slice to
+#: (:mod:`fleet.core.runner_cpuset_render`, MCPs board task 349e25ee).
+RESERVED_CORES = 8
+
 
 def an_install(
     repo: str = "wagner-austin/API", runner_name: str = "lavender", *, slot: int = 1
@@ -227,6 +232,7 @@ def ci_slice_json() -> dict[str, JSONValue]:
 
 
 __all__ = [
+    "RESERVED_CORES",
     "a_base",
     "a_ci_slice",
     "a_host",

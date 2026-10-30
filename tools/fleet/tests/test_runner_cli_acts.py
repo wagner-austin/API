@@ -18,6 +18,7 @@ from fleet.contracts.runners import HostRunnerSpec
 from fleet.core import _test_hooks, runner_load, runner_onboard
 from tests._runner_fixtures import no_dropped_jobs, quiet_rebuild_answers
 from tests._runner_roster_files import (
+    REGISTRY,
     clean_transcript,
     manual_asset,
     raw_host,
@@ -122,6 +123,18 @@ def _onboarded(spec_path: str) -> HostRunnerSpec:
     return host
 
 
+def _rebuild_argv(spec_path: str) -> list[str]:
+    """A confirmed rebuild of lavender, its reservation read from the fleet's registry.
+
+    Args:
+        spec_path: The roster.
+
+    Returns:
+        The arguments after the program name.
+    """
+    return ["--spec", spec_path, "--host", "lavender", "--rebuild", "yes", "--config", REGISTRY]
+
+
 class TestOnboardMode:
     """The --onboard mode: flags, roster rewrite, exit codes."""
 
@@ -129,6 +142,17 @@ class TestOnboardMode:
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
         with pytest.raises(ValueError, match="--onboard requires --host"):
             runners.main(["--spec", spec_path, "--onboard", "wagner-austin/x"])
+
+    def test_onboard_without_the_registry_is_refused_before_any_token_is_minted(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        runner = FakeRun([])
+        _test_hooks.run = runner
+        argv = ["--spec", spec_path, "--host", "lavender", "--onboard", "wagner-austin/x"]
+        with pytest.raises(ValueError, match="--onboard requires --config"):
+            runners.main(argv)
+        assert runner.calls == []
 
     @pytest.mark.parametrize(("service", "code"), [("OK", 0), ("DRIFT it said: inactive", 1)])
     def test_onboard_rewrites_the_roster_and_exits_on_the_audit(
@@ -152,7 +176,16 @@ class TestOnboardMode:
                 *no_dropped_jobs(grown),
             ]
         )
-        argv = ["--spec", spec_path, "--host", "lavender", "--onboard", "wagner-austin/x"]
+        argv = [
+            "--spec",
+            spec_path,
+            "--host",
+            "lavender",
+            "--onboard",
+            "wagner-austin/x",
+            "--config",
+            REGISTRY,
+        ]
         assert runners.main(argv) == code
         assert roster_host(spec_path, "lavender") == grown
         assert pathlib.Path(spec_path).read_text(encoding="utf-8").endswith("}\n")
@@ -171,6 +204,16 @@ class TestRebuildMode:
         with pytest.raises(ValueError, match="takes the literal value yes"):
             runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "true"])
 
+    def test_rebuild_without_the_registry_is_refused_before_the_host_is_touched(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        runner = FakeRun([])
+        _test_hooks.run = runner
+        with pytest.raises(ValueError, match="--rebuild requires --config"):
+            runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"])
+        assert runner.calls == []
+
     def test_a_clean_rebuild_exits_zero(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
@@ -179,7 +222,7 @@ class TestRebuildMode:
         runner = FakeRun(quiet_rebuild_answers(clean_transcript(lavender), lavender, repos=1))
         _test_hooks.run = runner
         with caplog.at_level("INFO"):
-            code = runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"])
+            code = runners.main(_rebuild_argv(spec_path))
         assert code == 0
         assert len(runner.calls) == 9
         assert caplog.records[-1].getMessage() == "rebuild verified: every check green on lavender"
@@ -197,7 +240,7 @@ class TestRebuildMode:
         )
         _test_hooks.run = FakeRun(quiet_rebuild_answers(transcript, lavender, repos=1))
         with caplog.at_level("INFO"):
-            code = runners.main(["--spec", spec_path, "--host", "lavender", "--rebuild", "yes"])
+            code = runners.main(_rebuild_argv(spec_path))
         assert code == 1
         messages = [record.getMessage() for record in caplog.records]
         assert messages[:4] == [

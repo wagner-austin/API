@@ -13,7 +13,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks, remote, runner_audit, runner_onboard, runner_render
-from tests._runner_fixtures import a_host, an_install, no_dropped_jobs
+from tests._runner_fixtures import RESERVED_CORES, a_host, an_install, no_dropped_jobs
 from tests.conftest import FakeRun, failed, ok
 
 #: The install onboarding tree-bot onto lavender creates.
@@ -102,7 +102,7 @@ class TestOnboard:
             ]
         )
         _test_hooks.run = runner
-        plan, findings = runner_onboard.onboard(spec, "wagner-austin/tree-bot")
+        plan, findings = runner_onboard.onboard(spec, "wagner-austin/tree-bot", RESERVED_CORES)
         assert plan["install"] == _TREE_BOT
         assert spec == grown
         assert [finding["ok"] for finding in findings] == [True] * (
@@ -113,7 +113,7 @@ class TestOnboard:
         )
         path = "/home/corvis/fleet/runner-payloads/fleet-onboard-tree-bot.sh"
         assert runner.stdin[1] == runner_render.render_provision_script(
-            grown, {"wagner-austin/tree-bot": "TOKENABC123"}
+            grown, {"wagner-austin/tree-bot": "TOKENABC123"}, RESERVED_CORES
         ).encode("utf-8")
         assert tuple(runner.calls[2][-4:]) == (*remote.ROOT_BASH, path)
         assert runner.timeouts[2] == runner_render.STAGE_TIMEOUT_SECONDS
@@ -123,7 +123,7 @@ class TestOnboard:
             [ok("TOK1\n"), ok(""), failed(1, "Http response code: NotFound from 'POST'")]
         )
         with pytest.raises(AppError) as fault:
-            runner_onboard.onboard(_host(), "wagner-austin/x")
+            runner_onboard.onboard(_host(), "wagner-austin/x", RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
         assert "Http response code: NotFound" in fault.value.message
 
@@ -132,7 +132,7 @@ class TestOnboard:
             [ok("TOK1\n"), ok(""), ok("done\n"), failed(255, "No route to host")]
         )
         with pytest.raises(AppError) as fault:
-            runner_onboard.onboard(_host(), "wagner-austin/x")
+            runner_onboard.onboard(_host(), "wagner-austin/x", RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert fault.value.message.startswith("post-onboard audit could not reach lavender: ")
         assert "its roster entry is staged" in fault.value.message

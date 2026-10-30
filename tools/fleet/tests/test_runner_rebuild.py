@@ -15,7 +15,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec
 from fleet.core import _test_hooks, remote, runner_audit, runner_rebuild, runner_render
-from tests._runner_fixtures import a_host, an_install, quiet_rebuild_answers
+from tests._runner_fixtures import RESERVED_CORES, a_host, an_install, quiet_rebuild_answers
 from tests.conftest import FakeClock, FakeRun, FakeSleep, failed, ok
 
 #: Where the base lands on the host.
@@ -99,7 +99,7 @@ class TestAQuietRebuild:
         spec = _host()
         runner = FakeRun(_quiet(spec))
         _test_hooks.run = runner
-        report = runner_rebuild.rebuild(spec)
+        report = runner_rebuild.rebuild(spec, RESERVED_CORES)
         assert report["steps"] == [
             "base: laid, and nothing asked for a reboot",
             "tokens: minted for 2 repositories",
@@ -118,20 +118,23 @@ class TestAQuietRebuild:
         spec = _host()
         runner = FakeRun(_quiet(spec))
         _test_hooks.run = runner
-        runner_rebuild.rebuild(spec)
+        runner_rebuild.rebuild(spec, RESERVED_CORES)
         assert runner.stdin[0] == runner_render.render_base_script(spec).encode()
         assert tuple(runner.calls[1][-4:]) == (*remote.ROOT_BASH, _BASE_PATH)
         assert runner.calls[2][4] == "repos/wagner-austin/API/actions/runners/registration-token"
         assert runner.calls[3][4] == "repos/wagner-austin/chat/actions/runners/registration-token"
         tokens = {"wagner-austin/API": "TOKEN0", "wagner-austin/chat": "TOKEN1"}
-        assert runner.stdin[4] == runner_render.render_provision_script(spec, tokens).encode()
+        assert (
+            runner.stdin[4]
+            == runner_render.render_provision_script(spec, tokens, RESERVED_CORES).encode()
+        )
         assert runner.stdin[6] == runner_audit.render_audit_script(spec).encode()
 
     def test_the_long_stages_carry_the_stage_deadline(self) -> None:
         spec = _host()
         runner = FakeRun(_quiet(spec))
         _test_hooks.run = runner
-        runner_rebuild.rebuild(spec)
+        runner_rebuild.rebuild(spec, RESERVED_CORES)
         stage = runner_render.STAGE_TIMEOUT_SECONDS
         short = remote.SSH_TIMEOUT_SECONDS
         assert [runner.timeouts[i] for i in (0, 1, 4, 5, 6, 7)] == [
@@ -165,7 +168,7 @@ class TestTheReboot:
             ]
         )
         _test_hooks.run = runner
-        report = runner_rebuild.rebuild(spec)
+        report = runner_rebuild.rebuild(spec, RESERVED_CORES)
         assert report["steps"][0] == "base: laid, and the host rebooted for it (boot boot-b)"
         assert sleeper.slept == [runner_rebuild.REBOOT_POLL_SECONDS] * 3
         assert tuple(runner.calls[2][-2:]) == ("cat", runner_rebuild.BOOT_ID_PATH)
@@ -191,7 +194,7 @@ class TestTheReboot:
             ]
         )
         with pytest.raises(AppError) as fault:
-            runner_rebuild.rebuild(_host())
+            runner_rebuild.rebuild(_host(), RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert fault.value.message == (
             "lavender did not answer from a new boot within 1200s of the rebuild's restart "
@@ -213,7 +216,7 @@ class TestTheReboot:
             ]
         )
         with pytest.raises(AppError) as fault:
-            runner_rebuild.rebuild(_host())
+            runner_rebuild.rebuild(_host(), RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
         assert "asked for a second reboot" in fault.value.message
         assert fault.value.message.endswith(
@@ -241,7 +244,7 @@ class TestTheVerdict:
         answers[6:] = [failed(255, "No route to host")]
         _test_hooks.run = FakeRun(answers)
         with pytest.raises(AppError) as fault:
-            runner_rebuild.rebuild(spec)
+            runner_rebuild.rebuild(spec, RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert fault.value.message.startswith("the post-rebuild audit could not reach lavender: ")
         assert fault.value.message.endswith(
@@ -251,6 +254,6 @@ class TestTheVerdict:
     def test_a_failed_stage_raises_with_its_own_words(self) -> None:
         _test_hooks.run = FakeRun([ok(""), failed(1, "E: Unable to locate package golang-go")])
         with pytest.raises(AppError) as fault:
-            runner_rebuild.rebuild(_host())
+            runner_rebuild.rebuild(_host(), RESERVED_CORES)
         assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
         assert "E: Unable to locate package golang-go" in fault.value.message

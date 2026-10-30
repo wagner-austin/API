@@ -31,7 +31,7 @@ from fleet.core import (
 from fleet.core.runner_unit_files import render_drop_in_lines
 from tests._audit_rows import run_rows
 from tests._host_bash import host_bash
-from tests._runner_fixtures import a_host, an_install
+from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
 
 #: The unit every case runs.
 UNIT = "actions.runner.wagner-austin-API.lavender.service"
@@ -544,7 +544,8 @@ class TestTheRenderedPieces:
         )
 
     def test_the_provision_installs_the_helper_before_any_runner(self) -> None:
-        script = runner_render.render_provision(a_host([_install()]))["provision_script"]
+        rendered = runner_render.render_provision(a_host([_install()]), RESERVED_CORES)
+        script = rendered["provision_script"]
         assert script.index("visudo -cf") < script.index("./svc.sh start")
 
     def test_the_placement_row_is_named_for_the_install(self) -> None:
