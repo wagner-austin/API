@@ -227,7 +227,7 @@ Training, generation and scoring use shared records. Corpus identity and
 matching base quantisation matter. The wider v2 comparison does not
 retroactively give the v1 five-disagreement experiment adequate power.
 
-## Not registered with the hpc3 CLI
+## Not registered anywhere
 
 ### `sirius` — declared as an example, never run
 
@@ -235,7 +235,7 @@ The example workspace was deliberately never registered. The metabolomics
 workflow uses MFAssignR; the historical SIRIUS examples are not completed jobs.
 [Scope decision](https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L2465-L2494).
 
-## The shared record
+## The shared record, and who uses it
 
 `hpc3.cli.execution_inspect` produces a shared record from a completed durable
 attempt's verified native execution evidence. It reports pending accounting
