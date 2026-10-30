@@ -77,7 +77,8 @@ def test_final_mode_needs_both_its_flags(
     with pytest.raises(SystemExit) as stopped:
         research_trial.main([*call, flag, str(tmp_path / "x")], stand_in_pin)
     assert stopped.value.code == 2
-    assert "--ledger and --final-manifest are required together" in capsys.readouterr().err
+    _, message = capsys.readouterr().err.splitlines()[-1].split(": error: ")
+    assert message == "--ledger and --final-manifest are required together"
 
 
 def test_entrypoint_refuses_a_late_numerical_pin() -> None:
