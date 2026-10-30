@@ -31,7 +31,7 @@ def replies(output: str = "{}") -> list[_test_hooks.CommandResult]:
 def test_success_retains_closed_runtime_policy_and_verifies_cleanup() -> None:
     fake = FakeRun(replies('{"partition":"validation"}'))
     _test_hooks.run = fake
-    assert run_proposer(SOCKET, IMAGE, "print(1)", {"budget": 2}, timeout=10) == {
+    assert run_proposer(SOCKET, IMAGE, "print(1)", {"budget": 2}, host=None, timeout=10) == {
         "partition": "validation"
     }
     assert MAX_BYTES == 8192
@@ -88,7 +88,7 @@ def test_bounds_refuse_before_any_daemon_call(
     fake = FakeRun([])
     _test_hooks.run = fake
     with pytest.raises(ValueError, match="RESEARCH_PROPOSER_BOUNDS"):
-        run_proposer(SOCKET, IMAGE, program, context, timeout=timeout)
+        run_proposer(SOCKET, IMAGE, program, context, host=None, timeout=timeout)
     assert fake.calls == []
 
 
@@ -103,7 +103,7 @@ def test_bounds_refuse_before_any_daemon_call(
 def test_unsafe_endpoint_or_mutable_image_is_refused(socket: str, image: str, error: str) -> None:
     _test_hooks.run = FakeRun([])
     with pytest.raises(ValueError, match=error):
-        run_proposer(socket, image, "print(1)", {}, timeout=10)
+        run_proposer(socket, image, "print(1)", {}, host=None, timeout=10)
 
 
 @pytest.mark.parametrize(
@@ -121,7 +121,7 @@ def test_daemon_must_enforce_rootless_resource_limits(key: str, value: JSONValue
     fake = FakeRun([ok(dump_json_str(info))])
     _test_hooks.run = fake
     with pytest.raises(ValueError, match="PROPOSER_RUNTIME"):
-        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, host=None, timeout=10)
     assert len(fake.calls) == 1
 
 
@@ -132,7 +132,7 @@ def test_only_dockers_json_cpu_quota_key_is_accepted(spelling: str) -> None:
     fake = FakeRun([ok(dump_json_str(info))])
     _test_hooks.run = fake
     with pytest.raises(ValueError, match="PROPOSER_RUNTIME"):
-        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, host=None, timeout=10)
     assert len(fake.calls) == 1
 
 
@@ -140,7 +140,7 @@ def test_only_dockers_json_cpu_quota_key_is_accepted(spelling: str) -> None:
 def test_image_cannot_add_implicit_mounts(volume: str) -> None:
     _test_hooks.run = FakeRun([ok(dump_json_str(INFO)), ok(volume)])
     with pytest.raises(ValueError, match="PROPOSER_IMAGE"):
-        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, host=None, timeout=10)
 
 
 @pytest.mark.parametrize("output", ["[1]", "not json", "x" * 8193])
@@ -148,7 +148,7 @@ def test_invalid_output_is_refused_and_removed(output: str) -> None:
     fake = FakeRun(replies(output))
     _test_hooks.run = fake
     with pytest.raises((ValueError, TypeError)):
-        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, host=None, timeout=10)
     assert fake.calls[-2][-4:] == ("container", "rm", "--force", CID)
 
 
@@ -172,5 +172,5 @@ def test_lifecycle_failures_refuse_and_cleanup_is_verified(case: str) -> None:
     fake = FakeRun(values)
     _test_hooks.run = fake
     with pytest.raises(ValueError, match=error):
-        run_proposer(SOCKET, IMAGE, "print(1)", {}, timeout=10)
+        run_proposer(SOCKET, IMAGE, "print(1)", {}, host=None, timeout=10)
     assert fake.calls[-1][-2] == "--filter"

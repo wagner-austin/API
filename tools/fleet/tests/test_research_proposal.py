@@ -39,6 +39,7 @@ def specification(root: pathlib.Path) -> JSONObject:
         "script": _pinned(root / "research_proposals.py", "evaluator controller"),
         "policy": _pinned(root / "policy.json", '{"evaluator":"policy"}'),
         "ledger": str(root / "journal.sqlite"),
+        "host": None,
         "socket": SOCKET,
         "image": IMAGE,
         "program": _pinned(root / "program.py", PROGRAM),

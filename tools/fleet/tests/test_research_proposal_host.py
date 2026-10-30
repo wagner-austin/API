@@ -116,6 +116,7 @@ def test_installed_proposer_cannot_reach_evaluator_assets(
         "script": _pinned(controller, CONTROLLER),
         "policy": _pinned(policy, '{"max_candidates":2}'),
         "ledger": str(ledger),
+        "host": None,
         "socket": socket,
         "image": image,
         "program": _pinned(evaluator / "program.py", PROBE_PROGRAM),

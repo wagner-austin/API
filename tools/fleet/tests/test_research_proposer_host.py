@@ -102,7 +102,7 @@ def test_actual_proposer_denies_private_data_credentials_policy_and_network(
     environment = original()
     config_test_hooks.get_environment = lambda: {**environment, "WRDS_PROPOSER_CANARY": "sentinel"}
     try:
-        result = run_proposer(*runtime, DENIAL_PROGRAM, context, timeout=15)
+        result = run_proposer(*runtime, DENIAL_PROGRAM, context, host=None, timeout=15)
     finally:
         config_test_hooks.get_environment = original
     assert result == {
@@ -160,7 +160,7 @@ def test_actual_failures_and_timeout_remove_the_owned_container(
     socket, _ = runtime
     prefix = ("docker", "--host", f"unix://{socket}")
     with pytest.raises(ValueError, match=error):
-        run_proposer(*runtime, program, {}, timeout=timeout)
+        run_proposer(*runtime, program, {}, host=None, timeout=timeout)
     assert len(labels) == 1
     assert (
         command(
