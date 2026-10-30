@@ -9,7 +9,6 @@ that would skip the hook's later CI enrollment and mirror work.
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 from typing import Final
@@ -49,7 +48,7 @@ def route(
     result = subprocess.run(
         ["sh", "-c", "set -eu\n" + hook[start:end] + '\nprintf "continued\\n"\n'],
         env={
-            **os.environ,
+            "PATH": "/usr/bin:/bin",
             "HOOK_PYTHON": str(runner),
             "CALLS": str(calls),
             "POLICY_STATUS": str(policy_status),
@@ -60,6 +59,7 @@ def route(
         capture_output=True,
         text=True,
         check=False,
+        timeout=10,
     )
     return result, calls.read_text(encoding="utf-8").splitlines()
 
