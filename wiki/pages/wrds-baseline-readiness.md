@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json"
   - "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
@@ -20,6 +21,7 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e30492e1ef4ae30e3c3391560a066f51805d6250"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "09aad4f0cf5563d59f0b431ffed6e3c5911bd42a"
@@ -53,15 +55,27 @@ tests and 2,495 fleet tests passing with 100% coverage, plus 79 actual host case
 That establishes the tested code revision. It does not establish that the pilot's
 frozen controller or compute image contains that revision.[^readiness]
 
-The documented controller under `wrds-validation-bda8ca2af` still imports the
-old next-observation evaluator on the October 30 local-file read, and its CLI
-has no `select` operation. The existing native-job receipts identify the earlier
-compute image and one-security snapshot. No substantive monthly baseline result
-is recorded here. The remaining sequence is:[^readiness][^installed]
+The October 30 runtime upgrade freezes API
+`92719c0601c27d31fcd4338e9fd3e8fc3b85c656`. The separate installed controller is
+`/home/corvis/research-control/wrds-monthly-92719c060/bin/python`; its proposal CLI
+exposes `select`, and `pip check` passes. Native image build `58629088` completed
+with exit `0:0` in 83 seconds on `hpc3-15-20`, using eight CPUs on `free`.
+The generated symbol/version selfcheck passed both during construction and as
+the unprivileged user, followed by a passing dependency check. The image at
+`/pub/wagnera3/images/research-monthly-92719c060/research-monthly.sif` has SHA-256
+`5072a7a24b6dd2ae22e05c68d3691be400c49a8bc4a2be8ca27fc997b9e0a5fc`.
+The old pilot remains unchanged. These measurements establish the new runtime,
+not the complete queue rehearsal or a substantive baseline.[^monthly-runtime]
 
-1. Freeze and verify the current monthly controller and HPC3 image through the
-   maintained image/build/staging tools, including code, dependencies and entrypoint
-   identities. Preserve the old pilot artifacts as historical evidence.
+The operator additionally requires encrypted, checksum-verified data bundles,
+evaluator-only decryption into private job storage, keys absent from images,
+logs and proposer-visible files, and a separately sealed final bundle. This is
+a prerequisite for licensed staging, tracked in board task `e6729a16`.
+It is not a capability of the current runtime. The remaining sequence is:[^encryption]
+
+1. Integrate encrypted bundle delivery with existing staging, native execution
+   and result verification. Preserve verifiable plaintext identities after
+   private job storage is removed, and measure the key-access boundary.
 2. Rehearse an allowed proposal through the real admission controller, shared
    queue, native job and reconciled RunRecord in one chain. The existing installed
    isolation test uses a recording admission stand-in; its result cannot stand
@@ -78,5 +92,9 @@ is recorded here. The remaining sequence is:[^readiness][^installed]
 [^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. On main at 85e408c1c08cd3ff5faaf88416f4d62965ed64a3, job 8054c71b passed libs/covenant_ml on Colossus at 2026-10-30T05:57:25Z: 4,786 tests, 100.00% coverage. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 
 [^readiness]: `tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json`, controller_source_commit, controller_python and attempts; the October 30 local-file and live-tool reads recorded in this page's provenance. Implementation and test sources are cited in [^installed] and [^final]. Remaining steps are operational prerequisites, not completed jobs or performance findings.
+
+[^monthly-runtime]: `tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json`, source_commit, source_archive_sha256, controller_python_sha256, controller_entrypoint_hashes, first_party_wheel_sha256, image and evidence_sha256. Its private evidence includes native accounting, the generated build transcript, captured environment and staging manifests. At that exact source revision, fleet jobs 2eed7059, 7d1ae3f0 and 20312c9e passed 4,786 evaluator, 2,006 HPC3 and 2,510 fleet tests respectively, each with 100% coverage. Board task 474c840b.
+
+[^encryption]: Board task e6729a16-3d8b-4f0f-9d68-73ea5d56b95d, October 30 operator requirement and acceptance criteria. This paragraph specifies the required workflow; it reports no completed encryption or key-custody measurement.
 
 [^installed]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/src/fleet/core/research_control.py`, `read_pinned` and `invoke`; `tools/fleet/tests/test_research_proposal.py`, admitted and refused recording, no evaluator path in any daemon argument, drifted-input and isolation refusals; `tools/fleet/tests/test_research_proposal_host.py`, `test_installed_proposer_cannot_reach_evaluator_assets`. Host lane job fc8bc3c5-ad1b-479e-b44c-ddfcd40152ad passed tools/fleet-execution-linux at API 06636dbbebd56771e170b45a7f190309f396cde1 on Sedona at 2026-10-30T05:46:34Z: 79 cases ran, 0 skipped, 0 failed. Full check b01963a6-2105-49a3-a81a-8551982ca23d passed tools/fleet at the same commit on Sedona at 2026-10-30T05:43:08Z: 2,479 tests, 100.00% coverage. Commit 06636dbbe was staged on a pushed-tests ref and rebased unchanged onto main as part of 85e408c1c08cd3ff5faaf88416f4d62965ed64a3; there, host lane job 6833f095-6fe8-48c5-a464-548cf228597b passed on Colossus at 2026-10-30T05:58:34Z (79 cases, 0 failed, 0 skipped) and full check f7581b88 passed tools/fleet on Loki at 2026-10-30T05:55:25Z (2,495 tests, 100.00% coverage). The admission controller in the host case is a recording stand-in for `research_proposals propose`; the real controller's recording of proposals and refusals is the covenant_ml suite's. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
