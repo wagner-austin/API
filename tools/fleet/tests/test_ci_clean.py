@@ -55,7 +55,7 @@ def test_the_download_caches_go_only_by_whole_generations() -> None:
     assert caches.index(ci_clean.GENERATIONS_SWEEP) < caches.index(ci_clean.GENERATION_READERS)
     assert caches.index(ci_clean.GENERATION_READERS) < caches.index(ci_clean.WORK_TREES)
     assert caches.endswith(ci_clean.WORK_TREES + "\n")
-    assert ci_clean.WORK_TREES == "\n".join(ci_clean.work_trees_lines(60))
+    assert "\n".join(ci_clean.work_trees_lines(60)) == ci_clean.WORK_TREES
     assert (
         'remove_unused "$HOME/.cache/fleet-tools" "$HOME/.cache/fleet-jobs"'
         in ci_clean.GENERATIONS_SWEEP.splitlines()
@@ -456,8 +456,7 @@ def test_a_settled_update_goes_and_every_install_s_job_trees_are_reported(
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout.splitlines() == [
         f"runner-update: removed {busy}'s _update (2 MB)",
-        f"work-tree: {busy} running, started never, cleared never, 3 files (3 MB) in its job "
-        "trees",
+        f"work-tree: {busy} running, started never, cleared never, 3 files (3 MB) in its job trees",
         f"runner-update: removed {cleared}'s _update (2 MB)",
         f"work-tree: {cleared} idle, started 1793380000, cleared 1793390000, 0 files (0 MB) in "
         "its job trees",
@@ -486,7 +485,6 @@ def test_an_update_unpacked_within_the_grace_is_kept(tmp_path: pathlib.Path) -> 
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout.splitlines() == [
         f"runner-update: kept {install}'s _update, changed within 3600 s",
-        f"work-tree: {install} idle, started never, cleared never, 0 files (0 MB) in its job "
-        "trees",
+        f"work-tree: {install} idle, started never, cleared never, 0 files (0 MB) in its job trees",
     ]
     assert listener.stat().st_size == 2 * MIB

@@ -77,22 +77,19 @@ CLEAR_LINES: Final = (
     'find "$tree" -mindepth 1 -maxdepth 1 ! -path "$GITHUB_WORKSPACE"'
     " -exec rm -rf --one-file-system {} +",
     'find "$GITHUB_WORKSPACE" -mindepth 1 -maxdepth 1 -exec rm -rf --one-file-system {} +',
-    f"echo \"$(date +%s) $entries $size\" > \"$marker_dir/{WORK_CLEARED_NAME}\"",
+    f'echo "$(date +%s) $entries $size" > "$marker_dir/{WORK_CLEARED_NAME}"',
     'echo "fleet-runner-job-completed: removed $entries entries ($size MB) under $tree"',
 )
 
 #: The hook.
-JOB_COMPLETED_SCRIPT: Final = (
-    f"""#!/usr/bin/env bash
+JOB_COMPLETED_SCRIPT: Final = f"""#!/usr/bin/env bash
 # fleet-runner-job-completed.sh -- rendered by fleet-runners (MCPs board task 621902c3).
 # The runners' job-completed hook ({COMPLETED_HOOK_VARIABLE}): after the job's
 # last step, its workspace is emptied and every clone beside it under
 # _work/<repository> removed (fleet.core.runner_work_clear), and the removal is
 # recorded where ci-clean reports it.
 set -euo pipefail
-"""
-    + "".join(f"{line}\n" for line in (*INSTALL_LINES, *CLEAR_LINES))
-)
+""" + "".join(f"{line}\n" for line in (*INSTALL_LINES, *CLEAR_LINES))
 
 __all__ = [
     "CLEAR_LINES",

@@ -253,6 +253,7 @@ REPORT_WORK_TREE: Final = "work-tree: "
 #: How the report names each runner self-update it removed or kept.
 REPORT_RUNNER_UPDATE: Final = "runner-update: "
 
+
 def work_trees_lines(grace_minutes: int) -> tuple[str, ...]:
     """Each runner install's ``_work`` under the runner account's home, as bash lines.
 
@@ -270,8 +271,8 @@ def work_trees_lines(grace_minutes: int) -> tuple[str, ...]:
     its first job under the hook) and the files and MB they hold. An idle
     install its hook cleared after its last job started holds none; one whose
     last job started after the clear started it while these lines ran, or
-    lost it before the hook could run. These lines remove no job tree: the hook does, in the job, where no
-    other job of its runner can start.
+    lost it before the hook could run. These lines remove no job tree: the
+    hook does, in the job, where no other job of its runner can start.
 
     Args:
         grace_minutes: How recently a file of an update may have changed for
@@ -296,7 +297,7 @@ def work_trees_lines(grace_minutes: int) -> tuple[str, ...]:
         '            rm -rf "$update"',
         f'            echo "{REPORT_RUNNER_UPDATE}removed $install\'s _update ($size MB)"',
         "        else",
-        f'            echo "{REPORT_RUNNER_UPDATE}kept $install\'s _update, changed within'
+        f"            echo \"{REPORT_RUNNER_UPDATE}kept $install's _update, changed within"
         f' {grace_minutes * 60} s"',
         "        fi",
         "    fi",
