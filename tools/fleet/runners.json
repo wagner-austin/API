@@ -38,20 +38,6 @@
           "labels": ["lavender"]
         },
         {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-3",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-3.service",
-          "workdir": "/home/gharunner/actions-runner-mcps-3/_work",
-          "labels": ["lavender"]
-        },
-        {
-          "repo": "wagner-austin/MCPs",
-          "runner_name": "lavender-4",
-          "service": "actions.runner.wagner-austin-MCPs.lavender-4.service",
-          "workdir": "/home/gharunner/actions-runner-mcps-4/_work",
-          "labels": ["lavender"]
-        },
-        {
           "repo": "wagner-austin/corvis-stick",
           "runner_name": "lavender",
           "service": "actions.runner.wagner-austin-corvis-stick.lavender.service",

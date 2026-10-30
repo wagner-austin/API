@@ -7,7 +7,9 @@ both run on the host as root:
                 them), docker enabled, and the runner account in its group.
   provision.sh  the hygiene units, the assets, the CI slice, the reaper,
                 the job scopes, the action cache, and every runner install,
-                configured and started.
+                configured and started; then every runner unit the roster
+                no longer declares, retired once its jobs end
+                (:mod:`fleet.core.runner_retire_render`).
 
 ONE PROVISION, EVERY CALLER. The rebuild (:mod:`fleet.core.runner_rebuild`)
 and the onboarding (:mod:`fleet.core.runner_onboard`) run the same
@@ -59,6 +61,7 @@ from fleet.core.runner_slice_render import (
     render_runner_slice_move_lines,
     render_slice_unit_lines,
 )
+from fleet.core.runner_retire_render import render_retire_lines
 from fleet.core.runner_unit_files import render_unit_file_lines
 from fleet.core.script_values import scriptable
 
@@ -321,7 +324,10 @@ def render_provision_script(
     for install in spec["installs"]:
         lines += render_install_lines(install)
         lines.append("")
+    lines += ["# --- runner units the roster no longer declares (board task 49d1a916) ---"]
+    lines += render_retire_lines(spec)
     lines += [
+        "",
         "# --- the first hygiene pass, run now rather than at the timer's next 04:00 ---",
         FIRST_HYGIENE_PASS,
     ]

@@ -27,6 +27,7 @@ from fleet.core import (
     runner_slice_render,
 )
 from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
+from fleet.core.runner_retire_render import render_retire_lines
 from fleet.core.runner_unit_files import render_unit_file_lines
 from tests._host_bash import bash_path
 from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
@@ -270,6 +271,7 @@ class TestTheProvision:
             runner_action_cache.render_fill_lines(spec),
             runner_cache_adopt.render_adopt_lines(spec),
             *(runner_render.render_install_lines(install) for install in spec["installs"]),
+            render_retire_lines(spec),
         )
         assert lines[-1] == runner_render.FIRST_HYGIENE_PASS
 
