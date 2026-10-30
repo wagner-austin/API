@@ -336,11 +336,22 @@ must bind the authenticated tenant, backend and attempt. Every referenced
 immutable input uses `{path, sha256}` and is rehashed on every poll.
 
 An HPC3 request additionally names `python`, pinned `script`, `policy`, `trial`
-and `cluster`, plus absolute mutable `ledger` and `directory` paths and the
-`native_attempt` identity. It invokes the maintained proposal controller:
+and `cluster`, plus absolute mutable `ledger` and `directory` paths. It requires
+an explicit `phase`; private requests without it are refused and must be rebuilt
+and re-pinned. `phase: "validation"` requires the `native_attempt` identity.
+It invokes the maintained proposal controller:
 `admitted` submits once, `submitting` or `running` reconciles, and `complete`
 requires a fresh native inspection matching the journal's allocation and
 RunRecord. Admission budgets remain in the existing research journal.
+
+`phase: "final"` instead requires `remote_manifest`, the frozen final ciphertext
+manifest path. `directory` names the consumed local grant whose verified private
+delivery receipt binds the original journal's one-shot release. The adapter calls
+`submit-final` once, then `reconcile-final` after the grant's exclusive `native`
+directory exists. The controller reuses native staging, submission, accounting
+and dataset verification; completion retains the original validation record.
+The cluster's report task must equal the shared queue task. A missing receipt or
+failed final submission never restores the grant or authorizes another allocation.
 
 A WRDS request additionally names `python`, pinned `spec`, absolute `output`
 and boolean `adopt`. `adopt: true` reconciles a pre-existing native attempt.
