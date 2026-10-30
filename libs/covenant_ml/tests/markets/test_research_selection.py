@@ -15,29 +15,33 @@ from covenant_ml.markets.research_journal import (
 from ._research_fixtures import completion, policy, proposal
 
 
+def _complete_one(path: Path, number: int) -> str:
+    """Admit, submit, schedule and complete one actual persisted validation attempt."""
+    journal = research_journal(policy())
+    request = proposal()
+    require_dict(request, "config")["n_estimators"] = 100 * number
+    row = admit_proposal(path, policy(), request, 1000)
+    submit: JSONObject = {"action": "submit", "number": number, "observed_ms": 1000}
+    journal.transact(path, lambda _: submit)
+    job = f"slurm:{number}"
+    scheduled: JSONObject = {
+        "action": "scheduled",
+        "number": number,
+        "observed_ms": 1001,
+        "job_id": job,
+    }
+    journal.transact(path, lambda _: scheduled)
+    event = completion(number)
+    event["job_id"] = job
+    journal.transact(path, lambda _: event)
+    return row["candidate"]
+
+
 def _completed(path: Path) -> JSONObject:
     """Complete two distinct real validation attempts and return a selection."""
-    journal = research_journal(policy())
-    journal.initialize(path)
-    candidate = ""
-    for number in (1, 2):
-        request = proposal()
-        require_dict(request, "config")["n_estimators"] = 100 * number
-        row = admit_proposal(path, policy(), request, 1000)
-        candidate = row["candidate"]
-        submit: JSONObject = {"action": "submit", "number": number, "observed_ms": 1000}
-        journal.transact(path, lambda _, submit=submit: submit)
-        job = f"slurm:{number}"
-        scheduled: JSONObject = {
-            "action": "scheduled",
-            "number": number,
-            "observed_ms": 1001,
-            "job_id": job,
-        }
-        journal.transact(path, lambda _, scheduled=scheduled: scheduled)
-        event = completion(number)
-        event["job_id"] = job
-        journal.transact(path, lambda _, event=event: event)
+    research_journal(policy()).initialize(path)
+    _complete_one(path, 1)
+    candidate = _complete_one(path, 2)
     return {
         "action": "select",
         "number": 2,
@@ -48,7 +52,10 @@ def _completed(path: Path) -> JSONObject:
     }
 
 
-def test_selection_preserves_validation_and_consumes_one_final_release(tmp_path: Path) -> None:
+@pytest.mark.parametrize("repeat_action", ["select", "release_final"])
+def test_selection_preserves_validation_and_consumes_one_final_release(
+    tmp_path: Path, repeat_action: str
+) -> None:
     path = tmp_path / "study.sqlite"
     event = _completed(path)
     journal = research_journal(policy())
@@ -68,11 +75,10 @@ def test_selection_preserves_validation_and_consumes_one_final_release(tmp_path:
     assert released[1]["record"] == before[1]["record"]
     # A different reader after a process restart sees the consumed release.
     assert research_journal(policy()).read(path) == released
-    for repeated in (event, release):
-        repeated["observed_ms"] = 2003
-        with pytest.raises(ValueError, match=r"RESEARCH-00[89]"):
-            journal.transact(path, lambda _, repeated=repeated: repeated)
-        assert journal.read(path) == released
+    repeated: JSONObject = {**event, "action": repeat_action, "observed_ms": 2003}
+    with pytest.raises(ValueError, match=r"RESEARCH-00[89]"):
+        journal.transact(path, lambda _: repeated)
+    assert journal.read(path) == released
 
 
 @pytest.mark.parametrize("released", [False, True])
