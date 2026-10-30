@@ -48,6 +48,7 @@ class ResearchAttempt(TypedDict):
     record: ReadOnly[str]
     observed_ms: ReadOnly[int]
     final_manifest_digest: ReadOnly[str]
+    selection: ReadOnly[str]
 
 
 def encode_research_attempt(attempt: ResearchAttempt) -> JSONObject:
@@ -69,6 +70,7 @@ def encode_research_attempt(attempt: ResearchAttempt) -> JSONObject:
         "record": attempt["record"],
         "observed_ms": attempt["observed_ms"],
         "final_manifest_digest": attempt["final_manifest_digest"],
+        "selection": attempt["selection"],
     }
 
 
@@ -96,12 +98,15 @@ def decode_research_attempt(document: JSONObject) -> ResearchAttempt:
         "failed",
         "timeout",
         "interrupted",
-        "selected",
-        "final_released",
     }:
         raise ValueError("[RESEARCH-004] unknown attempt status")
+    selection = require_str(document, "selection")
+    if selection not in {"", "selected", "released"}:
+        raise ValueError("[RESEARCH-004] unknown selection state")
     final_digest = require_str(document, "final_manifest_digest")
-    if status in {"selected", "final_released"}:
+    if selection:
+        if status != "complete":
+            raise ValueError("[RESEARCH-004] selection requires completed validation")
         final_digest = require_digest(document, "final_manifest_digest")
     elif final_digest:
         raise ValueError("[RESEARCH-004] only a selected attempt can bind final evidence")
@@ -115,6 +120,7 @@ def decode_research_attempt(document: JSONObject) -> ResearchAttempt:
         record=require_str(document, "record"),
         observed_ms=require_bounded_int(document, "observed_ms", 0, 2**63 - 1),
         final_manifest_digest=final_digest,
+        selection=selection,
     )
 
 
@@ -131,7 +137,7 @@ def _refusal(
     Returns:
         Named refusal, or empty for an admissible proposal.
     """
-    if any(row["status"] in {"selected", "final_released"} for row in history):
+    if any(row["selection"] for row in history):
         return "study_sealed"
     reason = policy_refusal(policy, proposal)
     if reason:
@@ -227,14 +233,11 @@ def _transition(
                 record="",
                 observed_ms=observed,
                 final_manifest_digest="",
+                selection="",
             ),
         )
-    number = require_int(event, "number")
-    if not 1 <= number <= len(history):
-        raise ValueError("[RESEARCH-005] unknown attempt number")
-    row = history[number - 1]
-    if observed < row["observed_ms"]:
-        raise ValueError("[RESEARCH-005] observation time moved backwards")
+    row = _event_row(history, event)
+    number = row["number"]
     updated = encode_research_attempt(row)
     updated["observed_ms"] = observed
     if action == "admit" and row["reason"] == "not_admitted":
@@ -253,18 +256,8 @@ def _transition(
     elif action == "complete" and row["status"] == "running":
         updated["record"] = _complete(policy, event, row)
         updated["status"] = "complete"
-    elif action == "select" and row["status"] == "complete":
-        if any(
-            prior["status"] in {"admitted", "submitting", "running", "selected", "final_released"}
-            for prior in history
-        ):
-            raise ValueError("[RESEARCH-008] selection requires settled, unsealed validation")
-        updated["final_manifest_digest"] = _final_identity(event, row)
-        updated["status"] = "selected"
-    elif action == "release_final" and row["status"] == "selected":
-        if _final_identity(event, row) != row["final_manifest_digest"]:
-            raise ValueError("[RESEARCH-009] final evidence differs from the selected manifest")
-        updated["status"] = "final_released"
+    elif action in {"select", "release_final"}:
+        updated["selection"], updated["final_manifest_digest"] = _selection(history, event, row)
     elif action in {"failed", "timeout", "interrupted"} and row["status"] in {
         "admitted",
         "submitting",
@@ -274,6 +267,60 @@ def _transition(
     else:
         raise ValueError("[RESEARCH-006] invalid attempt transition")
     return (*history[: number - 1], decode_research_attempt(updated), *history[number:])
+
+
+def _event_row(history: tuple[ResearchAttempt, ...], event: JSONObject) -> ResearchAttempt:
+    """Resolve an existing attempt and refuse backwards event time.
+
+    Args:
+        history: Locked journal state.
+        event: Event carrying the attempt number and observation time.
+
+    Returns:
+        Existing attempt without changing its execution status.
+
+    Raises:
+        ValueError: RESEARCH-005 for an absent attempt or backwards time.
+    """
+    number = require_int(event, "number")
+    if not 1 <= number <= len(history):
+        raise ValueError("[RESEARCH-005] unknown attempt number")
+    row = history[number - 1]
+    if require_int(event, "observed_ms") < row["observed_ms"]:
+        raise ValueError("[RESEARCH-005] observation time moved backwards")
+    return row
+
+
+def _selection(
+    history: tuple[ResearchAttempt, ...], event: JSONObject, row: ResearchAttempt
+) -> tuple[str, str]:
+    """Advance final selection while retaining the completed validation receipt.
+
+    Args:
+        history: Locked study attempts, including every active reservation.
+        event: Evaluator-owned select or release_final event.
+        row: Target validation attempt.
+
+    Returns:
+        New selection state and its frozen final-manifest digest.
+
+    Raises:
+        ValueError: RESEARCH-008 for unfinished or sealed validation;
+            RESEARCH-009 for release before selection or changed final evidence.
+    """
+    if row["status"] != "complete":
+        raise ValueError("[RESEARCH-008] selection requires completed validation")
+    digest = _final_identity(event, row)
+    if require_str(event, "action") == "select":
+        if any(
+            prior["selection"] or prior["status"] in {"admitted", "submitting", "running"}
+            for prior in history
+        ):
+            raise ValueError("[RESEARCH-008] selection requires settled, unsealed validation")
+        return "selected", digest
+    if row["selection"] != "selected" or digest != row["final_manifest_digest"]:
+        raise ValueError("[RESEARCH-009] release requires the selected manifest, once")
+    return "released", digest
 
 
 def _final_identity(event: JSONObject, row: ResearchAttempt) -> str:
