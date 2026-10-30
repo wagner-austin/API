@@ -87,8 +87,7 @@ def test_an_idle_listener_missing_a_hook_is_restarted(
 @pytest.mark.host_linux
 def test_a_listener_running_a_job_is_named_and_left_running(tmp_path: pathlib.Path) -> None:
     assert _run(tmp_path, (STARTED,), f"{UNIT} 13 99000 10") == (
-        f"job hooks pending: {UNIT} is running a job; a later provision restarts it once it "
-        "is idle\n",
+        f"job hooks pending: {UNIT} is running a job; the reaper restarts it between jobs\n",
         "",
     )
 

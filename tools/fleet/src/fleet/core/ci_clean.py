@@ -262,7 +262,10 @@ def work_trees_lines(grace_minutes: int) -> tuple[str, ...]:
     MB of the 2026-10-25 update five days on. One no file of which changed
     within the grace is removed whole; a later update unpacks its own. A file's
     change time is the instant it was unpacked whatever time the archive gave
-    it, so an update being unpacked is kept. Then each install's job trees,
+    it, so an update being unpacked is kept. The provision's ``chown -R`` of
+    each install changes every file's too: on lavender on 2026-10-30 its own
+    ci-clean pass kept all seven updates, so the first daily pass an hour or
+    more after a provision removes them. Then each install's job trees,
     everything under ``_work`` not named with a leading ``_``, are reported
     with whether a job runs from the install, the instant its last job started
     (its generation marker's, which the job-started hook writes), the instant

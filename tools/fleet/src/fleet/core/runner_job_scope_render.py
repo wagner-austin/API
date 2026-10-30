@@ -84,6 +84,12 @@ HOOK_DROP_IN = (
     f"Environment={COMPLETED_HOOK_VARIABLE}={JOB_COMPLETED_HOOK_PATH}\n"
 )
 
+#: Each ``NAME=value`` the drop-in sets, as a listener started under it holds
+#: it in its environment.
+HOOK_ENVIRONMENT: tuple[str, ...] = tuple(
+    line.removeprefix("Environment=") for line in HOOK_DROP_IN.splitlines()[1:]
+)
+
 #: The sudoers file. No dot in the name: sudo skips such files in sudoers.d.
 SUDOERS_PATH = "/etc/sudoers.d/fleet-runner-job-scope"
 
@@ -344,25 +350,28 @@ def render_hooks_live_lines(install: RunnerInstall) -> list[str]:
         nothing when it already names every hook :data:`HOOK_DROP_IN` sets.
         Otherwise the unit is restarted when the helper's ``--workers`` mode
         finds no ``Runner.Worker`` of it, in its cgroup or its job scopes,
-        and else left running a job and named, for the next provision.
+        and else left running its job and named: the reaper's pass restarts
+        it between jobs (:mod:`fleet.core.runner_reaper_render`).
 
     Raises:
         ValueError: When the unit name cannot be embedded verbatim.
     """
     unit = scriptable(install["service"], label="service")
-    wanted = [line.removeprefix("Environment=") for line in HOOK_DROP_IN.splitlines()[1:]]
     return [
         f"pid=$(systemctl show -p MainPID --value {unit})",
         'environ=$(tr "\\0" "\\n" < "/proc/$pid/environ")',
         "hooks=live",
-        *(f'case "$environ" in *"{variable}"*) ;; *) hooks=stale ;; esac' for variable in wanted),
+        *(
+            f'case "$environ" in *"{variable}"*) ;; *) hooks=stale ;; esac'
+            for variable in HOOK_ENVIRONMENT
+        ),
         'if [ "$hooks" = stale ]; then',
         f'    if [ "$({JOB_SCOPE_PATH} --workers {unit})" = "{unit} -" ]; then',
         f"        systemctl restart {unit}",
         f"        echo 'job hooks live: {unit} restarted to read {HOOK_DROP_IN_NAME}'",
         "    else",
-        f"        echo 'job hooks pending: {unit} is running a job; a later provision "
-        "restarts it once it is idle'",
+        f"        echo 'job hooks pending: {unit} is running a job; the reaper restarts it "
+        "between jobs'",
         "    fi",
         "fi",
     ]
@@ -417,6 +426,7 @@ __all__ = [
     "ADOPTION_GRACE_SECONDS",
     "HOOK_DROP_IN",
     "HOOK_DROP_IN_NAME",
+    "HOOK_ENVIRONMENT",
     "HOOK_VARIABLE",
     "JOB_HOOK_PATH",
     "JOB_HOOK_SCRIPT",

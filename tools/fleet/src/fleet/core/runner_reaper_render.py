@@ -81,12 +81,21 @@ passes. So once every unit's leftovers are reaped, the pass reads each unit
 still owed a move and running a job again five times a second, for up to
 :data:`PLACE_WAIT_SECONDS`, and restarts it on the first read its job has
 ended. Reaping comes first, so the watch delays no unit's leftovers.
+
+THE JOB HOOKS FINISH HERE THE SAME WAY (MCPs board task 621902c3). A runner
+reads its hooks from its environment when it starts, so a unit the provision
+found busy runs on without the job-completed hook its drop-in now names: at
+2026-10-30T20:46Z both MCPs units on lavender were. So a unit whose main
+process's environment lacks a hook the drop-in sets
+(:data:`fleet.core.runner_job_scope_render.HOOK_ENVIRONMENT`) is owed a
+restart too, taken between jobs by the same watch.
 """
 
 from __future__ import annotations
 
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.core.runner_job_scope_render import HOOK_ENVIRONMENT
 from fleet.core.runner_proc_bash import (
     PROCESS_FUNCTIONS,
     UNIT_PROCS_FUNCTION,
@@ -122,6 +131,13 @@ DROPPED_KILL_WAIT_SECONDS = 10
 #: :data:`REAPER_INTERVAL_SECONDS`, so a pass that waits the whole bound still
 #: ends before the timer's next one is due.
 PLACE_WAIT_SECONDS = 20
+
+#: The reaper's ``stale_hooks`` lines: one case for each hook the runner
+#: drop-in sets, which returns success when the environment lacks it.
+HOOK_CASES = "\n".join(
+    f'    case "$environ" in *"{variable}"*) ;; *) return 0 ;; esac'
+    for variable in HOOK_ENVIRONMENT
+)
 
 #: The reaper. ``SECONDS`` is the host's job timeout: past it a Worker is
 #: stale. ``--audit SECONDS UNIT`` prints, for one unit, how many of the
@@ -284,22 +300,39 @@ dropped() {
         "process(es), whose job GitHub dropped; its listener runs on"
 }
 
-# Fails only while a job runs in a unit whose move is owed, which a later
-# read may find ended.
+# Succeeds when the unit's main process was started without a job hook its
+# drop-in names; an environment it cannot read owes nothing.
+stale_hooks() {
+    local environ
+    environ=$(tr '\\0' '\\n' 2>/dev/null < "$proc_root/$1/environ") || return 1
+$HOOK_CASES
+    return 1
+}
+
+# Fails only while a job runs in a unit whose move or hooks are owed, which a
+# later read may find ended.
 place() {
-    local unit=$1 cgroup pids
-    [ "$(systemctl show -p Slice --value "$unit")" = $LISTENER_SLICE ] || return 0
+    local unit=$1 cgroup pids why=''
     cgroup=$(systemctl show -p ControlGroup --value "$unit")
     case "$cgroup" in
-        ''|/$LISTENER_SLICE/*) return 0 ;;
+        '') return 0 ;;
+        /$LISTENER_SLICE/*) ;;
+        *)
+            if [ "$(systemctl show -p Slice --value "$unit")" = $LISTENER_SLICE ]; then
+                why="into $LISTENER_SLICE, as its drop-in says"
+            fi
+            ;;
     esac
+    if [ -z "$why" ] && stale_hooks "$(systemctl show -p MainPID --value "$unit")"; then
+        why="to read the job hooks its drop-in names"
+    fi
+    [ -n "$why" ] || return 0
     pids=$(unit_procs "$cgroup" "$unit") || return 0
     # No Listener is a self-update under way, which a restart would cut short.
     runs Runner.Listener "$pids" || return 0
     runs Runner.Worker "$pids" && return 1
     systemctl restart "$unit"
-    echo "fleet-runner-reaper: $unit: restarted between jobs into $LISTENER_SLICE, as its" \\
-        "drop-in says"
+    echo "fleet-runner-reaper: $unit: restarted between jobs $why"
 }
 
 if [ "${1:-}" = --dropped ]; then
@@ -355,6 +388,7 @@ while :; do
 done
 """
     )
+    .replace("$HOOK_CASES", HOOK_CASES)
     .replace("$KILL_WAIT", str(DROPPED_KILL_WAIT_SECONDS))
     .replace("$PLACE_TRIES", str(PLACE_WAIT_SECONDS * 5))
     .replace("$LISTENER_SLICE", LISTENER_SLICE_NAME)
@@ -451,6 +485,7 @@ def render_reaper_lines(spec: HostRunnerSpec) -> list[str]:
 
 __all__ = [
     "DROPPED_KILL_WAIT_SECONDS",
+    "HOOK_CASES",
     "KILL_DROP_IN",
     "KILL_DROP_IN_NAME",
     "PLACE_WAIT_SECONDS",
