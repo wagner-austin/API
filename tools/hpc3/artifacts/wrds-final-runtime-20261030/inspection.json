@@ -1,0 +1,105 @@
+{
+  "kind": "wrds-runtime-reinspection-v1",
+  "board_task": "474c840b-d392-4a67-ab77-bc5c7e90f3b7",
+  "inspection_source_commit": "6326093c32d9f3e73124c04bbd659005ce5aa566",
+  "fleet_check": "626bb7b7-2774-4b64-aa53-141a979cddb2",
+  "tests_passed": 2053,
+  "coverage_percent": 100,
+  "negative_probe": {
+    "mutation": "Separate checksum manifest with an all-zero image digest; no runtime file changed.",
+    "exit_code": 2,
+    "error": "DIGEST_MISMATCH",
+    "log_sha256": "d1b2c80b7754823b194dfbe6ef97c1a3bd092424aac1a2de4c5e79b289590cb9",
+    "private_log": "/home/corvis/research-data/wrds/runtime/final-85f1d4d75/image-inspect-refusal.log"
+  },
+  "native_report_query": {
+    "verified_distinct_builds": 2,
+    "with_incorrect_final_image_digest": 1
+  },
+  "reports": [
+    {
+      "runtime": "monthly-92719c060",
+      "native_job_id": "58629088",
+      "board_report_id": "f3670415-c99c-4c3c-adf1-863c7c738650",
+      "accounting": {
+        "job": {
+          "job_id": "58629088",
+          "name": "cleargbm.monthly-image-92719c060",
+          "partition": "free",
+          "state": "COMPLETED",
+          "elapsed_seconds": 83,
+          "billing_tres": 8,
+          "gpu_count": 0,
+          "cpu_count": 8,
+          "node_list": "hpc3-15-20"
+        },
+        "exit_code": "0:0",
+        "started_at": "2026-10-30T11:12:36",
+        "ended_at": "2026-10-30T11:13:59"
+      },
+      "image_sha256": "5072a7a24b6dd2ae22e05c68d3691be400c49a8bc4a2be8ca27fc997b9e0a5fc",
+      "verified_files": 14,
+      "selfcheck_passes": 2,
+      "dependency_check": "passed",
+      "controller_readback": {
+        "controller_python": "/home/corvis/research-control/wrds-monthly-92719c060/bin/python",
+        "python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+        "verified_installed_files": 856,
+        "selfcheck_output": "image self-check OK",
+        "source_commit": "92719c0601c27d31fcd4338e9fd3e8fc3b85c656"
+      },
+      "private_evidence": "/home/corvis/research-data/wrds/runtime/monthly-92719c060",
+      "evidence_sha256": {
+        "image-inspect-report.json": "32f353fe727f2031d679bd55aef935cc082616a7f39c62099886b25fa75cc007",
+        "image-inspect-checksums.txt": "009c5f41f2aab344e8c26cf7429b6e22cc99181b2c43b57c772d4d4ae390974b",
+        "controller-readback-20261030T2204.json": "8d990961394388985af6cce7beb222c78ff1264a54c4cb6ac4f70327aa1713d7",
+        "controller-selfcheck-20261030T2203.txt": "77b31c783c98e46c05ff48554a78eb6ced7ac0985196c22f51c13d4299997d3c"
+      }
+    },
+    {
+      "runtime": "final-85f1d4d75",
+      "native_job_id": "58635077",
+      "board_report_id": "1fcd7480-1d43-4094-a60c-e9c82d9ead90",
+      "accounting": {
+        "job": {
+          "job_id": "58635077",
+          "name": "cleargbm.final-85f1d4d75-home",
+          "partition": "free",
+          "state": "COMPLETED",
+          "elapsed_seconds": 113,
+          "billing_tres": 8,
+          "gpu_count": 0,
+          "cpu_count": 8,
+          "node_list": "hpc3-19-14"
+        },
+        "exit_code": "0:0",
+        "started_at": "2026-10-30T19:26:06",
+        "ended_at": "2026-10-30T19:27:59"
+      },
+      "image_sha256": "eeedc89bbde5fde0e49c497da124526a51d31a1d7cb6fd605924697ac0813710",
+      "verified_files": 14,
+      "selfcheck_passes": 2,
+      "dependency_check": "passed",
+      "controller_readback": {
+        "controller_python": "/home/corvis/research-control/wrds-final-85f1d4d75/bin/python",
+        "python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+        "verified_installed_files": 868,
+        "selfcheck_output": "image self-check OK",
+        "source_commit": "85f1d4d7521d4a189836f8ecca805f39c5c366df"
+      },
+      "private_evidence": "/home/corvis/research-data/wrds/runtime/final-85f1d4d75",
+      "evidence_sha256": {
+        "image-inspect-report.json": "292c800c78070f7508707796a676e33bdb05297c67782fd3125a7f813b177165",
+        "image-inspect-checksums.txt": "63d3990fb8e9533ac3629ca834dfece3a4ae868ae6367a36395be47c678ea4de",
+        "controller-readback-20261030T2204.json": "e1f272f0237b56db47279ee75947ac840f168047c67ca4ad0c5cd797ccfd94ef",
+        "controller-selfcheck-20261030T2203.txt": "77b31c783c98e46c05ff48554a78eb6ced7ac0985196c22f51c13d4299997d3c"
+      }
+    }
+  ],
+  "limits": [
+    "Reinspection reads retained native build evidence and current file hashes; it does not submit or rebuild an image.",
+    "Controller readback is a local installed-file measurement; native image evidence is published by the maintained service reporter.",
+    "Both controller dependency checks reported no broken requirements; generated selfchecks passed.",
+    "The substantive baseline, licensed extraction and WRDS forced-kill reclamation remain outside this measurement."
+  ]
+}
