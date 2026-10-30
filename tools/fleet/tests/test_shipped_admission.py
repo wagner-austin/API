@@ -343,7 +343,5 @@ def test_loki_alone_checks_the_nixos_flake() -> None:
         "loki": None,
     }
     # The workers that take the pool's checks refuse it too, not only the
-    # stack hosts that refuse everything unpinned. colossus is held while it
-    # reinstalls as a NixOS worker (MCPs board task 7c8cb3e2), so it is not
-    # among the enabled nodes read here.
-    assert {"demure", "diphtheria", "lavender", "pendragon", "sedona"} < set(codes)
+    # stack hosts that refuse everything unpinned.
+    assert {"colossus", "demure", "diphtheria", "lavender", "pendragon", "sedona"} < set(codes)
