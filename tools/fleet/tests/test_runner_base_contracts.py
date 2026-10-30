@@ -138,9 +138,9 @@ class TestDiskBounds:
     """disk_bounds_gb: what a host's root holds with every bounded area full."""
 
     def test_the_bound_is_the_one_ci_clean_prunes_to(self) -> None:
-        assert BUILD_CACHE_BOUND_GIB == 20
+        assert BUILD_CACHE_BOUND_GIB == 10
 
-    @pytest.mark.parametrize(("installs", "bounds"), [(1, 113), (7, 203)])
+    @pytest.mark.parametrize(("installs", "bounds"), [(1, 103), (7, 193)])
     def test_each_install_adds_one_work_ceiling(self, installs: int, bounds: int) -> None:
-        """18 GB baseline, 20 GiB build cache, a 60 GB cache and 15 GB per work tree."""
+        """18 GB baseline, 10 GiB build cache, a 60 GB cache and 15 GB per work tree."""
         assert disk_bounds_gb(a_base()["disk"], installs) == bounds

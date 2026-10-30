@@ -45,8 +45,11 @@ from typing_extensions import TypedDict
 #: docker's ``gb``, which counts 1024**3 bytes (:mod:`fleet.core.ci_clean`).
 #: It was 60, the bound diphtheria's stack prunes to; on 2026-10-30 lavender
 #: held 39 GB of build cache in 1171 records, none in use and 36.44 GB of it
-#: reclaimable, inside that bound and over a fifth of its root's ceiling.
-BUILD_CACHE_BOUND_GIB: Final = 20
+#: reclaimable, inside that bound and over a fifth of its root's ceiling. At
+#: 20 the root still read 155 GB at 2026-10-30T20:02Z with 21.31 GB of build
+#: cache, none in use, against the 150 GB the operator asked for ('Get it
+#: under 150', MCPs board task 621902c3).
+BUILD_CACHE_BOUND_GIB: Final = 10
 
 
 class DiskCeiling(TypedDict):

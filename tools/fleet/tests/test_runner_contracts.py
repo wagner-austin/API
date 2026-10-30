@@ -279,7 +279,7 @@ class TestHostRunnerSpec:
 
     @staticmethod
     def _with_ceiling(ceiling: int) -> dict[str, JSONValue]:
-        """One install's host whose disk ceiling is ``ceiling``; its bounds are 113 GB."""
+        """One install's host whose disk ceiling is ``ceiling``; its bounds are 103 GB."""
         base = base_json()
         base["disk"] = {
             "ceiling_gb": ceiling,
@@ -292,16 +292,16 @@ class TestHostRunnerSpec:
         return _host(base=base)
 
     def test_a_ceiling_at_the_host_s_own_bounds_is_accepted(self) -> None:
-        decoded = decode_host_runner_spec(self._with_ceiling(113))
-        assert decoded["base"]["disk"]["ceiling_gb"] == 113
+        decoded = decode_host_runner_spec(self._with_ceiling(103))
+        assert decoded["base"]["disk"]["ceiling_gb"] == 103
 
     def test_a_ceiling_under_the_host_s_own_bounds_is_refused(self) -> None:
         with pytest.raises(
             JSONTypeError,
-            match=r"ceiling_gb 112 is under the 113 GB the host's own bounds let its root hold "
+            match=r"ceiling_gb 102 is under the 103 GB the host's own bounds let its root hold "
             r"with 1 install\(s\)",
         ):
-            decode_host_runner_spec(self._with_ceiling(112))
+            decode_host_runner_spec(self._with_ceiling(102))
 
 
 class TestRunnerSpec:

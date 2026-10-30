@@ -20,9 +20,9 @@ cache no build has used for a week goes, and then the reclaimable cache above
 :data:`~fleet.contracts.runner_base.BUILD_CACHE_BOUND_GIB`, least recently
 used first, the two passes diphtheria's corvis-docker-prune runs on its
 stack's daemon (MCPs scripts/host/diphtheria/docker-prune.sh). The bound was
-that script's 60 GB until board task 621902c3 held it to 20, inside the
-runner host's disk ceiling. A record a running build holds is in use, so
-neither pass removes it.
+that script's 60 GB until board task 621902c3 held it to 20, and then to
+10, inside the runner host's disk ceiling. A record a running build holds is
+in use, so neither pass removes it.
 
 THE PYTHON CACHES, UNGATED TOO (MCPs board task ecb13d3d). Until then this half
 refused to run while any Runner.Worker executed, and on lavender one always
