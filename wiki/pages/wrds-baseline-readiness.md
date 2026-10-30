@@ -143,16 +143,16 @@ entrypoint. The result retains the admitted ciphertext-bundle identity and
 plaintext-manifest identity. This is a synthetic validation measurement, not a
 substantive study or a native final-scoring rehearsal.[^rehearsal]
 
-The live rootless proposer probe on Colossus could not read a real canary age
-identity or synthetic final CSV, including through `/proc/1/root`, access its
-host Docker socket, or connect to the network. It ran as uid 65534 with only
+The live rootless proposer probe on Colossus was denied reads of a real canary
+age identity and synthetic final CSV, including through `/proc/1/root`, access
+to its host Docker socket, and network connectivity. It ran as uid 65534 with only
 `LC_CTYPE` and `PATH`; the host files existed, were readable by the evaluator,
 and remained byte-identical. This verifies that sandbox boundary against host
 canaries, not protection against the evaluator's administrators.[^key-probe]
 
 [^key-probe]: Live Colossus run on 2026-10-30 using `PROBE_PROGRAM` from `tools/fleet/tests/test_research_proposal_host.py` through installed `fleet.core.research_proposer.run_proposer`, with pinned image sha256:e697c81897302a4c4333bade000d98038fbb21eb064f8ee1fd42d02ebcd9d337. Private evidence `/home/corvis/research-data/wrds/runtime/encrypted-44fa91cea/isolation-probe/result.json` has SHA-256 21eb46b323576db1d33f651b347a4c68c10624e43123e23c43f44e6ca80086e9; program SHA-256 127315f96d43024be4880c08266a7aec6d3d1cd563768c3bfd786c4266f5cd32. All four reads returned errno 2; network access returned errno 101. The separately generated canary identity was not the study's final key, and no secret bytes were emitted.
 
-The remaining sequence is:
+The remaining sequence follows these measured gaps:[^rehearsal][^integrated]
 
 1. Finish native final-key delivery through the authoritative controller and
    measure allocation cleanup after forced termination. Exercise final release
