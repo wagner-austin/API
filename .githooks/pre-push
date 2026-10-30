@@ -136,6 +136,30 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _ct_local_ref ct_local_sha _ct_remot
     fi
 done
 
+# PUBLISHED TIPS ALREADY PASSED THEIR PUBLICATION CHECKS (board task dd40bba5).
+# Reuse MCPs' push-published policy, including its fail-closed status contract.
+# A fleet-roll moves a reference to code already on origin/main; checking its
+# entire historical range again delayed a registry-only repair by minutes.
+# Keep commit registration above and CI enrollment/mirroring below unchanged.
+PUBLISHED_TIPS=""
+while read -r _pp_local_ref pp_local_sha _pp_remote_ref _pp_remote_sha; do
+    [ -z "$pp_local_sha" ] && continue
+    [ "$pp_local_sha" = "$ZERO" ] && continue
+    PUBLISHED_TIPS="$PUBLISHED_TIPS $pp_local_sha"
+done <<EOF
+$PUSH_INPUT
+EOF
+published_status=3
+if [ -n "$PUBLISHED_TIPS" ]; then
+    published_status=0
+    # Git object ids are individual words, as in STAGING_UPDATES above.
+    "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" push-published "$REPO" $PUBLISHED_TIPS < /dev/null || published_status=$?
+    if [ "$published_status" -ne 0 ] && [ "$published_status" -ne 3 ]; then
+        echo "=== PRE-PUSH BLOCKED: push-published exited $published_status, so publication state is unknown ==="
+        exit 1
+    fi
+fi
+
 # EVERY PUSH RUNS THE TESTS IT TOUCHES (MCPs board task a7416f6f), as MCPs'
 # own pre-push has since board task c04519f9: on 2026-09-28 a push of four
 # test files nobody had run left MCPs' main red for twelve hours, and until
@@ -160,6 +184,7 @@ done
 # (this repository's registry keys its projects by path), in place of the
 # venvs and tests here; 3 means any other machine, which runs them as above;
 # any other exit refuses the push rather than guess where its checks belong.
+if [ "$published_status" -ne 0 ]; then
 session_host_status=0
 "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" session-host "$REPO" < /dev/null || session_host_status=$?
 if [ "$session_host_status" -ne 0 ] && [ "$session_host_status" -ne 3 ]; then
@@ -181,6 +206,7 @@ printf '%s\n' "$PUSH_INPUT" | while read -r _pt_local_ref pt_local_sha _pt_remot
         "$HOOK_PYTHON" "$REPO/.githooks/published_maketools.py" pushed-tests "$REPO" "$pt_local_sha" "$pt_remote_sha..$pt_local_sha" < /dev/null
     fi
 done
+fi
 
 # The tool's own virtualenv, and NOTHING ELSE -- the interpreter its suite
 # ran against, so a green `make check` in that package is evidence about
