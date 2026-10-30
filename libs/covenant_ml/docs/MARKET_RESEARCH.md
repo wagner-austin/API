@@ -682,12 +682,37 @@ reopening the journal does not reset it. The original validation request and
 result remain attached to the selected attempt. The stored candidate identifies
 the benchmark configuration and feature set, not a separately selected learner.
 
-These transitions are for a trusted evaluator with exclusive journal access.
-They do not authenticate a caller, isolate a process, choose the winning candidate,
-or execute final scoring. No proposer-facing CLI grants these transitions, and the
-current compute worker still refuses final-partition proposals. An isolated
-controller must consume the release before accessing final data; interrupted
-release requires reconciliation, never automatic reauthorization.
+These transitions are for a trusted evaluator with exclusive journal access;
+they do not authenticate a caller. The evaluator issues them through
+`markets.research_final`: `research_proposals select --trial T --final-manifest M`
+binds the named completed attempt's journal candidate and validation payload to
+the SHA-256 of `M`, and `research_trial --request T --out O --ledger L
+--final-manifest M` runs `execute_final`. That run requires the journal row to be
+selected and `M` to hash to the bound digest, rechecks the policy, protocol,
+code and image lineage, and only then commits `release_final`, before any final
+relation is read. A failure after release, including a missing data file, leaves
+the release consumed; a second run is refused with RESEARCH-009. The candidate,
+seed and features come from the journal's own admitted request, which still
+names the validation partition: no proposal field authorizes final scoring, and
+a proposal naming another partition is refused at admission and can never be
+selected. `markets.crsp_final.run_crsp_final` fits the candidate once on every
+decision whose exit precedes `holdout_start`, with the declared stopping months
+immediately before the boundary, scores every decision from `holdout_start`
+through `holdout_end`, and reuses the validation study's holdings, arms and
+paired comparisons; its record is labelled `final-<attempt>`. The cases in
+`test_research_final.py` and `test_crsp_final.py` exercise each refusal on real
+journals and show that changing outcomes after the last final decision changes
+no fit or selection. Choosing which completed attempt to select remains the
+evaluator's decision.
+
+Proposers reach this package only as data. Their programs run through
+`tools/fleet`'s `fleet.cli.research_propose`, which executes evaluator-pinned
+program text in a rootless container with no host mount, environment, network
+or capabilities, writes the returned object beside the evaluator's private
+specification and passes it to `research_proposals propose`, so every proposal
+is recorded before decoding. The process boundary covers the proposal program,
+not an administrator or an agent session holding the evaluator's account, SSH
+or WRDS credentials; such a session is privileged access by definition.
 
 `scripts.research_proposals` records validation proposals under an evaluator-owned
 policy. It uses `platform_core.event_journal.EventJournal`, lifted from the
@@ -769,11 +794,11 @@ its validation period, using the existing baseline trainers and the shared
 the declared stopping months, fold months and interval confidence; its protocol
 hash names `crsp-monthly-holdings-validation-v1` and all of those settings. The
 evaluation manifest is the CRSP extract manifest, and the worker refuses to fit
-unless the staged protocol bytes decode to exactly the admitted design. The
-final partition is refused by this interface and its decisions are never
-constructed; filesystem isolation from agents with general SSH access remains a
-separate requirement. Hash chaining detects corruption, not deliberate rewriting
-by someone who can modify the journal database.
+unless the staged protocol bytes decode to exactly the admitted design. A
+validation run never constructs a final-period decision; only the evaluator's
+`--ledger`/`--final-manifest` mode above does, once. Hash chaining detects
+corruption, not deliberate rewriting by someone who can modify the journal
+database.
 
 ## Frozen monthly CRSP contract
 
