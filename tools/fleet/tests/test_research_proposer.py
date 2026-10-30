@@ -136,7 +136,7 @@ def test_only_dockers_json_cpu_quota_key_is_accepted(spelling: str) -> None:
     assert len(fake.calls) == 1
 
 
-@pytest.mark.parametrize("volume",['{"/data":{}}', "[]"])
+@pytest.mark.parametrize("volume", ['{"/data":{}}', "[]"])
 def test_image_cannot_add_implicit_mounts(volume: str) -> None:
     _test_hooks.run = FakeRun([ok(dump_json_str(INFO)), ok(volume)])
     with pytest.raises(ValueError, match="PROPOSER_IMAGE"):
