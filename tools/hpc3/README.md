@@ -41,12 +41,13 @@ receipt, including after completion. See [fleet's research configuration](../fle
 for preparation, pinned inputs, resource controls and recovery. Posting a board
 task alone does not submit a cluster job.
 
-For the installed validation study, inspect the existing journal first:
+For the installed encrypted synthetic validation study, inspect the existing
+journal first:
 
 ```bash
-cd /home/corvis/research-control/wrds-validation-bda8ca2af/entrypoint
-research_python=/home/corvis/research-control/wrds-validation-bda8ca2af/bin/python
-research_study=/home/corvis/research-data/wrds/experiments/admitted-validation-20261028
+cd /home/corvis/research-control/wrds-encrypted-44fa91cea/entrypoint
+research_python=/home/corvis/research-control/wrds-encrypted-44fa91cea/bin/python
+research_study=/home/corvis/research-data/wrds/experiments/encrypted-synthetic-44fa91cea
 "$research_python" -m scripts.research_proposals \
   --policy "$research_study/policy.json" --ledger "$research_study/attempts.sqlite" status
 ```
@@ -251,17 +252,19 @@ verification. The program posts its measurement and emits structured JSON for
 the journal controller. Missing or ambiguous submissions never authorize retry.
 
 The installed Ziggurat controller is
-`/home/corvis/research-control/wrds-validation-bda8ca2af/bin/python`, with the
+`/home/corvis/research-control/wrds-encrypted-44fa91cea/bin/python`, with the
 proposal entrypoint under the adjacent `entrypoint/` working directory. Its
 policy, journal and cluster configuration are under
-`/home/corvis/research-data/wrds/experiments/admitted-validation-20261028/`.
+`/home/corvis/research-data/wrds/experiments/encrypted-synthetic-44fa91cea/`.
 It uses installed wheels rather than relying on this temporary worktree.
 
-Use `cluster-4.json` as the installed-controller configuration reference; its
+Use `cluster.json` as the installed-controller configuration reference; its
 `report_task` must name the task owning a new run. Preserve the existing journal
 and use a newly admitted attempt number and exclusive directory for each run.
-The [operational verification record](wiki/pages/wrds-installed-controller-verification.md)
-documents the measured jobs, controller repair, frozen image and remaining limits.
+The [readiness record](../../wiki/pages/wrds-baseline-readiness.md) documents the
+frozen image, completed encrypted validation rehearsal and remaining final-key,
+cleanup and WRDS-native verification work. This synthetic fixture is not the
+substantive CRSP study.
 
 ### WRDS data inventory
 
