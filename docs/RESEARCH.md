@@ -237,6 +237,11 @@ workflow uses MFAssignR; the historical SIRIUS examples are not completed jobs.
 
 ## The shared record
 
+`hpc3.cli.execution_inspect` produces a shared record from a completed durable
+attempt's verified native execution evidence. It reports pending accounting
+without claiming a completed measurement. See the existing
+[installed-controller verification](../tools/hpc3/wiki/pages/wrds-installed-controller-verification.md).
+
 Use [RunRecord and RunFingerprint](../wiki/pages/model-trainer-run-record-provenance.md),
 implemented in `libs/platform_core`, and each project's existing writer.
 The [historical adoption corrections](https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L2495-L2562)
