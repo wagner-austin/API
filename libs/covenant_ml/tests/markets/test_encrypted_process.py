@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 import signal
 import subprocess
 import sys
@@ -10,6 +9,7 @@ import time
 from hashlib import sha256
 from pathlib import Path
 
+from platform_core.config import config_test_hooks
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_str
 
 from .test_research_storage_probe import probe_arguments
@@ -23,7 +23,7 @@ def test_real_sigkill_leaves_plaintext_for_scheduler_reclamation(tmp_path: Path)
     scratch.mkdir(mode=0o700)
     output = tmp_path / "outputs"
     output.mkdir()
-    environment = os.environ.copy()
+    environment = config_test_hooks.get_environment()
     environment.update(PROBE_SCRATCH=str(scratch), PROBE_OUTPUT=str(output))
     command = [sys.executable, "-m", "scripts.research_storage_probe", *args]
     opened = output / "opened.json"
