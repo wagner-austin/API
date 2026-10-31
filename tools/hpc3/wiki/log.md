@@ -151,3 +151,11 @@ is not declared passed. Metadata-only WRDS job 40538087 returned 331 columns
 across 14 relations through existing grid helpers. Exact SQL and CSV stay private;
 the committed digest/count record identifies the monthly adapter's candidate
 inputs without claiming resolved return semantics or an implemented evaluator.
+
+## [2026-10-31] update | measured staging receipts
+Pages updated: pages/staging-identity.md
+Notes: The existing staging command can publish a shared board report after
+verified file transport, certificate readback and an unchanged independent
+digest record. The receipt includes the executing controller identity. The
+full package check passed 2,131 tests at 100% coverage. Board task a622165c;
+no new staging controller or page was introduced.
