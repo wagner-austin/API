@@ -142,7 +142,10 @@ def test_failed_transfer_refuses_and_joins_other_real_staging(
 
 
 def test_no_companions_stage_nothing(tmp_path: pathlib.Path) -> None:
-    assert staging.stage_companions(
-        "stage-test", stage_root=str(tmp_path / "absent"), companions=(), workers=1
-    ) == ()
+    assert (
+        staging.stage_companions(
+            "stage-test", stage_root=str(tmp_path / "absent"), companions=(), workers=1
+        )
+        == ()
+    )
     assert not (tmp_path / "absent").exists()
