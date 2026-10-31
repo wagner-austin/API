@@ -17,6 +17,7 @@ from platform_core.environment_record import (
     installed_version as _installed_version,
 )
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
+from platform_core.mcp_client import McpPostProtocol, urllib_mcp_post
 
 from .campaign_process import CommandRunner, run_command
 from .crsp_process import BoundedRunner, run_bounded
@@ -36,7 +37,21 @@ def utc_now() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def read_stack_text(path: Path) -> str:
+    """Read one of the corvis stack's files (its ``.env`` or endpoint declaration).
+
+    Args:
+        path: The file :mod:`platform_core.session_label` asks for.
+
+    Returns:
+        Its UTF-8 text.
+    """
+    return path.read_text("utf-8")
+
+
 clock: Callable[[], str] = utc_now
+http_post: McpPostProtocol = urllib_mcp_post
+stack_text: Callable[[Path], str] = read_stack_text
 pause: Callable[[float], None] = sleep
 client_factory: Callable[[float, SyncTransport | None], HttpxClient] = build_client
 host_probe: HostProbe = stdlib_host_probe(cpu_count)
@@ -65,7 +80,10 @@ __all__ = [
     "demo_trial_factory",
     "evidence_relocations",
     "host_probe",
+    "http_post",
     "installed_version",
     "pause",
+    "read_stack_text",
+    "stack_text",
     "utc_now",
 ]

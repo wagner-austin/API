@@ -5,7 +5,9 @@ of age ciphertext. The train-validation bundle is opened with its own key into
 private scratch, reread by ``load_crsp_sources`` and checked against its
 partition. A final bundle is opened only for synthetic evidence: licensed
 final-period evidence is opened by the one-shot final release and nothing else.
-The result is metadata: identities, counts and the latest date per column.
+The result is metadata: identities, counts and the latest date per column, with
+the sha256 of the collected receipt and of each partition's ``bundle.json`` so
+the reading names the files the native run's own load report digested.
 """
 
 from __future__ import annotations
@@ -142,7 +144,9 @@ def verify_crsp_extraction(
         open_final: Also open the final bundle; permitted only for synthetic evidence.
 
     Returns:
-        Metadata for both partitions and the ciphertext file count.
+        Metadata for both partitions, each with its verified ``bundle.json``
+        sha256, the collected ``extraction.json`` sha256 and the ciphertext
+        file count.
 
     Raises:
         ValueError: CRSP-013 for plaintext in the collected tree, a final open of
@@ -152,9 +156,8 @@ def verify_crsp_extraction(
     """
     outputs = collected / "outputs"
     ciphertext = require_ciphertext_only(outputs)
-    receipt = decode_crsp_extraction_receipt(
-        load_json_str((outputs / "extraction.json").read_text("utf-8"))
-    )
+    receipt_bytes = (outputs / "extraction.json").read_bytes()
+    receipt = decode_crsp_extraction_receipt(load_json_str(receipt_bytes.decode("utf-8")))
     if open_final and receipt["source"] != SYNTHETIC_SOURCE:
         raise ValueError("[CRSP-013] licensed final evidence opens only through its release")
     items = (receipt["train_validation"], receipt["final"])
@@ -165,13 +168,15 @@ def verify_crsp_extraction(
         bundle = read_encrypted_bundle(path, item["bundle"]["sha256"])
         if bundle["partition"] != item["partition"] or bundle["recipient"] != recipient:
             raise ValueError("[CRSP-013] a bundle is not sealed to its partition's recipient")
+        sealed: JSONObject = {"bundle_sha256": item["bundle"]["sha256"]}
         if item["partition"] == "final" and not open_final:
-            partitions.append({"partition": "final", "opened": False})
+            partitions.append({"partition": "final", "opened": False} | sealed)
             continue
-        partitions.append(_open(path, item, keys, scratch, receipt))
+        partitions.append(_open(path, item, keys, scratch, receipt) | sealed)
     return {
         "source": receipt["source"],
         "snapshot": receipt["snapshot"],
+        "extraction_sha256": sha256(receipt_bytes).hexdigest(),
         "ciphertext_files": ciphertext,
         "partitions": partitions,
     }

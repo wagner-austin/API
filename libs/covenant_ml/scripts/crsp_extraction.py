@@ -3,8 +3,9 @@
 ``extract`` runs inside the scheduler allocation: plaintext stays in its
 private scratch and only ciphertext, the receipt and metrics reach the output
 directory named by an environment variable. ``verify`` runs on the evaluator
-host against the collected directory and writes metadata to standard output;
-it never prints a source row or key.
+host against the collected directory, posts its metadata on the named board
+task under the task's WRDS load-report identity, then writes the same metadata
+to standard output; it never prints or posts a source row or key.
 """
 
 from __future__ import annotations
@@ -15,7 +16,9 @@ from pathlib import Path
 
 from platform_core.config import config_test_hooks
 from platform_core.json_utils import dump_json_str
+from platform_core.load_report import post_load_report, report_identity
 
+from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import extract_crsp
@@ -43,6 +46,7 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--access", required=True, type=Path)
     verify.add_argument("--scratch", required=True, type=Path)
     verify.add_argument("--open-final", action="store_true")
+    verify.add_argument("--report-task", required=True)
     return parser
 
 
@@ -53,12 +57,15 @@ def main(argv: list[str] | None = None) -> int:
         argv: Explicit arguments, or the process arguments.
 
     Returns:
-        Zero after a complete extraction or verification.
+        Zero after a complete extraction, or a verification posted on its task.
 
     Raises:
         KeyError: A named scheduler environment variable is absent.
-        ValueError: Any writer or verifier refusal; nothing usable is published.
+        ValueError: Any writer or verifier refusal, or a report task that is
+            not a full task id; nothing usable is published.
         OSError: Input, key or storage access fails.
+        AppError: The board's credentials are missing or it refuses the
+            verification's report; nothing is written to standard output.
     """
     args = _parser().parse_args(argv)
     command: str = args.command
@@ -95,10 +102,20 @@ def main(argv: list[str] | None = None) -> int:
     collected: Path = args.collected
     scratch: Path = args.scratch
     open_final: bool = args.open_final
+    task: str = args.report_task
+    report_identity(task, "wrds")  # refuses a malformed task before a bundle is opened
     result = verify_crsp_extraction(
         collected, EvaluatorKeys(settings), scratch=scratch, open_final=open_final
     )
-    sys.stdout.write(dump_json_str(result) + "\n")
+    payload = dump_json_str(result)
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_test_hooks.stack_text,
+        task_id=task,
+        body="WRDS EXTRACTION VERIFY LOAD-REPORT\n" + payload,
+        family="wrds",
+    )
+    sys.stdout.write(payload + "\n")
     return 0
 
 

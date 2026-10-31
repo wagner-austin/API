@@ -18,9 +18,15 @@ from pathlib import Path
 
 import pytest
 from platform_core.config import config_test_hooks
+from platform_core.errors import AppError
 from platform_core.json_utils import load_json_str
+from platform_core.load_report import report_identity
+from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
+from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments, stack_endpoint_files
+from platform_core.session_label import API_KEY_NAME, STACK_ENV_PATH, TENANT_ID_NAME
 from scripts import crsp_extraction
 
+from covenant_ml.markets import _test_hooks as markets_hooks
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import PSQL
 
@@ -32,6 +38,9 @@ from ._crsp_extraction_fixtures import (
     installed,
 )
 from ._encrypted_fixtures import evaluator_keys
+
+TASK = "1f60a20d-d860-43b3-9616-68f192bcedd9"
+ENV_TEXT = f"{API_KEY_NAME}=internal-key\n{TENANT_ID_NAME}=2e137b5f-0000-4000-8000-0000aa\n"
 
 
 def _arguments(case: Extraction, *, relation_bytes: int = 2_000_000) -> list[str]:
@@ -80,21 +89,85 @@ def database() -> Generator[FakeDatabase, None, None]:
         yield fake
 
 
-def test_extract_then_verify_in_process(
-    allocation: Extraction, database: FakeDatabase, capsys: pytest.CaptureFixture[str]
+@pytest.fixture()
+def board() -> Generator[None, None, None]:
+    """Answer the stack's files from memory; each test binds its own poster."""
+    files = stack_endpoint_files()
+    files[STACK_ENV_PATH] = ENV_TEXT
+    previous = (markets_hooks.http_post, markets_hooks.stack_text)
+    markets_hooks.stack_text = files.__getitem__
+    yield
+    markets_hooks.http_post, markets_hooks.stack_text = previous
+
+
+def _verify_command(case: Extraction, task: str = TASK) -> list[str]:
+    scratch = case.root / "verify-scratch"
+    scratch.mkdir(mode=0o700, exist_ok=True)
+    command = ["verify", "--collected", str(case.root), "--access"]
+    command += [str(case.root / "access.json"), "--scratch", str(scratch)]
+    return [*command, "--report-task", task]
+
+
+def test_extract_then_verify_in_process_posts_the_reading_before_printing_it(
+    allocation: Extraction,
+    database: FakeDatabase,
+    board: None,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     assert crsp_extraction.main(_arguments(allocation)) == 0
     assert len(database.calls) == 1
-    scratch = allocation.root / "verify-scratch"
-    scratch.mkdir(mode=0o700)
-    command = ["verify", "--collected", str(allocation.root), "--access"]
-    command += [str(allocation.root / "access.json"), "--scratch", str(scratch)]
-    assert crsp_extraction.main(command) == 0
-    printed = load_json_str(capsys.readouterr().out)
+    post = FakeHttpPost([posted_ok(), posted_ok()])
+    markets_hooks.http_post = post
+    assert crsp_extraction.main(_verify_command(allocation)) == 0
+    printed = capsys.readouterr().out
     expected = verify_crsp_extraction(
-        allocation.root, evaluator_keys(allocation.root), scratch=scratch, open_final=False
+        allocation.root,
+        evaluator_keys(allocation.root),
+        scratch=allocation.root / "verify-scratch",
+        open_final=False,
     )
-    assert printed == expected
+    assert load_json_str(printed) == expected
+    checkin, note = (sent_arguments(body) for body in post.bodies)
+    identity = report_identity(TASK, "wrds")
+    assert (checkin["agent"], checkin["sessionId"]) == (
+        identity["agent"],
+        identity["session_id"],
+    )
+    assert note["agent"] == "load-report-1f60a20d"
+    assert note["taskId"] == TASK
+    assert note["body"] == "WRDS EXTRACTION VERIFY LOAD-REPORT\n" + printed.removesuffix("\n")
+
+
+def test_a_refused_report_fails_verification_without_printing(
+    allocation: Extraction,
+    database: FakeDatabase,
+    board: None,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert crsp_extraction.main(_arguments(allocation)) == 0
+    refusal = McpHttpResponse(status=401, body="bad key", content_type=EVENT_STREAM_MEDIA_TYPE)
+    markets_hooks.http_post = FakeHttpPost([posted_ok(), refusal])
+    with pytest.raises(AppError, match="HTTP 401"):
+        crsp_extraction.main(_verify_command(allocation))
+    assert capsys.readouterr().out == ""
+
+
+def test_a_malformed_report_task_is_refused_before_any_bundle_is_opened(
+    allocation: Extraction, database: FakeDatabase, board: None
+) -> None:
+    assert crsp_extraction.main(_arguments(allocation)) == 0
+    post = FakeHttpPost([])
+    markets_hooks.http_post = post
+    with pytest.raises(ValueError, match="WRDS_REPORT_TASK"):
+        crsp_extraction.main(_verify_command(allocation, task="1f60a20d"))
+    assert post.bodies == []
+    assert list((allocation.root / "verify-scratch").iterdir()) == []
+
+
+def test_the_stack_reader_reads_the_file_as_text(tmp_path: Path) -> None:
+    path = tmp_path / ".env"
+    path.write_text(ENV_TEXT, encoding="utf-8")
+    assert markets_hooks.read_stack_text(path) == ENV_TEXT
 
 
 def _client(root: Path, body: str) -> dict[str, str]:

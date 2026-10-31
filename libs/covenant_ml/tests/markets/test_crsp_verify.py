@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -43,6 +44,11 @@ def _scratch(case: Extraction) -> Path:
     return path
 
 
+def _bundle_digest(case: Extraction, partition: str) -> str:
+    """Hash the collected ``bundle.json`` bytes, as a native load report does."""
+    return sha256((case.output / partition / "bundle.json").read_bytes()).hexdigest()
+
+
 def _verify(case: Extraction, *, open_final: bool) -> JSONObject:
     return verify_crsp_extraction(
         case.root, evaluator_keys(case.root), scratch=_scratch(case), open_final=open_final
@@ -67,9 +73,11 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
     receipt = run_vendor(case, limits())
     result = _verify(case, open_final=False)
     item = receipt["train_validation"]
+    receipt_bytes = (case.output / "extraction.json").read_bytes()
     assert result == {
         "source": "crsp_a_stock",
         "snapshot": "750:750:",
+        "extraction_sha256": sha256(receipt_bytes).hexdigest(),
         "ciphertext_files": 20,
         "partitions": [
             VALIDATION
@@ -81,10 +89,16 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
                     item["delists_rows"],
                 ],
                 "plaintext_removed": True,
+                "bundle_sha256": _bundle_digest(case, "train-validation"),
             },
-            {"partition": "final", "opened": False},
+            {
+                "partition": "final",
+                "opened": False,
+                "bundle_sha256": _bundle_digest(case, "final"),
+            },
         ],
     }
+    assert item["bundle"]["sha256"] == _bundle_digest(case, "train-validation")
     assert list(_scratch(case).iterdir()) == []
     with pytest.raises(ValueError, match=r"\[CRSP-013\] licensed final evidence opens only"):
         _verify(case, open_final=True)
@@ -117,6 +131,7 @@ def test_synthetic_final_partition_opens_with_its_own_key(
         "latest_calendar": "2020-08-31",
     }
     assert final["plaintext_removed"] is True
+    assert final["bundle_sha256"] == _bundle_digest(case, "final")
 
 
 @pytest.mark.parametrize(
