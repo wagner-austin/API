@@ -692,7 +692,7 @@ not arbitrary extra packages or scientific validity.
 | `hpc3-triage --config C` | the [five conditions that look like health](wiki/pages/triage-conditions.md); exit 1 if any |
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
-| `hpc3-stage --config C --manifest M --source-dir D --expect-from R` | places files, verifies sha256 on both sides, and holds every digest against the published record ([staging identity](wiki/pages/staging-identity.md)) |
+| `hpc3-stage --config C --manifest M --source-dir D --expect-from R [--report-task UUID]` | places files, verifies sha256 on both sides, and holds every digest against the published record; reporting also reads back the certificate and posts measured identities through the shared board reporter ([staging identity](wiki/pages/staging-identity.md)) |
 | `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
 | `hpc3-bootstrap --config C --project P --env-path E --python V` | creates a project's FIRST environment and proves it owns its own interpreter. The step capture assumes has already happened ([the interpreter is not in `module avail python`](wiki/pages/interpreter-availability.md)) |
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
