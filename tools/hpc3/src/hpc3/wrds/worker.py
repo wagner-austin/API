@@ -191,13 +191,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         execute_run(pathlib.Path(tokens[1]), tokens[2])
     elif len(tokens) == 2 and tokens[0] == "extract":
         extract(decode_crsp_selection(load_json_str(tokens[1])))
-    elif len(tokens) == 5 and tokens[0] == "scratch":
-        reading = observe(tokens[1], tokens[2], pathlib.Path(tokens[3]), pathlib.Path("/tmp"))
-        _test_hooks.write(pathlib.Path(tokens[4]), dump_json_str(reading).encode())
+    elif len(tokens) in {4, 5} and tokens[0] == "scratch":
+        private = pathlib.Path(tokens[3]) if len(tokens) == 5 else None
+        reading = observe(tokens[1], tokens[2], private, pathlib.Path("/tmp"))
+        _test_hooks.write(pathlib.Path(tokens[-1]), dump_json_str(reading).encode())
     else:
         raise ValueError(
             "WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT, extract SCOPE "
-            "or scratch HOST JOB PRIVATE OUTPUT"
+            "or scratch HOST JOB [PRIVATE] OUTPUT"
         )
     return 0
 
