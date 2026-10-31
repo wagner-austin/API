@@ -43,6 +43,7 @@ def worker_bundle() -> bytes:
         "wrds/_test_hooks",
         "wrds/worker",
         "wrds/extract",
+        "wrds/scratch",
     ):
         members[f"hpc3/{name}.py"] = package / f"{name}.py"
     buffer = io.BytesIO()

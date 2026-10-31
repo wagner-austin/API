@@ -89,7 +89,9 @@ def inventory(host: str, remote_dir: str, output: pathlib.Path) -> CatalogRun:
     remote_catalog = str(remote / "catalog.jsonl")
     source_sha = wrds_grid.upload(host, probe, probe_archive())
     command = ["python3", probe, "--root", "/wrds", "--output", remote_catalog]
-    job_id = wrds_grid.submit(host, remote, "wrds_catalog", command, environment=False)
+    job_id = wrds_grid.submit(
+        host, remote, "wrds_catalog", command, environment=False, execution_host=None
+    )
     artifact = artifacts.download(host, remote_catalog)
     entries = read_catalog(artifact["text"])
     receipt = CatalogReceipt(

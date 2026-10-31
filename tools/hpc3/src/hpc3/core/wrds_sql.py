@@ -228,7 +228,12 @@ def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     remote_catalog = str(remote / "relations.csv")
     query_sha = wrds_grid.upload(host, query, RELATIONS_QUERY.encode("utf-8"))
     metadata_job = wrds_grid.submit(
-        host, remote, "wrds_sql_catalog", psql_argv(query, remote_catalog), environment=True
+        host,
+        remote,
+        "wrds_sql_catalog",
+        psql_argv(query, remote_catalog),
+        environment=True,
+        execution_host=None,
     )
     artifact = artifacts.download(host, remote_catalog)
     relations = read_relations(artifact["text"])
@@ -242,7 +247,12 @@ def sql_inventory(host: str, remote_dir: str, output: pathlib.Path) -> SqlRun:
     validation = str(remote / "validate.sql")
     validation_sha = wrds_grid.upload(host, validation, script)
     validation_job = wrds_grid.submit(
-        host, remote, "wrds_sql_validate", psql_argv(validation, "/dev/null"), environment=True
+        host,
+        remote,
+        "wrds_sql_validate",
+        psql_argv(validation, "/dev/null"),
+        environment=True,
+        execution_host=None,
     )
     receipt = SqlReceipt(
         host=host,

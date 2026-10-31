@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import hashlib
 import pathlib
+import re
 import shlex
 
 from hpc3.core import _test_hooks
@@ -100,7 +101,13 @@ def upload(host: str, path: str, payload: bytes) -> str:
 
 
 def submit(
-    host: str, remote: pathlib.PurePosixPath, name: str, command: list[str], *, environment: bool
+    host: str,
+    remote: pathlib.PurePosixPath,
+    name: str,
+    command: list[str],
+    *,
+    environment: bool,
+    execution_host: str | None,
 ) -> str:
     """Run one job synchronously under a one-hour bound.
 
@@ -112,6 +119,8 @@ def submit(
         environment: Export the login shell's environment to the job. The
             SQL catalog needs it: WRDS Cloud sets the ident-authenticated
             database host there, and the job has no password to offer.
+        execution_host: Exact scheduler hostname, or None for scheduler placement.
+            Wildcards and resource-expression delimiters are refused.
 
     Returns:
         The scheduler's job id.
@@ -119,9 +128,14 @@ def submit(
     Raises:
         AppError: When the job exits non-zero; ``qsub -sync y`` exits with
             the job's status.
-        ValueError: ``WRDS_JOB_ID`` when the scheduler's first line is not an id.
+        ValueError: Invalid execution host or unreadable scheduler receipt.
     """
     exported = ["-V"] if environment else []
+    placement: list[str] = []
+    if execution_host is not None:
+        if re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9.-]*", execution_host) is None:
+            raise ValueError("WRDS_EXECUTION_HOST: expected one literal scheduler hostname")
+        placement = ["-l", "hostname=" + execution_host]
     argv = [
         "qsub",
         "-terse",
@@ -134,6 +148,7 @@ def submit(
         name,
         "-l",
         "h_rt=3600",
+        *placement,
         "-o",
         str(remote / f"{name}.out"),
         "-e",
