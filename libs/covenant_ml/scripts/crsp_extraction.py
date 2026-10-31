@@ -30,7 +30,7 @@ def _parser() -> argparse.ArgumentParser:
     extract = commands.add_parser("extract")
     extract.add_argument("--protocol", required=True, type=Path)
     extract.add_argument("--access", required=True, type=Path)
-    extract.add_argument("--schema", required=True)
+    extract.add_argument("--source", required=True)
     extract.add_argument("--setup", type=Path)
     extract.add_argument("--max-rows", required=True, type=int)
     extract.add_argument("--max-relation-bytes", required=True, type=int)
@@ -69,7 +69,7 @@ def main(argv: list[str] | None = None) -> int:
         scratch_variable: str = args.scratch_env
         output_variable: str = args.output_env
         protocol: Path = args.protocol
-        schema: str = args.schema
+        source: str = args.source
         setup: Path | None = args.setup
         rows: int = args.max_rows
         relation_bytes: int = args.max_relation_bytes
@@ -78,7 +78,7 @@ def main(argv: list[str] | None = None) -> int:
         extract_crsp(
             protocol,
             settings,
-            schema=schema,
+            source=source,
             setup=setup,
             scratch=Path(environment[scratch_variable]),
             output=Path(environment[output_variable]),
