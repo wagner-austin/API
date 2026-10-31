@@ -366,3 +366,15 @@ verification now occupy separate polls. Added metadata-only provenance and a
 live audit query that refuses changed record, output-count, wheel and final-bundle
 identities. HPC3 staging, verifier corrections and the substantive baseline
 remain pending. Board task da2a55dc; no new page or page-count change.
+
+## 2026-10-31 — Bind collection closure to the executing controller
+
+Audit a814e463 reopened collection because installation evidence did not
+identify the closing interpreter or enforce verification-before-close. The
+existing queue observation now measures both Python path and checksum. Adopted
+queue 132859b5 reverified native 40554174 and the same RunRecord, then closed
+passed with measured controller identity. The package check passed 2,578 tests;
+95 actual host cases passed before the maintained fleet rollout. The revised
+live query passed and seven altered-evidence probes returned zero. Readiness
+retains pending independent acceptance, HPC3 staging and verifier hardening.
+Board task da2a55dc; no new page or page-count change.
