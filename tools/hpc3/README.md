@@ -170,6 +170,25 @@ attempts match exactly when those lines do. Any other job adds the
 present or absent on WRDS. A completed job whose attestation does not match
 fails the command with collect's own refusal, and posts nothing.
 
+For a failed synthetic storage probe that recorded `opened.json`, observe its
+exact private directory through a scheduler job pinned to the original node:
+
+```bash
+python -m hpc3.cli.wrds scratch --spec experiment.json --attempt first --output cleanup.json
+python -m hpc3.cli.wrds scratch-report --spec experiment.json --attempt first --output cleanup.json --report-task TASK_UUID
+```
+
+`scratch` creates an exclusive remote observation directory and saves the job,
+subject and worker identities in `cleanup.json.receipt.json`. `scratch-report`
+uses that receipt and the existing scheduler state reader. If accounting is
+not yet available, it emits `accounting-pending` and writes no evidence file or
+board report. Repeat only `scratch-report` after accounting becomes available;
+it never submits another job. Completed evidence verifies the execution node,
+worker digest, subject paths and observation bytes. Presence is recorded as
+measured, not automatically treated as a cleanup pass. The maintained storage
+probe requires explicit `--hold-seconds` (0 for ordinary exit, up to 300 for a
+bounded forced-termination measurement); no licensed rows are needed.
+
 The backend currently supports individual Python CPU jobs, with conservative
 limits of eight slots, 48 GiB total and seven days. It pins interpreter bytes
 and installed package **versions**, not an immutable container or every
