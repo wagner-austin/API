@@ -83,6 +83,10 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
             "state": "running",
             "native_job_id": "12345",
             "record_sha256": None,
+            "controller_python": sys.executable,
+            "controller_python_sha256": hashlib.sha256(
+                pathlib.Path(sys.executable).read_bytes()
+            ).hexdigest(),
         }
     else:
         assert result["returncode"] != 0

@@ -15,7 +15,7 @@ from fleet.cli import research, research_native, rolled, tick
 from fleet.contracts.research_worker import encode_worker
 from fleet.core import _test_hooks
 from tests._queue_fakes import QUEUE_CREDENTIALS, FakeEnv, FakeQueue
-from tests._research_fixtures import research_job, worker
+from tests._research_fixtures import observation, research_job, worker
 from tests.conftest import FakeRun, ok
 from tests.test_research_hpc import _document as hpc_document
 from tests.test_research_hpc import _row
@@ -59,6 +59,10 @@ def test_native_cli_resolves_authorized_bytes_and_emits_only_metadata(
         "state": "running",
         "native_job_id": "12345" if backend == "hpc3" else "123",
         "record_sha256": None,
+        "controller_python": sys.executable,
+        "controller_python_sha256": hashlib.sha256(
+            pathlib.Path(sys.executable).read_bytes()
+        ).hexdigest(),
     }
     assert not (directory / "poll.lock").exists()
 
@@ -96,9 +100,7 @@ def test_queue_cli_announces_or_runs_one_tick(
         replies.append(dump_json_str({"job": row}))
     endpoint = FakeQueue(replies)
     _test_hooks.http_post = endpoint
-    _test_hooks.run = FakeRun(
-        [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
-    )
+    _test_hooks.run = FakeRun([ok(""), ok(dump_json_str(observation()))])
     args = [
         "--config",
         str(config_path),

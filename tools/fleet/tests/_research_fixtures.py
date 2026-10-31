@@ -45,4 +45,24 @@ def research_job(**overrides: JSONValue) -> JSONObject:
     return row
 
 
-__all__ = ["research_job", "worker"]
+def observation(**overrides: JSONValue) -> JSONObject:
+    """Build native metadata with measured controller identity for boundary tests.
+
+    Args:
+        **overrides: Evidence or lifecycle fields changed by the test.
+
+    Returns:
+        Complete observation for the fixture's explicit placement.
+    """
+    row: JSONObject = {
+        "state": "running",
+        "native_job_id": "123",
+        "record_sha256": None,
+        "controller_python": "/private/runtime/bin/python",
+        "controller_python_sha256": "b" * 64,
+    }
+    row.update(overrides)
+    return row
+
+
+__all__ = ["observation", "research_job", "worker"]

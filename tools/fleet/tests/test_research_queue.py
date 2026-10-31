@@ -7,7 +7,7 @@ import socket
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
-from platform_core.json_utils import JSONObject, JSONTypeError, dump_json_str
+from platform_core.json_utils import JSONTypeError, dump_json_str
 from platform_core.mcp_client import McpCredentials
 
 from fleet.cli import research_queue
@@ -15,7 +15,7 @@ from fleet.contracts.dispatch import DispatchStatus, decode_job
 from fleet.contracts.lease import Lease
 from fleet.core import _test_hooks, leases
 from tests._queue_fakes import QUEUE_CREDENTIALS, RUNNER_IDENTITY, FakeQueue
-from tests._research_fixtures import research_job, worker
+from tests._research_fixtures import observation, research_job, worker
 from tests.conftest import FakeRun, failed, ok
 
 
@@ -27,11 +27,7 @@ def test_native_tick_records_only_verified_outcomes_and_releases_resources(
     running = research_job(status="running", runId="preserved-receipt")
     endpoint = FakeQueue([dump_json_str({"job": running}), dump_json_str({"job": running})])
     _test_hooks.http_post = endpoint
-    result: JSONObject = {
-        "state": state,
-        "native_job_id": "123",
-        "record_sha256": "a" * 64 if state == "complete" else None,
-    }
+    result = observation(state=state, record_sha256="a" * 64 if state == "complete" else None)
     outcome = (
         failed(255, "private transport details")
         if state == "unreachable"
@@ -56,6 +52,9 @@ def test_native_tick_records_only_verified_outcomes_and_releases_resources(
         if state in {"complete", "failed"}:
             assert reported["status"] == ("passed" if state == "complete" else "failed")
             assert reported["exitCode"] == (0 if state == "complete" else 1)
+            assert reported[
+                "detail"
+            ] == "Native controller outcome (adapter exit status): " + dump_json_str(result)
         else:
             assert "exitCode" not in reported
         assert "private transport details" not in dump_json_str(reported)
@@ -69,9 +68,7 @@ def test_running_receipt_survives_repeated_poll_without_start(tmp_path: pathlib.
     row = research_job(status="running", runId="native-receipt")
     endpoint = FakeQueue([dump_json_str({"job": row}), dump_json_str({"job": row})])
     _test_hooks.http_post = endpoint
-    _test_hooks.run = FakeRun(
-        [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')] * 2
-    )
+    _test_hooks.run = FakeRun([ok(""), ok(dump_json_str(observation()))] * 2)
     job = decode_job(row, answer="")
     for _ in range(2):
         job = research_queue.reconcile(
@@ -79,6 +76,36 @@ def test_running_receipt_survives_repeated_poll_without_start(tmp_path: pathlib.
         )
         assert job["run_id"] == "native-receipt"
     assert [row["action"] for row in endpoint.arguments] == ["progress", "progress"]
+
+
+def test_wrong_executing_controller_cannot_close_or_renew(tmp_path: pathlib.Path) -> None:
+    row = research_job(status="running", runId="native-receipt")
+    endpoint = FakeQueue([])
+    _test_hooks.http_post = endpoint
+    _test_hooks.run = FakeRun(
+        [
+            ok(""),
+            ok(
+                dump_json_str(
+                    observation(
+                        state="complete",
+                        record_sha256="a" * 64,
+                        controller_python="/other/bin/python",
+                    )
+                )
+            ),
+        ]
+    )
+    with pytest.raises(ValueError, match="RESEARCH_QUEUE_CONTROLLER"):
+        research_queue.reconcile(
+            QUEUE_CREDENTIALS,
+            RUNNER_IDENTITY,
+            worker(),
+            tmp_path / "leases",
+            decode_job(row, answer=""),
+        )
+    assert endpoint.tools == []
+    assert leases.read_leases(tmp_path / "leases") == ()
 
 
 @pytest.mark.parametrize(
@@ -145,9 +172,7 @@ def test_empty_queue_claims_only_research_and_handles_idle(
         replies.extend([dump_json_str({"job": research_job(status="running")})] * 2)
     endpoint = FakeQueue(replies)
     _test_hooks.http_post = endpoint
-    _test_hooks.run = FakeRun(
-        [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
-    )
+    _test_hooks.run = FakeRun([ok(""), ok(dump_json_str(observation()))])
     result = research_queue.tick(QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), tmp_path / "leases")
     assert (result is not None) == claimed
     assert endpoint.arguments[1]["lane"] == "research"
@@ -168,9 +193,7 @@ def test_full_lane_polls_oldest_renewal_without_claiming_more(tmp_path: pathlib.
         [dump_json_str({"jobs": list(reversed(rows))}), dump_json_str({"job": rows[0]})]
     )
     _test_hooks.http_post = endpoint
-    _test_hooks.run = FakeRun(
-        [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
-    )
+    _test_hooks.run = FakeRun([ok(""), ok(dump_json_str(observation()))])
     result = research_queue.tick(QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), tmp_path / "leases")
     assert result == decode_job(rows[0], answer="")
     assert endpoint.tools == ["dispatch_list", "dispatch_report"]
@@ -188,9 +211,7 @@ def test_reclaimed_row_is_polled_once_with_its_existing_run_identity(
         ]
     )
     _test_hooks.http_post = endpoint
-    _test_hooks.run = FakeRun(
-        [ok(""), ok('{"state":"running","native_job_id":"123","record_sha256":null}')]
-    )
+    _test_hooks.run = FakeRun([ok(""), ok(dump_json_str(observation()))])
     result = research_queue.tick(QUEUE_CREDENTIALS, RUNNER_IDENTITY, worker(), tmp_path / "leases")
     assert result == decode_job(row, answer="")
     assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
