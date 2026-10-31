@@ -92,7 +92,9 @@ def test_nonregular_and_nested_inventory_is_refused(
     if damage == "directory":
         (case.output / "final" / "empty").mkdir()
     elif damage == "fifo":
-        os.mkfifo(case.output / "unexpected-pipe")
+        path = case.output / "final" / "returns.csv.age"
+        path.unlink()
+        os.mkfifo(path)
     elif damage == "partition-link":
         partition = case.output / "final"
         target = case.root / "final-ciphertext"
@@ -103,6 +105,30 @@ def test_nonregular_and_nested_inventory_is_refused(
         target = case.root / "receipt-copy.json"
         metadata.rename(target)
         metadata.symlink_to(target)
+    with pytest.raises(ValueError, match=r"\[CRSP-013\]"):
+        verify_crsp_extraction(
+            case.root, evaluator_keys(case.root), scratch=case.root / "absent", open_final=False
+        )
+    assert not (case.root / "absent").exists()
+
+
+@pytest.mark.parametrize("damage", ["symlink", "missing", "file", "metadata", "partition-file"])
+def test_collection_root_and_required_metadata_are_checked(
+    encrypted_case: Extraction, damage: str
+) -> None:
+    case = encrypted_case
+    if damage == "metadata":
+        (case.output / "metrics.json").unlink()
+    elif damage == "partition-file":
+        (case.output / "final").rename(case.root / "moved-final")
+        (case.output / "final").write_bytes(b"not a directory")
+    else:
+        target = case.root / "moved-outputs"
+        case.output.rename(target)
+        if damage == "symlink":
+            case.output.symlink_to(target, target_is_directory=True)
+        elif damage == "file":
+            case.output.write_bytes(b"not a directory")
     with pytest.raises(ValueError, match=r"\[CRSP-013\]"):
         verify_crsp_extraction(
             case.root, evaluator_keys(case.root), scratch=case.root / "absent", open_final=False

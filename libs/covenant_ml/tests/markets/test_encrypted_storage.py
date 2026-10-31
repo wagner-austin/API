@@ -20,6 +20,7 @@ from covenant_ml.markets.encrypted_storage import (
     decrypted_bundle,
     encrypt_bundle,
     encrypted_stage_manifest,
+    verify_encrypted_bundle,
 )
 
 from ._crsp_fixtures import panel_protocol, source_rows, write_sources
@@ -231,3 +232,40 @@ def test_changed_source_and_changed_published_metadata_are_refused(tmp_path: Pat
             partition="final",
         )
     assert list((tmp_path / "failed").iterdir()) == []
+
+
+def test_ciphertext_inventory_can_be_verified_without_decryption(tmp_path: Path) -> None:
+    path, bundle, _ = _bundle(tmp_path)
+    assert verify_encrypted_bundle(path, sha256(path.read_bytes()).hexdigest()) == bundle
+    assert {item.name for item in tmp_path.iterdir()} == {"source", "encrypted"}
+
+
+@pytest.mark.parametrize(
+    "damage", ["missing", "extra", "symlink", "directory", "metadata", "parent", "absent-metadata"]
+)
+def test_closed_bundle_inventory_requires_exact_regular_files(tmp_path: Path, damage: str) -> None:
+    path, bundle, _ = _bundle(tmp_path)
+    digest = sha256(path.read_bytes()).hexdigest()
+    cipher = path.parent / bundle["files"][0]["ciphertext"]["name"]
+    if damage == "missing":
+        cipher.unlink()
+    elif damage == "extra":
+        (path.parent / "extra.age").write_bytes(cipher.read_bytes())
+    elif damage == "symlink":
+        cipher.unlink()
+        cipher.symlink_to(path.parent / bundle["files"][1]["ciphertext"]["name"])
+    elif damage == "directory":
+        cipher.unlink()
+        cipher.mkdir()
+    elif damage == "metadata":
+        target = tmp_path / "metadata-copy"
+        path.rename(target)
+        path.symlink_to(target)
+    elif damage == "parent":
+        target = tmp_path / "ciphertext-copy"
+        path.parent.rename(target)
+        path.parent.symlink_to(target, target_is_directory=True)
+    else:
+        path.unlink()
+    with pytest.raises(ValueError, match="ENCRYPTED_INVENTORY"):
+        verify_encrypted_bundle(path, digest)

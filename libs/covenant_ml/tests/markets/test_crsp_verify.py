@@ -139,9 +139,9 @@ def test_synthetic_final_partition_opens_with_its_own_key(
     [
         ("train-validation/returns.csv", b"permno\n", "is not age ciphertext"),
         ("final/extra.age", b"plain", "is not age ciphertext"),
-        ("notes.txt", b"x", "unexpected collected file notes.txt"),
-        ("final/nested/x.age", AGE_HEADER, "unexpected collected file final/nested/x.age"),
-        (".pending-final/bundle.json", b"{}", "unexpected collected file .pending-final"),
+        ("notes.txt", b"x", "unexpected or incomplete collected root inventory"),
+        ("final/nested/x.age", AGE_HEADER, "unexpected collected directory final/nested"),
+        (".pending-final/bundle.json", b"{}", "unexpected or incomplete collected root inventory"),
     ],
 )
 def test_any_file_beyond_ciphertext_and_metadata_is_refused(
