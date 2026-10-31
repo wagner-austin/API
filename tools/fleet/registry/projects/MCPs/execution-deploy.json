@@ -13,26 +13,22 @@
       {
         "phase": "install",
         "argv": [
-          "npm",
-          "ci",
-          "--ignore-scripts"
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "install"
         ]
       },
       {
         "phase": "workspace-build",
         "argv": [
-          "node",
-          "scripts/ci-build-consumed-workspaces.mjs",
-          "execution",
-          "mcp-proxy"
-        ]
-      },
-      {
-        "phase": "workspace-build",
-        "argv": [
-          "npm",
-          "rebuild",
-          "mcp-shared"
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "workspace-build",
+          "ROOTS=execution mcp-proxy"
         ]
       }
     ],

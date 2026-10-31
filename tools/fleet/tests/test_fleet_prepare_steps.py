@@ -79,29 +79,33 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # 770837b7). The unprepared lose MCPs/execution-elevated, whose
     # installer cases MCPs board task 42fb4e26 deleted, and MCPs/execution,
     # the Windows lane MCPs board task 5b040fdb deleted.
-    assert len(prepared) == 68
+    # 70 since execution-deploy and execution-linux share cached multi-root
+    # preparation (MCPs board task 007bfc7e).
+    assert len(prepared) == 70
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
     )
-    assert unprepared == [
-        "MCPs/execution-deploy",
-        "MCPs/execution-linux",
-        "MCPs/phone-release-execution",
-    ]
+    assert unprepared == ["MCPs/phone-release-execution"]
     # Board task 007bfc7e: these lanes run execution and its nested proxy
     # twin. The existing planner includes their dependencies and generated
     # outputs; a bare invocation builds consumers from the entire repository.
     for name in ("MCPs/execution-deploy", "MCPs/execution-linux"):
-        assert _steps()[name][1] == InstallStep(
-            phase="workspace-build",
-            argv=(
-                "node",
-                "scripts/ci-build-consumed-workspaces.mjs",
-                "execution",
-                "mcp-proxy",
+        assert prepared[name] == (
+            InstallStep(phase="install", argv=(*PREPARE, "install")),
+            InstallStep(
+                phase="workspace-build",
+                argv=(*PREPARE, "workspace-build", "ROOTS=execution mcp-proxy"),
             ),
         )
+    assert prepared["MCPs/packages/wiki-check"] == (
+        InstallStep(phase="install", argv=(*PREPARE, "install")),
+        InstallStep(
+            phase="workspace-build",
+            argv=(*PREPARE, "workspace-build", "ROOTS=packages/wiki-check packages/wiki-search"),
+        ),
+        InstallStep(phase="peer-wikis", argv=(*PREPARE, "peer-wikis")),
+    )
     for steps in prepared.values():
         assert [step["phase"] for step in steps[:2]] == ["install", "workspace-build"]
         assert [step["argv"][4] for step in steps[:2]] == ["install", "workspace-build"]

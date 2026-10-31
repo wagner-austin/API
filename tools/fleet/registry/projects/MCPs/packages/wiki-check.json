@@ -27,15 +27,8 @@
           "-s",
           "-C",
           "scripts/fleet-prepare",
-          "workspace-build"
-        ]
-      },
-      {
-        "phase": "wiki-search-build",
-        "argv": [
-          "node",
-          "scripts/ci-build-consumed-workspaces.mjs",
-          "packages/wiki-search"
+          "workspace-build",
+          "ROOTS=packages/wiki-check packages/wiki-search"
         ]
       },
       {
