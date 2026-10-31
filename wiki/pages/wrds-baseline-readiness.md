@@ -75,7 +75,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "4a076cda036c8c500ae42bf5e562d4a14a374f8a"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "fb6b71e076c33612ca3d906e8a194baf2157a777"
   "libs/covenant_ml/tests/markets/test_crsp_writer.py": "d33b9a62ba2f7067115310a7e09ad2f30670542c"
   "libs/covenant_ml/scripts/crsp_extraction.py": "bf19c177db704f0654daab7bb2e2aa4fcc28e488"
   "libs/platform_core/src/platform_core/load_report.py": "b731fba8a13e7424070695845c66e9b2d8ea4361"
@@ -114,8 +114,8 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_research_keys.py": "ceb7f3b58753e99d7a559b8e471c46d1abb28067"
   "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_records.py": "6b3826b16f265301ec9923070cc89322427f8bc6"
-  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "9ab574a88a6f97dd7020ae1240948fba54c54698"
-  "libs/covenant_ml/tests/markets/test_encrypted_storage.py": "de361bb8f31d40eecacea21a0e493d3eba2abe30"
+  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "964609d0d26e17031994cb5ab1473a8fd5f61563"
+  "libs/covenant_ml/tests/markets/test_encrypted_storage.py": "3b6198a8cc61bf3c071c236729e1c7ceb7135d79"
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
@@ -149,10 +149,11 @@ confidence: medium
 **Current reading, October 31:** the licensed extraction and encrypted collection
 have completed through the shared queue. All 24 declared outputs and the
 RunRecord were verified; the completed native allocation was reused after a
-collection timeout. The final bundle remains sealed. HPC3 staging, evaluator
-verification corrections, candidate-selection rules and the substantive study
-remain ahead. Earlier runtime measurements below retain their historical
-scope.[^licensed-collection]
+collection timeout. The final bundle remains sealed. The verifier corrections
+passed the complete package suite; licensed ciphertext integrity also passed
+without opening either partition. HPC3 staging, licensed evaluator decoding,
+candidate-selection rules and the substantive study remain ahead. Earlier runtime
+measurements below retain their historical scope.[^licensed-collection]
 
 Collection audit `a814e463` reopened the milestone at 19:30 UTC: the earlier
 closing receipt did not measure its executing controller, and its audit query
@@ -165,7 +166,22 @@ Adoption queue `132859b5` closed passed at 20:24:56 UTC with the measured
 The revised query requires matching installed/executing identities and a native
 verification report between submission and closure; altered identities, counts
 and reversed timestamp ordering each returned zero.
-Independent acceptance of the corrected collection evidence remains pending.[^collection-review]
+Independent audit `9fe59092` verified both collection criteria at
+20:37:43 UTC on October 31.[^collection-review]
+
+The standalone verifier now requires the exact regular-file inventory and
+checksums for both partitions before opening either, including the sealed final
+partition. Decryption uses the smaller of the receipt and evaluator-owned
+plaintext budgets. Real authenticated regression fixtures reproduced 17 failures
+before the correction; the corrected full suite passed 4,988 tests with 100%
+statement and branch coverage. The installed `wrds-verifier-af859c42b` controller
+passed wheel-member readback for 581 files, the generated selfcheck and dependency
+checks. At 20:42:22 UTC it verified all 20 licensed ciphertext files against the
+pinned receipt, with no key acquisition or plaintext. This is ciphertext-integrity
+evidence, not licensed row decoding or a completed study; the HPC3 image still
+contains the older calendar runtime.[^verifier-integrity]
+
+[^verifier-integrity]: `libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py`, `verify_encrypted_bundle`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `_collected_files`, `_open` and `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_encrypted_storage.py`, real closed-bundle integrity cases. Board task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`; corrected fleet check `f97e7fee-4d0f-411b-a2fd-b344bc41650a` at source `af859c42b489eb913aaf726f991e7eb787bb112a`; production correction published as `e479dfc69da5903f2dcb00c6408dcb8e97b56b3f`. Private evidence directory `/home/corvis/research-data/wrds/runtime/verifier-af859c42b` retains `controller-provenance.json`, `controller-inspection.json` and `licensed-ciphertext-inspection.json`. The new covenant wheel SHA-256 is `8c46c3f2d149e88847bb4f474f47fac788d93d0f4b2625c9c1af4e6b30c22c75`; the other frozen first-party wheels are unchanged.
 
 [^collection-review]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json`, controller measurement, live query and negative probes. Live board audit `a814e463-b0ea-49b3-86a9-feb31b27c8e2`, check review `effd76f3-7599-4951-aa78-babd1e5a346e`; correction commits `4a8ba8ff6258c8ba4730f6935177fa886e4900ce`, `2e7232e848c5310c4b356594f4fbfa6b4c85bc66`, `a0550032d5ea977d58528c45e0ec72aa610cb855`. The canonical observation contract is described in [[wrds-research-queue-admission]].
 
@@ -439,9 +455,8 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    seconds. The next poll verified every output and its RunRecord; queue
    `872b9e09` closed passed at 19:18:48 UTC. HPC3 staging remains pending at
    this reading.[^licensed-start][^licensed-collection]
-3. Complete evaluator verification, including the separately tracked unopened
-   ciphertext and byte-limit corrections (`9cbbc85f`), and stage only the
-   encrypted training/validation bundle to private HPC3 storage. The final
+3. Complete licensed evaluator decoding with the corrected verifier (`9cbbc85f`)
+   and stage only the encrypted training/validation bundle to private HPC3 storage. The final
    bundle and its key remain evaluator-owned.[^licensed-collection]
 4. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
