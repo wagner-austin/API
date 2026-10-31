@@ -45,20 +45,33 @@ def main(argv: Sequence[str] | None = None) -> int:
     result = research_proposal.propose(document, directory, directory / "admission.jsonl")
     if task is not None:
         identity = service_identity(
-            agent="fleet-research-proposer", service="corvis:fleet:research-proposer",
+            agent="fleet-research-proposer",
+            service="corvis:fleet:research-proposer",
             cwd="service://fleet-research-proposer",
         )
         credentials = board_config.load_credentials()
         register_service_session(
-            _test_hooks.http_post, credentials, identity, harness="fleet-research-proposer",
+            _test_hooks.http_post,
+            credentials,
+            identity,
+            harness="fleet-research-proposer",
             purpose="records isolated proposal handoffs measured by the admission controller",
         )
         post_to_task(
-            _test_hooks.http_post, credentials, identity, task_id=task, kind="note",
-            body="RESEARCH PROPOSAL LOAD-REPORT\n" + dump_json_str({
-                "spec_sha256": digest, "host": document["host"], "image": document["image"],
-                "result": result,
-            }),
+            _test_hooks.http_post,
+            credentials,
+            identity,
+            task_id=task,
+            kind="note",
+            body="RESEARCH PROPOSAL LOAD-REPORT\n"
+            + dump_json_str(
+                {
+                    "spec_sha256": digest,
+                    "host": document["host"],
+                    "image": document["image"],
+                    "result": result,
+                }
+            ),
         )
     emit_line(dump_json_str(result))
     return 0
