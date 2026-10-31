@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/fleet/tests/test_research_wrds.py"
+  - "tools/fleet/tests/test_research_control.py"
   - "tools/fleet/tests/test_research_hpc.py"
   - "tools/fleet/tests/test_research_hpc_final.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
@@ -25,9 +27,11 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/fleet/tests/test_research_wrds.py": "128047efa432f77d6b3b51259356f270f7c8cf99"
+  "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
   "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "9686350a06789e4f05d869da140948b6a56d0d19"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1f07441042f149defedacdf986af5ea8bddc4d09"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
@@ -37,7 +41,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "daead9502e635ddc7abf3243eac2b7b838714094"
-  "tools/fleet/src/fleet/core/research_wrds.py": "2130dac9b040de079efcdb5b5b238c6cb6022927"
+  "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
@@ -49,7 +53,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
-fact_checked: 2026-10-30
+fact_checked: 2026-10-31
 confidence: medium
 ---
 
@@ -73,6 +77,18 @@ poll. HPC3 keeps proposal admission and its attempt journal; WRDS keeps held
 submission and its durable receipt. Transport failures retain those identities.
 Completion requires fresh native evidence and verified RunRecord metadata;
 no research rows or credentials are placed on the board.[^queue][^controllers]
+
+WRDS submission, collection and final verification occupy separate polls.
+Collection has a 900-second process deadline after a 60-second status call,
+inside the existing 1,020-second native tick deadline. A successful collection
+process still returns `running`; the next poll compares the native completion,
+every collected output and the RunRecord before returning `complete`. An
+existing partial directory fails verification and is never overwritten by the
+poller. Explicit recovery must preserve that failed transfer before collecting
+again; durable submission intent continues to prevent another native
+submission.[^wrds-phases]
+
+[^wrds-phases]: `tools/fleet/src/fleet/core/research_wrds.py`, `poll`, `_reserve` and `_verify_collected`; `tools/fleet/tests/test_research_wrds.py`, separate bounded polls for newly submitted and adopted jobs, incomplete receipts and changed files; `tools/fleet/tests/test_research_control.py`, actual controller subprocess success, nonzero exit and timeout; `tools/fleet/src/fleet/cli/research_queue.py`, `_script` and `reconcile`. Board task `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; fleet check `2c441d42-2aea-437a-806a-e19d76ca53da` at API `0ffb98731e70c234e4052d4319332faf7496a60e` passed 2,574 tests with 100% coverage on Pendragon.
 
 The private HPC3 document requires explicit `phase: "validation"` with
 `native_attempt`, or `phase: "final"` with `remote_manifest`. Old documents

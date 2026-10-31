@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json"
   - "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json"
   - "tools/hpc3/src/hpc3/core/wrds_cleanup.py"
   - "tools/hpc3/src/hpc3/wrds/scratch.py"
@@ -67,6 +68,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json": "f69fefdc21501823201906b30f64122f04c4a931"
   "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
@@ -142,6 +144,14 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
+**Current reading, October 31:** the licensed extraction and encrypted collection
+have completed through the shared queue. All 24 declared outputs and the
+RunRecord were verified; the completed native allocation was reused after a
+collection timeout. The final bundle remains sealed. HPC3 staging, evaluator
+verification corrections, candidate-selection rules and the substantive study
+remain ahead. Earlier runtime measurements below retain their historical
+scope.[^licensed-collection]
+
 The encrypted-bundle implementation passed independent audit `acd2c6c4` on
 October 30 at 21:38 UTC: all three criteria were verified. The earlier audit
 `02c6e4a1` reopened its evidence mapping because it omitted the real
@@ -194,8 +204,9 @@ manifest only after every file authenticates and matches its frozen identity.
 Plaintext lives in a new mode-0700 temporary directory, with a declared size
 limit, and is removed on ordinary exit or exception. HPC3 validation and final
 scoring, and WRDS-native validation storage, are measured below. WRDS final
-scoring remains unverified. The later WRDS forced-kill measurement below awaits
-independent review.[^bundle][^final-rehearsal][^wrds-native][^wrds-cleanup]
+scoring remains unverified. The WRDS forced-kill measurement below passed
+independent review on October 31, as recorded in the prerequisite verdicts
+below.[^bundle][^final-rehearsal][^wrds-native][^wrds-cleanup][^review-closure]
 
 The evaluator now requires encrypted inputs and separate private partition keys.
 Validation works without a final key. Final scoring acquires its key only after
@@ -397,21 +408,30 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    `0fc95070` at 07:34 UTC on October 31, semantics task `54b55cc7` passed
    `28d1701d` at 09:26 UTC, and the synthetic writer task `1f60a20d` passed
    `a6d63e70` at 11:47 UTC. Native final scoring is rehearsed on HPC3 only.[^review-closure]
-2. Licensed extraction job `40554134` failed calendar validation; shared queue
-   `24d6f2d4` reconciled that failure. A preceding aggregate-only native count
-   measured 28,034,527 training/validation daily rows and 31,465,356 final-bundle
-   daily rows, with about 3.8 GB of projected scalar CSV bytes combined. The
-   request caps each relation at 35 million rows and 2.1 GB, each partition at
-   2.15 GB, and the allocation at two hours with 48 GiB requested. Successful
-   sealing and verified training/validation staging remain pending. No encrypted
-   output was published: the old query excluded closed-day `N/A/N` rows.
-   The corrected query retains all dates and the reader validates `CIZ/Y` or
-   `N/A/N`; a corrected runtime and new attempt are required. The final key
-   remains evaluator-owned.[^licensed-start]
-3. Declare candidate/seed aggregation, the selection criterion and tie handling
+2. Licensed extraction `40554174` succeeded with the corrected calendar reader:
+   28,034,527 training/validation daily rows and 31,465,356 final-bundle daily
+   rows were sealed separately. Same-node observer `40554207` found no remaining
+   scratch roots for that allocation. The first job, `40554134`, remains recorded
+   as a calendar-validation failure; its query had excluded closed dates.
+   The current runtime retains all civil dates and accepts exactly `CIZ/Y` or
+   `N/A/N`. The new HPC3 image is built and verified, with no data or keys inside.
+   Collection hit the old five-minute queue deadline; the installed controller
+   now separates submission, collection and final verification, as documented in
+   [[wrds-research-queue-admission]]. The interrupted transfer is preserved.
+   Recovery reused the same completed job and collected 24 outputs in 324
+   seconds. The next poll verified every output and its RunRecord; queue
+   `872b9e09` closed passed at 19:18:48 UTC. HPC3 staging remains pending at
+   this reading.[^licensed-start][^licensed-collection]
+3. Complete evaluator verification, including the separately tracked unopened
+   ciphertext and byte-limit corrections (`9cbbc85f`), and stage only the
+   encrypted training/validation bundle to private HPC3 storage. The final
+   bundle and its key remain evaluator-owned.[^licensed-collection]
+4. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
    comparison first; seal the chosen candidate and use the one-shot final release
    afterward. The selection API enforces identity, not which candidate is best.
+
+[^licensed-collection]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json`, native extraction receipt, cleanup observation, runtime inspection and preserved interrupted collection. Board tasks `a622165c-bb63-4714-933b-10d527f21478` and `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; separate verifier task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`. Extraction receipt timestamps delimit database capture, not encryption or the whole allocation. Native report author `load-report-a622165c`; installed-controller report `fd164407-3505-4207-bc2d-d0e26fa69a1f`, author `hpc-report-da2a55dc`; image build `58662034`, SHA-256 `0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912`. None of these measurements is a substantive study result.
 
 [^review-closure]: Live board tasks `4b7fe216-2670-4dbe-bee4-9970faec8258`, `54b55cc7-ff40-4753-a04e-776bce1830d0` and `1f60a20d-d860-43b3-9616-68f192bcedd9`; independent audit verdicts `0fc95070-87d9-4577-8227-b15e64f4d8ed`, `28d1701d-4bae-402e-adc9-d9a39c49f6cb` and `a6d63e70-86ad-418e-be4f-b6fd8d6275c8`, each VERIFIED. These verdicts close the named prerequisites, not the substantive study.
 
