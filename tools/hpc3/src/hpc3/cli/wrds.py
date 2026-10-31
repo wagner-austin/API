@@ -39,6 +39,7 @@ _ACTIONS = {
     "trace",
     "report",
     "scratch",
+    "scratch-report",
 }
 
 
@@ -78,25 +79,34 @@ def _prepare(action: str, flags: dict[str, str]) -> None:
         _test_hooks.emit(dump_json_str(encode_wrds_runtime(runtime)))
 
 
-def _report(run: WrdsRun, attempt: str, flags: dict[str, str], *, scratch: bool) -> None:
+def _evidence(run: WrdsRun, attempt: str, flags: dict[str, str], action: str) -> None:
     """Measure the requested native evidence and publish through one service identity.
 
     Args:
         run: Frozen native experiment.
         attempt: Exact attempt to measure.
         flags: Explicit report destination and task.
-        scratch: Request a subsequent same-node scratch observation.
+        action: Submit an observer, reconcile its report, or report the subject.
 
     Raises:
         ValueError: Invalid task or inconsistent native evidence.
         AppError: Transport or report publication fails.
     """
+    if action == "scratch":
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        observer = wrds_cleanup.submit(run, attempt, output)
+        _test_hooks.emit(dump_json_str({"observer_job_id": observer, "output": str(output)}))
+        return
     task_id = cli_args.require_flag(flags, "--report-task")
     report_identity(task_id, "wrds")
     result: JSONObject
-    if scratch:
+    if action == "scratch-report":
         output = pathlib.Path(cli_args.require_flag(flags, "--output"))
-        body = wrds_cleanup.measure(run, attempt, output)
+        measured = wrds_cleanup.measure(run, attempt, output)
+        if measured is None:
+            _test_hooks.emit(dump_json_str({"state": "accounting-pending", "output": str(output)}))
+            return
+        body = measured
         result = {"report_task": task_id, "output": str(output)}
     else:
         body, completion_digest = wrds_attempt_report.measure(run, attempt)
@@ -162,8 +172,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = pathlib.Path(cli_args.require_flag(flags, "--output"))
         result = wrds_results.collect(run, attempt, output, ledger, now)
         _test_hooks.emit(dump_json_str({"output": str(output), "identity": result["identity"]}))
-    elif action in {"report", "scratch"}:
-        _report(run, attempt, flags, scratch=action == "scratch")
+    elif action in {"report", "scratch", "scratch-report"}:
+        _evidence(run, attempt, flags, action)
     else:
         _trace(ledger, run_identity(run), attempt)
     return 0
