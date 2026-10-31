@@ -19,6 +19,29 @@ from covenant_ml.markets.crsp_rows import decode_crsp_rows
 from ._crsp_fixtures import panel_protocol, save_file, source_rows, write_sources
 
 
+def test_vendor_calendar_retains_holiday_and_weekend_rows_without_normalizing() -> None:
+    payload = (
+        b"caldt,exchangegroup,tradingflg\n"
+        b"1998-01-01,N/A,N\n1998-01-02,CIZ,Y\n1998-01-03,N/A,N\n"
+    )
+    assert decode_crsp_rows(
+        payload, "calendar", ("caldt", "exchangegroup", "tradingflg"), "2026-10-31T00:00:00Z"
+    ) == (
+        {"caldt": "1998-01-01", "exchangegroup": "N/A", "tradingflg": "N"},
+        {"caldt": "1998-01-02", "exchangegroup": "CIZ", "tradingflg": "Y"},
+        {"caldt": "1998-01-03", "exchangegroup": "N/A", "tradingflg": "N"},
+    )
+
+
+@pytest.mark.parametrize(("group", "flag"), [("CIZ", "N"), ("N/A", "Y"), ("OTHER", "N")])
+def test_calendar_refuses_inconsistent_group_and_session_flags(group: str, flag: str) -> None:
+    payload = f"caldt,exchangegroup,tradingflg\n1998-01-01,{group},{flag}\n".encode()
+    with pytest.raises(ValueError, match=r"\[CRSP-007\] require CIZ/Y sessions or N/A/N"):
+        decode_crsp_rows(
+            payload, "calendar", ("caldt", "exchangegroup", "tradingflg"), "2026-10-31T00:00:00Z"
+        )
+
+
 def test_manifest_roundtrip_and_missing_terminal_values_remain_null(tmp_path: Path) -> None:
     rows = source_rows()
     rows["delists"] = [

@@ -85,8 +85,7 @@ def test_validation_queries_clip_membership_and_date_every_relation() -> None:
         ),
         "calendar": (
             "COPY (SELECT caldt, exchangegroup, tradingflg FROM crsp_a_stock.metaexchangecalendar"
-            " WHERE exchangegroup = 'CIZ'"
-            " AND caldt BETWEEN DATE '1998-01-01' AND DATE '2022-02-28'"
+            " WHERE caldt BETWEEN DATE '1998-01-01' AND DATE '2022-02-28'"
             " ORDER BY caldt LIMIT 6) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
         ),
         "delists": (
@@ -109,7 +108,7 @@ def test_synthetic_definitions_open_every_final_statement_with_unqualified_names
     assert [statement.startswith(opening) for statement in sql.values()] == [True] * 4
     assert "FROM dsenames WHERE shrcd IN (10, 11)" in sql["membership"]
     assert "LEAST(nameendt, DATE '2025-02-28') AS nameendt" in sql["membership"]
-    assert "AND caldt BETWEEN DATE '1998-01-01' AND DATE '2025-02-28'" in sql["calendar"]
+    assert "WHERE caldt BETWEEN DATE '1998-01-01' AND DATE '2025-02-28'" in sql["calendar"]
     ending = "LIMIT 2) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
     assert [statement.endswith(ending) for statement in sql.values()] == [True] * 4
     assert "crsp_a_stock" not in "".join(sql.values())

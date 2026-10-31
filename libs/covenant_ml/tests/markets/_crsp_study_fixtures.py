@@ -63,7 +63,7 @@ def study_rows(end: date = VALIDATION_END) -> dict[str, list[JSONObject]]:
     calendar: list[JSONObject] = [
         {
             "caldt": day.isoformat(),
-            "exchangegroup": "CIZ",
+            "exchangegroup": "CIZ" if day.weekday() < 5 else "N/A",
             "tradingflg": "Y" if day.weekday() < 5 else "N",
         }
         for day in days
