@@ -28,7 +28,7 @@ from .encrypted_records import (
 )
 
 
-def _file_record(stream: BufferedIOBase, name: str) -> StagedFile:
+def staged_record(stream: BufferedIOBase, name: str) -> StagedFile:
     """Hash an open file without materializing its contents in memory."""
     size = stream.seek(0, 2)
     stream.seek(0)
@@ -59,7 +59,7 @@ class _BoundedWriter:
 
 def _verify(stream: BufferedIOBase, expected: StagedFile) -> None:
     """Require both the length and SHA-256 of the same open descriptor."""
-    if _file_record(stream, expected["name"]) != expected:
+    if staged_record(stream, expected["name"]) != expected:
         raise ValueError("ENCRYPTED_DIGEST: file differs from its frozen identity")
 
 
@@ -102,7 +102,7 @@ def encrypt_bundle(
                 hooks.backend.encrypt_io(source, target, [public])
                 target.flush()
                 encrypted.append(
-                    EncryptedFile(plaintext=plain, ciphertext=_file_record(target, cipher_name))
+                    EncryptedFile(plaintext=plain, ciphertext=staged_record(target, cipher_name))
                 )
     bundle = EncryptedBundle(
         format="age-v1",
@@ -213,4 +213,5 @@ __all__ = [
     "encrypt_bundle",
     "encrypted_stage_manifest",
     "read_encrypted_bundle",
+    "staged_record",
 ]

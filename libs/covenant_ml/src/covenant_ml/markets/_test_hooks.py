@@ -19,6 +19,7 @@ from platform_core.environment_record import (
 from platform_core.http_client import HttpxClient, SyncTransport, build_client
 
 from .campaign_process import CommandRunner, run_command
+from .crsp_process import BoundedRunner, run_bounded
 from .demo_batch import DemoBatchService, build_demo_batch
 from .demo_trial import DemoTrialService, build_demo_trial
 from .evidence_location import EvidenceRelocation, read_host_relocations
@@ -41,6 +42,7 @@ client_factory: Callable[[float, SyncTransport | None], HttpxClient] = build_cli
 host_probe: HostProbe = stdlib_host_probe(cpu_count)
 installed_version: VersionReader = _installed_version
 campaign_runner: CommandRunner = run_command
+bounded_runner: BoundedRunner = run_bounded
 evidence_relocations: Callable[[], tuple[EvidenceRelocation, ...]] = read_host_relocations
 demo_account_factory: Callable[
     [HttpxClient, KalshiSigner, Callable[[], str]], DemoAccountClient
@@ -54,6 +56,7 @@ demo_batch_factory: Callable[
 
 
 __all__ = [
+    "bounded_runner",
     "campaign_runner",
     "client_factory",
     "clock",
