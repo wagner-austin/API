@@ -8,18 +8,22 @@ properties that make that an isolation; the host case runs inside
 tools/fleet-execution-linux's own isolated build, which the docker tag
 routes through that script, and proves from there that it runs as
 execdocker, sees a rootless daemon, is refused by the stack's socket and
-cannot escalate.
+cannot escalate. A second host case reads, from the same build, that the
+venv the lane made for it runs the fleet's pinned Python (MCPs board task
+53b4725d).
 """
 
 from __future__ import annotations
 
 import subprocess
+import sys
 
 import pytest
 
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
+from fleet.contracts.toolchain import REQUIRED_PYTHON
 from fleet.core import dialect, names, recipe, tool_caches
 from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines
 from fleet.core.dialect import PROLOGUE
@@ -284,3 +288,20 @@ def test_this_suite_itself_runs_as_execdocker_and_cannot_reach_the_stack() -> No
     assert stack.returncode != 0, stack.stdout
     assert escalate.returncode != 0, escalate.stdout
     assert (prune.returncode, beside.returncode) == (1, 0), prune.stderr + beside.stderr
+
+
+@pytest.mark.host_linux_docker
+def test_this_suites_venv_runs_the_fleets_pinned_python() -> None:
+    """The venv the isolated build made for this suite is on the pinned 3.11.
+
+    Poetry builds a venv on the first ``python`` on PATH and takes no
+    ``python3``; with none on execdocker's cleared PATH, as on every Ubuntu
+    node until MCPs scripts/host/lib/fleet-exec-docker.sh step_exec_poetry
+    linked /usr/local/bin/python to /usr/bin/python3.11 (MCPs board task
+    53b4725d), it fell back to /usr/bin/python3.12, which this package's
+    ``python = "^3.11"`` accepts. So the interpreter running this case is
+    the one Poetry chose in this node's lane.
+    """
+    running = f"{sys.version_info.major}.{sys.version_info.minor}"
+
+    assert running == REQUIRED_PYTHON, sys.executable
