@@ -104,7 +104,7 @@ def _client(root: Path, body: str) -> dict[str, str]:
     client = directory / "psql"
     client.write_text("#!/bin/sh\n" + body, encoding="utf-8")
     client.chmod(0o755)
-    environment = dict(os.environ)
+    environment = dict(config_test_hooks.get_environment())
     environment["PATH"] = f"{directory}{os.pathsep}{environment['PATH']}"
     return environment
 
@@ -112,7 +112,7 @@ def _client(root: Path, body: str) -> dict[str, str]:
 def _run(
     case: Extraction, environment: dict[str, str], arguments: list[str]
 ) -> subprocess.CompletedProcess[str]:
-    environment.update(_environment(case))
+    environment.update(EXTRACT_SCRATCH=str(case.scratch), EXTRACT_OUTPUT=str(case.output))
     command = [sys.executable, "-m", "scripts.crsp_extraction", *arguments]
     return subprocess.run(
         command, env=environment, capture_output=True, text=True, timeout=120, check=False

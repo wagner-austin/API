@@ -9,7 +9,7 @@ from typing import NamedTuple
 
 from platform_core.json_utils import JSONObject, dump_json_str
 
-from covenant_ml.markets import _test_hooks as hooks
+from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.crsp_extraction_records import (
     CrspExtractionReceipt,
     CrspLimits,
@@ -24,6 +24,11 @@ from ._encrypted_fixtures import create_access
 
 #: The writer's clock in every test: the day after the fixture's coverage.
 NOW = "2026-10-31T09:00:00+00:00"
+
+
+def _now() -> str:
+    """The fixed writer clock."""
+    return NOW
 
 
 class Extraction(NamedTuple):
@@ -63,11 +68,12 @@ def limits(**changes: int) -> CrspLimits:
 @contextmanager
 def installed(database: FakeDatabase) -> Generator[FakeDatabase, None, None]:
     """Install the database and a fixed clock, restoring the real hooks afterwards."""
-    runner, clock = hooks.bounded_runner, hooks.clock
-    hooks.bounded_runner = database
-    hooks.clock = lambda: NOW
+    runner, clock = _test_hooks.bounded_runner, _test_hooks.clock
+    _test_hooks.bounded_runner = database
+    _test_hooks.clock = _now
     yield database
-    hooks.bounded_runner, hooks.clock = runner, clock
+    _test_hooks.bounded_runner = runner
+    _test_hooks.clock = clock
 
 
 def run_vendor(case: Extraction, bounds: CrspLimits) -> CrspExtractionReceipt:

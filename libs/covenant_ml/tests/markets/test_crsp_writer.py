@@ -7,7 +7,13 @@ from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict, require_int
+from platform_core.json_utils import (
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_int,
+    require_str,
+)
 
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 from covenant_ml.markets.crsp_extraction_records import (
@@ -116,15 +122,15 @@ def test_one_snapshot_yields_two_separate_sealed_partitions(
     assert list(opened.returns) == expected["returns"]
     assert list(opened.delists) == expected["delists"]
     assert len(opened.returns) == receipt["train_validation"]["returns_rows"]
-    assert {row["nameendt"] for row in opened.membership} == {"2019-12-31"}
-    assert max(row["dlycaldt"] for row in opened.returns) == "2019-12-31"
-    assert opened.calendar[-1]["caldt"] == "2020-02-29"
+    assert {require_str(row, "nameendt") for row in opened.membership} == {"2019-12-31"}
+    assert max(require_str(row, "dlycaldt") for row in opened.returns) == "2019-12-31"
+    assert require_str(opened.calendar[-1], "caldt") == "2020-02-29"
     assert _permnos(opened) == set(range(1, 9))
     sealed = _open(case, "final", receipt["final"]["bundle"]["sha256"])
     assert list(sealed.returns) == partition_rows(database_rows(), protocol, final)["returns"]
-    assert _permnos(sealed) == {*range(1, 9), LATE}
-    assert STRADDLE in {row["permno"] for row in sealed.delists}
-    assert STRADDLE not in {row["permno"] for row in opened.delists}
+    assert _permnos(sealed) == set(range(1, 9)) | {LATE}
+    assert STRADDLE in {require_int(row, "permno") for row in sealed.delists}
+    assert STRADDLE not in {require_int(row, "permno") for row in opened.delists}
     assert INELIGIBLE not in _permnos(sealed)
 
 

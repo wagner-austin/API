@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, require_str
 
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 from covenant_ml.markets.crsp_partition import check_crsp_partition
@@ -82,7 +82,9 @@ def test_empty_required_relations_are_refused_but_terminal_events_may_be_empty(
 def test_calendar_must_span_exactly_and_completely(tmp_path: Path) -> None:
     validation = crsp_scopes(database_protocol())[0]
     short = _rows(0)
-    short["calendar"] = [row for row in short["calendar"] if row["caldt"] < "2020-02-01"]
+    short["calendar"] = [
+        row for row in short["calendar"] if require_str(row, "caldt") < "2020-02-01"
+    ]
     with pytest.raises(ValueError, match=r"\[CRSP-012\] the calendar does not span"):
         check_crsp_partition(_load(tmp_path / "a", short), validation, 20000)
     holed = _rows(0)

@@ -96,9 +96,19 @@ def _valuation(row: JSONObject) -> str:
     return max(days, default=require_str(row, "delistingdt"))
 
 
-def _key(row: JSONObject, field: str) -> tuple[int, str]:
-    """Sort by security, then by one date column."""
-    return require_int(row, "permno"), require_str(row, field)
+def _by_start(row: JSONObject) -> tuple[int, str]:
+    """Membership order: security, then interval start."""
+    return require_int(row, "permno"), require_str(row, "namedt")
+
+
+def _by_day(row: JSONObject) -> tuple[int, str]:
+    """Daily order: security, then session."""
+    return require_int(row, "permno"), require_str(row, "dlycaldt")
+
+
+def _by_event(row: JSONObject) -> tuple[int, str]:
+    """Terminal-event order: security, then delisting date."""
+    return require_int(row, "permno"), require_str(row, "delistingdt")
 
 
 def partition_rows(
@@ -139,10 +149,10 @@ def partition_rows(
         and _valuation(row) <= end
     ]
     return {
-        "membership": sorted(membership, key=lambda row: _key(row, "namedt")),
-        "returns": sorted(returns, key=lambda row: _key(row, "dlycaldt")),
+        "membership": sorted(membership, key=_by_start),
+        "returns": sorted(returns, key=_by_day),
         "calendar": calendar,
-        "delists": sorted(delists, key=lambda row: _key(row, "delistingdt")),
+        "delists": sorted(delists, key=_by_event),
     }
 
 
