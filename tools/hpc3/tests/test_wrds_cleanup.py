@@ -6,7 +6,7 @@ import hashlib
 import pathlib
 
 import pytest
-from platform_core.errors import AppError
+from platform_core.errors import AppError, Hpc3ErrorCode
 from platform_core.json_utils import (
     JSONObject,
     JSONValue,
@@ -294,6 +294,7 @@ def test_changed_observer_program_is_refused(tmp_path: pathlib.Path, fake_run: F
     receipt = narrow_json_to_dict(load_json_str(path.read_text()))
     receipt["worker_sha256"] = "b" * 64
     path.write_text(dump_json_str(receipt))
-    with pytest.raises(AppError, match="DIGEST_MISMATCH"):
+    with pytest.raises(AppError) as failure:
         wrds_cleanup.measure(run, "one", output)
+    assert failure.value.code is Hpc3ErrorCode.DIGEST_MISMATCH
     assert not output.exists()
