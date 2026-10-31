@@ -26,6 +26,7 @@ from platform_core.json_utils import dump_json_str
 from fleet.cli import _config, node_collect, node_watch
 from fleet.cli.node_collected import Collected, CollectOutcome
 from fleet.contracts.ledger import NO_EXIT_CODE
+from fleet.contracts.node import NodeConfig
 from fleet.contracts.workspace import FleetWorkspace
 from fleet.core import _test_hooks, leases, queue, records
 from tests._holder_fakes import RecordingHolder
@@ -56,11 +57,11 @@ def _moved(config_path: pathlib.Path) -> _config.LoadedWorkspace:
         The loaded workspace, lavender declaring :data:`MOVED_ROOT`.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    nodes = {
-        **loaded.workspace["nodes"],
-        "lavender": {**loaded.workspace["nodes"]["lavender"], "stage_root": MOVED_ROOT},
+    lavender: NodeConfig = {**loaded.workspace["nodes"]["lavender"], "stage_root": MOVED_ROOT}
+    workspace: FleetWorkspace = {
+        **loaded.workspace,
+        "nodes": {**loaded.workspace["nodes"], "lavender": lavender},
     }
-    workspace: FleetWorkspace = {**loaded.workspace, "nodes": nodes}
     return _config.LoadedWorkspace(workspace, loaded.registry, loaded.directory)
 
 
