@@ -14,7 +14,6 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     require_bool,
     require_dict,
-    require_int,
     require_str,
 )
 from platform_core.stage_manifest import StagedFile, decode_staged_file, encode_staged_file
@@ -225,9 +224,7 @@ def decode_crsp_extraction_receipt(value: JSONValue) -> CrspExtractionReceipt:
         snapshot=snapshot,
         transaction_started_at=require_str(obj, "transaction_started_at"),
         limits=decode_crsp_limits(require_dict(obj, "limits")),
-        train_validation=decode_crsp_partition_receipt(
-            obj["train_validation"], "train-validation"
-        ),
+        train_validation=decode_crsp_partition_receipt(obj["train_validation"], "train-validation"),
         final=decode_crsp_partition_receipt(obj["final"], "final"),
         plaintext_removed=True,
     )
