@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json"
   - "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json"
   - "tools/hpc3/src/hpc3/core/wrds_cleanup.py"
@@ -68,6 +69,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json": "cb08d7053e4363b23ce2740d54bb1823bc4801fb"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json": "f69fefdc21501823201906b30f64122f04c4a931"
   "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
@@ -158,9 +160,14 @@ did not require verification before queue closure. The correction records the
 executing interpreter in the existing queue observation and explicitly adopts
 the completed native job for fresh verification. The original receipt remains
 historical evidence; it cannot retroactively gain an execution measurement.
+Adoption queue `132859b5` closed passed at 20:24:56 UTC with the measured
+`wrds-queue-a0550032d` interpreter and unchanged native job and RunRecord.
+The revised query requires matching installed/executing identities and a native
+verification report between submission and closure; altered identities, counts
+and reversed timestamp ordering each returned zero.
 Independent acceptance of the corrected collection evidence remains pending.[^collection-review]
 
-[^collection-review]: Live board audit `a814e463-b0ea-49b3-86a9-feb31b27c8e2`, check review `effd76f3-7599-4951-aa78-babd1e5a346e`; correction commits `4a8ba8ff6258c8ba4730f6935177fa886e4900ce`, `2e7232e848c5310c4b356594f4fbfa6b4c85bc66`, `a0550032d5ea977d58528c45e0ec72aa610cb855`. The canonical observation contract is described in [[wrds-research-queue-admission]].
+[^collection-review]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json`, controller measurement, live query and negative probes. Live board audit `a814e463-b0ea-49b3-86a9-feb31b27c8e2`, check review `effd76f3-7599-4951-aa78-babd1e5a346e`; correction commits `4a8ba8ff6258c8ba4730f6935177fa886e4900ce`, `2e7232e848c5310c4b356594f4fbfa6b4c85bc66`, `a0550032d5ea977d58528c45e0ec72aa610cb855`. The canonical observation contract is described in [[wrds-research-queue-admission]].
 
 The encrypted-bundle implementation passed independent audit `acd2c6c4` on
 October 30 at 21:38 UTC: all three criteria were verified. The earlier audit
