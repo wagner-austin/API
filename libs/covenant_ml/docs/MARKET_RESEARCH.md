@@ -902,10 +902,16 @@ limits) and `metrics.json` are written last. Any refusal leaves no published
 bundle. A complete calendar proves only that the calendar is complete; no
 table's date extent proves an individual security's history is complete.
 
-A synthetic session passes `schema="pg_temp"` with a setup script that builds
-temporary relations of the vendor column types before the transaction; the
-vendor run passes the protocol's library and no setup, and any other pairing is
-refused. `scripts/crsp_extraction.py` exposes `extract` for the native
+The WRDS server is a read-only hot standby (`pg_is_in_recovery()` is true on
+2026-10-31), so no session there can create even a temporary table, and WRDS
+nodes carry no PostgreSQL server. A synthetic session therefore passes
+`source="synthetic"` with a file of `WITH` definitions named like the vendor
+relations, with the vendor column types; `markets.crsp_queries.synthetic_source`
+places them at the head of every statement, so they are preserved in each saved
+query, and refuses text holding a semicolon or a backslash. The same client,
+server and read-only transaction run. The vendor run passes the protocol's
+library and no definitions, its statements are schema-qualified, and any other
+pairing is refused. `scripts/crsp_extraction.py` exposes `extract` for the native
 allocation and `verify` for the evaluator. `verify` refuses any collected file
 other than the receipt, metrics, bundle metadata and age ciphertext, opens the
 train-validation bundle with its own key through `load_crsp_sources`, and
