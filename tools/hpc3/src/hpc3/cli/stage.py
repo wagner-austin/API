@@ -15,6 +15,12 @@ trace: a corpus regenerated from the wrong source state stages clean, verifies
 clean, trains to completion, and is comparable to nothing. A check that only
 runs when someone remembers to ask for it is not protection against a failure
 nobody notices.
+
+``--inspect-root ROOT`` performs a read-only complete study-tree inspection.
+It requires ``--report-task`` and forbids ``--source-dir``: no files are sent.
+The root must contain only the manifest destination and its certificate,
+under mode-0700 directories. Every file is hashed and the inventory is reread
+before its measurement is published through the existing reporter.
 """
 
 from __future__ import annotations
