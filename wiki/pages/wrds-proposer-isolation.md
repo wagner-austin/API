@@ -98,6 +98,16 @@ reports and only one after changing the expected validation specification hash.
 No licensed rows or keys were involved; no queue submission or new cluster
 allocation was part of this handoff measurement.[^remote]
 
+The real hub lane subsequently passed all ten cases with no skips, including
+literal quotes and shell metacharacters across SSH, and a real timed-out
+proposal whose owned container was removed. The Linux isolation lane passed
+all 95 cases. An earlier hub run passed the two remote cases but failed an
+unrelated user-service identity assumption; the corrected test starts and
+inspects a bounded user service instead of treating the check's system service
+as a user service. No production tick restriction was relaxed.[^remote-gates]
+
+[^remote-gates]: `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`. Live fleet job `b2285d48-6c1f-4ee8-b1b9-3c38c6926a6c` at API `f62c99f16582589365902255c6e6bc658d6e0c75`, Diphtheria, 2026-10-31T00:03:37Z: 10 passed, 0 skipped, both remote readings report `remaining=0`. Full package job `b01f1bec-8498-4428-9b49-5caf9be7ab5a` at the same commit passed 2,561 tests with 100% coverage on Loki. Linux job `7f4fb878-467f-4220-b5aa-0c580a483663` at API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207` passed 95 cases on Lavender. Earlier hub job `a92ec475-ad65-4313-867e-18c1cef68f25` at that earlier commit failed with 9 passed and 1 failed; it is not a passing suite receipt.
+
 [^remote]: `tools/fleet/src/fleet/core/research_proposer.py`, `_checked` and `run_proposer`; `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/tests/test_research_proposer_remote.py`, quoting, transport failures, cleanup and local admission cases; `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`; `tools/fleet/tests/test_research_proposal_report.py`, service identity and outcome binding. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207` passed full check `672d626f-e949-44a2-921b-1df16de480b0` on Colossus: 2,561 tests, 100% statement/branch coverage. Read-only source installation `/home/corvis/research-control/proposer-remote-ca178d11a` runs with the existing final controller Python; it does not replace the frozen evaluator wheels. Private journal `/home/corvis/research-data/wrds/experiments/remote-proposer-20261030/journal.sqlite`. Reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` on task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, author `fleet-research-proposer`. Validation spec SHA-256 `3ee8eac1611d368a65b9238806a43382d233a1c186c4daa385ef7898b2daac70`; refused final spec `815fade7b1f1c04aaea6baf4e8f777b7e344a90cef70783f13ffe931b569ad92`.
 
 Enforced boundary, by what the proposer holds: the program text and approved
