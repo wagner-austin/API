@@ -96,7 +96,12 @@ def poll(
     task_id: str,
     environment: tuple[tuple[str, str], ...] = (),
 ) -> JSONObject:
-    """Submit once or recover the native receipt, then collect verified success.
+    """Advance one durable phase within the enclosing controller tick budget.
+
+    Submission, collection and final verification occupy separate polls. A
+    collection poll allows 60 seconds for status and 900 for transfer, leaving
+    margin inside the queue's 1020-second native deadline. Existing output
+    directories are verified, never overwritten or accepted as completion.
 
     Args:
         document: Tenant-authorized private specification with pinned native spec.
@@ -119,17 +124,19 @@ def poll(
     attempt = require_str(document, "attempt")
     prefix = (python, "-m", "hpc3.cli.wrds")
     arguments = ("--spec", str(spec), "--attempt", attempt)
-    if not require_bool(document, "adopt") and _reserve(log.parent):
+    submitted = not require_bool(document, "adopt") and _reserve(log.parent)
+    if submitted:
         research_control.invoke((*prefix, "submit", *arguments), log, 300, environment)
     status = research_control.invoke((*prefix, "status", *arguments), log, 60, environment)
     job, state = require_str(status, "job_id"), require_str(status, "state")
     if state == "failed":
         return {"state": "failed", "native_job_id": job, "record_sha256": None}
-    if state == "completed":
+    if state == "completed" and not submitted:
         if not _test_hooks.directory_exists(output):
             research_control.invoke(
-                (*prefix, "collect", *arguments, "--output", str(output)), log, 300, environment
+                (*prefix, "collect", *arguments, "--output", str(output)), log, 900, environment
             )
+            return {"state": "running", "native_job_id": job, "record_sha256": None}
         report = research_control.invoke(
             (*prefix, "report", *arguments, "--report-task", task_id), log, 300, environment
         )
