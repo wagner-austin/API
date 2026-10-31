@@ -100,17 +100,53 @@ def test_lost_submit_response_leaves_intent_for_reconciliation(tmp_path: pathlib
     assert [call[3] for call in runner.calls] == ["submit", "status"]
 
 
-@pytest.mark.parametrize("collect", [True, False])
+@pytest.mark.parametrize("adopt", [True, False])
+def test_submission_collection_and_verification_use_separate_bounded_polls(
+    tmp_path: pathlib.Path, adopt: bool
+) -> None:
+    document = _document(tmp_path, adopt=adopt)
+    status = ok('{"job_id":"123","state":"completed"}')
+    replies = [] if adopt else [ok("{}"), status]
+    replies.extend([status, ok("{}")])
+    runner = FakeRun(replies)
+    _test_hooks.run = runner
+    log = tmp_path / "transcript"
+    expected: JSONObject = {"state": "running", "native_job_id": "123", "record_sha256": None}
+    if not adopt:
+        assert research_wrds.poll(document, log, "task") == expected
+        assert [call[3] for call in runner.calls] == ["submit", "status"]
+        assert runner.timeouts == [300, 60]
+    assert research_wrds.poll(document, log, "task") == expected
+    assert [call[3] for call in runner.calls] == (
+        ["status", "collect"] if adopt else ["submit", "status", "status", "collect"]
+    )
+    assert runner.timeouts[-2:] == [60, 900]
+    # The collector's real durable files, not its process response, authorize success.
+    completion = _completion(tmp_path)
+    digest = hashlib.sha256(dump_json_str(completion).encode()).hexdigest()
+    verifier = FakeRun(
+        [status, ok(dump_json_str({"identity": "identity", "completion_sha256": digest}))]
+    )
+    _test_hooks.run = verifier
+    assert research_wrds.poll(document, log, "task") == {
+        "state": "complete",
+        "native_job_id": "123",
+        "record_sha256": hashlib.sha256(
+            (tmp_path / "collected/results.runrecord.json").read_bytes()
+        ).hexdigest(),
+    }
+    assert [call[3] for call in verifier.calls] == ["status", "report"]
+    assert verifier.timeouts == [60, 300]
+    assert (tmp_path / "submission.intent").exists() is not adopt
+
+
 def test_completion_is_reverified_and_credentials_are_not_logged(
-    tmp_path: pathlib.Path, collect: bool
+    tmp_path: pathlib.Path,
 ) -> None:
     document = _document(tmp_path, adopt=True)
     completion = _completion(tmp_path)
     digest = hashlib.sha256(dump_json_str(completion).encode()).hexdigest()
     replies = [ok('{"job_id":"123","state":"completed"}')]
-    if collect:
-        replies.append(ok("{}"))
-        _test_hooks.directory_exists = lambda path: False
     replies.append(ok(dump_json_str({"identity": "identity", "completion_sha256": digest})))
     runner = FakeRun(replies)
     _test_hooks.run = runner
@@ -123,12 +159,30 @@ def test_completion_is_reverified_and_credentials_are_not_logged(
             (tmp_path / "collected/results.runrecord.json").read_bytes()
         ).hexdigest(),
     }
-    assert [call[3] for call in runner.calls] == (
-        ["status", "collect", "report"] if collect else ["status", "report"]
-    )
+    assert [call[3] for call in runner.calls] == ["status", "report"]
     assert all(value == (("PRIVATE_TOKEN", "secret-value"),) for value in runner.set_env)
     assert "secret-value" not in log.read_text()
     assert not (tmp_path / "submission.intent").exists()
+
+
+@pytest.mark.parametrize("missing", ["completion.json", "results.runrecord.json", "outputs/data"])
+def test_partial_collection_is_preserved_and_cannot_close_success(
+    tmp_path: pathlib.Path, missing: str
+) -> None:
+    completion = _completion(tmp_path)
+    digest = hashlib.sha256(dump_json_str(completion).encode()).hexdigest()
+    (tmp_path / "collected" / missing).unlink()
+    runner = FakeRun(
+        [
+            ok('{"job_id":"123","state":"completed"}'),
+            ok(dump_json_str({"identity": "identity", "completion_sha256": digest})),
+        ]
+    )
+    _test_hooks.run = runner
+    with pytest.raises(FileNotFoundError):
+        research_wrds.poll(_document(tmp_path, adopt=True), tmp_path / "transcript", "task")
+    assert [call[3] for call in runner.calls] == ["status", "report"]
+    assert not (tmp_path / "collected" / missing).exists()
 
 
 @pytest.mark.parametrize(
