@@ -719,8 +719,16 @@ through `holdout_end`, and reuses the validation study's holdings, arms and
 paired comparisons; its record is labelled `final-<attempt>`. The cases in
 `test_research_final.py` and `test_crsp_final.py` exercise each refusal on real
 journals and show that changing outcomes after the last final decision changes
-no fit or selection. Choosing which completed attempt to select remains the
-evaluator's decision.
+no fit or selection. The existing journal's selection transition now requires
+the winning candidate's frozen final seed. It ranks complete seed groups from
+their verified monthly RunRecord observations, using the frozen primary arm,
+reference, cost and consecutive calendar. Required initial candidates must have
+every seed; incomplete optional candidates are ineligible. It averages paired
+monthly differences across seeds in ascending seed order, then across months,
+using `math.fsum`; exact score ties prefer fewer leaves, then candidate digest.
+Wrong candidates and noncanonical final seeds are refused even through a direct
+journal event. This gate does not authenticate the caller or compute a pooled
+uncertainty interval; the journal remains evaluator-owned.
 
 Proposers reach this package only as data. Their programs run through
 `tools/fleet`'s `fleet.cli.research_propose`, which executes evaluator-pinned
@@ -735,7 +743,9 @@ or WRDS credentials; such a session is privileged access by definition.
 policy. It uses `platform_core.event_journal.EventJournal`, lifted from the
 execution rehearsal; those rehearsal callers now use the same persistence code.
 The policy pins protocol, dataset, code and image digests, permitted features and
-seeds, and candidate, runtime, tree and leaf ceilings. Proposals reuse the existing
+seeds, candidate, runtime, tree and leaf ceilings, and mandatory selection rules.
+The selection calendar and primary cost must match the study design before
+decryption. Proposals reuse the existing
 benchmark configuration codec and cannot supply a shell command or data path.
 
 From this package, initialize and use a study with:
