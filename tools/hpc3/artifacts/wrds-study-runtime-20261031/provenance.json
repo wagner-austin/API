@@ -1,0 +1,578 @@
+{
+  "board_task": "2e8b95b0-0f7e-4a04-9994-94fcd8ec2294",
+  "collection_audit": {
+    "id": "18e302d9-4c55-483f-b8d0-c204f14d1378",
+    "verdict": "VERIFIED",
+    "completed_at": "2026-10-31T21:58:49.057Z"
+  },
+  "runtime_source": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+  "production_source_equivalence": "git diff 3b20b14e96ddb7c48ffd38f342f4883c9e16e511 d3c4912a59e55ff64b9626a66c1fcf3fa89341d4 -- libs/covenant_ml/src libs/covenant_ml/scripts tools/hpc3/src: no differences",
+  "controller_report": "202da96b-342e-4b90-bb1b-a7bb754df364",
+  "image_report": "9dde1016-5b7f-47b0-829a-d5e4e08e8ea5",
+  "build_stage_report": "a7f98ca1-a9c1-40e9-b304-7d6647adb986",
+  "wheels_stage_report": "6771c6b6-e53d-4c20-a8ac-24d823f9729b",
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+    "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-evidence-3b20b14e9/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+        "installed_files": 351
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "9fb2f51fdf2dd7c47baff2ab60cf66137271de5d8741f3c2aca085fcc359cf3d",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      }
+    },
+    "installed_files": 581,
+    "selfcheck_sha256": "6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e"
+  },
+  "image": {
+    "kind": "HPC3_IMAGE_BUILD_EVIDENCE",
+    "ledger": {
+      "job_id": "58682261",
+      "project": "cleargbm",
+      "name": "cleargbm.image-study-3b20b14e9",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-10-31T22:15:07.842676+00:00",
+      "log_dir": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9",
+      "deterministic": false,
+      "experiment": {
+        "kind": "image-build",
+        "image_dir": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9"
+      },
+      "image_digest": "",
+      "submitter": "fleet-research-diphtheria",
+      "artifact": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/research-study.sif",
+      "image_drift": {
+        "image_commit": "",
+        "head": "",
+        "modules": []
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58682261",
+        "name": "cleargbm.image-study-3b20b14e9",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 119,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-14-07"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-31T22:15:09",
+      "ended_at": "2026-10-31T22:17:08"
+    },
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build.sbatch": "17ff5107a302473d5266f287b7343b4d9943f7a81f1e46359ca34d8bdcb1a6b3",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build.sh": "376ceda15c626f663d37da5f7587a343c358b48b82f53b18e86c0bee6fb4d123",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/image.def": "68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/requirements.txt": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/selfcheck.py": "6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/covenant_ml-0.1.0-py3-none-any.whl": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/GIT_COMMIT": "9e2d55dfa810b97e556c67479cdde92e094f64c9c33e228e72771408b56237fb",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/research-study.sif": "67831aa9e885d91788770839643b092be7d0297eb6a3dd699bd62d4261da9818",
+      "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build-58682261.out": "ae763d9bdf0803bd7c7c49941e3c3368e249f86f3e00e66a0c431695edb4292f"
+    },
+    "image_mtime": 1793485022,
+    "log_mtime": 1793485028,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "stage": {
+    "build": {
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "host": "hpc3",
+      "manifest": {
+        "destination": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9",
+        "files": [
+          {
+            "name": "build.sbatch",
+            "sha256": "17ff5107a302473d5266f287b7343b4d9943f7a81f1e46359ca34d8bdcb1a6b3",
+            "size_bytes": 2122
+          },
+          {
+            "name": "build.sh",
+            "sha256": "376ceda15c626f663d37da5f7587a343c358b48b82f53b18e86c0bee6fb4d123",
+            "size_bytes": 741
+          },
+          {
+            "name": "image.def",
+            "sha256": "68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b",
+            "size_bytes": 3203
+          },
+          {
+            "name": "requirements.txt",
+            "sha256": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+            "size_bytes": 900
+          },
+          {
+            "name": "selfcheck.py",
+            "sha256": "6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675",
+            "size_bytes": 6853
+          }
+        ],
+        "provenance": {
+          "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+          "board_task": "2e8b95b0-0f7e-4a04-9994-94fcd8ec2294",
+          "prior_spec_sha256": "6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c",
+          "controller_provenance_sha256": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e"
+        }
+      },
+      "manifest_sha256": "836d6ab16df8a222e40b895e8ff3c551abaa167c8c698e25ae3eec5ca377f16c",
+      "expected_sha256": "3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5",
+      "verified_files": 5,
+      "certification_path": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build-stage-digests.txt",
+      "certification_sha256": "be5e51e742164b31fe91ccb3419e028df905c73a90377892ac4d9bbdae018eeb",
+      "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    },
+    "wheels": {
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "host": "hpc3",
+      "manifest": {
+        "destination": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels",
+        "files": [
+          {
+            "name": "cleargbm-0.1.0-py3-none-any.whl",
+            "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+            "size_bytes": 34972
+          },
+          {
+            "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+            "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+            "size_bytes": 618460
+          },
+          {
+            "name": "covenant_domain-0.1.0-py3-none-any.whl",
+            "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+            "size_bytes": 11753
+          },
+          {
+            "name": "covenant_ml-0.1.0-py3-none-any.whl",
+            "sha256": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+            "size_bytes": 790585
+          },
+          {
+            "name": "platform_core-0.1.0-py3-none-any.whl",
+            "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+            "size_bytes": 286120
+          },
+          {
+            "name": "platform_ml-0.1.0-py3-none-any.whl",
+            "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+            "size_bytes": 52844
+          }
+        ],
+        "provenance": {
+          "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+          "board_task": "2e8b95b0-0f7e-4a04-9994-94fcd8ec2294",
+          "prior_spec_sha256": "6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c",
+          "controller_provenance_sha256": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e"
+        }
+      },
+      "manifest_sha256": "44f73a392c91c267569d1945f8a347604ba2de9277e4ca29d5b60bd4fb9b0214",
+      "expected_sha256": "3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5",
+      "verified_files": 6,
+      "certification_path": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/wheels-stage-digests.txt",
+      "certification_sha256": "73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c",
+      "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    }
+  },
+  "image_spec": {
+    "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
+    "env_prefix": "/opt/env",
+    "git_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+    "system_packages": [
+      "libgomp1=12.2.0-14+deb12u1"
+    ],
+    "extra_index_urls": [],
+    "requirements": [
+      "alembic==1.17.2",
+      "annotated-doc==0.0.4",
+      "annotated-types==0.7.0",
+      "anyio==4.12.0",
+      "certifi==2025.11.12",
+      "cffi==2.1.1",
+      "cloudpickle==3.1.2",
+      "colorlog==6.10.1",
+      "cryptography==50.0.2",
+      "fastapi==0.124.0",
+      "greenlet==3.3.0",
+      "h11==0.16.0",
+      "httpcore==1.0.9",
+      "httpx==0.28.1",
+      "idna==3.11",
+      "joblib==1.5.2",
+      "lightgbm==4.6.0",
+      "llvmlite==0.46.0",
+      "mako==1.3.10",
+      "markdown-it-py==4.0.0",
+      "markupsafe==3.0.3",
+      "mdurl==0.1.2",
+      "numba==0.63.1",
+      "numpy==2.3.5",
+      "nvidia-nccl-cu12==2.27.5",
+      "optuna==4.6.0",
+      "packaging==25.0",
+      "pandas==2.3.3",
+      "polars-runtime-32==1.36.1",
+      "polars==1.36.1",
+      "pycparser==3.11",
+      "pydantic-core==2.41.5",
+      "pydantic==2.12.5",
+      "pygments==2.19.2",
+      "pyrage==1.4.0",
+      "python-dateutil==2.9.0.post0",
+      "pytz==2025.2",
+      "pyyaml==6.0.3",
+      "rich==14.2.0",
+      "scikit-learn==1.7.2",
+      "scipy==1.16.3",
+      "sentencepiece==0.2.1",
+      "shap==0.51.0",
+      "six==1.17.0",
+      "slicer==0.0.8",
+      "sqlalchemy==2.0.45",
+      "starlette==0.50.0",
+      "threadpoolctl==3.6.0",
+      "tqdm==4.67.1",
+      "typing-extensions==4.15.0",
+      "typing-inspection==0.4.2",
+      "tzdata==2025.3",
+      "xgboost==3.1.2"
+    ],
+    "wheels": [
+      "cleargbm-0.1.0-py3-none-any.whl",
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+      "covenant_domain-0.1.0-py3-none-any.whl",
+      "covenant_ml-0.1.0-py3-none-any.whl",
+      "platform_core-0.1.0-py3-none-any.whl",
+      "platform_ml-0.1.0-py3-none-any.whl"
+    ],
+    "expected_versions": {
+      "pycparser": "3.11",
+      "certifi": "2025.11.12",
+      "pytz": "2025.2",
+      "scikit-learn": "1.7.2",
+      "pydantic-core": "2.41.5",
+      "polars-runtime-32": "1.36.1",
+      "xgboost": "3.1.2",
+      "six": "1.17.0",
+      "markupsafe": "3.0.3",
+      "cffi": "2.1.1",
+      "sqlalchemy": "2.0.45",
+      "pydantic": "2.12.5",
+      "cloudpickle": "3.1.2",
+      "markdown-it-py": "4.0.0",
+      "pyyaml": "6.0.3",
+      "httpcore": "1.0.9",
+      "alembic": "1.17.2",
+      "scipy": "1.16.3",
+      "mdurl": "0.1.2",
+      "polars": "1.36.1",
+      "typing-inspection": "0.4.2",
+      "joblib": "1.5.2",
+      "optuna": "4.6.0",
+      "nvidia-nccl-cu12": "2.27.5",
+      "h11": "0.16.0",
+      "starlette": "0.50.0",
+      "llvmlite": "0.46.0",
+      "numpy": "2.3.5",
+      "packaging": "25.0",
+      "annotated-types": "0.7.0",
+      "idna": "3.11",
+      "greenlet": "3.3.0",
+      "mako": "1.3.10",
+      "anyio": "4.12.0",
+      "numba": "0.63.1",
+      "threadpoolctl": "3.6.0",
+      "annotated-doc": "0.0.4",
+      "tzdata": "2025.3",
+      "lightgbm": "4.6.0",
+      "pyrage": "1.4.0",
+      "colorlog": "6.10.1",
+      "shap": "0.51.0",
+      "pygments": "2.19.2",
+      "rich": "14.2.0",
+      "python-dateutil": "2.9.0.post0",
+      "slicer": "0.0.8",
+      "typing-extensions": "4.15.0",
+      "sentencepiece": "0.2.1",
+      "pandas": "2.3.3",
+      "tqdm": "4.67.1",
+      "fastapi": "0.124.0",
+      "httpx": "0.28.1",
+      "cryptography": "50.0.2"
+    },
+    "required_symbols": [
+      {
+        "module": "covenant_ml.markets.research_trial",
+        "attribute": "execute_trial"
+      },
+      {
+        "module": "covenant_ml.markets.research_final",
+        "attribute": "execute_final"
+      },
+      {
+        "module": "covenant_ml.markets.research_keys",
+        "attribute": "EvaluatorKeys"
+      },
+      {
+        "module": "covenant_ml.markets.encrypted_storage",
+        "attribute": "decrypted_bundle"
+      },
+      {
+        "module": "covenant_ml.evaluation.evidence",
+        "attribute": "require_private_directory"
+      },
+      {
+        "module": "pyrage",
+        "attribute": "decrypt_io"
+      },
+      {
+        "module": "cleargbm_rs",
+        "attribute": "train_gradient_boosting_rs"
+      },
+      {
+        "module": "covenant_ml.markets.research_release",
+        "attribute": "consume_final_grant"
+      },
+      {
+        "module": "covenant_ml.markets.research_native_final",
+        "attribute": "reconcile_final_attempt"
+      },
+      {
+        "module": "covenant_ml.markets.crsp_verify",
+        "attribute": "verify_crsp_extraction"
+      },
+      {
+        "module": "covenant_ml.markets.crsp_writer",
+        "attribute": "extract_crsp"
+      },
+      {
+        "module": "platform_core.load_report",
+        "attribute": "post_load_report"
+      },
+      {
+        "module": "covenant_ml.markets.encrypted_storage",
+        "attribute": "verify_encrypted_bundle"
+      }
+    ],
+    "smoke_commands": [
+      "/opt/env/bin/python -m pip check"
+    ],
+    "labels": {
+      "org.corvis.env-source": "/home/corvis/research-build/encrypted-44fa91cea/python/cpython-3.11.16-linux-x86_64-gnu"
+    },
+    "project": "cleargbm"
+  },
+  "definition": "Bootstrap: docker\nFrom: python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84\n\n# Generated by hpc3.core.image_definition.render_definition. Do not\n# hand-edit: the self-check shipped alongside is rendered from the same\n# spec, and editing one reintroduces the drift an image removes.\n\n%files\n    requirements.txt /opt/spec/requirements.txt\n    selfcheck.py /opt/spec/selfcheck.py\n    GIT_COMMIT /opt/spec/GIT_COMMIT\n    wheels /opt/wheels\n\n%post\n    set -eu\n\n    # Operating-system layer. Some dependencies are not wheels: a JVM,\n    # an X server and a software GL stack cannot be pip-installed.\n    export DEBIAN_FRONTEND=noninteractive\n\n    # APT drops privileges to the '_apt' user before fetching, and in\n    # an unprivileged apptainer build that is not allowed: HPC3 lists\n    # no subuid mapping for the user and ships no fakeroot, so the\n    # build runs in a root-mapped namespace where seteuid(42) fails\n    # and apt's http method dies with 'Sub-process http returned an\n    # error code (112)'. Measured on the first image to declare an OS\n    # layer at all (job 55662349, 2026-08-30). Telling apt not to drop\n    # privileges is the whole fix; as real root it is a no-op, so one\n    # rendering serves a privileged build and an unprivileged one.\n    apt-get -o APT::Sandbox::User=root update\n    apt-get -o APT::Sandbox::User=root install -y --no-install-recommends \\\n        libgomp1=12.2.0-14+deb12u1\n    rm -rf /var/lib/apt/lists/*\n\n    python -m venv /opt/env\n    /opt/env/bin/pip install --no-cache-dir --upgrade pip\n\n    # Third-party layer, every version pinned by the spec.\n    /opt/env/bin/pip install --no-cache-dir -r /opt/spec/requirements.txt\n\n    # First-party layer. --no-deps because the pins above ARE the\n    # captured environment; resolving again would silently move one.\n    /opt/env/bin/pip install --no-cache-dir --no-deps /opt/wheels/*.whl\n\n    # Provenance the trainer stamps into every manifest it writes.\n    cp /opt/spec/GIT_COMMIT /opt/env/GIT_COMMIT\n\n    # %files preserves the HOST's permissions and %post runs as root,\n    # so a file staged mode 640 lands root-owned and unreadable by the\n    # unprivileged user who later runs the image. Measured: the first\n    # build produced /opt/spec/selfcheck.py as 'nobody nogroup' 640,\n    # and re-running the verification failed with EACCES while the\n    # environment itself imported fine. An image whose own check\n    # cannot be re-run is an image nobody can re-verify, so the modes\n    # are set here rather than left to whatever umask staged them.\n    chmod -R a+rX /opt/spec /opt/env\n\n    # Fail the build, not the first job to use the image.\n    /opt/env/bin/python /opt/spec/selfcheck.py\n\n%environment\n    export PATH=/opt/env/bin:$PATH\n    export PYTHONDONTWRITEBYTECODE=1\n\n%labels\n    org.corvis.env-source /home/corvis/research-build/encrypted-44fa91cea/python/cpython-3.11.16-linux-x86_64-gnu\n\n%help\n    Rendered from an hpc3 image spec. Corpora and artifacts are\n    bind-mounted, never baked in; their identity is carried by digest\n    verification at staging time.\n\n    Self-check:  apptainer exec <image> /opt/env/bin/python /opt/spec/selfcheck.py\n",
+  "audit_queries": {
+    "image": "SELECT count(*) FROM agent_task_updates WHERE id='9dde1016-5b7f-47b0-829a-d5e4e08e8ea5' AND task_id='2e8b95b0-0f7e-4a04-9994-94fcd8ec2294' AND author='hpc-report-2e8b95b0' AND body LIKE 'HPC3 IMAGE BUILD LOAD-REPORT%' AND created_at > '2026-10-31T22:17:08Z'::timestamptz AND split_part(body,chr(10),2)::jsonb='{\"kind\":\"HPC3_IMAGE_BUILD_EVIDENCE\",\"ledger\":{\"job_id\":\"58682261\",\"project\":\"cleargbm\",\"name\":\"cleargbm.image-study-3b20b14e9\",\"host\":\"hpc3\",\"partition\":\"free\",\"submitted_at\":\"2026-10-31T22:15:07.842676+00:00\",\"log_dir\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9\",\"deterministic\":false,\"experiment\":{\"kind\":\"image-build\",\"image_dir\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9\"},\"image_digest\":\"\",\"submitter\":\"fleet-research-diphtheria\",\"artifact\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/research-study.sif\",\"image_drift\":{\"image_commit\":\"\",\"head\":\"\",\"modules\":[]}},\"accounting\":{\"job\":{\"job_id\":\"58682261\",\"name\":\"cleargbm.image-study-3b20b14e9\",\"partition\":\"free\",\"state\":\"COMPLETED\",\"elapsed_seconds\":119,\"billing_tres\":8,\"gpu_count\":0,\"cpu_count\":8,\"node_list\":\"hpc3-14-07\"},\"exit_code\":\"0:0\",\"started_at\":\"2026-10-31T22:15:09\",\"ended_at\":\"2026-10-31T22:17:08\"},\"verified_files\":{\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build.sbatch\":\"17ff5107a302473d5266f287b7343b4d9943f7a81f1e46359ca34d8bdcb1a6b3\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build.sh\":\"376ceda15c626f663d37da5f7587a343c358b48b82f53b18e86c0bee6fb4d123\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/image.def\":\"68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/requirements.txt\":\"941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/selfcheck.py\":\"6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/cleargbm-0.1.0-py3-none-any.whl\":\"122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl\":\"9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/covenant_domain-0.1.0-py3-none-any.whl\":\"307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/covenant_ml-0.1.0-py3-none-any.whl\":\"b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/platform_core-0.1.0-py3-none-any.whl\":\"13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/platform_ml-0.1.0-py3-none-any.whl\":\"bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/GIT_COMMIT\":\"9e2d55dfa810b97e556c67479cdde92e094f64c9c33e228e72771408b56237fb\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/research-study.sif\":\"67831aa9e885d91788770839643b092be7d0297eb6a3dd699bd62d4261da9818\",\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build-58682261.out\":\"ae763d9bdf0803bd7c7c49941e3c3368e249f86f3e00e66a0c431695edb4292f\"},\"image_mtime\":1793485022,\"log_mtime\":1793485028,\"selfcheck_passes\":2,\"dependency_check\":\"passed\"}'::jsonb",
+    "controller_stage": "WITH reports AS (SELECT id,created_at,split_part(body,chr(10),2)::jsonb AS d FROM agent_task_updates WHERE task_id='2e8b95b0-0f7e-4a04-9994-94fcd8ec2294' AND author='hpc-report-2e8b95b0' AND id IN ('202da96b-342e-4b90-bb1b-a7bb754df364','a7f98ca1-a9c1-40e9-b304-7d6647adb986','6771c6b6-e53d-4c20-a8ac-24d823f9729b')) SELECT count(*) FROM reports c CROSS JOIN reports b CROSS JOIN reports w WHERE c.id='202da96b-342e-4b90-bb1b-a7bb754df364' AND b.id='a7f98ca1-a9c1-40e9-b304-7d6647adb986' AND w.id='6771c6b6-e53d-4c20-a8ac-24d823f9729b' AND c.d='{\"kind\":\"HPC3_CONTROLLER_EVIDENCE\",\"source_commit\":\"3b20b14e96ddb7c48ffd38f342f4883c9e16e511\",\"controller_python\":\"/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"site_packages\":\"/home/corvis/research-control/wrds-evidence-3b20b14e9/lib/python3.11/site-packages\",\"verified_wheels\":{\"covenant_ml-0.1.0-py3-none-any.whl\":{\"sha256\":\"b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982\",\"installed_files\":351},\"hpc3-0.1.0-py3-none-any.whl\":{\"sha256\":\"9fb2f51fdf2dd7c47baff2ab60cf66137271de5d8741f3c2aca085fcc359cf3d\",\"installed_files\":134},\"platform_core-0.1.0-py3-none-any.whl\":{\"sha256\":\"13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea\",\"installed_files\":96}},\"installed_files\":581,\"selfcheck_sha256\":\"6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675\",\"selfcheck\":\"image self-check OK\",\"dependency_check\":\"No broken requirements found.\",\"provenance_sha256\":\"717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e\"}'::jsonb AND b.d='{\"kind\":\"HPC3_STAGE_EVIDENCE\",\"host\":\"hpc3\",\"manifest\":{\"destination\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9\",\"files\":[{\"name\":\"build.sbatch\",\"sha256\":\"17ff5107a302473d5266f287b7343b4d9943f7a81f1e46359ca34d8bdcb1a6b3\",\"size_bytes\":2122},{\"name\":\"build.sh\",\"sha256\":\"376ceda15c626f663d37da5f7587a343c358b48b82f53b18e86c0bee6fb4d123\",\"size_bytes\":741},{\"name\":\"image.def\",\"sha256\":\"68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b\",\"size_bytes\":3203},{\"name\":\"requirements.txt\",\"sha256\":\"941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb\",\"size_bytes\":900},{\"name\":\"selfcheck.py\",\"sha256\":\"6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675\",\"size_bytes\":6853}],\"provenance\":{\"source_commit\":\"3b20b14e96ddb7c48ffd38f342f4883c9e16e511\",\"board_task\":\"2e8b95b0-0f7e-4a04-9994-94fcd8ec2294\",\"prior_spec_sha256\":\"6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c\",\"controller_provenance_sha256\":\"717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e\"}},\"manifest_sha256\":\"836d6ab16df8a222e40b895e8ff3c551abaa167c8c698e25ae3eec5ca377f16c\",\"expected_sha256\":\"3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5\",\"verified_files\":5,\"certification_path\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/build-stage-digests.txt\",\"certification_sha256\":\"be5e51e742164b31fe91ccb3419e028df905c73a90377892ac4d9bbdae018eeb\",\"controller_python\":\"/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"}'::jsonb AND w.d='{\"kind\":\"HPC3_STAGE_EVIDENCE\",\"host\":\"hpc3\",\"manifest\":{\"destination\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels\",\"files\":[{\"name\":\"cleargbm-0.1.0-py3-none-any.whl\",\"sha256\":\"122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793\",\"size_bytes\":34972},{\"name\":\"cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl\",\"sha256\":\"9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad\",\"size_bytes\":618460},{\"name\":\"covenant_domain-0.1.0-py3-none-any.whl\",\"sha256\":\"307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7\",\"size_bytes\":11753},{\"name\":\"covenant_ml-0.1.0-py3-none-any.whl\",\"sha256\":\"b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982\",\"size_bytes\":790585},{\"name\":\"platform_core-0.1.0-py3-none-any.whl\",\"sha256\":\"13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea\",\"size_bytes\":286120},{\"name\":\"platform_ml-0.1.0-py3-none-any.whl\",\"sha256\":\"bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501\",\"size_bytes\":52844}],\"provenance\":{\"source_commit\":\"3b20b14e96ddb7c48ffd38f342f4883c9e16e511\",\"board_task\":\"2e8b95b0-0f7e-4a04-9994-94fcd8ec2294\",\"prior_spec_sha256\":\"6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c\",\"controller_provenance_sha256\":\"717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e\"}},\"manifest_sha256\":\"44f73a392c91c267569d1945f8a347604ba2de9277e4ca29d5b60bd4fb9b0214\",\"expected_sha256\":\"3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5\",\"verified_files\":6,\"certification_path\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/wheels-stage-digests.txt\",\"certification_sha256\":\"73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c\",\"controller_python\":\"/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"}'::jsonb",
+    "wheel_inventory": "SELECT count(*) FROM agent_task_updates WHERE id='caa7bcfb-6160-4f7e-9e2f-d5e9880ca13c' AND task_id='2e8b95b0-0f7e-4a04-9994-94fcd8ec2294' AND author='hpc-report-2e8b95b0' AND split_part(body,chr(10),2)::jsonb='{\"kind\":\"HPC3_STAGE_INSPECTION\",\"host\":\"hpc3\",\"manifest\":{\"destination\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels\",\"files\":[{\"name\":\"cleargbm-0.1.0-py3-none-any.whl\",\"sha256\":\"122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793\",\"size_bytes\":34972},{\"name\":\"cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl\",\"sha256\":\"9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad\",\"size_bytes\":618460},{\"name\":\"covenant_domain-0.1.0-py3-none-any.whl\",\"sha256\":\"307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7\",\"size_bytes\":11753},{\"name\":\"covenant_ml-0.1.0-py3-none-any.whl\",\"sha256\":\"b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982\",\"size_bytes\":790585},{\"name\":\"platform_core-0.1.0-py3-none-any.whl\",\"sha256\":\"13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea\",\"size_bytes\":286120},{\"name\":\"platform_ml-0.1.0-py3-none-any.whl\",\"sha256\":\"bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501\",\"size_bytes\":52844}],\"provenance\":{\"source_commit\":\"3b20b14e96ddb7c48ffd38f342f4883c9e16e511\",\"board_task\":\"2e8b95b0-0f7e-4a04-9994-94fcd8ec2294\",\"prior_spec_sha256\":\"6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c\",\"controller_provenance_sha256\":\"717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e\"}},\"manifest_sha256\":\"44f73a392c91c267569d1945f8a347604ba2de9277e4ca29d5b60bd4fb9b0214\",\"expected_sha256\":\"3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5\",\"verified_files\":6,\"certification_path\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/wheels-stage-digests.txt\",\"certification_sha256\":\"73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c\",\"controller_python\":\"/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"inventory\":{\"root\":\"/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels\",\"directories\":{\"\":448},\"files\":[{\"name\":\"cleargbm-0.1.0-py3-none-any.whl\",\"size_bytes\":34972,\"sha256\":\"122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793\"},{\"name\":\"cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl\",\"size_bytes\":618460,\"sha256\":\"9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad\"},{\"name\":\"covenant_domain-0.1.0-py3-none-any.whl\",\"size_bytes\":11753,\"sha256\":\"307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7\"},{\"name\":\"covenant_ml-0.1.0-py3-none-any.whl\",\"size_bytes\":790585,\"sha256\":\"b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982\"},{\"name\":\"platform_core-0.1.0-py3-none-any.whl\",\"size_bytes\":286120,\"sha256\":\"13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea\"},{\"name\":\"platform_ml-0.1.0-py3-none-any.whl\",\"size_bytes\":52844,\"sha256\":\"bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501\"},{\"name\":\"wheels-stage-digests.txt\",\"size_bytes\":912,\"sha256\":\"73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c\"}]}}'::jsonb"
+  },
+  "audit_probes": [
+    {
+      "name": "image",
+      "expected": "1",
+      "actual": "1"
+    },
+    {
+      "name": "controller_stage",
+      "expected": "1",
+      "actual": "1"
+    },
+    {
+      "name": "image",
+      "changed_from": "\"selfcheck_passes\":2",
+      "changed_to": "\"selfcheck_passes\":3",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "image",
+      "changed_from": "\"state\":\"COMPLETED\"",
+      "changed_to": "\"state\":\"FAILED\"",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "image",
+      "changed_from": "67831aa9e885d91788770839643b092be7d0297eb6a3dd699bd62d4261da9818",
+      "changed_to": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "image",
+      "changed_from": "\"job_id\":\"58682261\"",
+      "changed_to": "\"job_id\":\"58682260\"",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "controller_stage",
+      "changed_from": "\"installed_files\":581",
+      "changed_to": "\"installed_files\":580",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "controller_stage",
+      "changed_from": "\"verified_files\":6",
+      "changed_to": "\"verified_files\":7",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "controller_stage",
+      "changed_from": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+      "changed_to": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "controller_stage",
+      "changed_from": "6373b38c8590b31c001ed049a76867e7b1e891e8e8d318e1ea7abca52e1f9675",
+      "changed_to": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "wheel_inventory",
+      "expected": "1",
+      "actual": "1"
+    },
+    {
+      "name": "wheel_inventory changed directory mode",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "wheel_inventory changed file count",
+      "expected": "0",
+      "actual": "0"
+    }
+  ],
+  "limits": "Runtime construction and installed-controller verification only. Licensed decoding, substantive baseline and controlled final evaluation have not run. No partition key was acquired or sent during image construction.",
+  "wheel_inventory_report": "caa7bcfb-6160-4f7e-9e2f-d5e9880ca13c",
+  "wheel_inventory": {
+    "kind": "HPC3_STAGE_INSPECTION",
+    "host": "hpc3",
+    "manifest": {
+      "destination": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels",
+      "files": [
+        {
+          "name": "cleargbm-0.1.0-py3-none-any.whl",
+          "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+          "size_bytes": 34972
+        },
+        {
+          "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+          "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+          "size_bytes": 618460
+        },
+        {
+          "name": "covenant_domain-0.1.0-py3-none-any.whl",
+          "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+          "size_bytes": 11753
+        },
+        {
+          "name": "covenant_ml-0.1.0-py3-none-any.whl",
+          "sha256": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+          "size_bytes": 790585
+        },
+        {
+          "name": "platform_core-0.1.0-py3-none-any.whl",
+          "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+          "size_bytes": 286120
+        },
+        {
+          "name": "platform_ml-0.1.0-py3-none-any.whl",
+          "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+          "size_bytes": 52844
+        }
+      ],
+      "provenance": {
+        "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+        "board_task": "2e8b95b0-0f7e-4a04-9994-94fcd8ec2294",
+        "prior_spec_sha256": "6c92e220d7baf8c1f1b3a710cd0e0904f097f7cf28de9fa58ebb5719a254e96c",
+        "controller_provenance_sha256": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e"
+      }
+    },
+    "manifest_sha256": "44f73a392c91c267569d1945f8a347604ba2de9277e4ca29d5b60bd4fb9b0214",
+    "expected_sha256": "3127d38940380a234343355f5ff8661ce90207e35f4b29964a30ef7b670cd8e5",
+    "verified_files": 6,
+    "certification_path": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels/wheels-stage-digests.txt",
+    "certification_sha256": "73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c",
+    "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "inventory": {
+      "root": "/data/homezvol1/wagnera3/research-images/study-3b20b14e9/wheels",
+      "directories": {
+        "": 448
+      },
+      "files": [
+        {
+          "name": "cleargbm-0.1.0-py3-none-any.whl",
+          "size_bytes": 34972,
+          "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793"
+        },
+        {
+          "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+          "size_bytes": 618460,
+          "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad"
+        },
+        {
+          "name": "covenant_domain-0.1.0-py3-none-any.whl",
+          "size_bytes": 11753,
+          "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7"
+        },
+        {
+          "name": "covenant_ml-0.1.0-py3-none-any.whl",
+          "size_bytes": 790585,
+          "sha256": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982"
+        },
+        {
+          "name": "platform_core-0.1.0-py3-none-any.whl",
+          "size_bytes": 286120,
+          "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea"
+        },
+        {
+          "name": "platform_ml-0.1.0-py3-none-any.whl",
+          "size_bytes": 52844,
+          "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501"
+        },
+        {
+          "name": "wheels-stage-digests.txt",
+          "size_bytes": 912,
+          "sha256": "73b40c0b85fe8dccba0a4b89f6703629fc88780942c35e4104deab7b31361a4c"
+        }
+      ]
+    }
+  },
+  "permission_correction": "Initial maintained wheel-tree inspection refused mode 0755. The new runtime root and wheels directory were changed to 0700; stat confirmed both, and maintained inspection verified six wheels plus certificate. Licensed-data storage was unchanged.",
+  "submission_attribution": "Direct image-build invocation by codex-wrds-1027 session 01a17e81-fec7-7b01-846a-081765e939dc inherited BOARD_AGENT_LABEL=fleet-research-diphtheria from the credential environment. The historical ledger/report retains that submitter label; this was a direct maintained-CLI build, not a shared-queue build. Subsequent invocations explicitly set the actual session label after reading credentials."
+}
