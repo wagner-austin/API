@@ -4,6 +4,11 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json"
+  - "tools/hpc3/src/hpc3/core/wrds_cleanup.py"
+  - "tools/hpc3/src/hpc3/wrds/scratch.py"
+  - "tools/hpc3/tests/test_wrds_cleanup.py"
+  - "tools/hpc3/tests/test_wrds_scratch.py"
   - "tools/hpc3/src/hpc3/core/controller_evidence.py"
   - "tools/hpc3/src/hpc3/cli/controller_inspect.py"
   - "tools/hpc3/tests/test_controller_evidence.py"
@@ -54,27 +59,32 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
-  "tools/hpc3/src/hpc3/core/controller_evidence.py": "0e60c262f722a55d11cfaf25d00696b271d4c9ef"
+  "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
+  "tools/hpc3/src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
+  "tools/hpc3/src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
+  "tools/hpc3/tests/test_wrds_cleanup.py": "c24870098fe9c6636bbcc9afdd619899bcc6c45e"
+  "tools/hpc3/tests/test_wrds_scratch.py": "73ed2f3795051cb668d5900017a98e799cb88cfa"
+  "tools/hpc3/src/hpc3/core/controller_evidence.py": "a1e9ef38fa11dfcf808c12649389264167062d93"
   "tools/hpc3/src/hpc3/cli/controller_inspect.py": "9a4d5a9d26c5319dbc037afbbbd62ea137923a70"
-  "tools/hpc3/tests/test_controller_evidence.py": "e67e103689e440d90ba42147c00619116b692ecc"
-  "tools/hpc3/tests/test_controller_inspect.py": "38eac26d35cf356c486fdfbcf5e5adc1bdb508c8"
+  "tools/hpc3/tests/test_controller_evidence.py": "ffe8dac548ada4b5b954fda7f985cdc863c48dd7"
+  "tools/hpc3/tests/test_controller_inspect.py": "4fbabd8f2cb7691caabc3369bc68a7d65752b274"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json": "f27ad04239492a0e30637ccb454e9492f0b9e101"
-  "tools/hpc3/src/hpc3/core/image_evidence.py": "95f74bbdf2fca54380504c91053f86cddee16138"
-  "tools/hpc3/src/hpc3/cli/image_inspect.py": "b88cbc6388a5a97c447835dc00f11d9a48e548f3"
-  "tools/hpc3/tests/test_image_evidence.py": "f9c4ec90fcd2aab342d05c3749820b0392270a55"
-  "tools/hpc3/tests/test_image_inspect.py": "290e29766a55958aa9025930b3630aaa4f05cdb8"
+  "tools/hpc3/src/hpc3/core/image_evidence.py": "43429e648bf91e3c274d9cc673c92f8cd94bac52"
+  "tools/hpc3/src/hpc3/cli/image_inspect.py": "b0d2b960253fe6ba493ccd1d4ec630ff79e01efa"
+  "tools/hpc3/tests/test_image_evidence.py": "7e2fe6c50bd089bbb66336f69efc513234430cd9"
+  "tools/hpc3/tests/test_image_inspect.py": "f8f598c7b4429ad4567cb8f285d52b9c90723d7b"
   "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
   "tools/fleet/tests/test_research_proposer_host.py": "4ec3e7e668ddf0915b15daf276a75054bfecf6c0"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
-  "libs/covenant_ml/scripts/research_storage_probe.py": "8dc13973868bdefb3e3cf26c452871ce6d072235"
-  "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "ce083a45f3100c51e049c85eae865fde345c8034"
+  "libs/covenant_ml/scripts/research_storage_probe.py": "e82dc21bada11294d448043dbe9b3cf67bfcda8f"
+  "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "b5ae8ee229e57a09f5520021e64455abbabc5646"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json": "2ef67b9d8ea85e09cf92c99d7ec56b96b07cb609"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/provenance.json": "1d1fd48609fe278db5adbd9ded31746c01c94df4"
   "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
   "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
   "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json": "976cfc40fbaca4955084948061d6a2fcd90d54ab"
-  "libs/covenant_ml/tests/markets/test_encrypted_process.py": "63a3a2f34e7188ee307ce1ea1b178f44f1995854"
+  "libs/covenant_ml/tests/markets/test_encrypted_process.py": "0e016843a4c1e4aac8baf07a72240cef64d36348"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json": "6f58fc955b6a9086564ea6a36f3028fcd2ac0ed6"
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
   ".github/workflows/covenant-ml.yml": "3dd4022a0f4e46cddaccec3be16188fbdc275dae"
@@ -168,7 +178,8 @@ manifest only after every file authenticates and matches its frozen identity.
 Plaintext lives in a new mode-0700 temporary directory, with a declared size
 limit, and is removed on ordinary exit or exception. HPC3 validation and final
 scoring, and WRDS-native validation storage, are measured below. WRDS final
-scoring and forced-kill scratch reclamation remain unverified.[^bundle][^final-rehearsal][^wrds-native]
+scoring remains unverified. The later WRDS forced-kill measurement below awaits
+independent review.[^bundle][^final-rehearsal][^wrds-native][^wrds-cleanup]
 
 The evaluator now requires encrypted inputs and separate private partition keys.
 Validation works without a final key. Final scoring acquires its key only after
@@ -267,6 +278,23 @@ scratch reclamation, or execution of the HPC3 Apptainer image. The published
 probe passed 4,877 evaluator tests at 100% coverage with typing and guards clean.
 No licensed rows were involved.[^wrds-native]
 
+The WRDS forced-kill subject `40551337` authenticated ten synthetic files into
+a mode-0700 directory on `wrds-sas30-w.wharton.private`. Grid Engine enforced
+its 30-second runtime limit while the maintained probe was holding for 300
+seconds: accounting records failure 44 and exit 137. The shared queue closed
+failed with no result digest, and collection refused `WRDS_NOT_COMPLETE`.
+Same-node observers `40551338` at 02:46:04 UTC and `40551800` at 05:25:42 UTC on
+October 31 found both exact recorded directories absent. The first reporting
+command failed because accounting had not yet appeared; its observation and
+failure remain preserved. The corrected controller durably records the observer
+before checking accounting and reconciles that receipt without another job.
+Its complete service-authored report was posted at 05:27:14 UTC. This establishes
+later filesystem absence for one killed subject, not immediate cleanup,
+physical erasure or behavior after node failure. Independent review remains
+open under `4b7fe216`.[^wrds-cleanup]
+
+[^wrds-cleanup]: `tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json`, `measurement`, `first_observation`, `preserved_failure`, `verification`, `evidence_sha256` and `limits`; `tools/hpc3/src/hpc3/core/wrds_cleanup.py`, `submit` and `measure`; `tools/hpc3/src/hpc3/wrds/scratch.py`, `observe`; `tools/hpc3/tests/test_wrds_cleanup.py`, pending accounting, bound receipts and refusal cases; `tools/hpc3/tests/test_wrds_scratch.py`, actual directory observations and failures. Report `c59b266b-9a99-4e43-aaa4-a6345ad91831` on task `4b7fe216-2670-4dbe-bee4-9970faec8258`, author `load-report-4b7fe216`; queue `c0e0e899-3fea-40a4-b065-8a6e3519ce93`. Frozen controller-source snapshot at API `b95578fa619c9176ae83ff4cd15429f96c500730` uses the existing final Python without replacing evaluator wheels. Fleet `50243676-55b0-4535-93b0-481b4e10d7ec` passed 2,134 controller tests with 100% statement and branch coverage at 05:24:02 UTC.
+
 The forced-kill probe decrypted and verified ten synthetic files in a mode-0700
 directory on `hpc3-22-05`, then intentionally ended native job `58629286` with
 `FAILED`, exit `137:0`. A later allocation, `58630827`, required that same node
@@ -276,7 +304,7 @@ for this one probe, not immediate reclamation, physical erasure or cleanup after
 node failure. Real-process regression cases separately confirm normal exit
 removes plaintext and SIGKILL leaves it for the scheduler.[^cleanup]
 
-[^cleanup]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json`, native accounting, receipts, recipe hashes and limits; `libs/covenant_ml/tests/markets/test_encrypted_process.py`, `PROBE_PROGRAM` and `test_real_process_exit_and_sigkill_have_distinct_cleanup`. Fleet job 42b48bdc-c31d-4436-b670-6efe4860c8f1 passed all 4,838 evaluator tests with 100% coverage at API 8dfc76f75003cdefdaa124e2a3b1e5f95670ce5a on Lavender, ending 2026-10-30T12:48:59Z. GitHub runs 41058285948 and 41058285858 also succeeded. The native runtime remains 44fa91cea; the probe program is extracted from the tested constant at 8dfc76f.
+[^cleanup]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/cleanup.json`, native accounting, receipts, recipe hashes and limits. That historical HPC3 measurement used the probe constant at API `8dfc76f75003cdefdaa124e2a3b1e5f95670ce5a` and runtime `44fa91cea`; fleet job `42b48bdc-c31d-4436-b670-6efe4860c8f1` passed 4,838 evaluator tests with 100% coverage on Lavender at 2026-10-30T12:48:59Z. Current regression `libs/covenant_ml/tests/markets/test_encrypted_process.py`, `test_real_sigkill_leaves_plaintext_for_scheduler_reclamation`, launches the maintained `libs/covenant_ml/scripts/research_storage_probe.py`, `main`, rather than a duplicate program. Normal exit is covered by `libs/covenant_ml/tests/markets/test_research_storage_probe.py`. Fleet job `0c56fff6-03a2-454d-bd73-848ea0e254b4` at API `be057eac8f65d1439f51825d27b0124d8398d597` passed 4,876 tests with 100% coverage on Colossus at 2026-10-31T02:42:11Z.
 
 The real isolated proposer produced an allowed synthetic proposal, which was
 transported manually to the installed admission controller and admitted into a
@@ -313,18 +341,20 @@ The handoff audit reopened the milestone for missing denial measurements on
 the remote daemon. The existing denial probe now also passes through actual
 remote placement on Colossus: private files, writes and networking are denied,
 the credential canary is absent and resource limits match the local assertions.
-The corrected milestone awaits independent acceptance; the measured details
-are in [[wrds-proposer-isolation]].[^remote-boundary]
+Independent audit `4fb7330a` verified the corrected milestone at
+2026-10-31T02:12:59Z, including the remote execution lane. The live board now
+records task `45ff6e73` done; the measured details are in
+[[wrds-proposer-isolation]].[^remote-boundary]
 
-[^remote-boundary]: Live board audit `f300a990-7101-4bfd-8972-3d29c582cb71`, A1 partly met for the missing remote isolation measurement. Corrected real hub job `bc02f915-acf1-40ad-a330-2aa01f9405ff` at API `fdaf517940e01f78e68cc279747859fcc2f28c4c` passed 11 cases with zero skips, including the remote denial scenario and owned-container removal, on 2026-10-31 at 01:59:52 UTC. Existing program-authored admission receipts are unchanged.
+[^remote-boundary]: Live board audit `f300a990-7101-4bfd-8972-3d29c582cb71`, A1 partly met for the missing remote isolation measurement; superseded by verified audit `4fb7330a-dd28-421d-a17f-82d82cc271d0` on 2026-10-31 at 02:12:59 UTC. Corrected real hub job `bc02f915-acf1-40ad-a330-2aa01f9405ff` at API `fdaf517940e01f78e68cc279747859fcc2f28c4c` passed 11 cases with zero skips, including the remote denial scenario and owned-container removal, on 2026-10-31 at 01:59:52 UTC. Existing program-authored admission receipts are unchanged.
 
 [^remote-handoff]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`. Live task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, program-authored reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` as `fleet-research-proposer`: attempts 1 admitted and 2 refused with `holdout_forbidden`. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207`, full fleet check `672d626f`, 2,561 passed with 100% coverage. No licensed data, final release or native allocation was used in this measurement.
 
 The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant]
 
-1. Verify WRDS forced-kill scratch reclamation, which the
-   normal-exit measurements do not establish; native final scoring is currently
-   rehearsed on HPC3 only.
+1. Complete independent review of the measured WRDS cleanup milestone and the
+   pending CRSP semantics task `54b55cc7`, whose wiki-audit dependency
+   `0ae483f4` remains open. Native final scoring is rehearsed on HPC3 only.
 2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
    checksums and calendar coverage, then stage its verified manifest to HPC3.
    Keep final-period evidence confined to the evaluator.

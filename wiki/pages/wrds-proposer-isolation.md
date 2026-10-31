@@ -117,7 +117,9 @@ return errno 2, the root write returns 30 and networking returns 101. The canary
 is absent, uid is 65534, effective capabilities are zero, no-new-privileges is
 1, and limits are 256 MiB, 64 processes and one CPU. The test removes its canary
 directory and confirms zero owned containers. This directly measures the remote
-daemon; independent acceptance of the corrected milestone remains pending.[^remote-denial]
+daemon. Independent audit `4fb7330a-dd28-421d-a17f-82d82cc271d0` verified
+the corrected milestone at 2026-10-31T02:12:59Z; the live board records parent
+task `45ff6e73` done.[^remote-denial]
 
 [^remote-denial]: `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`, denial scenario; `tools/fleet/tests/test_research_proposer_host.py`, `DENIAL_PROGRAM` and `assert_denied_resources`. API `fdaf517940e01f78e68cc279747859fcc2f28c4c`: real hub job `bc02f915-acf1-40ad-a330-2aa01f9405ff` passed 11 cases with zero skips at 2026-10-31T01:59:52Z; its reading reports all denials and `scenario=denial` with `remaining=0`. Linux job `c6297263-f954-4931-8f77-b350180d7f90` passed 95 cases. Full job `7ee0b15d-0c96-4ece-8ed0-45691610427f` passed 2,566 tests with 100% coverage; pinned formatter reported `433 files left unchanged`. Audit `f300a990-7101-4bfd-8972-3d29c582cb71`, check review `da6836be-2956-4b32-a209-92835e613d82`, accepted the prior handoff evidence and identified the missing remote denial measurement.
 
