@@ -14,10 +14,10 @@ source_paths:
   - "src/hpc3/cli/_load_report.py"
 source_git_blobs:
   "src/hpc3/core/wrds_scan.py": "377d02f3bcbbb15e1b362298f59ae5eec89e97fb"
-  "src/hpc3/core/wrds_grid.py": "beb9d589853518e51185aa30ad44365e49290806"
+  "src/hpc3/core/wrds_grid.py": "ecdca06d88f7aa4f818ef220ee09174a71833414"
   "src/hpc3/core/artifacts.py": "4dffdf06b94e1cd6d58f45ac785788ad242f05c4"
-  "src/hpc3/core/wrds_catalog.py": "b9633ede191be573181933067b3a3ab89f3ce8ab"
-  "src/hpc3/core/wrds_sql.py": "91c9b1054a60eff86a037bc5ebd17b420cd8bb52"
+  "src/hpc3/core/wrds_catalog.py": "9969c812050e073947127036da80f0bb007c3dc1"
+  "src/hpc3/core/wrds_sql.py": "8b09091403ad16fed66828336a419a2cded0525d"
   "src/hpc3/cli/wrds_catalog.py": "d46ba2ea77da094898227c93093ed54790c2b2d1"
   "src/hpc3/cli/wrds_sql_catalog.py": "a49efcd087ea7ee21fca3adaab4be51f49c47308"
   "src/hpc3/cli/_load_report.py": "3a109d6314c9a077bbfbf860a073217dd2efdd8f"

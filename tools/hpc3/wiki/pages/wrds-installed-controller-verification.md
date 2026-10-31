@@ -13,12 +13,12 @@ source_paths:
   - "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
 source_git_blobs:
   "src/hpc3/cli/execution_inspect.py": "fd0d98dc12dba896ebc552149a7da69f76d4316e"
-  "src/hpc3/core/execution_evidence.py": "f0347915a8720f9a95d62be1221340a876f31e49"
+  "src/hpc3/core/execution_evidence.py": "bf31a1091302ae2786425afa629677fccf07f681"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
   "artifacts/research-queue-fresh-20261029/provenance.json": "da6266d1583b6ad0bab4a66f70de69aafdd8db83"
-  "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "d1a69245c7fd39affab69216f78cde86374e67c3"
+  "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
 provenance:
   - "Board task 8a113204-42d0-41a0-8094-73776bae8846; native reports by hpc-report-8a113204, prefix HPC3 ATTEMPT LOAD-REPORT, jobs 58578791 and 58578878"
   - "API libs/covenant_ml/src/covenant_ml/markets/research_execution.py at bda8ca2af532d89b301b56cc0b55a4346bb6e421; outside this wiki workspaceRoot"

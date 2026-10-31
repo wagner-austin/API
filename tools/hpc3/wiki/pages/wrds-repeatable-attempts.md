@@ -4,6 +4,11 @@ tags: [wrds, reproducibility, operations]
 hubs: [operations]
 related: ["[[one-ledger-per-repository]]", "[[wrds-filesystem-catalog]]", "[[node-local-scratch]]"]
 source_paths:
+  - "artifacts/wrds-forced-kill-20261031/provenance.json"
+  - "src/hpc3/core/wrds_cleanup.py"
+  - "src/hpc3/wrds/scratch.py"
+  - "tests/test_wrds_cleanup.py"
+  - "tests/test_wrds_scratch.py"
   - "src/hpc3/contracts/wrds_run.py"
   - "src/hpc3/core/wrds_jobs.py"
   - "src/hpc3/core/wrds_results.py"
@@ -21,13 +26,18 @@ source_paths:
   - "artifacts/wrds-synthetic-2a50e93ca/configuration-comparison.json"
   - "artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json"
 source_git_blobs:
+  "artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
+  "src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
+  "src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
+  "tests/test_wrds_cleanup.py": "c24870098fe9c6636bbcc9afdd619899bcc6c45e"
+  "tests/test_wrds_scratch.py": "73ed2f3795051cb668d5900017a98e799cb88cfa"
   "src/hpc3/contracts/wrds_run.py": "00660ff78017fe0dd51c344ba8f3f0b51ae0b23f"
   "src/hpc3/core/wrds_jobs.py": "e79b573ab5a1f145599018c38c95fcde511d9d7b"
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
   "src/hpc3/core/wrds_attempt_report.py": "97a16cbbd011b4311db2da780b5901791f00580e"
-  "src/hpc3/cli/wrds.py": "51b8110f69f6fd553f070fe9e064ef0f78026864"
-  "src/hpc3/wrds/worker.py": "e8a91def08eb391ac271f04c5cf3dbc3561470a5"
+  "src/hpc3/cli/wrds.py": "5791832af3706dca52ced13e8f7c5c8ddc2f7674"
+  "src/hpc3/wrds/worker.py": "e603488a92df6145d872ff728d632ed8bfda15fc"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
   "runs/bench-wrds-synthetic-b.json": "d3df02db2cf4c5743ed9a4de8352dfb6491f1bcd"
@@ -53,7 +63,7 @@ provenance:
   - "Ziggurat /home/corvis/research-data/wrds/runtime/2a50e93ca preserves source archive, six wheel digests, original captured spec, rendered build, synthetic input and query, run documents and collected logs; source commit 2a50e93ca06fcc82896c143a37ee247187cd2b12, archive SHA256 02e542cdfc0909cda9a228bf6cf535397e8c395502619979bb4b5defade3d2d8"
   - "Remote and collected replay files SHA256: both manifests db9c0d4cd183655762f49ad7940db8e68b62e90e66409da0bc30afb23243ab05; both RunRecords 6a317031cd5ba5cafbedbc8ab0db75a6d59acd81e0a034a931b9721abc3f1fac"
   - "API libs/covenant_ml/README.md section WRDS-shaped evaluation inputs and libs/platform_core/src/platform_core/run_record.py agree_across_runs, outside this wiki workspaceRoot"
-fact_checked: 2026-10-28
+fact_checked: 2026-10-31
 confidence: high
 ---
 
@@ -91,6 +101,29 @@ also carries `completion_sha256`, the canonical completion manifest digest
 from that same native measurement, or null before completion. A queue consumer
 can compare this with its collected manifest without trusting a cached local
 success label.[^report][^cli]
+
+Forced-termination storage checks use the same scheduler transport and worker
+bundle. `scratch` validates the failed subject's `opened.json`, requests its
+exact execution host, and persists a separate observer receipt. `scratch-report`
+reconciles that recorded job: accounting not yet available returns
+`accounting-pending`, without a report or another submission. Terminal evidence
+must match the subject, worker digest, original node and exact paths. The worker
+lists names without reading plaintext; inaccessible storage raises an error
+instead of being recorded as absent.[^scratch]
+
+Native synthetic subject `40551337` reached authenticated private storage, then
+ended with Grid Engine failure 44 and exit 137 under its 30-second runtime cap.
+The shared queue preserved failure and no result digest. Later observers
+`40551338` and `40551800` both ran on its original `wrds-sas30-w.wharton.private`
+node and found its exact scratch and plaintext paths absent. The first report
+failed during the accounting delay; the second completed through the corrected
+receipt/reconciliation path and posted measured evidence as `load-report-4b7fe216`.
+This is eventual absence for one killed subject, not physical erasure or a
+cleanup deadline. Native final scoring on WRDS remains unverified.[^scratch-native]
+
+[^scratch-native]: `artifacts/wrds-forced-kill-20261031/provenance.json`, `measurement`, `first_observation`, `preserved_failure` and `limits`; board report `c59b266b-9a99-4e43-aaa4-a6345ad91831` on task `4b7fe216-2670-4dbe-bee4-9970faec8258`, 2026-10-31T05:27:14Z. No licensed observations were used.
+
+[^scratch]: `src/hpc3/core/wrds_cleanup.py`, `submit` and `measure`; `src/hpc3/wrds/scratch.py`, `observe`; `tests/test_wrds_cleanup.py`, `test_delayed_accounting_reconciles_the_same_job_without_resubmitting` and failure cases; `tests/test_wrds_scratch.py`, actual directory and inaccessible-storage cases. Fleet job `50243676-55b0-4535-93b0-481b4e10d7ec` at API `b95578fa619c9176ae83ff4cd15429f96c500730` passed 2,134 tests with 100% statement and branch coverage on Lavender, 2026-10-31T05:24:02Z. This gate tests the control path; native measurements are separate evidence.
 
 The synthetic fixture ran twice with the same worker, code, five-number
 input, runtime and seed. Jobs **40530016** and **40530018** ran on two
@@ -184,7 +217,7 @@ validation-controller runs and the subsequent repair are recorded in
 [^status]: `src/hpc3/core/wrds_scheduler.py:181` `status` and `:113` `decode_accounting`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:25` `job_argv`.
 [^report]: `src/hpc3/core/wrds_attempt_report.py:70` `measure` and `:25` `completion_presence`.
-[^cli]: `src/hpc3/cli/wrds.py:80` `main`.
+[^cli]: `src/hpc3/cli/wrds.py:123` `main`.
 [^live]: The four posts by `load-report-d43697b3` on board task d43697b3 listed in the frontmatter provenance section, and Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`.
 [^paired]: API `libs/covenant_ml/README.md` WRDS input contract; executed manifests under `artifacts/wrds-synthetic-2a50e93ca/`, fields `dataset`, `seeds`, `results` and `seed_comparisons`; synthetic provenance in `runs/wrds-synthetic-stage.json`.
 [^image]: `specs/cleargbm-paired-image.json`; `runs/bench-wrds-image-verify.json`; job 58566045 build logs and job 58574938 verification logs identified in `provenance`.
