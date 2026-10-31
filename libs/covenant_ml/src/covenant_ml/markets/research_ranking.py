@@ -152,7 +152,10 @@ def winning_attempt(policy: ResearchPolicy, completed: Sequence[SeedResult]) -> 
     ranked: list[tuple[float, int, str, int]] = []
     for candidate, rows in eligible.items():
         columns = tuple(rows[seed][1] for seed in seeds)
-        means = tuple(fsum(month) / len(seeds) for month in zip(*columns, strict=True))
+        means = tuple(
+            fsum(column[month] for column in columns) / len(seeds)
+            for month in range(len(columns[0]))
+        )
         score = fsum(means) / len(means)
         chosen = rows[selection["final_seed"]][0]
         ranked.append((-score, chosen.proposal["config"]["num_leaves"], candidate, chosen.number))
