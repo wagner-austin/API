@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/fleet/src/fleet/cli/research_native.py"
+  - "tools/fleet/src/fleet/contracts/research_worker.py"
+  - "tools/fleet/tests/test_research_native_process.py"
   - "tools/fleet/tests/test_research_wrds.py"
   - "tools/fleet/tests/test_research_control.py"
   - "tools/fleet/tests/test_research_hpc.py"
@@ -27,6 +30,9 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/fleet/src/fleet/cli/research_native.py": "ab22d29f01c1e7f072e12f204c6bcb2f52794242"
+  "tools/fleet/src/fleet/contracts/research_worker.py": "f42dd4b565b1cc5a9c2320b44969ee7676c7ea24"
+  "tools/fleet/tests/test_research_native_process.py": "0ac7c3d85462d0a8e2862f9377902c723c87817e"
   "tools/fleet/tests/test_research_wrds.py": "128047efa432f77d6b3b51259356f270f7c8cf99"
   "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
   "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
@@ -38,7 +44,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
-  "tools/fleet/src/fleet/cli/research_queue.py": "aced6395998134dd8d9532dc7243b87745eab0c6"
+  "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "daead9502e635ddc7abf3243eac2b7b838714094"
   "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
@@ -77,6 +83,14 @@ poll. HPC3 keeps proposal admission and its attempt journal; WRDS keeps held
 submission and its durable receipt. Transport failures retain those identities.
 Completion requires fresh native evidence and verified RunRecord metadata;
 no research rows or credentials are placed on the board.[^queue][^controllers]
+
+Each native CLI observation measures the executing Python path and SHA-256.
+The queue requires these fields, refuses a path different from its configured
+placement, and retains both fields in progress or closing evidence. A runtime
+installation report alone cannot establish which interpreter executed a poll;
+the closing observation supplies that measurement for either backend.[^execution]
+
+[^execution]: `tools/fleet/src/fleet/cli/research_native.py`, `main`; `tools/fleet/src/fleet/contracts/research_worker.py`, `decode_observation` and `encode_observation`; `tools/fleet/src/fleet/cli/research_queue.py`, `reconcile`; `tools/fleet/tests/test_research_native_process.py`, actual rendered-shell and child-process execution. Board task `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; audit `a814e463-b0ea-49b3-86a9-feb31b27c8e2` identified the missing closing-controller measurement. Fleet check `4c6aa1e0-0188-4fdd-82f1-d420407e4ea6` passed 2,578 tests at API `a0550032d5ea977d58528c45e0ec72aa610cb855`, with 100% statement and branch coverage.
 
 WRDS submission, collection and final verification occupy separate polls.
 Collection has a 900-second process deadline after a 60-second status call,

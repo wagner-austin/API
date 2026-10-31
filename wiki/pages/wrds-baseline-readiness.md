@@ -152,6 +152,16 @@ verification corrections, candidate-selection rules and the substantive study
 remain ahead. Earlier runtime measurements below retain their historical
 scope.[^licensed-collection]
 
+Collection audit `a814e463` reopened the milestone at 19:30 UTC: the earlier
+closing receipt did not measure its executing controller, and its audit query
+did not require verification before queue closure. The correction records the
+executing interpreter in the existing queue observation and explicitly adopts
+the completed native job for fresh verification. The original receipt remains
+historical evidence; it cannot retroactively gain an execution measurement.
+Independent acceptance of the corrected collection evidence remains pending.[^collection-review]
+
+[^collection-review]: Live board audit `a814e463-b0ea-49b3-86a9-feb31b27c8e2`, check review `effd76f3-7599-4951-aa78-babd1e5a346e`; correction commits `4a8ba8ff6258c8ba4730f6935177fa886e4900ce`, `2e7232e848c5310c4b356594f4fbfa6b4c85bc66`, `a0550032d5ea977d58528c45e0ec72aa610cb855`. The canonical observation contract is described in [[wrds-research-queue-admission]].
+
 The encrypted-bundle implementation passed independent audit `acd2c6c4` on
 October 30 at 21:38 UTC: all three criteria were verified. The earlier audit
 `02c6e4a1` reopened its evidence mapping because it omitted the real
