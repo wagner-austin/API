@@ -1,8 +1,9 @@
 """Measure authenticated synthetic storage inside a native scheduler allocation.
 
 This entrypoint produces metadata and scalar observations, never source rows or
-key material. It exercises normal cleanup; it does not certify SIGKILL reclamation
-or isolation from processes sharing the evaluator's OS identity.
+key material. The opened receipt precedes an explicit bounded hold, allowing a
+native timeout to interrupt decryption storage before normal cleanup. A separate
+same-node observation must establish scheduler reclamation after termination.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 import argparse
 import socket
 import stat
+import time
 from hashlib import sha256
 from pathlib import Path
 
@@ -43,12 +45,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--access", required=True, type=Path)
     parser.add_argument("--scratch-env", required=True)
     parser.add_argument("--output-env", required=True)
+    parser.add_argument("--hold-seconds", required=True, type=int, choices=range(301))
     args = parser.parse_args(argv)
     bundle: Path = args.bundle
     digest: str = args.sha256
     access: Path = args.access
     scratch_variable: str = args.scratch_env
     output_variable: str = args.output_env
+    hold_seconds: int = args.hold_seconds
     environment = config_test_hooks.get_environment()
     scratch = Path(environment[scratch_variable])
     output = Path(environment[output_variable])
@@ -73,6 +77,9 @@ def main(argv: list[str] | None = None) -> int:
             "manifest_sha256": sha256(manifest.read_bytes()).hexdigest(),
             "files": files,
         }
+        with (output / "opened.json").open("x", encoding="utf-8") as stream:
+            stream.write(dump_json_str(receipt))
+        time.sleep(hold_seconds)
     removed = not private.exists()
     receipt["plaintext_removed"] = removed
     observations = (
