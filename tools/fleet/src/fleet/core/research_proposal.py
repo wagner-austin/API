@@ -33,8 +33,18 @@ from fleet.core import _test_hooks, research_control
 from fleet.core.research_proposer import run_proposer
 
 _FIELDS = frozenset(
-    {"python", "script", "policy", "ledger", "host", "socket", "image",
-     "program", "context", "timeout"}
+    {
+        "python",
+        "script",
+        "policy",
+        "ledger",
+        "host",
+        "socket",
+        "image",
+        "program",
+        "context",
+        "timeout",
+    }
 )
 
 

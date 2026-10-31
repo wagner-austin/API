@@ -87,7 +87,8 @@ def _runtime(socket: str, image: str, host: str | None) -> tuple[str, ...]:
 def _owned(prefix: tuple[str, ...], label: str, host: str | None) -> tuple[str, ...]:
     """Read the full IDs of containers bearing this invocation's private nonce."""
     output = _checked(
-        prefix, ("container", "ls", "--all", "--quiet", "--no-trunc", "--filter", f"label={label}"),
+        prefix,
+        ("container", "ls", "--all", "--quiet", "--no-trunc", "--filter", f"label={label}"),
         host,
     )
     return tuple(require_digest(item) for item in output.split())

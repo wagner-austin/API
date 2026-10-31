@@ -213,9 +213,7 @@ def _attempt_ssh_within(host: str, argv: tuple[str, ...], *, timeout_seconds: in
     return RemoteOutcome(output="" if failure is not None else result["stdout"], failure=failure)
 
 
-def run_ssh(
-    host: str, argv: tuple[str, ...], *, timeout_seconds: int = SSH_TIMEOUT_SECONDS
-) -> str:
+def run_ssh(host: str, argv: tuple[str, ...], *, timeout_seconds: int = SSH_TIMEOUT_SECONDS) -> str:
     """Run one argv on a node and return its standard output.
 
     The raising boundary over :func:`attempt_ssh`, for callers that have
