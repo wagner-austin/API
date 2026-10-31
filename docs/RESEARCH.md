@@ -133,8 +133,10 @@ Code: `libs/cleargbm`, `libs/cleargbm_rs`, `libs/covenant_ml`,
 - [WRDS baseline readiness](../wiki/pages/wrds-baseline-readiness.md)
 - [Historical benchmark power audit and provenance corrections](https://github.com/wagner-austin/API/blob/4a145beef16d445e9f786da8ebcce9e3d2f5c2c8/docs/RESEARCH.md#L1406-L1530)
 
-The substantive baseline has not run: the measured October 28–29 jobs and
-October 30 installed-file recheck concern the older one-security diagnostic.
+The substantive baseline has not run. The October 28–29 jobs concern the
+older one-security diagnostic; subsequent frozen-runtime rehearsals used
+synthetic encrypted data on HPC3 and WRDS, including one-shot final scoring
+on HPC3. They do not establish a substantive CRSP result.
 Evaluator-owned `research_proposals select` and
 `research_trial --ledger --final-manifest` enforce one-shot final scoring.
 The readiness page distinguishes implemented controls from deployment rehearsal.
