@@ -54,11 +54,11 @@ def _key(row: JSONObject, relation: str, extracted_day: str) -> tuple[str, ...]:
     key: tuple[str, ...]
     if relation == "calendar":
         day = require_str(row, "caldt")
-        if require_str(row, "exchangegroup") != "CIZ" or require_str(row, "tradingflg") not in {
-            "Y",
-            "N",
+        if (require_str(row, "exchangegroup"), require_str(row, "tradingflg")) not in {
+            ("CIZ", "Y"),
+            ("N/A", "N"),
         }:
-            raise ValueError("[CRSP-007] require the declared CIZ calendar flags")
+            raise ValueError("[CRSP-007] require CIZ/Y sessions or N/A/N closed calendar days")
         key = (day,)
     elif relation == "membership":
         first, last = require_str(row, "namedt"), require_str(row, "nameendt")

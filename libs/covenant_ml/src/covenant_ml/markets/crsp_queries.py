@@ -125,10 +125,12 @@ def crsp_relation_sql(
 ) -> dict[str, str]:
     """Render one partition's four COPY statements in protocol column order.
 
-    Every query restricts securities to those with an eligible share and
+    Security queries restrict securities to those with an eligible share and
     exchange interval overlapping ``universe_start`` through the partition's
     observation end, orders by the relation's natural key and fetches one row
     beyond ``max_rows`` so truncation is detectable rather than silent.
+    The calendar selects every civil date: closed days have exchangegroup
+    N/A, not CIZ. The source reader validates each group/session-flag pair.
 
     Args:
         protocol: Decoded frozen design supplying tables, columns and codes.
@@ -178,8 +180,7 @@ def crsp_relation_sql(
         "calendar": copy(
             f"SELECT {', '.join(protocol['calendar_columns'])}"
             f" FROM {qualified}{protocol['calendar']}"
-            f" WHERE exchangegroup = '{protocol['calendar_group']}'"
-            f" AND caldt BETWEEN DATE '{scope.calendar_start}' AND DATE '{scope.calendar_end}'"
+            f" WHERE caldt BETWEEN DATE '{scope.calendar_start}' AND DATE '{scope.calendar_end}'"
             " ORDER BY caldt" + limit
         ),
         "delists": copy(

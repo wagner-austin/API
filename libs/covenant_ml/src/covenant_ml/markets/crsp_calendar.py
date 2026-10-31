@@ -24,7 +24,8 @@ def _calendar_months(calendar: tuple[tuple[str, str], ...]) -> tuple[list[str], 
     """Validate a nonempty calendar and group its declared sessions by month.
 
     Args:
-        calendar: Ordered (caldt, tradingflg) rows for ExchangeGroup CIZ.
+        calendar: Ordered (caldt, tradingflg) rows including CIZ sessions
+            and the vendor's N/A closed days.
             Include complete calendar months through the final exit month.
 
     Returns:
@@ -93,7 +94,8 @@ def crsp_windows(
     """Derive monthly windows from a complete CIZ calendar, including nontrading days.
 
     Args:
-        calendar: Ordered (caldt, tradingflg) rows for ExchangeGroup CIZ.
+        calendar: Ordered (caldt, tradingflg) rows including CIZ sessions
+            and the vendor's N/A closed days.
             Include complete calendar months through the final exit month.
         first_decision: Inclusive lower decision-date bound.
         last_decision: Inclusive upper decision-date bound.
