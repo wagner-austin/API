@@ -18,9 +18,18 @@ def arguments(root: Path, fake_run: FakeRun) -> list[str]:
     """Prepare the same provenance the public command reads."""
     provenance = root / "provenance.json"
     provenance.write_text(dump_json_str(prepare(root, fake_run)))
-    return ["--provenance", str(provenance), "--wheels-dir", str(root),
-            "--selfcheck", str(root / "selfcheck.py"),
-            "--selfcheck-sha256", sha256_hex(SELFCHECK), "--report-task", TASK]
+    return [
+        "--provenance",
+        str(provenance),
+        "--wheels-dir",
+        str(root),
+        "--selfcheck",
+        str(root / "selfcheck.py"),
+        "--selfcheck-sha256",
+        sha256_hex(SELFCHECK),
+        "--report-task",
+        TASK,
+    ]
 
 
 def test_publication_matches_measured_files(

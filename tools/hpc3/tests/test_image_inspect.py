@@ -21,8 +21,16 @@ def arguments(root: Path) -> list[str]:
     ledger.append(root / "ledger.jsonl", build_entry())
     checksums = root / "checksums.txt"
     checksums.write_text("".join(f"{digest}  {path}\n" for path, digest in pins().items()))
-    return ["--config", workspace, "--job", "101", "--checksums", str(checksums),
-            "--report-task", TASK]
+    return [
+        "--config",
+        workspace,
+        "--job",
+        "101",
+        "--checksums",
+        str(checksums),
+        "--report-task",
+        TASK,
+    ]
 
 
 def test_build_report_is_the_measured_metadata(

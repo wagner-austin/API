@@ -28,8 +28,10 @@ def test_installed_application_and_command_receipts(tmp_path: Path, fake_run: Fa
     assert report["selfcheck"] == "image self-check OK"
     assert report["dependency_check"] == "No broken requirements found."
     assert report["verified_wheels"] == {
-        WHEEL: {"sha256": require_dict(provenance, "first_party_wheel_sha256")[WHEEL],
-                "installed_files": 1}
+        WHEEL: {
+            "sha256": require_dict(provenance, "first_party_wheel_sha256")[WHEEL],
+            "installed_files": 1,
+        }
     }
     assert fake_run.calls[1].stdin_bytes == SELFCHECK
     assert all(call.argv[1:3] == ("-I", "-B") for call in fake_run.calls)
@@ -82,13 +84,21 @@ def test_zero_exit_without_receipt_refused(tmp_path: Path, fake_run: FakeRun, co
         measure(tmp_path, provenance)
 
 
-@pytest.mark.parametrize("rows", [
-    [["wrong-width"]], [["", "", ""]], [["/absolute", "", ""]],
-    [["../escape", "", ""]], [["back\\slash", "", ""]], [["absent", "", ""]],
-    [[RECORD, "", ""], [RECORD, "", ""]],
-    [["example.py", "sha256=incorrect", "10"]],
-    [[RECORD, "", ""]], [],
-])
+@pytest.mark.parametrize(
+    "rows",
+    [
+        [["wrong-width"]],
+        [["", "", ""]],
+        [["/absolute", "", ""]],
+        [["../escape", "", ""]],
+        [["back\\slash", "", ""]],
+        [["absent", "", ""]],
+        [[RECORD, "", ""], [RECORD, "", ""]],
+        [["example.py", "sha256=incorrect", "10"]],
+        [[RECORD, "", ""]],
+        [],
+    ],
+)
 def test_invalid_record_refused(tmp_path: Path, fake_run: FakeRun, rows: list[list[str]]) -> None:
     provenance = prepare(tmp_path, fake_run)
     provenance["first_party_wheel_sha256"] = {WHEEL: write_wheel(tmp_path, rows)}
@@ -161,16 +171,17 @@ def test_real_interpreter_success_and_failed_generated_check(tmp_path: Path) -> 
     python = tmp_path / "bin/python"
     result = _test_hooks.run([sys.executable, "-m", "venv", str(tmp_path)])
     assert result["returncode"] == 0, result["stderr"]
-    site_result = _test_hooks.run([
-        str(python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"
-    ])
+    site_result = _test_hooks.run(
+        [str(python), "-c", "import sysconfig; print(sysconfig.get_path('purelib'))"]
+    )
     assert site_result["returncode"] == 0
     site = Path(site_result["stdout"].strip())
     (site / "example.py").write_bytes(CONTENT)
     check = tmp_path / "selfcheck.py"
     check.write_bytes(SELFCHECK)
     provenance: JSONObject = {
-        "source_commit": "a" * 40, "controller_python": str(python),
+        "source_commit": "a" * 40,
+        "controller_python": str(python),
         "controller_python_sha256": sha256_hex(python.read_bytes()),
         "first_party_wheel_sha256": {WHEEL: write_wheel(tmp_path)},
     }

@@ -29,8 +29,11 @@ def test_verified_build_reads_all_pins_accounting_and_native_checks(fake_run: Fa
 
 @pytest.mark.parametrize(
     "changes",
-    [{"experiment": {"kind": "evaluation"}}, {"artifact": None},
-     {"artifact": "/other/runtime.sif"}],
+    [
+        {"experiment": {"kind": "evaluation"}},
+        {"artifact": None},
+        {"artifact": "/other/runtime.sif"},
+    ],
 )
 def test_non_build_or_unrelated_artifact_refused(changes: dict[str, JSONValue]) -> None:
     with pytest.raises(ValueError, match="require a recorded image build"):
@@ -73,7 +76,8 @@ def test_remote_native_failure_propagates_real_process_exit() -> None:
         assert argv[0] == "ssh"
         return real_run(
             [
-                sys.executable, "-c",
+                sys.executable,
+                "-c",
                 "import sys; sys.stderr.write('build-read-failed'); sys.exit(7)",
             ],
             stdin_bytes=stdin_bytes,

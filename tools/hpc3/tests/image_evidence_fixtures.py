@@ -13,9 +13,15 @@ LOG_PATH = DIRECTORY + "/build-101.out"
 FILES = ("build.sbatch", "build.sh", "image.def", "requirements.txt", "selfcheck.py", "GIT_COMMIT")
 LOG = "\n".join(
     (
-        "image self-check OK", f"{IMAGE}  runtime.sif", "image self-check OK",
-        "re-verify exit 0", "--- smoke 1/1: /opt/env/bin/python -m pip check ---",
-        "No broken requirements found.", "smoke 1 OK", "exit      0", "",
+        "image self-check OK",
+        f"{IMAGE}  runtime.sif",
+        "image self-check OK",
+        "re-verify exit 0",
+        "--- smoke 1/1: /opt/env/bin/python -m pip check ---",
+        "No broken requirements found.",
+        "smoke 1 OK",
+        "exit      0",
+        "",
     )
 )
 
@@ -24,7 +30,9 @@ def build_entry(**changes: JSONValue) -> LedgerEntry:
     """Construct a ledger-recorded build, including explicit invalid variants."""
     fields: dict[str, JSONValue] = {
         "experiment": {"kind": "image-build", "image_dir": DIRECTORY},
-        "log_dir": DIRECTORY, "artifact": IMAGE_PATH, "image_digest": "",
+        "log_dir": DIRECTORY,
+        "artifact": IMAGE_PATH,
+        "image_digest": "",
     }
     fields.update(changes)
     return entry(**fields)
@@ -34,7 +42,8 @@ def pins(log: str = LOG) -> dict[str, str]:
     """Include every generated build file, the image and its native output."""
     return {
         **{f"{DIRECTORY}/{name}": "b" * 64 for name in FILES},
-        IMAGE_PATH: IMAGE, LOG_PATH: sha256_hex(log.encode()),
+        IMAGE_PATH: IMAGE,
+        LOG_PATH: sha256_hex(log.encode()),
     }
 
 

@@ -47,7 +47,8 @@ def prepare(root: Path, fake_run: FakeRun) -> JSONObject:
     fake_run.add("-", stdout="image self-check OK")
     fake_run.add("check", stdout="No broken requirements found.")
     return {
-        "source_commit": "a" * 40, "controller_python": str(root / "bin/python"),
+        "source_commit": "a" * 40,
+        "controller_python": str(root / "bin/python"),
         "controller_python_sha256": sha256_hex(b"interpreter"),
         "first_party_wheel_sha256": {WHEEL: write_wheel(root)},
     }
