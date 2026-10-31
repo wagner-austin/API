@@ -1,0 +1,150 @@
+{
+ "kind": "wrds-crsp-writer-synthetic-rehearsal-v1",
+ "board_task": "1f60a20d-d860-43b3-9616-68f192bcedd9",
+ "synthetic": true,
+ "source_commit": "d758dfc40607090650f441a0b34e9f7869c43ed4",
+ "fleet_checks": {
+  "libs/covenant_ml": {
+   "job": "9d99e209-9c08-4256-98f9-a483b6b4f0bb",
+   "tests_passed": 4948,
+   "tests_failed": 0,
+   "coverage_percent": 100.0
+  },
+  "tools/hpc3": {
+   "job": "dc88e275-00cc-4a0f-8da0-92e86863e36e",
+   "tests_passed": 2134,
+   "tests_failed": 0,
+   "coverage_percent": 100.0
+  }
+ },
+ "runtime": {
+  "python": "/home/uci/awagner14/research-runtime-extract-d758dfc40/cpython-3.11.16-linux-x86_64-gnu/bin/python3.11",
+  "python_sha256": "e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b",
+  "base": "research-runtime-final-85f1d4d75 interpreter copy; only covenant_ml replaced",
+  "covenant_ml_wheel_sha256": "4810bc51905b4f75f3fe4a57427851a6dda4b0c4b4a207f2ce5c7cee07487945",
+  "installed_covenant_ml_files_verified": 350
+ },
+ "server": {
+  "postgresql": "17.11",
+  "pg_is_in_recovery": true,
+  "measured": "2026-10-31 on the WRDS login node"
+ },
+ "native_run": {
+  "queue_job": "d80d9e7d-ad94-4f13-bee2-a06262eae2c8",
+  "queue_request_sha256": "dd9126dfae8fdd2e0f1663396d84d2b92666ac70c457e074335f9c846c64ca47",
+  "native_job": "40552575",
+  "node": "wrds-sas46-w.wharton.private",
+  "exit_status": 0,
+  "wallclock_seconds": 2.615,
+  "identity": "3dc06697df2288e4be31935bb84fab51852650ada7252b4cf5e01a2e83d1ea42",
+  "experiment_sha256": "9ce77aa48fc8ea6ce956aea3621768f397a0607f1166feecb3fa3c3c977e6f0b",
+  "completion_sha256": "ca146e103c7b4609b6c989cd343acf27fd654b967082eaa44c4c94bb3ffaeaa2",
+  "load_report_author": "load-report-1f60a20d"
+ },
+ "receipt": {
+  "sha256": "095b72f7acd38e364d7e914cae32e2aaa659054db812d1f8c77d65aa9b3b326f",
+  "source": "synthetic",
+  "setup_sha256": "c05fec8d63a459d70709d80fdca17f66dfd4eaee755e25c7ae462515b064e3ce",
+  "driver_sha256": "11be189f8217af635cef44ceee79ad12d8a5dca8aafe41a96f079bd2319b78a3",
+  "started_at": "2026-10-31T10:36:20.341136+00:00",
+  "completed_at": "2026-10-31T10:36:20.511169+00:00",
+  "snapshot": "13138198359:13145998144:",
+  "transaction_started_at": "2026-10-31 10:36:20.413632+00",
+  "limits": {
+   "max_rows": 50000,
+   "max_relation_bytes": 8000000,
+   "max_partition_bytes": 16000000,
+   "seconds": 300
+  },
+  "train_validation": {
+   "observation_end": "2019-12-31",
+   "calendar_end": "2020-02-29",
+   "membership_rows": 8,
+   "returns_rows": 7259,
+   "calendar_rows": 1521,
+   "delists_rows": 1,
+   "plaintext_bytes": 424621,
+   "manifest_sha256": "b2722fd8f154ba3480b3102afce0030fbe8d3c6ae9cce6a6b103ca4a3bed37a2",
+   "bundle_sha256": "2e15e17d5409d06ad3bd848ea04b126649847524c1d61fdf98d1ac140c13464c"
+  },
+  "final": {
+   "observation_end": "2020-08-31",
+   "calendar_end": "2020-08-31",
+   "membership_rows": 9,
+   "returns_rows": 8621,
+   "calendar_rows": 1705,
+   "delists_rows": 3,
+   "plaintext_bytes": 500007,
+   "manifest_sha256": "79a9ce5979ee2e51adc9ad4d3700147da002e92b093b2180ffca70222f0845a0",
+   "bundle_sha256": "278a43ca7b82b34f88efe1c87e61b20133b85ed1f84b89a3d896375a7df7e688"
+  },
+  "plaintext_removed": true
+ },
+ "evaluator_verify": {
+  "output_sha256": "3556a4bce6bf3b8ab90e712ba23cf39a014dff0786122c48200084432816e811",
+  "result": {
+   "source": "synthetic",
+   "snapshot": "13138198359:13145998144:",
+   "ciphertext_files": 20,
+   "partitions": [
+    {
+     "partition": "train-validation",
+     "opened": true,
+     "observation_end": "2019-12-31",
+     "latest_return": "2019-12-31",
+     "latest_membership_end": "2019-12-31",
+     "latest_delisting": "2019-03-14",
+     "latest_calendar": "2020-02-29",
+     "rows": [
+      8,
+      7259,
+      1521,
+      1
+     ],
+     "plaintext_removed": true
+    },
+    {
+     "partition": "final",
+     "opened": true,
+     "observation_end": "2020-08-31",
+     "latest_return": "2020-08-31",
+     "latest_membership_end": "2020-08-31",
+     "latest_delisting": "2020-04-15",
+     "latest_calendar": "2020-08-31",
+     "rows": [
+      9,
+      8621,
+      1705,
+      3
+     ],
+     "plaintext_removed": true
+    }
+   ]
+  }
+ },
+ "inputs": {
+  "synthetic_protocol_sha256": "2bd5caef865c20658b364e459909fb5cb8e7313a6c831839d03c4c175b5bc154",
+  "access_sha256": "e620fb0a8c5e0fdd3570d755f61dad73e322947ce013c68cb777e71a16010103",
+  "entrypoint_sha256": "580df1a3bb9c17dea28a1938784e9a58fec6b7f9c7535f6fe312b5b1e555cfab",
+  "synthetic_definitions_sha256": "c05fec8d63a459d70709d80fdca17f66dfd4eaee755e25c7ae462515b064e3ce",
+  "synthetic_definitions": "dsenames(permno, namedt, nameendt, shrcd, exchcd) AS (\n    VALUES\n        (1, DATE '2015-01-01', DATE '2024-12-31', 10::smallint, 1::smallint),\n        (2, DATE '2015-01-01', DATE '2024-12-31', 11::smallint, 2::smallint),\n        (3, DATE '2015-01-01', DATE '2024-12-31', 10::smallint, 3::smallint),\n        (4, DATE '2015-01-01', DATE '2024-12-31', 10::smallint, 1::smallint),\n        (5, DATE '2015-01-01', DATE '2024-12-31', 11::smallint, 1::smallint),\n        (6, DATE '2015-01-01', DATE '2024-12-31', 10::smallint, 2::smallint),\n        (9, DATE '2015-01-01', DATE '2024-12-31', 12::smallint, 1::smallint),\n        (10, DATE '2020-02-03', DATE '2024-12-31', 11::smallint, 3::smallint),\n        (11, DATE '2015-01-01', DATE '2018-06-29', 10::smallint, 1::smallint),\n        (11, DATE '2018-07-02', DATE '2024-12-31', 10::smallint, 3::smallint)\n),\nmetaexchangecalendar(caldt, exchangegroup, tradingflg) AS (\n    SELECT day::date, groups.name::character varying,\n           (CASE WHEN extract(isodow FROM day) < 6\n                  AND to_char(day, 'MM-DD') NOT IN ('01-01', '12-25')\n                 THEN 'Y' ELSE 'N' END)::character varying\n    FROM generate_series(DATE '2015-06-01', DATE '2021-12-31', INTERVAL '1 day') AS day,\n         (VALUES ('CIZ'), ('NYSE')) AS groups(name)\n),\nstkdlysecuritydata(\n    permno, dlycaldt, dlyprevdt, dlyret, dlyretmissflg, dlyretdurflg,\n    dlydelflg, dlyprc, dlyprcflg, dlyvol\n) AS (\n    SELECT securities.permno, calendar.caldt,\n           lag(calendar.caldt) OVER (PARTITION BY securities.permno ORDER BY calendar.caldt),\n           round((hashtext(securities.permno::text || calendar.caldt::text) % 2000) / 100000.0, 6),\n           'NA'::character varying, 'D1'::character varying, 'N'::character varying,\n           (10 + securities.permno)::numeric, 'TR'::character varying,\n           (1000 * securities.permno)::numeric\n    FROM (VALUES (1), (2), (3), (4), (5), (6), (9), (10), (11)) AS securities(permno)\n    JOIN metaexchangecalendar AS calendar\n      ON calendar.exchangegroup = 'CIZ' AND calendar.tradingflg = 'Y'\n     AND calendar.caldt BETWEEN\n         CASE WHEN securities.permno = 10 THEN DATE '2020-02-03' ELSE DATE '2015-06-01' END\n         AND DATE '2021-06-30'\n),\nstkdelists(permno, delistingdt, deldlydt, delamtdt, delnextdt, delret, delretmisstype) AS (\n    VALUES\n        (5, DATE '2019-03-14', DATE '2019-03-15', DATE '2019-03-20', NULL::date,\n         -0.25::numeric, 'NA'::character varying),\n        (6, DATE '2019-12-20', DATE '2019-12-23', DATE '2020-01-10', NULL, -0.1, 'NA'),\n        (4, DATE '2020-04-15', DATE '2020-04-16', DATE '2020-04-20', DATE '2020-04-22', 0.05, 'NA'),\n        (3, DATE '2021-03-01', DATE '2021-03-02', DATE '2021-03-05', NULL, -1, 'NA')\n)\n"
+ },
+ "preserved_failure": {
+  "queue_job": "ea07c31c-5156-454b-ab80-6ddd4536fd34",
+  "native_job": "40552520",
+  "node": "wrds-sas24-w.wharton.private",
+  "exit_status": 1,
+  "error": "psql:setup.sql:11: ERROR: cannot execute CREATE TABLE in a read-only transaction; [CRSP-011] psql exited 3; no bundle was published",
+  "outputs_published": 0,
+  "cause": "WRDS PostgreSQL is a hot standby; temporary tables are refused and WRDS nodes carry no server",
+  "superseded_by": "inline WITH definitions at 479ba62f6",
+  "experiment_sha256": "3ee01c0bf9846280af872bc29f8d62d5b17ea998a09756c9156e6ed01b4748df"
+ },
+ "private_evidence_directory": "/home/corvis/research-data/wrds/experiments/crsp-writer-d758dfc40",
+ "limits": [
+  "Synthetic relations only: no licensed CRSP row was read, extracted or staged.",
+  "The same psql client, WRDS standby server and single REPEATABLE READ READ ONLY transaction a vendor run uses; the synthetic statements differ only by their leading WITH definitions and unqualified names.",
+  "The licensed four-relation extraction, its HPC3 staging, candidate selection and final scoring have not run.",
+  "A complete calendar proves calendar completeness only, never that any security history is complete."
+ ]
+}
