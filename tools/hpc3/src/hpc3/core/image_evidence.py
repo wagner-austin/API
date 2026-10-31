@@ -50,8 +50,12 @@ def measure_build(
     required = {
         str(directory / name)
         for name in (
-            SBATCH_NAME, "build.sh", DEFINITION_NAME, REQUIREMENTS_NAME,
-            SELFCHECK_NAME, COMMIT_NAME,
+            SBATCH_NAME,
+            "build.sh",
+            DEFINITION_NAME,
+            REQUIREMENTS_NAME,
+            SELFCHECK_NAME,
+            COMMIT_NAME,
         )
     } | {image, log_path}
     if not required.issubset(checksums):

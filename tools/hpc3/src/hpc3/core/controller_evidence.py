@@ -42,8 +42,12 @@ def _member_path(row: list[str], seen: set[str], names: list[str]) -> PurePosixP
     name = row[0]
     path = PurePosixPath(name)
     if (
-        not name or path.is_absolute() or ".." in path.parts
-        or "\\" in name or name in seen or name not in names
+        not name
+        or path.is_absolute()
+        or ".." in path.parts
+        or "\\" in name
+        or name in seen
+        or name not in names
     ):
         raise ValueError("CONTROLLER_WHEEL_RECORD: unsafe, duplicate or absent member")
     return path
@@ -110,9 +114,9 @@ def measure_controller(
     wheels = require_dict(provenance, "first_party_wheel_sha256")
     if not wheels:
         raise ValueError("CONTROLLER_WHEELS: require frozen first-party wheels")
-    site = Path(_checked_process(
-        python, ["-c", "import sysconfig; print(sysconfig.get_path('purelib'))"]
-    ))
+    site = Path(
+        _checked_process(python, ["-c", "import sysconfig; print(sysconfig.get_path('purelib'))"])
+    )
     if not site.is_absolute() or not site.resolve().is_relative_to(python.parent.parent.resolve()):
         raise ValueError("CONTROLLER_SITE: interpreter site directory is outside the controller")
     verified: JSONObject = {}
@@ -131,11 +135,16 @@ def measure_controller(
         raise ValueError("CONTROLLER_CHECK_RECEIPT: missing symbol or dependency success")
     _verified_bytes(python, python_sha256)
     return {
-        "kind": "HPC3_CONTROLLER_EVIDENCE", "source_commit": source,
-        "controller_python": str(python), "controller_python_sha256": python_sha256,
-        "site_packages": str(site), "verified_wheels": verified,
-        "installed_files": total, "selfcheck_sha256": selfcheck_sha256,
-        "selfcheck": symbols, "dependency_check": dependencies,
+        "kind": "HPC3_CONTROLLER_EVIDENCE",
+        "source_commit": source,
+        "controller_python": str(python),
+        "controller_python_sha256": python_sha256,
+        "site_packages": str(site),
+        "verified_wheels": verified,
+        "installed_files": total,
+        "selfcheck_sha256": selfcheck_sha256,
+        "selfcheck": symbols,
+        "dependency_check": dependencies,
     }
 
 
