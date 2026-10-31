@@ -1,0 +1,757 @@
+{
+  "kind": "wrds-licensed-evidence-corrections-v1",
+  "board_task": "a622165c-bb63-4714-933b-10d527f21478",
+  "repairs_audit": "7cebf61f-f39f-41f5-acdc-160a2aeff1c0",
+  "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+  "published_code_commit": "a1872e7ee62c6f6c416b22cb74e34e0da9bf623d",
+  "source_equivalence": "git diff 3b20b14e96ddb7c48ffd38f342f4883c9e16e511 a1872e7ee62c6f6c416b22cb74e34e0da9bf623d -- libs/covenant_ml/src libs/covenant_ml/scripts tools/hpc3/src returned no differences",
+  "controller_report_id": "9e945d2f-f685-4a02-a3b9-60508eeb77cf",
+  "ciphertext_report_id": "93e6e12c-2acf-48ff-87d1-adcf79ae1e91",
+  "inventory_report_id": "be73d576-d2c7-4b10-9976-fff21a276a58",
+  "cleanup_report_id": "1a4e1d46-abbd-4fcf-a643-b871fa4bf985",
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+    "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-evidence-3b20b14e9/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "b7e09f856fafafe6f1ac66d4bfcd4ab6b1937b0ecc5d116733b65f8750fd4982",
+        "installed_files": 351
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "9fb2f51fdf2dd7c47baff2ab60cf66137271de5d8741f3c2aca085fcc359cf3d",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      }
+    },
+    "installed_files": 581,
+    "selfcheck_sha256": "e58af8c1976e3f966cfd3a9ae1a575814f9e14973d86aeb2ed56669be332006e",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e"
+  },
+  "ciphertext": {
+    "source": "crsp_a_stock",
+    "snapshot": "13138198359:13149639397:",
+    "extraction_receipt": {
+      "source": "crsp_a_stock",
+      "setup_sha256": null,
+      "protocol": {
+        "name": "protocol.json",
+        "sha256": "6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b",
+        "size_bytes": 1251
+      },
+      "driver_sha256": "f61e6665ec0755f4e8ec1bdd792a49f33040ff2dd24d4c2e77ffc048b0a9c36a",
+      "started_at": "2026-10-31T18:44:04.122752+00:00",
+      "completed_at": "2026-10-31T18:46:02.546334+00:00",
+      "snapshot": "13138198359:13149639397:",
+      "transaction_started_at": "2026-10-31 18:44:04.200309+00",
+      "limits": {
+        "max_rows": 35000000,
+        "max_relation_bytes": 2100000000,
+        "max_partition_bytes": 2150000000,
+        "seconds": 1800
+      },
+      "train_validation": {
+        "partition": "train-validation",
+        "observation_end": "2021-12-31",
+        "calendar_end": "2022-02-28",
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+          "size_bytes": 1242
+        },
+        "bundle": {
+          "name": "bundle.json",
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+          "size_bytes": 2959
+        },
+        "membership_rows": 40091,
+        "returns_rows": 28034527,
+        "calendar_rows": 8825,
+        "delists_rows": 7901,
+        "plaintext_bytes": 1789525544
+      },
+      "final": {
+        "partition": "final",
+        "observation_end": "2025-02-28",
+        "calendar_end": "2025-02-28",
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "7a330b024227ef47558b68dad413bcdf6f5253441077cb08b8af21737325aa65",
+          "size_bytes": 1242
+        },
+        "bundle": {
+          "name": "bundle.json",
+          "sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+          "size_bytes": 2948
+        },
+        "membership_rows": 43610,
+        "returns_rows": 31465356,
+        "calendar_rows": 9921,
+        "delists_rows": 9038,
+        "plaintext_bytes": 2011883179
+      },
+      "plaintext_removed": true
+    },
+    "extraction_sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+    "ciphertext_files": 20,
+    "partitions": [
+      {
+        "partition": "train-validation",
+        "opened": false,
+        "bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1"
+      },
+      {
+        "partition": "final",
+        "opened": false,
+        "bundle_sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e"
+      }
+    ]
+  },
+  "inventory": {
+    "kind": "HPC3_STAGE_INSPECTION",
+    "host": "hpc3",
+    "manifest": {
+      "destination": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation",
+      "files": [
+        {
+          "name": "bundle.json",
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+          "size_bytes": 2959
+        },
+        {
+          "name": "calendar.csv.age",
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+          "size_bytes": 150323
+        },
+        {
+          "name": "calendar.sql.age",
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+          "size_bytes": 488
+        },
+        {
+          "name": "delists.csv.age",
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+          "size_bytes": 438816
+        },
+        {
+          "name": "delists.sql.age",
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+          "size_bytes": 843
+        },
+        {
+          "name": "manifest.json.age",
+          "sha256": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647",
+          "size_bytes": 1558
+        },
+        {
+          "name": "membership.csv.age",
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+          "size_bytes": 1323763
+        },
+        {
+          "name": "membership.sql.age",
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+          "size_bytes": 740
+        },
+        {
+          "name": "protocol.json.age",
+          "sha256": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851",
+          "size_bytes": 1579
+        },
+        {
+          "name": "returns.csv.age",
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+          "size_bytes": 1788046370
+        },
+        {
+          "name": "returns.sql.age",
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+          "size_bytes": 815
+        }
+      ],
+      "provenance": {
+        "encrypted_bundle": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+        "plaintext_manifest": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+        "partition": "train-validation"
+      }
+    },
+    "manifest_sha256": "e536d1a4358300ceed112870b5690d84f3a5738b8a1a91198dda8b2780cf4f9f",
+    "expected_sha256": "6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58",
+    "verified_files": 11,
+    "certification_path": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation/train-validation-stage-digests.txt",
+    "certification_sha256": "fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84",
+    "controller_python": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "inventory": {
+      "root": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031",
+      "directories": {
+        "": 448,
+        "train-validation": 448
+      },
+      "files": [
+        {
+          "name": "train-validation/bundle.json",
+          "size_bytes": 2959,
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1"
+        },
+        {
+          "name": "train-validation/calendar.csv.age",
+          "size_bytes": 150323,
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24"
+        },
+        {
+          "name": "train-validation/calendar.sql.age",
+          "size_bytes": 488,
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1"
+        },
+        {
+          "name": "train-validation/delists.csv.age",
+          "size_bytes": 438816,
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2"
+        },
+        {
+          "name": "train-validation/delists.sql.age",
+          "size_bytes": 843,
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395"
+        },
+        {
+          "name": "train-validation/manifest.json.age",
+          "size_bytes": 1558,
+          "sha256": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647"
+        },
+        {
+          "name": "train-validation/membership.csv.age",
+          "size_bytes": 1323763,
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32"
+        },
+        {
+          "name": "train-validation/membership.sql.age",
+          "size_bytes": 740,
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb"
+        },
+        {
+          "name": "train-validation/protocol.json.age",
+          "size_bytes": 1579,
+          "sha256": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851"
+        },
+        {
+          "name": "train-validation/returns.csv.age",
+          "size_bytes": 1788046370,
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66"
+        },
+        {
+          "name": "train-validation/returns.sql.age",
+          "size_bytes": 815,
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f"
+        },
+        {
+          "name": "train-validation/train-validation-stage-digests.txt",
+          "size_bytes": 1114,
+          "sha256": "fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84"
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "subject_report": "WRDS ATTEMPT LOAD-REPORT wrds-crsp-extraction/licensed-calendar-20261031 attempt first: job 40554174 on wrds\nidentity 51da76ff3aa3a0c547f4b6627b1fe2475a2d473982c183546485fff1b6e0a79c\ncode crsp_extraction.py sha256=3829af8f2eb091de7e32984196249d6495a8d0297f3889d0884b6f516fe2b893\ninput protocol.json sha256=6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b\ninput access.json sha256=e168f23bdb4c79325d9849449772c63af2f416d3d39f7840797ed0cacb539f46\nruntime python=/home/uci/awagner14/research-runtime-calendar-5e61e1450/bin/python sha256=e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b version=3.11.16 packages=61 pin_sha256=a0c759c120732543c0bb5e8cbe470a93791e0320766e32a4be63458dd58dcfdb\nscheduler state=completed\naccounting job 40554174 hostname=wrds-sas31-w.wharton.private failed=0 exit_status=0\noutput extraction.json sha256=18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349\noutput metrics.json sha256=e15f4d51b1f3ba3a7a53b240292da6510343eee724c25b91ba018067a2f4cb6c\noutput train-validation/bundle.json sha256=26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1\noutput train-validation/calendar.csv.age sha256=15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24\noutput train-validation/calendar.sql.age sha256=14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1\noutput train-validation/delists.csv.age sha256=36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2\noutput train-validation/delists.sql.age sha256=91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395\noutput train-validation/manifest.json.age sha256=b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647\noutput train-validation/membership.csv.age sha256=87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32\noutput train-validation/membership.sql.age sha256=57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb\noutput train-validation/protocol.json.age sha256=281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851\noutput train-validation/returns.csv.age sha256=760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66\noutput train-validation/returns.sql.age sha256=0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f\noutput final/bundle.json sha256=377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e\noutput final/calendar.csv.age sha256=df9b6b8643240727635a2a35e395ecac30091a69d25f1cdc9886a546ec5f3487\noutput final/calendar.sql.age sha256=f38af8ba2005097b160f1b13f8d5de8d28d775379c851ff11d2ad6337f9b1cae\noutput final/delists.csv.age sha256=bcb97baceb08c5f2bab7b1e3c4fde35b3613736e25ea912845a2d0e252a2dae2\noutput final/delists.sql.age sha256=fa9da22247f2d54df2577e0697559c5f5b994e057dd019b937f501585e6e80e4\noutput final/manifest.json.age sha256=f2911fd3d67cb8e3ffe412b80717dbf642f5d681506e82e421f802323143df1c\noutput final/membership.csv.age sha256=7ae4397a464b1a95cb36c4b54a832ed46994d92c208f18014b1e7f86856a2bdb\noutput final/membership.sql.age sha256=f678257895fdaa93187cdfc03b4a1913d1fa2ad6480af885523329998e43f097\noutput final/protocol.json.age sha256=dea90e23eeac92f5d1bc9006650752a93147f4123f67c4a8559403666c9e34fb\noutput final/returns.csv.age sha256=dcd57fb215b1085a1755250552c4beddd1280f0983a4cf09eedadeb28956b603\noutput final/returns.sql.age sha256=2f0ce4cda33b77bf3918db0ce1bc176887ad66fc810d50670908ee36f7fc95d4\nrun-record sha256=b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde",
+    "subject_receipt": {
+      "identity": "51da76ff3aa3a0c547f4b6627b1fe2475a2d473982c183546485fff1b6e0a79c",
+      "attempt": "first",
+      "job_id": "40554174",
+      "worker_sha256": "9c023ddabbd7d46a7e20f237e1dbf1b30f613fa8500f17d7a9245a444fd96ad0",
+      "runtime": {
+        "python": "/home/uci/awagner14/research-runtime-calendar-5e61e1450/bin/python",
+        "sha256": "e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b",
+        "version": "3.11.16",
+        "packages": {
+          "alembic": "1.17.2",
+          "annotated-doc": "0.0.4",
+          "annotated-types": "0.7.0",
+          "anyio": "4.12.0",
+          "certifi": "2025.11.12",
+          "cffi": "2.1.1",
+          "cleargbm": "0.1.0",
+          "cleargbm-rs": "0.1.0",
+          "cloudpickle": "3.1.2",
+          "colorlog": "6.10.1",
+          "covenant-domain": "0.1.0",
+          "covenant-ml": "0.1.0",
+          "cryptography": "50.0.2",
+          "fastapi": "0.124.0",
+          "greenlet": "3.3.0",
+          "h11": "0.16.0",
+          "httpcore": "1.0.9",
+          "httpx": "0.28.1",
+          "idna": "3.11",
+          "joblib": "1.5.2",
+          "lightgbm": "4.6.0",
+          "llvmlite": "0.46.0",
+          "mako": "1.3.10",
+          "markdown-it-py": "4.0.0",
+          "markupsafe": "3.0.3",
+          "mdurl": "0.1.2",
+          "numba": "0.63.1",
+          "numpy": "2.3.5",
+          "nvidia-nccl-cu12": "2.27.5",
+          "optuna": "4.6.0",
+          "packaging": "25.0",
+          "pandas": "2.3.3",
+          "pip": "24.0",
+          "platform-core": "0.1.0",
+          "platform-ml": "0.1.0",
+          "polars": "1.36.1",
+          "polars-runtime-32": "1.36.1",
+          "pycparser": "3.11",
+          "pydantic": "2.12.5",
+          "pydantic-core": "2.41.5",
+          "pygments": "2.19.2",
+          "pyrage": "1.4.0",
+          "python-dateutil": "2.9.0.post0",
+          "pytz": "2025.2",
+          "pyyaml": "6.0.3",
+          "rich": "14.2.0",
+          "scikit-learn": "1.7.2",
+          "scipy": "1.16.3",
+          "sentencepiece": "0.2.1",
+          "setuptools": "79.0.1",
+          "shap": "0.51.0",
+          "six": "1.17.0",
+          "slicer": "0.0.8",
+          "sqlalchemy": "2.0.45",
+          "starlette": "0.50.0",
+          "threadpoolctl": "3.6.0",
+          "tqdm": "4.67.1",
+          "typing-extensions": "4.15.0",
+          "typing-inspection": "0.4.2",
+          "tzdata": "2025.3",
+          "xgboost": "3.1.2"
+        }
+      },
+      "outputs": {
+        "extraction.json": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+        "metrics.json": "e15f4d51b1f3ba3a7a53b240292da6510343eee724c25b91ba018067a2f4cb6c",
+        "train-validation/bundle.json": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+        "train-validation/calendar.csv.age": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+        "train-validation/calendar.sql.age": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+        "train-validation/delists.csv.age": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+        "train-validation/delists.sql.age": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+        "train-validation/manifest.json.age": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647",
+        "train-validation/membership.csv.age": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+        "train-validation/membership.sql.age": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+        "train-validation/protocol.json.age": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851",
+        "train-validation/returns.csv.age": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+        "train-validation/returns.sql.age": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+        "final/bundle.json": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+        "final/calendar.csv.age": "df9b6b8643240727635a2a35e395ecac30091a69d25f1cdc9886a546ec5f3487",
+        "final/calendar.sql.age": "f38af8ba2005097b160f1b13f8d5de8d28d775379c851ff11d2ad6337f9b1cae",
+        "final/delists.csv.age": "bcb97baceb08c5f2bab7b1e3c4fde35b3613736e25ea912845a2d0e252a2dae2",
+        "final/delists.sql.age": "fa9da22247f2d54df2577e0697559c5f5b994e057dd019b937f501585e6e80e4",
+        "final/manifest.json.age": "f2911fd3d67cb8e3ffe412b80717dbf642f5d681506e82e421f802323143df1c",
+        "final/membership.csv.age": "7ae4397a464b1a95cb36c4b54a832ed46994d92c208f18014b1e7f86856a2bdb",
+        "final/membership.sql.age": "f678257895fdaa93187cdfc03b4a1913d1fa2ad6480af885523329998e43f097",
+        "final/protocol.json.age": "dea90e23eeac92f5d1bc9006650752a93147f4123f67c4a8559403666c9e34fb",
+        "final/returns.csv.age": "dcd57fb215b1085a1755250552c4beddd1280f0983a4cf09eedadeb28956b603",
+        "final/returns.sql.age": "2f0ce4cda33b77bf3918db0ce1bc176887ad66fc810d50670908ee36f7fc95d4"
+      },
+      "record": {
+        "experiment": "wrds-crsp-extraction",
+        "label": "licensed-calendar-20261031",
+        "fingerprint": {
+          "image_digest": "",
+          "gpu_model": "",
+          "driver_version": "",
+          "determinism": {
+            "stack": "wrds-launcher",
+            "settings": {
+              "MKL_NUM_THREADS": "2",
+              "NUMEXPR_NUM_THREADS": "2",
+              "OMP_NUM_THREADS": "2",
+              "OPENBLAS_NUM_THREADS": "2",
+              "PYTHONHASHSEED": "31",
+              "WRDS_SEED": "31"
+            }
+          },
+          "host": {
+            "platform": "Linux-5.14.0-687.60.1.el9_8.x86_64-x86_64-with-glibc2.34",
+            "machine": "x86_64",
+            "logical_cores": 24
+          },
+          "packages": [
+            {
+              "name": "alembic",
+              "version": "1.17.2"
+            },
+            {
+              "name": "annotated-doc",
+              "version": "0.0.4"
+            },
+            {
+              "name": "annotated-types",
+              "version": "0.7.0"
+            },
+            {
+              "name": "anyio",
+              "version": "4.12.0"
+            },
+            {
+              "name": "certifi",
+              "version": "2025.11.12"
+            },
+            {
+              "name": "cffi",
+              "version": "2.1.1"
+            },
+            {
+              "name": "cleargbm",
+              "version": "0.1.0"
+            },
+            {
+              "name": "cleargbm-rs",
+              "version": "0.1.0"
+            },
+            {
+              "name": "cloudpickle",
+              "version": "3.1.2"
+            },
+            {
+              "name": "colorlog",
+              "version": "6.10.1"
+            },
+            {
+              "name": "covenant-domain",
+              "version": "0.1.0"
+            },
+            {
+              "name": "covenant-ml",
+              "version": "0.1.0"
+            },
+            {
+              "name": "cryptography",
+              "version": "50.0.2"
+            },
+            {
+              "name": "fastapi",
+              "version": "0.124.0"
+            },
+            {
+              "name": "greenlet",
+              "version": "3.3.0"
+            },
+            {
+              "name": "h11",
+              "version": "0.16.0"
+            },
+            {
+              "name": "httpcore",
+              "version": "1.0.9"
+            },
+            {
+              "name": "httpx",
+              "version": "0.28.1"
+            },
+            {
+              "name": "idna",
+              "version": "3.11"
+            },
+            {
+              "name": "joblib",
+              "version": "1.5.2"
+            },
+            {
+              "name": "lightgbm",
+              "version": "4.6.0"
+            },
+            {
+              "name": "llvmlite",
+              "version": "0.46.0"
+            },
+            {
+              "name": "mako",
+              "version": "1.3.10"
+            },
+            {
+              "name": "markdown-it-py",
+              "version": "4.0.0"
+            },
+            {
+              "name": "markupsafe",
+              "version": "3.0.3"
+            },
+            {
+              "name": "mdurl",
+              "version": "0.1.2"
+            },
+            {
+              "name": "numba",
+              "version": "0.63.1"
+            },
+            {
+              "name": "numpy",
+              "version": "2.3.5"
+            },
+            {
+              "name": "nvidia-nccl-cu12",
+              "version": "2.27.5"
+            },
+            {
+              "name": "optuna",
+              "version": "4.6.0"
+            },
+            {
+              "name": "packaging",
+              "version": "25.0"
+            },
+            {
+              "name": "pandas",
+              "version": "2.3.3"
+            },
+            {
+              "name": "pip",
+              "version": "24.0"
+            },
+            {
+              "name": "platform-core",
+              "version": "0.1.0"
+            },
+            {
+              "name": "platform-ml",
+              "version": "0.1.0"
+            },
+            {
+              "name": "polars",
+              "version": "1.36.1"
+            },
+            {
+              "name": "polars-runtime-32",
+              "version": "1.36.1"
+            },
+            {
+              "name": "pycparser",
+              "version": "3.11"
+            },
+            {
+              "name": "pydantic",
+              "version": "2.12.5"
+            },
+            {
+              "name": "pydantic-core",
+              "version": "2.41.5"
+            },
+            {
+              "name": "pygments",
+              "version": "2.19.2"
+            },
+            {
+              "name": "pyrage",
+              "version": "1.4.0"
+            },
+            {
+              "name": "python-dateutil",
+              "version": "2.9.0.post0"
+            },
+            {
+              "name": "pytz",
+              "version": "2025.2"
+            },
+            {
+              "name": "pyyaml",
+              "version": "6.0.3"
+            },
+            {
+              "name": "rich",
+              "version": "14.2.0"
+            },
+            {
+              "name": "scikit-learn",
+              "version": "1.7.2"
+            },
+            {
+              "name": "scipy",
+              "version": "1.16.3"
+            },
+            {
+              "name": "sentencepiece",
+              "version": "0.2.1"
+            },
+            {
+              "name": "setuptools",
+              "version": "79.0.1"
+            },
+            {
+              "name": "shap",
+              "version": "0.51.0"
+            },
+            {
+              "name": "six",
+              "version": "1.17.0"
+            },
+            {
+              "name": "slicer",
+              "version": "0.0.8"
+            },
+            {
+              "name": "sqlalchemy",
+              "version": "2.0.45"
+            },
+            {
+              "name": "starlette",
+              "version": "0.50.0"
+            },
+            {
+              "name": "threadpoolctl",
+              "version": "3.6.0"
+            },
+            {
+              "name": "tqdm",
+              "version": "4.67.1"
+            },
+            {
+              "name": "typing-extensions",
+              "version": "4.15.0"
+            },
+            {
+              "name": "typing-inspection",
+              "version": "0.4.2"
+            },
+            {
+              "name": "tzdata",
+              "version": "2025.3"
+            },
+            {
+              "name": "xgboost",
+              "version": "3.1.2"
+            }
+          ]
+        },
+        "observations": [
+          {
+            "name": "final_calendar_rows",
+            "value": 9921.0
+          },
+          {
+            "name": "final_delists_rows",
+            "value": 9038.0
+          },
+          {
+            "name": "final_membership_rows",
+            "value": 43610.0
+          },
+          {
+            "name": "final_returns_rows",
+            "value": 31465356.0
+          },
+          {
+            "name": "plaintext_removed",
+            "value": 1.0
+          },
+          {
+            "name": "train_validation_calendar_rows",
+            "value": 8825.0
+          },
+          {
+            "name": "train_validation_delists_rows",
+            "value": 7901.0
+          },
+          {
+            "name": "train_validation_membership_rows",
+            "value": 40091.0
+          },
+          {
+            "name": "train_validation_returns_rows",
+            "value": 28034527.0
+          }
+        ],
+        "payload_digest": "ec3b733ad42dc2e1b00306726e8184ffde332abeaba45b13a0f01d60fcd45b04"
+      }
+    },
+    "subject_receipt_sha256": "66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83",
+    "observer_source_sha256": "e08cf9c01a850b7bf5acf4efdfcc2868ab965b81364c05f7da32922adda3e14a",
+    "observer_accounting": {
+      "hostname": "wrds-sas31-w.wharton.private",
+      "failed": "0",
+      "exit_status": "0"
+    },
+    "observation": {
+      "node": "wrds-sas31-w.wharton.private",
+      "job_id": "40554174",
+      "observer_job_id": "40554707",
+      "observed_at": "2026-10-31T21:39:57.076558+00:00",
+      "matching_scratch_roots": []
+    },
+    "observation_sha256": "370ed15d46116e373ff12d03636fbc09b3f8f33cc6067e9d74921e37c0dac24d"
+  },
+  "observer_submission": {
+    "identity": "51da76ff3aa3a0c547f4b6627b1fe2475a2d473982c183546485fff1b6e0a79c",
+    "attempt": "first",
+    "subject_job_id": "40554174",
+    "observer_job_id": "40554707",
+    "worker_sha256": "e08cf9c01a850b7bf5acf4efdfcc2868ab965b81364c05f7da32922adda3e14a",
+    "subject_receipt_sha256": "66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83"
+  },
+  "queries": {
+    "protocol": "SELECT count(*) FROM agent_task_updates WHERE id='7d43afbd-9dfa-42b8-94de-e026395ca578' AND task_id='da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320' AND author='load-report-da2a55dc' AND body LIKE 'WRDS ATTEMPT LOAD-REPORT %job 40554174 on wrds%' AND body LIKE '%input protocol.json sha256=6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b%'",
+    "ciphertext": "WITH report AS (SELECT split_part(body,E'\\n',2)::jsonb AS doc FROM agent_task_updates WHERE id='93e6e12c-2acf-48ff-87d1-adcf79ae1e91' AND task_id='a622165c-bb63-4714-933b-10d527f21478' AND author='load-report-a622165c' AND body LIKE 'WRDS EXTRACTION VERIFY LOAD-REPORT%') SELECT count(*) FROM report WHERE doc @> '{\"source\": \"crsp_a_stock\", \"snapshot\": \"13138198359:13149639397:\", \"extraction_sha256\": \"18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349\", \"ciphertext_files\": 20, \"extraction_receipt\": {\"started_at\": \"2026-10-31T18:44:04.122752+00:00\", \"completed_at\": \"2026-10-31T18:46:02.546334+00:00\", \"transaction_started_at\": \"2026-10-31 18:44:04.200309+00\", \"snapshot\": \"13138198359:13149639397:\", \"driver_sha256\": \"f61e6665ec0755f4e8ec1bdd792a49f33040ff2dd24d4c2e77ffc048b0a9c36a\", \"protocol\": {\"name\": \"protocol.json\", \"sha256\": \"6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b\", \"size_bytes\": 1251}, \"plaintext_removed\": true}}'::jsonb AND doc->'partitions'='[{\"partition\": \"train-validation\", \"opened\": false, \"bundle_sha256\": \"26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1\"}, {\"partition\": \"final\", \"opened\": false, \"bundle_sha256\": \"377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e\"}]'::jsonb",
+    "inventory": "WITH measured AS (SELECT id,author,created_at,split_part(body,E'\\n',2)::jsonb AS doc FROM agent_task_updates WHERE task_id='a622165c-bb63-4714-933b-10d527f21478' AND author='hpc-report-a622165c' AND id IN ('bc09355e-578c-492b-a8b7-a7a1765b958e','be73d576-d2c7-4b10-9976-fff21a276a58','9e945d2f-f685-4a02-a3b9-60508eeb77cf')), placed AS (SELECT * FROM measured WHERE id='bc09355e-578c-492b-a8b7-a7a1765b958e'), inspected AS (SELECT * FROM measured WHERE id='be73d576-d2c7-4b10-9976-fff21a276a58'), controller AS (SELECT * FROM measured WHERE id='9e945d2f-f685-4a02-a3b9-60508eeb77cf'), expected AS (SELECT jsonb_build_object('name','train-validation/' || (f->>'name'),'size_bytes',f->'size_bytes','sha256',f->'sha256') AS item FROM placed CROSS JOIN LATERAL jsonb_array_elements(doc->'manifest'->'files') f UNION ALL SELECT jsonb_build_object('name','train-validation/train-validation-stage-digests.txt','size_bytes',1114,'sha256','fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84')) SELECT count(*) FROM placed s CROSS JOIN inspected i CROSS JOIN controller c WHERE s.created_at < c.created_at AND c.created_at < i.created_at AND s.doc->>'kind'='HPC3_STAGE_EVIDENCE' AND i.doc->>'kind'='HPC3_STAGE_INSPECTION' AND i.doc->>'host'='hpc3' AND i.doc->'manifest'=s.doc->'manifest' AND i.doc->'expected_sha256'=s.doc->'expected_sha256' AND i.doc->>'verified_files'='11' AND i.doc->>'certification_sha256'='fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84' AND i.doc->'inventory'->>'root'='/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031' AND i.doc->'inventory'->'directories'='{\"\":448,\"train-validation\":448}'::jsonb AND i.doc->'inventory'->'files'=(SELECT jsonb_agg(item ORDER BY item->>'name') FROM expected) AND jsonb_array_length(i.doc->'inventory'->'files')=12 AND i.doc->>'controller_python'='/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python' AND i.doc->'controller_python'=c.doc->'controller_python' AND i.doc->'controller_python_sha256'=c.doc->'controller_python_sha256' AND c.doc->>'kind'='HPC3_CONTROLLER_EVIDENCE' AND c.doc->>'installed_files'='581' AND c.doc->>'selfcheck'='image self-check OK' AND c.doc->>'dependency_check'='No broken requirements found.' AND c.doc->'verified_wheels'->'hpc3-0.1.0-py3-none-any.whl'->>'sha256'='9fb2f51fdf2dd7c47baff2ab60cf66137271de5d8741f3c2aca085fcc359cf3d'",
+    "cleanup": "WITH report AS (SELECT split_part(body,E'\\n',2)::jsonb AS doc FROM agent_task_updates WHERE id='1a4e1d46-abbd-4fcf-a643-b871fa4bf985' AND task_id='a622165c-bb63-4714-933b-10d527f21478' AND author='load-report-a622165c' AND body LIKE 'WRDS SCRATCH LOAD-REPORT%') SELECT count(*) FROM report WHERE doc @> '{\"subject_receipt_sha256\": \"66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83\", \"subject_receipt\": {\"identity\": \"51da76ff3aa3a0c547f4b6627b1fe2475a2d473982c183546485fff1b6e0a79c\", \"attempt\": \"first\", \"job_id\": \"40554174\", \"outputs\": {\"extraction.json\": \"18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349\"}}, \"observer_source_sha256\": \"e08cf9c01a850b7bf5acf4efdfcc2868ab965b81364c05f7da32922adda3e14a\", \"observer_accounting\": {\"hostname\": \"wrds-sas31-w.wharton.private\", \"failed\": \"0\", \"exit_status\": \"0\"}, \"observation_sha256\": \"370ed15d46116e373ff12d03636fbc09b3f8f33cc6067e9d74921e37c0dac24d\"}'::jsonb AND doc->'observation'='{\"node\": \"wrds-sas31-w.wharton.private\", \"job_id\": \"40554174\", \"observer_job_id\": \"40554707\", \"observed_at\": \"2026-10-31T21:39:57.076558+00:00\", \"matching_scratch_roots\": []}'::jsonb"
+  },
+  "negative_probes": {
+    "metadata": {
+      "ciphertext": 1,
+      "wrong-snapshot": 0,
+      "wrong-start": 0,
+      "wrong-driver": 0,
+      "wrong-cleanup": 0,
+      "final-opened": 0,
+      "protocol": 1,
+      "wrong-protocol": 0
+    },
+    "inventory": {
+      "inventory": 1,
+      "wrong-count": 0,
+      "public-root": 0,
+      "wrong-root": 0,
+      "wrong-certificate": 0,
+      "wrong-controller": 0,
+      "extra-key": 0,
+      "reversed-measurements": 0
+    },
+    "cleanup": {
+      "cleanup": 1,
+      "wrong-subject": 0,
+      "wrong-observer": 0,
+      "wrong-node": 0,
+      "remaining-scratch": 0,
+      "wrong-receipt": 0,
+      "wrong-worker": 0
+    }
+  },
+  "fleet_checks": {
+    "covenant_ml": "6b35ec06-0944-4070-b09d-7bdef00f8a8a",
+    "hpc3": "7b344ac5-c0cf-4bd4-a9a1-1b13299409f5"
+  },
+  "private_artifacts": {
+    "source.tar": "44b759094c7c871f87c54b862a1e0759acd575833cd269b9da8e2aebf6134700",
+    "crsp_extraction.py": "ddd6c62b85f2ac6a5b6656270fc9b99d26fc6926556f92e7b6c26ab536f49e30",
+    "controller-provenance.json": "717fd112cdf72ffe0c82264fb241b5328645f7db27cc87c3e2074c092abbbe1e",
+    "controller-inspection.json": "102f88270a8858b396a9a5c38ef23afd545c7d90a0b471fb16e1268749aa0322",
+    "ciphertext-report.json": "7ac2a7a9f7a83606ad43050d53377a59b9a466137e7f0339b8ddb7c79bf1ac26",
+    "staging-inspection.log": "ad21d08527027390c03d0df40046963f7d86919c1bfb92cbd1165f32a1421b7d",
+    "cleanup-evidence.json": "fadeca6d30f6399a7b614c5b0915b0fa6e3de7ca89e87ea662d5bc31b73eb897",
+    "cleanup-evidence.json.receipt.json": "f20da64d4620b396af7660b41838ea561e831fd69ab60d18cf7d67f22918d50a"
+  },
+  "limits": [
+    "No bundle was retransferred or re-extracted.",
+    "Neither partition was decrypted by ciphertext-only verification.",
+    "The complete HPC3 inventory measures this study root at inspection time; it is not a claim of filesystem immutability.",
+    "Fresh maintained observer 40554707 supersedes the ad hoc observation 40554207 for audit evidence; the historical observation remains unchanged.",
+    "The substantive baseline and controlled final evaluation have not run.",
+    "The compute image still contains the older calendar runtime."
+  ]
+}
