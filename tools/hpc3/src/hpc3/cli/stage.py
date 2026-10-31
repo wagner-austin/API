@@ -25,16 +25,18 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
-from platform_core.json_utils import load_json_str
-from platform_core.stage_manifest import decode_stage_manifest
+from platform_core.json_utils import dump_json_str, load_json_str
+from platform_core.load_report import post_load_report, report_identity
+from platform_core.stage_manifest import decode_stage_manifest, encode_stage_manifest
 from platform_core.stage_provenance import format_provenance
 
 from hpc3.cli import _config, _test_hooks
 from hpc3.core import _test_hooks as core_hooks
+from hpc3.core import digest, remote
 from hpc3.core.expected import check_expected, read_expected_digests
-from hpc3.core.stage import certification_path, stage_manifest
+from hpc3.core.stage import certification_path, certification_text, stage_manifest
 
-_FLAGS = (_config.CONFIG_FLAG, "--manifest", "--source-dir", "--expect-from")
+_FLAGS = (_config.CONFIG_FLAG, "--manifest", "--source-dir", "--expect-from", "--report-task")
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -48,7 +50,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         Exit code 0 when every file was placed and verified on the cluster.
 
     Raises:
-        ValueError: If a required flag is missing or an argument is unknown.
+        ValueError: Missing flags, invalid report task or independent digest
+            record changed during staging (STAGE_EXPECTED_CHANGED).
         JSONTypeError: If the manifest is not a valid stage manifest, or its
             provenance record is missing or empty.
         AppError: With ``STAGED_DIGEST_UNEXPECTED`` if a digest is absent from
@@ -56,10 +59,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             absent, ``DIGEST_MISMATCH`` if bytes differ on either side, or
             ``REMOTE_COMMAND_FAILED`` if a remote command fails. Nothing is
             caught: a partial stage is not a success and must not be reported
-            as one.
+            as one. With --report-task, certificate readback and board
+            publication must also succeed before the command returns zero.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    task = parsed.get("--report-task")
+    if task is not None:
+        report_identity(task, "hpc")
     # The connection only: staging bytes needs the host and takes nothing
     # from the project registry, so it must not fail on a registry entry
     # that is mid-onboarding.
@@ -67,6 +74,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     manifest_path = pathlib.Path(cli_args.require_flag(parsed, "--manifest"))
     source_dir = pathlib.Path(cli_args.require_flag(parsed, "--source-dir"))
     expect_path = pathlib.Path(cli_args.require_flag(parsed, "--expect-from"))
+    expected_bytes = core_hooks.read_bytes(expect_path)
 
     raw = core_hooks.read_bytes(manifest_path).decode("utf-8")
     manifest = decode_stage_manifest(load_json_str(raw))
@@ -86,6 +94,39 @@ def main(argv: Sequence[str] | None = None) -> int:
     # no such record names is refused by
     # `model_trainer.cluster.preflight.check_corpus_certified`.
     _test_hooks.emit(f"certified by {certification_path(manifest, manifest_path.stem)}")
+    if task is not None:
+        certificate = certification_path(manifest, manifest_path.stem)
+        certificate_digest = digest.sha256_hex(certification_text(manifest).encode("utf-8"))
+        arrived = digest.parse_remote_digest(remote.remote_digest(host, certificate), certificate)
+        digest.check_remote_digest(certificate, certificate_digest, arrived)
+        if core_hooks.read_bytes(expect_path) != expected_bytes:
+            raise ValueError(
+                "STAGE_EXPECTED_CHANGED: independent digest record changed during staging"
+            )
+        payload = dump_json_str(
+            {
+                "kind": "HPC3_STAGE_EVIDENCE",
+                "host": host,
+                "manifest": encode_stage_manifest(manifest),
+                "manifest_sha256": digest.sha256_hex(raw.encode("utf-8")),
+                "expected_sha256": digest.sha256_hex(expected_bytes),
+                "verified_files": len(placed),
+                "certification_path": certificate,
+                "certification_sha256": certificate_digest,
+                "controller_python": sys.executable,
+                "controller_python_sha256": digest.sha256_hex(
+                    core_hooks.read_bytes(pathlib.Path(sys.executable))
+                ),
+            }
+        )
+        post_load_report(
+            post=_test_hooks.http_post,
+            read_text=_config.stack_file_text,
+            task_id=task,
+            body="HPC3 STAGE LOAD-REPORT\n" + payload,
+            family="hpc",
+        )
+        _test_hooks.emit(payload)
     return 0
 
 
