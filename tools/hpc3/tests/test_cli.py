@@ -271,7 +271,7 @@ class TestStageCli:
             )
 
     def test_a_missing_flag_is_refused(self, tmp_path: pathlib.Path) -> None:
-        with pytest.raises(ValueError, match="--source-dir is required"):
+        with pytest.raises(ValueError, match="--expect-from is required"):
             stage_cli.main(["--config", _config(tmp_path), "--manifest", str(tmp_path / "m.json")])
 
 
