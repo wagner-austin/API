@@ -58,7 +58,19 @@ source_paths:
   - "tools/fleet/src/fleet/cli/research_propose.py"
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
+  - "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_writer.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "c021684ab74ddd87c3a20d2dc8446e0a6bbb642b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "f95b38a9b9912570e1650642888fb4429a358a4b"
+  "libs/covenant_ml/tests/markets/test_crsp_writer.py": "d33b9a62ba2f7067115310a7e09ad2f30670542c"
   "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
   "tools/hpc3/src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
   "tools/hpc3/src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
@@ -357,15 +369,33 @@ records task `45ff6e73` done; the measured details are in
 
 [^remote-handoff]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`. Live task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, program-authored reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` as `fleet-research-proposer`: attempts 1 admitted and 2 refused with `holdout_forbidden`. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207`, full fleet check `672d626f`, 2,561 passed with 100% coverage. No licensed data, final release or native allocation was used in this measurement.
 
+The four-relation writer now exists and has been rehearsed on synthetic data
+only. It derives each partition's COPY statements from the frozen protocol and
+runs all eight in one read-only snapshot on WRDS, with row, byte and time
+limits. Both partitions pass the existing reader and a boundary check before
+each is sealed to its own recipient; only ciphertext and a metadata receipt
+are published. The train-validation partition ends the day before the holdout,
+with membership ends clipped there; its calendar runs two months further for
+the last known exits. Because WRDS PostgreSQL is a read-only hot standby, the
+rehearsal's relations were inline `WITH` definitions, not temporary tables.
+On October 31 the shared queue ran WRDS job 40552575 at API `d758dfc40` in 2.6
+seconds. Evaluator verification opened each bundle with its own key: 7,259
+train-validation returns ending December 31, 2019, and 8,621 final returns
+ending August 31, 2020; plaintext was removed. An earlier temporary-table
+attempt refused and published nothing. The licensed extraction, its HPC3
+staging, candidate selection and final scoring remain unrun.[^crsp-writer]
+
+[^crsp-writer]: `tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json`, `native_run`, `receipt`, `evaluator_verify`, `preserved_failure` and `limits`; `libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py`, `extract_crsp`; `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_scopes`, `crsp_relation_sql` and `synthetic_source`; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_crsp_writer.py`, sealed bundles reopened with real keys and every refusal. Queue job `d80d9e7d-ad94-4f13-bee2-a06262eae2c8` closed passed with a program-authored load report on task `1f60a20d-d860-43b3-9616-68f192bcedd9`; refused attempt queue `ea07c31c-5156-454b-ab80-6ddd4536fd34`, WRDS job 40552520. Fleet `9d99e209-9c08-4256-98f9-a483b6b4f0bb` passed covenant_ml at `d758dfc40607090650f441a0b34e9f7869c43ed4`: 4,948 tests, 100% statement and branch coverage.
+
 The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant][^wrds-delay]
 
 1. Complete independent review of the measured WRDS cleanup milestone and the
    pending CRSP semantics task `54b55cc7`. Its wiki-audit dependency `0ae483f4`
    passed independent audit `2f50ce9a` at 05:56:20 UTC on October 31 and released
    the semantics task for review. Native final scoring is rehearsed on HPC3 only.
-2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
-   checksums and calendar coverage, then stage its verified manifest to HPC3.
-   Keep final-period evidence confined to the evaluator.
+2. Run the rehearsed writer below against the licensed library, then stage its
+   verified train-validation bundle to HPC3. Keep the final bundle confined to
+   the evaluator. Neither step has run.
 3. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
    comparison first; seal the chosen candidate and use the one-shot final release
