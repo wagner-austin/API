@@ -14,6 +14,7 @@ import signal
 import subprocess
 import sys
 from collections.abc import Generator
+from hashlib import sha256
 from pathlib import Path
 
 import pytest
@@ -125,6 +126,7 @@ def test_extract_then_verify_in_process_posts_the_reading_before_printing_it(
         evaluator_keys(allocation.root),
         scratch=allocation.root / "verify-scratch",
         open_final=False,
+        ciphertext_only=False,
     )
     assert load_json_str(printed) == expected
     checkin, note = (sent_arguments(body) for body in post.bodies)
@@ -136,6 +138,75 @@ def test_extract_then_verify_in_process_posts_the_reading_before_printing_it(
     assert note["agent"] == "load-report-1f60a20d"
     assert note["taskId"] == TASK
     assert note["body"] == "WRDS EXTRACTION VERIFY LOAD-REPORT\n" + printed.removesuffix("\n")
+
+
+def test_ciphertext_only_reports_receipt_without_keys_or_plaintext(
+    allocation: Extraction,
+    database: FakeDatabase,
+    board: None,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert crsp_extraction.main(_arguments(allocation)) == 0
+    for partition in ("train-validation", "final"):
+        (allocation.root / "keys" / (partition + ".agekey")).unlink()
+    post = FakeHttpPost([posted_ok(), posted_ok()])
+    markets_hooks.http_post = post
+    assert crsp_extraction.main([*_verify_command(allocation), "--ciphertext-only"]) == 0
+    printed = capsys.readouterr().out
+    expected = verify_crsp_extraction(
+        allocation.root,
+        evaluator_keys(allocation.root),
+        scratch=allocation.root / "nonexistent-scratch",
+        open_final=False,
+        ciphertext_only=True,
+    )
+    assert load_json_str(printed) == expected
+    assert expected["extraction_receipt"] == load_json_str(
+        (allocation.output / "extraction.json").read_text()
+    )
+    assert expected["partitions"] == [
+        {
+            "partition": partition,
+            "opened": False,
+            "bundle_sha256": sha256(
+                (allocation.output / partition / "bundle.json").read_bytes()
+            ).hexdigest(),
+        }
+        for partition in ("train-validation", "final")
+    ]
+    assert sent_arguments(post.bodies[1])["body"] == (
+        "WRDS EXTRACTION VERIFY LOAD-REPORT\n" + printed.removesuffix("\n")
+    )
+    assert list((allocation.root / "verify-scratch").iterdir()) == []
+    assert not (allocation.root / "nonexistent-scratch").exists()
+
+
+def test_conflicting_verification_modes_are_refused_before_reading(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="ciphertext-only verification cannot open"):
+        verify_crsp_extraction(
+            tmp_path,
+            evaluator_keys(extraction(tmp_path).root),
+            scratch=tmp_path / "absent",
+            open_final=True,
+            ciphertext_only=True,
+        )
+    with pytest.raises(SystemExit) as stopped:
+        crsp_extraction.main(
+            [
+                "verify",
+                "--collected",
+                str(tmp_path),
+                "--access",
+                "absent.json",
+                "--scratch",
+                str(tmp_path / "absent"),
+                "--report-task",
+                TASK,
+                "--ciphertext-only",
+                "--open-final",
+            ]
+        )
+    assert stopped.value.code == 2
 
 
 def test_a_refused_report_fails_verification_without_printing(

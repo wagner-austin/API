@@ -51,7 +51,11 @@ def _bundle_digest(case: Extraction, partition: str) -> str:
 
 def _verify(case: Extraction, *, open_final: bool) -> JSONObject:
     return verify_crsp_extraction(
-        case.root, evaluator_keys(case.root), scratch=_scratch(case), open_final=open_final
+        case.root,
+        evaluator_keys(case.root),
+        scratch=_scratch(case),
+        open_final=open_final,
+        ciphertext_only=False,
     )
 
 
@@ -77,6 +81,7 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
     assert result == {
         "source": "crsp_a_stock",
         "snapshot": "750:750:",
+        "extraction_receipt": load_json_str(receipt_bytes.decode()),
         "extraction_sha256": sha256(receipt_bytes).hexdigest(),
         "ciphertext_files": 20,
         "partitions": [

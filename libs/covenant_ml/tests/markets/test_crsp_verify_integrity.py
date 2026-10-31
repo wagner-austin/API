@@ -31,10 +31,11 @@ def encrypted_case(tmp_path: Path) -> Extraction:
     return case
 
 
+@pytest.mark.parametrize("ciphertext_only", [True, False])
 @pytest.mark.parametrize("partition", ["train-validation", "final"])
 @pytest.mark.parametrize("damage", ["missing", "extra", "changed", "size", "symlink", "dangling"])
 def test_ciphertext_damage_in_either_partition_is_refused(
-    encrypted_case: Extraction, partition: str, damage: str
+    encrypted_case: Extraction, partition: str, damage: str, ciphertext_only: bool
 ) -> None:
     case = encrypted_case
     path = case.output / partition / "returns.csv.age"
@@ -64,7 +65,11 @@ def test_ciphertext_damage_in_either_partition_is_refused(
     scratch.mkdir(mode=0o700)
     with pytest.raises(ValueError, match=expected):
         verify_crsp_extraction(
-            case.root, evaluator_keys(case.root), scratch=scratch, open_final=False
+            case.root,
+            evaluator_keys(case.root),
+            scratch=scratch,
+            open_final=False,
+            ciphertext_only=ciphertext_only,
         )
     assert list(scratch.iterdir()) == []
 
@@ -79,7 +84,11 @@ def test_final_ciphertext_is_checked_before_validation_decryption(
     scratch = case.root / "never-created-scratch"
     with pytest.raises(ValueError, match="ENCRYPTED_DIGEST"):
         verify_crsp_extraction(
-            case.root, evaluator_keys(case.root), scratch=scratch, open_final=False
+            case.root,
+            evaluator_keys(case.root),
+            scratch=scratch,
+            open_final=False,
+            ciphertext_only=False,
         )
     assert not scratch.exists()
 
@@ -107,7 +116,11 @@ def test_nonregular_and_nested_inventory_is_refused(
         metadata.symlink_to(target)
     with pytest.raises(ValueError, match=r"\[CRSP-013\]"):
         verify_crsp_extraction(
-            case.root, evaluator_keys(case.root), scratch=case.root / "absent", open_final=False
+            case.root,
+            evaluator_keys(case.root),
+            scratch=case.root / "absent",
+            open_final=False,
+            ciphertext_only=False,
         )
     assert not (case.root / "absent").exists()
 
@@ -131,7 +144,11 @@ def test_collection_root_and_required_metadata_are_checked(
             case.output.write_bytes(b"not a directory")
     with pytest.raises(ValueError, match=r"\[CRSP-013\]"):
         verify_crsp_extraction(
-            case.root, evaluator_keys(case.root), scratch=case.root / "absent", open_final=False
+            case.root,
+            evaluator_keys(case.root),
+            scratch=case.root / "absent",
+            open_final=False,
+            ciphertext_only=False,
         )
     assert not (case.root / "absent").exists()
 
@@ -150,7 +167,11 @@ def test_evaluator_owned_byte_budget_prevents_any_plaintext(
         scratch.mkdir(mode=0o700)
     with pytest.raises(ValueError, match="ENCRYPTED_LIMIT"):
         verify_crsp_extraction(
-            case.root, evaluator_keys(case.root), scratch=scratch, open_final=False
+            case.root,
+            evaluator_keys(case.root),
+            scratch=scratch,
+            open_final=False,
+            ciphertext_only=False,
         )
     assert scratch.exists() == scratch_exists
     if scratch_exists:
@@ -163,7 +184,11 @@ def test_complete_final_inventory_is_verified_without_its_key(encrypted_case: Ex
     scratch = case.root / "private-scratch"
     scratch.mkdir(mode=0o700)
     result = verify_crsp_extraction(
-        case.root, evaluator_keys(case.root), scratch=scratch, open_final=False
+        case.root,
+        evaluator_keys(case.root),
+        scratch=scratch,
+        open_final=False,
+        ciphertext_only=False,
     )
     assert result["ciphertext_files"] == 20
     assert list(scratch.iterdir()) == []
