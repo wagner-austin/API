@@ -30,6 +30,16 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
    with a per-test timeout lose. Measured on covenant-radar-api, 2637
    tests: ``-n auto`` uncapped 206 s with two crashed workers; capped 94 s
    green. SET HERE, not in a conftest: a BLAS reads these when it LOADS.
+
+5. THE RUN'S OWN MODEL CACHES. Hugging Face and Triton cache under the
+   user's home by default, so a suite that loads ``sshleifer/tiny-gpt2`` or
+   compiles a Triton helper wrote outside its own temporary directories:
+   Model-Trainer's check on lavender (fleet job 58471c54, 2026-10-31) left
+   ``~/.triton/cache/.../cuda_utils.so`` and a ``.no_exist`` marker under
+   ``~/.cache/huggingface/hub`` (MCPs board task bcb7c6ef). ``HF_HOME`` and
+   ``TRITON_HOME`` name a directory under ``runs/`` that is this run's alone
+   and is removed with its coverage files. Set here for item 4's reason:
+   ``huggingface_hub`` reads ``HF_HOME`` when it is imported.
 """
 
 from __future__ import annotations
@@ -58,6 +68,16 @@ RUNS_DIRECTORY: Final[str] = "runs"
 
 #: The prefix every run's coverage files share, followed by the run's token.
 COVERAGE_PREFIX: Final[str] = ".coverage-"
+
+#: The prefix of the run's cache directory, item 5 above, followed by the
+#: same token as its coverage files.
+CACHES_PREFIX: Final[str] = ".caches-"
+
+#: Each variable naming a cache's home, and its directory under the run's.
+CACHE_HOMES: Final[Sequence[tuple[str, str]]] = (
+    ("HF_HOME", "huggingface"),
+    ("TRITON_HOME", "triton"),
+)
 
 #: The BLAS thread caps, item 4 above.
 THREAD_CAPS: Final[Sequence[tuple[str, str]]] = (
@@ -161,11 +181,16 @@ def run_tests(
         reap.sweep_stale(project)
     runs = project / RUNS_DIRECTORY
     runs.mkdir(exist_ok=True)
-    token = COVERAGE_PREFIX + _test_hooks.token()
+    run_token = _test_hooks.token()
+    token = COVERAGE_PREFIX + run_token
+    caches = runs.resolve() / (CACHES_PREFIX + run_token)
+    caches.mkdir(exist_ok=True)
     environment = _test_hooks.environ()
     environment["COVERAGE_FILE"] = str(runs.resolve() / token)
     for name, value in THREAD_CAPS:
         environment[name] = value
+    for name, directory in CACHE_HOMES:
+        environment[name] = str(caches / directory)
     parallel = () if serial else PARALLEL_ARGV
     argv = [
         *pytest_argv(project, runner),
@@ -184,12 +209,15 @@ def run_tests(
         )
     finally:
         remove_run_files(runs, token)
+        _test_hooks.remove_tree(caches)
         # Reap the child tree on normal exit and propagated failures. A
         # SIGKILL cannot run this cleanup; the next pre-run sweep covers it.
         reap.reap_descendants(_test_hooks.process_id())
 
 
 __all__ = [
+    "CACHES_PREFIX",
+    "CACHE_HOMES",
     "COVERAGE_PREFIX",
     "COVERAGE_ROOTS",
     "NO_WORKER_RESTART",
