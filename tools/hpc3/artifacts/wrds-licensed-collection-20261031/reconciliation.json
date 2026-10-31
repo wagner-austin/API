@@ -1,0 +1,121 @@
+{
+  "purpose": "Fresh adopted-native verification after audit a814e463; original queue and extraction unchanged",
+  "source_commit": "a0550032d5ea977d58528c45e0ec72aa610cb855",
+  "native_job_id": "40554174",
+  "queue_job_id": "132859b5-6f6b-44d5-93ec-8bc1f9f5b540",
+  "request_sha256": "7221eab7d1991db4f7718ef85197b68f39714462c61711fdf699bd1769abcbc1",
+  "original_queue_job_id": "872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+  "controller_provenance": {
+    "source_commit": "a0550032d5ea977d58528c45e0ec72aa610cb855",
+    "controller_python": "/home/corvis/research-control/wrds-queue-a0550032d/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "first_party_wheel_sha256": {
+      "board_watch-0.1.0-py3-none-any.whl": "759585c617cce6f16c320f4360b932c7efda153dc035d12d15cee99395782536",
+      "cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "covenant_ml-0.1.0-py3-none-any.whl": "a8c5cbcdefb3df4ac32cf3e6ec8c1e1dac9c03d23aad8f400cbc81c6f2b46ade",
+      "fleet-0.1.0-py3-none-any.whl": "128c00fe9b04c1d7fc143012c82cb187ba2f5c820a4a07e0dbee06058602ddbe",
+      "hpc3-0.1.0-py3-none-any.whl": "a4a7a60ba4dd58fc9f1634bad2b771c9d6db3fde5c218f998af662a962fabe25",
+      "monorepo_guards-0.1.0-py3-none-any.whl": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+      "platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501"
+    },
+    "source_archive_sha256": "c4964fd619fe56ea1480c168142f107d9e24e13d03a6e798e9e62943211fa902",
+    "dependency_origins": {
+      "fleet": "a0550032d5ea977d58528c45e0ec72aa610cb855",
+      "platform_core": "07d07d3cb",
+      "other_first_party": "85f1d4d7521d4a189836f8ecca805f39c5c366df"
+    }
+  },
+  "controller_measurement": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "a0550032d5ea977d58528c45e0ec72aa610cb855",
+    "controller_python": "/home/corvis/research-control/wrds-queue-a0550032d/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-queue-a0550032d/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "board_watch-0.1.0-py3-none-any.whl": {
+        "sha256": "759585c617cce6f16c320f4360b932c7efda153dc035d12d15cee99395782536",
+        "installed_files": 9
+      },
+      "cleargbm-0.1.0-py3-none-any.whl": {
+        "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+        "installed_files": 15
+      },
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": {
+        "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+        "installed_files": 2
+      },
+      "covenant_domain-0.1.0-py3-none-any.whl": {
+        "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+        "installed_files": 8
+      },
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "a8c5cbcdefb3df4ac32cf3e6ec8c1e1dac9c03d23aad8f400cbc81c6f2b46ade",
+        "installed_files": 345
+      },
+      "fleet-0.1.0-py3-none-any.whl": {
+        "sha256": "128c00fe9b04c1d7fc143012c82cb187ba2f5c820a4a07e0dbee06058602ddbe",
+        "installed_files": 185
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "a4a7a60ba4dd58fc9f1634bad2b771c9d6db3fde5c218f998af662a962fabe25",
+        "installed_files": 129
+      },
+      "monorepo_guards-0.1.0-py3-none-any.whl": {
+        "sha256": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+        "installed_files": 60
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      },
+      "platform_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+        "installed_files": 23
+      }
+    },
+    "installed_files": 872,
+    "selfcheck_sha256": "95f8509bcfa7847193c537d936e8b02a72a6f19d76284a14605cda200ce800a8",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "baaba6d2994c3971a4c4d89e083591b83c3fc4bd6cad9cb1f2ccb6c72f01b531"
+  },
+  "query_measurement": {
+    "measured_at": "2026-10-31T20:25:40.140890+00:00",
+    "query": "SELECT count(*)\nFROM fleet_dispatch_jobs AS job\nWHERE job.id = '132859b5-6f6b-44d5-93ec-8bc1f9f5b540'\n  AND job.status = 'passed'\n  AND job.exit_code = 0\n  AND job.detail LIKE '%\"controller_python\":\"/home/corvis/research-control/wrds-queue-a0550032d/bin/python\"%'\n  AND job.detail LIKE '%\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"%' \n  AND job.detail LIKE '%\"native_job_id\":\"40554174\"%'\n  AND job.detail LIKE '%b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde%'\n  AND EXISTS (\n    SELECT 1 FROM agent_task_updates AS native\n    WHERE native.task_id = 'da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320'\n      AND native.author = 'load-report-da2a55dc'\n      AND native.created_at >= job.created_at\n      AND native.created_at <= job.closed_at\n      AND native.body LIKE 'WRDS ATTEMPT LOAD-REPORT %job 40554174 on wrds%'\n      AND native.body LIKE '%identity 51da76ff3aa3a0c547f4b6627b1fe2475a2d473982c183546485fff1b6e0a79c%'\n      AND native.body LIKE '%accounting job 40554174 hostname=wrds-sas31-w.wharton.private failed=0 exit_status=0%'\n      AND native.body LIKE '%output extraction.json sha256=18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349%'\n      AND native.body LIKE '%output train-validation/bundle.json sha256=26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1%'\n      AND native.body LIKE '%output final/bundle.json sha256=377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e%'\n      AND native.body LIKE '%run-record sha256=b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde%'\n      AND (SELECT count(*) FROM unnest(string_to_array(native.body, chr(10))) AS line\n           WHERE line LIKE 'output % sha256=%') = 24\n      AND (SELECT count(*) FROM unnest(string_to_array(native.body, chr(10))) AS line\n           WHERE line LIKE 'output %.age sha256=%') = 20\n  )\n  AND EXISTS (\n    SELECT 1 FROM agent_task_updates AS installed\n    WHERE installed.task_id = 'da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320'\n      AND installed.author = 'hpc-report-da2a55dc'\n      AND installed.created_at <= job.claimed_at\n      AND installed.body LIKE '%\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"%' \n      AND installed.body LIKE 'HPC3 CONTROLLER LOAD-REPORT%'\n      AND installed.body LIKE '%\"controller_python\":\"/home/corvis/research-control/wrds-queue-a0550032d/bin/python\"%'\n      AND installed.body LIKE '%\"fleet-0.1.0-py3-none-any.whl\":{\"sha256\":\"128c00fe9b04c1d7fc143012c82cb187ba2f5c820a4a07e0dbee06058602ddbe\",\"installed_files\":185}%'\n      AND installed.body LIKE '%\"installed_files\":872%'\n      AND installed.body LIKE '%\"dependency_check\":\"No broken requirements found.\"%'\n  );",
+    "expected": 1,
+    "probes": {
+      "verified_reconciliation": 1,
+      "verification_after_close": 0,
+      "wrong_executing_path": 0,
+      "wrong_executing_digest": 0,
+      "wrong_installed_wheel": 0,
+      "wrong_runrecord": 0,
+      "wrong_final_bundle": 0,
+      "wrong_output_count": 0
+    }
+  },
+  "placement_sha256": "137f14f2c64f20326d10d9fadc206a5489fec52b286a4162612a4c22456aa339",
+  "checks": {
+    "fleet": "4c6aa1e0-0188-4fdd-82f1-d420407e4ea6",
+    "fleet_tests_passed": 2578,
+    "coverage_percent": 100,
+    "host_execution": "020640ce-0596-42d2-aed3-984a870ae57c",
+    "host_cases_passed": 95,
+    "host_cases_skipped": 0
+  },
+  "roll": {
+    "command": "make fleet-roll",
+    "node": "diphtheria",
+    "commit": "a0550032d5ea977d58528c45e0ec72aa610cb855",
+    "outcome": "passed checked-commit gate and published refs/fleet/rolled"
+  },
+  "limits": [
+    "The first adoption poll reached the new native runtime but the old scheduler pin refused the new observation fields; the same queue was reconciled after the checked rollout.",
+    "The original closing receipt has no measured executing interpreter and is not retroactively amended.",
+    "Final ciphertext remains sealed; no keys or licensed rows in this record.",
+    "HPC3 staging and standalone verifier corrections remain separate milestones."
+  ]
+}

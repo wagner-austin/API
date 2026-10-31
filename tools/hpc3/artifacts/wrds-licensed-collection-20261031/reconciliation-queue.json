@@ -1,0 +1,65 @@
+{
+  "job": {
+    "researchRequest": {
+      "backend": "wrds",
+      "specSha256": "7221eab7d1991db4f7718ef85197b68f39714462c61711fdf699bd1769abcbc1",
+      "attempt": "first"
+    },
+    "id": "132859b5-6f6b-44d5-93ec-8bc1f9f5b540",
+    "project": "research/wrds",
+    "command": "research",
+    "status": "passed",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320",
+    "node": "ziggurat",
+    "runId": "132859b5-6f6b-44d5-93ec-8bc1f9f5b540",
+    "exitCode": 0,
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"40554174\",\"record_sha256\":\"b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-a0550032d/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"}",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-10-31T20:20:22.512Z",
+    "updatedAt": "2026-10-31T20:24:56.913Z",
+    "claimedAt": "2026-10-31T20:20:23.779Z",
+    "closedAt": "2026-10-31T20:24:56.913Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "6f725a5c-167f-44e6-8690-2edaa904c3c0",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued research wrds specification 7221eab7d1991db4f7718ef85197b68f39714462c61711fdf699bd1769abcbc1 attempt first on ziggurat for task da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320",
+      "createdAt": "2026-10-31T20:20:22.512Z"
+    },
+    {
+      "id": "ad6be3f4-5cf0-4ff2-930f-9e2465618d49",
+      "kind": "claimed",
+      "actor": "fleet-research-diphtheria",
+      "body": "claimed by fleet-research-diphtheria under a 7200s lease",
+      "createdAt": "2026-10-31T20:20:23.779Z"
+    },
+    {
+      "id": "917c9b13-bc0e-410d-97a7-bc9ae2d7e6ff",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "started make research for research/wrds on ziggurat as run 132859b5-6f6b-44d5-93ec-8bc1f9f5b540",
+      "createdAt": "2026-10-31T20:20:23.822Z"
+    },
+    {
+      "id": "524ba0f7-7d20-43a3-9019-fcb983fbfbaa",
+      "kind": "closed",
+      "actor": "fleet-research-diphtheria",
+      "body": "passed: Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"40554174\",\"record_sha256\":\"b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-a0550032d/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"}",
+      "createdAt": "2026-10-31T20:24:56.913Z"
+    }
+  ],
+  "waiting": []
+}
