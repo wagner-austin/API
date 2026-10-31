@@ -286,9 +286,37 @@ class TestResultAndStopScripts:
         body = dialect.result_script(TARGET)
         result = f"{TARGET}/{names.RESULT_NAME}"
 
-        assert f"if [ -f '{result}' ]; then" in body
+        assert f"elif [ -f '{result}' ]; then" in body
         assert f"stat -c %Y '{result}'" in body
         assert 'printf \'%s %s\\n\' "$code" "$written"' in body
+
+    def test_the_result_script_run_tells_unlaunched_from_running_from_ended(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """RUN under sh against a real directory (MCPs board task f02b144e):
+        a directory the launch never wrote its unit-end script into is
+        ``unlaunched``, though sending the read made the directory, while a
+        launched one answers nothing until its status is written."""
+        target = str(tmp_path / "run-1")
+        read = tmp_path / "read.sh"
+        read.write_text(dialect.result_script(target), encoding="utf-8")
+
+        def answer() -> str:
+            return subprocess.run(
+                [*SH_INVOCATION, str(read)], capture_output=True, text=True, check=True
+            ).stdout
+
+        (tmp_path / "run-1").mkdir()
+        unlaunched = answer()
+        pathlib.Path(unit_end_path(target)).write_text("exit 0\n", encoding="utf-8")
+        running = answer()
+        status = tmp_path / "run-1" / names.RESULT_NAME
+        status.write_text("0\n", encoding="utf-8")
+        ended = answer()
+
+        assert unlaunched == f"{dialect.UNLAUNCHED_ANSWER}\n"
+        assert running == ""
+        assert ended == f"0 {int(status.stat().st_mtime)}\n"
 
     def test_the_stop_script_stops_through_the_helper_and_always_reports(self) -> None:
         """systemctl stop of a collected unit exits 5; the cancel must still

@@ -32,6 +32,16 @@ closed 22 minutes later as ``LEASE_NOT_HELD``. The unit's ``ExecStopPost=``
 now writes the result for a build that did not
 (:mod:`fleet.core.linux_unit_end`), so absence means the build's process is
 still alive.
+
+A RUN IS READ WHERE IT WAS LAUNCHED, OR NOT AT ALL (MCPs board task
+f02b144e). The stage root is read from the rolled workspace on every pass,
+so a roll that moves a node's account moves where its runs are looked for.
+On 2026-10-30 colossus's tick took the roll naming /home/corvis/fleet/stage
+at 07:11:58Z; its kvm-mcp and document-vault checks, launched under
+/home/user/fleet/stage, had passed there two seconds before, and were read
+as running under the new root until their leases lapsed at 07:32Z. The
+read now says when the directory it reads holds no launch, so the runner
+gives the job back instead (:mod:`fleet.cli.node_moved`).
 """
 
 from __future__ import annotations
@@ -72,10 +82,13 @@ class Polled(TypedDict):
             node did not answer.
         unreachable: Why the node did not answer, when ssh could not reach
             it or timed out; None when it answered.
+        unlaunched: Why the run is not in the directory the node's stage
+            root names now, when no launch wrote into it; None otherwise.
     """
 
     result: RunResult | None
     unreachable: str | None
+    unlaunched: str | None
 
 
 def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
@@ -94,8 +107,8 @@ def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
         run_id: The dispatch.
 
     Returns:
-        Its status and finish time, None while it is still going, or why
-        the node did not answer.
+        Its status and finish time, None while it is still going, why the
+        node did not answer, or why the run was not launched where it reads.
 
     Raises:
         AppError: ``DISPATCH_FAILED`` when the node answered and the read
@@ -116,8 +129,18 @@ def attempt_poll_result(node: NodeConfig, *, run_id: str) -> Polled:
     )
     output = read["output"]
     if output is None:
-        return Polled(result=None, unreachable=read["unreachable"])
-    return Polled(result=_read_result(node, run_id=run_id, answer=output), unreachable=None)
+        return Polled(result=None, unreachable=read["unreachable"], unlaunched=None)
+    if output.strip() == dialect.UNLAUNCHED_ANSWER:
+        unlaunched = (
+            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {target} on {node['host']} holds no "
+            f"unit-end script, which the launch writes before it starts the unit, so {run_id} "
+            f"was launched under another stage root than {node['stage_root']}, the one the "
+            "rolled workspace declares now"
+        )
+        return Polled(result=None, unreachable=None, unlaunched=unlaunched)
+    return Polled(
+        result=_read_result(node, run_id=run_id, answer=output), unreachable=None, unlaunched=None
+    )
 
 
 def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
@@ -133,12 +156,15 @@ def poll_result(node: NodeConfig, *, run_id: str) -> RunResult | None:
         of every dispatch for as long as it runs.
 
     Raises:
-        AppError: With ``NODE_UNREACHABLE`` when the node did not answer, or
-            as :func:`attempt_poll_result` raises.
+        AppError: With ``NODE_UNREACHABLE`` when the node did not answer,
+            ``DISPATCH_NOT_LAUNCHED`` when the run was not launched under the
+            node's stage root, or as :func:`attempt_poll_result` raises.
     """
     polled = attempt_poll_result(node, run_id=run_id)
     if polled["unreachable"] is not None:
         raise AppError(FleetErrorCode.NODE_UNREACHABLE, polled["unreachable"])
+    if polled["unlaunched"] is not None:
+        raise AppError(FleetErrorCode.DISPATCH_NOT_LAUNCHED, polled["unlaunched"])
     return polled["result"]
 
 

@@ -179,6 +179,28 @@ class TestPollResult:
         assert "Connection timed out during banner exchange" in refusal.value.message
         assert refusal.value.code is FleetErrorCode.NODE_UNREACHABLE
 
+    def test_a_run_not_launched_where_it_is_read_is_a_value_to_the_attempt_and_raised_by_the_poll(
+        self,
+    ) -> None:
+        """MCPs board task f02b144e: a roll moved colossus's stage root under
+        two runs, which then read as running until their leases lapsed."""
+        _test_hooks.run = FakeRun([ok(""), ok("unlaunched\n"), ok(""), ok("unlaunched\n")])
+
+        polled = core_collect.attempt_poll_result(_node(), run_id=DEMO_RUN_ID)
+        with pytest.raises(AppError) as refusal:
+            core_collect.poll_result(_node(), run_id=DEMO_RUN_ID)
+
+        assert polled["result"] is None
+        assert polled["unreachable"] is None
+        assert polled["unlaunched"] == refusal.value.message
+        assert refusal.value.code is FleetErrorCode.DISPATCH_NOT_LAUNCHED
+        assert refusal.value.message == (
+            f"DISPATCH_NOT_LAUNCHED: /home/corvis/fleet/stage/{DEMO_RUN_ID} on lavender holds "
+            f"no unit-end script, which the launch writes before it starts the unit, so "
+            f"{DEMO_RUN_ID} was launched under another stage root than "
+            "/home/corvis/fleet/stage, the one the rolled workspace declares now"
+        )
+
     def test_a_read_that_failed_on_the_node_is_raised_by_the_attempt_too(self) -> None:
         _test_hooks.run = FakeRun([ok(""), failed(1, "Permission denied")])
 

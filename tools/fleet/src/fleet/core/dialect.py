@@ -490,13 +490,20 @@ def launch_script(*, target: str, run_id: str) -> str:
     )
 
 
+#: What the result script prints for a directory no launch wrote into.
+UNLAUNCHED_ANSWER = "unlaunched"
+
+
 def result_script(target: str) -> str:
-    """Print the status and the epoch second it was written, or nothing.
+    """Print the status and when it was written, nothing, or :data:`UNLAUNCHED_ANSWER`.
 
     A build that ended without writing its status has had it written by its
     unit's ``ExecStopPost=`` (:mod:`fleet.core.linux_unit_end`) by the time
     systemd considers the unit stopped, so this reads the result file alone,
-    and nothing while the run is still going.
+    and nothing while the run is still going. The launch writes the unit-end
+    script before it starts the unit and the ledger row is written after, so
+    a live run's directory without it was launched from another stage root
+    (MCPs board task f02b144e); sending this script made the directory.
 
     Args:
         target: Absolute remote directory holding the staged tree.
@@ -507,7 +514,9 @@ def result_script(target: str) -> str:
     """
     result = f"{target}/{names.RESULT_NAME}"
     return (
-        f"{PROLOGUE}if [ -f '{result}' ]; then\n"
+        f"{PROLOGUE}if [ ! -f '{unit_end_path(target)}' ]; then\n"
+        f"  printf '%s\\n' '{UNLAUNCHED_ANSWER}'\n"
+        f"elif [ -f '{result}' ]; then\n"
         f"  code=\"$(tr -d '[:space:]' < '{result}')\"\n"
         f"  written=\"$(stat -c %Y '{result}')\"\n"
         f'  printf \'%s %s\\n\' "$code" "$written"\n'
@@ -566,6 +575,7 @@ __all__ = [
     "SH_INVOCATION",
     "TOOLCHAIN_PROBE_SCRIPT",
     "UNIT_END_DELIMITER",
+    "UNLAUNCHED_ANSWER",
     "WRITE_COMMAND",
     "build_script",
     "checked_script",

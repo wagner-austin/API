@@ -107,9 +107,10 @@ def give_back(
 ) -> DispatchJob:
     """Give the queue back a job whose run ended with no verdict of its own, and log it.
 
-    That is a run the kernel or systemd-oomd ended for memory, and one whose
+    That is a run the kernel or systemd-oomd ended for memory, one whose
     project the rolled workspace no longer declares
-    (:mod:`fleet.cli.node_retired`, MCPs board task 4ec65b8f).
+    (:mod:`fleet.cli.node_retired`, MCPs board task 4ec65b8f), and one
+    launched under another stage root (:mod:`fleet.cli.node_moved`).
 
     Args:
         credentials: The queue's endpoint and headers.

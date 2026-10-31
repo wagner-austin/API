@@ -11,6 +11,8 @@ runner holds and settles every run it launched in one of four ways:
   task-naming job's outcome to its thread (MCPs board task 2fecad69).
 * STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim, once it was last
   set 70 s or more ago (:mod:`fleet.cli.node_collected`), and leave it.
+* LAUNCHED UNDER ANOTHER STAGE ROOT (MCPs board task f02b144e). Give it
+  back to the queue and stop it (:mod:`fleet.cli.node_moved`).
 * STILL RUNNING, PAST ITS LEASE (MCPs board task fd5cabfa). Stop it. Until
   this, a renewal had no deadline, so a suite that hung kept its claim and
   its node for as long as it stayed hung: measured 2026-09-22, slime job
@@ -62,7 +64,7 @@ from platform_core.json_utils import JSONObject
 from platform_core.logging import get_logger
 from platform_core.mcp_client import McpCredentials
 
-from fleet.cli import _config, node_lost, node_retired
+from fleet.cli import _config, node_lost, node_moved, node_retired
 from fleet.cli import collect as collect_cli
 from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
@@ -143,7 +145,8 @@ def collect_one_job(
         :data:`fleet.cli.node_collected.RENEW_AFTER_SECONDS` ago writes
         nothing (MCPs board task c1d48330). A run whose project the rolled
         workspace no longer declares is settled by
-        :func:`fleet.cli.node_retired.settle_retired`.
+        :func:`fleet.cli.node_retired.settle_retired`, and one launched under
+        another stage root given back by :func:`fleet.cli.node_moved.give_back_moved`.
 
     Raises:
         AppError: With a node code when the node failed a read it answered
@@ -173,6 +176,11 @@ def collect_one_job(
             return Collected(
                 outcome=CollectOutcome.UNREACHABLE,
                 line=f"{encode_job_line(job)}: did not answer the read: {polled['unreachable']}",
+            )
+        unlaunched = polled["unlaunched"]
+        if unlaunched is not None:
+            return node_moved.give_back_moved(
+                loaded, credentials, job, identity, row=row, node=node, unlaunched=unlaunched
             )
         result = polled["result"]
         # A roll may remove the project of a run still held (MCPs board task 4ec65b8f).

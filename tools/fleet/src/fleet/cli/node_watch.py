@@ -123,6 +123,8 @@ class RunRead(StrEnum):
 
     #: The node has written its result.
     ENDED = "ended"
+    #: It was launched under another stage root, so the collect gives it back.
+    MOVED = "moved"
     #: The run is still going.
     RUNNING = "running"
     #: The node did not answer; it is read again at the next poll.
@@ -437,6 +439,8 @@ class RunWatch:
         """
         if found is RunRead.ENDED:
             return "has ended"
+        if found is RunRead.MOVED:
+            return "was launched under another stage root"
         with self._changed:
             owed = run_id in self._owed
         if found is RunRead.RUNNING and owed:
@@ -539,6 +543,8 @@ class RunWatch:
                 polled["unreachable"],
             )
             return RunRead.UNREACHABLE
+        if polled["unlaunched"] is not None:
+            return RunRead.MOVED
         return RunRead.RUNNING if polled["result"] is None else RunRead.ENDED
 
 
