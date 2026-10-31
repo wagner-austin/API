@@ -157,6 +157,38 @@ def read_encrypted_bundle(path: Path, expected_digest: str) -> EncryptedBundle:
     return decode_encrypted_bundle(load_json_str(payload.decode("utf-8")))
 
 
+def verify_encrypted_bundle(path: Path, expected_digest: str) -> EncryptedBundle:
+    """Verify an exact regular-file inventory without acquiring a decryption key.
+
+    Args:
+        path: Bundle metadata beside the declared ciphertext files.
+        expected_digest: Independently pinned metadata identity.
+
+    Returns:
+        The decoded bundle after every declared ciphertext length and hash matches.
+
+    Raises:
+        ValueError: ENCRYPTED_INVENTORY for missing, extra or nonregular entries;
+            ENCRYPTED_MANIFEST or ENCRYPTED_DIGEST for changed frozen bytes.
+        OSError: Unreadable storage; no plaintext is created.
+    """
+    if path.parent.is_symlink() or path.is_symlink() or not path.is_file():
+        raise ValueError("ENCRYPTED_INVENTORY: require regular bundle metadata without symlinks")
+    bundle = read_encrypted_bundle(path, expected_digest)
+    members = tuple(path.parent.iterdir())
+    expected = {path.name, *(item["ciphertext"]["name"] for item in bundle["files"])}
+    if {member.name for member in members} != expected:
+        raise ValueError("ENCRYPTED_INVENTORY: ciphertext inventory differs from the frozen bundle")
+    for member in members:
+        if member.is_symlink() or not member.is_file():
+            raise ValueError("ENCRYPTED_INVENTORY: require regular files without symlinks")
+    for item in bundle["files"]:
+        cipher = item["ciphertext"]
+        with require_evidence_path(path.parent, cipher["name"]).open("rb") as source:
+            _verify(source, cipher)
+    return bundle
+
+
 @contextmanager
 def decrypted_bundle(
     path: Path,
@@ -214,4 +246,5 @@ __all__ = [
     "encrypted_stage_manifest",
     "read_encrypted_bundle",
     "staged_record",
+    "verify_encrypted_bundle",
 ]

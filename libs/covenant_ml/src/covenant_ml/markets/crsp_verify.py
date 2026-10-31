@@ -12,6 +12,7 @@ the reading names the files the native run's own load report digested.
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from hashlib import sha256
 from pathlib import Path
 
@@ -26,11 +27,38 @@ from .crsp_extraction_records import (
 from .crsp_partition import check_crsp_partition
 from .crsp_queries import crsp_scopes
 from .crsp_writer import SYNTHETIC_SOURCE
-from .encrypted_storage import decrypted_bundle, read_encrypted_bundle
+from .encrypted_storage import decrypted_bundle, verify_encrypted_bundle
 from .research_keys import EvaluatorKeys
 
 #: The first line of every age v1 file.
 AGE_HEADER = b"age-encryption.org/v1\n"
+
+
+def _collected_files(outputs: Path) -> Generator[Path, None, None]:
+    """Yield only regular files in the exact two-partition collection layout.
+
+    Raises:
+        ValueError: CRSP-013 for links, special files, nested directories or
+            missing collection metadata; dangling links are never ignored.
+    """
+    if outputs.is_symlink() or not outputs.is_dir():
+        raise ValueError("[CRSP-013] unsafe collected directory")
+    expected = {"extraction.json", "metrics.json", "train-validation", "final"}
+    if {path.name for path in outputs.iterdir()} != expected:
+        raise ValueError("[CRSP-013] unexpected or incomplete collected root inventory")
+    for path in sorted(outputs.rglob("*")):
+        name = path.relative_to(outputs).as_posix()
+        if path.is_symlink():
+            raise ValueError(f"[CRSP-013] symlink in collected evidence {name}")
+        if path.is_dir():
+            if name not in {"train-validation", "final"}:
+                raise ValueError(f"[CRSP-013] unexpected collected directory {name}")
+        elif path.is_file():
+            if name in {"train-validation", "final"}:
+                raise ValueError(f"[CRSP-013] expected collected partition directory {name}")
+            yield path
+        else:
+            raise ValueError(f"[CRSP-013] nonregular collected file {name}")
 
 
 def require_ciphertext_only(outputs: Path) -> int:
@@ -46,13 +74,11 @@ def require_ciphertext_only(outputs: Path) -> int:
         ValueError: CRSP-013 for an unexpected name or a file without the age header.
     """
     ciphertext = 0
-    for path in sorted(item for item in outputs.rglob("*") if item.is_file()):
+    for path in _collected_files(outputs):
         name = path.relative_to(outputs).as_posix()
-        partition, _, leaf = name.partition("/")
+        leaf = path.name
         if name in {"extraction.json", "metrics.json"}:
             continue
-        if partition not in {"train-validation", "final"} or "/" in leaf or not leaf:
-            raise ValueError(f"[CRSP-013] unexpected collected file {name}")
         if leaf == "bundle.json":
             continue
         with path.open("rb") as stream:
@@ -122,7 +148,7 @@ def _open(
         partition=item["partition"],
         identity=keys.acquire(item["partition"]),
         scratch=scratch,
-        max_plaintext_bytes=item["plaintext_bytes"],
+        max_plaintext_bytes=min(item["plaintext_bytes"], keys.access["max_plaintext_bytes"]),
     ) as manifest:
         if sha256(manifest.read_bytes()).hexdigest() != item["manifest"]["sha256"]:
             raise ValueError("[CRSP-013] decrypted manifest differs from the receipt")
@@ -165,9 +191,12 @@ def verify_crsp_extraction(
     partitions: list[JSONValue] = []
     for item, recipient in zip(items, recipients, strict=True):
         path = outputs / item["partition"] / "bundle.json"
-        bundle = read_encrypted_bundle(path, item["bundle"]["sha256"])
+        bundle = verify_encrypted_bundle(path, item["bundle"]["sha256"])
         if bundle["partition"] != item["partition"] or bundle["recipient"] != recipient:
             raise ValueError("[CRSP-013] a bundle is not sealed to its partition's recipient")
+    # Verify both sealed inventories before opening even the validation partition.
+    for item in items:
+        path = outputs / item["partition"] / "bundle.json"
         if item["partition"] == "final" and not open_final:
             summary: JSONObject = {"partition": "final", "opened": False}
         else:
