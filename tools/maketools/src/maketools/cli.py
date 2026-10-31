@@ -39,6 +39,9 @@ SERIAL_FLAG: Final[str] = "--serial"
 #: The flag that names how pytest is reached.
 RUNNER_FLAG: Final[str] = "--runner"
 
+#: The flag that runs a suite under a HOME of its own (test_run item 6).
+OWN_HOME_FLAG: Final[str] = "--own-home"
+
 #: The flag that sets the sweep's minimum age.
 OLDER_THAN_FLAG: Final[str] = "--older-than-minutes"
 
@@ -79,7 +82,7 @@ def command_guard(arguments: Sequence[str]) -> int:
 
 
 def command_test(arguments: Sequence[str]) -> int:
-    """``test [--no-sweep] [--serial] [--runner poetry|venv] [pytest args...]``.
+    """``test [--no-sweep] [--serial] [--own-home] [--runner poetry|venv] [pytest args...]``.
 
     Args:
         arguments: The launcher's flags first, then anything for pytest.
@@ -92,17 +95,22 @@ def command_test(arguments: Sequence[str]) -> int:
     """
     sweep = True
     serial = False
+    own_home = False
     runner = Runner.POETRY
     remaining = list(arguments)
-    while remaining and remaining[0] in (NO_SWEEP_FLAG, SERIAL_FLAG, RUNNER_FLAG):
+    while remaining and remaining[0] in (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, RUNNER_FLAG):
         flag = remaining.pop(0)
         if flag == NO_SWEEP_FLAG:
             sweep = False
         elif flag == SERIAL_FLAG:
             serial = True
+        elif flag == OWN_HOME_FLAG:
+            own_home = True
         else:
             runner = require_runner(remaining.pop(0) if remaining else "")
-    return run_tests(Path.cwd(), remaining, sweep=sweep, serial=serial, runner=runner)
+    return run_tests(
+        Path.cwd(), remaining, sweep=sweep, serial=serial, runner=runner, own_home=own_home
+    )
 
 
 def require_runner(value: str) -> Runner:
@@ -547,6 +555,7 @@ __all__ = [
     "GIT_COMMIT_FLAG",
     "NO_SWEEP_FLAG",
     "OLDER_THAN_FLAG",
+    "OWN_HOME_FLAG",
     "PACKAGE_FLAG",
     "PROGRESS_FLAG",
     "RUNNER_FLAG",

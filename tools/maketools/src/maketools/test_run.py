@@ -40,6 +40,17 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
    ``TRITON_HOME`` name a directory under ``runs/`` that is this run's alone
    and is removed with its coverage files. Set here for item 4's reason:
    ``huggingface_hub`` reads ``HF_HOME`` when it is imported.
+
+6. A HOME OF THE RUN'S OWN, when the recipe asks (``--own-home``). Item 5
+   moves the two caches that were measured, and nothing would notice a
+   third. Asked, the launcher points ``HOME`` at a directory under
+   ``runs/`` that is this run's alone, and after the suite fails the run
+   naming every file left there: each is a write the suite would have made
+   under the user's home (MCPs board task bcb7c6ef). pytest is then reached
+   through the venv's interpreter, named by ``poetry env info --executable``
+   before ``HOME`` moves, since Poetry under a fresh ``HOME`` reads no
+   configuration and finds no venv. Opt-in, because only the suites whose
+   recipes pass it have been measured under it.
 """
 
 from __future__ import annotations
@@ -48,6 +59,9 @@ from collections.abc import Sequence
 from enum import StrEnum
 from pathlib import Path
 from typing import Final
+
+from platform_core.error_codes_tooling import MaketoolsErrorCode
+from platform_core.errors import AppError
 
 from maketools import _test_hooks, reap
 from maketools.venvs import venv_executable
@@ -78,6 +92,13 @@ CACHE_HOMES: Final[Sequence[tuple[str, str]]] = (
     ("HF_HOME", "huggingface"),
     ("TRITON_HOME", "triton"),
 )
+
+#: The prefix of the run's own ``HOME``, item 6 above, followed by the same
+#: token as its coverage files.
+HOME_PREFIX: Final[str] = ".home-"
+
+#: The question that names the venv interpreter Poetry runs a project in.
+POETRY_EXECUTABLE_ARGV: Final[Sequence[str]] = ("poetry", "env", "info", "--executable")
 
 #: The BLAS thread caps, item 4 above.
 THREAD_CAPS: Final[Sequence[tuple[str, str]]] = (
@@ -124,6 +145,46 @@ def pytest_argv(project: Path, runner: Runner) -> list[str]:
     return list(PYTEST_ARGV)
 
 
+def own_home_pytest_argv(project: Path, runner: Runner) -> list[str]:
+    """How pytest is reached when the suite runs under a ``HOME`` of its own.
+
+    Args:
+        project: The package directory.
+        runner: As :func:`pytest_argv`; ``poetry`` is asked for its venv's
+            interpreter while ``HOME`` is still the user's.
+
+    Returns:
+        The leading argv, through the venv's interpreter.
+
+    Raises:
+        AppError: ``MAKETOOLS_ARTIFACT_MISSING`` when Poetry names no
+            interpreter for the project.
+    """
+    if runner is Runner.VENV:
+        return pytest_argv(project, runner)
+    answer = _test_hooks.run_capturing(POETRY_EXECUTABLE_ARGV, cwd=project)
+    executable = answer["stdout"].strip()
+    if answer["returncode"] != 0 or not executable:
+        raise AppError(
+            MaketoolsErrorCode.ARTIFACT_MISSING,
+            f"poetry names no venv interpreter for {project}: {answer['stderr'].strip()}",
+        )
+    return [executable, "-m", "pytest"]
+
+
+def home_writes(home: Path) -> list[Path]:
+    """Every file a suite left under its own ``HOME``.
+
+    Args:
+        home: The run's ``HOME``.
+
+    Returns:
+        Each file, relative to ``home``, in sorted order; directories alone
+        are not writes of anything.
+    """
+    return sorted(path.relative_to(home) for path in home.rglob("*") if not path.is_dir())
+
+
 def coverage_arguments(project: Path) -> list[str]:
     """The ``--cov`` arguments for the roots this project has.
 
@@ -163,6 +224,7 @@ def run_tests(
     sweep: bool,
     serial: bool = False,
     runner: Runner = Runner.POETRY,
+    own_home: bool = False,
 ) -> int:
     """Run the project's suite under the launcher's protections.
 
@@ -172,44 +234,58 @@ def run_tests(
         sweep: Whether to run the pre-run sweep; off for debugging only.
         serial: Run without xdist (see :data:`PARALLEL_ARGV`).
         runner: How pytest is reached (see :func:`pytest_argv`).
+        own_home: Run under a ``HOME`` of the run's own and fail on any
+            file left there (item 6 above).
 
     Returns:
-        pytest's exit status, or 1 when the launcher refused to start it.
+        pytest's exit status, 1 when it passed but left a file under its own
+        ``HOME``, or 1 when the launcher refused to start it.
     """
     _test_hooks.write_line("run-tests: the suite runs in its own session and is reaped on exit")
     if sweep:
         reap.sweep_stale(project)
+    leading = own_home_pytest_argv(project, runner) if own_home else pytest_argv(project, runner)
     runs = project / RUNS_DIRECTORY
     runs.mkdir(exist_ok=True)
     run_token = _test_hooks.token()
     token = COVERAGE_PREFIX + run_token
     caches = runs.resolve() / (CACHES_PREFIX + run_token)
     caches.mkdir(exist_ok=True)
+    home = runs.resolve() / (HOME_PREFIX + run_token)
     environment = _test_hooks.environ()
     environment["COVERAGE_FILE"] = str(runs.resolve() / token)
     for name, value in THREAD_CAPS:
         environment[name] = value
     for name, directory in CACHE_HOMES:
         environment[name] = str(caches / directory)
+    if own_home:
+        home.mkdir(exist_ok=True)
+        environment["HOME"] = str(home)
     parallel = () if serial else PARALLEL_ARGV
     argv = [
-        *pytest_argv(project, runner),
+        *leading,
         *parallel,
         "-v",
         *coverage_arguments(project),
         *pytest_arguments,
     ]
     try:
-        return _test_hooks.run_inheriting(
+        code = _test_hooks.run_inheriting(
             argv,
             cwd=project,
             env=environment,
             new_session=True,
             timeout_seconds=SUITE_WALL_SECONDS,
         )
+        written = home_writes(home) if own_home else []
+        for path in written:
+            _test_hooks.write_error(f"run-tests: the suite wrote {path} under its own HOME, {home}")
+        return 1 if written and code == 0 else code
     finally:
         remove_run_files(runs, token)
         _test_hooks.remove_tree(caches)
+        if own_home:
+            _test_hooks.remove_tree(home)
         # Reap the child tree on normal exit and propagated failures. A
         # SIGKILL cannot run this cleanup; the next pre-run sweep covers it.
         reap.reap_descendants(_test_hooks.process_id())
@@ -220,13 +296,17 @@ __all__ = [
     "CACHE_HOMES",
     "COVERAGE_PREFIX",
     "COVERAGE_ROOTS",
+    "HOME_PREFIX",
     "NO_WORKER_RESTART",
     "PARALLEL_ARGV",
+    "POETRY_EXECUTABLE_ARGV",
     "PYTEST_ARGV",
     "RUNS_DIRECTORY",
     "THREAD_CAPS",
     "Runner",
     "coverage_arguments",
+    "home_writes",
+    "own_home_pytest_argv",
     "pytest_argv",
     "remove_run_files",
     "run_tests",
