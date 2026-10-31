@@ -23,7 +23,7 @@ from .crsp_extraction_records import (
 )
 from .crsp_partition import check_crsp_partition
 from .crsp_queries import crsp_scopes
-from .crsp_writer import SYNTHETIC_SCHEMA
+from .crsp_writer import SYNTHETIC_SOURCE
 from .encrypted_storage import decrypted_bundle, read_encrypted_bundle
 from .research_keys import EvaluatorKeys
 
@@ -155,7 +155,7 @@ def verify_crsp_extraction(
     receipt = decode_crsp_extraction_receipt(
         load_json_str((outputs / "extraction.json").read_text("utf-8"))
     )
-    if open_final and receipt["schema"] != SYNTHETIC_SCHEMA:
+    if open_final and receipt["source"] != SYNTHETIC_SOURCE:
         raise ValueError("[CRSP-013] licensed final evidence opens only through its release")
     items = (receipt["train_validation"], receipt["final"])
     recipients = (keys.access["validation_recipient"], keys.access["final_recipient"])
@@ -170,7 +170,7 @@ def verify_crsp_extraction(
             continue
         partitions.append(_open(path, item, keys, scratch, receipt))
     return {
-        "schema": receipt["schema"],
+        "source": receipt["source"],
         "snapshot": receipt["snapshot"],
         "ciphertext_files": ciphertext,
         "partitions": partitions,

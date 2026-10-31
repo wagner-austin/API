@@ -15,14 +15,11 @@ carries trading-day flags and no security observation.
 
 from __future__ import annotations
 
-import re
 from datetime import date, timedelta
 from typing import NamedTuple
 
 from .crsp_calendar import crsp_month
 from .crsp_protocol import CrspProtocol
-
-_SCHEMA = re.compile(r"[a-z_][a-z0-9_]{0,62}")
 
 
 class CrspScope(NamedTuple):
@@ -82,21 +79,40 @@ def crsp_scopes(protocol: CrspProtocol) -> tuple[CrspScope, CrspScope]:
     )
 
 
-def require_schema(value: str) -> str:
-    """Accept only a plain lowercase PostgreSQL schema identifier.
+class CrspSource(NamedTuple):
+    """Where the four relations come from: the vendor library or inline definitions."""
+
+    name: str
+    qualifier: str
+    definitions: str
+
+
+def vendor_source(protocol: CrspProtocol) -> CrspSource:
+    """Name every relation inside the protocol's subscribed library, which its decoder pins."""
+    return CrspSource(protocol["library"], protocol["library"] + ".", "")
+
+
+def synthetic_source(definitions: str) -> CrspSource:
+    """Define the four relations inside each statement, for a read-only server.
+
+    A hot-standby server refuses even temporary tables, so a synthetic session
+    supplies relations named like the vendor's as ``WITH`` definitions that
+    every COPY statement carries, and that its saved query bytes preserve.
 
     Args:
-        value: The vendor library or ``pg_temp`` for a synthetic session.
+        definitions: Comma-separated ``name(columns) AS (query)`` definitions.
 
     Returns:
-        The identifier, safe to place unquoted in SQL.
+        A source whose statements begin with those definitions.
 
     Raises:
-        ValueError: CRSP-010 for any other spelling.
+        ValueError: CRSP-010 for blank text, or a semicolon or backslash that
+            could end the statement or reach the client as a command.
     """
-    if _SCHEMA.fullmatch(value) is None:
-        raise ValueError("[CRSP-010] source schema must be a plain lowercase identifier")
-    return value
+    text = definitions.strip()
+    if not text or ";" in text or "\\" in text:
+        raise ValueError("[CRSP-010] synthetic definitions must be one statement's WITH list")
+    return CrspSource("synthetic", "", "WITH " + text + "\n")
 
 
 def _codes(values: tuple[int, ...]) -> str:
@@ -104,13 +120,8 @@ def _codes(values: tuple[int, ...]) -> str:
     return ", ".join(str(value) for value in values)
 
 
-def _copy(select: str) -> str:
-    """Wrap one bounded query as CSV with its header on standard output."""
-    return f"COPY ({select}) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
-
-
 def crsp_relation_sql(
-    protocol: CrspProtocol, scope: CrspScope, schema: str, max_rows: int
+    protocol: CrspProtocol, scope: CrspScope, source: CrspSource, max_rows: int
 ) -> dict[str, str]:
     """Render one partition's four COPY statements in protocol column order.
 
@@ -122,20 +133,25 @@ def crsp_relation_sql(
     Args:
         protocol: Decoded frozen design supplying tables, columns and codes.
         scope: Partition bounds from ``crsp_scopes``.
-        schema: Validated source schema.
+        source: Vendor library or synthetic definitions.
         max_rows: Positive per-relation row limit.
 
     Returns:
         Exact SQL bytes to save and execute, keyed by relation role.
 
     Raises:
-        ValueError: CRSP-010 for an invalid schema or row limit.
+        ValueError: CRSP-010 for a nonpositive row limit.
     """
-    source = require_schema(schema)
     if max_rows < 1:
         raise ValueError("[CRSP-010] the row limit must be positive")
+
+    def copy(select: str) -> str:
+        """Wrap one bounded query as CSV with its header on standard output."""
+        return f"COPY ({source.definitions}{select}) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
+
+    qualified = source.qualifier
     end, start = f"DATE '{scope.observation_end}'", f"DATE '{scope.history_start}'"
-    names = f"{source}.{protocol['membership']}"
+    names = f"{qualified}{protocol['membership']}"
     universe = (
         f"SELECT DISTINCT permno FROM {names}"
         f" WHERE shrcd IN ({_codes(protocol['share_codes'])})"
@@ -149,41 +165,39 @@ def crsp_relation_sql(
     )
     valuation = "COALESCE(GREATEST(deldlydt, delamtdt, delnextdt), delistingdt)"
     return {
-        "membership": _copy(
+        "membership": copy(
             f"SELECT {membership} FROM {names} WHERE permno IN ({universe})"
             f" AND namedt <= {end} AND nameendt >= {start}"
             " ORDER BY permno, namedt, nameendt" + limit
         ),
-        "returns": _copy(
+        "returns": copy(
             f"SELECT {', '.join(protocol['returns_columns'])}"
-            f" FROM {source}.{protocol['returns']} WHERE permno IN ({universe})"
+            f" FROM {qualified}{protocol['returns']} WHERE permno IN ({universe})"
             f" AND dlycaldt BETWEEN {start} AND {end} ORDER BY permno, dlycaldt" + limit
         ),
-        "calendar": _copy(
+        "calendar": copy(
             f"SELECT {', '.join(protocol['calendar_columns'])}"
-            f" FROM {source}.{protocol['calendar']}"
+            f" FROM {qualified}{protocol['calendar']}"
             f" WHERE exchangegroup = '{protocol['calendar_group']}'"
             f" AND caldt BETWEEN DATE '{scope.calendar_start}' AND DATE '{scope.calendar_end}'"
             " ORDER BY caldt" + limit
         ),
-        "delists": _copy(
+        "delists": copy(
             f"SELECT {', '.join(protocol['delists_columns'])}"
-            f" FROM {source}.{protocol['delists']} WHERE permno IN ({universe})"
+            f" FROM {qualified}{protocol['delists']} WHERE permno IN ({universe})"
             f" AND delistingdt BETWEEN {start} AND {end} AND {valuation} <= {end}"
             " ORDER BY permno, delistingdt" + limit
         ),
     }
 
 
-def crsp_driver_sql(setup: str | None, statement_seconds: int) -> str:
+def crsp_driver_sql(statement_seconds: int) -> str:
     """Render the one-session script running every partition in one snapshot.
 
-    The optional setup file runs before the transaction; it exists only for a
-    synthetic session that builds temporary relations. All eight COPY files and
-    two snapshot readings share one ``REPEATABLE READ READ ONLY`` transaction.
+    All eight COPY files and two snapshot readings share one
+    ``REPEATABLE READ READ ONLY`` transaction.
 
     Args:
-        setup: Relative name of a synthetic setup script, or None for vendor data.
         statement_seconds: Positive per-statement server timeout.
 
     Returns:
@@ -194,8 +208,7 @@ def crsp_driver_sql(setup: str | None, statement_seconds: int) -> str:
     """
     if statement_seconds < 1:
         raise ValueError("[CRSP-010] the statement timeout must be positive")
-    lines = [] if setup is None else [f"\\i {setup}"]
-    lines += [
+    lines = [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         f"SET LOCAL statement_timeout = '{statement_seconds}s';",
         "SET LOCAL DateStyle = 'ISO, YMD';",
@@ -215,4 +228,12 @@ def crsp_driver_sql(setup: str | None, statement_seconds: int) -> str:
     return "\n".join(lines) + "\n"
 
 
-__all__ = ["CrspScope", "crsp_driver_sql", "crsp_relation_sql", "crsp_scopes", "require_schema"]
+__all__ = [
+    "CrspScope",
+    "CrspSource",
+    "crsp_driver_sql",
+    "crsp_relation_sql",
+    "crsp_scopes",
+    "synthetic_source",
+    "vendor_source",
+]

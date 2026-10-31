@@ -33,18 +33,20 @@ from .crsp_partition import check_crsp_partition
 from .crsp_protocol import CrspProtocol, decode_crsp_protocol
 from .crsp_queries import (
     CrspScope,
+    CrspSource,
     crsp_driver_sql,
     crsp_relation_sql,
     crsp_scopes,
-    require_schema,
+    synthetic_source,
+    vendor_source,
 )
 from .encrypted_storage import encrypt_bundle, staged_record
 from .research_keys import ResearchAccess
 
 #: psql without startup files or password prompts, stopping at the first error.
 PSQL = ("psql", "-X", "-w", "-q", "-v", "ON_ERROR_STOP=1", "-f", "extract.sql")
-#: The schema a synthetic session's temporary relations live in.
-SYNTHETIC_SCHEMA = "pg_temp"
+#: The source name of a session whose relations are inline synthetic definitions.
+SYNTHETIC_SOURCE = "synthetic"
 
 
 def _record(path: Path) -> StagedFile:
@@ -126,7 +128,7 @@ def _prepare(
     protocol_bytes: bytes,
     protocol: CrspProtocol,
     scopes: tuple[CrspScope, CrspScope],
-    schema: str,
+    source: CrspSource,
     rows: int,
 ) -> None:
     """Write each partition's exact protocol copy and relation queries."""
@@ -134,7 +136,7 @@ def _prepare(
         directory = root / scope.partition
         directory.mkdir(mode=0o700)
         (directory / "protocol.json").write_bytes(protocol_bytes)
-        for name, sql in crsp_relation_sql(protocol, scope, schema, rows).items():
+        for name, sql in crsp_relation_sql(protocol, scope, source, rows).items():
             (directory / (name + ".sql")).write_text(sql, encoding="utf-8")
 
 
@@ -180,7 +182,7 @@ def extract_crsp(
     protocol_path: Path,
     access: ResearchAccess,
     *,
-    schema: str,
+    source: str,
     setup: Path | None,
     scratch: Path,
     output: Path,
@@ -191,8 +193,8 @@ def extract_crsp(
     Args:
         protocol_path: Frozen protocol; its exact bytes enter both partitions.
         access: Evaluator access settings; only the public recipients are used.
-        schema: The protocol's vendor library, or ``pg_temp`` for a synthetic session.
-        setup: Synthetic setup script, required exactly when ``schema`` is ``pg_temp``.
+        source: The protocol's vendor library, or ``synthetic``.
+        setup: Synthetic ``WITH`` definitions, required exactly for ``synthetic``.
         scratch: Scheduler-owned private scratch for plaintext.
         output: Existing directory receiving only ciphertext and metadata.
         limits: Row, byte and time bounds.
@@ -209,13 +211,19 @@ def extract_crsp(
         TimeoutExpired: The client exceeded ``limits["seconds"]``.
         OSError: Storage fails; private plaintext is removed on unwinding.
     """
-    source = require_schema(schema)
-    if (source == SYNTHETIC_SCHEMA) != (setup is not None):
-        raise ValueError("[CRSP-010] a setup script is required exactly for a synthetic session")
+    if (source == SYNTHETIC_SOURCE) != (setup is not None):
+        raise ValueError("[CRSP-010] definitions are required exactly for a synthetic source")
     protocol_bytes = protocol_path.read_bytes()
     protocol = decode_crsp_protocol(narrow_json_to_dict(load_json_str(protocol_bytes.decode())))
-    if source not in {SYNTHETIC_SCHEMA, protocol["library"]}:
-        raise ValueError("[CRSP-010] the source schema must be the protocol's library")
+    setup_sha256: str | None
+    if setup is None:
+        if source != protocol["library"]:
+            raise ValueError("[CRSP-010] the source must be the protocol's library")
+        relations = vendor_source(protocol)
+        setup_sha256 = None
+    else:
+        relations = synthetic_source(setup.read_text("utf-8"))
+        setup_sha256 = _record(setup)["sha256"]
     started = hooks.clock()
     if protocol["coverage_end"] >= started[:10]:
         raise ValueError("[CRSP-010] coverage must end before the extraction day")
@@ -224,13 +232,8 @@ def extract_crsp(
     with TemporaryDirectory(prefix="research-plaintext-", dir=scratch) as temporary:
         root = Path(temporary)
         require_private_directory(root)
-        setup_sha256: str | None = None
-        if setup is not None:
-            (root / "setup.sql").write_bytes(setup.read_bytes())
-            setup_sha256 = _record(root / "setup.sql")["sha256"]
-        driver = crsp_driver_sql(None if setup is None else "setup.sql", limits["seconds"])
-        (root / "extract.sql").write_text(driver, encoding="utf-8")
-        _prepare(root, protocol_bytes, protocol, scopes, source, limits["max_rows"])
+        (root / "extract.sql").write_text(crsp_driver_sql(limits["seconds"]), encoding="utf-8")
+        _prepare(root, protocol_bytes, protocol, scopes, relations, limits["max_rows"])
         code = hooks.bounded_runner(
             PSQL, root, seconds=limits["seconds"], max_file_bytes=limits["max_relation_bytes"]
         )
@@ -259,7 +262,7 @@ def extract_crsp(
         for scope, bundle, (manifest, files, counts) in zip(scopes, bundles, sealed, strict=True)
     ]
     receipt = CrspExtractionReceipt(
-        schema=source,
+        source=source,
         setup_sha256=setup_sha256,
         protocol=_record(protocol_path),
         driver_sha256=driver_sha256,
@@ -285,4 +288,4 @@ def extract_crsp(
     return receipt
 
 
-__all__ = ["PSQL", "SYNTHETIC_SCHEMA", "extract_crsp"]
+__all__ = ["PSQL", "SYNTHETIC_SOURCE", "extract_crsp"]

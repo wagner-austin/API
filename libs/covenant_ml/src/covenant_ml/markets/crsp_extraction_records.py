@@ -53,7 +53,7 @@ class CrspPartitionReceipt(TypedDict):
 class CrspExtractionReceipt(TypedDict):
     """Where, when and from which snapshot both partitions were produced."""
 
-    schema: ReadOnly[str]
+    source: ReadOnly[str]
     setup_sha256: ReadOnly[str | None]
     protocol: ReadOnly[StagedFile]
     driver_sha256: ReadOnly[str]
@@ -174,7 +174,7 @@ def decode_crsp_partition_receipt(value: JSONValue, partition: str) -> CrspParti
 def encode_crsp_extraction_receipt(value: CrspExtractionReceipt) -> JSONObject:
     """Encode the complete receipt without machine paths."""
     return {
-        "schema": value["schema"],
+        "source": value["source"],
         "setup_sha256": value["setup_sha256"],
         "protocol": encode_staged_file(value["protocol"]),
         "driver_sha256": value["driver_sha256"],
@@ -215,7 +215,7 @@ def decode_crsp_extraction_receipt(value: JSONValue) -> CrspExtractionReceipt:
     if not require_bool(obj, "plaintext_removed"):
         raise ValueError("[CRSP-010] private plaintext must have been removed")
     return CrspExtractionReceipt(
-        schema=require_str(obj, "schema"),
+        source=require_str(obj, "source"),
         setup_sha256=None if setup is None else require_digest(obj, "setup_sha256"),
         protocol=decode_staged_file(obj["protocol"]),
         driver_sha256=require_digest(obj, "driver_sha256"),
