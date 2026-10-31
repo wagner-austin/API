@@ -1,0 +1,83 @@
+{
+  "board_task": "4b7fe216-2670-4dbe-bee4-9970faec8258",
+  "synthetic": true,
+  "controller_source_commit": "b95578fa619c9176ae83ff4cd15429f96c500730",
+  "controller_source_directory": "/home/corvis/research-control/wrds-scratch-b95578fa6",
+  "controller_source_manifest_sha256": "675ce5e9eac7e8959ed8165c754abfb49bec0e9530d2d20e9de2804dd5dfe421",
+  "queue_id": "c0e0e899-3fea-40a4-b065-8a6e3519ce93",
+  "queue_state": "failed",
+  "queue_record_sha256": null,
+  "experiment_sha256": "94678ef305d364f78c891b1260a94cca3ce5d70530b11aef862eb803ab4f0835",
+  "subject_seconds": 30,
+  "probe_hold_seconds": 300,
+  "measurement": {
+    "subject_report": "WRDS ATTEMPT LOAD-REPORT wrds-storage-probe/forced-kill-20261031 attempt first: job 40551337 on wrds\nidentity a612d1d4a87b2916d26e89df4ab6d3929b1ded3e4005ed36eb213c362665679b\ncode research_storage_probe.py sha256=3e4215c94c03267eb9d95255202e11df8cb440774d67efd282008c0141cd0ca6\ninput bundle.json sha256=7e5c804d834510250e962d2253a36661f43a0dd0bbd17aac1d8cea6231246d5c\ninput calendar.csv.age sha256=958138ba21d9e1afbbc387cb1667f7c61eeda96fa0529489fe7fd946cd92636e\ninput calendar.sql.age sha256=852e3b78db228b4f6f2e395c33e8b76758c82f1e499c9515b36c90c4b47bf10f\ninput delists.csv.age sha256=f488ea61923766d1d87e2ee2448938e113c14c69027daa815cc92c10a7f46952\ninput delists.sql.age sha256=2db9a5e5d581c0b0e2c71b236683c85a13833e01783ed48f49149911c6c5c137\ninput manifest.json.age sha256=59c2b8596413aee30d1617ddedd2c9a6bfb44413ab8f1da1eb4ea4e7d6d48fc4\ninput membership.csv.age sha256=3dfdcee833670e839ccf1ac285578ab40d696746a7eb054360da9fd6273ec68d\ninput membership.sql.age sha256=0f1c49d168615824f976180ff87875866d17a16bf6d7ff164c557490cb588103\ninput protocol.json.age sha256=74cc9dc77d4fc00a3ba8e0b030c601ca71cdef72c5b75a5644175967248db7f0\ninput returns.csv.age sha256=bf64c013086c57a93b76193d35167dbbcd6124898e5da4f55a586ccff537b239\ninput returns.sql.age sha256=5972e5d869a41a60127c15cc1c6ffe82dfd7085aa7a914c6749f14074b35d2bb\ninput access.json sha256=469ebe40e8c52288c5e65628fc756e4d30fa308c251521996615f4851ac5954e\nruntime python=/home/uci/awagner14/research-runtime-final-85f1d4d75/cpython-3.11.16-linux-x86_64-gnu/bin/python3.11 sha256=e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b version=3.11.16 packages=61 pin_sha256=5eface5a57aaa3ac5d972dd4e2d6bbe082a884c2e4cc1d9122c88212ee6f89b3\nscheduler state=failed\naccounting job 40551337 hostname=wrds-sas30-w.wharton.private failed=44 exit_status=137\ncollect refused: WRDS_NOT_COMPLETE: job 40551337 is failed\ncompletion.json absent",
+    "opened": {
+      "node": "wrds-sas30-w.wharton.private",
+      "scratch": "/tmp/40551337.1.all.q",
+      "scratch_mode": 493,
+      "private": "/tmp/40551337.1.all.q/research-plaintext-8yxkrpyp",
+      "mode": 448,
+      "manifest_sha256": "13714324c358ce0a45ea6d57f150bbc49e75c6cf90a64d97551584a8d6e8d330",
+      "files": 10
+    },
+    "opened_sha256": "8af8842e078c3bd6e4f9e632ba3ec6622b1d4cda8896078cfd7bfe61cb5deefa",
+    "observer_source_sha256": "9c023ddabbd7d46a7e20f237e1dbf1b30f613fa8500f17d7a9245a444fd96ad0",
+    "observer_accounting": {
+      "hostname": "wrds-sas30-w.wharton.private",
+      "failed": "0",
+      "exit_status": "0"
+    },
+    "observation": {
+      "node": "wrds-sas30-w.wharton.private",
+      "job_id": "40551337",
+      "observer_job_id": "40551800",
+      "observed_at": "2026-10-31T05:25:42.104784+00:00",
+      "scratch": "/tmp/40551337.1.all.q",
+      "private": "/tmp/40551337.1.all.q/research-plaintext-8yxkrpyp",
+      "scratch_present": false,
+      "private_present": false
+    },
+    "observation_sha256": "c931af0ef6e957219212632a723907bd9d121dd103e2eb32b9a27536b0319e1a"
+  },
+  "first_observation": {
+    "node": "wrds-sas30-w.wharton.private",
+    "job_id": "40551337",
+    "observer_job_id": "40551338",
+    "observed_at": "2026-10-31T02:46:04.271897+00:00",
+    "scratch": "/tmp/40551337.1.all.q",
+    "private": "/tmp/40551337.1.all.q/research-plaintext-8yxkrpyp",
+    "scratch_present": false,
+    "private_present": false
+  },
+  "report_update_id": "c59b266b-9a99-4e43-aaa4-a6345ad91831",
+  "preserved_failure": "REMOTE_COMMAND_FAILED: `qacct -j 40551338` on wrds exited 1: error: job id 40551338 not found",
+  "verification": {
+    "hpc3_fleet_job": "50243676-55b0-4535-93b0-481b4e10d7ec",
+    "hpc3_tests": 2134,
+    "coverage_percent": 100,
+    "evaluator_fleet_job": "0c56fff6-03a2-454d-bd73-848ea0e254b4",
+    "evaluator_tests": 4876
+  },
+  "private_evidence_directory": "/home/corvis/research-data/wrds/experiments/forced-kill-20261031",
+  "evidence_sha256": {
+    "experiment.json": "94678ef305d364f78c891b1260a94cca3ce5d70530b11aef862eb803ab4f0835",
+    "research_storage_probe.py": "3e4215c94c03267eb9d95255202e11df8cb440774d67efd282008c0141cd0ca6",
+    "native-accounting.txt": "d37a0ec3c0f0d6ca990a2a14fc2cfebdfdc5bdb7558ea81a9feff7e4829e8315",
+    "first-observation.json": "4da4eaf775e06cc4fc8f72338e53576e070795b767af04dcab251b4c8b0d9667",
+    "observer-command.log": "542a500479a19bffdf094760a7d48203745aa9593f4dddc00dac87ca177704a6",
+    "collection-refusal.log": "f8fe84e9399aa2a099cb54149101355aa3e1b4f45e8fac10bd36867d1a234ff5",
+    "reconciled.json": "ab85f2d84a041aedadbb94eaa0a60598b2c6bbc1e4ed16b26ab16d82f079ab47",
+    "reconciled.json.receipt.json": "8f672b7a6dd2ac6ee5f0fc22fd028afb71f1713e70ac758e0b72b9aa3369f603",
+    "observer-submit.log": "32ad018a0181a0dc24eb65765b20f7d8b1969c02c6c8cb1f926a9b1f75500a56",
+    "observer-report.log": "42741823b02f74b6c34269213b2c4672a2ec4d993a32e5c03408ac6a1fc7f291"
+  },
+  "limits": [
+    "One forced-kill subject, two later same-node observations; synthetic validation data only.",
+    "The original reporting attempt failed when accounting was not yet available; its observation is retained separately.",
+    "The corrected command records submission before accounting and reconciles without resubmitting; delayed accounting is also exercised by the regression test.",
+    "Absence establishes neither immediate deletion, physical secure erasure, nor cleanup after node failure.",
+    "This installs a pinned controller-source snapshot over the existing frozen Python; it does not replace the evaluator wheels.",
+    "WRDS native final scoring, substantive four-relation extraction and baseline remain unverified or unrun."
+  ]
+}
