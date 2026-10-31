@@ -57,6 +57,10 @@ def test_a_posix_run_starts_its_own_session_sweeps_caps_and_reaps(
     assert call["env"]["OMP_NUM_THREADS"] == "1"
     assert call["env"]["MKL_NUM_THREADS"] == "1"
     assert call["env"]["OPENBLAS_NUM_THREADS"] == "1"
+    caches = (tmp_path / "runs").resolve() / ".caches-deadbeef"
+    assert call["env"]["HF_HOME"] == str(caches / "huggingface")
+    assert call["env"]["TRITON_HOME"] == str(caches / "triton")
+    assert caches.is_dir()
     assert call["env"]["PATH"] == "/bin"
     assert (tmp_path / "runs").is_dir()
     assert world.lines[0] == "run-tests: the suite runs in its own session and is reaped on exit"
@@ -71,5 +75,6 @@ def test_this_runs_coverage_files_are_removed_after_the_suite(world: World, tmp_
     (runs / ".coverage-deadbeef.h.1.z").write_bytes(b"")
     (runs / ".coverage-other").write_bytes(b"")
     run_tests(tmp_path, [], sweep=False)
-    assert sorted(p.name for p in runs.iterdir()) == [".coverage-other"]
+    assert sorted(p.name for p in runs.iterdir()) == [".caches-deadbeef", ".coverage-other"]
     assert len(world.removed_files) == 2
+    assert world.removed_trees == [runs.resolve() / ".caches-deadbeef"]
