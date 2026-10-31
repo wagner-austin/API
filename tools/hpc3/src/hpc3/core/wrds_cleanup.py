@@ -1,4 +1,4 @@
-"""Measure a failed storage probe's exact scratch path through Grid Engine."""
+"""Measure terminal job scratch on its original node through Grid Engine."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
     require_int,
+    require_list,
     require_str,
 )
 
@@ -20,32 +21,37 @@ from hpc3.core import (
     wrds_attempt_report,
     wrds_grid,
     wrds_jobs,
+    wrds_results,
     wrds_scheduler,
 )
-from hpc3.core.digest import check_remote_digest, parse_remote_digest
+from hpc3.core.digest import check_remote_digest, parse_remote_digest, sha256_hex
 from hpc3.core.remote import remote_digest
 from hpc3.core.wrds_bundle import worker_bundle
 
 
-def _subject(run: WrdsRun, attempt: str) -> tuple[str, str, JSONObject, str]:
-    """Read authenticated storage metadata for an exactly identified failed job.
+def _subject(run: WrdsRun, attempt: str) -> tuple[str, str, JSONObject, str, str | None]:
+    """Read a failed probe receipt or a completed job's authenticated attestation.
 
     Args:
-        run: Frozen storage-probe specification.
-        attempt: Failed attempt with an opened.json receipt.
+        run: Frozen native experiment specification.
+        attempt: Terminal attempt; failed probes require an opened.json receipt.
 
     Returns:
-        Subject job id, execution host, opened receipt and its verified digest.
+        Subject id, node, authenticated receipt, digest and optional probe path.
 
     Raises:
-        ValueError: Active/successful subject, inconsistent receipts or failed observer.
+        ValueError: Nonterminal subject or inconsistent receipts.
         AppError: Transport, scheduler or verified download fails.
     """
     identifier = wrds_jobs.job_id(run, attempt)
-    if wrds_scheduler.status(run["host"], identifier) != "failed":
-        raise ValueError("WRDS_SCRATCH_STATE: subject must have failed terminal accounting")
+    state = wrds_scheduler.status(run["host"], identifier)
+    if state not in {"failed", "completed"}:
+        raise ValueError("WRDS_SCRATCH_STATE: subject must have terminal accounting")
     accounting = wrds_scheduler.accounting(run["host"], identifier)
     host = accounting["hostname"]
+    if state == "completed":
+        completion = wrds_results.attested_completion(run, attempt, identifier)
+        return identifier, host, completion, sha256_hex(dump_json_str(completion).encode()), None
     directory = wrds_jobs.attempt_directory(run, attempt)
     opened = artifacts.download(run["host"], directory + "/outputs/opened.json")
     receipt = narrow_json_to_dict(load_json_str(opened["text"]))
@@ -68,15 +74,15 @@ def _subject(run: WrdsRun, attempt: str) -> tuple[str, str, JSONObject, str]:
     ):
         raise ValueError("WRDS_SCRATCH_RECEIPT: opened receipt differs from private native storage")
     digest(require_str(receipt, "manifest_sha256"))
-    return identifier, host, receipt, opened["sha256"]
+    return identifier, host, receipt, opened["sha256"], private
 
 
 def submit(run: WrdsRun, attempt: str, output: pathlib.Path) -> str:
     """Submit one same-node observer and persist its receipt before accounting.
 
     Args:
-        run: Frozen storage-probe specification.
-        attempt: Failed attempt with an opened.json receipt.
+        run: Frozen native experiment specification.
+        attempt: Terminal attempt; failed probes require an opened.json receipt.
         output: Future evidence file; its stem also names the remote observation.
 
     Returns:
@@ -90,7 +96,7 @@ def submit(run: WrdsRun, attempt: str, output: pathlib.Path) -> str:
     receipt_path = wrds_grid.receipt_path(output)
     wrds_grid.refuse_existing([output, receipt_path])
     label = safe_label(output.stem)
-    identifier, host, receipt, opened_sha = _subject(run, attempt)
+    identifier, host, _, receipt_sha, private = _subject(run, attempt)
     directory = wrds_jobs.attempt_directory(run, attempt)
     remote = wrds_grid.remote_directory(directory + "/scratch-" + label)
     wrds_grid.create_directory(run["host"], remote)
@@ -108,7 +114,7 @@ def submit(run: WrdsRun, attempt: str, output: pathlib.Path) -> str:
             "scratch",
             host,
             identifier,
-            require_str(receipt, "private"),
+            *([] if private is None else [private]),
             target,
         ],
         environment=False,
@@ -123,7 +129,7 @@ def submit(run: WrdsRun, attempt: str, output: pathlib.Path) -> str:
                 "subject_job_id": identifier,
                 "observer_job_id": observer,
                 "worker_sha256": source_sha,
-                "opened_sha256": opened_sha,
+                "subject_receipt_sha256": receipt_sha,
             }
         )
         + "\n",
@@ -132,16 +138,16 @@ def submit(run: WrdsRun, attempt: str, output: pathlib.Path) -> str:
 
 
 def _submitted_observer(
-    run: WrdsRun, attempt: str, output: pathlib.Path, identifier: str, opened_sha: str
+    run: WrdsRun, attempt: str, output: pathlib.Path, identifier: str, receipt_sha: str
 ) -> tuple[str, str]:
     """Validate the persisted observer against the live subject's exact identity.
 
     Args:
-        run: Frozen storage-probe specification.
-        attempt: Failed attempt with an opened.json receipt.
+        run: Frozen native experiment specification.
+        attempt: Terminal attempt; failed probes require an opened.json receipt.
         output: Evidence destination naming the persisted submission receipt.
         identifier: Verified native subject job id.
-        opened_sha: Verified subject storage receipt digest.
+        receipt_sha: Verified subject receipt digest.
 
     Returns:
         Observer job id and worker digest from the matched receipt.
@@ -159,7 +165,7 @@ def _submitted_observer(
         "subject_job_id",
         "observer_job_id",
         "worker_sha256",
-        "opened_sha256",
+        "subject_receipt_sha256",
     }:
         raise ValueError("WRDS_SCRATCH_SUBMISSION: unexpected submission receipt fields")
     if any(
@@ -168,7 +174,7 @@ def _submitted_observer(
             ("identity", run_identity(run)),
             ("attempt", attempt),
             ("subject_job_id", identifier),
-            ("opened_sha256", opened_sha),
+            ("subject_receipt_sha256", receipt_sha),
         )
     ):
         raise ValueError("WRDS_SCRATCH_SUBMISSION: receipt does not identify this subject")
@@ -177,12 +183,58 @@ def _submitted_observer(
     return observer, source_sha
 
 
+def _check_observation(
+    reading: JSONObject,
+    host: str,
+    identifier: str,
+    observer: str,
+    receipt: JSONObject,
+    private: str | None,
+) -> None:
+    """Require the observer's exact identity, scope and typed directory measurements.
+
+    Raises:
+        ValueError: WRDS_SCRATCH_OBSERVER for mismatched identities or scope.
+        TypeError: A required metadata field has the wrong type.
+    """
+    expected_fields = {
+        "node",
+        "job_id",
+        "observer_job_id",
+        "observed_at",
+        "matching_scratch_roots",
+    }
+    if private is not None:
+        expected_fields.update({"scratch", "private", "scratch_present", "private_present"})
+    if set(reading) != expected_fields:
+        raise ValueError("WRDS_SCRATCH_OBSERVER: unexpected observation fields")
+    if any(
+        reading.get(key) != expected
+        for key, expected in (
+            ("node", host),
+            ("job_id", identifier),
+            ("observer_job_id", observer),
+        )
+    ):
+        raise ValueError("WRDS_SCRATCH_OBSERVER: observation identity differs from the subject")
+    roots = require_list(reading, "matching_scratch_roots")
+    if any(not isinstance(root, str) or not root.startswith(identifier + ".1.") for root in roots):
+        raise ValueError("WRDS_SCRATCH_OBSERVER: scratch roots must belong to the subject")
+    if private is not None:
+        if reading["private"] != private or reading["scratch"] != receipt["scratch"]:
+            raise ValueError("WRDS_SCRATCH_OBSERVER: observation paths differ from the subject")
+        for key in ("scratch_present", "private_present"):
+            if type(reading[key]) is not bool:
+                raise ValueError("WRDS_SCRATCH_OBSERVER: presence observations must be booleans")
+    require_str(reading, "observed_at")
+
+
 def measure(run: WrdsRun, attempt: str, output: pathlib.Path) -> str | None:
     """Reconcile a recorded observer; pending accounting never publishes evidence.
 
     Args:
-        run: Frozen storage-probe specification.
-        attempt: Failed attempt with an opened.json receipt.
+        run: Frozen native experiment specification.
+        attempt: Terminal attempt; failed probes require an opened.json receipt.
         output: Evidence destination with its existing submission receipt.
 
     Returns:
@@ -195,8 +247,8 @@ def measure(run: WrdsRun, attempt: str, output: pathlib.Path) -> str | None:
     """
     wrds_grid.refuse_existing([output])
     label = safe_label(output.stem)
-    identifier, host, receipt, opened_sha = _subject(run, attempt)
-    observer, source_sha = _submitted_observer(run, attempt, output, identifier, opened_sha)
+    identifier, host, receipt, receipt_sha, private = _subject(run, attempt)
+    observer, source_sha = _submitted_observer(run, attempt, output, identifier, receipt_sha)
     state = wrds_scheduler.status(run["host"], observer)
     if state == "accounting-pending":
         return None
@@ -213,37 +265,12 @@ def measure(run: WrdsRun, attempt: str, output: pathlib.Path) -> str | None:
         raise ValueError("WRDS_SCRATCH_OBSERVER: observer accounting differs from requested node")
     observed = artifacts.download(run["host"], str(remote / "observation.json"))
     reading = narrow_json_to_dict(load_json_str(observed["text"]))
-    if set(reading) != {
-        "node",
-        "job_id",
-        "observer_job_id",
-        "observed_at",
-        "scratch",
-        "private",
-        "scratch_present",
-        "private_present",
-    }:
-        raise ValueError("WRDS_SCRATCH_OBSERVER: unexpected observation fields")
-    if any(
-        reading.get(key) != expected
-        for key, expected in (
-            ("node", host),
-            ("job_id", identifier),
-            ("observer_job_id", observer),
-            ("private", require_str(receipt, "private")),
-            ("scratch", require_str(receipt, "scratch")),
-        )
-    ):
-        raise ValueError("WRDS_SCRATCH_OBSERVER: observation identity differs from the subject")
-    for key in ("scratch_present", "private_present"):
-        if type(reading.get(key)) is not bool:
-            raise ValueError("WRDS_SCRATCH_OBSERVER: presence observations must be booleans")
-    require_str(reading, "observed_at")
+    _check_observation(reading, host, identifier, observer, receipt, private)
     report, _ = wrds_attempt_report.measure(run, attempt)
     evidence: JSONObject = {
         "subject_report": report,
-        "opened": receipt,
-        "opened_sha256": opened_sha,
+        "subject_receipt": receipt,
+        "subject_receipt_sha256": receipt_sha,
         "observer_source_sha256": source_sha,
         "observer_accounting": {
             "hostname": observed_accounting["hostname"],

@@ -18,7 +18,9 @@ because a corpus staged in part is not a corpus.
 from __future__ import annotations
 
 import pathlib
+import shlex
 
+from platform_core.json_utils import JSONObject, JSONValue
 from platform_core.stage_manifest import StagedFile, StageManifest
 from platform_core.stage_provenance import format_provenance
 
@@ -155,10 +157,96 @@ def stage_manifest(
     return placed
 
 
+def _tree(host: str, root: pathlib.PurePosixPath) -> dict[str, tuple[str, int, int]]:
+    """Read every entry without following links; traversal errors propagate.
+
+    Raises:
+        ValueError: STAGE_INVENTORY for malformed or repeated records.
+        AppError: Any remote traversal failure.
+    """
+    command = shlex.join(["find", "-P", str(root), "-printf", "%y\\t%m\\t%s\\t%P\\0"])
+    raw = remote.run_remote(host, command)
+    if not raw.endswith("\0"):
+        raise ValueError("STAGE_INVENTORY: missing complete traversal record")
+    entries: dict[str, tuple[str, int, int]] = {}
+    for record in raw[:-1].split("\0"):
+        fields = record.split("\t")
+        if len(fields) != 4 or fields[3] in entries:
+            raise ValueError("STAGE_INVENTORY: malformed or repeated traversal record")
+        kind, mode, size, name = fields
+        entries[name] = (kind, int(mode, 8), int(size))
+    return entries
+
+
+def inspect_staged_tree(
+    host: str, root: str, manifest: StageManifest, *, record_name: str
+) -> JSONObject:
+    """Measure an entire private staging tree against its existing manifest.
+
+    Args:
+        host: Cluster SSH alias.
+        root: Absolute study directory containing only the staged partition.
+        manifest: Independently vouched-for files and destination.
+        record_name: Existing certification record's stem.
+
+    Returns:
+        Complete file digests, sizes and private directory modes. This is a
+        readback observation, not an immutable snapshot or an access-control grant.
+
+    Raises:
+        ValueError: STAGE_INVENTORY for wrong scope, extra/missing/unsafe entries,
+            public directories, wrong sizes or a tree changing during inspection.
+        AppError: Remote read failure or any file/certificate digest mismatch.
+    """
+    base, destination = pathlib.PurePosixPath(root), pathlib.PurePosixPath(manifest["destination"])
+    if not base.is_absolute() or ".." in base.parts or not destination.is_relative_to(base):
+        raise ValueError("STAGE_INVENTORY: destination must belong to an absolute study root")
+    relative = destination.relative_to(base)
+    directories = {"", *(str(parent) for parent in relative.parents if str(parent) != ".")}
+    if relative != pathlib.PurePosixPath("."):
+        directories.add(str(relative))
+    certificate = certification_text(manifest).encode()
+    certificate_name = pathlib.PurePosixPath(certification_path(manifest, record_name)).name
+    expected = {
+        str((destination / item["name"]).relative_to(base)): (item["size_bytes"], item["sha256"])
+        for item in manifest["files"]
+    }
+    certificate_relative = str((destination / certificate_name).relative_to(base))
+    if certificate_relative in expected:
+        raise ValueError("STAGE_INVENTORY: certificate collides with a staged file")
+    expected[certificate_relative] = (len(certificate), digest.sha256_hex(certificate))
+    before = _tree(host, base)
+    if set(before) != directories | set(expected):
+        raise ValueError("STAGE_INVENTORY: study tree differs from manifest and certificate")
+    for name in directories:
+        kind, mode, _ = before[name]
+        if kind != "d" or mode != 0o700:
+            raise ValueError(
+                "STAGE_INVENTORY: study directories must be private regular directories"
+            )
+    files: list[JSONValue] = []
+    for name, (size, expected_digest) in sorted(expected.items()):
+        kind, _, actual_size = before[name]
+        if kind != "f" or actual_size != size:
+            raise ValueError("STAGE_INVENTORY: expected regular file with exact size")
+        path = str(base / name)
+        actual = digest.parse_remote_digest(remote.remote_digest(host, path), path)
+        checked = digest.check_remote_digest(path, expected_digest, actual)
+        files.append({"name": name, "size_bytes": actual_size, "sha256": checked})
+    if _tree(host, base) != before:
+        raise ValueError("STAGE_INVENTORY: study tree changed during inspection")
+    return {
+        "root": str(base),
+        "directories": {name: before[name][1] for name in sorted(directories)},
+        "files": files,
+    }
+
+
 __all__ = [
     "CERTIFICATION_SUFFIX",
     "certification_path",
     "certification_text",
+    "inspect_staged_tree",
     "stage_manifest",
     "stage_one",
 ]
