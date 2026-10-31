@@ -27,7 +27,7 @@ source_paths:
 source_git_blobs:
   "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "284621906d62f97da2080ca823bdc971aa9a0454"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "9686350a06789e4f05d869da140948b6a56d0d19"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "3a5069fbde15c85b942237313970187f8bff7c00"
