@@ -862,6 +862,57 @@ An unresolved value or one dated after the scored exit makes that outcome
 incomplete. This is a revised-history valuation and settlement assumption,
 not evidence of historical cash availability or an executable liquidation.
 
+## Four-relation CRSP extraction
+
+`markets.crsp_writer.extract_crsp` produces the manifest above for two
+partitions from one database session. `markets.crsp_queries` derives every
+statement from the decoded protocol: the projection is the frozen column list,
+the securities are those with an eligible share/exchange interval overlapping
+`train_start` through the partition's end, and each query orders by its
+natural key and fetches one row beyond the row limit so truncation is refused
+rather than silent. Nothing about the scope is typed by hand.
+
+Each partition holds what is knowable by its observation end. For
+train-validation that is the day before `holdout_start`; for final it is
+`coverage_end`. Returns and membership starts are cut at that day. Membership
+end bounds are clipped to it inside the query (`LEAST(nameendt, ...)`), which
+never extends membership and changes no decision before the boundary. A
+terminal event enters only when its valuation date, the latest present of
+`deldlydt`, `delamtdt` and `delnextdt`, also lies within the partition; an
+event with no valuation date is kept so the evaluator refuses it. The CIZ
+calendar runs to the end of the exit month of the partition's last decision,
+which `crsp_windows` needs: for the committed design the train-validation
+calendar ends 2022-02-28 and carries trading-day flags only, no security
+observation. A daily-return cutoff alone would have dropped membership that
+spans the boundary and the two calendar months the last known exits need.
+
+One psql script runs all eight `COPY` statements, and a snapshot reading
+before and after them, inside one `REPEATABLE READ READ ONLY` transaction;
+differing readings are refused. The client runs with a wall deadline and
+`RLIMIT_FSIZE`, so a relation larger than its byte limit kills it. Plaintext
+lives only in a mode-0700 directory under the allocation's scratch. Each
+partition's CSV bytes are checked against a total budget before the existing
+whole-file reader loads them; `load_crsp_sources` then rereads the manifest
+and `markets.crsp_partition.check_crsp_partition` independently checks the
+bounds, the row limits and calendar completeness. Only then is each partition
+encrypted with `encrypt_bundle` to its own recipient under a pending name.
+Both are renamed into place after the private directory has been removed, and
+`extraction.json` (timestamps, snapshot, query and protocol digests, counts,
+limits) and `metrics.json` are written last. Any refusal leaves no published
+bundle. A complete calendar proves only that the calendar is complete; no
+table's date extent proves an individual security's history is complete.
+
+A synthetic session passes `schema="pg_temp"` with a setup script that builds
+temporary relations of the vendor column types before the transaction; the
+vendor run passes the protocol's library and no setup, and any other pairing is
+refused. `scripts/crsp_extraction.py` exposes `extract` for the native
+allocation and `verify` for the evaluator. `verify` refuses any collected file
+other than the receipt, metrics, bundle metadata and age ciphertext, opens the
+train-validation bundle with its own key through `load_crsp_sources`, and
+opens the final bundle only for synthetic evidence; licensed final-period
+evidence is opened by the one-shot final release alone. The licensed
+extraction itself has not run.
+
 ## Monthly holdings and validation study
 
 `markets.crsp_holdings.evaluate_crsp_holdings` accounts for a long-only
