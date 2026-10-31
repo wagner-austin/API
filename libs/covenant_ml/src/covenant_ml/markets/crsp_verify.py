@@ -168,11 +168,12 @@ def verify_crsp_extraction(
         bundle = read_encrypted_bundle(path, item["bundle"]["sha256"])
         if bundle["partition"] != item["partition"] or bundle["recipient"] != recipient:
             raise ValueError("[CRSP-013] a bundle is not sealed to its partition's recipient")
-        sealed: JSONObject = {"bundle_sha256": item["bundle"]["sha256"]}
         if item["partition"] == "final" and not open_final:
-            partitions.append({"partition": "final", "opened": False} | sealed)
-            continue
-        partitions.append(_open(path, item, keys, scratch, receipt) | sealed)
+            summary: JSONObject = {"partition": "final", "opened": False}
+        else:
+            summary = _open(path, item, keys, scratch, receipt)
+        summary["bundle_sha256"] = item["bundle"]["sha256"]
+        partitions.append(summary)
     return {
         "source": receipt["source"],
         "snapshot": receipt["snapshot"],
