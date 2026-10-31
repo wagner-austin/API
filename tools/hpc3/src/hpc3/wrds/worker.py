@@ -32,6 +32,7 @@ from hpc3.contracts.wrds_run import (
 )
 from hpc3.wrds import _test_hooks
 from hpc3.wrds.extract import extract
+from hpc3.wrds.scratch import observe
 
 
 def checked_file(path: pathlib.Path, expected: str) -> str:
@@ -190,9 +191,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         execute_run(pathlib.Path(tokens[1]), tokens[2])
     elif len(tokens) == 2 and tokens[0] == "extract":
         extract(decode_crsp_selection(load_json_str(tokens[1])))
+    elif len(tokens) == 5 and tokens[0] == "scratch":
+        reading = observe(tokens[1], tokens[2], pathlib.Path(tokens[3]), pathlib.Path("/tmp"))
+        _test_hooks.write(pathlib.Path(tokens[4]), dump_json_str(reading).encode())
     else:
         raise ValueError(
-            "WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT or extract SCOPE"
+            "WRDS_WORKER_ARGS: expected inspect, run DOCUMENT ATTEMPT, extract SCOPE "
+            "or scratch HOST JOB PRIVATE OUTPUT"
         )
     return 0
 
