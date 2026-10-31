@@ -45,7 +45,9 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--collected", required=True, type=Path)
     verify.add_argument("--access", required=True, type=Path)
     verify.add_argument("--scratch", required=True, type=Path)
-    verify.add_argument("--open-final", action="store_true")
+    mode = verify.add_mutually_exclusive_group()
+    mode.add_argument("--open-final", action="store_true")
+    mode.add_argument("--ciphertext-only", action="store_true")
     verify.add_argument("--report-task", required=True)
     return parser
 
@@ -102,10 +104,15 @@ def main(argv: list[str] | None = None) -> int:
     collected: Path = args.collected
     scratch: Path = args.scratch
     open_final: bool = args.open_final
+    ciphertext_only: bool = args.ciphertext_only
     task: str = args.report_task
     report_identity(task, "wrds")  # refuses a malformed task before a bundle is opened
     result = verify_crsp_extraction(
-        collected, EvaluatorKeys(settings), scratch=scratch, open_final=open_final
+        collected,
+        EvaluatorKeys(settings),
+        scratch=scratch,
+        open_final=open_final,
+        ciphertext_only=ciphertext_only,
     )
     payload = dump_json_str(result)
     post_load_report(
