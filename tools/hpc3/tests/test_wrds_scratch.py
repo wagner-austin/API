@@ -9,7 +9,7 @@ import sys
 from collections.abc import Generator
 
 import pytest
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import load_json_str, narrow_json_to_dict
 
 from hpc3.core.wrds_bundle import worker_bundle
 from hpc3.wrds import _test_hooks, worker
@@ -111,8 +111,7 @@ def test_real_archive_completed_scope_observes_absence(tmp_path: pathlib.Path) -
     _test_hooks.environment = lambda: {"JOB_ID": "456"}
     direct = tmp_path / "direct.json"
     assert worker.main(["scratch", socket.gethostname(), "999999999999999999999", str(direct)]) == 0
-    direct_reading = load_json_str(direct.read_text())
-    assert isinstance(direct_reading, dict)
+    direct_reading = narrow_json_to_dict(load_json_str(direct.read_text()))
     assert direct_reading["matching_scratch_roots"] == []
     archive = tmp_path / "worker.pyz"
     archive.write_bytes(worker_bundle())
@@ -133,8 +132,7 @@ def test_real_archive_completed_scope_observes_absence(tmp_path: pathlib.Path) -
         timeout=30,
     )
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
-    reading = load_json_str(output.read_text())
-    assert isinstance(reading, dict)
+    reading = narrow_json_to_dict(load_json_str(output.read_text()))
     assert reading["node"] == socket.gethostname()
     assert reading["job_id"] == "999999999999999999999"
     assert reading["observer_job_id"] == "456"
