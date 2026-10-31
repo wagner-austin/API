@@ -15,7 +15,7 @@ source_paths:
   - "README.md"
 source_git_blobs:
   "src/hpc3/core/checkout.py": "e903c5d1c622d088d73dbc1bc018b41dd6077d6c"
-  "src/hpc3/cli/_config.py": "5287aecbeca09b166e8932f5ea38b227fbd7e720"
+  "src/hpc3/cli/_config.py": "7cfdaf07b84e34ea1b096dcf3f790f5a68391972"
   "src/hpc3/contracts/workspace.py": "ba27d634de77b9ca57d6ccec1dd7815bc95da0fc"
   "src/hpc3/core/inflight.py": "96492a481dad7ead1916b61056585103e87443c5"
   "src/hpc3/core/submit.py": "0f9eb84b36a023b1c2c1ee7388932a60df7d903c"

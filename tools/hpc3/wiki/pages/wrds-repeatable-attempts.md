@@ -36,7 +36,7 @@ source_git_blobs:
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
   "src/hpc3/core/wrds_attempt_report.py": "97a16cbbd011b4311db2da780b5901791f00580e"
-  "src/hpc3/cli/wrds.py": "5791832af3706dca52ced13e8f7c5c8ddc2f7674"
+  "src/hpc3/cli/wrds.py": "2e1f0bae21fbb4157cb2bdbd8530d0ea58615e23"
   "src/hpc3/wrds/worker.py": "e603488a92df6145d872ff728d632ed8bfda15fc"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
@@ -217,7 +217,7 @@ validation-controller runs and the subsequent repair are recorded in
 [^status]: `src/hpc3/core/wrds_scheduler.py:181` `status` and `:113` `decode_accounting`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:25` `job_argv`.
 [^report]: `src/hpc3/core/wrds_attempt_report.py:70` `measure` and `:25` `completion_presence`.
-[^cli]: `src/hpc3/cli/wrds.py:123` `main`.
+[^cli]: `src/hpc3/cli/wrds.py:129` `main`.
 [^live]: The four posts by `load-report-d43697b3` on board task d43697b3 listed in the frontmatter provenance section, and Ziggurat `/home/corvis/research-data/wrds/experiments/system-probe-20261027/repeatability-proof.json:1`, fields `jobs`, `identity`, `worker_sha256`, `matching_outputs`, `observations` and `artifact_sha256`.
 [^paired]: API `libs/covenant_ml/README.md` WRDS input contract; executed manifests under `artifacts/wrds-synthetic-2a50e93ca/`, fields `dataset`, `seeds`, `results` and `seed_comparisons`; synthetic provenance in `runs/wrds-synthetic-stage.json`.
 [^image]: `specs/cleargbm-paired-image.json`; `runs/bench-wrds-image-verify.json`; job 58566045 build logs and job 58574938 verification logs identified in `provenance`.

@@ -12,7 +12,7 @@ source_paths:
   - "artifacts/research-queue-fresh-20261029/provenance.json"
   - "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
 source_git_blobs:
-  "src/hpc3/cli/execution_inspect.py": "fd0d98dc12dba896ebc552149a7da69f76d4316e"
+  "src/hpc3/cli/execution_inspect.py": "97234adfb10e9f5f060b5b0f3b81300f4a646916"
   "src/hpc3/core/execution_evidence.py": "bf31a1091302ae2786425afa629677fccf07f681"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"

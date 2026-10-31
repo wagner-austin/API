@@ -11,17 +11,16 @@ source_paths:
   - "src/hpc3/core/wrds_sql.py"
   - "src/hpc3/cli/wrds_catalog.py"
   - "src/hpc3/cli/wrds_sql_catalog.py"
-  - "src/hpc3/cli/_load_report.py"
 source_git_blobs:
   "src/hpc3/core/wrds_scan.py": "377d02f3bcbbb15e1b362298f59ae5eec89e97fb"
   "src/hpc3/core/wrds_grid.py": "ecdca06d88f7aa4f818ef220ee09174a71833414"
   "src/hpc3/core/artifacts.py": "4dffdf06b94e1cd6d58f45ac785788ad242f05c4"
   "src/hpc3/core/wrds_catalog.py": "9969c812050e073947127036da80f0bb007c3dc1"
   "src/hpc3/core/wrds_sql.py": "8b09091403ad16fed66828336a419a2cded0525d"
-  "src/hpc3/cli/wrds_catalog.py": "d46ba2ea77da094898227c93093ed54790c2b2d1"
-  "src/hpc3/cli/wrds_sql_catalog.py": "a49efcd087ea7ee21fca3adaab4be51f49c47308"
-  "src/hpc3/cli/_load_report.py": "3a109d6314c9a077bbfbf860a073217dd2efdd8f"
+  "src/hpc3/cli/wrds_catalog.py": "4846eb168c87596fb2ae9008a873e3d6a07f3877"
+  "src/hpc3/cli/wrds_sql_catalog.py": "d02c6019dd675f8418adc86a3a84274340b36058"
 provenance:
+  - "The poster both commands call, platform_core.load_report (libs/platform_core/src/platform_core/load_report.py, outside this workspaceRoot): post_load_report and report_identity, lifted out of this package's cli/_load_report.py on 2026-10-31 with labels and service names unchanged (board task 1f60a20d)"
   - "WRDS Grid Engine job 40529889, awagner14, 2026-10-28T01:29Z, run by hpc3.cli.wrds_catalog at API d0d0cafe8; synchronous qsub exit 0"
   - "Ziggurat /home/corvis/research-data/wrds/catalogs/2026-10-28/filesystem.jsonl, sha256 cff2ebb8751f6bb1b4f574330f89cdfeafdf9a9f435d271bddfeb0555951647a; adjacent receipt records probe archive sha256 7878f224f9d7ba0f117a539bcf7b0b4894c0e634e441fdd427f099bf07335b86"
   - "WRDS Grid Engine jobs 40529873 (catalog) and 40529878 (zero-row validation), awagner14, 2026-10-28T01:27Z, run by hpc3.cli.wrds_sql_catalog at API d0d0cafe8 against WRDS Cloud's ident-authenticated PostgreSQL host; both exit 0"
@@ -110,7 +109,7 @@ staging manifest and a matching dataset-registry entry before training.
 Neither inventory downloads, registers or trains on any data; downloads wait
 for the operator's dataset selection.[^integration]
 
-[^report]: `src/hpc3/cli/_load_report.py:59` (`post_load_report`), under the identity `src/hpc3/cli/_load_report.py:34` (`report_identity`) derives from the task id.
+[^report]: `platform_core.load_report`'s `post_load_report`, called from `src/hpc3/cli/wrds_catalog.py:48` (`main`) and `src/hpc3/cli/wrds_sql_catalog.py:50` (`main`), under the identity its `report_identity` derives from the task id; the module is named in `provenance` because it lives outside this workspace.
 [^measurement]: WRDS job 40529889 and the local catalog and receipt named in `provenance`, posted by `src/hpc3/cli/wrds_catalog.py:22` (`report`); a dated observation, not a live entitlement service.
 [^scan]: `src/hpc3/core/wrds_scan.py:45` (`scan`) and `src/hpc3/core/wrds_scan.py:29` (`permission_error`).
 [^sql]: WRDS jobs 40529873 and 40529878 and the artifacts named in `provenance`; classification in `src/hpc3/core/wrds_sql.py:102` (`classify`), the run in `src/hpc3/core/wrds_sql.py:201` (`sql_inventory`).
