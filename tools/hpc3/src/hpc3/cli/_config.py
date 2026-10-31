@@ -19,15 +19,7 @@ import pathlib
 from platform_core import cli_args
 from platform_core.config import _optional_env_str
 from platform_core.json_utils import JSONValue, load_json_str
-from platform_core.mcp_client import McpCredentials
-from platform_core.session_label import (
-    LABEL_VARIABLE,
-    SESSION_ID_VARIABLE,
-    STACK_ENV_PATH,
-    resolve_label,
-    stack_credentials,
-)
-from platform_core.stack_endpoints import TASKBOARD_SERVICE, declared_url
+from platform_core.session_label import LABEL_VARIABLE, SESSION_ID_VARIABLE, resolve_label
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.contracts.workspace import (
@@ -111,9 +103,12 @@ def load_workspace(parsed: dict[str, str]) -> Workspace:
     return decode_workspace(value, config_dir=config_dir, ledger_dir=shared_directory(config_dir))
 
 
-def _stack_file_text(path: pathlib.Path) -> str:
+def stack_file_text(path: pathlib.Path) -> str:
     """Read one of the stack's files (its ``.env`` or its endpoint
     declaration) through the core's byte seam.
+
+    The file seam :func:`submitter_label` and every command posting its own
+    report through :func:`platform_core.load_report.post_load_report` pass.
 
     Args:
         path: The file :mod:`platform_core.session_label` asks for.
@@ -122,23 +117,6 @@ def _stack_file_text(path: pathlib.Path) -> str:
         Its text.
     """
     return core_hooks.read_bytes(path).decode("utf-8")
-
-
-def taskboard_credentials() -> McpCredentials:
-    """Read the taskboard's address and secrets from the stack's own files.
-
-    For a command that posts its own report under a service identity; the
-    same two files :func:`submitter_label` reads, through the same seam.
-
-    Returns:
-        The credentials, bound to the declared taskboard url.
-
-    Raises:
-        AppError: ``STACK_ENDPOINT_UNDECLARED`` or ``CREDENTIALS_MISSING``
-            when either file does not carry its part.
-    """
-    url = declared_url(_stack_file_text, TASKBOARD_SERVICE)
-    return stack_credentials(_stack_file_text(STACK_ENV_PATH), url)
 
 
 def submitter_label() -> str:
@@ -177,7 +155,7 @@ def submitter_label() -> str:
     return resolve_label(
         session_id=_optional_env_str(SESSION_ID_VARIABLE),
         exported=_optional_env_str(LABEL_VARIABLE),
-        read_text=_stack_file_text,
+        read_text=stack_file_text,
         post=cli_hooks.http_post,
     )
 
@@ -186,6 +164,6 @@ __all__ = [
     "CONFIG_FLAG",
     "load_workspace",
     "load_workspace_connection",
+    "stack_file_text",
     "submitter_label",
-    "taskboard_credentials",
 ]

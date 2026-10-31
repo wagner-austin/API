@@ -9,9 +9,9 @@ from pathlib import Path
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.load_report import post_load_report, report_identity
 
-from hpc3.cli import _test_hooks
-from hpc3.cli._load_report import post_load_report, report_identity
+from hpc3.cli import _config, _test_hooks
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.controller_evidence import measure_controller
 from hpc3.core.digest import sha256_hex
@@ -45,7 +45,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     report["provenance_sha256"] = sha256_hex(provenance)
     payload = dump_json_str(report)
-    post_load_report(task, "HPC3 CONTROLLER LOAD-REPORT\n" + payload, "hpc")
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_config.stack_file_text,
+        task_id=task,
+        body="HPC3 CONTROLLER LOAD-REPORT\n" + payload,
+        family="hpc",
+    )
     _test_hooks.emit(payload)
     return 0
 

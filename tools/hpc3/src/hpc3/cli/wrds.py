@@ -16,9 +16,9 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.load_report import post_load_report, report_identity
 
-from hpc3.cli import _test_hooks
-from hpc3.cli._load_report import post_load_report, report_identity
+from hpc3.cli import _config, _test_hooks
 from hpc3.contracts.wrds_run import WrdsRun, decode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import wrds_attempt_report, wrds_cleanup, wrds_jobs, wrds_results, wrds_scheduler
@@ -116,7 +116,13 @@ def _evidence(run: WrdsRun, attempt: str, flags: dict[str, str], action: str) ->
             "attempt": attempt,
             "completion_sha256": completion_digest,
         }
-    post_load_report(task_id, body, "wrds")
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_config.stack_file_text,
+        task_id=task_id,
+        body=body,
+        family="wrds",
+    )
     _test_hooks.emit(dump_json_str(result))
 
 

@@ -9,9 +9,9 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import dump_json_str
+from platform_core.load_report import post_load_report, report_identity
 
 from hpc3.cli import _config, _test_hooks
-from hpc3.cli._load_report import post_load_report, report_identity
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import ledger
@@ -50,7 +50,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         checksums,
     )
     body = "HPC3 REPLAY LOAD-REPORT\n" + dump_json_str(report)
-    post_load_report(task, body, "hpc")
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_config.stack_file_text,
+        task_id=task,
+        body=body,
+        family="hpc",
+    )
     _test_hooks.emit(body)
     return 0 if report["comparison"] == "identical" else 2
 

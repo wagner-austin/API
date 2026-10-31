@@ -9,9 +9,9 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.json_utils import dump_json_str
+from platform_core.load_report import post_load_report, report_identity
 
 from hpc3.cli import _config, _test_hooks
-from hpc3.cli._load_report import post_load_report, report_identity
 from hpc3.clusters import require_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import ledger
@@ -50,7 +50,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         entry, cluster, parse_checksums(core_hooks.read_bytes(path).decode("utf-8"))
     )
     payload = dump_json_str(report)
-    post_load_report(task, "HPC3 IMAGE BUILD LOAD-REPORT\n" + payload, "hpc")
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_config.stack_file_text,
+        task_id=task,
+        body="HPC3 IMAGE BUILD LOAD-REPORT\n" + payload,
+        family="hpc",
+    )
     _test_hooks.emit(payload)
     return 0
 

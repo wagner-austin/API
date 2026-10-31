@@ -12,9 +12,9 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
+from platform_core.load_report import post_load_report, report_identity
 
-from hpc3.cli import _test_hooks
-from hpc3.cli._load_report import post_load_report, report_identity
+from hpc3.cli import _config, _test_hooks
 from hpc3.contracts.wrds_catalog import CatalogRun
 from hpc3.core.wrds_catalog import inventory
 
@@ -67,7 +67,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     body = report(run)
     _test_hooks.emit(body)
     _test_hooks.emit(f"Metadata catalog: {output}; scheduler receipt: {output}.receipt.json")
-    post_load_report(task_id, body, "wrds")
+    post_load_report(
+        post=_test_hooks.http_post,
+        read_text=_config.stack_file_text,
+        task_id=task_id,
+        body=body,
+        family="wrds",
+    )
     _test_hooks.emit(f"Posted on board task {task_id}")
     return 0
 

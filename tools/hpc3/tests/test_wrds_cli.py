@@ -7,11 +7,11 @@ import runpy
 
 import pytest
 from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.load_report import report_identity
 from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import _test_hooks as cli_hooks
 from hpc3.cli import wrds
-from hpc3.cli._load_report import report_identity
 from hpc3.contracts.wrds_run import encode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks
 from hpc3.core.wrds_attempt_report import measure

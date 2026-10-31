@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 from platform_core.json_utils import dump_json_str, require_dict
+from platform_core.load_report import report_identity
 from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import execution_report
-from hpc3.cli._load_report import report_identity
 from hpc3.core import ledger
 from tests.conftest import FakeRun, write_workspace
 from tests.execution_fixtures import IMAGE, documents, entry, serve
