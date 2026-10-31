@@ -355,3 +355,14 @@ the grant extension has not received independent adequacy review.
 Pages written: fleet-runner-disk-hygiene
 Pages updated: fleet-runner-listener-isolation-and-dropped-jobs, hubs/infrastructure, index
 Notes: records lavender's job-completed hook, the reaper's hook restarts, ci-clean's update and venv passes, and the lane's on-host runner audit (MCPs board tasks 621902c3 and faec98a5); repins the listener page's five stale sources after re-reading each cited line.
+
+## 2026-10-31: recover licensed WRDS collection within bounded queue polls
+
+Updated readiness and queue ownership for the successful licensed extraction
+and encrypted collection. WRDS job 40554174 produced 24 declared outputs;
+queue 872b9e09 verified them and the RunRecord after preserving a timed-out
+transfer and reusing the completed allocation. Submission, collection and
+verification now occupy separate polls. Added metadata-only provenance and a
+live audit query that refuses changed record, output-count, wheel and final-bundle
+identities. HPC3 staging, verifier corrections and the substantive baseline
+remain pending. Board task da2a55dc; no new page or page-count change.
