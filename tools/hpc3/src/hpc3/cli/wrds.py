@@ -15,11 +15,11 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, narrow_json_to_dict
 
 from hpc3.cli import _test_hooks
 from hpc3.cli._load_report import post_load_report, report_identity
-from hpc3.contracts.wrds_run import decode_wrds_run, encode_wrds_runtime, run_identity
+from hpc3.contracts.wrds_run import WrdsRun, decode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import wrds_attempt_report, wrds_cleanup, wrds_jobs, wrds_results, wrds_scheduler
 from hpc3.core.checkout import shared_directory
@@ -78,6 +78,38 @@ def _prepare(action: str, flags: dict[str, str]) -> None:
         _test_hooks.emit(dump_json_str(encode_wrds_runtime(runtime)))
 
 
+def _report(run: WrdsRun, attempt: str, flags: dict[str, str], *, scratch: bool) -> None:
+    """Measure the requested native evidence and publish through one service identity.
+
+    Args:
+        run: Frozen native experiment.
+        attempt: Exact attempt to measure.
+        flags: Explicit report destination and task.
+        scratch: Request a subsequent same-node scratch observation.
+
+    Raises:
+        ValueError: Invalid task or inconsistent native evidence.
+        AppError: Transport or report publication fails.
+    """
+    task_id = cli_args.require_flag(flags, "--report-task")
+    report_identity(task_id, "wrds")
+    result: JSONObject
+    if scratch:
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        body = wrds_cleanup.measure(run, attempt, output)
+        result = {"report_task": task_id, "output": str(output)}
+    else:
+        body, completion_digest = wrds_attempt_report.measure(run, attempt)
+        result = {
+            "report_task": task_id,
+            "identity": run_identity(run),
+            "attempt": attempt,
+            "completion_sha256": completion_digest,
+        }
+    post_load_report(task_id, body, "wrds")
+    _test_hooks.emit(dump_json_str(result))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Execute one WRDS lifecycle action.
 
@@ -130,28 +162,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = pathlib.Path(cli_args.require_flag(flags, "--output"))
         result = wrds_results.collect(run, attempt, output, ledger, now)
         _test_hooks.emit(dump_json_str({"output": str(output), "identity": result["identity"]}))
-    elif action == "scratch":
-        task_id = cli_args.require_flag(flags, "--report-task")
-        report_identity(task_id, "wrds")
-        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
-        body = wrds_cleanup.measure(run, attempt, output)
-        post_load_report(task_id, body, "wrds")
-        _test_hooks.emit(dump_json_str({"report_task": task_id, "output": str(output)}))
-    elif action == "report":
-        task_id = cli_args.require_flag(flags, "--report-task")
-        report_identity(task_id, "wrds")  # refuses a malformed task before WRDS is queried
-        body, completion_digest = wrds_attempt_report.measure(run, attempt)
-        post_load_report(task_id, body, "wrds")
-        _test_hooks.emit(
-            dump_json_str(
-                {
-                    "report_task": task_id,
-                    "identity": run_identity(run),
-                    "attempt": attempt,
-                    "completion_sha256": completion_digest,
-                }
-            )
-        )
+    elif action in {"report", "scratch"}:
+        _report(run, attempt, flags, scratch=action == "scratch")
     else:
         _trace(ledger, run_identity(run), attempt)
     return 0
