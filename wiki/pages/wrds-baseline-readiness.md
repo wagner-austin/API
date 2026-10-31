@@ -64,7 +64,7 @@ source_git_blobs:
   "tools/hpc3/tests/test_image_evidence.py": "f9c4ec90fcd2aab342d05c3749820b0392270a55"
   "tools/hpc3/tests/test_image_inspect.py": "290e29766a55958aa9025930b3630aaa4f05cdb8"
   "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
-  "tools/fleet/tests/test_research_proposer_host.py": "41ddec456e01f4b2b10bb180fa0cebe67f6ce45e"
+  "tools/fleet/tests/test_research_proposer_host.py": "4ec3e7e668ddf0915b15daf276a75054bfecf6c0"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
   "libs/covenant_ml/scripts/research_storage_probe.py": "8dc13973868bdefb3e3cf26c452871ce6d072235"
   "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "ce083a45f3100c51e049c85eae865fde345c8034"
@@ -99,15 +99,15 @@ source_git_blobs:
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
-  "tools/fleet/src/fleet/core/research_proposal.py": "e4276cfec0006ed26aa8fb3c7b8fb8cdcb93a179"
-  "tools/fleet/src/fleet/cli/research_propose.py": "f6f9b337556473eddc55eb72f1d8cc4ce708bd65"
+  "tools/fleet/src/fleet/core/research_proposal.py": "5d55b036810db1a301137b2385dd75d5c5269e00"
+  "tools/fleet/src/fleet/cli/research_propose.py": "c354898c0f5ad752fafd1f86e4650e6a02daee78"
   "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
   "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
 provenance:
   - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "2026-10-30 readiness recheck, board cda5d102-9f26-4c2a-bfbe-cfdbe17b33c6: live task_get reports 1e555057, 7c71808d and 364a4ba8 done after independent audit; dispatch_list at API e12eb1c8312b9d4ae57e38906ca787e02e0e094c reports research check b37025f3 (4786 passed, 100%), fleet check a4f8cdc8 (2495 passed, 100%) and real host check 16b62830 (79 passed). Local-file inspection of /home/corvis/research-control/wrds-validation-bda8ca2af/lib/python3.11/site-packages/covenant_ml/markets/research_trial.py still finds load_wrds_evaluation at lines 18 and 58, SHA-256 98e11f10c1a28dcaeaeec9fde9e21c22f93be0c8c8cd0add5c50e23e4805d271. Its entrypoint/scripts/research_proposals.py exposes init/status/propose/submit/reconcile and no select, SHA-256 ed2272d101c645375ada9cc46caa4f2c288f9cefd196c634827a81ca7d0785ef. These are local installed-file readings, not a new cluster execution."
-fact_checked: 2026-10-30
+fact_checked: 2026-10-31
 confidence: medium
 ---
 
@@ -308,6 +308,15 @@ proposal and a refused final-partition request in a fresh local journal.
 [[wrds-proposer-isolation]] records the source, service-authored reports and
 verification scope. This measurement stops at admission; the prior shared-queue
 and native-job receipts remain separate evidence.[^remote-handoff]
+
+The handoff audit reopened the milestone for missing denial measurements on
+the remote daemon. The existing denial probe now also passes through actual
+remote placement on Colossus: private files, writes and networking are denied,
+the credential canary is absent and resource limits match the local assertions.
+The corrected milestone awaits independent acceptance; the measured details
+are in [[wrds-proposer-isolation]].[^remote-boundary]
+
+[^remote-boundary]: Live board audit `f300a990-7101-4bfd-8972-3d29c582cb71`, A1 partly met for the missing remote isolation measurement. Corrected real hub job `bc02f915-acf1-40ad-a330-2aa01f9405ff` at API `fdaf517940e01f78e68cc279747859fcc2f28c4c` passed 11 cases with zero skips, including the remote denial scenario and owned-container removal, on 2026-10-31 at 01:59:52 UTC. Existing program-authored admission receipts are unchanged.
 
 [^remote-handoff]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`. Live task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, program-authored reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` as `fleet-research-proposer`: attempts 1 admitted and 2 refused with `holdout_forbidden`. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207`, full fleet check `672d626f`, 2,561 passed with 100% coverage. No licensed data, final release or native allocation was used in this measurement.
 

@@ -19,24 +19,24 @@ source_paths:
   - "tools/fleet/tests/test_research_proposer_hub.py"
   - "tools/fleet/tests/test_research_proposal_report.py"
 source_git_blobs:
-  "tools/fleet/tests/test_research_proposer_remote.py": "746f23412b9c7c5aff8838bc5a35b59f04b25742"
-  "tools/fleet/tests/test_research_proposer_hub.py": "323f96f26ccf0cb43fa78903f1a2ac541d55942a"
-  "tools/fleet/tests/test_research_proposal_report.py": "a3711895f09c8266571b621e9ebdb18e116a64f0"
+  "tools/fleet/tests/test_research_proposer_remote.py": "2a2adc547b340ce0e001feccb0da45a228a33d9b"
+  "tools/fleet/tests/test_research_proposer_hub.py": "ebe36dcf0b906c9973e9504009fe7b16ce9bbdce"
+  "tools/fleet/tests/test_research_proposal_report.py": "dce73cf7233c68b374610ca8062e7fe1273f943b"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "284621906d62f97da2080ca823bdc971aa9a0454"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_proposer.py": "62a07acd52b848b65014155466fe268beecfe247"
+  "tools/fleet/src/fleet/core/research_proposer.py": "a931921a535500039078346bf9e83e3ccff6db9b"
   "tools/fleet/tests/test_research_proposer.py": "04d28830b7b0fdfbf20b478f7e7fdeef25083d35"
-  "tools/fleet/tests/test_research_proposer_host.py": "41ddec456e01f4b2b10bb180fa0cebe67f6ce45e"
-  "tools/fleet/src/fleet/core/research_proposal.py": "e4276cfec0006ed26aa8fb3c7b8fb8cdcb93a179"
-  "tools/fleet/src/fleet/cli/research_propose.py": "f6f9b337556473eddc55eb72f1d8cc4ce708bd65"
+  "tools/fleet/tests/test_research_proposer_host.py": "4ec3e7e668ddf0915b15daf276a75054bfecf6c0"
+  "tools/fleet/src/fleet/core/research_proposal.py": "5d55b036810db1a301137b2385dd75d5c5269e00"
+  "tools/fleet/src/fleet/cli/research_propose.py": "c354898c0f5ad752fafd1f86e4650e6a02daee78"
   "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
   "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
-fact_checked: 2026-10-30
+fact_checked: 2026-10-31
 confidence: medium
 ---
 
@@ -105,6 +105,21 @@ all 95 cases. An earlier hub run passed the two remote cases but failed an
 unrelated user-service identity assumption; the corrected test starts and
 inspects a bounded user service instead of treating the check's system service
 as a user service. No production tick restriction was relaxed.[^remote-gates]
+
+Audit `f300a990` reopened the handoff milestone because those remote cases
+measured transport and cleanup, while the denial cases measured a different
+local daemon. The corrected hub case now runs the existing `DENIAL_PROGRAM`
+with `host="colossus"` and shares the local case's exact assertions. Real remote
+canary files are readable before the probe and byte-identical afterward; the
+remote launcher is given a synthetic credential canary before its environment
+is cleared. Inside the proposer, all four private reads and the policy write
+return errno 2, the root write returns 30 and networking returns 101. The canary
+is absent, uid is 65534, effective capabilities are zero, no-new-privileges is
+1, and limits are 256 MiB, 64 processes and one CPU. The test removes its canary
+directory and confirms zero owned containers. This directly measures the remote
+daemon; independent acceptance of the corrected milestone remains pending.[^remote-denial]
+
+[^remote-denial]: `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`, denial scenario; `tools/fleet/tests/test_research_proposer_host.py`, `DENIAL_PROGRAM` and `assert_denied_resources`. API `fdaf517940e01f78e68cc279747859fcc2f28c4c`: real hub job `bc02f915-acf1-40ad-a330-2aa01f9405ff` passed 11 cases with zero skips at 2026-10-31T01:59:52Z; its reading reports all denials and `scenario=denial` with `remaining=0`. Linux job `c6297263-f954-4931-8f77-b350180d7f90` passed 95 cases. Full job `7ee0b15d-0c96-4ece-8ed0-45691610427f` passed 2,566 tests with 100% coverage; pinned formatter reported `433 files left unchanged`. Audit `f300a990-7101-4bfd-8972-3d29c582cb71`, check review `da6836be-2956-4b32-a209-92835e613d82`, accepted the prior handoff evidence and identified the missing remote denial measurement.
 
 [^remote-gates]: `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`. Live fleet job `b2285d48-6c1f-4ee8-b1b9-3c38c6926a6c` at API `f62c99f16582589365902255c6e6bc658d6e0c75`, Diphtheria, 2026-10-31T00:03:37Z: 10 passed, 0 skipped, both remote readings report `remaining=0`. Full package job `b01f1bec-8498-4428-9b49-5caf9be7ab5a` at the same commit passed 2,561 tests with 100% coverage on Loki. Linux job `7f4fb878-467f-4220-b5aa-0c580a483663` at API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207` passed 95 cases on Lavender. Earlier hub job `a92ec475-ad65-4313-867e-18c1cef68f25` at that earlier commit failed with 9 passed and 1 failed; it is not a passing suite receipt.
 
