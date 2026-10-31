@@ -22,7 +22,7 @@ source_git_blobs:
   "src/hpc3/core/array_submit.py": "205fb40432570438368f18ff26bcf9cbd8bee13a"
   "tests/test_checkout.py": "0e0aecf8997ffab178f84741756ef91c48c42495"
   "tests/test_campaign_shared_ledger.py": "407c07d19e5eb59172780c39c71f72757802b590"
-  "README.md": "ac67efe201119ac5992ff0f63881cbe5ac01d528"
+  "README.md": "6330ede027cf4fee339c856be571925ac5b15300"
 provenance:
   - "board task 747c391e (MCPs board): ledger line counts per checkout and the duplicate array 57783755_[0-12], measured 2026-10-05T10:35Z"
 fact_checked: 2026-10-16
