@@ -25,7 +25,7 @@ from collections.abc import Sequence
 
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
-from platform_core.json_utils import dump_json_str, load_json_str
+from platform_core.json_utils import JSONObject, dump_json_str, load_json_str
 from platform_core.load_report import post_load_report, report_identity
 from platform_core.stage_manifest import decode_stage_manifest, encode_stage_manifest
 from platform_core.stage_provenance import format_provenance
@@ -34,9 +34,21 @@ from hpc3.cli import _config, _test_hooks
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import digest, remote
 from hpc3.core.expected import check_expected, read_expected_digests
-from hpc3.core.stage import certification_path, certification_text, stage_manifest
+from hpc3.core.stage import (
+    certification_path,
+    certification_text,
+    inspect_staged_tree,
+    stage_manifest,
+)
 
-_FLAGS = (_config.CONFIG_FLAG, "--manifest", "--source-dir", "--expect-from", "--report-task")
+_FLAGS = (
+    _config.CONFIG_FLAG,
+    "--manifest",
+    "--source-dir",
+    "--expect-from",
+    "--report-task",
+    "--inspect-root",
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -67,12 +79,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     task = parsed.get("--report-task")
     if task is not None:
         report_identity(task, "hpc")
+    inspect_root = parsed.get("--inspect-root")
+    if inspect_root is not None and (task is None or "--source-dir" in parsed):
+        raise ValueError("STAGE_INSPECTION: require report-task and omit source-dir for readback")
     # The connection only: staging bytes needs the host and takes nothing
     # from the project registry, so it must not fail on a registry entry
     # that is mid-onboarding.
     host = _config.load_workspace_connection(parsed)["host"]
     manifest_path = pathlib.Path(cli_args.require_flag(parsed, "--manifest"))
-    source_dir = pathlib.Path(cli_args.require_flag(parsed, "--source-dir"))
     expect_path = pathlib.Path(cli_args.require_flag(parsed, "--expect-from"))
     expected_bytes = core_hooks.read_bytes(expect_path)
 
@@ -85,10 +99,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     _test_hooks.emit(f"digests vouched for by {expect_path}")
     _test_hooks.emit(f"provenance {format_provenance(manifest['provenance'])}")
 
-    placed = stage_manifest(host, source_dir, manifest, record_name=manifest_path.stem)
-    for remote_path in placed:
-        _test_hooks.emit(f"staged {remote_path}")
-    _test_hooks.emit(f"verified {len(placed)} file(s) on {host}:{manifest['destination']}")
+    inventory: JSONObject | None = None
+    if inspect_root is None:
+        source_dir = pathlib.Path(cli_args.require_flag(parsed, "--source-dir"))
+        placed = stage_manifest(host, source_dir, manifest, record_name=manifest_path.stem)
+        for remote_path in placed:
+            _test_hooks.emit(f"staged {remote_path}")
+    else:
+        inventory = inspect_staged_tree(
+            host, inspect_root, manifest, record_name=manifest_path.stem
+        )
+    _test_hooks.emit(
+        f"verified {len(manifest['files'])} file(s) on {host}:{manifest['destination']}"
+    )
     # Reported separately from the verified count, and after it, because this
     # is what admits the staged bytes to a training run: a corpus whose digest
     # no such record names is refused by
@@ -103,22 +126,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             raise ValueError(
                 "STAGE_EXPECTED_CHANGED: independent digest record changed during staging"
             )
-        payload = dump_json_str(
-            {
-                "kind": "HPC3_STAGE_EVIDENCE",
-                "host": host,
-                "manifest": encode_stage_manifest(manifest),
-                "manifest_sha256": digest.sha256_hex(raw.encode("utf-8")),
-                "expected_sha256": digest.sha256_hex(expected_bytes),
-                "verified_files": len(placed),
-                "certification_path": certificate,
-                "certification_sha256": certificate_digest,
-                "controller_python": sys.executable,
-                "controller_python_sha256": digest.sha256_hex(
-                    core_hooks.read_bytes(pathlib.Path(sys.executable))
-                ),
-            }
-        )
+        report: JSONObject = {
+            "kind": "HPC3_STAGE_EVIDENCE",
+            "host": host,
+            "manifest": encode_stage_manifest(manifest),
+            "manifest_sha256": digest.sha256_hex(raw.encode("utf-8")),
+            "expected_sha256": digest.sha256_hex(expected_bytes),
+            "verified_files": len(manifest["files"]),
+            "certification_path": certificate,
+            "certification_sha256": certificate_digest,
+            "controller_python": sys.executable,
+            "controller_python_sha256": digest.sha256_hex(
+                core_hooks.read_bytes(pathlib.Path(sys.executable))
+            ),
+        }
+        if inventory is not None:
+            report["kind"] = "HPC3_STAGE_INSPECTION"
+            report["inventory"] = inventory
+        payload = dump_json_str(report)
         post_load_report(
             post=_test_hooks.http_post,
             read_text=_config.stack_file_text,
