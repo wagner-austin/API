@@ -1,0 +1,179 @@
+{
+  "kind": "wrds-baseline-preregistration",
+  "version": 1,
+  "board_task": "dcbb1d84-ddd6-4eed-9ff2-492b8f82329e",
+  "status": "frozen choices; selection enforcement and licensed execution pending",
+  "frozen_before_licensed_validation_opened": true,
+  "design": {
+    "path": "libs/covenant_ml/docs/crsp-monthly-v1.json",
+    "sha256": "6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b"
+  },
+  "evaluation": {
+    "stopping_months": 12,
+    "fold_months": 12,
+    "confidence": 0.95,
+    "evaluation_digest": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a"
+  },
+  "runtime": {
+    "source_commit": "3b20b14e96ddb7c48ffd38f342f4883c9e16e511",
+    "controller": "/home/corvis/research-control/wrds-evidence-3b20b14e9/bin/python",
+    "image_sha256": "67831aa9e885d91788770839643b092be7d0297eb6a3dd699bd62d4261da9818",
+    "entrypoint_sha256": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+    "audit": "c25ad212-b932-450a-a6a1-d00175492ca5",
+    "audit_verdict": "VERIFIED",
+    "audit_completed_utc": "2026-10-31T22:29:11.794Z",
+    "scope": "Current verified runtime; any selection-control code change requires a fresh frozen controller and image before study execution."
+  },
+  "validation_bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+  "final_bundle_sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+  "seeds": [
+    11,
+    23,
+    37,
+    53,
+    71
+  ],
+  "initial_candidates": [
+    {
+      "candidate_digest": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "proposal_seed_11": {
+        "hypothesis": "Frozen baseline feature comparison before licensed validation results",
+        "parent": "root",
+        "protocol_digest": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a",
+        "partition": "validation",
+        "features": [
+          "momentum",
+          "liquidity"
+        ],
+        "seed": 11,
+        "seconds": 7200,
+        "config": {
+          "n_estimators": 200,
+          "max_depth": 6,
+          "learning_rate": 0.05,
+          "max_bins": 64,
+          "min_data_in_leaf": 20,
+          "num_leaves": 31,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "n_jobs": 1,
+          "repeats": 1,
+          "warmups": 0
+        }
+      }
+    },
+    {
+      "candidate_digest": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "proposal_seed_11": {
+        "hypothesis": "Frozen baseline feature comparison before licensed validation results",
+        "parent": "root",
+        "protocol_digest": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a",
+        "partition": "validation",
+        "features": [
+          "momentum"
+        ],
+        "seed": 11,
+        "seconds": 7200,
+        "config": {
+          "n_estimators": 200,
+          "max_depth": 6,
+          "learning_rate": 0.05,
+          "max_bins": 64,
+          "min_data_in_leaf": 20,
+          "num_leaves": 31,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "n_jobs": 1,
+          "repeats": 1,
+          "warmups": 0
+        }
+      }
+    },
+    {
+      "candidate_digest": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "proposal_seed_11": {
+        "hypothesis": "Frozen baseline feature comparison before licensed validation results",
+        "parent": "root",
+        "protocol_digest": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a",
+        "partition": "validation",
+        "features": [
+          "liquidity"
+        ],
+        "seed": 11,
+        "seconds": 7200,
+        "config": {
+          "n_estimators": 200,
+          "max_depth": 6,
+          "learning_rate": 0.05,
+          "max_bins": 64,
+          "min_data_in_leaf": 20,
+          "num_leaves": 31,
+          "reg_alpha": 0.0,
+          "reg_lambda": 0.0,
+          "n_jobs": 1,
+          "repeats": 1,
+          "warmups": 0
+        }
+      }
+    }
+  ],
+  "candidate_definition": "Existing candidate_digest over exact BenchmarkConfig and sorted feature names; hypothesis wording, parent and seed do not create new candidates.",
+  "arms": {
+    "computed": [
+      "cleargbm",
+      "lightgbm",
+      "xgboost",
+      "momentum",
+      "equal_weight"
+    ],
+    "primary": "lightgbm",
+    "reference": "momentum",
+    "secondary": [
+      "cleargbm",
+      "xgboost",
+      "equal_weight"
+    ],
+    "rationale": "Fix the reference library as the selection arm before observing performance; other implementations remain paired secondary comparisons and never determine the winner."
+  },
+  "selection": {
+    "primary_cost_bps": 10,
+    "metric": "arithmetic mean monthly net-return difference from momentum",
+    "seed_aggregation": "For each candidate and each decision month, arithmetic mean of the five seed-specific lightgbm-minus-momentum differences; candidate score is the arithmetic mean across those months. Seeds in ascending numeric order, months chronological, math.fsum for each mean. Do not concatenate seeds as independent months.",
+    "required_evidence": "All five distinct seed attempts completed with verified RunRecords and payloads, identical complete decision/entry/exit calendars, policy/evaluation/data/code/image identities and finite values. Refuse duplicate seeds, missing arms/months, changed identities or unsettled attempts; never intersect calendars or discard failed seeds.",
+    "ranking": "Descending unrounded finite candidate score, then ascending config.num_leaves, then ascending hexadecimal candidate_digest. Exact float equality is a tie; no tolerance or displayed rounding.",
+    "failure_treatment": "A failed or incomplete candidate is ineligible; record every failure and consumed reservation. Do not select until all admitted attempts settle and all three initial candidates have complete five-seed evidence. A required initial-candidate failure stops this study pending a separately recorded repair and a new preregistration; no silent retry or replacement seed.",
+    "negative_scores": "The highest eligible score still determines the candidate even when all scores are negative; report the sign and do not claim improvement.",
+    "final_attempt_seed": 11,
+    "final_rule": "Select the completed seed-11 attempt of the winning candidate, never the best-performing seed. Existing one-shot final release evaluates all fixed arms; the primary final comparison remains lightgbm versus momentum at 10 bps. Final output is single-seed, not a five-seed ensemble."
+  },
+  "uncertainty": {
+    "selection_uses_interval": false,
+    "validation_summary": "For each arm, average paired monthly differences across the same five seeds, then use the existing paired moving-block implementation on chronological months. Report each seed separately as diagnostics; seeds are not additional temporal observations.",
+    "block_months": 12,
+    "resamples": 10000,
+    "bootstrap_seed": 7,
+    "confidence": 0.95,
+    "interpretation": "Validation intervals after adaptive search are descriptive, not multiplicity-adjusted confirmatory evidence. Final inference uses the already frozen final-period study and its single released seed."
+  },
+  "limits": {
+    "max_candidates": 20,
+    "initial_candidates": 3,
+    "initial_attempts": 15,
+    "max_total_candidate_seed_attempts": 100,
+    "per_attempt_seconds": 7200,
+    "max_trees": 200,
+    "max_leaves": 31,
+    "cpus": 4,
+    "memory_gib": 128,
+    "partition": "free",
+    "concurrent_licensed_jobs": 1,
+    "resource_status": "Planned ceilings, not a successful scheduler preflight or measured memory requirement. Existing workspace/resource controller must validate them before submission."
+  },
+  "agent_phase": "After all initial baseline seeds complete and operational evidence verifies, agents may propose at most 17 additional distinct candidates through existing admission and shared queue, under the same five seeds and limits. Complete this bounded search before selection and final release. No new proposals after sealing.",
+  "enforcement_gap": "Existing journal seals identity and consumes final release, but does not rank all candidate/seed results. Extend the existing evaluator-owned select transition to enforce this plan; no separate queue, journal, result shape, or alternate selection path.",
+  "execution_status": {
+    "licensed_validation_run": false,
+    "final_opened": false,
+    "scores_observed": false
+  }
+}
