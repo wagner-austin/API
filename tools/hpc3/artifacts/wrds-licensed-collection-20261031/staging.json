@@ -1,0 +1,292 @@
+{
+  "kind": "wrds-licensed-staging-v1",
+  "board_task": "a622165c-bb63-4714-933b-10d527f21478",
+  "synthetic": false,
+  "source_commit": "9c79fc713c4d30e8e89390c3990b735435458475",
+  "extraction_evidence": "provenance.json",
+  "collection_audit": "9fe59092-6963-45ee-bd83-401a39d156fe",
+  "verifier_audit": "a90c5a79-aecb-4c6e-97c8-e02a2837cc18",
+  "controller_report_id": "8b30c072-3c92-4b0e-9c22-8c0a79d2f7b7",
+  "staging_report_id": "bc09355e-578c-492b-a8b7-a7a1765b958e",
+  "controller_inspection": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "9c79fc713c4d30e8e89390c3990b735435458475",
+    "controller_python": "/home/corvis/research-control/wrds-staging-9c79fc713/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-staging-9c79fc713/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "4430d5316cc33efd0fe3f3063c804565f78fe00a8224ebc2df069295080aba11",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      },
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "8c46c3f2d149e88847bb4f474f47fac788d93d0f4b2625c9c1af4e6b30c22c75",
+        "installed_files": 351
+      }
+    },
+    "installed_files": 581,
+    "selfcheck_sha256": "e58af8c1976e3f966cfd3a9ae1a575814f9e14973d86aeb2ed56669be332006e",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "cdda5028b2405680ced34f0ccbe8dcb55d3f9d6efe157a4e0e0c79fb57be6c78"
+  },
+  "invocation": {
+    "started_at": "2026-10-31T20:49:39.753295+00:00",
+    "argv": [
+      "/home/corvis/research-control/wrds-staging-9c79fc713/bin/python",
+      "-u",
+      "-m",
+      "hpc3.cli.stage",
+      "--config",
+      "/home/corvis/research-data/wrds/experiments/final-synthetic-85f1d4d75-v2/hpc3-home.json",
+      "--manifest",
+      "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/train-validation-stage.json",
+      "--source-dir",
+      "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first/outputs/train-validation",
+      "--expect-from",
+      "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first/completion.json",
+      "--report-task",
+      "a622165c-bb63-4714-933b-10d527f21478"
+    ],
+    "completion_canonical_sha256": "66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83",
+    "completion_file_sha256": "6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58"
+  },
+  "completion": {
+    "started_at": "2026-10-31T20:49:39.753295+00:00",
+    "completed_at": "2026-10-31T20:58:58.448081+00:00",
+    "exit_code": 0,
+    "log_sha256": "43810ca26dedc9ac367c413a61cc8f75c911f6c318c10461239763d77365f793"
+  },
+  "staging_report": {
+    "kind": "HPC3_STAGE_EVIDENCE",
+    "host": "hpc3",
+    "manifest": {
+      "destination": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation",
+      "files": [
+        {
+          "name": "bundle.json",
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+          "size_bytes": 2959
+        },
+        {
+          "name": "calendar.csv.age",
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+          "size_bytes": 150323
+        },
+        {
+          "name": "calendar.sql.age",
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+          "size_bytes": 488
+        },
+        {
+          "name": "delists.csv.age",
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+          "size_bytes": 438816
+        },
+        {
+          "name": "delists.sql.age",
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+          "size_bytes": 843
+        },
+        {
+          "name": "manifest.json.age",
+          "sha256": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647",
+          "size_bytes": 1558
+        },
+        {
+          "name": "membership.csv.age",
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+          "size_bytes": 1323763
+        },
+        {
+          "name": "membership.sql.age",
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+          "size_bytes": 740
+        },
+        {
+          "name": "protocol.json.age",
+          "sha256": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851",
+          "size_bytes": 1579
+        },
+        {
+          "name": "returns.csv.age",
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+          "size_bytes": 1788046370
+        },
+        {
+          "name": "returns.sql.age",
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+          "size_bytes": 815
+        }
+      ],
+      "provenance": {
+        "encrypted_bundle": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+        "plaintext_manifest": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+        "partition": "train-validation"
+      }
+    },
+    "manifest_sha256": "e536d1a4358300ceed112870b5690d84f3a5738b8a1a91198dda8b2780cf4f9f",
+    "expected_sha256": "6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58",
+    "verified_files": 11,
+    "certification_path": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation/train-validation-stage-digests.txt",
+    "certification_sha256": "fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84",
+    "controller_python": "/home/corvis/research-control/wrds-staging-9c79fc713/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+  },
+  "remote_inventory": {
+    "checked_at": "2026-10-31T20:59:28.505303+00:00",
+    "host": "hpc3",
+    "root": "/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031",
+    "entries": [
+      {
+        "kind": "d",
+        "mode": "700",
+        "size_bytes": 3,
+        "path": ""
+      },
+      {
+        "kind": "d",
+        "mode": "700",
+        "size_bytes": 14,
+        "path": "train-validation"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 1579,
+        "path": "train-validation/protocol.json.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 1788046370,
+        "path": "train-validation/returns.csv.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 150323,
+        "path": "train-validation/calendar.csv.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 488,
+        "path": "train-validation/calendar.sql.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 815,
+        "path": "train-validation/returns.sql.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 438816,
+        "path": "train-validation/delists.csv.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 843,
+        "path": "train-validation/delists.sql.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 2959,
+        "path": "train-validation/bundle.json"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 1114,
+        "path": "train-validation/train-validation-stage-digests.txt"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 1558,
+        "path": "train-validation/manifest.json.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 1323763,
+        "path": "train-validation/membership.csv.age"
+      },
+      {
+        "kind": "f",
+        "mode": "644",
+        "size_bytes": 740,
+        "path": "train-validation/membership.sql.age"
+      }
+    ]
+  },
+  "licensed_ciphertext_inspection": {
+    "checked_at": "2026-10-31T20:42:22.456600+00:00",
+    "receipt_sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+    "ciphertext_files": 20,
+    "partitions": [
+      {
+        "partition": "train-validation",
+        "bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+        "ciphertext_files": 10,
+        "ciphertext_bytes": 1789965295,
+        "opened": false
+      },
+      {
+        "partition": "final",
+        "bundle_sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+        "ciphertext_files": 10,
+        "ciphertext_bytes": 2012377398,
+        "opened": false
+      }
+    ],
+    "scope": "ciphertext integrity only; no key acquired and no licensed rows decoded"
+  },
+  "audit_query": "WITH staged AS (SELECT created_at, substring(body FROM strpos(body, chr(10)) + 1)::jsonb AS data FROM agent_task_updates WHERE task_id = 'a622165c-bb63-4714-933b-10d527f21478' AND author = 'hpc-report-a622165c' AND body LIKE 'HPC3 STAGE LOAD-REPORT%') SELECT count(*) FROM staged WHERE data = '{\"kind\":\"HPC3_STAGE_EVIDENCE\",\"host\":\"hpc3\",\"manifest\":{\"destination\":\"/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation\",\"files\":[{\"name\":\"bundle.json\",\"sha256\":\"26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1\",\"size_bytes\":2959},{\"name\":\"calendar.csv.age\",\"sha256\":\"15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24\",\"size_bytes\":150323},{\"name\":\"calendar.sql.age\",\"sha256\":\"14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1\",\"size_bytes\":488},{\"name\":\"delists.csv.age\",\"sha256\":\"36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2\",\"size_bytes\":438816},{\"name\":\"delists.sql.age\",\"sha256\":\"91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395\",\"size_bytes\":843},{\"name\":\"manifest.json.age\",\"sha256\":\"b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647\",\"size_bytes\":1558},{\"name\":\"membership.csv.age\",\"sha256\":\"87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32\",\"size_bytes\":1323763},{\"name\":\"membership.sql.age\",\"sha256\":\"57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb\",\"size_bytes\":740},{\"name\":\"protocol.json.age\",\"sha256\":\"281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851\",\"size_bytes\":1579},{\"name\":\"returns.csv.age\",\"sha256\":\"760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66\",\"size_bytes\":1788046370},{\"name\":\"returns.sql.age\",\"sha256\":\"0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f\",\"size_bytes\":815}],\"provenance\":{\"encrypted_bundle\":\"26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1\",\"plaintext_manifest\":\"3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0\",\"partition\":\"train-validation\"}},\"manifest_sha256\":\"e536d1a4358300ceed112870b5690d84f3a5738b8a1a91198dda8b2780cf4f9f\",\"expected_sha256\":\"6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58\",\"verified_files\":11,\"certification_path\":\"/data/homezvol1/wagnera3/research-data/crsp-licensed-calendar-20261031/train-validation/train-validation-stage-digests.txt\",\"certification_sha256\":\"fdb86171af88d95c7cc8380bc24bfb955c76b011c32871daf9ff575506fb0a84\",\"controller_python\":\"/home/corvis/research-control/wrds-staging-9c79fc713/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\"}'::jsonb AND created_at >= '2026-10-31T20:49:39.753295Z'::timestamptz AND EXISTS (SELECT 1 FROM agent_task_updates AS installed WHERE installed.task_id = 'a622165c-bb63-4714-933b-10d527f21478' AND installed.author = 'hpc-report-a622165c' AND installed.created_at < '2026-10-31T20:49:39.753295Z'::timestamptz AND installed.body LIKE 'HPC3 CONTROLLER LOAD-REPORT%' AND installed.body LIKE '%\"controller_python\":\"/home/corvis/research-control/wrds-staging-9c79fc713/bin/python\"%' AND installed.body LIKE '%\"hpc3-0.1.0-py3-none-any.whl\":{\"sha256\":\"4430d5316cc33efd0fe3f3063c804565f78fe00a8224ebc2df069295080aba11\",\"installed_files\":134}%' AND installed.body LIKE '%\"installed_files\":581%' AND installed.body LIKE '%\"dependency_check\":\"No broken requirements found.\"%')",
+  "audit_probes": {
+    "checked_at": "2026-10-31T20:59:09.273863+00:00",
+    "before_completion": 0,
+    "results": {
+      "positive": "1",
+      "changed_bundle": "0",
+      "changed_count": "0",
+      "changed_partition": "0",
+      "changed_certificate": "0",
+      "changed_completion": "0",
+      "changed_controller": "0",
+      "changed_wheel": "0"
+    }
+  },
+  "private_evidence_sha256": {
+    "staging-invocation.json": "e5a99a246e7b4d1d847262a47460a8b0b09e8046b2615523228162fcf01c451e",
+    "staging-exit.json": "c4862671a73639ada3b40505da0fcb6b098703f0638812346789485d58795b8a",
+    "staging-report.json": "0e36f74b8992a53b43779ea55612afa648b5d95b4df63ebd69c0bfc63b3ca3f5",
+    "staging-inventory.json": "cc3151a15544d9895c70d1192d4478c7f839687e66a833d722de3cc13b1fd0c4",
+    "staging-audit-query.sql": "73f56abee6e3c0c6f5ac55272a34d37d4246172bdb2610994de6207e551f513b",
+    "staging-audit-probes.json": "fa612ede11b8f0ade64585f077ad6f1fa11233f4dd34281b2201a095aba0d685",
+    "staging.log": "43810ca26dedc9ac367c413a61cc8f75c911f6c318c10461239763d77365f793",
+    "train-validation-stage.json": "e536d1a4358300ceed112870b5690d84f3a5738b8a1a91198dda8b2780cf4f9f",
+    "controller-provenance.json": "cdda5028b2405680ced34f0ccbe8dcb55d3f9d6efe157a4e0e0c79fb57be6c78",
+    "controller-inspection.json": "8598d09db0a060b5f4d1c95c62c631c30753c6add989960868bf37a8e6156eef",
+    "licensed-ciphertext-inspection.json": "6f4d2ff9d24926ad9d00c6f0e160bdd5ea743b57aacf91a49026fc33c4cc5689"
+  },
+  "scope": {
+    "training_ciphertext_bytes": 1789965295,
+    "staged_files": 11,
+    "staged_bytes_including_metadata": 1789968254,
+    "licensed_partitions_opened": false,
+    "final_bundle_transferred_to_hpc3": false,
+    "keys_transferred_to_hpc3": false,
+    "substantive_baseline_run": false,
+    "controlled_final_evaluation_run": false,
+    "hpc3_compute_image": "calendar-5e61e1450 remains installed; verifier correction is installed in the controller only"
+  }
+}
