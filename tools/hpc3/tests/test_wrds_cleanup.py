@@ -6,6 +6,7 @@ import hashlib
 import pathlib
 
 import pytest
+from platform_core.errors import AppError
 from platform_core.json_utils import (
     JSONObject,
     JSONValue,
@@ -17,7 +18,7 @@ from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import wrds
 from hpc3.contracts.wrds_run import WrdsRun, encode_wrds_run, execution_document
-from hpc3.core import wrds_cleanup
+from hpc3.core import wrds_cleanup, wrds_grid
 from hpc3.core.wrds_bundle import worker_bundle
 from hpc3.core.wrds_jobs import attempt_directory
 from tests.conftest import FakeRun
@@ -86,9 +87,18 @@ def test_cli_posts_measured_evidence(
     output = tmp_path / "evidence.json"
     board = accepting_board(2)
     assert (
+        wrds.main(["scratch", "--spec", str(spec), "--attempt", "one", "--output", str(output)])
+        == 0
+    )
+    assert load_json_str(emitted[-1]) == {"observer_job_id": "456", "output": str(output)}
+    assert not output.exists()
+    assert not any("qacct -j 456" in command for command in fake_run.commands())
+    with pytest.raises(FileExistsError):
+        wrds_cleanup.submit(run, "one", output)
+    assert (
         wrds.main(
             [
-                "scratch",
+                "scratch-report",
                 "--spec",
                 str(spec),
                 "--attempt",
@@ -140,7 +150,7 @@ def test_opened_receipt_must_match_native_private_storage(
     before[key] = value
     prepare(fake_run, run, before, observed())
     with pytest.raises(ValueError, match="WRDS_SCRATCH_RECEIPT"):
-        wrds_cleanup.measure(run, "one", tmp_path / "evidence.json")
+        wrds_cleanup.submit(run, "one", tmp_path / "evidence.json")
     assert not any("qsub" in command for command in fake_run.commands())
 
 
@@ -164,6 +174,7 @@ def test_wrong_or_malformed_observer_is_not_published(
     after = observed()
     after[key] = value
     prepare(fake_run, run, opened(), after)
+    wrds_cleanup.submit(run, "one", tmp_path / "evidence.json")
     with pytest.raises(ValueError, match="WRDS_SCRATCH_OBSERVER"):
         wrds_cleanup.measure(run, "one", tmp_path / "evidence.json")
     assert not (tmp_path / "evidence.json").exists()
@@ -176,7 +187,7 @@ def test_successful_subject_is_not_a_forced_termination(
     fake_run.add("qacct -j 123", stdout=DONE)
     prepare(fake_run, run, opened(), observed())
     with pytest.raises(ValueError, match="WRDS_SCRATCH_STATE"):
-        wrds_cleanup.measure(run, "one", tmp_path / "evidence.json")
+        wrds_cleanup.submit(run, "one", tmp_path / "evidence.json")
 
 
 def test_observer_accounting_must_match_node_and_success(
@@ -187,5 +198,102 @@ def test_observer_accounting_must_match_node_and_success(
         "qacct -j 456", stdout=DONE.replace("jobnumber 123", "jobnumber 456").replace(HOST, "other")
     )
     prepare(fake_run, run, opened(), observed())
+    wrds_cleanup.submit(run, "one", tmp_path / "evidence.json")
     with pytest.raises(ValueError, match="WRDS_SCRATCH_OBSERVER"):
         wrds_cleanup.measure(run, "one", tmp_path / "evidence.json")
+
+
+def test_delayed_accounting_reconciles_the_same_job_without_resubmitting(
+    tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+) -> None:
+    run = example(tmp_path)
+    fake_run.add("qacct -j 456", returncode=1, stderr="error: job id 456 not found", once=True)
+    prepare(fake_run, run, opened(), observed())
+    output = tmp_path / "evidence.json"
+    assert wrds_cleanup.submit(run, "one", output) == "456"
+    receipt = wrds_grid.receipt_path(output).read_bytes()
+    board = accepting_board(2)
+    spec = tmp_path / "experiment.json"
+    spec.write_text(dump_json_str(encode_wrds_run(run)))
+    flags = [
+        "scratch-report",
+        "--spec",
+        str(spec),
+        "--attempt",
+        "one",
+        "--output",
+        str(output),
+        "--report-task",
+        TASK,
+    ]
+    assert wrds.main(flags) == 0
+    assert load_json_str(emitted[-1]) == {"state": "accounting-pending", "output": str(output)}
+    assert not output.exists()
+    assert board.bodies == []
+    assert wrds.main(flags) == 0
+    assert wrds_grid.receipt_path(output).read_bytes() == receipt
+    assert len([command for command in fake_run.commands() if "qsub" in command]) == 1
+    assert len(board.bodies) == 2
+    assert narrow_json_to_dict(load_json_str(output.read_text()))["observation"] == observed()
+
+
+@pytest.mark.parametrize(
+    "key,value",
+    [
+        ("identity", "b" * 64),
+        ("attempt", "other"),
+        ("subject_job_id", "999"),
+        ("opened_sha256", "c" * 64),
+        ("extra", "field"),
+    ],
+)
+def test_submission_receipt_cannot_be_reused_for_another_subject(
+    tmp_path: pathlib.Path, fake_run: FakeRun, key: str, value: str
+) -> None:
+    run = example(tmp_path)
+    prepare(fake_run, run, opened(), observed())
+    output = tmp_path / "evidence.json"
+    wrds_cleanup.submit(run, "one", output)
+    path = wrds_grid.receipt_path(output)
+    receipt = narrow_json_to_dict(load_json_str(path.read_text()))
+    receipt[key] = value
+    path.write_text(dump_json_str(receipt))
+    with pytest.raises(ValueError, match="WRDS_SCRATCH_SUBMISSION"):
+        wrds_cleanup.measure(run, "one", output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("failed", [False, True])
+def test_accounting_errors_and_observer_failures_never_publish(
+    tmp_path: pathlib.Path, fake_run: FakeRun, failed: bool
+) -> None:
+    run = example(tmp_path)
+    if failed:
+        fake_run.add(
+            "qacct -j 456",
+            stdout=DONE.replace("jobnumber 123", "jobnumber 456").replace(
+                "exit_status 0", "exit_status 137"
+            ),
+        )
+    else:
+        fake_run.add("qacct -j 456", returncode=1, stderr="accounting database unavailable")
+    prepare(fake_run, run, opened(), observed())
+    output = tmp_path / "evidence.json"
+    wrds_cleanup.submit(run, "one", output)
+    with pytest.raises(ValueError, match="WRDS_SCRATCH_OBSERVER|WRDS_ACCOUNTING"):
+        wrds_cleanup.measure(run, "one", output)
+    assert not output.exists()
+
+
+def test_changed_observer_program_is_refused(tmp_path: pathlib.Path, fake_run: FakeRun) -> None:
+    run = example(tmp_path)
+    prepare(fake_run, run, opened(), observed())
+    output = tmp_path / "evidence.json"
+    wrds_cleanup.submit(run, "one", output)
+    path = wrds_grid.receipt_path(output)
+    receipt = narrow_json_to_dict(load_json_str(path.read_text()))
+    receipt["worker_sha256"] = "b" * 64
+    path.write_text(dump_json_str(receipt))
+    with pytest.raises(AppError, match="DIGEST_MISMATCH"):
+        wrds_cleanup.measure(run, "one", output)
+    assert not output.exists()
