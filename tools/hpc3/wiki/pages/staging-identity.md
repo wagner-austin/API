@@ -9,11 +9,13 @@ source_paths:
   - "src/hpc3/core/reproducible.py"
   - "src/hpc3/cli/stage.py"
   - "tests/test_stage_report.py"
+  - "tests/test_stage_inspection.py"
 source_git_blobs:
+  "tests/test_stage_inspection.py": "bd217a85b36ad1d52079c8b92f2e597df93cae17"
   "src/hpc3/core/expected.py": "7355b6fee112fcba63cc346eef386fead380ea03"
-  "src/hpc3/core/stage.py": "88d735b5d967dda49c3c623cbf8187ede2d2ead3"
+  "src/hpc3/core/stage.py": "450870282e6df188076183fb5b65a24b795bc3f7"
   "src/hpc3/core/reproducible.py": "8258650f38c32515c80274d6acfe9917b88646b6"
-  "src/hpc3/cli/stage.py": "01557e1aa9cc012257a43781a64b2fe3cff6b815"
+  "src/hpc3/cli/stage.py": "f3069bd64c8ab8fe8d4468cd98e7c30d4d1cbfbc"
   "tests/test_stage_report.py": "cc94e608baba49d799471014273df0040b258c6e"
 provenance:
   - "platform_core.stage_manifest (libs/platform_core, outside this workspaceRoot)"
@@ -56,6 +58,17 @@ board write fails the command; none produces a success receipt. This uses the
 same transport and staging functions as an invocation without reporting.[^report]
 
 [^report]: `src/hpc3/cli/stage.py`, `main`; `tests/test_stage_report.py`, `test_report_names_verified_bytes_and_controller`, `test_failed_transport_or_changed_evidence_never_posts` and `test_board_failure_propagates_after_verified_transport`. API `9c79fc713c4d30e8e89390c3990b735435458475`, fleet `8fd49050-ae8c-4e55-8029-20ea5d718a02`: 2,131 tests, 100% statement and branch coverage. Board task `a622165c-bb63-4714-933b-10d527f21478`.
+
+The same command accepts `--inspect-root ROOT` for complete readback without
+transferring files. It requires `--report-task` and refuses `--source-dir`.
+The named root must contain exactly the manifest files, their certificate and
+the intervening mode-0700 directories. It refuses links, extra or missing
+entries, wrong sizes and changed digests, then rereads the inventory before
+publishing `HPC3_STAGE_INSPECTION`. The report lists every file with its size
+and checksum; it is an observation at inspection time, not a claim that the
+directory cannot subsequently change.[^inventory]
+
+[^inventory]: `src/hpc3/core/stage.py`, `inspect_staged_tree` and `_tree`; `src/hpc3/cli/stage.py`, `main`; `tests/test_stage_inspection.py`, real shell traversal and hashing, corruption and unexpected-file refusal, traversal failure and read-only CLI reporting.
 
 **`--expect-from` cannot see one thing, and since 2026-09-09 staging refuses
 it separately** (re-read 2026-10-08). A manifest records the digest of the
