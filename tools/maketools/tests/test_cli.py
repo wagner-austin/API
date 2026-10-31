@@ -12,6 +12,7 @@ from platform_core.errors import AppError
 from maketools.cli import COMMANDS, dispatch, main, repository_root, require_integer
 from maketools.guard_run import GUARD_ARGV
 from maketools.makefile_grammar import SHELL_INCLUDE
+from maketools.test_run import POETRY_EXECUTABLE_ARGV
 from maketools.venv_check import PROBE_ARGV
 from maketools.venvs import EMBED_PROBE
 from tests.conftest import World, ok, row
@@ -83,6 +84,15 @@ def test_test_forwards_pytest_arguments_and_honours_no_sweep(world: World, cwd: 
     assert not any(line.startswith("reap: sweep") for line in world.lines)
     assert dispatch(["test"]) == 0
     assert any(line.startswith("reap: sweep") for line in world.lines)
+
+
+def test_test_own_home_runs_the_suite_under_the_runs_home(world: World, cwd: Path) -> None:
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    assert dispatch(["test", "--own-home", "--no-sweep", "-k", "x"]) == 0
+    call = world.inheriting_calls[0]
+    assert call["argv"][0] == "/v/bin/python"
+    assert call["argv"][-2:] == ("-k", "x")
+    assert call["env"]["HOME"] == str((cwd / "runs").resolve() / ".home-deadbeef")
 
 
 def test_test_serial_and_venv_runner_flags(world: World, cwd: Path) -> None:
