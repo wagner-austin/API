@@ -64,25 +64,29 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py"
   - "libs/covenant_ml/tests/markets/test_crsp_writer.py"
+  - "libs/covenant_ml/scripts/crsp_extraction.py"
+  - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "c021684ab74ddd87c3a20d2dc8446e0a6bbb642b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "f95b38a9b9912570e1650642888fb4429a358a4b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "4a076cda036c8c500ae42bf5e562d4a14a374f8a"
   "libs/covenant_ml/tests/markets/test_crsp_writer.py": "d33b9a62ba2f7067115310a7e09ad2f30670542c"
+  "libs/covenant_ml/scripts/crsp_extraction.py": "bf19c177db704f0654daab7bb2e2aa4fcc28e488"
+  "libs/platform_core/src/platform_core/load_report.py": "b731fba8a13e7424070695845c66e9b2d8ea4361"
   "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
   "tools/hpc3/src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
   "tools/hpc3/src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
   "tools/hpc3/tests/test_wrds_cleanup.py": "c24870098fe9c6636bbcc9afdd619899bcc6c45e"
   "tools/hpc3/tests/test_wrds_scratch.py": "73ed2f3795051cb668d5900017a98e799cb88cfa"
   "tools/hpc3/src/hpc3/core/controller_evidence.py": "a1e9ef38fa11dfcf808c12649389264167062d93"
-  "tools/hpc3/src/hpc3/cli/controller_inspect.py": "9a4d5a9d26c5319dbc037afbbbd62ea137923a70"
+  "tools/hpc3/src/hpc3/cli/controller_inspect.py": "44ffcf8091bc019cfcaee742ecf5f8073f0f67f0"
   "tools/hpc3/tests/test_controller_evidence.py": "ffe8dac548ada4b5b954fda7f985cdc863c48dd7"
   "tools/hpc3/tests/test_controller_inspect.py": "4fbabd8f2cb7691caabc3369bc68a7d65752b274"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/inspection.json": "f27ad04239492a0e30637ccb454e9492f0b9e101"
   "tools/hpc3/src/hpc3/core/image_evidence.py": "43429e648bf91e3c274d9cc673c92f8cd94bac52"
-  "tools/hpc3/src/hpc3/cli/image_inspect.py": "b0d2b960253fe6ba493ccd1d4ec630ff79e01efa"
+  "tools/hpc3/src/hpc3/cli/image_inspect.py": "9cfd6f869a8985416247e31114c78313a3b4bcad"
   "tools/hpc3/tests/test_image_evidence.py": "7e2fe6c50bd089bbb66336f69efc513234430cd9"
   "tools/hpc3/tests/test_image_inspect.py": "f8f598c7b4429ad4567cb8f285d52b9c90723d7b"
   "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
@@ -385,7 +389,7 @@ ending August 31, 2020; plaintext was removed. An earlier temporary-table
 attempt refused and published nothing. The licensed extraction, its HPC3
 staging, candidate selection and final scoring remain unrun.[^crsp-writer]
 
-[^crsp-writer]: `tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json`, `native_run`, `receipt`, `evaluator_verify`, `preserved_failure` and `limits`; `libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py`, `extract_crsp`; `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_scopes`, `crsp_relation_sql` and `synthetic_source`; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_crsp_writer.py`, sealed bundles reopened with real keys and every refusal. Queue job `d80d9e7d-ad94-4f13-bee2-a06262eae2c8` closed passed with a program-authored load report on task `1f60a20d-d860-43b3-9616-68f192bcedd9`; refused attempt queue `ea07c31c-5156-454b-ab80-6ddd4536fd34`, WRDS job 40552520. Fleet `9d99e209-9c08-4256-98f9-a483b6b4f0bb` passed covenant_ml at `d758dfc40607090650f441a0b34e9f7869c43ed4`: 4,948 tests, 100% statement and branch coverage.
+[^crsp-writer]: `tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json`, `native_run`, `receipt`, `evaluator_verify`, `preserved_failure` and `limits`; `libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py`, `extract_crsp`; `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_scopes`, `crsp_relation_sql` and `synthetic_source`; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_crsp_writer.py`, sealed bundles reopened with real keys and every refusal. Queue job `d80d9e7d-ad94-4f13-bee2-a06262eae2c8` closed passed with a program-authored load report on task `1f60a20d-d860-43b3-9616-68f192bcedd9`. The evaluator verification is also program-authored: `libs/covenant_ml/scripts/crsp_extraction.py`, `main`, posts its reading through `libs/platform_core/src/platform_core/load_report.py`, `post_load_report`, under the same `load-report-1f60a20d` identity, as board post `bfe70a86-ba4c-4cbc-a644-40bc53ea0a02` (API `32cf8e455`, over the collected outputs, both partitions opened). That post carries 20 ciphertext files and the same `extraction.json` and `bundle.json` SHA-256 digests the native load report recorded. Refused attempt queue `ea07c31c-5156-454b-ab80-6ddd4536fd34`, WRDS job 40552520. Fleet `9d99e209-9c08-4256-98f9-a483b6b4f0bb` passed covenant_ml at `d758dfc40607090650f441a0b34e9f7869c43ed4`: 4,948 tests, 100% statement and branch coverage.
 
 The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant][^wrds-delay]
 
