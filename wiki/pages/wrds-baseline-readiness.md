@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json"
   - "tools/hpc3/artifacts/wrds-study-runtime-20261031/provenance.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/evidence-corrections.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json"
@@ -72,6 +73,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json": "38c1d946ee0fa443d8913cb56100b91cd78bd9f8"
   "tools/hpc3/artifacts/wrds-study-runtime-20261031/provenance.json": "3c49827f19b30bd83a4c86fcb07a28687948a3af"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/evidence-corrections.json": "86bb76064249dfa52dc49b61f8c3c8fe0d4dab88"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json": "e65e100b5be0f5575f096653d0e4de61c6f9fcc4"
@@ -161,9 +163,11 @@ without opening either partition. Encrypted training/validation staging to HPC3
 completed at 20:58:58 UTC and passed independent audit at 21:58:49 UTC.
 Image build `58682261` now carries the corrected verifier and evaluator;
 native accounting, both selfchecks and all 14 frozen file identities passed
-inspection. Licensed evaluator decoding, candidate-selection rules and the
-substantive study remain ahead. Earlier runtime measurements below retain
-their historical scope.[^licensed-collection][^licensed-staging][^staging-review][^study-runtime]
+inspection, and independent runtime audit `c25ad212` passed all three criteria
+at 22:29:11 UTC. Candidate and seed rules are now frozen before any licensed
+validation results are opened; enforcing those rules at selection, licensed
+evaluator decoding and the substantive study remain ahead. Earlier runtime measurements below retain
+their historical scope.[^licensed-collection][^licensed-staging][^staging-review][^study-runtime][^baseline-freeze]
 
 Collection audit `a814e463` reopened the milestone at 19:30 UTC: the earlier
 closing receipt did not measure its executing controller, and its audit query
@@ -250,7 +254,8 @@ controller and platform-core wheels, then passed the new image's generated
 selfcheck and dependency check. Program reports `202da96b` and `9dde1016`
 record the controller and native image measurements. The three audit predicates
 returned one; ten altered identity, count, state, permission and selfcheck probes
-returned zero. This runtime milestone is submitted for independent review;
+returned zero. Independent audit `c25ad212-b932-450a-a6a1-d00175492ca5`
+verified all three criteria at `2026-10-31T22:29:11.794Z`;
 it does not execute or select a study candidate.[^study-runtime]
 
 The initial wheel-directory readback refused the runtime directory's default
@@ -546,10 +551,16 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    evaluator decoding of training/validation data next. The verifier corrections
    and licensed staging passed independent audit; the sealed final bundle and
    its key remain evaluator-owned.[^verifier-integrity][^staging-review][^study-runtime]
-4. Declare candidate/seed aggregation, the selection criterion and tie handling
-   before inspecting study results. Run the bounded baseline and validation
-   comparison first; seal the chosen candidate and use the one-shot final release
-   afterward. The selection API enforces identity, not which candidate is best.
+4. Enforce the frozen selection rules through the existing evaluator-owned
+   journal transition before running licensed validation. The initial three
+   candidates use both features, momentum alone and liquidity alone, each over
+   seeds 11, 23, 37, 53 and 71 with the shared 200-tree configuration. Rank the
+   five-seed mean monthly LightGBM-minus-momentum net return at 10 bps; break
+   exact ties by fewer leaves then candidate digest. ClearGBM, XGBoost and the
+   equal-weight universe remain secondary comparisons. Final evaluation uses
+   the winning candidate's fixed seed 11, never its best seed. The current
+   selection API enforces identity, not this ranking or complete seed coverage.
+   The licensed baseline has not run.[^baseline-freeze]
 
 [^licensed-collection]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json`, native extraction receipt, cleanup observation, runtime inspection and preserved interrupted collection. Board tasks `a622165c-bb63-4714-933b-10d527f21478` and `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; separate verifier task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`. Extraction receipt timestamps delimit database capture, not encryption or the whole allocation. Native report author `load-report-a622165c`; installed-controller report `fd164407-3505-4207-bc2d-d0e26fa69a1f`, author `hpc-report-da2a55dc`; image build `58662034`, SHA-256 `0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912`. None of these measurements is a substantive study result.
 
@@ -580,3 +591,5 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
 [^installed]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/src/fleet/core/research_control.py`, `read_pinned` and `invoke`; `tools/fleet/tests/test_research_proposal.py`, admitted and refused recording, no evaluator path in any daemon argument, drifted-input and isolation refusals; `tools/fleet/tests/test_research_proposal_host.py`, `test_installed_proposer_cannot_reach_evaluator_assets`. Host lane job fc8bc3c5-ad1b-479e-b44c-ddfcd40152ad passed tools/fleet-execution-linux at API 06636dbbebd56771e170b45a7f190309f396cde1 on Sedona at 2026-10-30T05:46:34Z: 79 cases ran, 0 skipped, 0 failed. Full check b01963a6-2105-49a3-a81a-8551982ca23d passed tools/fleet at the same commit on Sedona at 2026-10-30T05:43:08Z: 2,479 tests, 100.00% coverage. Commit 06636dbbe was staged on a pushed-tests ref and rebased unchanged onto main as part of 85e408c1c08cd3ff5faaf88416f4d62965ed64a3; there, host lane job 6833f095-6fe8-48c5-a464-548cf228597b passed on Colossus at 2026-10-30T05:58:34Z (79 cases, 0 failed, 0 skipped) and full check f7581b88 passed tools/fleet on Loki at 2026-10-30T05:55:25Z (2,495 tests, 100.00% coverage). The admission controller in the host case is a recording stand-in for `research_proposals propose`; the real controller's recording of proposals and refusals is the covenant_ml suite's. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
 
 [^integrated]: `libs/covenant_ml/src/covenant_ml/markets/research_keys.py`, `EvaluatorKeys.acquire` and `create_evaluator_keys`; `libs/covenant_ml/src/covenant_ml/evaluation/evidence.py`, `require_private_directory`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py`, `reconcile_attempt`; the trial/final implementations and `test_research_keys.py`, `test_research_execution.py`, and `test_research_final.py` cited in source_paths. API 2e3a5cfebea38db752aa4bfb281104337cb6baee passed fleet job f8020224-a82c-42d7-9b3e-cf2fc084689a on Loki: 4,836 tests, 100% coverage. The permission check in 44fa91cea1607660a45f29172d8564a465d40744 passed the full suite again at API 90b03d7c8b6bc5c1ca1620d6fb4c4b13d9148994, job cd0d062a-c5b0-4a7d-acb5-f860b6a546de on Lacrymal, ending 2026-10-30T12:15:55Z: 4,836 tests, 100% coverage, lint, typing and guards passed. These are Linux suite measurements, not a completed native encrypted-data rehearsal. GitHub run 41050434226 at the earlier e8c4358f revision failed its Windows 0700 assertion; the workflow now targets Linux without omitting security cases. GitHub Ubuntu run 41054078619 at 90b03d7c also passed all 4,836 tests at 100% coverage on 2026-10-30.
+
+[^baseline-freeze]: `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json`, frozen design reference, evaluation digest, decoded initial proposals, selection, uncertainty, limits, agent phase and explicit enforcement gap. Board task `dcbb1d84-ddd6-4eed-9ff2-492b8f82329e`. These are prospective choices, not measurements or deployed controls. The artifact is the single record of the exact choices; existing proposal/evaluation codecs produced its candidate and evaluation identities without opening licensed data. Planned allocation is four CPUs, 128 GiB and 7,200 seconds on free, one licensed job at a time, subject to the existing resource preflight.
