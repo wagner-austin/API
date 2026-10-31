@@ -189,6 +189,12 @@ measured, not automatically treated as a cleanup pass. The maintained storage
 probe requires explicit `--hold-seconds` (0 for ordinary exit, up to 300 for a
 bounded forced-termination measurement); no licensed rows are needed.
 
+The same commands also accept a successfully completed job after verifying its
+native completion attestation. That observation lists every `/tmp/JOB.1.*`
+entry on the original node, without needing a probe's `opened.json`. Both
+scopes report `matching_scratch_roots`; an empty list is an observed absence,
+while a remaining entry is recorded without calling cleanup successful.
+
 The backend currently supports individual Python CPU jobs, with conservative
 limits of eight slots, 48 GiB total and seven days. It pins interpreter bytes
 and installed package **versions**, not an immutable container or every
@@ -693,6 +699,7 @@ not arbitrary extra packages or scientific validity.
 | `hpc3-trace --config C {--match V \| --job ID}` | which run produced a result, or what a job was; exit 1 if nothing matches |
 | `hpc3-cancel --config C --job ID[,ID…]` | stops jobs and reports which were actually running — `scancel` is silent about one that had already finished |
 | `hpc3-stage --config C --manifest M --source-dir D --expect-from R [--report-task UUID]` | places files, verifies sha256 on both sides, and holds every digest against the published record; reporting also reads back the certificate and posts measured identities through the shared board reporter ([staging identity](wiki/pages/staging-identity.md)) |
+| `hpc3-stage --config C --manifest M --expect-from R --inspect-root ROOT --report-task UUID` | reads the complete private study tree without transferring files; requires exactly the manifest files and certificate, checks every checksum, and publishes the measured inventory |
 | `hpc3-chain --config C --chain H` | runs stages in order and stops at the first failure, so a broken stage does not feed the next |
 | `hpc3-bootstrap --config C --project P --env-path E --python V` | creates a project's FIRST environment and proves it owns its own interpreter. The step capture assumes has already happened ([the interpreter is not in `module avail python`](wiki/pages/interpreter-availability.md)) |
 | `hpc3-image-capture --out S …` | reads a live environment and writes the image spec. **Use this rather than writing a spec by hand** |
