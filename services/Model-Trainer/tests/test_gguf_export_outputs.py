@@ -109,16 +109,34 @@ class TestGgufExportConfigInvalid:
 class TestFindConvertScript:
     """Tests for _find_convert_script function."""
 
-    def test_find_script_returns_existing_path(self) -> None:
-        """Find script returns path when script exists in known location."""
+    def test_find_script_returns_first_existing_path(self, tmp_path: Path) -> None:
+        """Find script skips a missing location and returns the one that exists.
+
+        The script is written under tmp_path rather than read from a llama.cpp
+        checkout, so the case passes on a fleet node that has none.
+        """
         from model_trainer.core.services.export._test_hooks import _find_convert_script
 
-        # The script should exist at ~/PROJECTS/llama.cpp-src/convert_lora_to_gguf.py
-        result = _find_convert_script()
-        assert "convert_lora_to_gguf.py" in result
-        assert Path(result).exists()
+        script = tmp_path / "present" / "convert_lora_to_gguf.py"
+        script.parent.mkdir()
+        script.write_text("")
+
+        def fake_paths() -> tuple[Path, ...]:
+            return (tmp_path / "absent" / "convert_lora_to_gguf.py", script)
+
+        export_hooks.convert_script_paths = fake_paths
+
+        assert _find_convert_script() == str(script)
 
         export_hooks.reset_hooks()
+
+    def test_default_paths_are_the_known_install_locations(self) -> None:
+        """Production searches the llama.cpp checkouts the error message names."""
+        assert export_hooks.convert_script_paths() == (
+            Path.home() / "PROJECTS" / "llama.cpp-src" / "convert_lora_to_gguf.py",
+            Path.home() / "llama.cpp" / "convert_lora_to_gguf.py",
+            Path("/opt/llama.cpp/convert_lora_to_gguf.py"),
+        )
 
     def test_find_script_raises_when_not_found(self, tmp_path: Path) -> None:
         """Find script raises RuntimeError when script not in any location."""
@@ -144,8 +162,20 @@ class TestRealGgufConverter:
     """Tests for _real_gguf_converter function."""
 
     def test_real_converter_fails_on_invalid_adapter(self, tmp_path: Path) -> None:
-        """Real converter raises RuntimeError when adapter directory is invalid."""
+        """Real converter raises RuntimeError, carrying stderr, when the script exits non-zero."""
         from model_trainer.core.services.export._test_hooks import _real_gguf_converter
+
+        # A script that refuses the adapter as llama.cpp's does, written here so
+        # the case needs no llama.cpp checkout on the machine running it.
+        script = tmp_path / "refusing_convert.py"
+        script.write_text(
+            "import sys\nsys.stderr.write('adapter_config.json not found\\n')\nsys.exit(1)\n"
+        )
+
+        def fake_paths() -> tuple[Path, ...]:
+            return (script,)
+
+        export_hooks.convert_script_paths = fake_paths
 
         adapter_dir = str(tmp_path / "fake_adapter")
         output_path = str(tmp_path / "output.gguf")
@@ -157,7 +187,7 @@ class TestRealGgufConverter:
                 output_path=output_path,
                 output_type="f16",
             )
-        assert "GGUF conversion failed" in str(exc.value)
+        assert str(exc.value) == "GGUF conversion failed: adapter_config.json not found\n"
 
         export_hooks.reset_hooks()
 

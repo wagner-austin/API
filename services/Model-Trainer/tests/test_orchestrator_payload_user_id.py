@@ -7,7 +7,7 @@ from platform_workers.testing import FakeQueue, FakeRedis, FakeRedisBytesClient,
 
 from model_trainer.api.schemas.runs import TrainRequest
 from model_trainer.core import _test_hooks
-from model_trainer.core.config.settings import load_settings
+from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.services.queue.rq_adapter import RQEnqueuer, RQSettings
 from model_trainer.orchestrators.training_orchestrator import TrainingOrchestrator
@@ -23,8 +23,10 @@ def _get_payload_user_id(raw: JSONValue) -> int:
     return val
 
 
-def test_orchestrator_threads_user_id() -> None:
-    s = load_settings()
+def test_orchestrator_threads_user_id(settings_with_paths: Settings) -> None:
+    # Settings rooted under tmp_path: enqueueing writes under artifacts_root,
+    # and the default root is /data, which a fleet node's check cannot write.
+    s = settings_with_paths
     r = FakeRedis()
 
     # Set up fake RQ infrastructure via hooks
