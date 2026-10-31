@@ -378,3 +378,15 @@ passed with measured controller identity. The package check passed 2,578 tests;
 live query passed and seven altered-evidence probes returned zero. Readiness
 retains pending independent acceptance, HPC3 staging and verifier hardening.
 Board task da2a55dc; no new page or page-count change.
+
+## 2026-10-31 — Verify sealed partitions and evaluator byte limits
+
+Collection audit 9fe59092 verified both criteria at 20:37:43 UTC. The standalone
+verifier now checks both exact ciphertext inventories before decryption and
+enforces the evaluator-owned plaintext budget alongside the receipt. Real
+encrypted regressions reproduced 17 failures before the correction; the full
+corrected suite passed 4,988 tests at 100% statement and branch coverage. Installed
+controller readback verified 581 application files. A ciphertext-only check of
+the licensed collection verified all 20 files without acquiring keys or decoding
+rows. Readiness retains HPC3 staging, licensed decoding and the study as remaining
+work. Board task 9cbbc85f; no new page or page-count change.
