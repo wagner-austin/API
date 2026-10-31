@@ -28,7 +28,7 @@
           "-C",
           "scripts/fleet-prepare",
           "workspace-build",
-          "ROOTS=packages/wiki-check packages/wiki-search"
+          "ROOTS=packages/wiki-check:packages/wiki-search"
         ]
       },
       {

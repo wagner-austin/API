@@ -95,14 +95,14 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
             InstallStep(phase="install", argv=(*PREPARE, "install")),
             InstallStep(
                 phase="workspace-build",
-                argv=(*PREPARE, "workspace-build", "ROOTS=execution mcp-proxy"),
+                argv=(*PREPARE, "workspace-build", "ROOTS=execution:mcp-proxy"),
             ),
         )
     assert prepared["MCPs/packages/wiki-check"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
             phase="workspace-build",
-            argv=(*PREPARE, "workspace-build", "ROOTS=packages/wiki-check packages/wiki-search"),
+            argv=(*PREPARE, "workspace-build", "ROOTS=packages/wiki-check:packages/wiki-search"),
         ),
         InstallStep(phase="peer-wikis", argv=(*PREPARE, "peer-wikis")),
     )
