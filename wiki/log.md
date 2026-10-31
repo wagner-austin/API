@@ -390,3 +390,15 @@ controller readback verified 581 application files. A ciphertext-only check of
 the licensed collection verified all 20 files without acquiring keys or decoding
 rows. Readiness retains HPC3 staging, licensed decoding and the study as remaining
 work. Board task 9cbbc85f; no new page or page-count change.
+
+## 2026-10-31 — Stage the encrypted licensed training bundle to HPC3
+
+The existing staging command transferred 11 files, 1,789,968,254 bytes including
+metadata, and verified each local and remote checksum plus certificate readback.
+The program posted receipt bc09355e under its shared HPC reporting identity.
+The positive audit predicate now returns one and seven altered-evidence probes
+return zero. Final remote inventory contains only training/validation files and
+the certificate under private directories; no final bundle or keys were sent.
+Verifier audit a90c5a79 independently passed both criteria. Readiness records
+the remaining compute-image update, licensed decoding and unrun study. Board
+task a622165c; no new page or page-count change.
