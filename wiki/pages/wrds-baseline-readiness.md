@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json"
   - "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json"
@@ -69,6 +70,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json": "e65e100b5be0f5575f096653d0e4de61c6f9fcc4"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json": "cb08d7053e4363b23ce2740d54bb1823bc4801fb"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json": "f69fefdc21501823201906b30f64122f04c4a931"
   "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
@@ -151,9 +153,11 @@ have completed through the shared queue. All 24 declared outputs and the
 RunRecord were verified; the completed native allocation was reused after a
 collection timeout. The final bundle remains sealed. The verifier corrections
 passed the complete package suite; licensed ciphertext integrity also passed
-without opening either partition. HPC3 staging, licensed evaluator decoding,
-candidate-selection rules and the substantive study remain ahead. Earlier runtime
-measurements below retain their historical scope.[^licensed-collection]
+without opening either partition. Encrypted training/validation staging to HPC3
+completed at 20:58:58 UTC. Licensed evaluator decoding, a compute image carrying
+the verifier correction, candidate-selection rules and the substantive study
+remain ahead. Earlier runtime measurements below retain their historical
+scope.[^licensed-collection][^licensed-staging]
 
 Collection audit `a814e463` reopened the milestone at 19:30 UTC: the earlier
 closing receipt did not measure its executing controller, and its audit query
@@ -179,7 +183,24 @@ passed wheel-member readback for 581 files, the generated selfcheck and dependen
 checks. At 20:42:22 UTC it verified all 20 licensed ciphertext files against the
 pinned receipt, with no key acquisition or plaintext. This is ciphertext-integrity
 evidence, not licensed row decoding or a completed study; the HPC3 image still
-contains the older calendar runtime.[^verifier-integrity]
+contains the older calendar runtime. Independent audit `a90c5a79` verified both
+verifier criteria at 20:56:52 UTC after its own 4,988-test fleet run.[^verifier-integrity]
+
+The existing staging controller transferred 11 training/validation files
+(1,789,968,254 bytes, including bundle metadata) to the private HPC3 study
+directory. Every local and remote checksum matched, the independent completion
+record stayed unchanged, and the remote certificate checksum passed readback.
+Program report `bc09355e` binds those measurements to the installed
+`wrds-staging-9c79fc713` controller. The live evidence predicate returned zero
+before completion and one afterward; seven altered-evidence probes returned
+zero. The final remote inventory contains only training/validation files and
+their certificate under mode-0700 directories. No keys or final bundle were
+transferred. The final holdout remains sealed in existing WRDS/evaluator
+storage.[^licensed-staging]
+
+The substantive baseline and controlled final evaluation have not run.[^licensed-staging]
+
+[^licensed-staging]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json`, controller inspection, invocation, completion, program-authored staging receipt, final remote inventory, ciphertext inspection and audit probes. Native extraction `40554174` and measured adoption queue `132859b5` remain unchanged. Staging report `bc09355e-578c-492b-a8b7-a7a1765b958e` and installed-controller report `8b30c072-3c92-4b0e-9c22-8c0a79d2f7b7` were posted by `hpc-report-a622165c`. API `9c79fc713c4d30e8e89390c3990b735435458475` passed fleet `8fd49050-ae8c-4e55-8029-20ea5d718a02`: 2,131 tests, 100% statement and branch coverage. The transfer ran from 20:49:39 to 20:58:58 UTC on October 31. The independent completion file hash is `6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58`; its canonical decoded identity remains `66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83`. The command and reporting contract are documented in the HPC3 wiki's staging-identity page. Staging acceptance on board task `a622165c-bb63-4714-933b-10d527f21478` remains subject to independent review.
 
 [^verifier-integrity]: `libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py`, `verify_encrypted_bundle`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `_collected_files`, `_open` and `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_encrypted_storage.py`, real closed-bundle integrity cases. Board task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`; corrected fleet check `f97e7fee-4d0f-411b-a2fd-b344bc41650a` at source `af859c42b489eb913aaf726f991e7eb787bb112a`; production correction published as `e479dfc69da5903f2dcb00c6408dcb8e97b56b3f`. Private evidence directory `/home/corvis/research-data/wrds/runtime/verifier-af859c42b` retains `controller-provenance.json`, `controller-inspection.json` and `licensed-ciphertext-inspection.json`. The new covenant wheel SHA-256 is `8c46c3f2d149e88847bb4f474f47fac788d93d0f4b2625c9c1af4e6b30c22c75`; the other frozen first-party wheels are unchanged.
 
@@ -453,11 +474,13 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    [[wrds-research-queue-admission]]. The interrupted transfer is preserved.
    Recovery reused the same completed job and collected 24 outputs in 324
    seconds. The next poll verified every output and its RunRecord; queue
-   `872b9e09` closed passed at 19:18:48 UTC. HPC3 staging remains pending at
-   this reading.[^licensed-start][^licensed-collection]
-3. Complete licensed evaluator decoding with the corrected verifier (`9cbbc85f`)
-   and stage only the encrypted training/validation bundle to private HPC3 storage. The final
-   bundle and its key remain evaluator-owned.[^licensed-collection]
+   `872b9e09` closed passed at 19:18:48 UTC. Measured adoption `132859b5`
+   subsequently passed independent collection review. Encrypted HPC3 staging
+   completed at 20:58:58 UTC.[^licensed-start][^licensed-collection][^licensed-staging]
+3. Freeze the corrected verifier in the compute image and complete licensed
+   evaluator decoding of training/validation data. The verifier corrections
+   passed independent audit; the sealed final bundle and its key remain
+   evaluator-owned.[^verifier-integrity][^licensed-staging]
 4. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
    comparison first; seal the chosen candidate and use the one-shot final release
