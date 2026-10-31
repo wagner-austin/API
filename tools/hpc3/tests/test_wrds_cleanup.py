@@ -280,7 +280,7 @@ def test_accounting_errors_and_observer_failures_never_publish(
     prepare(fake_run, run, opened(), observed())
     output = tmp_path / "evidence.json"
     wrds_cleanup.submit(run, "one", output)
-    with pytest.raises(ValueError, match="WRDS_SCRATCH_OBSERVER|WRDS_ACCOUNTING"):
+    with pytest.raises(ValueError, match="WRDS_SCRATCH_OBSERVER" if failed else "WRDS_ACCOUNTING"):
         wrds_cleanup.measure(run, "one", output)
     assert not output.exists()
 
