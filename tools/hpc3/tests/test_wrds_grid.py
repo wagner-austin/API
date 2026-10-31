@@ -68,11 +68,19 @@ def test_upload_refuses_bytes_that_arrived_altered(fake_run: FakeRun) -> None:
 
 
 @pytest.mark.parametrize(("environment", "exported"), [(True, True), (False, False)])
+@pytest.mark.parametrize("execution_host", [None, "wrds-sas34-w.wharton.private"])
 def test_submit_waits_bounded_and_exports_only_when_asked(
-    fake_run: FakeRun, environment: bool, exported: bool
+    fake_run: FakeRun, environment: bool, exported: bool, execution_host: str | None
 ) -> None:
     fake_run.add("qsub", stdout="40529817\nJob 40529817 exited with exit code 0.\n")
-    job = wrds_grid.submit("wrds", REMOTE, "probe", ["psql", "-f", "x"], environment=environment)
+    job = wrds_grid.submit(
+        "wrds",
+        REMOTE,
+        "probe",
+        ["psql", "-f", "x"],
+        environment=environment,
+        execution_host=execution_host,
+    )
     assert job == "40529817"
     command = fake_run.commands()[0]
     assert command.startswith("qsub -terse -sync y ")
@@ -81,19 +89,31 @@ def test_submit_waits_bounded_and_exports_only_when_asked(
     assert "-o '/home/uci/test/run one/probe.out'" in command
     assert "-e '/home/uci/test/run one/probe.err'" in command
     assert command.endswith("psql -f x")
+    assert ("hostname=" in command) is (execution_host is not None)
+    if execution_host is not None:
+        assert "-l hostname=wrds-sas34-w.wharton.private" in command
+
+
+@pytest.mark.parametrize("hostname", ["", "*", "node,mem=2", "-node", "node\n", "node;true"])
+def test_placement_refuses_resource_expressions(fake_run: FakeRun, hostname: str) -> None:
+    with pytest.raises(ValueError, match="WRDS_EXECUTION_HOST"):
+        wrds_grid.submit(
+            "wrds", REMOTE, "probe", ["true"], environment=False, execution_host=hostname
+        )
+    assert fake_run.commands() == []
 
 
 @pytest.mark.parametrize("response", ["", "not a scheduler receipt"])
 def test_submit_refuses_an_unreadable_scheduler_receipt(fake_run: FakeRun, response: str) -> None:
     fake_run.add("qsub", stdout=response)
     with pytest.raises(ValueError, match="WRDS_JOB_ID"):
-        wrds_grid.submit("wrds", REMOTE, "probe", ["true"], environment=False)
+        wrds_grid.submit("wrds", REMOTE, "probe", ["true"], environment=False, execution_host=None)
 
 
 def test_submit_propagates_a_failed_job(fake_run: FakeRun) -> None:
     fake_run.add("qsub", returncode=1, stdout="7\n", stderr="Job 7 exited with exit code 3.")
     with pytest.raises(AppError, match="exit code 3"):
-        wrds_grid.submit("wrds", REMOTE, "probe", ["false"], environment=True)
+        wrds_grid.submit("wrds", REMOTE, "probe", ["false"], environment=True, execution_host=None)
 
 
 def test_download_returns_the_verified_text(fake_run: FakeRun) -> None:
