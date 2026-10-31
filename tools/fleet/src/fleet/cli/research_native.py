@@ -15,7 +15,14 @@ from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.contracts.research import ResearchBackend, decode_research_request
 from fleet.contracts.research_worker import decode_observation, encode_observation
-from fleet.core import _test_hooks, file_turn, research_control, research_hpc, research_wrds
+from fleet.core import (
+    _test_hooks,
+    file_turn,
+    research_control,
+    research_hpc,
+    research_wrds,
+    staging,
+)
 
 _FLAGS = ("--root", "--backend", "--digest", "--attempt", "--tenant", "--task", "--env-file")
 
@@ -62,6 +69,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             research_hpc.poll if request["backend"] is ResearchBackend.HPC3 else research_wrds.poll
         )
         result = poll(document, directory / "controller.jsonl", task, environment)
+        result["controller_python"] = sys.executable
+        result["controller_python_sha256"] = staging.digest(
+            _test_hooks.read_bytes(pathlib.Path(sys.executable))
+        )
         emit_line(dump_json_str(encode_observation(decode_observation(result))))
     return 0
 

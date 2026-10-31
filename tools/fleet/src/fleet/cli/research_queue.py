@@ -158,6 +158,8 @@ def reconcile(
                 ),
             )
         observation = decode_observation(load_json_str(outcome["output"]))
+        if observation["controller_python"] != worker["python"]:
+            raise ValueError("RESEARCH_QUEUE_CONTROLLER: executing Python differs from placement")
         detail = dump_json_str(encode_observation(observation))
         if observation["state"] is ResearchState.RUNNING:
             return queue.report_progress(
