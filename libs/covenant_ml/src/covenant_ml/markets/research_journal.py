@@ -25,6 +25,7 @@ from typing_extensions import ReadOnly, TypedDict
 
 from .campaign_records import require_digest
 from .research_limits import policy_refusal
+from .research_ranking import SeedResult, winning_attempt
 from .research_records import (
     ResearchPolicy,
     ResearchProposal,
@@ -257,7 +258,9 @@ def _transition(
         updated["record"] = _complete(policy, event, row)
         updated["status"] = "complete"
     elif action in {"select", "release_final"}:
-        updated["selection"], updated["final_manifest_digest"] = _selection(history, event, row)
+        updated["selection"], updated["final_manifest_digest"] = _selection(
+            policy, history, event, row
+        )
     elif action in {"failed", "timeout", "interrupted"} and row["status"] in {
         "admitted",
         "submitting",
@@ -292,11 +295,15 @@ def _event_row(history: tuple[ResearchAttempt, ...], event: JSONObject) -> Resea
 
 
 def _selection(
-    history: tuple[ResearchAttempt, ...], event: JSONObject, row: ResearchAttempt
+    policy: ResearchPolicy,
+    history: tuple[ResearchAttempt, ...],
+    event: JSONObject,
+    row: ResearchAttempt,
 ) -> tuple[str, str]:
     """Advance final selection while retaining the completed validation receipt.
 
     Args:
+        policy: Frozen selection settings and required seeds.
         history: Locked study attempts, including every active reservation.
         event: Evaluator-owned select or release_final event.
         row: Target validation attempt.
@@ -317,6 +324,17 @@ def _selection(
             for prior in history
         ):
             raise ValueError("[RESEARCH-008] selection requires settled, unsealed validation")
+        completed = tuple(
+            SeedResult(
+                prior["number"],
+                decode_research_proposal(narrow_json_to_dict(load_json_str(prior["request"]))),
+                decode_run_record(narrow_json_to_dict(load_json_str(prior["record"]))),
+            )
+            for prior in history
+            if prior["status"] == "complete"
+        )
+        if row["number"] != winning_attempt(policy, completed):
+            raise ValueError("RESEARCH_SELECTION_WINNER: require the winner's fixed final seed")
         return "selected", digest
     if row["selection"] != "selected" or digest != row["final_manifest_digest"]:
         raise ValueError("[RESEARCH-009] release requires the selected manifest, once")

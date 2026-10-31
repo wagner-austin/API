@@ -189,17 +189,21 @@ def test_a_partition_field_never_authorizes_final_scoring(tmp_path: Path) -> Non
     request["partition"] = "final"
     request["seed"] = 23
     refused = admit_proposal(path, trial["policy"], request, 5000)
-    assert (refused["number"], refused["status"]) == (2, "refused")
+    assert (refused["number"], refused["status"]) == (3, "refused")
     assert refused["reason"] == "holdout_forbidden"
     document = encode_research_trial(trial)
     document["proposal"] = request
-    document["number"] = 2
+    document["number"] = 3
     asked = decode_research_trial(document)
     with pytest.raises(ValueError, match="RESEARCH-008"):
         select_candidate(path, asked, manifest)
     with pytest.raises(ValueError, match="RESEARCH-009"):
         _final(path, asked, manifest, tmp_path / "out" / "r.json")
-    assert [row["selection"] for row in research_journal(trial["policy"]).read(path)] == ["", ""]
+    assert [row["selection"] for row in research_journal(trial["policy"]).read(path)] == [
+        "",
+        "",
+        "",
+    ]
     assert not (tmp_path / "out").exists()
 
 
@@ -207,13 +211,14 @@ def test_selection_requires_settled_completed_validation(tmp_path: Path) -> None
     path, trial, manifest = completed_study(tmp_path)
     request: JSONObject = encode_research_proposal(trial["proposal"])
     request["seed"] = 23
+    require_dict(request, "config")["n_estimators"] = 2
     admitted = admit_proposal(path, trial["policy"], request, 5000)
     assert admitted["status"] == "admitted"
     document = encode_research_trial(trial)
     document["proposal"] = request
-    document["number"] = 2
+    document["number"] = 3
     with pytest.raises(ValueError, match="RESEARCH-008"):
         select_candidate(path, decode_research_trial(document), manifest)
-    # Attempt 2 is still active, so even the completed attempt cannot be selected yet.
+    # Attempt 3 is still active, so even the completed attempt cannot be selected yet.
     with pytest.raises(ValueError, match="RESEARCH-008"):
         select_candidate(path, trial, manifest)

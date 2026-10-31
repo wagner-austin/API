@@ -7,7 +7,12 @@ from platform_core.run_record import Observation, encode_run_record, run_record
 from covenant_ml.benchmarking.factory import make_benchmark_config
 from covenant_ml.benchmarking.types_codec import encode_benchmark_config
 from covenant_ml.markets.provenance import market_fingerprint
-from covenant_ml.markets.research_records import ResearchPolicy
+from covenant_ml.markets.research_records import (
+    ResearchPolicy,
+    candidate_digest,
+    decode_research_proposal,
+)
+from covenant_ml.markets.research_selection_records import ResearchSelection
 from tests.benchmarking._cli_fixtures import stand_in_pin
 
 
@@ -23,6 +28,15 @@ def policy() -> ResearchPolicy:
         max_seconds=60,
         max_trees=200,
         max_leaves=31,
+        selection=ResearchSelection(
+            primary="lightgbm",
+            reference="momentum",
+            cost_bps=10,
+            first_month=24228,
+            last_month=24229,
+            final_seed=11,
+            required_candidates=(candidate_digest(decode_research_proposal(proposal())),),
+        ),
     )
 
 
@@ -46,7 +60,25 @@ def completion(number: int = 1) -> JSONObject:
         "a" * 64,
         str(number),
         fingerprint,
-        (Observation(name="candidate_minus_reference", value=-0.02),),
+        (
+            Observation(name="candidate_minus_reference", value=-0.02),
+            Observation(
+                name="monthly_net_return.lightgbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+                value=number * 0.01,
+            ),
+            Observation(
+                name="monthly_net_return.momentum.10bps.2019-01-31.2019-02-01.2019-03-01",
+                value=0.0,
+            ),
+            Observation(
+                name="monthly_net_return.lightgbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+                value=number * 0.02,
+            ),
+            Observation(
+                name="monthly_net_return.momentum.10bps.2019-02-28.2019-03-01.2019-04-01",
+                value=0.0,
+            ),
+        ),
         "e" * 64,
     )
     return {

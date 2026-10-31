@@ -50,7 +50,7 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     assert (record["experiment"], record["label"]) == (trial["policy"]["protocol_digest"], "1")
     names = [observation["name"] for observation in record["observations"]]
     # Five arms at three frozen costs, two means each, and four paired intervals.
-    assert len(names) == 5 * 3 * 2 + 4 * 4
+    assert len(names) == 5 * 3 * 2 + 4 * 4 + 2 * 16
     assert "mean_net_return.momentum.10bps" in names
     assert "equal_weight_vs_momentum.net_return.ci_low" in names
     assert result["kind"] == "research-monthly-validation-v1"
@@ -78,6 +78,19 @@ def test_validation_succeeds_without_any_final_identity(tmp_path: Path) -> None:
     (tmp_path / "keys/final.agekey").unlink()
     result = _run(document, tmp_path / "result/out.json")
     assert decode_run_record(load_json_str(result.read_text()))["label"] == "1"
+    assert list(tmp_path.glob("research-plaintext-*")) == []
+
+
+@pytest.mark.parametrize("field", ["first_month", "last_month", "cost_bps"])
+def test_selection_settings_must_match_the_design_before_decryption(
+    tmp_path: Path, field: str
+) -> None:
+    document = trial_document(tmp_path)
+    selection = require_dict(require_dict(document, "policy"), "selection")
+    selection[field] = 24229 if field != "cost_bps" else 5
+    with pytest.raises(ValueError, match="RESEARCH_TRIAL_LINEAGE"):
+        _run(document, tmp_path / "result/out.json")
+    assert not (tmp_path / "result").exists()
     assert list(tmp_path.glob("research-plaintext-*")) == []
 
 

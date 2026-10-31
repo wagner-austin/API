@@ -18,6 +18,7 @@ from ..benchmarking.harness import write_observed_manifest
 from ..benchmarking.types_codec import encode_benchmark_config
 from ..evaluation.codec_records import encode_comparison
 from ..evaluation.types import PairedComparison
+from .crsp_calendar import crsp_month
 from .crsp_extract import CrspSources, encode_crsp_extract, load_crsp_sources
 from .crsp_protocol import encode_crsp_protocol
 from .crsp_study import (
@@ -32,6 +33,7 @@ from .encrypted_storage import decrypted_bundle, read_encrypted_bundle
 from .research_journal import research_policy_digest
 from .research_keys import EvaluatorKeys
 from .research_limits import policy_refusal
+from .research_ranking import monthly_selection_observations
 from .research_records import candidate_digest
 from .research_trial_records import ResearchTrial, encode_research_evaluation, evaluation_digest
 
@@ -148,6 +150,14 @@ def require_trial_lineage(
         OSError: The manifest cannot be read.
     """
     policy, proposal, evaluation = trial["policy"], trial["proposal"], trial["evaluation"]
+    selection = policy["selection"]
+    design = evaluation["design"]
+    if (
+        selection["first_month"] != crsp_month(design["validation_start"])
+        or selection["last_month"] != crsp_month(design["holdout_start"]) - 3
+        or selection["cost_bps"] != design["cost_bps"][0]
+    ):
+        raise ValueError("RESEARCH_TRIAL_LINEAGE: selection calendar or cost differs from design")
     reason = policy_refusal(policy, proposal)
     if reason:
         raise ValueError(f"RESEARCH_TRIAL_REFUSED: {reason}")
@@ -245,7 +255,10 @@ def publish_monthly_record(
         output,
         policy["protocol_digest"],
         label,
-        _observations(study.series, study.comparisons),
+        (
+            *_observations(study.series, study.comparisons),
+            *monthly_selection_observations(study.series, policy["selection"]),
+        ),
     )
 
 

@@ -3,11 +3,16 @@
 from hashlib import sha256
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, require_dict, require_str
 
 from covenant_ml.benchmarking.factory import make_benchmark_config
 from covenant_ml.benchmarking.types_codec import encode_benchmark_config
-from covenant_ml.markets.research_records import encode_research_policy
+from covenant_ml.markets.crsp_calendar import crsp_month
+from covenant_ml.markets.research_records import (
+    candidate_digest,
+    decode_research_proposal,
+    encode_research_policy,
+)
 from covenant_ml.markets.research_trial_records import decode_research_evaluation, evaluation_digest
 
 from ._crsp_fixtures import write_sources
@@ -35,6 +40,11 @@ def frozen_request(evaluation: JSONObject, manifest: Path, features: list[str]) 
     request["protocol_digest"] = fixed["protocol_digest"]
     request["features"] = list(features)
     request["config"] = encode_benchmark_config(make_benchmark_config(3, 2, 16, 4, 1, 0))
+    selection = require_dict(fixed, "selection")
+    design = require_dict(evaluation, "design")
+    selection["first_month"] = crsp_month(require_str(design, "validation_start"))
+    selection["last_month"] = crsp_month(require_str(design, "holdout_start")) - 3
+    selection["required_candidates"] = [candidate_digest(decode_research_proposal(request))]
     return {
         "policy": fixed,
         "proposal": request,

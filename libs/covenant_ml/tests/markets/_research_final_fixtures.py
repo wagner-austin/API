@@ -54,34 +54,46 @@ def completed_study(root: Path, code_digest: str = "c" * 64) -> tuple[Path, Rese
     path = root / "journal.sqlite"
     journal = research_journal(trial["policy"])
     journal.initialize(path)
-    admit_proposal(path, trial["policy"], require_dict(document, "proposal"), 1000)
-    record = execute_trial(
-        trial,
-        sample_run_fingerprint(image_digest="d" * 64),
-        code_digest,
-        root / "validation-1" / "result.json",
-        keys=evaluator_keys(root / "validation"),
-        scratch=root,
-    )
-    _commit(journal, path, {"action": "submit", "number": 1, "observed_ms": 1001})
-    _commit(
-        journal,
-        path,
-        {"action": "scheduled", "number": 1, "observed_ms": 1002, "job_id": "slurm:1"},
-    )
-    _commit(
-        journal,
-        path,
-        {
-            "action": "complete",
-            "number": 1,
-            "observed_ms": 1003,
-            "job_id": "slurm:1",
-            "dataset_digest": trial["policy"]["dataset_digest"],
-            "code_digest": code_digest,
-            "record": narrow_json_to_dict(load_json_str(record.read_text())),
-        },
-    )
+    original = trial
+    for number, seed in enumerate(trial["policy"]["seeds"], start=1):
+        document = encode_research_trial(original)
+        document["number"] = number
+        require_dict(document, "proposal")["seed"] = seed
+        trial = decode_research_trial(document)
+        admit_proposal(path, trial["policy"], require_dict(document, "proposal"), 1000)
+        record = execute_trial(
+            trial,
+            sample_run_fingerprint(image_digest="d" * 64),
+            code_digest,
+            root / f"validation-{number}" / "result.json",
+            keys=evaluator_keys(root / "validation"),
+            scratch=root,
+        )
+        _commit(journal, path, {"action": "submit", "number": number, "observed_ms": 1001})
+        _commit(
+            journal,
+            path,
+            {
+                "action": "scheduled",
+                "number": number,
+                "observed_ms": 1002,
+                "job_id": f"slurm:{number}",
+            },
+        )
+        _commit(
+            journal,
+            path,
+            {
+                "action": "complete",
+                "number": number,
+                "observed_ms": 1003,
+                "job_id": f"slurm:{number}",
+                "dataset_digest": trial["policy"]["dataset_digest"],
+                "code_digest": code_digest,
+                "record": narrow_json_to_dict(load_json_str(record.read_text())),
+            },
+        )
+    trial = original
     manifest = final_manifest(root / "final")
     encrypted = seal_extract(
         manifest, root / "encrypted-final", evaluator_keys(root / "validation").access, "final"

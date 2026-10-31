@@ -10,6 +10,11 @@ from typing_extensions import ReadOnly, TypedDict
 from ..benchmarking.types import BenchmarkConfig
 from ..benchmarking.types_codec import decode_benchmark_config, encode_benchmark_config
 from .campaign_records import require_digest
+from .research_selection_records import (
+    ResearchSelection,
+    decode_research_selection,
+    encode_research_selection,
+)
 from .validation import require_bounded_int, require_nonempty
 
 
@@ -26,6 +31,7 @@ class ResearchPolicy(TypedDict):
     max_seconds: ReadOnly[int]
     max_trees: ReadOnly[int]
     max_leaves: ReadOnly[int]
+    selection: ReadOnly[ResearchSelection]
 
 
 class ResearchProposal(TypedDict):
@@ -80,6 +86,7 @@ def encode_research_policy(policy: ResearchPolicy) -> JSONObject:
         "max_seconds": policy["max_seconds"],
         "max_trees": policy["max_trees"],
         "max_leaves": policy["max_leaves"],
+        "selection": encode_research_selection(policy["selection"]),
     }
 
 
@@ -104,6 +111,10 @@ def decode_research_policy(document: JSONObject) -> ResearchPolicy:
     )
     if not seeds or len(set(seeds)) != len(seeds):
         raise ValueError("[RESEARCH-002] seeds must be nonempty and unique")
+    selection = decode_research_selection(require_dict(document, "selection"))
+    ceiling = require_bounded_int(document, "max_candidates", 1, 20)
+    if selection["final_seed"] not in seeds or len(selection["required_candidates"]) > ceiling:
+        raise ValueError("RESEARCH_SELECTION_POLICY: final seed and baselines exceed admission")
     return ResearchPolicy(
         protocol_digest=require_digest(document, "protocol_digest"),
         dataset_digest=require_digest(document, "dataset_digest"),
@@ -111,10 +122,11 @@ def decode_research_policy(document: JSONObject) -> ResearchPolicy:
         image_digest=require_digest(document, "image_digest"),
         features=_strings(document, "features"),
         seeds=seeds,
-        max_candidates=require_bounded_int(document, "max_candidates", 1, 20),
+        max_candidates=ceiling,
         max_seconds=require_bounded_int(document, "max_seconds", 1, 259200),
         max_trees=require_bounded_int(document, "max_trees", 1, 10000),
         max_leaves=require_bounded_int(document, "max_leaves", 2, 1024),
+        selection=selection,
     )
 
 
