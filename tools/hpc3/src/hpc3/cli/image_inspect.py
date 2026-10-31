@@ -42,7 +42,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     cluster = require_cluster(connection["cluster"])
     entry = ledger.require_entry(
         ledger.read(pathlib.Path(connection["ledger"]), cluster),
-        cli_args.require_flag(flags, "--job"), connection["host"],
+        cli_args.require_flag(flags, "--job"),
+        connection["host"],
     )
     path = pathlib.Path(cli_args.require_flag(flags, "--checksums"))
     report = measure_build(
