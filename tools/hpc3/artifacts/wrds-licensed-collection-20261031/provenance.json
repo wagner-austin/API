@@ -1,0 +1,368 @@
+{
+  "kind": "wrds-licensed-collection-v1",
+  "board_task": "da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320",
+  "extraction_task": "a622165c-bb63-4714-933b-10d527f21478",
+  "synthetic": false,
+  "queue_id": "872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+  "queue_request_sha256": "8c1d3ceb0ca66acd6b906fb4f57e25c87c57450699af8867896ad5f756fd9fd5",
+  "native_job_id": "40554174",
+  "native_spec_sha256": "13397ba5adfe4137a512c3cd4a1b5db22c74506327212c4e8e656bc278e3c3e7",
+  "extraction_receipt_sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+  "extraction": {
+    "source": "crsp_a_stock",
+    "setup_sha256": null,
+    "protocol": {
+      "name": "protocol.json",
+      "sha256": "6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b",
+      "size_bytes": 1251
+    },
+    "driver_sha256": "f61e6665ec0755f4e8ec1bdd792a49f33040ff2dd24d4c2e77ffc048b0a9c36a",
+    "started_at": "2026-10-31T18:44:04.122752+00:00",
+    "completed_at": "2026-10-31T18:46:02.546334+00:00",
+    "snapshot": "13138198359:13149639397:",
+    "transaction_started_at": "2026-10-31 18:44:04.200309+00",
+    "limits": {
+      "max_rows": 35000000,
+      "max_relation_bytes": 2100000000,
+      "max_partition_bytes": 2150000000,
+      "seconds": 1800
+    },
+    "train_validation": {
+      "partition": "train-validation",
+      "observation_end": "2021-12-31",
+      "calendar_end": "2022-02-28",
+      "manifest": {
+        "name": "manifest.json",
+        "sha256": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+        "size_bytes": 1242
+      },
+      "bundle": {
+        "name": "bundle.json",
+        "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+        "size_bytes": 2959
+      },
+      "membership_rows": 40091,
+      "returns_rows": 28034527,
+      "calendar_rows": 8825,
+      "delists_rows": 7901,
+      "plaintext_bytes": 1789525544
+    },
+    "final": {
+      "partition": "final",
+      "observation_end": "2025-02-28",
+      "calendar_end": "2025-02-28",
+      "manifest": {
+        "name": "manifest.json",
+        "sha256": "7a330b024227ef47558b68dad413bcdf6f5253441077cb08b8af21737325aa65",
+        "size_bytes": 1242
+      },
+      "bundle": {
+        "name": "bundle.json",
+        "sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+        "size_bytes": 2948
+      },
+      "membership_rows": 43610,
+      "returns_rows": 31465356,
+      "calendar_rows": 9921,
+      "delists_rows": 9038,
+      "plaintext_bytes": 2011883179
+    },
+    "plaintext_removed": true
+  },
+  "cleanup_observation": {
+    "subject_job_id": "40554174",
+    "observer_job_id": "40554207",
+    "node": "wrds-sas31-w.wharton.private",
+    "observed_at": "2026-10-31T18:56:35.480312+00:00",
+    "matching_scratch_roots": []
+  },
+  "cleanup_observation_sha256": "d86c2f52a6fde895cd661235b08d6dc0ed7a6a88a4a7cd567ca3931fef1fa4a2",
+  "controller_inspection": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "0ffb98731e70c234e4052d4319332faf7496a60e",
+    "controller_python": "/home/corvis/research-control/wrds-queue-0ffb98731/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-queue-0ffb98731/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "board_watch-0.1.0-py3-none-any.whl": {
+        "sha256": "759585c617cce6f16c320f4360b932c7efda153dc035d12d15cee99395782536",
+        "installed_files": 9
+      },
+      "cleargbm-0.1.0-py3-none-any.whl": {
+        "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+        "installed_files": 15
+      },
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": {
+        "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+        "installed_files": 2
+      },
+      "covenant_domain-0.1.0-py3-none-any.whl": {
+        "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+        "installed_files": 8
+      },
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "a8c5cbcdefb3df4ac32cf3e6ec8c1e1dac9c03d23aad8f400cbc81c6f2b46ade",
+        "installed_files": 345
+      },
+      "fleet-0.1.0-py3-none-any.whl": {
+        "sha256": "384056b601e5792c9c543b6ebc7ef5c0f6bd06a8216cd3adfdc6400a65f9e37f",
+        "installed_files": 185
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "a4a7a60ba4dd58fc9f1634bad2b771c9d6db3fde5c218f998af662a962fabe25",
+        "installed_files": 129
+      },
+      "monorepo_guards-0.1.0-py3-none-any.whl": {
+        "sha256": "d026fbf2317cb1786e3af37687808cf2fb8c8d6595cc715eefc1f07eab4dacfa",
+        "installed_files": 60
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      },
+      "platform_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+        "installed_files": 23
+      }
+    },
+    "installed_files": 872,
+    "selfcheck_sha256": "95f8509bcfa7847193c537d936e8b02a72a6f19d76284a14605cda200ce800a8",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "9382e7445d3299931d3a6350b1cf848b32e78c737a2affaf85121b221e89f872"
+  },
+  "image_inspection": {
+    "kind": "HPC3_IMAGE_BUILD_EVIDENCE",
+    "ledger": {
+      "job_id": "58662034",
+      "project": "cleargbm",
+      "name": "cleargbm.image-calendar-5e61e1450",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-10-31T18:44:54.098201+00:00",
+      "log_dir": "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450",
+      "deterministic": false,
+      "experiment": {
+        "kind": "image-build",
+        "image_dir": "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450"
+      },
+      "image_digest": "",
+      "submitter": "",
+      "artifact": "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/research-calendar.sif",
+      "image_drift": {
+        "image_commit": "",
+        "head": "",
+        "modules": []
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58662034",
+        "name": "cleargbm.image-calendar-5e61e1450",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 78,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-23-07"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-31T18:44:57",
+      "ended_at": "2026-10-31T18:46:15"
+    },
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/build.sbatch": "d6b2d352bb5ccb2d92c945b46479a18f98283a267180cf6dfeff068b1c1b13e2",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/build.sh": "61c7134daa469929a1c9a690d3981c36c1245f033ecd8f69c9e37cf939c2a609",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/image.def": "68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/requirements.txt": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/selfcheck.py": "e58af8c1976e3f966cfd3a9ae1a575814f9e14973d86aeb2ed56669be332006e",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/covenant_ml-0.1.0-py3-none-any.whl": "c57e7cad80e497c20f91df3f8d71f0eead48c4a30dea0247dcf388eff99ffcf7",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/wheels/platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/GIT_COMMIT": "bf6af88b2d5622229abfb7b9520778e22aba1433cc82022bd629af38ca609772",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/build-58662034.out": "5450ece31bd19501634739254fd9500fd63aae97744b88e4bb35c92b0b1f9d86",
+      "/data/homezvol1/wagnera3/research-images/calendar-5e61e1450/research-calendar.sif": "0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912"
+    },
+    "image_mtime": 1793472372,
+    "log_mtime": 1793472375,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "collection_recovery": {
+    "at": "2026-10-31T19:10:58.961133+00:00",
+    "queue": "872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+    "native_job": "40554174",
+    "source": "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first",
+    "preserved": "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first-interrupted-300s",
+    "reason": "300-second collection timeout; preserve incomplete bytes and recollect through the same immutable queue request",
+    "files": {
+      "outputs/extraction.json": {
+        "bytes": 1535,
+        "sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349"
+      },
+      "outputs/final/bundle.json": {
+        "bytes": 2948,
+        "sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e"
+      },
+      "outputs/final/calendar.csv.age": {
+        "bytes": 168953,
+        "sha256": "df9b6b8643240727635a2a35e395ecac30091a69d25f1cdc9886a546ec5f3487"
+      },
+      "outputs/final/calendar.sql.age": {
+        "bytes": 554,
+        "sha256": "f38af8ba2005097b160f1b13f8d5de8d28d775379c851ff11d2ad6337f9b1cae"
+      },
+      "outputs/final/delists.csv.age": {
+        "bytes": 501868,
+        "sha256": "bcb97baceb08c5f2bab7b1e3c4fde35b3613736e25ea912845a2d0e252a2dae2"
+      },
+      "outputs/final/delists.sql.age": {
+        "bytes": 832,
+        "sha256": "fa9da22247f2d54df2577e0697559c5f5b994e057dd019b937f501585e6e80e4"
+      },
+      "outputs/final/manifest.json.age": {
+        "bytes": 1495,
+        "sha256": "f2911fd3d67cb8e3ffe412b80717dbf642f5d681506e82e421f802323143df1c"
+      },
+      "outputs/final/membership.csv.age": {
+        "bytes": 1439899,
+        "sha256": "7ae4397a464b1a95cb36c4b54a832ed46994d92c208f18014b1e7f86856a2bdb"
+      },
+      "outputs/final/membership.sql.age": {
+        "bytes": 809,
+        "sha256": "f678257895fdaa93187cdfc03b4a1913d1fa2ad6480af885523329998e43f097"
+      },
+      "outputs/final/protocol.json.age": {
+        "bytes": 1594,
+        "sha256": "dea90e23eeac92f5d1bc9006650752a93147f4123f67c4a8559403666c9e34fb"
+      },
+      "outputs/final/returns.csv.age": {
+        "bytes": 2010260627,
+        "sha256": "dcd57fb215b1085a1755250552c4beddd1280f0983a4cf09eedadeb28956b603"
+      },
+      "outputs/metrics.json": {
+        "bytes": 464,
+        "sha256": "e15f4d51b1f3ba3a7a53b240292da6510343eee724c25b91ba018067a2f4cb6c"
+      },
+      "outputs/train-validation/bundle.json": {
+        "bytes": 2959,
+        "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1"
+      },
+      "outputs/train-validation/calendar.csv.age": {
+        "bytes": 150323,
+        "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24"
+      },
+      "outputs/train-validation/calendar.sql.age": {
+        "bytes": 488,
+        "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1"
+      },
+      "outputs/train-validation/delists.csv.age": {
+        "bytes": 438816,
+        "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2"
+      },
+      "outputs/train-validation/delists.sql.age": {
+        "bytes": 843,
+        "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395"
+      },
+      "outputs/train-validation/manifest.json.age": {
+        "bytes": 1558,
+        "sha256": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647"
+      },
+      "outputs/train-validation/membership.csv.age": {
+        "bytes": 1323763,
+        "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32"
+      },
+      "outputs/train-validation/membership.sql.age": {
+        "bytes": 740,
+        "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb"
+      },
+      "outputs/train-validation/protocol.json.age": {
+        "bytes": 1579,
+        "sha256": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851"
+      },
+      "outputs/train-validation/returns.csv.age": {
+        "bytes": 1788046370,
+        "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66"
+      },
+      "outputs/train-validation/returns.sql.age": {
+        "bytes": 815,
+        "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f"
+      }
+    }
+  },
+  "collection": {
+    "state": "passed",
+    "closed_at": "2026-10-31T19:18:48.165Z",
+    "collection_seconds": 324,
+    "collection_deadline_seconds": 900,
+    "previous_deadline_seconds": 300,
+    "completion_sha256": "66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83",
+    "record_sha256": "b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde",
+    "outputs": {
+      "extraction.json": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+      "metrics.json": "e15f4d51b1f3ba3a7a53b240292da6510343eee724c25b91ba018067a2f4cb6c",
+      "train-validation/bundle.json": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+      "train-validation/calendar.csv.age": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+      "train-validation/calendar.sql.age": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+      "train-validation/delists.csv.age": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+      "train-validation/delists.sql.age": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+      "train-validation/manifest.json.age": "b0c8f94aabc65f60d1b48f08d15119d59f2322086ed1b5915b76058b5d20d647",
+      "train-validation/membership.csv.age": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+      "train-validation/membership.sql.age": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+      "train-validation/protocol.json.age": "281bce3216db500362537864be85d528e950c1e726157b7fe41fec0fd6fbd851",
+      "train-validation/returns.csv.age": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+      "train-validation/returns.sql.age": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+      "final/bundle.json": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+      "final/calendar.csv.age": "df9b6b8643240727635a2a35e395ecac30091a69d25f1cdc9886a546ec5f3487",
+      "final/calendar.sql.age": "f38af8ba2005097b160f1b13f8d5de8d28d775379c851ff11d2ad6337f9b1cae",
+      "final/delists.csv.age": "bcb97baceb08c5f2bab7b1e3c4fde35b3613736e25ea912845a2d0e252a2dae2",
+      "final/delists.sql.age": "fa9da22247f2d54df2577e0697559c5f5b994e057dd019b937f501585e6e80e4",
+      "final/manifest.json.age": "f2911fd3d67cb8e3ffe412b80717dbf642f5d681506e82e421f802323143df1c",
+      "final/membership.csv.age": "7ae4397a464b1a95cb36c4b54a832ed46994d92c208f18014b1e7f86856a2bdb",
+      "final/membership.sql.age": "f678257895fdaa93187cdfc03b4a1913d1fa2ad6480af885523329998e43f097",
+      "final/protocol.json.age": "dea90e23eeac92f5d1bc9006650752a93147f4123f67c4a8559403666c9e34fb",
+      "final/returns.csv.age": "dcd57fb215b1085a1755250552c4beddd1280f0983a4cf09eedadeb28956b603",
+      "final/returns.sql.age": "2f0ce4cda33b77bf3918db0ce1bc176887ad66fc810d50670908ee36f7fc95d4"
+    },
+    "declared_output_count": 24,
+    "ciphertext_count": 20,
+    "ciphertext_bytes": 3802342693,
+    "queue_receipt_sha256": "959adeed5c9c34020a2023e8a834194e68233bc8ddb0ac8e7eb6564728f4a8b9",
+    "adapter_source_commit": "0ffb98731e70c234e4052d4319332faf7496a60e",
+    "published_commit": "0e3691a88fc0320846df456f77b686ab593bbb2f",
+    "original_native_job_reused": true,
+    "substantive_baseline_run": false,
+    "final_bundle_opened": false
+  },
+  "limitations": [
+    "This records extraction and encrypted collection, not a substantive baseline or final evaluation.",
+    "Final bundle remains sealed; its key stays on the evaluator host.",
+    "HPC3 train-validation staging and evaluator verification remain separate milestones."
+  ],
+  "fleet_checks": {
+    "tools/fleet": {
+      "job": "879448a0-eb81-45da-b6c3-22fc67b4ed9f",
+      "tests_passed": 2574,
+      "coverage_percent": 100
+    },
+    "libs/covenant_ml": {
+      "job": "4127f092-16fe-4536-9ef4-dbffc366d4c6",
+      "tests_passed": 4955,
+      "coverage_percent": 100
+    }
+  },
+  "audit_query_probes": {
+    "verified_collection": 1,
+    "changed_record": 0,
+    "changed_output_count": 0,
+    "changed_installed_wheel": 0,
+    "changed_final_bundle": 0,
+    "measured_at": "2026-10-31T19:19:00.484035+00:00"
+  },
+  "queue_placement_sha256": "5fdcd866135183793b26d38ed7e3260a981a787452c0b13ef6757784e6670efb",
+  "controller_report_id": "fd164407-3505-4207-bc2d-d0e26fa69a1f"
+}

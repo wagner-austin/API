@@ -1,0 +1,135 @@
+{
+  "job": {
+    "researchRequest": {
+      "backend": "wrds",
+      "specSha256": "8c1d3ceb0ca66acd6b906fb4f57e25c87c57450699af8867896ad5f756fd9fd5",
+      "attempt": "first"
+    },
+    "id": "872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+    "project": "research/wrds",
+    "command": "research",
+    "status": "passed",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "a622165c-bb63-4714-933b-10d527f21478",
+    "node": "ziggurat",
+    "runId": "872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+    "exitCode": 0,
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"40554174\",\"record_sha256\":\"b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde\"}",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-10-31T18:43:30.734Z",
+    "updatedAt": "2026-10-31T19:18:48.165Z",
+    "claimedAt": "2026-10-31T18:43:47.287Z",
+    "closedAt": "2026-10-31T19:18:48.165Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "598086ed-5088-4100-8d67-7c123d7344b7",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued research wrds specification 8c1d3ceb0ca66acd6b906fb4f57e25c87c57450699af8867896ad5f756fd9fd5 attempt first on ziggurat for task a622165c-bb63-4714-933b-10d527f21478",
+      "createdAt": "2026-10-31T18:43:30.734Z"
+    },
+    {
+      "id": "ff7ebf8f-0e13-48c3-9686-b6e0746c69d6",
+      "kind": "claimed",
+      "actor": "fleet-research-diphtheria",
+      "body": "claimed by fleet-research-diphtheria under a 7200s lease",
+      "createdAt": "2026-10-31T18:43:47.287Z"
+    },
+    {
+      "id": "47395b14-c305-42f7-8b00-1174e4d8ab95",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "started make research for research/wrds on ziggurat as run 872b9e09-d808-414a-aa3a-c93b9f8a8f3f",
+      "createdAt": "2026-10-31T18:43:47.320Z"
+    },
+    {
+      "id": "48ec0f00-663b-4f2a-9d36-8aeefa089f01",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T18:44:01.775Z"
+    },
+    {
+      "id": "ef4b5497-4ee0-47a1-9092-bdd0506fb190",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T18:45:10.885Z"
+    },
+    {
+      "id": "95d3c66a-d925-4059-8487-d6a20485bc24",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T18:48:06.513Z"
+    },
+    {
+      "id": "4ee02db9-df9d-4993-b11e-02d50a9f1914",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T18:51:09.301Z"
+    },
+    {
+      "id": "ad31bfc5-7553-4301-a91a-e405bd4fc1b6",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T18:54:09.270Z"
+    },
+    {
+      "id": "7a3df65b-4a5a-473b-bdf2-22ea48b78844",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "DISPATCH_FAILED: controller tick failed; native receipt retained for reconciliation",
+      "createdAt": "2026-10-31T19:01:09.132Z"
+    },
+    {
+      "id": "13fbb062-3826-49df-8225-e83c0320e999",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "DISPATCH_FAILED: controller tick failed; native receipt retained for reconciliation",
+      "createdAt": "2026-10-31T19:04:21.625Z"
+    },
+    {
+      "id": "2d5814ef-60c0-4009-ae56-9d234e881e02",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "DISPATCH_FAILED: controller tick failed; native receipt retained for reconciliation",
+      "createdAt": "2026-10-31T19:07:02.132Z"
+    },
+    {
+      "id": "7fbca495-1d26-44c2-aa3f-8fa41342ee09",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "DISPATCH_FAILED: controller tick failed; native receipt retained for reconciliation",
+      "createdAt": "2026-10-31T19:10:49.103Z"
+    },
+    {
+      "id": "b3102dd1-4413-4749-8a35-f2ebe15c151e",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"40554174\",\"record_sha256\":null}",
+      "createdAt": "2026-10-31T19:17:30.357Z"
+    },
+    {
+      "id": "bfba010a-22d8-4288-b13e-19ab34a87dab",
+      "kind": "closed",
+      "actor": "fleet-research-diphtheria",
+      "body": "passed: Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"40554174\",\"record_sha256\":\"b93adc4e218c707fb3cf883df598e03656dcf400c5274433392b1a8d236d5bde\"}",
+      "createdAt": "2026-10-31T19:18:48.165Z"
+    }
+  ],
+  "waiting": []
+}
