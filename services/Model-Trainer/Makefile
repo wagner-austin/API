@@ -42,10 +42,14 @@ _lint-mypy:
 # more in every check's log, as services/covenant-radar-api does, so a run
 # that nears the five-minute budget says on the CI runner or fleet node itself
 # which tests cost it (MCPs board task 2f90d785).
+#
+# --own-home runs the suite under a HOME of the run's own and fails it on any
+# file left there: lavender's run of fleet job 58471c54 wrote Triton's and
+# Hugging Face's caches under the node user's home (MCPs board task bcb7c6ef).
 test: _deps _test-suite
 
 _test-suite:
-	$(MAKETOOLS) test --durations=0 --durations-min=1.0
+	$(MAKETOOLS) test --own-home --durations=0 --durations-min=1.0
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
