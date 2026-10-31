@@ -21,7 +21,7 @@ from hpc3.cli import _test_hooks
 from hpc3.cli._load_report import post_load_report, report_identity
 from hpc3.contracts.wrds_run import decode_wrds_run, encode_wrds_runtime, run_identity
 from hpc3.core import _test_hooks as core_hooks
-from hpc3.core import wrds_attempt_report, wrds_jobs, wrds_results, wrds_scheduler
+from hpc3.core import wrds_attempt_report, wrds_cleanup, wrds_jobs, wrds_results, wrds_scheduler
 from hpc3.core.checkout import shared_directory
 from hpc3.core.wrds_bundle import worker_bundle
 from hpc3.wrds import _test_hooks as worker_hooks
@@ -38,6 +38,7 @@ _ACTIONS = {
     "collect",
     "trace",
     "report",
+    "scratch",
 }
 
 
@@ -129,6 +130,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         output = pathlib.Path(cli_args.require_flag(flags, "--output"))
         result = wrds_results.collect(run, attempt, output, ledger, now)
         _test_hooks.emit(dump_json_str({"output": str(output), "identity": result["identity"]}))
+    elif action == "scratch":
+        task_id = cli_args.require_flag(flags, "--report-task")
+        report_identity(task_id, "wrds")
+        output = pathlib.Path(cli_args.require_flag(flags, "--output"))
+        body = wrds_cleanup.measure(run, attempt, output)
+        post_load_report(task_id, body, "wrds")
+        _test_hooks.emit(dump_json_str({"report_task": task_id, "output": str(output)}))
     elif action == "report":
         task_id = cli_args.require_flag(flags, "--report-task")
         report_identity(task_id, "wrds")  # refuses a malformed task before WRDS is queried
