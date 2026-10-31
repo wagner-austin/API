@@ -156,6 +156,28 @@ def stack_credentials(env_text: str, url: str) -> McpCredentials:
     return McpCredentials(url=url, api_key=api_key, tenant_id=tenant_id)
 
 
+def taskboard_credentials(read_text: Callable[[pathlib.Path], str]) -> McpCredentials:
+    """Read the taskboard's address and secrets from the stack's own files.
+
+    The one composition of :func:`platform_core.stack_endpoints.declared_url`
+    with :func:`stack_credentials`, shared by a session asking who it is and
+    by a service posting its own report.
+
+    Args:
+        read_text: The caller's file seam, for the stack's ``.env`` and its
+            endpoint declaration.
+
+    Returns:
+        The credentials, bound to the declared taskboard url.
+
+    Raises:
+        AppError: ``STACK_ENDPOINT_UNDECLARED`` or ``CREDENTIALS_MISSING``
+            when either file does not carry its part.
+    """
+    url = declared_url(read_text, TASKBOARD_SERVICE)
+    return stack_credentials(read_text(STACK_ENV_PATH), url)
+
+
 def bound_label(whereis_text: str) -> str:
     """The label ``task_whereis`` reports as bound to the session.
 
@@ -203,8 +225,7 @@ def read_identity(
     if session_id is None:
         return SessionIdentity(session_id="", exported=declared, bound="")
     session = require_session_id(session_id)
-    url = declared_url(read_text, TASKBOARD_SERVICE)
-    credentials = stack_credentials(read_text(STACK_ENV_PATH), url)
+    credentials = taskboard_credentials(read_text)
     text = call_mcp_tool(post, credentials, WHEREIS_TOOL, {"session": session})
     return SessionIdentity(session_id=session, exported=declared, bound=bound_label(text))
 
@@ -312,4 +333,5 @@ __all__ = [
     "resolve_label",
     "resolved_label",
     "stack_credentials",
+    "taskboard_credentials",
 ]
