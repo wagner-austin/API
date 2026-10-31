@@ -23,6 +23,7 @@ from .crsp_extraction_records import (
     CrspExtractionReceipt,
     CrspPartitionReceipt,
     decode_crsp_extraction_receipt,
+    encode_crsp_extraction_receipt,
 )
 from .crsp_partition import check_crsp_partition
 from .crsp_queries import crsp_scopes
@@ -159,7 +160,7 @@ def _open(
 
 
 def verify_crsp_extraction(
-    collected: Path, keys: EvaluatorKeys, *, scratch: Path, open_final: bool
+    collected: Path, keys: EvaluatorKeys, *, scratch: Path, open_final: bool, ciphertext_only: bool
 ) -> JSONObject:
     """Verify a collected extraction through decryption and the existing reader.
 
@@ -168,6 +169,7 @@ def verify_crsp_extraction(
         keys: Evaluator identities; the final key is read only when opening final.
         scratch: Evaluator-private scratch for transient plaintext.
         open_final: Also open the final bundle; permitted only for synthetic evidence.
+        ciphertext_only: Verify sealed inventories and receipt without acquiring keys.
 
     Returns:
         Metadata for both partitions, each with its verified ``bundle.json``
@@ -180,6 +182,8 @@ def verify_crsp_extraction(
             receipt, bundle, identity, reader and partition refusals propagate.
         OSError: A collected file or key cannot be read.
     """
+    if ciphertext_only and open_final:
+        raise ValueError("[CRSP-013] ciphertext-only verification cannot open final evidence")
     outputs = collected / "outputs"
     ciphertext = require_ciphertext_only(outputs)
     receipt_bytes = (outputs / "extraction.json").read_bytes()
@@ -197,8 +201,8 @@ def verify_crsp_extraction(
     # Verify both sealed inventories before opening even the validation partition.
     for item in items:
         path = outputs / item["partition"] / "bundle.json"
-        if item["partition"] == "final" and not open_final:
-            summary: JSONObject = {"partition": "final", "opened": False}
+        if ciphertext_only or (item["partition"] == "final" and not open_final):
+            summary: JSONObject = {"partition": item["partition"], "opened": False}
         else:
             summary = _open(path, item, keys, scratch, receipt)
         summary["bundle_sha256"] = item["bundle"]["sha256"]
@@ -206,6 +210,7 @@ def verify_crsp_extraction(
     return {
         "source": receipt["source"],
         "snapshot": receipt["snapshot"],
+        "extraction_receipt": encode_crsp_extraction_receipt(receipt),
         "extraction_sha256": sha256(receipt_bytes).hexdigest(),
         "ciphertext_files": ciphertext,
         "partitions": partitions,
