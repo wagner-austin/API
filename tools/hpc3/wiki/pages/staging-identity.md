@@ -35,8 +35,8 @@ hpc3-stage --config hpc3.json --manifest runs/stage.json \
 ```
 
 A manifest is self-consistent by construction: whoever emitted the files
-computed the digests from those same files, so they always agree. That proves
-the emitter was deterministic and nothing else.[^identity]
+computed the digests from those same files, so they agree. Those hashes
+establish which file bytes the manifest describes.[^identity]
 
 `--expect-from` is required and points at a record written by a *different
 act* — every digest in the manifest must appear in it. That is a real check
