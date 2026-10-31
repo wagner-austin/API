@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/evidence-corrections.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json"
@@ -70,6 +71,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-collection-20261031/evidence-corrections.json": "86bb76064249dfa52dc49b61f8c3c8fe0d4dab88"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json": "e65e100b5be0f5575f096653d0e4de61c6f9fcc4"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json": "cb08d7053e4363b23ce2740d54bb1823bc4801fb"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json": "f69fefdc21501823201906b30f64122f04c4a931"
@@ -77,15 +79,15 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "fb6b71e076c33612ca3d906e8a194baf2157a777"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "11c82cd301f6f395bd493e5c5751df689ee8a7d1"
   "libs/covenant_ml/tests/markets/test_crsp_writer.py": "d33b9a62ba2f7067115310a7e09ad2f30670542c"
-  "libs/covenant_ml/scripts/crsp_extraction.py": "bf19c177db704f0654daab7bb2e2aa4fcc28e488"
+  "libs/covenant_ml/scripts/crsp_extraction.py": "f29779aa66a17db73c9a81ed61e591758274a146"
   "libs/platform_core/src/platform_core/load_report.py": "b731fba8a13e7424070695845c66e9b2d8ea4361"
   "tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
-  "tools/hpc3/src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
-  "tools/hpc3/src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
-  "tools/hpc3/tests/test_wrds_cleanup.py": "c24870098fe9c6636bbcc9afdd619899bcc6c45e"
-  "tools/hpc3/tests/test_wrds_scratch.py": "73ed2f3795051cb668d5900017a98e799cb88cfa"
+  "tools/hpc3/src/hpc3/core/wrds_cleanup.py": "8ab5d24dea2b97f1bdb9a6cd3a9c8e9b849370d1"
+  "tools/hpc3/src/hpc3/wrds/scratch.py": "9e1cf69c0cb34e1379bb99a11c2c006c926c751b"
+  "tools/hpc3/tests/test_wrds_cleanup.py": "bc5ae1b90621204b993869865be27637dd0b932a"
+  "tools/hpc3/tests/test_wrds_scratch.py": "6b88bd1e0ebfad5d3fd3544abbaa382f13d029cf"
   "tools/hpc3/src/hpc3/core/controller_evidence.py": "a1e9ef38fa11dfcf808c12649389264167062d93"
   "tools/hpc3/src/hpc3/cli/controller_inspect.py": "44ffcf8091bc019cfcaee742ecf5f8073f0f67f0"
   "tools/hpc3/tests/test_controller_evidence.py": "ffe8dac548ada4b5b954fda7f985cdc863c48dd7"
@@ -198,7 +200,32 @@ their certificate under mode-0700 directories. No keys or final bundle were
 transferred. The final holdout remains sealed in existing WRDS/evaluator
 storage.[^licensed-staging]
 
+Audit `7cebf61f` reopened staging at 21:11 UTC because the closing evidence
+did not programmatically measure successful-job cleanup, receipt timestamps
+or the complete remote tree. The correction extends the existing verifier,
+scratch observer and staging command. Program report `93e6e12c` records the
+authenticated extraction receipt, snapshot, timestamps and 20 verified
+ciphertext files with both partitions unopened. Report `be73d576` records
+exactly 11 staged files plus their certificate under the private HPC3 study
+root; it independently rereads all checksums without retransferring data.
+Fresh maintained observer `40554707` ran on `wrds-sas31-w.wharton.private`
+and found no scratch entries for subject `40554174` at 21:39:57 UTC.
+Its program report `1a4e1d46` binds that reading to the original completion
+attestation. The earlier ad hoc observer `40554207` remains historical
+evidence and is not relabelled as maintained-program output.[^evidence-corrections]
+
+Both packages passed their complete checks at API `a1872e7ee`: 5,002 research
+tests and 2,159 controller tests with 100% statement and branch coverage.
+The separate `wrds-evidence-3b20b14e9` controller verified 581 installed files,
+its generated selfcheck and dependencies before publishing the measurements.
+The audit queries returned one for each measured report and zero for changed
+identities, timestamps, counts, permissions, retained scratch and reversed
+measurement ordering. These corrections are submitted for independent audit;
+they do not complete the study or refresh the compute image.[^evidence-corrections]
+
 The substantive baseline and controlled final evaluation have not run.[^licensed-staging]
+
+[^evidence-corrections]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/evidence-corrections.json`, program-authored controller, ciphertext, inventory and scratch reports, frozen source equivalence, executable audit predicates and negative probes. Report ids are `9e945d2f-f685-4a02-a3b9-60508eeb77cf`, `93e6e12c-2acf-48ff-87d1-adcf79ae1e91`, `be73d576-d2c7-4b10-9976-fff21a276a58` and `1a4e1d46-abbd-4fcf-a643-b871fa4bf985`. Fleet checks `6b35ec06-0944-4070-b09d-7bdef00f8a8a` and `7b344ac5-c0cf-4bd4-a9a1-1b13299409f5` passed at API `a1872e7ee62c6f6c416b22cb74e34e0da9bf623d`. `libs/covenant_ml/scripts/crsp_extraction.py`, `main`, exposes `verify --ciphertext-only`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `verify_crsp_extraction`, uses the existing receipt decoder and encrypted-bundle integrity owner without acquiring keys.
 
 [^licensed-staging]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json`, controller inspection, invocation, completion, program-authored staging receipt, final remote inventory, ciphertext inspection and audit probes. Native extraction `40554174` and measured adoption queue `132859b5` remain unchanged. Staging report `bc09355e-578c-492b-a8b7-a7a1765b958e` and installed-controller report `8b30c072-3c92-4b0e-9c22-8c0a79d2f7b7` were posted by `hpc-report-a622165c`. API `9c79fc713c4d30e8e89390c3990b735435458475` passed fleet `8fd49050-ae8c-4e55-8029-20ea5d718a02`: 2,131 tests, 100% statement and branch coverage. The transfer ran from 20:49:39 to 20:58:58 UTC on October 31. The independent completion file hash is `6d57212a36af66d5aa72d580acd4d9756f2e84a8d0c5211f3735da40501e7f58`; its canonical decoded identity remains `66943a2abb2cff8b351569fdd648095837b2a796d1539c78daa84439a9e52b83`. The command and reporting contract are documented in the HPC3 wiki's staging-identity page. Staging acceptance on board task `a622165c-bb63-4714-933b-10d527f21478` remains subject to independent review.
 
