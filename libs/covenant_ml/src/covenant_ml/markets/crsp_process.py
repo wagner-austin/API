@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import resource
 import subprocess
+from functools import partial
 from pathlib import Path
 from typing import Protocol
 
@@ -39,17 +40,15 @@ def run_bounded(
         TimeoutExpired: The deadline passed; the child has been killed.
     """
 
-    def limit() -> None:
-        """Apply the file-size limit inside the child only."""
-        resource.setrlimit(resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes))
-
     completed = subprocess.run(
         command,
         cwd=directory,
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         timeout=seconds,
-        preexec_fn=limit,
+        preexec_fn=partial(
+            resource.setrlimit, resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes)
+        ),
         check=False,
     )
     return completed.returncode
