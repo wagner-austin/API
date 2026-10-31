@@ -16,13 +16,14 @@ runners have no user manager to ask, which is why they are not ``host_linux``.
 from __future__ import annotations
 
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Callable, Generator
 from typing import Final
 
 import pytest
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
 
 from fleet.cli import orphans
 from fleet.core import _test_hooks, queue, tick_run
@@ -137,18 +138,31 @@ def test_a_unit_the_manager_never_ran_reads_gone() -> None:
 
 
 @pytest.mark.host_fleet_hub
-def test_this_runs_own_unit_is_named_and_reads_live(
-    record_property: Callable[[str, str], None],
+def test_a_user_service_names_its_own_run_and_reads_live(
+    units: list[str], record_property: Callable[[str, str], None],
 ) -> None:
-    """What a tick names its jobs' runs by is a unit the manager reads live
-    while the tick runs."""
-    own = tick_run.read_own_run()
-
-    state = tick_run.read_run_state(own["unit"])
-
-    assert own["machine"] == _test_hooks.hostname()
+    """Inspect from a real tick-shaped user service, not the check's system unit."""
+    unit = f"fleet-tick-run-test-{uuid.uuid4().hex}.service"
+    units.append(unit)
+    program = (
+        "from fleet.core import tick_run; "
+        "from platform_core.json_utils import dump_json_str; "
+        "own = tick_run.read_own_run(); "
+        "state = tick_run.read_run_state(own['unit']); "
+        "print(dump_json_str({'own': own, 'state': state}))"
+    )
+    result = subprocess.run(
+        ["/usr/bin/systemd-run", "--user", "--collect", "--quiet", "--wait", "--pipe",
+         f"--unit={unit}", "--property=RuntimeMaxSec=15", sys.executable, "-c", program],
+        check=True, timeout=30, text=True, capture_output=True,
+    )
+    measured = narrow_json_to_dict(load_json_str(result.stdout))
+    assert measured["own"] == {"unit": unit, "machine": _test_hooks.hostname()}
+    state = narrow_json_to_dict(measured["state"])
     assert state["live"] is True
-    record_property(READING_PROPERTY, f"{tick_run.encode_run_id(own)}: {state['shown']}")
+    assert str(state["shown"]).startswith("ActiveState=active ControlGroup=/user.slice/")
+    assert wait_gone(unit)["live"] is False
+    record_property(READING_PROPERTY, f"{unit}: {result.stdout.strip()}, then gone")
 
 
 @pytest.mark.host_fleet_hub
