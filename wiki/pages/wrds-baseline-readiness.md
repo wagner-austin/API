@@ -64,7 +64,7 @@ source_git_blobs:
   "tools/hpc3/tests/test_image_evidence.py": "f9c4ec90fcd2aab342d05c3749820b0392270a55"
   "tools/hpc3/tests/test_image_inspect.py": "290e29766a55958aa9025930b3630aaa4f05cdb8"
   "tools/fleet/tests/_host.py": "3f7c3145ff37f9e74f0ad77d9195265e23beacd7"
-  "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
+  "tools/fleet/tests/test_research_proposer_host.py": "41ddec456e01f4b2b10bb180fa0cebe67f6ce45e"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
   "libs/covenant_ml/scripts/research_storage_probe.py": "8dc13973868bdefb3e3cf26c452871ce6d072235"
   "libs/covenant_ml/tests/markets/test_research_storage_probe.py": "ce083a45f3100c51e049c85eae865fde345c8034"
@@ -99,10 +99,10 @@ source_git_blobs:
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
-  "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
-  "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
-  "tools/fleet/tests/test_research_proposal.py": "e3032d998c3d7e4b0951b2db7d1be643978ac2c5"
-  "tools/fleet/tests/test_research_proposal_host.py": "177c817e1992334468ed07142a01df4f71908aa6"
+  "tools/fleet/src/fleet/core/research_proposal.py": "e4276cfec0006ed26aa8fb3c7b8fb8cdcb93a179"
+  "tools/fleet/src/fleet/cli/research_propose.py": "f6f9b337556473eddc55eb72f1d8cc4ce708bd65"
+  "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
+  "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
 provenance:
   - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
@@ -228,9 +228,9 @@ selfcheck and `pip check` with that interpreter in isolated mode. At 22:22 UTC
 it published service reports for both controllers: 856 and 868 application files
 across ten wheels each, with both checks passing. A wrong selfcheck digest was
 refused with exit 2 before publication. The controller audit query returned two
-matched runtimes and one after changing the monthly count to 855. This supplies
-the missing program evidence; independent acceptance of the corrected milestone
-remains pending. Installed metadata and undeclared extra packages are outside
+matched runtimes and one after changing the monthly count to 855. Independent
+audit `42510bec-69a6-4eb6-84b1-b659dcf5fdf0` verified the corrected runtime
+milestone at 22:32:59 UTC on October 30. Installed metadata and undeclared extra packages are outside
 the byte-comparison scope.[^controller-inspection]
 
 [^controller-inspection]: `tools/hpc3/src/hpc3/core/controller_evidence.py`, `measure_controller`; `tools/hpc3/src/hpc3/cli/controller_inspect.py`, `main`; `tools/hpc3/tests/test_controller_evidence.py`, frozen-file drift, malformed RECORD, escaping paths, explicit relocated-layout refusal, actual isolated interpreter/pip success and real selfcheck exit 7; `tools/hpc3/tests/test_controller_inspect.py`, refusal before publication. Published inspection source API `51d409346d799ae0b5149b56283074d4440d3ce2` passed fleet `16a2eb36-4c59-4081-b801-fd4354e5c0e2`: 2,090 tests, 100% statement/branch coverage. Program-authored board reports `66fbe2dd-8212-477b-b99f-68ca308155a0` and `8b865f32-bead-42c8-92ca-4722a6352591` on task `474c840b`, author `hpc-report-474c840b`, bind the original provenance files by SHA-256 `a6ab86111468fdc643933c410b278881b115423f47c1ded42e25e0b1d7523f88` and `e7ae526bb0b0494527272a00119167d77c5b8cdd4eb6b0701c2d8d87916ff3c3`. Check review `c9852508-a6f7-4c6c-853a-c36fe961f662` identifies the earlier evidence gaps. Its seven monthly-runtime and prerequisite substring checks all matched the published page; removing each full string from an in-memory copy made its check fail.
@@ -301,10 +301,19 @@ canaries, not protection against the evaluator's administrators.[^key-probe]
 
 [^grant]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `release_final` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/research_release.py`, `write_final_grant` and `consume_final_grant`; `libs/covenant_ml/tests/markets/test_research_release.py`, competing real consumers and failure cases; `libs/covenant_ml/tests/markets/test_research_trial_cli.py`, `test_real_final_worker_needs_neither_journal_nor_long_lived_keys`; `libs/covenant_ml/tests/markets/test_research_final.py`, `test_failed_grant_creation_cannot_restore_journal_permission`. Full fleet gate f428dec3-aeb3-4bc4-9b5e-e7f9f3e1acd9 at API 9783dcd84dbc6ba6a5033e05fb1ca6c1085d1f66 passed on Serendipity at 2026-10-30T17:33:05Z: 4,850 tests, 100% coverage, 191 seconds of 300. Earlier acb42784 at 66b17108f passed all tests but failed env-access-banned in the subprocess test; 9783dcd84 uses the existing shared environment reader and passes the complete gate. The authoritative journal and existing numerical evaluator are reused; no native grant transport is claimed by these process tests.
 
+The remote proposer-to-admission handoff is now automated through the existing
+controller. At 23:59 UTC on October 30, the installed CLI ran on Ziggurat,
+executed the pinned program on Colossus and recorded both an admitted validation
+proposal and a refused final-partition request in a fresh local journal.
+[[wrds-proposer-isolation]] records the source, service-authored reports and
+verification scope. This measurement stops at admission; the prior shared-queue
+and native-job receipts remain separate evidence.[^remote-handoff]
+
+[^remote-handoff]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`. Live task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, program-authored reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` as `fleet-research-proposer`: attempts 1 admitted and 2 refused with `holdout_forbidden`. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207`, full fleet check `672d626f`, 2,561 passed with 100% coverage. No licensed data, final release or native allocation was used in this measurement.
+
 The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant]
 
-1. Automate the measured cross-host proposer-to-admission handoff through the
-   existing controller. Verify WRDS forced-kill scratch reclamation, which the
+1. Verify WRDS forced-kill scratch reclamation, which the
    normal-exit measurements do not establish; native final scoring is currently
    rehearsed on HPC3 only.
 2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
@@ -321,7 +330,7 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
 
 [^wrds-native]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json`, `runtime`, `dataset`, `measurements`, `repeatability`, `preserved_failure`, `verification` and hashed private evidence; `libs/covenant_ml/scripts/research_storage_probe.py`, `main`; `libs/covenant_ml/tests/markets/test_research_storage_probe.py`, real encrypted files and subprocess success/refusal. Queue jobs `836d7d24-ac43-42eb-8e1d-f4723a061532` and `120da295-8f12-4b90-ba0e-a2af14d5d3b6` closed passed on 2026-10-30. Probe publication `bbd989810` passed fleet job `8ed8468c`; its source bytes match the earlier tested snapshot used by both allocations. This session explicitly invoked existing queue ticks for submission and reconciliation.
 
-[^final-rehearsal]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json`, `validation`, `final`, `grant`, `recorded_failures` and hashed private evidence. Queue closure digests are `bd9fcef7219a2d9b4e6840324c41e327a24e8ca1e08b3aff18d0da9e86416139` and `43ba8b73ca203fb5bf6843cacd92f444337516a1fdaa7e96de88395dd806cd86`. The scheduled runner claimed the requests and submitted the final allocation; this session explicitly invoked existing ticks for validation submission and prompt reconciliation. The proposer ran in the existing Colossus sandbox, with its output transported by this session before admission; a fully automated cross-host proposal handoff is not established.
+[^final-rehearsal]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json`, `validation`, `final`, `grant`, `recorded_failures` and hashed private evidence. Queue closure digests are `bd9fcef7219a2d9b4e6840324c41e327a24e8ca1e08b3aff18d0da9e86416139` and `43ba8b73ca203fb5bf6843cacd92f444337516a1fdaa7e96de88395dd806cd86`. The scheduled runner claimed the requests and submitted the final allocation; this session explicitly invoked existing ticks for validation submission and prompt reconciliation. The proposer ran in the existing Colossus sandbox, with its output transported by this session before admission; that rehearsal did not establish an automated cross-host proposal handoff. The later handoff measurement is recorded separately in [^remote-handoff].
 
 [^rehearsal]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/rehearsal.json`, queue closure, native accounting, verified_files, dataset identities, proposer isolation and private evidence hashes. Live dispatch_get on 2026-10-30 reported queue a332dd13-11b8-470f-9871-211490a67a8b passed with canonical RunRecord SHA-256 cfe6049eaf1431f68e73f8bc62c98dbf2da7a86f8a9ea04eb86b2c91b2d0087a. The native record file separately hashes to 8122346701a00789c9d17f626bca454481f7d39d2315e07d78f803d9c15a79da; these distinguish canonical record encoding from stored file bytes. Private observe-1.log SHA-256 3d49ad6aee7d1abafa6891063160ed73aa11474999cb2ebcdd166aac9cfbb550 retains the native evidence returned to the existing reconciliation controller. The source revision remains 44fa91cea; documentation publication at f17f7ba3 passed full fleet checks 2b00dfd6 (2,006 HPC3 tests) and e9a5322b (4,836 evaluator tests), both at 100% coverage.
 

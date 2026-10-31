@@ -15,18 +15,24 @@ source_paths:
   - "tools/fleet/src/fleet/cli/research_propose.py"
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
+  - "tools/fleet/tests/test_research_proposer_remote.py"
+  - "tools/fleet/tests/test_research_proposer_hub.py"
+  - "tools/fleet/tests/test_research_proposal_report.py"
 source_git_blobs:
+  "tools/fleet/tests/test_research_proposer_remote.py": "746f23412b9c7c5aff8838bc5a35b59f04b25742"
+  "tools/fleet/tests/test_research_proposer_hub.py": "323f96f26ccf0cb43fa78903f1a2ac541d55942a"
+  "tools/fleet/tests/test_research_proposal_report.py": "a3711895f09c8266571b621e9ebdb18e116a64f0"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "284621906d62f97da2080ca823bdc971aa9a0454"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_proposer.py": "bd5fd21260663875a363265c935f961773986ab9"
-  "tools/fleet/tests/test_research_proposer.py": "be097d47578910937d731e4efcd012ad2bb7e118"
-  "tools/fleet/tests/test_research_proposer_host.py": "894256824c924e03236a5c64160a753f96015579"
-  "tools/fleet/src/fleet/core/research_proposal.py": "dd0d9f77373e490d69aef66d305768a959b6f525"
-  "tools/fleet/src/fleet/cli/research_propose.py": "1c5e8bf6bab8bd79564235a292cc875a54a71fe2"
-  "tools/fleet/tests/test_research_proposal.py": "e3032d998c3d7e4b0951b2db7d1be643978ac2c5"
-  "tools/fleet/tests/test_research_proposal_host.py": "177c817e1992334468ed07142a01df4f71908aa6"
+  "tools/fleet/src/fleet/core/research_proposer.py": "62a07acd52b848b65014155466fe268beecfe247"
+  "tools/fleet/tests/test_research_proposer.py": "04d28830b7b0fdfbf20b478f7e7fdeef25083d35"
+  "tools/fleet/tests/test_research_proposer_host.py": "41ddec456e01f4b2b10bb180fa0cebe67f6ce45e"
+  "tools/fleet/src/fleet/core/research_proposal.py": "e4276cfec0006ed26aa8fb3c7b8fb8cdcb93a179"
+  "tools/fleet/src/fleet/cli/research_propose.py": "f6f9b337556473eddc55eb72f1d8cc4ce708bd65"
+  "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
+  "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
@@ -71,6 +77,28 @@ decoding, keeps refusals (exit 2 is accepted as a recorded refusal), and an
 admitted attempt then reaches HPC3 through the existing queue unchanged; there
 is no new queue or public submission tool. A drifted input or an isolation
 refusal writes no proposal and invokes no admission.[^installed]
+
+The private specification now requires explicit placement: `host: null` uses
+the caller's rootless daemon; an SSH alias such as `colossus` uses that host's
+existing `execdocker` lane. The shared SSH transport receives individually
+quoted arguments and the operation's deadline. Policy, journal, controller and
+data stay with the evaluator. A transport failure propagates, including a
+failure that prevents confirming cleanup; placement never retries on another
+host. `--report-task` optionally publishes the admission metadata under the
+`fleet-research-proposer` service identity. If reporting fails after admission,
+inspect the journal before rerunning.[^remote]
+
+On October 30 at 23:59 UTC, the installed CLI ran the same pinned proposal
+program twice on Colossus from Ziggurat and returned its output directly to the
+frozen local admission controller. A fresh synthetic journal recorded attempt 1
+as `admitted` and attempt 2, requesting the final partition, as `refused` with
+`holdout_forbidden`. The two program-authored reports bind the specification,
+image, candidate and returned proposal hashes. A read-only query found both
+reports and only one after changing the expected validation specification hash.
+No licensed rows or keys were involved; no queue submission or new cluster
+allocation was part of this handoff measurement.[^remote]
+
+[^remote]: `tools/fleet/src/fleet/core/research_proposer.py`, `_checked` and `run_proposer`; `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`; `tools/fleet/tests/test_research_proposer_remote.py`, quoting, transport failures, cleanup and local admission cases; `tools/fleet/tests/test_research_proposer_hub.py`, `test_actual_remote_proposal_and_timeout_cleanup`; `tools/fleet/tests/test_research_proposal_report.py`, service identity and outcome binding. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207` passed full check `672d626f-e949-44a2-921b-1df16de480b0` on Colossus: 2,561 tests, 100% statement/branch coverage. Read-only source installation `/home/corvis/research-control/proposer-remote-ca178d11a` runs with the existing final controller Python; it does not replace the frozen evaluator wheels. Private journal `/home/corvis/research-data/wrds/experiments/remote-proposer-20261030/journal.sqlite`. Reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` on task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, author `fleet-research-proposer`. Validation spec SHA-256 `3ee8eac1611d368a65b9238806a43382d233a1c186c4daa385ef7898b2daac70`; refused final spec `815fade7b1f1c04aaea6baf4e8f777b7e344a90cef70783f13ffe931b569ad92`.
 
 Enforced boundary, by what the proposer holds: the program text and approved
 context only; no host path (the evaluator's policy, journal, final extract,
