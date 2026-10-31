@@ -41,7 +41,10 @@ runner holds and settles every run it launched in one of four ways:
   the launch that removes it ended with its killed tick, and measured
   2026-10-16, six claims the hub runner's restart left at 07:10:08Z held
   colossus and serendipity, the one elevated node then, for the hour until
-  their leases lapsed. A cancel of such a job reaches its run the same way.
+  their leases lapsed. It gives back the project lease the claim took too
+  (:mod:`fleet.cli.node_unlaunched`, MCPs board task 31d1627d), which held
+  demure's lane for twenty minutes with no run on 2026-10-30. A cancel of
+  such a job reaches its run the same way.
 
 A stop ends the build's whole process tree
 (:func:`fleet.core.dialect.stop_script`) and then closes the row
@@ -63,6 +66,7 @@ from fleet.cli import _config, node_lost, node_retired
 from fleet.cli import collect as collect_cli
 from fleet.cli.node_collected import RENEW_AFTER_SECONDS, Collected, CollectOutcome, lease_age
 from fleet.cli.node_settle import settle
+from fleet.cli.node_unlaunched import give_back_lease
 from fleet.cli.run_locks import SETTLING
 from fleet.contracts.dispatch import DispatchJob, DispatchStatus, encode_job_line
 from fleet.contracts.ledger import NO_EXIT_CODE, LedgerEntry, LedgerOutcome
@@ -324,16 +328,15 @@ def reconcile_claim(
     )
     row = launched_by_claim(rows, job, alias=alias)
     if row is None:
-        answered = report_lost(
-            credentials,
-            job_id=job["job_id"],
-            detail=(
-                f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {job['job_id']} was claimed on "
-                f"{alias}, its start report never reached the queue, and nothing was launched, "
-                "so the job is given back"
-            ),
-            identity=identity,
+        detail = (
+            f"{FleetErrorCode.DISPATCH_NOT_LAUNCHED.value}: {job['job_id']} was claimed on "
+            f"{alias}, its start report never reached the queue, and nothing was launched, "
+            "so the job is given back"
         )
+        # Before the queue's give-back, so a report that fails leaves the job
+        # claimed for the next tick, which finds the lane already free.
+        lease = give_back_lease(loaded, job, alias=alias, detail=detail)
+        answered = report_lost(credentials, job_id=job["job_id"], detail=detail, identity=identity)
         # The launch that would have removed its host claim never ended: its
         # tick was killed (MCPs board task 3f7d40fe), so the claim is removed
         # here, or it charges the host until its lease lapses an hour later.
@@ -341,7 +344,8 @@ def reconcile_claim(
         return Reconciled(
             line=(
                 f"{encode_job_line(job)}: launched nothing, so it is given back and the queue "
-                f"left it {answered['status'].value}; its host claim on {alias} is discharged"
+                f"left it {answered['status'].value}; its host claim on {alias} is discharged; "
+                f"{lease}"
             ),
             adopted=None,
         )

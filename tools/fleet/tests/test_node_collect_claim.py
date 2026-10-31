@@ -22,10 +22,12 @@ from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import _config, node_agent, node_collect
 from fleet.contracts.dispatch import decode_job, encode_job_line
+from fleet.contracts.feed import FeedKind
 from fleet.contracts.host_claim import HostClaim
+from fleet.contracts.lease import Lease
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad
-from fleet.core import _test_hooks, claim_window, host_claims, leases, records, staging
+from fleet.core import _test_hooks, claim_window, host_claims, leases, queue, records, staging
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -57,6 +59,10 @@ ORPHANED = queue_job(
     claimedAt=queue_instant(DEMO_NOW),
     taskId=VERDICT_TASK,
 )
+
+#: The session that submitted it, which a lease its claim took names.
+ORPHANED_SUBMITTER = "opus-dispatch-0905"
+ORPHANED_SESSION = "11111111-aaaa-4aaa-8aaa-111111111111"
 
 #: The job once adopted: running under lavender's runner, naming the run.
 ADOPTED = queue_job(
@@ -114,6 +120,39 @@ def _ledger(config_path: pathlib.Path) -> tuple[LedgerEntry, ...]:
     """Every ledger row the workspace holds, oldest first."""
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
     return records.read_ledger(loaded.ledger)
+
+
+def _plant_lease(
+    config_path: pathlib.Path,
+    *,
+    agent: str = ORPHANED_SUBMITTER,
+    session_id: str = ORPHANED_SESSION,
+    acquired_unix: int = DEMO_NOW,
+) -> Lease:
+    """Hold the demo project on lavender as a claiming tick's take leaves it.
+
+    Args:
+        config_path: The workspace document.
+        agent: The session label the lease names.
+        session_id: That session's UUID.
+        acquired_unix: When it was taken.
+
+    Returns:
+        The lease, as acquired.
+    """
+    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
+    lease = Lease(
+        node="lavender",
+        project="libs/demo",
+        run_id=f"libs-demo-lavender-{acquired_unix}",
+        agent=agent,
+        session_id=session_id,
+        acquired_unix=acquired_unix,
+        expires_unix=DEMO_NOW + 1200,
+        resources=(),
+    )
+    leases.acquire(loaded.leases, lease, now_unix=DEMO_NOW)
+    return lease
 
 
 def _live_runs(config_path: pathlib.Path) -> int:
@@ -287,6 +326,119 @@ class TestTheNextTick:
         assert host_claims.host_load(
             host_claims.live_claims(loaded.host_claims, alias="lavender")
         ) == LiveLoad(runs=0, workers=0, ram_gb=0.0)
+
+    def test_a_given_back_claim_abandons_the_lease_it_took_and_the_lane_is_claimed_again(
+        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """MCPs board task 31d1627d, A1. The claiming tick took the project's
+        lease and died before it launched, as demure's did for job c1e06efc
+        at 2026-10-30T23:39:57Z; the give-back abandons that lease, so the
+        claim pass of the same tick asks for the lane it had excluded."""
+        _plant_lease(sourced_config)
+        _test_hooks.run = FakeRun(list(PROBED))
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": [ORPHANED]}),
+                dump_json_str({"job": queue_job(status="queued")}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level(logging.INFO):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.tools == ["dispatch_list", "dispatch_report", "dispatch_claim"]
+        assert endpoint.arguments[2]["projects"] == ["libs/demo"]
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        assert (
+            leases.find_holder(
+                loaded.leases, node="lavender", project="libs/demo", now_unix=DEMO_NOW
+            )
+            is None
+        )
+        refused = records.read_feed(loaded.feed)[-1]
+        assert refused["kind"] is FeedKind.REFUSED
+        assert refused["run_id"] == DEMO_RUN_ID
+        assert refused["detail"] == endpoint.arguments[1]["detail"]
+        assert f"its lease {DEMO_RUN_ID} is abandoned: lease released" in caplog.text
+
+    @pytest.mark.parametrize(
+        ("agent", "session_id", "acquired_unix"),
+        [
+            pytest.param("opus-fleet-w4-1003", ORPHANED_SESSION, DEMO_NOW, id="another-submitter"),
+            pytest.param(ORPHANED_SUBMITTER, "s", DEMO_NOW, id="another-session"),
+            pytest.param(
+                ORPHANED_SUBMITTER,
+                ORPHANED_SESSION,
+                DEMO_NOW - claim_window.CLAIM_CLOCK_SLACK_SECONDS - 1,
+                id="taken-before-the-claim",
+            ),
+        ],
+    )
+    def test_a_given_back_claim_leaves_a_lease_another_dispatch_took_held(
+        self,
+        sourced_config: pathlib.Path,
+        caplog: pytest.LogCaptureFixture,
+        agent: str,
+        session_id: str,
+        acquired_unix: int,
+    ) -> None:
+        """MCPs board task 31d1627d, A2. A lease carries no job id, so one the
+        dead claim cannot have taken is another dispatch's environment."""
+        planted = _plant_lease(
+            sourced_config, agent=agent, session_id=session_id, acquired_unix=acquired_unix
+        )
+        _test_hooks.run = FakeRun(list(PROBED))
+        endpoint = FakeQueue(
+            [
+                dump_json_str({"jobs": [ORPHANED]}),
+                dump_json_str({"job": queue_job(status="queued")}),
+                dump_json_str({"claimed": None}),
+            ]
+        )
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level(logging.INFO):
+            assert node_agent.main(node_argv(sourced_config)) == 0
+
+        assert endpoint.tools[:2] == ["dispatch_list", "dispatch_report"]
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        assert leases.held_leases(loaded.leases, now_unix=DEMO_NOW) == (planted,)
+        assert [event["kind"] for event in records.read_feed(loaded.feed)] == []
+        assert (
+            f"{planted['run_id']} holding libs/demo on lavender is not its claim's" in caplog.text
+        )
+
+    def test_a_given_back_claim_leaves_the_lease_of_a_run_still_going_held(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task 31d1627d, A2. A second job of the same submitter,
+        session and project, claimed in the window of a run another job holds
+        running, matches that run's lease on all three, and only the ledger
+        says the lease is a launched run's."""
+        launch(sourced_config)
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
+        second = {**ORPHANED, "id": "22222222-bbbb-4bbb-8bbb-222222222222"}
+        _test_hooks.http_post = FakeQueue([dump_json_str({"job": queue_job(status="queued")})])
+
+        reconciled = node_collect.reconcile_claim(
+            loaded,
+            queue.load_credentials(),
+            decode_job(second, answer=dump_json_str(second)),
+            {},
+            alias="lavender",
+            running=frozenset({DEMO_RUN_ID}),
+        )
+
+        assert reconciled["adopted"] is None
+        assert reconciled["line"].endswith(
+            f"{DEMO_RUN_ID} holding libs/demo on lavender is not its claim's, so it stays held"
+        )
+        assert [
+            lease["run_id"] for lease in leases.held_leases(loaded.leases, now_unix=DEMO_NOW)
+        ] == [DEMO_RUN_ID]
+        assert _ledger(sourced_config)[-1]["outcome"] == "running"
 
     def test_refuses_rather_than_guesses_between_two_runs_either_claim_could_have_launched(
         self, sourced_config: pathlib.Path
