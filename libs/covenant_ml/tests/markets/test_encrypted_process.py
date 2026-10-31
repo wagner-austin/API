@@ -1,93 +1,51 @@
-"""Real process termination distinguishes Python cleanup from scheduler reclamation."""
+"""Run the maintained storage probe through real uncatchable termination."""
 
 from __future__ import annotations
 
+import os
 import signal
 import subprocess
 import sys
+import time
 from hashlib import sha256
 from pathlib import Path
 
-import pytest
 from platform_core.json_utils import load_json_str, narrow_json_to_dict, require_str
 
-from ._trial_fixtures import trial_document
-
-PROBE_PROGRAM = """
-import os
-import signal
-import socket
-import stat
-import sys
-from hashlib import sha256
-from pathlib import Path
-
-from platform_core.json_utils import JSONObject, dump_json_str
-from covenant_ml.markets.encrypted_storage import decrypted_bundle
-from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
-from covenant_ml.markets.validation import read_document
-
-bundle, digest, access, scratch, output, termination = sys.argv[1:]
-keys = EvaluatorKeys(decode_research_access(read_document(Path(access))))
-with decrypted_bundle(
-    Path(bundle), digest, partition="train-validation",
-    identity=keys.acquire("train-validation"), scratch=Path(scratch),
-    max_plaintext_bytes=keys.access["max_plaintext_bytes"],
-) as manifest:
-    receipt: JSONObject = {
-        "node": socket.gethostname(), "scratch": scratch,
-        "private": str(manifest.parent),
-        "mode": stat.S_IMODE(manifest.parent.stat().st_mode),
-        "manifest_sha256": sha256(manifest.read_bytes()).hexdigest(),
-        "files": len(list(manifest.parent.iterdir())),
-    }
-    with Path(output).open("x", encoding="utf-8") as stream:
-        stream.write(dump_json_str(receipt))
-        stream.flush()
-        os.fsync(stream.fileno())
-    if termination == "kill":
-        os.kill(os.getpid(), signal.SIGKILL)
-"""
+from .test_research_storage_probe import probe_arguments
 
 
-@pytest.mark.parametrize("termination", ["normal", "kill"])
-def test_real_process_exit_and_sigkill_have_distinct_cleanup(
-    tmp_path: Path, termination: str
-) -> None:
-    """SIGKILL leaves private files for the scheduler; normal exit removes them."""
-    document = trial_document(tmp_path)
-    bundle = Path(require_str(document, "manifest"))
+def test_real_sigkill_leaves_plaintext_for_scheduler_reclamation(tmp_path: Path) -> None:
+    """Kill after authentication; no Python cleanup or success receipt can run."""
+    args = probe_arguments(tmp_path)
+    args[-1] = "300"
     scratch = tmp_path / "scratch"
     scratch.mkdir(mode=0o700)
-    output = tmp_path / "receipt.json"
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            PROBE_PROGRAM,
-            str(bundle),
-            sha256(bundle.read_bytes()).hexdigest(),
-            str(tmp_path / "access.json"),
-            str(scratch),
-            str(output),
-            termination,
-        ],
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=30,
-    )
-    assert result.returncode == (-signal.SIGKILL if termination == "kill" else 0)
-    assert (result.stdout, result.stderr) == ("", "")
-    receipt = narrow_json_to_dict(load_json_str(output.read_text()))
+    output = tmp_path / "outputs"
+    output.mkdir()
+    environment = os.environ.copy()
+    environment.update(PROBE_SCRATCH=str(scratch), PROBE_OUTPUT=str(output))
+    command = [sys.executable, "-m", "scripts.research_storage_probe", *args]
+    opened = output / "opened.json"
+    with subprocess.Popen(
+        command, env=environment, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+    ) as process:
+        try:
+            deadline = time.monotonic() + 30
+            while not (opened.exists() and opened.read_text().endswith("}")):
+                assert process.poll() is None
+                assert time.monotonic() < deadline
+                time.sleep(0.01)
+        finally:
+            process.kill()
+            stdout, stderr = process.communicate(timeout=10)
+        assert (process.returncode, stdout, stderr) == (-signal.SIGKILL, "", "")
+    receipt = narrow_json_to_dict(load_json_str(opened.read_text()))
     assert receipt["mode"] == 0o700
     assert receipt["files"] == 10
     manifest = tmp_path / "source/manifest.json"
     assert receipt["manifest_sha256"] == sha256(manifest.read_bytes()).hexdigest()
     private = Path(require_str(receipt, "private"))
     assert private.parent == scratch
-    assert private.is_dir() == (termination == "kill")
-    if termination == "kill":
-        assert (private / "manifest.json").read_bytes() == manifest.read_bytes()
-    else:
-        assert list(scratch.iterdir()) == []
+    assert (private / "manifest.json").read_bytes() == manifest.read_bytes()
+    assert sorted(path.name for path in output.iterdir()) == ["opened.json"]

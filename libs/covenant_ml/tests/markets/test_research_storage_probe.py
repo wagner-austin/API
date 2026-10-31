@@ -47,6 +47,8 @@ def probe_arguments(root: Path) -> list[str]:
         "PROBE_SCRATCH",
         "--output-env",
         "PROBE_OUTPUT",
+        "--hold-seconds",
+        "0",
     ]
 
 
@@ -69,6 +71,9 @@ def test_measurement_authenticates_files_and_confirms_cleanup(
         "plaintext_removed": True,
     }
     assert private.parent == Path(allocation["PROBE_SCRATCH"])
+    opened = dict(receipt)
+    del opened["plaintext_removed"]
+    assert load_json_str((output / "opened.json").read_text()) == opened
     assert list(private.parent.iterdir()) == []
     assert load_json_str((output / "metrics.json").read_text()) == [
         {"name": "authenticated_files", "value": 10.0},
