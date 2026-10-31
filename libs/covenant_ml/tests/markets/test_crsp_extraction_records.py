@@ -49,7 +49,7 @@ def partition_document(partition: str) -> JSONObject:
 def receipt_document() -> JSONObject:
     """A complete receipt as the writer encodes it."""
     return {
-        "schema": "pg_temp",
+        "source": "synthetic",
         "setup_sha256": DIGEST,
         "protocol": _file("protocol.json"),
         "driver_sha256": DIGEST,
@@ -73,7 +73,7 @@ def test_receipt_round_trips_exactly() -> None:
 
 def test_vendor_receipt_carries_no_setup() -> None:
     document = receipt_document()
-    document["schema"] = "crsp_a_stock"
+    document["source"] = "crsp_a_stock"
     document["setup_sha256"] = None
     assert decode_crsp_extraction_receipt(document)["setup_sha256"] is None
 

@@ -7,10 +7,12 @@ import pytest
 from covenant_ml.markets.crsp_protocol import decode_crsp_protocol
 from covenant_ml.markets.crsp_queries import (
     CrspScope,
+    CrspSource,
     crsp_driver_sql,
     crsp_relation_sql,
     crsp_scopes,
-    require_schema,
+    synthetic_source,
+    vendor_source,
 )
 
 from .test_crsp_protocol import protocol_document
@@ -64,7 +66,9 @@ def test_validation_calendar_beyond_coverage_is_refused() -> None:
 
 def test_validation_queries_clip_membership_and_date_every_relation() -> None:
     protocol = decode_crsp_protocol(protocol_document())
-    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], "crsp_a_stock", 5)
+    source = vendor_source(protocol)
+    assert source == CrspSource("crsp_a_stock", "crsp_a_stock.", "")
+    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 5)
     assert sql == {
         "membership": (
             "COPY (SELECT permno, namedt, LEAST(nameendt, DATE '2021-12-31') AS nameendt,"
@@ -96,10 +100,14 @@ def test_validation_queries_clip_membership_and_date_every_relation() -> None:
     }
 
 
-def test_final_queries_reach_coverage_and_name_the_synthetic_schema() -> None:
+def test_synthetic_definitions_open_every_final_statement_with_unqualified_names() -> None:
     protocol = decode_crsp_protocol(protocol_document())
-    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], "pg_temp", 1)
-    assert "FROM pg_temp.dsenames WHERE shrcd IN (10, 11)" in sql["membership"]
+    source = synthetic_source("\n dsenames(permno) AS (SELECT 1)\n")
+    assert source == CrspSource("synthetic", "", "WITH dsenames(permno) AS (SELECT 1)\n")
+    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], source, 1)
+    opening = "COPY (WITH dsenames(permno) AS (SELECT 1)\nSELECT "
+    assert [statement.startswith(opening) for statement in sql.values()] == [True] * 4
+    assert "FROM dsenames WHERE shrcd IN (10, 11)" in sql["membership"]
     assert "LEAST(nameendt, DATE '2025-02-28') AS nameendt" in sql["membership"]
     assert "AND caldt BETWEEN DATE '1998-01-01' AND DATE '2025-02-28'" in sql["calendar"]
     ending = "LIMIT 2) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
@@ -107,20 +115,22 @@ def test_final_queries_reach_coverage_and_name_the_synthetic_schema() -> None:
     assert "crsp_a_stock" not in "".join(sql.values())
 
 
-@pytest.mark.parametrize("schema", ["", "Crsp", "crsp; drop", "1abc", "a" * 64])
-def test_unsafe_schema_identifiers_are_refused(schema: str) -> None:
-    with pytest.raises(ValueError, match=r"\[CRSP-010\] source schema"):
-        require_schema(schema)
+@pytest.mark.parametrize("text", ["", "  \n", "a AS (SELECT 1); DROP x", "a AS (SELECT 1)\n\\! id"])
+def test_definitions_that_could_end_the_statement_or_reach_the_client_are_refused(
+    text: str,
+) -> None:
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] synthetic definitions must be"):
+        synthetic_source(text)
 
 
 def test_row_limit_must_be_positive() -> None:
     protocol = decode_crsp_protocol(protocol_document())
     with pytest.raises(ValueError, match=r"\[CRSP-010\] the row limit"):
-        crsp_relation_sql(protocol, crsp_scopes(protocol)[0], "crsp_a_stock", 0)
+        crsp_relation_sql(protocol, crsp_scopes(protocol)[0], vendor_source(protocol), 0)
 
 
 def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
-    driver = crsp_driver_sql(None, 120).splitlines()
+    driver = crsp_driver_sql(120).splitlines()
     assert driver[:6] == [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         "SET LOCAL statement_timeout = '120s';",
@@ -146,12 +156,6 @@ def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
     assert len(driver) == 6 + 16 + 4
 
 
-def test_synthetic_driver_builds_its_relations_before_the_transaction() -> None:
-    driver = crsp_driver_sql("setup.sql", 30).splitlines()
-    assert driver[0] == "\\i setup.sql"
-    assert driver[1] == "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;"
-
-
 def test_statement_timeout_must_be_positive() -> None:
     with pytest.raises(ValueError, match=r"\[CRSP-010\] the statement timeout"):
-        crsp_driver_sql(None, 0)
+        crsp_driver_sql(0)

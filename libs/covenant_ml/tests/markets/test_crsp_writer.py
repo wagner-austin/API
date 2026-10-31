@@ -20,7 +20,12 @@ from covenant_ml.markets.crsp_extraction_records import (
     decode_crsp_extraction_receipt,
     encode_crsp_extraction_receipt,
 )
-from covenant_ml.markets.crsp_queries import crsp_relation_sql, crsp_scopes
+from covenant_ml.markets.crsp_queries import (
+    crsp_relation_sql,
+    crsp_scopes,
+    synthetic_source,
+    vendor_source,
+)
 from covenant_ml.markets.crsp_writer import extract_crsp
 from covenant_ml.markets.encrypted_storage import decrypted_bundle
 
@@ -107,7 +112,7 @@ def test_one_snapshot_yields_two_separate_sealed_partitions(
     )
     assert receipt["driver_sha256"] == sha256(database.driver.encode()).hexdigest()
     assert receipt["protocol"]["sha256"] == sha256(case.protocol.read_bytes()).hexdigest()
-    assert (receipt["schema"], receipt["setup_sha256"], receipt["plaintext_removed"]) == (
+    assert (receipt["source"], receipt["setup_sha256"], receipt["plaintext_removed"]) == (
         "crsp_a_stock",
         None,
         True,
@@ -143,7 +148,7 @@ def test_manifest_preserves_the_exact_queries_and_protocol_bytes(
     opened = case.root / "opened"
     opened.mkdir(mode=0o700)
     protocol = database_protocol()
-    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], "crsp_a_stock", 15000)
+    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], vendor_source(protocol), 15000)
     with decrypted_bundle(
         case.output / "final" / "bundle.json",
         receipt["final"]["bundle"]["sha256"],
@@ -172,45 +177,84 @@ def test_manifest_preserves_the_exact_queries_and_protocol_bytes(
     ] + [{"name": "plaintext_removed", "value": 1.0}]
 
 
-def test_a_synthetic_session_builds_temporary_relations_first(
+def test_a_synthetic_source_carries_its_definitions_in_every_saved_query(
     tmp_path: Path, database: FakeDatabase
 ) -> None:
     case = extraction(tmp_path)
-    setup = tmp_path / "setup.sql"
-    setup.write_text("CREATE TEMP TABLE dsenames (permno integer);\n", encoding="utf-8")
+    setup = tmp_path / "definitions.sql"
+    setup.write_text("dsenames(permno) AS (SELECT 1)\n", encoding="utf-8")
     receipt = extract_crsp(
         case.protocol,
         case.access,
-        schema="pg_temp",
+        source="synthetic",
         setup=setup,
         scratch=case.scratch,
         output=case.output,
         limits=limits(),
     )
-    assert receipt["setup_sha256"] == sha256(setup.read_bytes()).hexdigest()
-    assert database.driver.splitlines()[0] == "\\i setup.sql"
-    assert receipt["schema"] == "pg_temp"
+    assert (receipt["source"], receipt["setup_sha256"]) == (
+        "synthetic",
+        sha256(setup.read_bytes()).hexdigest(),
+    )
+    assert database.driver.splitlines()[0] == "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;"
+    keys = evaluator_keys(case.root)
+    opened = case.root / "opened"
+    opened.mkdir(mode=0o700)
+    protocol = database_protocol()
+    source = synthetic_source(setup.read_text("utf-8"))
+    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 20000)
+    with decrypted_bundle(
+        case.output / "train-validation" / "bundle.json",
+        receipt["train_validation"]["bundle"]["sha256"],
+        partition="train-validation",
+        identity=keys.acquire("train-validation"),
+        scratch=opened,
+        max_plaintext_bytes=10_000_000,
+    ) as manifest:
+        for name, sql in queries.items():
+            saved = (manifest.parent / (name + ".sql")).read_text("utf-8")
+            assert saved == sql
+            assert saved.startswith("COPY (WITH dsenames(permno) AS (SELECT 1)\nSELECT ")
+
+
+def test_synthetic_definitions_that_could_end_a_statement_are_refused_before_any_query(
+    tmp_path: Path, database: FakeDatabase
+) -> None:
+    case = extraction(tmp_path)
+    setup = tmp_path / "definitions.sql"
+    setup.write_text("dsenames(permno) AS (SELECT 1); DROP TABLE x\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] synthetic definitions must be"):
+        extract_crsp(
+            case.protocol,
+            case.access,
+            source="synthetic",
+            setup=setup,
+            scratch=case.scratch,
+            output=case.output,
+            limits=limits(),
+        )
+    assert database.calls == []
 
 
 @pytest.mark.parametrize(
-    ("schema", "with_setup", "message"),
+    ("source", "with_setup", "message"),
     [
-        ("pg_temp", False, "a setup script is required exactly"),
-        ("crsp_a_stock", True, "a setup script is required exactly"),
-        ("crsp", False, "the source schema must be the protocol's library"),
+        ("synthetic", False, "definitions are required exactly"),
+        ("crsp_a_stock", True, "definitions are required exactly"),
+        ("crsp", False, "the source must be the protocol's library"),
     ],
 )
 def test_source_must_be_the_vendor_library_or_an_explicit_synthetic_session(
-    tmp_path: Path, database: FakeDatabase, schema: str, with_setup: bool, message: str
+    tmp_path: Path, database: FakeDatabase, source: str, with_setup: bool, message: str
 ) -> None:
     case = extraction(tmp_path)
-    setup = tmp_path / "setup.sql"
-    setup.write_text("SELECT 1;\n", encoding="utf-8")
+    setup = tmp_path / "definitions.sql"
+    setup.write_text("dsenames(permno) AS (SELECT 1)\n", encoding="utf-8")
     with pytest.raises(ValueError, match=rf"\[CRSP-010\] {message}"):
         extract_crsp(
             case.protocol,
             case.access,
-            schema=schema,
+            source=source,
             setup=setup if with_setup else None,
             scratch=case.scratch,
             output=case.output,

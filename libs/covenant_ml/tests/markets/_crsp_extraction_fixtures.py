@@ -77,11 +77,11 @@ def installed(database: FakeDatabase) -> Generator[FakeDatabase, None, None]:
 
 
 def run_vendor(case: Extraction, bounds: CrspLimits) -> CrspExtractionReceipt:
-    """Extract from the vendor schema with the given bounds."""
+    """Extract from the vendor library with the given bounds."""
     return extract_crsp(
         case.protocol,
         case.access,
-        schema="crsp_a_stock",
+        source="crsp_a_stock",
         setup=None,
         scratch=case.scratch,
         output=case.output,

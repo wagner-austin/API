@@ -68,7 +68,7 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
     result = _verify(case, open_final=False)
     item = receipt["train_validation"]
     assert result == {
-        "schema": "crsp_a_stock",
+        "source": "crsp_a_stock",
         "snapshot": "750:750:",
         "ciphertext_files": 20,
         "partitions": [
@@ -94,12 +94,12 @@ def test_synthetic_final_partition_opens_with_its_own_key(
     tmp_path: Path, database: FakeDatabase
 ) -> None:
     case = extraction(tmp_path)
-    setup = tmp_path / "setup.sql"
-    setup.write_text("SELECT 1;\n", encoding="utf-8")
+    setup = tmp_path / "definitions.sql"
+    setup.write_text("dsenames(permno) AS (SELECT 1)\n", encoding="utf-8")
     extract_crsp(
         case.protocol,
         case.access,
-        schema="pg_temp",
+        source="synthetic",
         setup=setup,
         scratch=case.scratch,
         output=case.output,

@@ -41,7 +41,7 @@ def _arguments(case: Extraction, *, relation_bytes: int = 2_000_000) -> list[str
         str(case.protocol),
         "--access",
         str(case.root / "access.json"),
-        "--schema",
+        "--source",
         "crsp_a_stock",
         "--max-rows",
         "20000",
