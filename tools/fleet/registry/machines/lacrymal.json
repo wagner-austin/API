@@ -9,16 +9,19 @@
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.104.15.118",
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC4Pf/KNHEl/qIJFVr9+JSw0ZumsjlgNjSBbwlvjpTkE corvis@lacrymal sessions duty host",
-  "bootMac": null,
+  "bootMac": "6c:3c:8c:32:89:be",
   "netbootWifi": false,
-  "installDisk": null,
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Samsung_SSD_970_EVO_1TB_S5H9NS0N548365Y_1"
+  },
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,
   "boot": {
     "units": []
   },
-  "notes": "The sessions duty's standby since 2026-10-25 (MCPs board task 770837b7, A3: a second Linux machine that takes the hub runner's sessions duty when diphtheria stops stamping), in demure's place, which the operator kept for the stack alone on 2026-10-24 (\"demure*will be dedicated as the server pc. not a worker.\", MCPs board task c036582e). Its reachKey is its own ~/.ssh/id_ed25519, made 2026-10-25 by the command MCPs maketools.fleet.duty_host_inputs.reach_key_command gives (fingerprint SHA256:dckr6S05cmQhdxVuXEpSYNSPEWyJQ9vADeSmEGzOSoE), which the hub and the session host admit from 100.104.15.118 alone; MCPs make duty-host-provision NODE=lacrymal gives it the MCPs and API clones, the room checkouts and the MCPs .env its runner reads, so a wipe loses nothing a re-run does not make again. Ubuntu 24.04.4 on a Dell OptiPlex Micro 7010 (i5-13500T), provisioned from the stick 2026-10-18 (Initialize-Node.sh --role worker, VERIFY ALL PASSED). A dispatch worker since 2026-10-19 (board task f3a19e1d), provisioned by scripts/host/fleet-node/provision.sh with the fleet test database and the isolated docker lane; nobody uses it at its console, so its budget keeps only the OS's margin.",
+  "notes": "Its boot MAC, the onboard e1000e's on enp0s31f6 (firmware entry Boot0001, ONBOARD NIC (IPV4)), and its install disk, its one NVMe, a Samsung 970 EVO 1TB, read with udevadm, were declared 2026-10-31 for its netboot reinstall with the fleet's NixOS (MCPs board task ee5e18e3). The sessions duty's standby since 2026-10-25 (MCPs board task 770837b7, A3: a second Linux machine that takes the hub runner's sessions duty when diphtheria stops stamping), in demure's place, which the operator kept for the stack alone on 2026-10-24 (\"demure*will be dedicated as the server pc. not a worker.\", MCPs board task c036582e). Its reachKey is its own ~/.ssh/id_ed25519, made 2026-10-25 by the command MCPs maketools.fleet.duty_host_inputs.reach_key_command gives (fingerprint SHA256:dckr6S05cmQhdxVuXEpSYNSPEWyJQ9vADeSmEGzOSoE), which the hub and the session host admit from 100.104.15.118 alone; MCPs make duty-host-provision NODE=lacrymal gives it the MCPs and API clones, the room checkouts and the MCPs .env its runner reads, so a wipe loses nothing a re-run does not make again. Ubuntu 24.04.4 on a Dell OptiPlex Micro 7010 (i5-13500T), provisioned from the stick 2026-10-18 (Initialize-Node.sh --role worker, VERIFY ALL PASSED). A dispatch worker since 2026-10-19 (board task f3a19e1d), provisioned by scripts/host/fleet-node/provision.sh with the fleet test database and the isolated docker lane; nobody uses it at its console, so its budget keeps only the OS's margin.",
   "dispatch": {
     "held": null,
     "stage_root": "/home/corvis/fleet/stage",
