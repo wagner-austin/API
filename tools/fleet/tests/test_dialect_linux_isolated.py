@@ -8,15 +8,18 @@ properties that make that an isolation; the host case runs inside
 tools/fleet-execution-linux's own isolated build, which the docker tag
 routes through that script, and proves from there that it runs as
 execdocker, sees a rootless daemon, is refused by the stack's socket and
-cannot escalate. A second host case reads, from the same build, that the
+cannot escalate. Two more host cases read, from the same build, that the
 venv the lane made for it runs the fleet's pinned Python (MCPs board task
-53b4725d).
+53b4725d) and that the interpreter's Python.h is on the node (MCPs board
+task bcb7c6ef).
 """
 
 from __future__ import annotations
 
+import pathlib
 import subprocess
 import sys
+import sysconfig
 
 import pytest
 
@@ -305,3 +308,19 @@ def test_this_suites_venv_runs_the_fleets_pinned_python() -> None:
     running = f"{sys.version_info.major}.{sys.version_info.minor}"
 
     assert running == REQUIRED_PYTHON, sys.executable
+
+
+@pytest.mark.host_linux_docker
+def test_this_suites_interpreter_carries_its_own_python_h() -> None:
+    """The pinned interpreter's development headers are on this node.
+
+    A C extension built in a venv, as Triton builds its cuda_utils helper,
+    compiles against the interpreter's include directory, and a node without
+    that interpreter's Python.h failed 25 of Model-Trainer's cases (MCPs
+    board task bcb7c6ef). The lane's interpreter is /usr/bin/python3.11 on
+    an Ubuntu node, the same file the node user's runner lane links, so this
+    reads the headers every lane on the node builds against.
+    """
+    header = pathlib.Path(sysconfig.get_paths()["include"]) / "Python.h"
+
+    assert header.is_file(), str(header)
