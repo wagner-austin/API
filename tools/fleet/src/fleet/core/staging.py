@@ -45,6 +45,7 @@ import tarfile
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import _test_hooks, dialect, names, remote, stage_repository
+from fleet.core.export import CompanionExport
 
 #: Directory names never carried to a node.
 #:
@@ -272,6 +273,54 @@ def stage_companion(
     return tree
 
 
+def stage_companions(
+    host: str,
+    *,
+    stage_root: str,
+    companions: tuple[CompanionExport, ...],
+    workers: int,
+) -> tuple[str, ...]:
+    """Stage independent companions concurrently within the admitted allocation.
+
+    The dispatch already holds every companion directory's node-local lease.
+    Each transfer uses its own staging directory and verified bundle, and
+    each checkout is replaced before use. At most four transfers run at once,
+    never more than the job's worker allocation. All finish before a build
+    can launch; a failed transfer propagates after the pool has joined its
+    in-flight work, so the caller cannot release leases over active writers.
+
+    Args:
+        host: SSH destination.
+        stage_root: The node's declared stage directory.
+        companions: Distinct companion directories, in declaration order.
+        workers: Positive worker allocation granted to this dispatch.
+
+    Returns:
+        Completed checkout paths in declaration order.
+
+    Raises:
+        AppError: A companion's transfer, digest or checkout failure.
+    """
+    if not companions:
+        return ()
+
+    def stage_one(companion: CompanionExport) -> str:
+        return stage_companion(
+            host,
+            stage_root=stage_root,
+            directory=companion["directory"],
+            ref=companion["ref"],
+            sha=companion["sha"],
+            source=companion["path"],
+            payload=companion["data"],
+        )
+
+    with _test_hooks.executor(
+        workers=min(4, workers, len(companions)), name="fleet-companion-stage"
+    ) as pool:
+        return tuple(pool.map(stage_one, companions))
+
+
 def stage(
     host: str,
     *,
@@ -441,5 +490,6 @@ __all__ = [
     "send_verified",
     "stage",
     "stage_companion",
+    "stage_companions",
     "stage_registry",
 ]

@@ -372,16 +372,13 @@ def launch(
     # so a verdict can be read against the workspace it was measured with --
     # a companion is the tip of a ref, so two runs of one sha can legitimately
     # measure different things, and the line is where that shows.
-    for companion in companions:
-        beside = staging.stage_companion(
-            node["host"],
-            stage_root=node["stage_root"],
-            directory=companion["directory"],
-            ref=companion["ref"],
-            sha=companion["sha"],
-            source=companion["path"],
-            payload=companion["data"],
-        )
+    staged_companions = staging.stage_companions(
+        node["host"],
+        stage_root=node["stage_root"],
+        companions=companions,
+        workers=workers,
+    )
+    for companion, beside in zip(companions, staged_companions, strict=True):
         run_lease.emit(
             loaded_feed,
             run_id=run_id,
