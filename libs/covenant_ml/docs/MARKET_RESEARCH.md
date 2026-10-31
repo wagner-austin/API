@@ -840,7 +840,7 @@ Changing, removing, adding or reordering a column is refused. The exact fields a
   Membership uses inclusive dates and exactly one active record, share codes
   10/11 and exchange codes 1/2/3. Never extend membership beyond its ending date.
 - `crsp_a_stock.metaexchangecalendar`: `caldt,exchangegroup,tradingflg`.
-  Filter group `CIZ`; retain all calendar days and their `Y`/`N` flags.
+  Retain all dates; require `CIZ/Y` sessions or `N/A/N` closed days.
   `crsp_windows` checks contiguity and complete months before selecting the
   month's last session and the following two months' first sessions.
 - `crsp_a_stock.stkdlysecuritydata`: `permno,dlycaldt,dlyprevdt,dlyret,
