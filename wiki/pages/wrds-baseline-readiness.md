@@ -283,15 +283,22 @@ a mode-0700 directory on `wrds-sas30-w.wharton.private`. Grid Engine enforced
 its 30-second runtime limit while the maintained probe was holding for 300
 seconds: accounting records failure 44 and exit 137. The shared queue closed
 failed with no result digest, and collection refused `WRDS_NOT_COMPLETE`.
-Same-node observers `40551338` at 02:46:04 UTC and `40551800` at 05:25:42 UTC on
-October 31 found both exact recorded directories absent. The first reporting
-command failed because accounting had not yet appeared; its observation and
-failure remain preserved. The corrected controller durably records the observer
+The program-authored report records same-node observer `40551800` at
+05:25:42 UTC on October 31 finding both exact recorded directories absent.
+The measured delay from the queue-failure note is 2 hours 40 minutes 11 seconds.
+That note was written by `fleet-research-diphtheria` at 02:45:30 UTC; it is
+the controller's failure report, not the scheduler's termination timestamp.
+The earlier observer and accounting-delay reporting failure remain in the
+worker-retained artifact, but do not establish an independently measured
+earlier cleanup time. The corrected controller durably records the observer
 before checking accounting and reconciles that receipt without another job.
 Its complete service-authored report was posted at 05:27:14 UTC. This establishes
 later filesystem absence for one killed subject, not immediate cleanup,
 physical erasure or behavior after node failure. Independent review remains
-open under `4b7fe216`.[^wrds-cleanup]
+open under `4b7fe216`; audit `4dde8a37` reopened its observation-delay
+mapping, corrected here using the program-authored timestamps.[^wrds-cleanup][^wrds-delay]
+
+[^wrds-delay]: Live board update `f257d742-c6d7-45b5-acfe-4444aa70eb85`, author `fleet-research-diphtheria`, `created_at=2026-10-31T02:45:30.812624Z`; report `c59b266b-9a99-4e43-aaa4-a6345ad91831`, author `load-report-4b7fe216`, `observation.observed_at=2026-10-31T05:25:42.104784Z`. A read-only database subtraction returned `02:40:11.29216`; a 2-hour-40-minute to 2-hour-41-minute window matched once, and a zero-to-one-minute window matched zero rows. Audit `4dde8a37` and check review `37f63942`, A2, identify the missing delay mapping; these checks measure delay from the queue note, not the scheduler's termination time. Live audit `2f50ce9a` closed the configured-wiki-root prerequisite `0ae483f4` VERIFIED at `2026-10-31T05:56:20.162Z`.
 
 [^wrds-cleanup]: `tools/hpc3/artifacts/wrds-forced-kill-20261031/provenance.json`, `measurement`, `first_observation`, `preserved_failure`, `verification`, `evidence_sha256` and `limits`; `tools/hpc3/src/hpc3/core/wrds_cleanup.py`, `submit` and `measure`; `tools/hpc3/src/hpc3/wrds/scratch.py`, `observe`; `tools/hpc3/tests/test_wrds_cleanup.py`, pending accounting, bound receipts and refusal cases; `tools/hpc3/tests/test_wrds_scratch.py`, actual directory observations and failures. Report `c59b266b-9a99-4e43-aaa4-a6345ad91831` on task `4b7fe216-2670-4dbe-bee4-9970faec8258`, author `load-report-4b7fe216`; queue `c0e0e899-3fea-40a4-b065-8a6e3519ce93`. Frozen controller-source snapshot at API `b95578fa619c9176ae83ff4cd15429f96c500730` uses the existing final Python without replacing evaluator wheels. Fleet `50243676-55b0-4535-93b0-481b4e10d7ec` passed 2,134 controller tests with 100% statement and branch coverage at 05:24:02 UTC.
 
@@ -350,11 +357,12 @@ records task `45ff6e73` done; the measured details are in
 
 [^remote-handoff]: `tools/fleet/src/fleet/core/research_proposal.py`, `propose`; `tools/fleet/src/fleet/cli/research_propose.py`, `main`. Live task `45ff6e73-ec8c-41ff-aae4-39d00423dddb`, program-authored reports `c389d77a-cd5b-4a2a-82e8-b5f80f4ad938` and `a823892d-3e21-45a1-adc3-a011d491a535` as `fleet-research-proposer`: attempts 1 admitted and 2 refused with `holdout_forbidden`. API `ca178d11ab74ab55eb24a3e7dbf69bdd6fa75207`, full fleet check `672d626f`, 2,561 passed with 100% coverage. No licensed data, final release or native allocation was used in this measurement.
 
-The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant]
+The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant][^wrds-delay]
 
 1. Complete independent review of the measured WRDS cleanup milestone and the
-   pending CRSP semantics task `54b55cc7`, whose wiki-audit dependency
-   `0ae483f4` remains open. Native final scoring is rehearsed on HPC3 only.
+   pending CRSP semantics task `54b55cc7`. Its wiki-audit dependency `0ae483f4`
+   passed independent audit `2f50ce9a` at 05:56:20 UTC on October 31 and released
+   the semantics task for review. Native final scoring is rehearsed on HPC3 only.
 2. Materialize the frozen four-relation CRSP extraction with exact SQL, vintage,
    checksums and calendar coverage, then stage its verified manifest to HPC3.
    Keep final-period evidence confined to the evaluator.
