@@ -105,6 +105,14 @@ def test_actual_proposer_denies_private_data_credentials_policy_and_network(
         result = run_proposer(*runtime, DENIAL_PROGRAM, context, host=None, timeout=15)
     finally:
         config_test_hooks.get_environment = original
+    assert_denied_resources(result, private, proposal)
+    assert [path.read_text() for path in (policy, holdout, credentials)] == ["private sentinel"] * 3
+
+
+def assert_denied_resources(
+    result: JSONObject, private: list[JSONValue], proposal: JSONObject
+) -> None:
+    """Require every denial and exact kernel resource limit on either placement."""
     assert result == {
         "blocked": [{"path": name, "errno": 2} for name in private],
         "policy_errno": 2,
@@ -119,7 +127,6 @@ def test_actual_proposer_denies_private_data_credentials_policy_and_network(
         "cpu": "100000 100000",
         "proposal": proposal,
     }
-    assert [path.read_text() for path in (policy, holdout, credentials)] == ["private sentinel"] * 3
 
 
 @pytest.mark.parametrize(

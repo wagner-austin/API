@@ -34,26 +34,46 @@ def test_service_publishes_the_controller_outcome(tmp_path: Path) -> None:
     poster = FakeHttpPost([posted_ok(), posted_ok()])
     _test_hooks.http_post = poster
     original = board_hooks.env
-    board_hooks.env = FakeEnv({
-        "TASKBOARD_MCP_API_KEY": "test-key", "CORVIS_TENANT_ID": "tenant",
-        "BOARD_WATCH_URL": DECLARED_TASKBOARD_URL,
-    })
+    board_hooks.env = FakeEnv(
+        {
+            "TASKBOARD_MCP_API_KEY": "test-key",
+            "CORVIS_TENANT_ID": "tenant",
+            "BOARD_WATCH_URL": DECLARED_TASKBOARD_URL,
+        }
+    )
     try:
-        assert research_propose.main([
-            "--root", str(tmp_path), "--digest", digest, "--report-task", TASK,
-        ]) == 0
+        assert (
+            research_propose.main(
+                [
+                    "--root",
+                    str(tmp_path),
+                    "--digest",
+                    digest,
+                    "--report-task",
+                    TASK,
+                ]
+            )
+            == 0
+        )
     finally:
         board_hooks.env = original
     arguments = sent_arguments(poster.bodies[-1])
     assert arguments["agent"] == "fleet-research-proposer"
     assert arguments["taskId"] == TASK
-    assert arguments["body"] == "RESEARCH PROPOSAL LOAD-REPORT\n" + dump_json_str({
-        "spec_sha256": digest, "host": "colossus", "image": document["image"],
-        "result": {
-            "number": 3, "status": "admitted", "reason": "", "candidate": "c" * 64,
-            "proposal_sha256": hashlib.sha256(dump_json_str(PROPOSAL).encode()).hexdigest(),
-        },
-    })
+    assert arguments["body"] == "RESEARCH PROPOSAL LOAD-REPORT\n" + dump_json_str(
+        {
+            "spec_sha256": digest,
+            "host": "colossus",
+            "image": document["image"],
+            "result": {
+                "number": 3,
+                "status": "admitted",
+                "reason": "",
+                "candidate": "c" * 64,
+                "proposal_sha256": hashlib.sha256(dump_json_str(PROPOSAL).encode()).hexdigest(),
+            },
+        }
+    )
 
 
 def test_invalid_report_task_runs_no_proposal() -> None:

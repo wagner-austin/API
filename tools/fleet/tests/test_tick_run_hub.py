@@ -139,7 +139,8 @@ def test_a_unit_the_manager_never_ran_reads_gone() -> None:
 
 @pytest.mark.host_fleet_hub
 def test_a_user_service_names_its_own_run_and_reads_live(
-    units: list[str], record_property: Callable[[str, str], None],
+    units: list[str],
+    record_property: Callable[[str, str], None],
 ) -> None:
     """Inspect from a real tick-shaped user service, not the check's system unit."""
     unit = f"fleet-tick-run-test-{uuid.uuid4().hex}.service"
@@ -152,9 +153,23 @@ def test_a_user_service_names_its_own_run_and_reads_live(
         "print(dump_json_str({'own': own, 'state': state}))"
     )
     result = subprocess.run(
-        ["/usr/bin/systemd-run", "--user", "--collect", "--quiet", "--wait", "--pipe",
-         f"--unit={unit}", "--property=RuntimeMaxSec=15", sys.executable, "-c", program],
-        check=True, timeout=30, text=True, capture_output=True,
+        [
+            "/usr/bin/systemd-run",
+            "--user",
+            "--collect",
+            "--quiet",
+            "--wait",
+            "--pipe",
+            f"--unit={unit}",
+            "--property=RuntimeMaxSec=15",
+            sys.executable,
+            "-c",
+            program,
+        ],
+        check=True,
+        timeout=30,
+        text=True,
+        capture_output=True,
     )
     measured = narrow_json_to_dict(load_json_str(result.stdout))
     assert measured["own"] == {"unit": unit, "machine": _test_hooks.hostname()}

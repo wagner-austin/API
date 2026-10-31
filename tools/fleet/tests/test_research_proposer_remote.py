@@ -22,7 +22,7 @@ def test_remote_words_are_one_quoted_command_and_deadlines_are_preserved() -> No
     fake = FakeRun(replies(dump_json_str(context)))
     _test_hooks.run = fake
     assert run_proposer(SOCKET, IMAGE, program, context, host="colossus", timeout=11) == context
-    assert all(call[:1 + len(SSH_OPTIONS)] == ("ssh", *SSH_OPTIONS) for call in fake.calls)
+    assert all(call[: 1 + len(SSH_OPTIONS)] == ("ssh", *SSH_OPTIONS) for call in fake.calls)
     assert all(call[-2] == "colossus" for call in fake.calls)
     commands = [shlex.split(call[-1]) for call in fake.calls]
     assert commands[2][:6] == ["sudo", "-n", "-u", EXEC_USER, "/usr/bin/env", "-i"]
