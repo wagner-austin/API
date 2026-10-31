@@ -21,8 +21,7 @@ from ._crsp_fixtures import panel_protocol, save_file, source_rows, write_source
 
 def test_vendor_calendar_retains_holiday_and_weekend_rows_without_normalizing() -> None:
     payload = (
-        b"caldt,exchangegroup,tradingflg\n"
-        b"1998-01-01,N/A,N\n1998-01-02,CIZ,Y\n1998-01-03,N/A,N\n"
+        b"caldt,exchangegroup,tradingflg\n1998-01-01,N/A,N\n1998-01-02,CIZ,Y\n1998-01-03,N/A,N\n"
     )
     assert decode_crsp_rows(
         payload, "calendar", ("caldt", "exchangegroup", "tradingflg"), "2026-10-31T00:00:00Z"
