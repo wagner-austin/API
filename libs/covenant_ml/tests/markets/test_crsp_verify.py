@@ -78,7 +78,7 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
     result = _verify(case, open_final=False)
     item = receipt["train_validation"]
     receipt_bytes = (case.output / "extraction.json").read_bytes()
-    assert result == {
+    expected: JSONObject = {
         "source": "crsp_a_stock",
         "snapshot": "750:750:",
         "extraction_receipt": load_json_str(receipt_bytes.decode()),
@@ -103,6 +103,7 @@ def test_validation_opens_and_final_stays_sealed_for_licensed_evidence(
             },
         ],
     }
+    assert result == expected
     assert item["bundle"]["sha256"] == _bundle_digest(case, "train-validation")
     assert list(_scratch(case).iterdir()) == []
     with pytest.raises(ValueError, match=r"\[CRSP-013\] licensed final evidence opens only"):
