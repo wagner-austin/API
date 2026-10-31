@@ -14,8 +14,14 @@ from platform_core.json_utils import (
 )
 
 from hpc3.contracts.wrds_run import WrdsRun, digest, safe_label
-from hpc3.core import _test_hooks, artifacts, wrds_attempt_report, wrds_grid, wrds_jobs
-from hpc3.core import wrds_scheduler
+from hpc3.core import (
+    _test_hooks,
+    artifacts,
+    wrds_attempt_report,
+    wrds_grid,
+    wrds_jobs,
+    wrds_scheduler,
+)
 from hpc3.core.wrds_bundle import worker_bundle
 
 
