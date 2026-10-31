@@ -32,6 +32,8 @@ class ResearchObservation(TypedDict):
     state: ReadOnly[ResearchState]
     native_job_id: ReadOnly[str]
     record_sha256: ReadOnly[str | None]
+    controller_python: ReadOnly[str]
+    controller_python_sha256: ReadOnly[str]
 
 
 def decode_observation(value: JSONValue) -> ResearchObservation:
@@ -47,8 +49,18 @@ def decode_observation(value: JSONValue) -> ResearchObservation:
         ValueError: RESEARCH_OBSERVATION for incomplete or inconsistent evidence.
     """
     row = narrow_json_to_dict(value)
-    if set(row) != {"state", "native_job_id", "record_sha256"}:
+    if set(row) != {
+        "state",
+        "native_job_id",
+        "record_sha256",
+        "controller_python",
+        "controller_python_sha256",
+    }:
         raise ValueError("RESEARCH_OBSERVATION: unexpected observation fields")
+    python = require_str(row, "controller_python")
+    if not pathlib.PurePosixPath(python).is_absolute():
+        raise ValueError("RESEARCH_OBSERVATION: executing controller path must be absolute")
+    python_digest = require_digest(require_str(row, "controller_python_sha256"))
     state = require_member(row, "state", ResearchState)
     native = require_str(row, "native_job_id")
     digest = row["record_sha256"]
@@ -60,7 +72,13 @@ def decode_observation(value: JSONValue) -> ResearchObservation:
         if digest is not None:
             raise ValueError("RESEARCH_OBSERVATION: unfinished work cannot claim a result digest")
         pin = None
-    return ResearchObservation(state=state, native_job_id=native, record_sha256=pin)
+    return ResearchObservation(
+        state=state,
+        native_job_id=native,
+        record_sha256=pin,
+        controller_python=python,
+        controller_python_sha256=python_digest,
+    )
 
 
 def encode_observation(value: ResearchObservation) -> JSONObject:
@@ -76,6 +94,8 @@ def encode_observation(value: ResearchObservation) -> JSONObject:
         "state": value["state"].value,
         "native_job_id": value["native_job_id"],
         "record_sha256": value["record_sha256"],
+        "controller_python": value["controller_python"],
+        "controller_python_sha256": value["controller_python_sha256"],
     }
 
 
