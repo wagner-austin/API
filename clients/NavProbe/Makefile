@@ -39,8 +39,7 @@ lint:
 # Test running lives in the shared launcher, tools/maketools (the ``test``
 # command): a per-run COVERAGE_FILE under runs/ so two concurrent runs cannot
 # corrupt one SQLite file (the reader then fails with "no such table: arc"
-# and reports 0.00% while every test passes), the pre-run sweep, and the
-# kill-on-close job object on Windows.
+# and reports 0.00% while every test passes), and the pre-run sweep.
 test:
 	@echo "=== test"
 	poetry lock

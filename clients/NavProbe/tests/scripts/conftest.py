@@ -18,7 +18,6 @@ from tests.scripts.vendor import (
     FakeInitWarp,
     FakeWarpRuntime,
     RecordingFactoryConstructor,
-    RecordingOptOut,
     RecordingWitnessFactoryConstructor,
     RecordingWriter,
     SteppingClock,
@@ -44,7 +43,6 @@ class Harness:
         init_warp: The initialiser, recording the configuration asked for.
         construct: The factory constructor, recording its arguments.
         writer: Everything the script wrote.
-        opt_out: Records that power throttling was opted out of.
     """
 
     def __init__(
@@ -53,13 +51,11 @@ class Harness:
         init_warp: FakeInitWarp,
         construct: RecordingFactoryConstructor,
         writer: RecordingWriter,
-        opt_out: RecordingOptOut,
     ) -> None:
         self.runtime = runtime
         self.init_warp = init_warp
         self.construct = construct
         self.writer = writer
-        self.opt_out = opt_out
 
 
 def install(deterministic: bool) -> Harness:
@@ -75,13 +71,11 @@ def install(deterministic: bool) -> Harness:
     init_warp = FakeInitWarp(runtime)
     construct = RecordingFactoryConstructor(runtime, deterministic)
     writer = RecordingWriter()
-    opt_out = RecordingOptOut()
-    _test_hooks.opt_out_of_power_throttling = opt_out
     _test_hooks.init_warp = init_warp
     _test_hooks.load_state_factory = lambda: construct
     _test_hooks.write_out = writer
     _test_hooks.monotonic = SteppingClock(CLOCK_STEP)
-    return Harness(runtime, init_warp, construct, writer, opt_out)
+    return Harness(runtime, init_warp, construct, writer)
 
 
 @pytest.fixture()
@@ -96,7 +90,6 @@ def harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     )
     yield install(deterministic=True)
     (
@@ -104,7 +97,6 @@ def harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     ) = saved
 
 
@@ -123,7 +115,6 @@ def drifting_harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     )
     yield install(deterministic=False)
     (
@@ -131,7 +122,6 @@ def drifting_harness() -> Generator[Harness, None, None]:
         _test_hooks.load_state_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     ) = saved
 
 
@@ -147,7 +137,6 @@ class WitnessHarness:
         init_warp: The initialiser, recording the configuration asked for.
         construct: The witness factory constructor, recording its arguments.
         writer: Everything the script wrote.
-        opt_out: Records that power throttling was opted out of.
     """
 
     def __init__(
@@ -156,13 +145,11 @@ class WitnessHarness:
         init_warp: FakeInitWarp,
         construct: RecordingWitnessFactoryConstructor,
         writer: RecordingWriter,
-        opt_out: RecordingOptOut,
     ) -> None:
         self.runtime = runtime
         self.init_warp = init_warp
         self.construct = construct
         self.writer = writer
-        self.opt_out = opt_out
 
 
 def install_witness(deterministic: bool, contacts_per_step: int) -> WitnessHarness:
@@ -180,13 +167,11 @@ def install_witness(deterministic: bool, contacts_per_step: int) -> WitnessHarne
     init_warp = FakeInitWarp(runtime)
     construct = RecordingWitnessFactoryConstructor(runtime, deterministic, contacts_per_step)
     writer = RecordingWriter()
-    opt_out = RecordingOptOut()
-    _test_hooks.opt_out_of_power_throttling = opt_out
     _test_hooks.init_warp = init_warp
     _test_hooks.load_witness_factory = lambda: construct
     _test_hooks.write_out = writer
     _test_hooks.monotonic = SteppingClock(CLOCK_STEP)
-    return WitnessHarness(runtime, init_warp, construct, writer, opt_out)
+    return WitnessHarness(runtime, init_warp, construct, writer)
 
 
 @pytest.fixture()
@@ -201,7 +186,6 @@ def witness_harness() -> Generator[WitnessHarness, None, None]:
         _test_hooks.load_witness_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     )
     yield install_witness(deterministic=True, contacts_per_step=LIVE_CONTACTS_PER_STEP)
     (
@@ -209,7 +193,6 @@ def witness_harness() -> Generator[WitnessHarness, None, None]:
         _test_hooks.load_witness_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     ) = saved
 
 
@@ -230,7 +213,6 @@ def inert_harness() -> Generator[WitnessHarness, None, None]:
         _test_hooks.load_witness_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     )
     yield install_witness(deterministic=True, contacts_per_step=0)
     (
@@ -238,5 +220,4 @@ def inert_harness() -> Generator[WitnessHarness, None, None]:
         _test_hooks.load_witness_factory,
         _test_hooks.write_out,
         _test_hooks.monotonic,
-        _test_hooks.opt_out_of_power_throttling,
     ) = saved

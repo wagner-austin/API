@@ -166,11 +166,6 @@ class TestRun:
         """A completed run reports success."""
         assert main(["RUN_TO_RUN", "cache", "4096"]) == 0
 
-    def test_opts_out_of_power_throttling(self, witness_harness: WitnessHarness) -> None:
-        """Wall time is an output, so the throttle is lifted first."""
-        main(["RUN_TO_RUN", "cache", "4096"])
-        assert witness_harness.opt_out.calls == 1
-
     def test_passes_the_configuration_to_warp(self, witness_harness: WitnessHarness) -> None:
         """Mode, cache and record bound reach the initialiser."""
         main(["RUN_TO_RUN", "cache", "4096"])
