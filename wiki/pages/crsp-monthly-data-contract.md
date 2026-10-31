@@ -22,13 +22,13 @@ source_paths:
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "b48812de06b8ffa1a4c095f26d45f44cfbc7a527"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "838e19bcd90c3a99173409378160b14035d12b5d"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "981e281e5f954d447007d4482c08507fc4fd11eb"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "67792a2f1fd38cf8927a88d68adb04f1e8eb7c98"
-  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "50c6414def75db3058cd7290f5b7da56b077ab53"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "e42f4ffb6ca47f399394cbe88c117302e8a4207f"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
   "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "e721684f962c297aa60e8c1ebc80c1f3376da02d"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
   "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
@@ -38,7 +38,8 @@ source_git_blobs:
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
-fact_checked: 2026-10-30
+  - "2026-10-31 live WRDS calendar aggregation for 1998-01-01 through 2025-02-28: 6832 CIZ/Y and 3089 N/A/N rows; no other pairs. Native licensed job 40554134 exposed the earlier CIZ-only predicate error. Board task a622165c-bb63-4714-933b-10d527f21478. The vendor guide describes all civil dates; N/A closed-day encoding was measured against the subscribed table."
+fact_checked: 2026-10-31
 confidence: medium
 ---
 
@@ -66,7 +67,7 @@ do not prove field semantics, historical completeness or publication availabilit
 | Ordinary daily completeness | Require finite return, missingness flag `NA`, nonterminal flag `N`, and duration in `D1,D2,D3,D4,DU`, with independent session and previous-date checks. An absent or unknown flag is an explicit validation error. |
 | Terminal reconciliation | `stkdelists`: `permno,delistingdt,delret,delretmisstype,deldlydt,delamtdt,delnextdt`. Require finite return at least -1 and missingness flag `NA`. Value once at the latest stored/amount/present next-price date; retain a receivable until modeled reinvestment at the next rebalance strictly after that date. Missing terminal value makes the held outcome incomplete; a valuation date after the scored exit also fails. |
 | Membership evidence | `dsenames`: `permno,namedt,nameendt,shrcd,exchcd`. Exactly one inclusive effective interval must apply at decision time. Preserve numeric codes 10/11 and 1/2/3 directly; do not infer equivalent mnemonic classifications or extrapolate after December 2024. Entry membership does not filter later held outcomes. |
-| Session evidence | `metaexchangecalendar`: `caldt,exchangegroup,tradingflg`. Select group `CIZ`; retain every calendar day and its `Y`/`N` flag. Validate contiguous full months and construct windows from declared sessions, including historical Saturday sessions. Never infer the calendar from stock rows. |
+| Session evidence | `metaexchangecalendar`: `caldt,exchangegroup,tradingflg`. Retain every date; require `CIZ/Y` sessions or `N/A/N` closed days. Validate contiguous full months and construct windows from declared sessions, including historical Saturday sessions. Never infer the calendar from stock rows. |
 | Incomplete observations | Exclude insufficient pre-decision history with counted reasons. A missing required held return or unresolved terminal event stops publication of a complete evaluation; no zero fill, forward fill or silent security removal. Aggregate flags serve diagnostics only and cannot override missing daily evidence. |
 | Historical availability | Preserve source capture, query, extraction timestamp, checksums and effective-date joins. The resulting study is a revised-history retrospective backtest. These dates do not establish when a vendor first published a value or what a historical subscriber actually saw. |
 

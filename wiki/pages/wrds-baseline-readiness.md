@@ -69,7 +69,7 @@ source_paths:
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json": "6d65de417f9a0de0ec3ea579b5f0d6cc67a4f199"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py": "ed69688d2b3d00bf1fb29facd446c1a775fa7fdc"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "c021684ab74ddd87c3a20d2dc8446e0a6bbb642b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py": "4a076cda036c8c500ae42bf5e562d4a14a374f8a"
   "libs/covenant_ml/tests/markets/test_crsp_writer.py": "d33b9a62ba2f7067115310a7e09ad2f30670542c"
@@ -115,7 +115,7 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "9686350a06789e4f05d869da140948b6a56d0d19"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1f07441042f149defedacdf986af5ea8bddc4d09"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
@@ -386,24 +386,36 @@ On October 31 the shared queue ran WRDS job 40552575 at API `d758dfc40` in 2.6
 seconds. Evaluator verification opened each bundle with its own key: 7,259
 train-validation returns ending December 31, 2019, and 8,621 final returns
 ending August 31, 2020; plaintext was removed. An earlier temporary-table
-attempt refused and published nothing. The licensed extraction, its HPC3
-staging, candidate selection and final scoring remain unrun.[^crsp-writer]
+attempt refused and published nothing. This rehearsal establishes the writer's
+synthetic behavior; the licensed run is recorded separately below.[^crsp-writer]
 
 [^crsp-writer]: `tools/hpc3/artifacts/wrds-crsp-writer-20261031/provenance.json`, `native_run`, `receipt`, `evaluator_verify`, `preserved_failure` and `limits`; `libs/covenant_ml/src/covenant_ml/markets/crsp_writer.py`, `extract_crsp`; `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_scopes`, `crsp_relation_sql` and `synthetic_source`; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`; `libs/covenant_ml/src/covenant_ml/markets/crsp_verify.py`, `verify_crsp_extraction`; `libs/covenant_ml/tests/markets/test_crsp_writer.py`, sealed bundles reopened with real keys and every refusal. Queue job `d80d9e7d-ad94-4f13-bee2-a06262eae2c8` closed passed with a program-authored load report on task `1f60a20d-d860-43b3-9616-68f192bcedd9`. The evaluator verification is also program-authored: `libs/covenant_ml/scripts/crsp_extraction.py`, `main`, posts its reading through `libs/platform_core/src/platform_core/load_report.py`, `post_load_report`, under the same `load-report-1f60a20d` identity, as board post `bfe70a86-ba4c-4cbc-a644-40bc53ea0a02` (API `32cf8e455`, over the collected outputs, both partitions opened). That post carries 20 ciphertext files and the same `extraction.json` and `bundle.json` SHA-256 digests the native load report recorded. Refused attempt queue `ea07c31c-5156-454b-ab80-6ddd4536fd34`, WRDS job 40552520. Fleet `9d99e209-9c08-4256-98f9-a483b6b4f0bb` passed covenant_ml at `d758dfc40607090650f441a0b34e9f7869c43ed4`: 4,948 tests, 100% statement and branch coverage.
 
 The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-native][^integrated][^cleanup][^grant][^wrds-delay]
 
-1. Complete independent review of the measured WRDS cleanup milestone and the
-   pending CRSP semantics task `54b55cc7`. Its wiki-audit dependency `0ae483f4`
-   passed independent audit `2f50ce9a` at 05:56:20 UTC on October 31 and released
-   the semantics task for review. Native final scoring is rehearsed on HPC3 only.
-2. Run the rehearsed writer below against the licensed library, then stage its
-   verified train-validation bundle to HPC3. Keep the final bundle confined to
-   the evaluator. Neither step has run.
+1. Independent review is complete: cleanup task `4b7fe216` passed audit
+   `0fc95070` at 07:34 UTC on October 31, semantics task `54b55cc7` passed
+   `28d1701d` at 09:26 UTC, and the synthetic writer task `1f60a20d` passed
+   `a6d63e70` at 11:47 UTC. Native final scoring is rehearsed on HPC3 only.[^review-closure]
+2. Licensed extraction job `40554134` failed calendar validation; shared queue
+   `24d6f2d4` reconciled that failure. A preceding aggregate-only native count
+   measured 28,034,527 training/validation daily rows and 31,465,356 final-bundle
+   daily rows, with about 3.8 GB of projected scalar CSV bytes combined. The
+   request caps each relation at 35 million rows and 2.1 GB, each partition at
+   2.15 GB, and the allocation at two hours with 48 GiB requested. Successful
+   sealing and verified training/validation staging remain pending. No encrypted
+   output was published: the old query excluded closed-day `N/A/N` rows.
+   The corrected query retains all dates and the reader validates `CIZ/Y` or
+   `N/A/N`; a corrected runtime and new attempt are required. The final key
+   remains evaluator-owned.[^licensed-start]
 3. Declare candidate/seed aggregation, the selection criterion and tie handling
    before inspecting study results. Run the bounded baseline and validation
    comparison first; seal the chosen candidate and use the one-shot final release
    afterward. The selection API enforces identity, not which candidate is best.
+
+[^review-closure]: Live board tasks `4b7fe216-2670-4dbe-bee4-9970faec8258`, `54b55cc7-ff40-4753-a04e-776bce1830d0` and `1f60a20d-d860-43b3-9616-68f192bcedd9`; independent audit verdicts `0fc95070-87d9-4577-8227-b15e64f4d8ed`, `28d1701d-4bae-402e-adc9-d9a39c49f6cb` and `a6d63e70-86ad-418e-be4f-b6fd8d6275c8`, each VERIFIED. These verdicts close the named prerequisites, not the substantive study.
+
+[^licensed-start]: Board task `a622165c-bb63-4714-933b-10d527f21478`, shared queue `24d6f2d4-1462-4f90-8a76-3ef06bec41ab`, specification `a0b15eed8cee40301db96de2cdb050398abb3deb9a876377de86d1848c600378`. Capacity job `40554122` completed with exit 0 in 27.589 seconds; exact SQL SHA-256 `e20f0b3b949dd6fbffa417bdc2e9a749b44fb8eb53b29e2f6a6ce2358c4854f8`, aggregate output SHA-256 `3932f6d7e6b823ae9206b7ad4ea816f8e371e2cbf5605c54cd85169252051465`. Private receipts live under `/home/corvis/research-data/wrds/experiments/crsp-licensed-20261031`; the projection counts scalar CSV field bytes and separators, not encrypted files. The current controller is `/home/corvis/research-control/wrds-licensed-07d07d3cb`. HPC3 image build `58661735` completed 0:0 in 109 seconds; image SHA-256 `7ab143e3d27688b8ebc12975b520c4a3190040b3efb92aa65d5f8edad843e567`. Program-authored image inspection `032575db-ddbd-42e1-b96b-048432a03425` verified 15 file identities, two selfchecks and dependencies. Submission used one explicit queue tick; the scheduled runner independently reconciled the same native job at 18:30:08 UTC on October 31. Neither the image nor the count job establishes a baseline result.
 
 [^encrypted-runtime]: `tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json`, source archive, controller and wheel identities, native image accounting, selfchecks and private evidence hashes. This artifact records the runtime build; subsequent queue evidence is in [^rehearsal]. Only the validation identity was delivered to HPC3; the final identity remains on the evaluator host. No licensed observations were staged.
 
