@@ -40,6 +40,7 @@ def test_observe_lists_real_paths(tmp_path: pathlib.Path, state: str) -> None:
         "job_id": "123",
         "observer_job_id": "456",
         "observed_at": NOW,
+        "matching_scratch_roots": [] if state == "scratch-absent" else [private.parent.name],
         "scratch": str(private.parent),
         "private": str(private),
         "scratch_present": state != "scratch-absent",
@@ -89,6 +90,57 @@ def test_wrong_node_and_unreadable_directory_fail(tmp_path: pathlib.Path) -> Non
         )
 
 
+def test_completed_job_scope_lists_real_roots_without_opening_them(tmp_path: pathlib.Path) -> None:
+    _test_hooks.environment = lambda: {"JOB_ID": "456"}
+    _test_hooks.now_iso = lambda: NOW
+    (tmp_path / "123.1.all.q").write_text("even a nondirectory remainder is recorded")
+    (tmp_path / "123.1.other.q").symlink_to(tmp_path / "absent")
+    (tmp_path / "1234.1.all.q").mkdir()
+    assert observe(socket.gethostname(), "123", None, tmp_path) == {
+        "node": socket.gethostname(),
+        "job_id": "123",
+        "observer_job_id": "456",
+        "observed_at": NOW,
+        "matching_scratch_roots": ["123.1.all.q", "123.1.other.q"],
+    }
+    with pytest.raises(FileNotFoundError):
+        observe(socket.gethostname(), "123", None, tmp_path / "absent")
+
+
+def test_real_archive_completed_scope_observes_absence(tmp_path: pathlib.Path) -> None:
+    _test_hooks.environment = lambda: {"JOB_ID": "456"}
+    direct = tmp_path / "direct.json"
+    assert worker.main(["scratch", socket.gethostname(), "999999999999999999999", str(direct)]) == 0
+    direct_reading = load_json_str(direct.read_text())
+    assert isinstance(direct_reading, dict)
+    assert direct_reading["matching_scratch_roots"] == []
+    archive = tmp_path / "worker.pyz"
+    archive.write_bytes(worker_bundle())
+    output = tmp_path / "observation.json"
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(archive),
+            "scratch",
+            socket.gethostname(),
+            "999999999999999999999",
+            str(output),
+        ],
+        env={"JOB_ID": "456"},
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    reading = load_json_str(output.read_text())
+    assert isinstance(reading, dict)
+    assert reading["node"] == socket.gethostname()
+    assert reading["job_id"] == "999999999999999999999"
+    assert reading["observer_job_id"] == "456"
+    assert reading["matching_scratch_roots"] == []
+
+
 def test_worker_and_real_archive_refuse_wrong_node(tmp_path: pathlib.Path) -> None:
     _test_hooks.environment = lambda: {"JOB_ID": "456"}
     _test_hooks.now_iso = lambda: NOW
@@ -105,6 +157,7 @@ def test_worker_and_real_archive_refuse_wrong_node(tmp_path: pathlib.Path) -> No
         "job_id": "999999999999999999999",
         "observer_job_id": "456",
         "observed_at": NOW,
+        "matching_scratch_roots": [],
         "scratch": str(pathlib.Path(private).parent),
         "private": private,
         "scratch_present": False,

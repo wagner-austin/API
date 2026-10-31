@@ -22,10 +22,11 @@ from hpc3.core import wrds_cleanup, wrds_grid
 from hpc3.core.wrds_bundle import worker_bundle
 from hpc3.core.wrds_jobs import attempt_directory
 from tests.conftest import FakeRun
+from tests.test_wrds_results import actual_result
 from tests.test_wrds_scheduler import DONE, EMPTY
 from tests.wrds_board import TASK, accepting_board
 from tests.wrds_support import example
-from tests.wrds_transport import metadata
+from tests.wrds_transport import completed, metadata
 
 HOST = "wrds-sas35-w.wharton.private"
 PRIVATE = "/tmp/123.1.all.q/research-plaintext-canary"
@@ -53,6 +54,7 @@ def observed() -> JSONObject:
         "job_id": "123",
         "observer_job_id": "456",
         "observed_at": "2026-10-31T03:00:00Z",
+        "matching_scratch_roots": [],
         "scratch_present": False,
         "private_present": False,
     }
@@ -112,10 +114,13 @@ def test_cli_posts_measured_evidence(
         == 0
     )
     evidence = narrow_json_to_dict(load_json_str(output.read_text()))
-    assert evidence["opened"] == opened()
+    assert evidence["subject_receipt"] == opened()
     assert evidence["observation"] == observed()
     assert evidence["observer_source_sha256"] == hashlib.sha256(worker_bundle()).hexdigest()
-    assert evidence["opened_sha256"] == hashlib.sha256(dump_json_str(opened()).encode()).hexdigest()
+    assert (
+        evidence["subject_receipt_sha256"]
+        == hashlib.sha256(dump_json_str(opened()).encode()).hexdigest()
+    )
     assert (
         evidence["observation_sha256"]
         == hashlib.sha256(dump_json_str(observed()).encode()).hexdigest()
@@ -164,6 +169,8 @@ def test_opened_receipt_must_match_native_private_storage(
         ("scratch", "/tmp/other"),
         ("scratch_present", 0),
         ("private_present", "false"),
+        ("matching_scratch_roots", [False]),
+        ("matching_scratch_roots", ["124.1.all.q"]),
         ("unexpected", "must never reach report"),
     ],
 )
@@ -180,14 +187,45 @@ def test_wrong_or_malformed_observer_is_not_published(
     assert not (tmp_path / "evidence.json").exists()
 
 
-def test_successful_subject_is_not_a_forced_termination(
+def test_pending_subject_is_not_measured_as_cleaned(
     tmp_path: pathlib.Path, fake_run: FakeRun
 ) -> None:
     run = example(tmp_path)
-    fake_run.add("qacct -j 123", stdout=DONE)
+    fake_run.add("qacct -j 123", returncode=1, stderr="error: job id 123 not found")
     prepare(fake_run, run, opened(), observed())
     with pytest.raises(ValueError, match="WRDS_SCRATCH_STATE"):
         wrds_cleanup.submit(run, "one", tmp_path / "evidence.json")
+
+
+@pytest.mark.parametrize("remaining", [[], ["123.1.all.q"]])
+def test_completed_job_observation_binds_attestation_and_lists_all_roots(
+    tmp_path: pathlib.Path, fake_run: FakeRun, remaining: list[str]
+) -> None:
+    run, result = actual_result(tmp_path)
+    fake_run.add("qacct -j 123", stdout=DONE)
+    fake_run.add("qacct -j 456", stdout=DONE.replace("jobnumber 123", "jobnumber 456"))
+    completed(fake_run, run, result)
+    reading = observed()
+    for key in ("private", "scratch", "scratch_present", "private_present"):
+        del reading[key]
+    reading["matching_scratch_roots"] = list(remaining)
+    prepare(fake_run, run, opened(), reading)
+    output = tmp_path / "evidence.json"
+    assert wrds_cleanup.submit(run, "one", output) == "456"
+    report = wrds_cleanup.measure(run, "one", output)
+    evidence = narrow_json_to_dict(load_json_str(output.read_text()))
+    assert evidence["subject_receipt"] == result
+    assert (
+        evidence["subject_receipt_sha256"]
+        == hashlib.sha256(dump_json_str(result).encode()).hexdigest()
+    )
+    assert evidence["observation"] == reading
+    assert report == "WRDS SCRATCH LOAD-REPORT\n" + dump_json_str(evidence)
+    assert not any("opened.json" in command for command in fake_run.commands())
+    commands = [command for command in fake_run.commands() if "qsub" in command]
+    assert len(commands) == 1
+    assert "scratch " + HOST + " 123 " in commands[0]
+    assert PRIVATE not in commands[0]
 
 
 def test_observer_accounting_must_match_node_and_success(
@@ -243,7 +281,7 @@ def test_delayed_accounting_reconciles_the_same_job_without_resubmitting(
         ("identity", "b" * 64),
         ("attempt", "other"),
         ("subject_job_id", "999"),
-        ("opened_sha256", "c" * 64),
+        ("subject_receipt_sha256", "c" * 64),
         ("extra", "field"),
     ],
 )
