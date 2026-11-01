@@ -60,11 +60,9 @@ MEASURED: Final[frozenset[str]] = frozenset(
         "libs/covenant_nn",
         "libs/platform_langid",
         "libs/platform_ml",
-        "services/Art-Trainer",
         "services/Model-Trainer",
         "services/covenant-radar-api",
         "services/grandma-api",
-        "services/handwriting-ai",
         "tools/code-style-eval",
     }
 )

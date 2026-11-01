@@ -314,14 +314,10 @@ class TestAgainstThisRepository:
         nobody knows why, which is a moment nothing else here rehearses. A
         walk whose heuristics quietly stopped matching would return nothing
         and read exactly like a clean repository. Handed an empty
-        declaration it must name the two directories this row is about, with
-        the weights git reports for them.
-
-        ``libs`` sits between the two in the answer and that is correct
-        rather than noise: with nothing declared it really does hold 166 MB
-        that no declaration accounts for, and its heaviest child is only 75%
-        of it, so it is where weight sits. Which is the reason this walk
-        does not get to fail a build on its own.
+        declaration it must name the heaviest directory this row is about,
+        with the weight git reports for it. The other, libs/instrument_io's
+        fixtures, left the repository when the operator had the package
+        archived on 2026-11-01 (MCPs board task a276f973).
         """
         found = undeclared_heavy_directories(())
         weights = {path: weight for weight, path in found}
@@ -331,10 +327,6 @@ class TestAgainstThisRepository:
         assert (
             weights["services/covenant-radar-api/data/external"]
             == (tracked["services/covenant-radar-api/data/external"])
-        )
-        assert (
-            weights["libs/instrument_io/tests/fixtures"]
-            == (tracked["libs/instrument_io/tests/fixtures"])
         )
 
     def test_the_scoped_payload_stays_small(self, scoped_tar: pathlib.Path) -> None:
@@ -506,8 +498,8 @@ class TestTheArchiveItKeeps:
         self, names: frozenset[str]
     ) -> None:
         """Dropping a project's data must not drop the project."""
-        assert "libs/instrument_io/pyproject.toml" in names
-        assert any(n.startswith("libs/instrument_io/src/") for n in names)
+        assert "services/covenant-radar-api/pyproject.toml" in names
+        assert any(n.startswith("services/covenant-radar-api/src/") for n in names)
 
     def test_it_drops_every_declared_directory(self, names: frozenset[str]) -> None:
         carried = [path for path in _declared() if any(n.startswith(f"{path}/") for n in names)]

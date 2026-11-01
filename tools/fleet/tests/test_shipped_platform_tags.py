@@ -47,8 +47,6 @@ FORMERLY_WINDOWS = (
     "clients/NavProbe",
     "clients/TankpitBot-execution",
     "corvis-stick",
-    "libs/instrument_io",
-    "services/procart-api",
     "slime",
     "tree-bot",
 )
