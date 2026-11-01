@@ -25,6 +25,9 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     commands = parser.add_subparsers(dest="action", required=True)
     commands.add_parser("init")
     commands.add_parser("status")
+    summary = commands.add_parser("summarize")
+    summary.add_argument("--trial", required=True, type=Path)
+    summary.add_argument("--out", required=True, type=Path)
     propose = commands.add_parser("propose")
     propose.add_argument("--proposal", required=True, type=Path)
     for name in ("submit", "reconcile", "submit-final", "reconcile-final"):
@@ -67,8 +70,11 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         OSError: Inputs cannot be read.
         sqlite3.OperationalError: Journal missing or locked.
     """
-    pin()
+    determinism = pin()
+    from platform_core.config import config_test_hooks
+
     from covenant_ml.markets import _test_hooks
+    from covenant_ml.markets.provenance import market_fingerprint
     from covenant_ml.markets.research_cluster import decode_research_cluster
     from covenant_ml.markets.research_delivery import deliver_final_grant
     from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
@@ -86,6 +92,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     )
     from covenant_ml.markets.research_records import decode_research_policy
     from covenant_ml.markets.research_selection_report import report_selection
+    from covenant_ml.markets.research_summary import write_validation_summary
     from covenant_ml.markets.research_trial_records import decode_research_trial
     from covenant_ml.markets.validation import parse_timestamp, read_document
 
@@ -109,13 +116,22 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
             parse_timestamp(_test_hooks.clock()),
         )
         attempts = (row,)
-        if row["status"] == "refused":
-            code = 2
+        code = 2 if row["status"] == "refused" else 0
     else:
         trial_path: Path = args.trial
         trial = decode_research_trial(read_document(trial_path))
         if trial["policy"] != policy:
             raise ValueError("RESEARCH_EXECUTION_REQUEST: trial policy differs from journal")
+        if action == "summarize":
+            output: Path = args.out
+            record = write_validation_summary(
+                ledger_path,
+                trial,
+                output,
+                market_fingerprint(determinism, config_test_hooks.get_env),
+            )
+            sys.stdout.write(str(record) + "\n")
+            return 0
         if action in {"select", "release", "deliver"}:
             final_manifest: Path = args.final_manifest
             if action == "select":
