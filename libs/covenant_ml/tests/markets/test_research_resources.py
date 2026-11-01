@@ -85,6 +85,7 @@ def test_native_recipe_uses_frozen_allocation(
     )
     assert f"timeout --signal=TERM --kill-after=5s {seconds}s python" in str(recipe["command"])
     assert decode_research_trial(read_document(directory / "request.json")) == frozen
-    assert require_dict(recipe, "experiment")["request_sha256"] == sha256(
-        (directory / "request.json").read_bytes()
-    ).hexdigest()
+    assert (
+        require_dict(recipe, "experiment")["request_sha256"]
+        == sha256((directory / "request.json").read_bytes()).hexdigest()
+    )
