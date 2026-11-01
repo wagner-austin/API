@@ -116,12 +116,15 @@ def _recipe_deps(path: str) -> tuple[InstallStep, ...]:
         Makefile, in recipe order.
     """
     makefile = (REPO_ROOT / path / "Makefile").read_text(encoding="utf-8")
-    lines = dict.fromkeys(
-        line.removeprefix(RECIPE_POETRY)
-        for line in makefile.splitlines()
-        if line.startswith(RECIPE_POETRY)
-        and line.removeprefix(RECIPE_POETRY).split(" ")[0] in RECIPE_VERBS
-    )
+    lines: list[str] = []
+    for line in makefile.splitlines():
+        command = line.removeprefix(RECIPE_POETRY)
+        if (
+            line.startswith(RECIPE_POETRY)
+            and command.split(" ")[0] in RECIPE_VERBS
+            and command not in lines
+        ):
+            lines.append(command)
     return tuple(
         InstallStep(phase="deps", argv=("poetry", "-C", path, *line.split())) for line in lines
     )
