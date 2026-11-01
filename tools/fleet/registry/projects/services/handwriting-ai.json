@@ -6,7 +6,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "services/handwriting-ai",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/handwriting-ai",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/handwriting-ai",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

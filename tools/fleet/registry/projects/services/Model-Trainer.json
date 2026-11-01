@@ -8,7 +8,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "services/Model-Trainer",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/Model-Trainer",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/Model-Trainer",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

@@ -8,7 +8,20 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "clients/OrderedKernels",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "clients/OrderedKernels",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

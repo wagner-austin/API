@@ -6,7 +6,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "tools/code-style-eval",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "tools/code-style-eval",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "tools/code-style-eval",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

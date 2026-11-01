@@ -6,7 +6,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "services/Art-Trainer",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/Art-Trainer",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/Art-Trainer",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

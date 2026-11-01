@@ -8,7 +8,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "services/covenant-radar-api",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/covenant-radar-api",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/covenant-radar-api",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

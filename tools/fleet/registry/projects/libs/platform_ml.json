@@ -6,7 +6,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "libs/platform_ml",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "libs/platform_ml",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "libs/platform_ml",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }

@@ -8,7 +8,29 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "libs/covenant_nn",
-    "install": [],
+    "install": [
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "libs/covenant_nn",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "libs/covenant_nn",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      }
+    ],
     "companions": []
   }
 }
