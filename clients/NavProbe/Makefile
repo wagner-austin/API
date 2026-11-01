@@ -19,14 +19,14 @@ help:
 install:
 	@echo "=== install"
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	@echo "[install] done"
 
 lint:
 	@echo "=== lint"
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	@echo "  -- guard"
 	poetry run python -m scripts.guard
 	@echo "  -- ruff check + format"
@@ -43,7 +43,7 @@ lint:
 test:
 	@echo "=== test"
 	poetry lock
-	poetry install --with dev
+	poetry install --no-cache --with dev
 	$(MAKETOOLS) test
 	@echo "[test] passed"
 
