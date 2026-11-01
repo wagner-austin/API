@@ -131,9 +131,11 @@ def report_preparation(policy_path: Path, ledger: Path, recipe_path: Path, task:
         raise ValueError(
             f"RESEARCH_PREPARATION_POLICY: recipe names policy {owner}, journal holds {digest}"
         )
-    admitted = {str(row["number"]) for row in attempts if row["status"] == "admitted"}
+    # Admission is the journal's first state, not its only one: an admitted
+    # attempt moves on to running and completed, and its recipe stays its own.
+    admitted = {str(row["number"]) for row in attempts if row["status"] != "refused"}
     if number.removesuffix(":final") not in admitted:
-        raise ValueError(f"RESEARCH_PREPARATION_ATTEMPT: attempt {number} was not admitted")
+        raise ValueError(f"RESEARCH_PREPARATION_ATTEMPT: attempt {number} was never admitted")
     if (recipe["cpus"], recipe["mem_gb"]) != (policy["cpus"], policy["mem_gb"]):
         raise ValueError("RESEARCH_PREPARATION_RESOURCES: recipe allocation differs from policy")
     rows: list[JSONValue] = [

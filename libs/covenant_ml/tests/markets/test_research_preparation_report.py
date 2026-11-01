@@ -16,6 +16,7 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
     require_dict,
+    require_list,
 )
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
 from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments, stack_endpoint_files
@@ -24,13 +25,17 @@ from scripts.research_preparation import main
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.research_cluster import prepare_bundle
-from covenant_ml.markets.research_journal import research_journal, research_policy_digest
+from covenant_ml.markets.research_journal import (
+    admit_proposal,
+    research_journal,
+    research_policy_digest,
+)
 from covenant_ml.markets.research_preparation_report import (
     decode_prepared_recipe,
     encode_prepared_recipe,
     report_preparation,
 )
-from covenant_ml.markets.research_records import encode_research_policy
+from covenant_ml.markets.research_records import encode_research_policy, encode_research_proposal
 from covenant_ml.markets.research_trial_records import ResearchTrial
 from covenant_ml.markets.validation import read_document
 
@@ -129,7 +134,7 @@ def test_final_recipe_of_an_admitted_attempt_is_read(tmp_path: Path, board: Fake
     ("change", "attempt", "error"),
     [
         ({}, "e" * 64 + ":1", "RESEARCH_PREPARATION_POLICY: recipe names policy eeee"),
-        ({}, "{digest}:2", "RESEARCH_PREPARATION_ATTEMPT: attempt 2 was not admitted"),
+        ({}, "{digest}:2", "RESEARCH_PREPARATION_ATTEMPT: attempt 2 was never admitted"),
         ({"cpus": 128}, "{digest}:1", "RESEARCH_PREPARATION_RESOURCES"),
         ({"mem_gb": 512}, "{digest}:1", "RESEARCH_PREPARATION_RESOURCES"),
     ],
@@ -141,6 +146,35 @@ def test_foreign_recipe_is_refused_before_posting(
     digest = research_policy_digest(trial["policy"])
     _rewrite(recipe, change, {"research_attempt": attempt.format(digest=digest)})
     with pytest.raises(ValueError, match=error):
+        report_preparation(policy, ledger, recipe, TASK)
+    assert board.bodies == []
+
+
+def test_running_attempt_keeps_its_recipe(tmp_path: Path, board: FakeHttpPost) -> None:
+    policy, ledger, recipe, trial = _prepared(tmp_path)
+    journal = research_journal(trial["policy"])
+    submit: JSONObject = {"action": "submit", "number": 1, "observed_ms": 1}
+    scheduled: JSONObject = {
+        "action": "scheduled",
+        "number": 1,
+        "observed_ms": 2,
+        "job_id": "58721392",
+    }
+    journal.transact(ledger, lambda _: submit)
+    journal.transact(ledger, lambda _: scheduled)
+    report = report_preparation(policy, ledger, recipe, TASK)
+    attempt = narrow_json_to_dict(require_list(report, "attempts")[0])
+    assert (attempt["status"], attempt["job_id"]) == ("running", "58721392")
+
+
+def test_refused_attempt_owns_no_recipe(tmp_path: Path, board: FakeHttpPost) -> None:
+    policy, ledger, recipe, trial = _prepared(tmp_path)
+    duplicate = encode_research_proposal(trial["proposal"])
+    refused = admit_proposal(ledger, trial["policy"], duplicate, 1)
+    assert (refused["number"], refused["status"]) == (2, "refused")
+    digest = research_policy_digest(trial["policy"])
+    _rewrite(recipe, {}, {"research_attempt": f"{digest}:2"})
+    with pytest.raises(ValueError, match="attempt 2 was never admitted"):
         report_preparation(policy, ledger, recipe, TASK)
     assert board.bodies == []
 
