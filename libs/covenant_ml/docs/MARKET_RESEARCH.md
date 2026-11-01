@@ -825,7 +825,7 @@ separate logs. These are owner-writable files, not hostile-owner attestation.
 its validation period, using the existing baseline trainers and the shared
 `RunRecord` publisher. `ResearchEvaluation` is the decoded frozen design plus
 the declared stopping months, fold months and interval confidence; its protocol
-hash names `crsp-monthly-holdings-validation-v1` and all of those settings. The
+hash names `crsp-monthly-holdings-validation-v2` and all of those settings. The
 evaluation manifest names the encrypted bundle. After authenticated decryption,
 the worker reads its CRSP extract manifest and refuses to fit unless the protocol
 decodes to exactly the admitted design. A
@@ -836,10 +836,17 @@ database.
 
 ## Frozen monthly CRSP contract
 
-`docs/crsp-monthly-v1.json` is the machine-readable design. Decode it through
+`docs/crsp-monthly.json` is the version-2 machine-readable design. Decode it through
 `markets.crsp_protocol.decode_crsp_protocol`, then bind its exact digest in the
 existing research policy. The codec rejects unknown fields and unsupported
 source/valuation conventions; proposals cannot replace the evaluator's policy.
+
+Version 2 declares `confirmed-terminal-entry-cash` and `actual-traded-notional`.
+The stopped November 1 study used version 1, preserved as historical evidence at
+`tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json` from the repo root.
+Old admitted requests and encrypted manifests cannot run under the new codec.
+Changing the design requires a new manifest, encrypted bundle, admitted policy
+and runtime identity; it does not revise a prior study's journal or results.
 
 The 2026-10-29 compute probes `40544368` and `40544470` found legacy membership
 through 2024-12-31, CIZ returns/calendar through 2025-12-31, and terminal events
@@ -864,7 +871,13 @@ Changing, removing, adding or reordering a column is refused. The exact fields a
   Ordinary execution requires finite positive `TR` closing trades. Universe
   liquidity uses 60 pre-decision sessions; eligibility requires 252 prior
   sessions and decision price at least $5. Future entry prices cannot change
-  the ranked selection: an unexecutable selected trade makes the run incomplete.
+  the ranked selection. A confirmed rejected new purchase retains its equal
+  allocation in zero-interest cash, with no replacement or redistribution.
+  Confirmation requires exactly one terminal event at decision close, before
+  entry, and an entry-day terminal row with `DD` duration and a non-`TR` price
+  flag. Missing or contradictory evidence still makes the run incomplete.
+  Both labels and the universe benchmark retain that cash multiplier of one.
+  No missing held return or unresolved owned terminal value becomes cash.
 - `crsp_a_stock.stkdelists`: `permno,delistingdt,deldlydt,delamtdt,delnextdt,
   delret,delretmisstype`. Require a finite return at least -1 with flag `NA`,
   required amount date, and explicit nullable next-price date. The valuation
@@ -933,7 +946,8 @@ other than the receipt, metrics, bundle metadata and age ciphertext, opens the
 train-validation bundle with its own key through `load_crsp_sources`, and
 opens the final bundle only for synthetic evidence; licensed final-period
 evidence is opened by the one-shot final release alone. The licensed
-extraction itself has not run.
+extraction and stopped licensed study are recorded in the repository wiki's
+`wrds-licensed-data-evidence` and `wrds-baseline-20261101` pages.
 
 ## Monthly holdings and validation study
 
@@ -941,16 +955,21 @@ extraction itself has not run.
 equal-weight portfolio across consecutive windows, each entering at the
 previous exit. Value starts as one unit of cash. At each rebalance close the
 investable value (positions plus terminal values dated strictly before that
-close) is split equally across the selection; traded notional is
-`sum |target - drifted position|` and the cost, one of the frozen `cost_bps`,
-is paid from the portfolio. Positions compound their own ordinary daily returns
+close), including retained cash, is split equally across the decision-time
+selection. Confirmed rejected purchases keep their slots in cash. Solve
+`slots * x + rate * actual_turnover(x) = investable` for the post-cost
+allocation `x`; turnover uses actual buys and sells, not pre-fee targets.
+The piecewise-linear solver uses prior position values as breakpoints.
+Positions compound their own ordinary daily returns
 over `(entry, exit]`. A position delisted inside the window stops at its
 delisting date and becomes a receivable worth its `stkdelists` multiplier,
 applied once; the daily delisting-flagged copy is never compounded. The last
 window also pays the cost of liquidating its positions at its exit close. Each
-period retains its selection, drifted end weights, receivables, turnover, cost
-and net return. A missing or non-ordinary held return, a missing or non-`TR`
-fill, an unresolved terminal event or a terminal value dated after the exit
+period retains its selection, rejected purchases, cash weight, drifted end
+weights, receivables, turnover, cost and net return. Cash and held weights use
+the pre-liquidation end value; terminal receivables remain separate. A missing
+or non-ordinary held return, an unverifiable fill, an unresolved owned terminal
+event or a terminal value dated after the exit
 refuses the whole evaluation; no partial result is returned.
 
 `markets.crsp_study.run_crsp_validation` considers decisions from `train_start`

@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 2,
   "library": "crsp_a_stock",
   "membership": "dsenames",
   "returns": "stkdlysecuritydata",
@@ -20,6 +20,8 @@
   "exchange_codes": [1, 2, 3],
   "calendar_group": "CIZ",
   "execution_flag": "TR",
+  "entry_rule": "confirmed-terminal-entry-cash",
+  "cost_rule": "actual-traded-notional",
   "terminal_rule": "dated-value-next-rebalance",
   "min_price": 5.0,
   "min_history": 252,
