@@ -198,7 +198,9 @@ class TestTheRealTree:
     def test_the_scan_has_subjects(self) -> None:
         # A derivation that finds nothing satisfies every equality below
         # forever -- the same silent-pass shape the guards exist to refuse.
-        assert len(package_roots(REPO_ROOT)) >= 40
+        # 39 since data-bank-api was archived on 2026-11-01 (MCPs board task
+        # a9566810).
+        assert len(package_roots(REPO_ROOT)) >= 39
 
     def test_every_package_runs_guards(self) -> None:
         assert unshimmed_packages(REPO_ROOT) == []
