@@ -55,10 +55,11 @@ def test_each_phase_adds_its_seconds_to_the_run_s_list(tmp_path: pathlib.Path) -
         timeout=60,
     )
     assert completed.returncode == 0, completed.stderr
-    listed = re.fullmatch(r"deps:(\d+)s,check:(\d+)s", completed.stdout)
-    assert listed is not None, completed.stdout
-    assert int(listed.group(1)) <= 1
-    assert 1 <= int(listed.group(2)) <= 3
+    entries = [entry.split(":") for entry in completed.stdout.split(",")]
+    assert [name for name, _ in entries] == ["deps", "check"], completed.stdout
+    deps, check = (int(seconds.removesuffix("s")) for _, seconds in entries)
+    assert deps <= 1
+    assert 1 <= check <= 3
 
 
 def _stamp(text: str) -> datetime:

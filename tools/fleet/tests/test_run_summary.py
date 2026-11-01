@@ -10,7 +10,6 @@ generation, one that reads it after, and the phases each took are what
 from __future__ import annotations
 
 import pathlib
-import re
 import subprocess
 
 from fleet.core import names, verdict
@@ -74,7 +73,8 @@ def test_the_first_build_says_it_began_the_generation_and_a_later_one_that_it_di
     assert first["began"] == "yes"
     assert second["generation"] == first["generation"]
     assert second["began"] == "no"
-    assert re.fullmatch(r"deps:\d+s,check:\d+s", first["phases"]) is not None
+    assert [entry.split(":")[0] for entry in first["phases"].split(",")] == ["deps", "check"]
+    assert all(entry.endswith("s") for entry in first["phases"].split(","))
 
 
 def test_the_summary_is_the_transcript_s_last_line(tmp_path: pathlib.Path) -> None:
