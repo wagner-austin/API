@@ -32,12 +32,10 @@ by booting it without, set to a placeholder, since no healthcheck reaches a
 credential. The case exports the same variables for the ones the compose
 file interpolates.
 
-Four services are absent, each for a reason measured on 2026-09-30.
-Model-Trainer, Art-Trainer and covenant-radar-api reserve an NVIDIA GPU,
-which the rootless daemon has no runtime for. handwriting-ai boots, but its
-readyz answers 503 'model not loaded' until a trained model sits in its
-artifacts, which neither its image nor the repository carries, so a clean
-deploy can never pass its healthcheck.
+Model-Trainer and covenant-radar-api are absent: each reserves an NVIDIA GPU,
+which the rootless daemon has no runtime for (measured 2026-09-30). data-bank-api,
+qr-api, music-wrapped-api and turkic-api were covered until the operator had
+them archived out of the monorepo on 2026-11-01 (MCPs board task a276f973).
 """
 
 from __future__ import annotations
@@ -96,18 +94,7 @@ SERVICES: Final[Mapping[str, ServiceEntry]] = {
             "GITHUB_REPO": "wagner-austin/API",
         },
     ),
-    "data-bank-api": ServiceEntry(
-        worker=True,
-        variables={
-            "API_UPLOAD_KEYS": PLACEHOLDER,
-            "API_READ_KEYS": PLACEHOLDER,
-            "API_DELETE_KEYS": PLACEHOLDER,
-        },
-    ),
-    "qr-api": ServiceEntry(worker=True, variables={}),
-    "music-wrapped-api": ServiceEntry(worker=True, variables={}),
     "transcript-api": ServiceEntry(worker=True, variables={"OPENAI_API_KEY": PLACEHOLDER}),
-    "turkic-api": ServiceEntry(worker=True, variables={"TURKIC_DATA_BANK_API_KEY": PLACEHOLDER}),
 }
 
 #: The security option a rootless daemon reports, and the stack's never does.

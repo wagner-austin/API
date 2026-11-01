@@ -109,8 +109,8 @@ def test_each_service_target_runs_the_builds_its_compose_file_declares() -> None
 
 
 def test_the_workers_are_built_beside_their_api() -> None:
-    """Five of the eight run a worker from a second stage of the same file."""
+    """transcript-api, the one of the four with a worker, runs it from a second stage of its file."""
     workers = sorted(service for service, entry in SERVICES.items() if entry["worker"])
 
     assert workers == sorted(service for service in SERVICES if len(_declared_builds(service)) == 2)
-    assert [_recipe(f"image-{service}")[-1].split()[-2] for service in workers] == ["worker"] * 5
+    assert [_recipe(f"image-{service}")[-1].split()[-2] for service in workers] == ["worker"]
