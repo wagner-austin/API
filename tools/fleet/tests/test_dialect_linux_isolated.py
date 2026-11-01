@@ -121,6 +121,7 @@ class TestIsolatedText:
                 tools='"$exec_cache/tools"',
                 marker=f'"$exec_root/{names.GENERATION_MARKER_NAME}"',
                 run_as="sudo -n ",
+                says_began=True,
             )
         )
         assert lines[copy + 2 : owner] == generation

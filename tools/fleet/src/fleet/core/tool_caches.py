@@ -122,7 +122,7 @@ def tool_caches_directory(cache_root: str) -> str:
     return f"{cache_root}/{names.TOOL_CACHES_DIRECTORY}"
 
 
-def sh_build_lines(*, tools: str, marker: str, run_as: str) -> tuple[str, ...]:
+def sh_build_lines(*, tools: str, marker: str, run_as: str, says_began: bool) -> tuple[str, ...]:
     """The lines a Linux build runs before its first install step.
 
     Args:
@@ -131,23 +131,27 @@ def sh_build_lines(*, tools: str, marker: str, run_as: str) -> tuple[str, ...]:
         marker: A shell word naming the run directory's marker file.
         run_as: The prefix every file operation takes, ``""`` for the
             build's own user or ``"sudo -n "`` for execdocker's caches.
+        says_began: Whether the lines also set ``$generation_began``. A fleet
+            build does, for its summary line; the runners' job-started hook
+            reads no such line, so its installed bytes stay as they were
+            (fleet job 76234b88 compared them).
 
     Returns:
         The lines. They leave ``$tool_cache`` naming the generation the
-        build reads, ``$generation`` its name, and ``$generation_began``
-        ``yes`` when this build started it, else ``no``: a build that began
-        its generation fetched every package it installs, and its verdict
-        line says so (:mod:`fleet.core.run_summary`).
+        build reads, ``$generation`` its name, and, when asked,
+        ``$generation_began`` ``yes`` when this build started it, else
+        ``no``: a build that began its generation fetched every package it
+        installs, and its verdict line says so (:mod:`fleet.core.run_summary`).
     """
     current = f'"$tools/{names.CURRENT_GENERATION_NAME}"'
     return (
         f"tools={tools}",
         f'{run_as}mkdir -p "$tools"',
         "now=$(date +%s)",
-        "generation_began=no",
+        *(("generation_began=no",) if says_began else ()),
         f"if ! {run_as}test -f {current} || "
         f"[ $((now - $({run_as}cat {current}))) -ge {GENERATION_SECONDS} ]; then",
-        "    generation_began=yes",
+        *(("    generation_began=yes",) if says_began else ()),
         f'    {run_as}mkdir -p "$tools/$now"',
         f'    printf \'%s\\n\' "$now" | {run_as}tee "$tools/$now/.pending" > /dev/null',
         f'    {run_as}mv -f "$tools/$now/.pending" {current}',

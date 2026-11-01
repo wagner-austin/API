@@ -159,7 +159,10 @@ class TestBuildScript:
         generation = "".join(
             f"{line}\n"
             for line in tool_caches.sh_build_lines(
-                tools="/s/cache/tools", marker=f"{TARGET}/{names.GENERATION_MARKER_NAME}", run_as=""
+                tools="/s/cache/tools",
+                marker=f"{TARGET}/{names.GENERATION_MARKER_NAME}",
+                run_as="",
+                says_began=True,
             )
         )
         assert body.startswith(PROLOGUE + generation)

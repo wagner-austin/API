@@ -44,6 +44,7 @@ def _build(tmp_path: pathlib.Path, run: str) -> str:
             tools=f"'{(tmp_path / 'cache' / 'tools').as_posix()}'",
             marker=f"'{target.as_posix()}/{names.GENERATION_MARKER_NAME}'",
             run_as="",
+            says_began=True,
         ),
         *sh_phase_lines(phase="deps", command="true", log=log),
         *sh_phase_lines(phase="check", command="echo suite", log=log),

@@ -76,6 +76,7 @@ HOOK_LINES: Final = (
         tools=f'"{RUNNER_TOOLS}"',
         marker=f'"$marker_dir/{names.GENERATION_MARKER_NAME}"',
         run_as="",
+        says_began=False,
     ),
     "{",
     "    printf 'POETRY_CACHE_DIR=%s\\n' \"$tool_cache/pypoetry\"",

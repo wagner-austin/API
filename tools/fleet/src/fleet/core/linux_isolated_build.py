@@ -169,6 +169,7 @@ def isolated_build_lines(
             tools=f'"{tool_caches_directory("$exec_cache")}"',
             marker=f'"$exec_root/{names.GENERATION_MARKER_NAME}"',
             run_as="sudo -n ",
+            says_began=True,
         ),
         f'sudo -n chown -R {EXEC_USER}:{EXEC_USER} "$exec_root" "$exec_registry" "$exec_cache"',
         "as_exec() {",

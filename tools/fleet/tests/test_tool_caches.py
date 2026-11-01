@@ -19,6 +19,9 @@ from tests._host_bash import host_bash
 #: One day in seconds.
 DAY: Final = 86400
 
+#: The two lines only a build that says whether it began its generation runs.
+BEGAN_ASSIGNMENTS: Final = ("generation_began=no", "generation_began=yes")
+
 
 def _run(tools: pathlib.Path, marker: pathlib.Path) -> tuple[str, str]:
     """Run the build's lines once, as a build starting now does.
@@ -31,7 +34,7 @@ def _run(tools: pathlib.Path, marker: pathlib.Path) -> tuple[str, str]:
         The ``$tool_cache`` and the ``$generation_began`` the lines left.
     """
     lines = tool_caches.sh_build_lines(
-        tools=f"'{tools.as_posix()}'", marker=f"'{marker.as_posix()}'", run_as=""
+        tools=f"'{tools.as_posix()}'", marker=f"'{marker.as_posix()}'", run_as="", says_began=True
     )
     tools.parent.mkdir(parents=True, exist_ok=True)
     script = tools.parent / "build.sh"
@@ -84,7 +87,7 @@ def test_the_generations_live_under_the_cache_root_and_last_two_weeks() -> None:
 
 
 def test_every_file_operation_takes_the_prefix_execdocker_s_caches_need() -> None:
-    lines = tool_caches.sh_build_lines(tools="T", marker="M", run_as="sudo -n ")
+    lines = tool_caches.sh_build_lines(tools="T", marker="M", run_as="sudo -n ", says_began=True)
 
     for verb in ("mkdir -p", "test -f", "cat ", "tee ", "mv -f"):
         uses = [line for line in lines if verb in line]
@@ -148,3 +151,14 @@ def test_a_build_says_whether_it_began_its_generation(tmp_path: pathlib.Path) ->
 
     assert first[1] == "yes"
     assert second == (first[0], "no")
+
+
+def test_lines_that_do_not_say_began_are_the_others_without_its_two_assignments() -> None:
+    """The runners' installed hook renders these (fleet job 76234b88)."""
+    saying = tool_caches.sh_build_lines(tools="T", marker="M", run_as="", says_began=True)
+    silent = tool_caches.sh_build_lines(tools="T", marker="M", run_as="", says_began=False)
+
+    assert [line for line in saying if line.strip() not in BEGAN_ASSIGNMENTS] == list(silent)
+    assert sorted(line.strip() for line in saying if line not in silent) == sorted(
+        BEGAN_ASSIGNMENTS
+    )

@@ -404,6 +404,7 @@ def build_script(
             tools=shlex.quote(tool_caches_directory(cache_root)),
             marker=shlex.quote(f"{target}/{names.GENERATION_MARKER_NAME}"),
             run_as="",
+            says_began=True,
         ),
         'npm_config_cache="$tool_cache/npm"',
         'POETRY_CACHE_DIR="$tool_cache/pypoetry"',
