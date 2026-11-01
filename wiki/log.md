@@ -472,3 +472,14 @@ CPU and RAM requests; full suites passed 5,066 research and 2,162 HPC3 tests.
 Documented the two corrected test defects and the remaining installed-controller
 and native-preflight measurement. Licensed validation and final scoring remain
 unrun; no study result is inferred from package checks.
+
+## [2026-11-01] maintenance | synthetic queue-to-summary rehearsal completed
+
+Recorded on wrds-baseline-readiness the five synthetic seeds that passed
+through the shared queue as native jobs, the installed `summarize` over their
+journal, and the reporter that posted its recomputed seed-averaged
+moving-block reading. The journal was byte-identical before and after, and
+`audit-probes.json` keeps the three read-only board queries that read it.
+Evidence is under `tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101`
+(board task `673a4bc4`). This is a synthetic operational rehearsal; the
+licensed baseline remains unrun and no final grant was released.

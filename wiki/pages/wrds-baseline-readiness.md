@@ -93,6 +93,11 @@ source_paths:
   - "libs/platform_core/src/platform_core/load_report.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_preparation_report.py"
   - "libs/covenant_ml/scripts/research_preparation.py"
+  - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json"
+  - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/summary-report.json"
+  - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/audit-probes.json"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py"
+  - "libs/covenant_ml/scripts/research_summary_report.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
@@ -183,6 +188,11 @@ source_git_blobs:
   "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
   "libs/covenant_ml/src/covenant_ml/markets/research_preparation_report.py": "acf13dc48ad22eebd76d97807d8e42d1c3be065e"
   "libs/covenant_ml/scripts/research_preparation.py": "ccb410066e3b258267bb0bc356b335e0b95290de"
+  "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json": "fc1b6b3b20e99d4ea3d594c7cc11b222f9dfcf77"
+  "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/summary-report.json": "1ced0411f90ede0de789ad86398d20a976b12e8c"
+  "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/audit-probes.json": "19b5b47a89014188e2b3913fa9d121e849c3c277"
+  "libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py": "b4554a891189c4b4a096776324c07bf8483036e5"
+  "libs/covenant_ml/scripts/research_summary_report.py": "e19c7d46bf055b40abc457884f3de8bba4251e7c"
 provenance:
   - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
@@ -220,6 +230,23 @@ admitted. No seed summary has been produced from this journal, so the complete
 synthetic queue-to-summary rehearsal remains the gate before licensed
 evaluation. The licensed study's separately frozen 128-GiB and 7,200-second
 requests are unchanged.[^summary-preparation][^resource-live]
+
+**Synthetic queue-to-summary rehearsal, completed later on November 1:** all
+five queue requests passed by `2026-11-01T17:42:36Z` as native jobs
+`58721392`, `58721481`, `58721691`, `58721976` and `58722099`, each with a
+service-authored attempt report binding image `14b1b5c9`, source `b3843a3d3`,
+the synthetic bundle, four CPUs on `free` with no GPU, and exit `0:0`. The
+installed controller's `summarize` then read all five completed seeds from
+the journal and exited zero; the journal's SHA-256 was `5d631699` before and
+after. The evaluator's reporter recomputed the four arms' seed-averaged
+moving-block results through the same `validation_summary` owner, confirmed
+the payload and RunRecord bytes, and posted that reading at `17:43:47Z`. This
+is an operational rehearsal on synthetic data, so its intervals say nothing
+about performance. It supersedes the earlier "no seed summary" reading above
+for this journal. The licensed baseline has not run, no licensed data was
+opened, and no final grant was released.[^summary-rehearsal]
+
+[^summary-rehearsal]: Board task `673a4bc4-8693-4764-8a8d-cca0483e279f`. `tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json` records the five queue jobs (`a7d5cc03`, `f8cd4f5c`, `0fdf43ef`, `e4d1f2c6`, `2a7451e0`, all `passed` by `fleet-research-diphtheria`), their spec digests, native job IDs, journal record digests and `HPC3 ATTEMPT LOAD-REPORT` IDs, plus the `summarize` argv, times, exit status and journal digests before and after. `summary-report.json` is the `RESEARCH SUMMARY LOAD-REPORT` that `hpc-report-673a4bc4` posted as update `ecbd196b-c807-4878-a57a-c2014ec8c13b`, written by `libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py`, `report_summary`, through `libs/covenant_ml/scripts/research_summary_report.py`. It refuses on a different summary-code hash, changed journal rows, another policy, results the owner does not reproduce, or a RunRecord that `run_record` does not rebuild. `audit-probes.json` holds the three read-only board queries over those reports, which returned 5, 5 and 4 at `2026-11-01T17:44Z`. The reporter landed in API `ef969f32d`; fleet check `3ba66ef9` passed `libs/covenant_ml` on Colossus with 5,105 tests and 100% coverage.
 
 [^summary-runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, exact source, controller and image identities, service report IDs and construction scope; its `runtime-audit.sql` and `audit-probes.json` retain the positive service-report join and six altered-evidence refusals. Full source check `e67de880` passed 5,078 tests, 100% statement and branch coverage, strict typing and guards in 248 seconds. The final typing correction passed independent audit `df6e94b8` at `2026-11-01T14:30:42.133Z`. See [[wrds-evaluation-reuse]] for the summary command and provenance.
 
