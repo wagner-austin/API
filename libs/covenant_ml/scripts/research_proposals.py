@@ -37,6 +37,7 @@ def _arguments(argv: list[str] | None) -> argparse.Namespace:
     select = commands.add_parser("select")
     select.add_argument("--trial", required=True, type=Path)
     select.add_argument("--final-manifest", required=True, type=Path)
+    select.add_argument("--report-task", required=True)
     release = commands.add_parser("release")
     release.add_argument("--trial", required=True, type=Path)
     release.add_argument("--final-manifest", required=True, type=Path)
@@ -71,7 +72,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
     from covenant_ml.markets.research_cluster import decode_research_cluster
     from covenant_ml.markets.research_delivery import deliver_final_grant
     from covenant_ml.markets.research_execution import reconcile_attempt, submit_attempt
-    from covenant_ml.markets.research_final import release_final, select_candidate
+    from covenant_ml.markets.research_final import release_final
     from covenant_ml.markets.research_journal import (
         admit_proposal,
         encode_research_attempt,
@@ -84,6 +85,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         submit_final_attempt,
     )
     from covenant_ml.markets.research_records import decode_research_policy
+    from covenant_ml.markets.research_selection_report import report_selection
     from covenant_ml.markets.research_trial_records import decode_research_trial
     from covenant_ml.markets.validation import parse_timestamp, read_document
 
@@ -117,7 +119,10 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
         if action in {"select", "release", "deliver"}:
             final_manifest: Path = args.final_manifest
             if action == "select":
-                attempts = (select_candidate(ledger_path, trial, final_manifest),)
+                task: str = args.report_task
+                code, measurement = report_selection(ledger_path, trial, final_manifest, task)
+                sys.stdout.write(dump_json_str(measurement) + "\n")
+                return code
             elif action == "release":
                 access: Path = args.access
                 destination: Path = args.directory
