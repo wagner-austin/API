@@ -12,7 +12,51 @@
 # met a real daemon only when somebody deployed it.
 include ../../scripts/make/shell.mk
 
-.PHONY: lint test check _check-unbudgeted
+# The images the deploy cases build, one target each so `make -j` builds them
+# side by side. The fleet runs `images` as this project's install step,
+# before the timed check (registry projects/tools/maketools-execution.json),
+# so the check's own builds read a warm build cache and the budget measures
+# the deploys. On loki on 2026-11-01, with an empty build cache, the eight
+# cases took 460 to 654 s and the check 664 s; warm, the whole check took
+# 31 s (MCPs board task eb6586e4). Each line is the build its service's
+# compose file declares, from the repository root, which
+# tools/maketools/tests/test_execution_images.py holds to those files.
+IMAGES := image-data-bank-api image-github-stats-api image-grandma-api \
+	image-music-wrapped-api image-opportunity-radar-api image-qr-api \
+	image-transcript-api image-turkic-api
+
+.PHONY: lint test check _check-unbudgeted images $(IMAGES)
+
+images: $(IMAGES)
+
+image-data-bank-api:
+	docker build --quiet --file ../../services/data-bank-api/Dockerfile --target api ../..
+	docker build --quiet --file ../../services/data-bank-api/Dockerfile --target worker ../..
+
+image-github-stats-api:
+	docker build --quiet --file ../../services/github-stats-api/Dockerfile ../..
+
+image-grandma-api:
+	docker build --quiet --file ../../services/grandma-api/Dockerfile ../..
+
+image-music-wrapped-api:
+	docker build --quiet --file ../../services/music-wrapped-api/Dockerfile --target api ../..
+	docker build --quiet --file ../../services/music-wrapped-api/Dockerfile --target worker ../..
+
+image-opportunity-radar-api:
+	docker build --quiet --file ../../services/opportunity-radar-api/Dockerfile ../..
+
+image-qr-api:
+	docker build --quiet --file ../../services/qr-api/Dockerfile --target api ../..
+	docker build --quiet --file ../../services/qr-api/Dockerfile --target worker ../..
+
+image-transcript-api:
+	docker build --quiet --file ../../services/transcript-api/Dockerfile --target api ../..
+	docker build --quiet --file ../../services/transcript-api/Dockerfile --target worker ../..
+
+image-turkic-api:
+	docker build --quiet --file ../../services/turkic-api/Dockerfile --target api ../..
+	docker build --quiet --file ../../services/turkic-api/Dockerfile --target worker ../..
 
 # This directory holds no code of its own, only this recipe, so its lint is
 # the grammar every tracked Makefile keeps to.
