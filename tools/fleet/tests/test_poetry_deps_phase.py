@@ -46,8 +46,11 @@ CUDA_WHEEL: Final[re.Pattern[str]] = re.compile(
     r'^name = "(?:nvidia-[a-z0-9-]+|torch|triton)"$', re.MULTILINE
 )
 
-#: A recipe line that locks or syncs the package's venv.
-RECIPE_POETRY: Final[re.Pattern[str]] = re.compile(r"^\tpoetry (lock|sync [^\n]+)$", re.MULTILINE)
+#: How a recipe line that runs poetry opens.
+RECIPE_POETRY: Final[str] = "\tpoetry "
+
+#: The poetry commands that lock or sync the package's venv.
+RECIPE_VERBS: Final[frozenset[str]] = frozenset({"lock", "sync"})
 
 #: The packages measured overrunning, or found by hand on 2026-11-01, which the scan must find.
 MEASURED: Final[frozenset[str]] = frozenset(
@@ -113,14 +116,19 @@ def _recipe_deps(path: str) -> tuple[InstallStep, ...]:
         Makefile, in recipe order.
     """
     makefile = (REPO_ROOT / path / "Makefile").read_text(encoding="utf-8")
-    lines = dict.fromkeys(match.group(1) for match in RECIPE_POETRY.finditer(makefile))
+    lines = dict.fromkeys(
+        line.removeprefix(RECIPE_POETRY)
+        for line in makefile.splitlines()
+        if line.startswith(RECIPE_POETRY)
+        and line.removeprefix(RECIPE_POETRY).split(" ")[0] in RECIPE_VERBS
+    )
     return tuple(
         InstallStep(phase="deps", argv=("poetry", "-C", path, *line.split())) for line in lines
     )
 
 
 def test_the_scan_finds_every_measured_package() -> None:
-    assert MEASURED <= frozenset(CUDA_PACKAGES), sorted(MEASURED - frozenset(CUDA_PACKAGES))
+    assert frozenset(CUDA_PACKAGES) >= MEASURED, sorted(MEASURED - frozenset(CUDA_PACKAGES))
 
 
 @pytest.mark.parametrize("path", CUDA_PACKAGES)
