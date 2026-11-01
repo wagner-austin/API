@@ -109,7 +109,7 @@ def test_each_service_target_runs_the_builds_its_compose_file_declares() -> None
 
 
 def test_the_workers_are_built_beside_their_api() -> None:
-    """transcript-api, the one of the four with a worker, runs it from a second stage of its file."""
+    """transcript-api, the one of the four with a worker, builds it from a second stage."""
     workers = sorted(service for service, entry in SERVICES.items() if entry["worker"])
 
     assert workers == sorted(service for service in SERVICES if len(_declared_builds(service)) == 2)
