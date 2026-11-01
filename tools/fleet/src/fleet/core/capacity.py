@@ -220,6 +220,15 @@ def assess(
     pressure ran five times its usual time. A node reading I/O pressure at
     :data:`IO_PRESSURE_BOUND_PCT` or over waits, after the CPU refusal.
 
+    A CHECK GETS NO MORE WORKERS THAN ITS SLICE'S QUOTA HAS CPUS (MCPs board
+    task d77b8c73). The node's cores are its declaration, and a CPU quota on
+    the slices checks run in (``check_cpu_quota``) is a cap the declaration
+    does not show: loki's check slice was held to one CPU at runtime while it
+    claimed packages/maketools with 6 workers three times, each over its 300 s
+    budget. The quota's whole CPUs, less the node's live workers, bound the
+    grant, and a node where they fall under the project's minimum waits,
+    after the I/O refusal, naming the quota.
+
     Args:
         node: The node's declaration.
         state: What it reported when last probed.
@@ -309,6 +318,20 @@ def assess(
                 "pressure falls."
             ),
         )
+    quota = state["check_cpu_quota"]
+    quota_room = None if quota is None else int(quota) - live["workers"]
+    if quota_room is not None and quota_room < project["minimum_workers"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_OWNER_RESERVED,
+            reason=(
+                f"{node['host']}'s checks are held to {quota:.2f} CPU(s) by the quota systemd "
+                f"keeps on their slice, so {quota_room} worker(s) fit where the suite declares a "
+                f"minimum of {project['minimum_workers']}{_live_clause(state)}. Whoever capped it "
+                "is using the machine, and a check placed here would run past its budget; it "
+                "takes the next job when the quota is lifted."
+            ),
+        )
     budget = _project_budget(node, project)
     # A reservation's cores come off beside the live runs' workers (MCPs board
     # task 84a2b690): a clean-VM smoke on diphtheria held 4 of its 8 cores
@@ -320,6 +343,7 @@ def assess(
             free_ram_gb=state["free_ram_gb"] - live["ram_gb"],
         ),
         job_ceiling(node, project),
+        *(() if quota_room is None else (quota_room,)),
     )
     if workers <= 0:
         return DispatchVerdict(

@@ -19,6 +19,8 @@ from fleet.core import probe
 from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
+    CHECK_QUOTA_LINE,
+    CHECK_QUOTA_PART,
     IO_PRESSURE_LINE,
     MEMINFO_LINE,
     PRESSURE_LINE,
@@ -44,12 +46,21 @@ IO_PRESSURE = (
     "full avg10=54.57 avg60=39.17 avg300=25.84 total=170774218710\n"
 )
 
+#: colossus's check slice and its parent at 14:2xZ on 2026-11-01, as
+#: ``systemctl show ... --property=CPUQuotaPerSecUSec --value`` prints them.
+QUOTA = "infinity\n\n8s"
+
 
 def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
-    assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + RESERVATIONS_PART)
+    assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + CHECK_QUOTA_PART + RESERVATIONS_PART)
+    assert CHECK_QUOTA_PART.startswith(CHECK_QUOTA_LINE)
+    assert CHECK_QUOTA_LINE == (
+        "check_quota=$(systemctl show system-dispatch-checks.slice system-dispatch.slice"
+        " --property=CPUQuotaPerSecUSec --value)\n"
+    )
     assert PRESSURE_PART.startswith(PRESSURE_LINE)
     assert PRESSURE_LINE == "pressure=/proc/pressure/cpu\n"
     assert IO_PRESSURE_LINE in PRESSURE_PART
@@ -82,7 +93,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "logical_cores"}
+    reported = {*probe.REQUIRED_FIELDS, "logical_cores", probe.CHECK_QUOTA_FIELD}
     assert set(fields) == reported | counted | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
@@ -94,6 +105,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     assert fields["reserved_cores"].isdigit()
     assert re.fullmatch(r"\d+\.\d{2}", fields["cpu_pressure_pct"])
     assert re.fullmatch(r"\d+\.\d{2}", fields["io_pressure_pct"])
+    assert re.fullmatch(r"max|\d+\.\d{3}", fields[probe.CHECK_QUOTA_FIELD])
 
 
 def _probe(
@@ -101,6 +113,7 @@ def _probe(
     held: pathlib.Path | None,
     pressure: str | None,
     io_pressure: str | None,
+    quota: str = QUOTA,
 ) -> subprocess.CompletedProcess[str]:
     """Run the probe with its roots pointed at fakes.
 
@@ -113,6 +126,8 @@ def _probe(
             a kernel without one.
         io_pressure: What the fake ``/proc/pressure/io`` holds, or None for
             a kernel without one.
+        quota: What ``systemctl show`` prints for the two check slices'
+            ``CPUQuotaPerSecUSec``.
 
     Returns:
         The finished probe.
@@ -135,6 +150,7 @@ def _probe(
         CAPACITY_PROBE_SCRIPT.replace(MEMINFO_LINE, f"meminfo='{meminfo.as_posix()}'\n", 1)
         .replace(PRESSURE_LINE, f"pressure='{cpu.as_posix()}'\n", 1)
         .replace(IO_PRESSURE_LINE, f"io_pressure='{io.as_posix()}'\n", 1)
+        .replace(CHECK_QUOTA_LINE, f"check_quota='{quota}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{reservations.as_posix()}'\n", 1),
         encoding="utf-8",
     )
@@ -152,6 +168,7 @@ def _run(
     held: pathlib.Path | None = None,
     pressure: str = PRESSURE,
     io_pressure: str = IO_PRESSURE,
+    quota: str = QUOTA,
 ) -> dict[str, str]:
     """Run the probe with its roots pointed at fakes, and read what it printed.
 
@@ -160,11 +177,12 @@ def _run(
         held: The fake reservations directory, or None for none.
         pressure: What the fake ``/proc/pressure/cpu`` holds.
         io_pressure: What the fake ``/proc/pressure/io`` holds.
+        quota: What ``systemctl show`` prints for the check slices' quotas.
 
     Returns:
         The probe's key=value fields.
     """
-    completed = _probe(tmp_path, held, pressure, io_pressure)
+    completed = _probe(tmp_path, held, pressure, io_pressure, quota)
     assert completed.returncode == 0, completed.stderr
     return fields_of(completed.stdout)
 
@@ -252,6 +270,31 @@ class TestTheProbeUnderSh:
         assert fields["cpu_pressure_pct"] == ""
         assert fields["reserved_cores"] == "0"
 
+    @pytest.mark.parametrize(
+        ("quota", "cores"),
+        [
+            # loki at 14:27Z on 2026-11-01: its check slice capped at runtime.
+            ("1s\n\n14s", "1.000"),
+            ("infinity\n\n8s", "8.000"),
+            ("1.500000s\n\ninfinity", "1.500"),
+            ("500ms\n\n4s", "0.500"),
+            ("250000us\n\ninfinity", "0.250"),
+            ("infinity\n\ninfinity", "max"),
+            ("unlimited\n\n4s", ""),
+            ("", ""),
+        ],
+    )
+    def test_the_check_quota_is_the_smaller_slice_s_in_cores_after_the_pressures(
+        self, tmp_path: pathlib.Path, quota: str, cores: str
+    ) -> None:
+        """MCPs board task d77b8c73: a value in no unit it reads prints the field
+        empty, which the parser refuses, so it never reads as no quota."""
+        fields = _run(tmp_path, quota=quota)
+
+        assert fields["check_cpu_quota"] == cores
+        keys = list(fields)
+        assert keys.index("check_cpu_quota") == keys.index("io_pressure_pct") + 1
+
     def test_a_kernel_without_the_pressure_file_ends_the_probe(
         self, tmp_path: pathlib.Path
     ) -> None:
@@ -298,7 +341,7 @@ class TestTheReservationsUnderSh:
         # Read after the body's other fields; the dialect's CI-slice lines,
         # printed only on a node with a runners.slice, follow it.
         keys = list(fields)
-        assert keys.index("reserved_cores") == keys.index("io_pressure_pct") + 1
+        assert keys.index("reserved_cores") == keys.index("check_cpu_quota") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         held = tmp_path / "reservations"

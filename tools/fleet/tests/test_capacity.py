@@ -94,6 +94,7 @@ def _state(
     reserved_cores: int = 0,
     cpu_pressure_pct: float = 0.0,
     io_pressure_pct: float = 0.0,
+    check_cpu_quota: float | None = None,
 ) -> NodeState:
     """Build a probed state.
 
@@ -106,6 +107,7 @@ def _state(
         reserved_cores: The cores its reservations hold.
         cpu_pressure_pct: Its CPU pressure.
         io_pressure_pct: Its I/O pressure.
+        check_cpu_quota: The CPUs its check slices' quota allows, or None.
 
     Returns:
         The state.
@@ -120,6 +122,7 @@ def _state(
         action_cache=None,
         cpu_pressure_pct=cpu_pressure_pct,
         io_pressure_pct=io_pressure_pct,
+        check_cpu_quota=check_cpu_quota,
     )
 
 

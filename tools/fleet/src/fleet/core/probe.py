@@ -46,6 +46,13 @@ PRESSURE_FIELD = "cpu_pressure_pct"
 #: 814c4555).
 IO_PRESSURE_FIELD = "io_pressure_pct"
 
+#: The CPUs a check may use, the smaller of its two slices' quotas in cores,
+#: or :data:`NO_QUOTA` (MCPs board task d77b8c73).
+CHECK_QUOTA_FIELD = "check_cpu_quota"
+
+#: What :data:`CHECK_QUOTA_FIELD` reads when neither slice has a quota.
+NO_QUOTA = "max"
+
 #: The numeric fields a node must report before anything can be decided about
 #: it; ``reserved_cores`` since MCPs board task 84a2b690, the cores its
 #: reservations hold (:mod:`fleet.core.reservations`), and the two pressure
@@ -132,6 +139,22 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         if sliced
         else None
     )
+    check_cpu_quota: float | None = None
+    if fields.get(CHECK_QUOTA_FIELD) != NO_QUOTA:
+        quota = _read_number(fields, CHECK_QUOTA_FIELD)
+        if quota is None:
+            return ProbeOutcome(
+                state=None, reason=_unreadable(host, fields, CHECK_QUOTA_FIELD, output)
+            )
+        if quota <= 0:
+            return ProbeOutcome(
+                state=None,
+                reason=(
+                    f"{host} reported {CHECK_QUOTA_FIELD}={quota!r}, which is no CPU a check "
+                    "could run on"
+                ),
+            )
+        check_cpu_quota = quota
     action_cache, cache_problem = _read_action_cache(host, fields, output)
     if cache_problem:
         return ProbeOutcome(state=None, reason=cache_problem)
@@ -146,6 +169,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             action_cache=action_cache,
             cpu_pressure_pct=readings[PRESSURE_FIELD],
             io_pressure_pct=readings[IO_PRESSURE_FIELD],
+            check_cpu_quota=check_cpu_quota,
         ),
         reason="",
     )

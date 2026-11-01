@@ -279,8 +279,9 @@ DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 
 #: The pressure lines of a node nothing stalls on, which every capacity
 #: probe answers since the last node without ``/proc/pressure`` left the
-#: fleet (board task e705f08c).
-CALM = "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\n"
+#: fleet (board task e705f08c), and the check quota of one whose check
+#: slices have none (MCPs board task d77b8c73).
+CALM = "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\ncheck_cpu_quota=max\n"
 
 #: What a healthy capacity probe answers.
 PROBE_OK = f"free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"

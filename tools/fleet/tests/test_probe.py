@@ -73,18 +73,54 @@ class TestProbe:
             "action_cache": None,
             "cpu_pressure_pct": 0.0,
             "io_pressure_pct": 0.0,
+            "check_cpu_quota": None,
         }
 
     def test_a_node_reports_its_cpu_and_io_pressure(self) -> None:
         """diphtheria's readings at 17:43Z on 2026-10-18 (MCPs 2ce5dc13, 814c4555)."""
         output = (
-            "free_ram_gb=4.073\nfree_disk_gb=206.206\n"
-            "logical_cores=8\ncpu_pressure_pct=14.06\nio_pressure_pct=68.81\nreserved_cores=0\n"
+            "free_ram_gb=4.073\nfree_disk_gb=206.206\nlogical_cores=8\n"
+            "cpu_pressure_pct=14.06\nio_pressure_pct=68.81\ncheck_cpu_quota=max\nreserved_cores=0\n"
         )
 
         state = probe.parse_probe("diphtheria", output, live=IDLE)
 
         assert (state["cpu_pressure_pct"], state["io_pressure_pct"]) == (14.06, 68.81)
+
+    def test_a_node_reports_the_cpus_its_check_slice_is_held_to(self) -> None:
+        """loki at 14:27Z on 2026-11-01, its check slice capped at runtime (MCPs d77b8c73)."""
+        output = (
+            "free_ram_gb=25.0\nfree_disk_gb=663.0\nlogical_cores=16\n"
+            "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=1.000\nreserved_cores=0\n"
+        )
+
+        state = probe.parse_probe("loki", output, live=IDLE)
+
+        assert state["check_cpu_quota"] == 1.0
+
+    @pytest.mark.parametrize(
+        ("quota", "message"),
+        [
+            ("check_cpu_quota=\n", "reported check_cpu_quota='', which is not a number"),
+            ("", "answered without a 'check_cpu_quota' field"),
+            ("check_cpu_quota=0.000\n", "reported check_cpu_quota=0.0, which is no CPU a check"),
+        ],
+    )
+    def test_a_check_quota_missing_unparsed_or_zero_is_unreadable_not_unlimited(
+        self, quota: str, message: str
+    ) -> None:
+        """The probe prints the field empty for a value in no unit it reads, so
+        neither that nor a missing field may read as a slice with no quota."""
+        output = (
+            "free_ram_gb=4.0\nfree_disk_gb=206.0\ncpu_pressure_pct=1.0\nio_pressure_pct=1.0\n"
+            f"{quota}reserved_cores=0\n"
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("loki", output, live=IDLE)
+
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+        assert f"loki {message}" in excinfo.value.message
 
     @pytest.mark.parametrize(
         ("readings", "message"),
@@ -304,6 +340,7 @@ class TestDescribeNode:
         action_cache=None,
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
+        check_cpu_quota=None,
     )
 
     def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:

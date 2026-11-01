@@ -104,6 +104,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         action_cache=None,
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
+        check_cpu_quota=None,
     )
 
 

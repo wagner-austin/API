@@ -215,6 +215,12 @@ class NodeState(TypedDict):
         io_pressure_pct: The share of the last minute some task stalled on
             I/O, ``/proc/pressure/io``'s ``some avg60`` (MCPs board task
             814c4555), printed as :attr:`cpu_pressure_pct` is.
+        check_cpu_quota: The CPUs a check may use, the smaller of the CPU
+            quotas systemd holds for the slice checks run in and its parent
+            (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
+            d77b8c73), or None where neither has one. A runtime cap set by
+            whoever is using the machine lands here: loki's check slice was
+            held to one CPU while its probe reported 16 cores.
     """
 
     host: str
@@ -226,6 +232,7 @@ class NodeState(TypedDict):
     action_cache: ActionCacheCounts | None
     cpu_pressure_pct: float
     io_pressure_pct: float
+    check_cpu_quota: float | None
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:

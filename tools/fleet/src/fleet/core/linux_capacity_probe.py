@@ -50,6 +50,22 @@ percent I/O while a database dump and a VM install shared its disk, and a
 check placed there ran five times its usual time. It is printed after the
 CPU reading and fails the same ways.
 
+THE CPUS A CHECK MAY USE ARE READ FROM SYSTEMD (MCPs board task d77b8c73).
+A check runs in ``system-dispatch-checks.slice`` under
+``system-dispatch.slice``, and a CPU quota on either bounds it whatever the
+node's core count says. On 2026-11-01 at 11:01:36Z a session capped loki's
+check slice at runtime (``systemctl set-property --runtime ... CPUQuota=100%``)
+for the operator's gameplay on battery, the probe went on reporting 16
+cores, and loki kept claiming checks with 6 workers on one CPU:
+packages/maketools ran 304, 362 and 341 s of its 300 s budget there, against
+64 to 77 s before the cap and 97 s on colossus. ``check_cpu_quota`` is the
+smaller of the two slices' ``CPUQuotaPerSecUSec`` in cores, ``max`` when
+neither has one. It is read from systemd rather than from the slice's
+``cpu.max`` because a slice's cgroup exists only while a unit runs in it,
+and a quota set on it before the first check after a boot already applies.
+A value the reading cannot parse prints the field empty, which
+:mod:`fleet.core.probe` refuses as not a number, never as no quota.
+
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
 ``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
@@ -100,6 +116,32 @@ PRESSURE_PART = (
     + _some_avg60("io_pressure", "io_pressure_pct")
 )
 
+#: Where the probe reads the check slices' CPU quotas from; the test replaces
+#: it. ``systemctl show`` prints each unit's value on its own line, a blank
+#: line between them, and ``infinity`` for a slice without one.
+CHECK_QUOTA_LINE = (
+    "check_quota=$(systemctl show system-dispatch-checks.slice system-dispatch.slice"
+    " --property=CPUQuotaPerSecUSec --value)\n"
+)
+
+#: The smaller of the quotas in cores: ``1s`` of CPU time a second is one
+#: core, ``500ms`` half of one. ``max`` when both read ``infinity``; empty
+#: when a value is in no unit this reads, or when there is none.
+CHECK_QUOTA_PART = (
+    CHECK_QUOTA_LINE
+    + "check_cpu_quota=$(printf '%s\\n' \"$check_quota\" | awk '"
+    + "function cores(v) { if (v ~ /^[0-9.]+us$/) return substr(v, 1, length(v) - 2) / 1000000;"
+    + " if (v ~ /^[0-9.]+ms$/) return substr(v, 1, length(v) - 2) / 1000;"
+    + " if (v ~ /^[0-9.]+s$/) return substr(v, 1, length(v) - 1) + 0; return -1 }"
+    + " NF == 0 { next }"
+    + ' $1 == "infinity" { seen = 1; next }'
+    + " { c = cores($1); if (c < 0) { bad = 1; next } seen = 1;"
+    + ' if (least == "" || c < least) least = c }'
+    + ' END { if (bad || !seen) exit; if (least == "") print "max"; else printf "%.3f\\n", least }'
+    + "')\n"
+    + "printf 'check_cpu_quota=%s\\n' \"$check_cpu_quota\"\n"
+)
+
 #: Where the probe reads the node's reservations from; the test replaces it.
 RESERVATIONS_LINE = f'reservations="$HOME/{reservations.DIRECTORY}"\n'
 
@@ -130,11 +172,16 @@ CAPACITY_PROBE_BODY = (
     MEMINFO_LINE
     + 'awk \'/^MemAvailable:/ { printf "free_ram_gb=%.3f\\n", $2 / 1048576 }\' "$meminfo"\n'
     "df -kP / | awk 'NR == 2 { printf \"free_disk_gb=%.3f\\n\", $4 / 1048576 }'\n"
-    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n" + PRESSURE_PART + RESERVATIONS_PART
+    "printf 'logical_cores=%s\\n' \"$(nproc)\"\n"
+    + PRESSURE_PART
+    + CHECK_QUOTA_PART
+    + RESERVATIONS_PART
 )
 
 __all__ = [
     "CAPACITY_PROBE_BODY",
+    "CHECK_QUOTA_LINE",
+    "CHECK_QUOTA_PART",
     "IO_PRESSURE_LINE",
     "MEMINFO_LINE",
     "PRESSURE_LINE",
