@@ -162,16 +162,7 @@ def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "tools/maketools-execution")
-    services = (
-        "data-bank-api",
-        "github-stats-api",
-        "grandma-api",
-        "music-wrapped-api",
-        "opportunity-radar-api",
-        "qr-api",
-        "transcript-api",
-        "turkic-api",
-    )
+    services = ("github-stats-api", "grandma-api", "opportunity-radar-api", "transcript-api")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.DOCKER)
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",

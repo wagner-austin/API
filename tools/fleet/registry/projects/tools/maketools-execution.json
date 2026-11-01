@@ -1,6 +1,6 @@
 {
   "worker_ram_gb": 1.0,
-  "minimum_workers": 8,
+  "minimum_workers": 4,
   "expected_minutes": 60,
   "required_tags": [
     "linux",
@@ -10,15 +10,6 @@
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "tools/maketools-execution",
     "install": [
-      {
-        "phase": "image-data-bank-api",
-        "argv": [
-          "make",
-          "-C",
-          "tools/maketools-execution",
-          "image-data-bank-api"
-        ]
-      },
       {
         "phase": "image-github-stats-api",
         "argv": [
@@ -38,15 +29,6 @@
         ]
       },
       {
-        "phase": "image-music-wrapped-api",
-        "argv": [
-          "make",
-          "-C",
-          "tools/maketools-execution",
-          "image-music-wrapped-api"
-        ]
-      },
-      {
         "phase": "image-opportunity-radar-api",
         "argv": [
           "make",
@@ -56,30 +38,12 @@
         ]
       },
       {
-        "phase": "image-qr-api",
-        "argv": [
-          "make",
-          "-C",
-          "tools/maketools-execution",
-          "image-qr-api"
-        ]
-      },
-      {
         "phase": "image-transcript-api",
         "argv": [
           "make",
           "-C",
           "tools/maketools-execution",
           "image-transcript-api"
-        ]
-      },
-      {
-        "phase": "image-turkic-api",
-        "argv": [
-          "make",
-          "-C",
-          "tools/maketools-execution",
-          "image-turkic-api"
         ]
       }
     ],
