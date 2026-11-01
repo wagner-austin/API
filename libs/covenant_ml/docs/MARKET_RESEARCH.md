@@ -684,9 +684,15 @@ the benchmark configuration and feature set, not a separately selected learner.
 
 These transitions are for a trusted evaluator with exclusive journal access;
 they do not authenticate a caller. The evaluator issues them through
-`markets.research_final`: `research_proposals select --trial T --final-manifest M`
+`markets.research_final`: `research_proposals select --trial T --final-manifest M
+--report-task TASK`
 binds the named completed attempt's journal candidate and validation payload to
-the SHA-256 of encrypted bundle `M`. The controller then invokes
+the SHA-256 of encrypted bundle `M`. Selection publishes its own measured exit
+status, refusal messages, before/after journal digests and selected identity
+through the shared service reporter before printing the same JSON. Refusals use
+the shared CLI boundary's status 2. Reporting failures propagate and cannot
+undo a committed selection. No data or key is opened by this measurement.
+The controller then invokes
 `research_proposals release --trial T --final-manifest M --access A --directory G`
 under the same `--policy` and `--ledger`. It checks admission and frozen protocol,
 commits `release_final`, and only then acquires the final identity and creates
