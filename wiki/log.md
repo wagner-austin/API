@@ -448,3 +448,9 @@ Updated readiness and queue ownership with service-report identities, actual
 tampering refusals and read-only audit queries. Six unstarted requests were
 replaced while retaining their admissions; their normal queue completion and
 the selection rehearsal remain pending. No licensed final grant was released.
+
+At 10:36:38 UTC the first fresh normal request also completed automatically,
+with its queue receipt matching native job 58719001 and its verified result.
+Added the service/queue evidence index and matching read-only audit query
+results, including three altered-evidence refusals. Independent recovery
+review and the full ten-trial selection study remain separate work.
