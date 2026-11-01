@@ -51,13 +51,6 @@ class CleanupConfig(TypedDict, total=True):
     dry_run: bool
 
 
-class CorpusCacheCleanupConfig(TypedDict, total=True):
-    enabled: bool
-    max_bytes: int
-    min_free_bytes: int
-    eviction_policy: Literal["lru", "oldest"]
-
-
 class TokenizerCleanupConfig(TypedDict, total=True):
     enabled: bool
     min_unused_days: int
@@ -70,10 +63,7 @@ class AppConfig(TypedDict, total=True):
     logs_root: str
     threads: int
     tokenizer_sample_max_lines: int
-    data_bank_api_url: str
-    data_bank_api_key: str
     cleanup: CleanupConfig
-    corpus_cache_cleanup: CorpusCacheCleanupConfig
     tokenizer_cleanup: TokenizerCleanupConfig
 
 
@@ -125,26 +115,10 @@ def load_settings() -> Settings:
         "grace_period_seconds": _parse_int("APP__CLEANUP__GRACE_PERIOD_SECONDS", 0),
         "dry_run": _parse_bool("APP__CLEANUP__DRY_RUN", False),
     }
-    corpus_cache_cleanup_cfg: CorpusCacheCleanupConfig = {
-        "enabled": _parse_bool("APP__CORPUS_CACHE_CLEANUP__ENABLED", False),
-        "max_bytes": _parse_int("APP__CORPUS_CACHE_CLEANUP__MAX_BYTES", 10 * 1024 * 1024 * 1024),
-        "min_free_bytes": _parse_int(
-            "APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES", 2 * 1024 * 1024 * 1024
-        ),
-        "eviction_policy": (
-            "oldest"
-            if _parse_str("APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY", "lru") == "oldest"
-            else "lru"
-        ),
-    }
     tokenizer_cleanup_cfg: TokenizerCleanupConfig = {
         "enabled": _parse_bool("APP__TOKENIZER_CLEANUP__ENABLED", False),
         "min_unused_days": _parse_int("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", 30),
     }
-
-    gateway_url = _parse_str("API_GATEWAY_URL", "")
-    direct_url = _parse_str("APP__DATA_BANK_API_URL", "")
-    data_bank_url = f"{gateway_url}/data-bank" if gateway_url else direct_url
 
     app_cfg: AppConfig = {
         "data_root": _parse_str("APP__DATA_ROOT", "/data"),
@@ -153,10 +127,7 @@ def load_settings() -> Settings:
         "logs_root": _parse_str("APP__LOGS_ROOT", "/data/logs"),
         "threads": _parse_int("APP__THREADS", 0),
         "tokenizer_sample_max_lines": _parse_int("APP__TOKENIZER_SAMPLE_MAX_LINES", 10000),
-        "data_bank_api_url": data_bank_url,
-        "data_bank_api_key": _parse_str("APP__DATA_BANK_API_KEY", ""),
         "cleanup": cleanup_cfg,
-        "corpus_cache_cleanup": corpus_cache_cleanup_cfg,
         "tokenizer_cleanup": tokenizer_cleanup_cfg,
     }
 
@@ -186,7 +157,6 @@ def load_settings() -> Settings:
 __all__ = [
     "AppConfig",
     "CleanupConfig",
-    "CorpusCacheCleanupConfig",
     "LoggingConfig",
     "RQConfig",
     "RedisConfig",

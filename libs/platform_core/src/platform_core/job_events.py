@@ -35,13 +35,8 @@ class JobDomain(StrEnum):
     """The service whose job queue emitted an event."""
 
     COVENANT = "covenant"
-    DATABANK = "databank"
-    DIGITS = "digits"
-    MUSIC_WRAPPED = "music_wrapped"
-    QR = "qr"
     TRAINER = "trainer"
     TRANSCRIPT = "transcript"
-    TURKIC = "turkic"
 
 
 class EventSuffix(StrEnum):

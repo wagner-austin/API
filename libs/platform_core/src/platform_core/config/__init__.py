@@ -17,10 +17,12 @@ So the per-service types are gone from here and each module owns unprefixed
 names. Import from the module that says whose they are:
 
     from platform_core.config.model_trainer import Settings, load_settings
-    from platform_core.config.art_trainer import Settings as ArtSettings
+    from platform_core.config.covenant_radar import Settings as CovenantSettings
 
 The module path carries the service, which is what a path is for. What stays
-here is what is genuinely shared: env parsing helpers and the test hooks.
+here is what is genuinely shared: env parsing helpers and the test hooks. The
+modules for Art-Trainer, the Discord bot, handwriting-ai, turkic-api and
+data-bank-api left with those services on 2026-11-01; two remain.
 """
 
 from __future__ import annotations
@@ -45,7 +47,6 @@ from ._utils import (
     _validate_log_level,
 )
 from .covenant_radar import MLBackend
-from .discordbot import require_discord_token
 
 __all__ = [
     "LogFormat",
@@ -66,5 +67,4 @@ __all__ = [
     "_validate_log_format",
     "_validate_log_level",
     "config_test_hooks",
-    "require_discord_token",
 ]

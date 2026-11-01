@@ -295,50 +295,6 @@ raise AppError(OAuthErrorCode.TOKEN_EXPIRED, "Token has expired")
 | `MISSING_REFRESH_TOKEN` | No refresh token in response |
 | `TOKEN_ENDPOINT_ERROR` | Token endpoint returned error |
 
-## Data Bank Client
-
-HTTP client for data-bank-api file storage:
-
-```python
-from platform_core import DataBankClient
-
-client = DataBankClient(
-    base_url="http://data-bank-api:8000",
-    api_key="secret",
-    timeout_seconds=30.0,
-)
-
-# Upload file
-response = client.upload(
-    file_bytes=b"...",
-    filename="model.bin",
-    content_type="application/octet-stream",
-    request_id="req-123",
-)
-print(response["file_id"], response["sha256"])
-
-# Download file
-data = client.download(file_id="model.bin", request_id="req-456")
-
-# Check file exists
-info = client.head(file_id="model.bin", request_id="req-789")
-```
-
-### Client Errors
-
-```python
-from platform_core import (
-    DataBankClientError,
-    NotFoundError,
-    AuthorizationError,
-    BadRequestError,
-    ConflictError,
-    ForbiddenError,
-    RangeNotSatisfiableError,
-    InsufficientStorageClientError,
-)
-```
-
 ## Event Schemas
 
 Typed event schemas for inter-service communication:
@@ -347,24 +303,15 @@ Typed event schemas for inter-service communication:
 
 ```python
 from platform_core.job_events import (
+    JobDomain,
     JobEventV1,
     decode_job_event,
     encode_job_event,
     default_events_channel,
 )
 
-# Domain-parametric events (turkic, handwriting, etc.)
-channel = default_events_channel("turkic")  # "events:turkic"
-```
-
-### Digits Metrics Events
-
-```python
-from platform_core.digits_metrics_events import (
-    DigitsMetricsEventV1,
-    decode_digits_metrics_event,
-    encode_digits_metrics_event,
-)
+# Domain-parametric events: JobDomain is covenant, trainer or transcript
+channel = default_events_channel(JobDomain.TRANSCRIPT)  # "transcript:events"
 ```
 
 ### Trainer Metrics Events
@@ -374,16 +321,6 @@ from platform_core.trainer_metrics_events import (
     TrainerMetricsEventV1,
     decode_trainer_metrics_event,
     encode_trainer_metrics_event,
-)
-```
-
-### Data Bank Events
-
-```python
-from platform_core.data_bank_events import (
-    DataBankEventV1,
-    decode_data_bank_event,
-    encode_data_bank_event,
 )
 ```
 
@@ -579,14 +516,6 @@ to start means for it.
 | `setup_logging` | Configure structured logging |
 | `get_logger` | Get named logger |
 | `stdlib_logging` | Get stdlib logger |
-
-### Client Types
-
-| Type | Description |
-|------|-------------|
-| `DataBankClient` | Data bank API client |
-| `FileInfoDict` | File info response |
-| `HeadInfo` | HEAD response info |
 
 ### Torch Protocol Types
 

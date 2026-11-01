@@ -33,28 +33,19 @@ libs/platform_core/
 │   ├── oauth_types.py           # OAuth TypedDicts with encode/decode
 │   ├── oauth_testing.py         # OAuth test utilities (public)
 │   ├── testing.py               # HTTP fakes and test utilities
-│   ├── data_bank_client.py      # Data bank API client
-│   ├── data_bank_events.py      # Data bank event schemas
-│   ├── data_bank_protocol.py    # Data bank protocols
 │   ├── model_trainer_client.py  # Model trainer API client
 │   ├── job_events.py            # Generic job event schemas
-│   ├── job_keys.py              # Job key utilities
 │   ├── job_types.py             # Job type definitions
 │   ├── queues.py                # Queue name constants
 │   ├── trainer_keys.py          # Trainer key utilities
 │   ├── trainer_metrics_events.py # Trainer metrics schemas
-│   ├── digits_metrics_events.py # Digits metrics schemas
 │   ├── covenant_metrics_events.py # Covenant metrics schemas
 │   └── config/                  # Service configuration loaders
 │       ├── __init__.py
 │       ├── _test_hooks.py
 │       ├── _utils.py
 │       ├── covenant_radar.py
-│       ├── data_bank.py
-│       ├── discordbot.py
-│       ├── handwriting_ai.py
-│       ├── model_trainer.py
-│       └── turkic_api.py
+│       └── model_trainer.py
 └── tests/
     ├── __init__.py
     ├── conftest.py
