@@ -1,6 +1,7 @@
 """Independent block-index oracle and strict evidence checks for seed summaries."""
 
 from hashlib import sha256
+from statistics import fmean, quantiles, stdev
 
 import numpy as np
 import pytest
@@ -31,10 +32,8 @@ def test_seed_average_matches_independent_moving_block_index_oracle() -> None:
     assert [item["arm"] for item in results] == ["cleargbm", "lightgbm", "xgboost", "equal_weight"]
     assert len(observations) == 20
     for arm_index, result in enumerate(results):
-        expected: NDArray[np.float64] = np.asarray(
-            [((month // 6 - 2) * 4 + arm_index) / 1024 for month in range(36)], dtype=np.float64
-        )
-        assert result["mean_paired_differences"] == [float(value) for value in expected]
+        expected = [((month // 6 - 2) * 4 + arm_index) / 1024 for month in range(36)]
+        assert result["mean_paired_differences"] == expected
         assert (result["n_months"], result["n_seeds"], result["cost_bps"]) == (36, 5, 10)
         assert result["candidate"] == candidate_digest(rows[0].proposal)
         assert result["reference"] == "momentum"
@@ -46,16 +45,21 @@ def test_seed_average_matches_independent_moving_block_index_oracle() -> None:
         }
         # Sample actual contiguous indexes independently, without production weights.
         rng = np.random.default_rng(evaluation["design"]["bootstrap_seed"])
-        starts = rng.integers(0, 25, size=(10000, 3), dtype=np.int64)
-        indexes = (starts[:, :, None] + np.arange(12, dtype=np.int64)).reshape(10000, 36)
-        draws: NDArray[np.float64] = expected[indexes].mean(axis=1)
+        starts: NDArray[np.int64] = rng.integers(0, 25, size=(10000, 3), dtype=np.int64)
+        draws: list[float] = []
+        for draw in range(10000):
+            sampled: list[float] = []
+            for block in range(3):
+                start: np.int64 = starts[draw, block]
+                sampled.extend(expected[int(start) : int(start) + 12])
+            draws.append(fmean(sampled))
         interval = require_dict(result, "interval")
-        assert interval["estimate"] == float(expected.mean())
-        assert interval["std_error"] == pytest.approx(float(draws.std(ddof=1)), abs=1e-15)
-        bounds: NDArray[np.float64] = np.quantile(draws, [0.025, 0.975])
-        assert interval["ci_low"] == pytest.approx(float(bounds[0]), abs=1e-15)
-        assert interval["ci_high"] == pytest.approx(float(bounds[1]), abs=1e-15)
-        tail = min(int(np.count_nonzero(draws <= 0)), int(np.count_nonzero(draws >= 0)))
+        assert interval["estimate"] == fmean(expected)
+        assert interval["std_error"] == pytest.approx(stdev(draws), abs=1e-15)
+        bounds = quantiles(draws, n=40, method="inclusive")
+        assert interval["ci_low"] == pytest.approx(bounds[0], abs=1e-15)
+        assert interval["ci_high"] == pytest.approx(bounds[-1], abs=1e-15)
+        tail = min(sum(value <= 0 for value in draws), sum(value >= 0 for value in draws))
         assert interval["p_value"] == min(1.0, 2 * (tail + 1) / 10001)
         assert (interval["confidence"], interval["n_units"]) == (0.95, 3)
         inputs = [narrow_json_to_dict(item) for item in require_list(result, "inputs")]
@@ -113,7 +117,8 @@ def test_uncertainty_rejects_incomplete_or_changed_seed_evidence(fault: str) -> 
         elif fault == "nonfinite":
             values[index] = {**values[index], "value": float("nan")}
         else:
-            values[0] = {**values[0], "value": 0.5}
+            reference = next(i for i, value in enumerate(values) if ".momentum." in value["name"])
+            values[reference] = {**values[reference], "value": 0.5}
         rows = (*rows[:-1], item._replace(record={**item.record, "observations": tuple(values)}))
     with pytest.raises(ValueError, match=r"RESEARCH_SELECTION_(SEEDS|CALENDAR)"):
         validation_summary(policy, evaluation, rows)

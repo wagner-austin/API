@@ -78,7 +78,7 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
                 )
     assert [
         row for row in record["observations"] if row["name"].startswith("monthly_net_return.")
-    ] == expected
+    ] == sorted(expected, key=lambda row: row["name"])
     first = narrow_json_to_dict(require_list(result, "results")[0])
     months = [narrow_json_to_dict(item) for item in require_list(first, "months")]
     assert len(months) == 16
