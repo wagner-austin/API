@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/Makefile"
   - "libs/covenant_ml/tests/markets/test_research_proposals_cli.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_selection_report.py"
   - "libs/covenant_ml/tests/markets/test_research_ranking.py"
@@ -34,6 +35,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_final.py"
   - "libs/covenant_ml/tests/markets/test_crsp_final.py"
 source_git_blobs:
+  "libs/covenant_ml/Makefile": "ad7d5dbde8c784bb781e5de8cc764eed2c506cd0"
   "libs/covenant_ml/tests/markets/test_research_proposals_cli.py": "ab6a5c10d03eaaf5703f5c4d1a3928a354f38720"
   "libs/covenant_ml/src/covenant_ml/markets/research_selection_report.py": "ac537055599f353fae294d9f01310a6e0a40d1eb"
   "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "b9f28bbe664535cfd134feecc4e6ae635597df48"
@@ -59,7 +61,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "1d359d0f1ecdbe17b87f1b682b0d0374810557e7"
+  "libs/covenant_ml/scripts/research_proposals.py": "5dfbb04cddfeedacee45ce63478f31cd6e5ecb97"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "9f903a82aebf9c42ec8bfd989a7496462c9e430b"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
@@ -174,5 +176,14 @@ to the existing queue.[^native]
 [^ranking]: `libs/covenant_ml/src/covenant_ml/markets/research_ranking.py`, `winning_attempt`, `_paired` and `_series`; `libs/covenant_ml/src/covenant_ml/markets/research_selection_records.py`, exact selection-policy codec; `libs/covenant_ml/tests/markets/test_research_ranking.py`, seed completeness, calendar and lineage refusals, averaging and both tie rules; `libs/covenant_ml/tests/markets/test_research_selection.py`, direct-event winner and final-seed refusals. API `a00c077b125ceb436e73b8f5327a2dda6b798663` passed full fleet checks `86e7d08b-0ba3-4e7e-875a-d4e5059e6437` and `ca5aed46-a588-4138-900f-871553960ef2`: 5,038 tests, 100% statement and branch coverage, typing, lint and guards. These tests do not constitute a native queue rehearsal or a licensed study.
 
 [^selection-report]: `libs/covenant_ml/src/covenant_ml/markets/research_selection_report.py`, `report_selection`; `libs/covenant_ml/tests/markets/test_research_proposals_cli.py`, real journal success, wrong-seed refusal and reporting-failure cases; `libs/covenant_ml/scripts/research_proposals.py`, `main`. Full fleet check `204352f7-6fad-4e73-81e3-98f5f5ac0817` passed at API `9b6cbf3671f9b61b4243b09c78d5794490d0a84f` on Lacrymal at `2026-11-01T01:45:31Z`: 5,041 tests, 100% statement and branch coverage, typing, lint and guards.
+
+The fleet pass above did not establish that the committed file passed lint
+unchanged: its Makefile used Ruff's automatic fixes. GitHub run
+`41262419379` rejected `RET505` at `research_proposals.py:126`, an unnecessary
+`elif` after selection returned. The source now uses `if`, and
+`libs/covenant_ml/Makefile` `_lint-prep` uses non-mutating lint and formatting
+checks. The installed recovery runtime remains explicitly pinned to its prior
+source revision; this lint-only source correction does not alter its recorded
+identity or certify the still-open queue handover.
 
 [^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. On main at 85e408c1c08cd3ff5faaf88416f4d62965ed64a3, job 8054c71b passed libs/covenant_ml on Colossus at 2026-10-30T05:57:25Z: 4,786 tests, 100.00% coverage. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
