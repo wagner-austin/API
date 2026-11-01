@@ -40,7 +40,17 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 [WRDS equity research extends the existing systems](../pages/wrds-equity-research-protocol.md) -- navigation to the study, implementation boundaries and measured readiness
 
-[WRDS baseline readiness](../pages/wrds-baseline-readiness.md) -- installed pilot versus tested implementation, and prerequisites for the substantive study
+[WRDS baseline readiness](../pages/wrds-baseline-readiness.md) -- short current status and requirements for a new licensed study
+
+[WRDS installed runtime](../pages/wrds-installed-runtime.md) -- verified controller and HPC3 image identities, separate from repository changes
+
+[WRDS operational rehearsals](../pages/wrds-operational-rehearsals.md) -- synthetic queue, seed summary, selection and final-grant measurements
+
+[WRDS licensed data evidence](../pages/wrds-licensed-data-evidence.md) -- extraction vintage, encrypted partitions and verified HPC3 staging
+
+[WRDS cleanup evidence](../pages/wrds-cleanup-evidence.md) -- allocation-specific normal-exit and forced-kill observations and remaining limits
+
+[November 1 CRSP baseline incident](../pages/wrds-baseline-20261101.md) -- stopped study, pre-entry delisting diagnosis and execution-boundary correction
 
 [Frozen CRSP monthly study design](../pages/crsp-monthly-study-design.md) -- target, historical universe, split dates, baselines, costs and trial budget
 
