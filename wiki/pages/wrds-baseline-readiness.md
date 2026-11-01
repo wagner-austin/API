@@ -662,7 +662,9 @@ tests and rejected A3's selection evidence: file substrings could pass without
 selection having run. No executable audit checks ran after that rejection;
 the next closure must run every check. Task `a9b2927c` was reclaimed for this
 repair. This finding does not invalidate the separately recorded native jobs
-or imply a completed licensed baseline.
+or imply a completed licensed baseline.[^selection-audit-review]
+
+[^selection-audit-review]: Live board audit `5046a547-8830-4c42-bf0b-864abf2c1490`, computed PARTIALLY VERIFIED result at `2026-11-01T00:13:28.890Z`, check-adequacy review for parent `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`: A1/A2 accepted, A3 rejected before executable checks. This is the audit's recorded finding, not a new independent verdict.
 
 The fresh synthetic repetition found a recovery collision: identical policy
 digests and attempt numbers from separate study roots shared the global native
@@ -672,7 +674,7 @@ adds the exact frozen artifact path and workspace host to that same lookup;
 duplicate exact matches still refuse. Recovery must retain these allocations
 and their journals. The repair and subsequent measured selection are not yet
 independently verified. See the active `a9b2927c` thread, including finding
-`26b741fd-14fd-434a-b368-293c2662ba2f`.
+`26b741fd-14fd-434a-b368-293c2662ba2f`.[^selection-recovery]
 
 The installed controller at
 `/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python`
