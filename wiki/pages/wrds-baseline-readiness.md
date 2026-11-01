@@ -137,23 +137,23 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-encrypted-runtime-20261030/provenance.json": "11769f95c43f98fe1e6df6dd071eb308a0c90a8b"
   ".github/workflows/covenant-ml.yml": "3dd4022a0f4e46cddaccec3be16188fbdc275dae"
   "libs/covenant_ml/src/covenant_ml/markets/research_keys.py": "8cb56c464b77f760375b512fd17159c3a2d9a9f3"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/tests/markets/test_research_keys.py": "ceb7f3b58753e99d7a559b8e471c46d1abb28067"
-  "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
+  "libs/covenant_ml/tests/markets/test_research_execution.py": "cca5b4c2f6a233e61b4b8a08de553a39b6f06743"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_records.py": "6b3826b16f265301ec9923070cc89322427f8bc6"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "964609d0d26e17031994cb5ab1473a8fd5f61563"
   "libs/covenant_ml/tests/markets/test_encrypted_storage.py": "3b6198a8cc61bf3c071c236729e1c7ceb7135d79"
   "libs/covenant_ml/tests/markets/test_encrypted_records.py": "2cfcf565e6b24f7b252059891a4cf9e545329923"
   "tools/hpc3/artifacts/wrds-monthly-runtime-20261030/provenance.json": "48a1ceff729c1af46bbf6a0748614eec152e2659"
   "tools/hpc3/artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e304c4b9211fd47a97a364033f38c93c1a88c839"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "f23c7f9e828d129ffc1a1d55188094dc998aea50"
+  "libs/covenant_ml/scripts/research_proposals.py": "1d359d0f1ecdbe17b87f1b682b0d0374810557e7"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "9f903a82aebf9c42ec8bfd989a7496462c9e430b"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
@@ -165,7 +165,7 @@ provenance:
   - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "2026-10-30 readiness recheck, board cda5d102-9f26-4c2a-bfbe-cfdbe17b33c6: live task_get reports 1e555057, 7c71808d and 364a4ba8 done after independent audit; dispatch_list at API e12eb1c8312b9d4ae57e38906ca787e02e0e094c reports research check b37025f3 (4786 passed, 100%), fleet check a4f8cdc8 (2495 passed, 100%) and real host check 16b62830 (79 passed). Local-file inspection of /home/corvis/research-control/wrds-validation-bda8ca2af/lib/python3.11/site-packages/covenant_ml/markets/research_trial.py still finds load_wrds_evaluation at lines 18 and 58, SHA-256 98e11f10c1a28dcaeaeec9fde9e21c22f93be0c8c8cd0add5c50e23e4805d271. Its entrypoint/scripts/research_proposals.py exposes init/status/propose/submit/reconcile and no select, SHA-256 ed2272d101c645375ada9cc46caa4f2c288f9cefd196c634827a81ca7d0785ef. These are local installed-file readings, not a new cluster execution."
-fact_checked: 2026-10-31
+fact_checked: 2026-11-01
 confidence: medium
 ---
 
@@ -174,7 +174,7 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-**Current reading, October 31:** the licensed extraction and encrypted collection
+**Current reading, November 1:** the licensed extraction and encrypted collection
 have completed through the shared queue. All 24 declared outputs and the
 RunRecord were verified; the completed native allocation was reused after a
 collection timeout. The final bundle remains sealed. The verifier corrections
@@ -189,7 +189,11 @@ are frozen before any licensed validation results are opened. The existing
 journal enforces ranking and complete seed coverage. Ten synthetic attempts
 passed the shared queue and native verification; installed selection refused
 the wrong candidate and seed, then selected the winner at seed 11. Independent
-review of this selection milestone is pending. Licensed evaluator decoding and the
+review reopened this selection milestone on November 1 at 00:13 UTC: the
+winner/refusal captures were session-authored, while the audit requires the
+maintained controller's own service report. The repair adds that measurement
+to the existing select command and requires a fresh synthetic rehearsal.
+Licensed evaluator decoding and the
 substantive study remain ahead. Earlier runtime measurements below retain
 their historical scope.[^licensed-collection][^licensed-staging][^staging-review][^selection-runtime][^baseline-freeze][^selection-enforcement][^selection-rehearsal]
 
@@ -586,7 +590,9 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    The verifier corrections and licensed staging passed independent audit;
    the sealed final bundle and its key remain evaluator-owned.[^verifier-integrity][^staging-review][^selection-runtime]
 4. The synthetic selection rehearsal passed through the existing evaluator-owned
-   journal transition; complete its independent review before licensed validation.
+   journal transition; its independent review reopened for missing program-authored
+   winner/refusal evidence. Repeat those measurements through the maintained
+   reporter and complete review before licensed validation.
    The initial three candidates use both features, momentum alone and liquidity alone, each over
    seeds 11, 23, 37, 53 and 71 with the shared 200-tree configuration. Rank the
    five-seed mean monthly LightGBM-minus-momentum net return at 10 bps; break
@@ -640,3 +646,21 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
 [^selection-runtime]: `tools/hpc3/artifacts/wrds-selection-runtime-20261031/provenance.json`, maintained controller, staging and image inspection outputs and exact input identities; `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py`, `prepare_bundle`, fixed resource fields. The first synthetic queue request `436d535d-44f9-4d1b-b1a0-5a72b9f065b7` closed failed for native job `58700181` with `CRSP-007`; nine remaining admitted attempts were interrupted before submission, preserving the abandoned study. Fresh synthetic fixtures use `libs/covenant_ml/tests/markets/_crsp_study_fixtures.py`, `study_rows` and `study_protocol`, and `_encrypted_fixtures.py`, `seal_extract`. No licensed input was opened by these measurements.
 
 [^selection-rehearsal]: `tools/hpc3/artifacts/wrds-selection-runtime-20261031/rehearsal.json`, ten queue/native identities, five fixed seeds for each of two candidates and exact installed-CLI captures; `audit-probes.json`, executable read-only predicates and eleven negative probes. Native evidence is service-authored and each verified canonical record digest matches its queue closure after verification. Selection captures are session-operated CLI measurements, not independent service attestations: unsettled selection refused `RESEARCH-008`; attempts 6 and 2 refused `RESEARCH_SELECTION_WINNER` with byte-identical journals; attempt 1 selected at seed 11. No final grant was released. Runtime and native predicates each returned one; changed identity, count, timing and digest predicates returned zero. The entrypoint remains outside the image environment and is separately checksum-pinned; this is explicit in native image-drift evidence.
+
+Independent audit `5046a547-8830-4c42-bf0b-864abf2c1490` returned PARTIALLY VERIFIED
+at `2026-11-01T00:13:28.890Z`. Its check-adequacy review accepted A1/A2's behavioral
+tests and rejected A3's selection evidence: file substrings could pass without
+selection having run. No executable audit checks ran after that rejection;
+the next closure must run every check. Task `a9b2927c` was reclaimed for this
+repair. This finding does not invalidate the separately recorded native jobs
+or imply a completed licensed baseline.
+
+The fresh synthetic repetition found a recovery collision: identical policy
+digests and attempt numbers from separate study roots shared the global native
+ledger. Jobs `58708603`, `58708606` and `58708609` were submitted, but the
+existing inspector refused ambiguous `research_attempt` matches. The correction
+adds the exact frozen artifact path and workspace host to that same lookup;
+duplicate exact matches still refuse. Recovery must retain these allocations
+and their journals. The repair and subsequent measured selection are not yet
+independently verified. See the active `a9b2927c` thread, including finding
+`26b741fd-14fd-434a-b368-293c2662ba2f`.

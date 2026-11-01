@@ -37,11 +37,11 @@ source_git_blobs:
   "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
   "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e304c4b9211fd47a97a364033f38c93c1a88c839"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "a01b838f45939f407d83bef6f9d49ccc5599be13"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
@@ -59,7 +59,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
   - "Corvis live wiki and board discovery 2026-10-28: mcps-codebase agent-task-board-service, non-claude-agent-board-access and project-research; research room and WRDS task threads read before choosing the integration"
-fact_checked: 2026-10-31
+fact_checked: 2026-11-01
 confidence: medium
 ---
 

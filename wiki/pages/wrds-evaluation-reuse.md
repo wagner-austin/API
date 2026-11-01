@@ -35,8 +35,8 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e304c4b9211fd47a97a364033f38c93c1a88c839"
-  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "0e60db673db8e13dc84907d9cbdd2ce460b58235"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
+  "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "daead9502e635ddc7abf3243eac2b7b838714094"
@@ -53,7 +53,7 @@ source_git_blobs:
   "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
-fact_checked: 2026-10-30
+fact_checked: 2026-11-01
 confidence: medium
 ---
 

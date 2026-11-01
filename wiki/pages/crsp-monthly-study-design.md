@@ -22,7 +22,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
   "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e304c4b9211fd47a97a364033f38c93c1a88c839"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
@@ -33,7 +33,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
-fact_checked: 2026-10-30
+fact_checked: 2026-11-01
 confidence: medium
 ---
 
