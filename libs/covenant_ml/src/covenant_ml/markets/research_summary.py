@@ -46,9 +46,8 @@ def _result(
     """Resample one candidate's exact averaged paired differences against zero."""
     design = evaluation["design"]
     values: NDArray[np.float64] = np.asarray(item.differences, dtype=np.float64)
-    months: NDArray[np.int64] = np.asarray(
-        [crsp_month(window.decision) for window in item.windows], dtype=np.int64
-    )
+    month_ids: list[int] = [crsp_month(window.decision) for window in item.windows]
+    months: NDArray[np.int64] = np.asarray(month_ids, dtype=np.int64)
     # Adding the baseline back and subtracting it again loses the exact paired
     # differences through rounding. The estimand is the increment against zero.
     comparison = compare_moving_block(
