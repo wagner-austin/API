@@ -7,10 +7,12 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json": "3b52554a69ce12c549fc47b3cc60d2c332299fa7"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
 fact_checked: 2026-11-01
@@ -43,9 +45,15 @@ identity, not valid scientific outcomes.[^runtime]
 ## Allocation and execution ownership
 
 The licensed attempt requested four CPUs, 128 GiB and 121 scheduler minutes
-on `free`, with a 7,200-second evaluator deadline. These are frozen per-job
-ceilings, not the account's total available compute. Native allocation can
-differ from the CPU request; retain accounting alongside the recipe.[^preparation]
+on `free`, with a 7,200-second evaluator deadline. These are per-job requests,
+not the account's total available compute.[^preparation]
+
+Native accounting records **eight allocated CPUs**, despite the four-CPU
+recipe and `ReqTRES`. Partition inspection reports 18 GiB maximum memory per
+CPU; rounding 128/18 upward gives eight. This is consistent with memory-driven
+allocation adjustment, although the site-specific adjustment was not traced.
+Four CPUs was not an enforced allocation ceiling. Preserve that discrepancy
+and freeze a feasible CPU/memory pair for the next study.[^allocation]
 
 The shared queue uses the installed `wrds-queue-b53b0ea34` adapter.
 A fresh synthetic request `eecf34ae` completed as native job `58719001`
@@ -62,3 +70,4 @@ Do not describe newly committed code as already installed.[^runtime][^preparatio
 [^runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, `controller`, `image`, `construction`, `service_reports` and `scope`.
 [^preparation]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json`, frozen runtime, policy and first-attempt preparation.
 [^controller]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, `queue.observation` and `scope`.
+[^allocation]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json`, `allocation`, exact `sacct_row`, partition limit and bounded interpretation.

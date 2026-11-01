@@ -7,12 +7,14 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
   - "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json": "3b52554a69ce12c549fc47b3cc60d2c332299fa7"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "dab95633b59869e38fffa4e80d18a556f5fba0eb"
 provenance:
@@ -27,6 +29,14 @@ The first required licensed attempt failed before model fitting.
 The preregistration stopped without retry, replacement or candidate selection;
 attempts 2–15 were not submitted and the final holdout remained unreleased.
 This is a stopped study, not a completed validation result.[^stopped]
+
+The post-failure service reread at 23:56 UTC confirms one failed journal
+attempt, fourteen admitted attempts with empty job IDs, and no selection or
+final-manifest binding. A separate native reread verified all sixteen launch
+inputs and their retained compute checksum receipts. The external launcher
+is bound by that checksum gate; image-drift comparison still reports it as
+outside the image. These readings establish retained provenance and journal
+state, not successful evaluation or hostile-owner attestation.[^audit]
 
 ## Failure and cause
 
@@ -73,3 +83,4 @@ allocation remains an evidence gap in [[wrds-cleanup-evidence]].[^diagnostic]
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `terminal_report`, `interpretation`, `repair_status` and `cleanup_limit`; its repair-status field is the historical pre-correction observation.
 [^path]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, boundary arithmetic and verified-extract cash labels with unchanged selection.
+[^audit]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json`, `service_reports`, `launch`, `journal` and `reporter_execution`; the cited service posts hold the program-generated readings.
