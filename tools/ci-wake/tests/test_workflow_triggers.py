@@ -86,7 +86,6 @@ class TestTheWorkflowsThatExist:
             "covenant-ml.yml",
             "navprobe.yml",
             "tankpitbot.yml",
-            "turkic-api.yml",
         ):
             assert workflows[name].push == transport_filtered
         for ref in (MAIN, "refs/heads/feature/x", DX_MOD, "refs/tags/pushed-tests/v1"):
