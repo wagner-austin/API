@@ -25,6 +25,7 @@ from scripts.research_preparation import main
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.research_cluster import prepare_bundle
+from covenant_ml.markets.research_final import release_final, select_candidate
 from covenant_ml.markets.research_journal import (
     admit_proposal,
     research_journal,
@@ -36,10 +37,12 @@ from covenant_ml.markets.research_preparation_report import (
     report_preparation,
 )
 from covenant_ml.markets.research_records import encode_research_policy, encode_research_proposal
-from covenant_ml.markets.research_trial_records import ResearchTrial
+from covenant_ml.markets.research_trial_records import ResearchTrial, encode_research_trial
 from covenant_ml.markets.validation import read_document
 
+from ._encrypted_fixtures import evaluator_keys
 from ._research_execution_fixtures import setup
+from ._research_final_fixtures import completed_study
 
 TASK = "e1621f6f-7c31-4ec1-bae1-8657053e707f"
 
@@ -100,6 +103,8 @@ def test_reading_is_posted_by_the_program_and_printed(
             "seed": trial["proposal"]["seed"],
             "candidate": row["candidate"],
             "job_id": "",
+            "selection": "",
+            "final_manifest_digest": "",
         }
     ]
     assert report["recipe"] == {
@@ -150,7 +155,10 @@ def test_foreign_recipe_is_refused_before_posting(
     assert board.bodies == []
 
 
-def test_running_attempt_keeps_its_recipe(tmp_path: Path, board: FakeHttpPost) -> None:
+@pytest.mark.parametrize("failed", [False, True])
+def test_running_or_failed_attempt_keeps_its_recipe(
+    tmp_path: Path, board: FakeHttpPost, failed: bool
+) -> None:
     policy, ledger, recipe, trial = _prepared(tmp_path)
     journal = research_journal(trial["policy"])
     submit: JSONObject = {"action": "submit", "number": 1, "observed_ms": 1}
@@ -162,9 +170,69 @@ def test_running_attempt_keeps_its_recipe(tmp_path: Path, board: FakeHttpPost) -
     }
     journal.transact(ledger, lambda _: submit)
     journal.transact(ledger, lambda _: scheduled)
+    if failed:
+        failure: JSONObject = {
+            "action": "failed",
+            "number": 1,
+            "observed_ms": 3,
+            "reason": "native_failed",
+        }
+        journal.transact(ledger, lambda _: failure)
+    before = ledger.read_bytes()
     report = report_preparation(policy, ledger, recipe, TASK)
     attempt = narrow_json_to_dict(require_list(report, "attempts")[0])
-    assert (attempt["status"], attempt["job_id"]) == ("running", "58721392")
+    assert (attempt["status"], attempt["job_id"]) == ("failed" if failed else "running", "58721392")
+    assert (attempt["selection"], attempt["final_manifest_digest"]) == ("", "")
+    assert ledger.read_bytes() == before
+
+
+@pytest.mark.parametrize("released", [False, True])
+def test_report_distinguishes_selected_and_released_final_holdout(
+    tmp_path: Path, board: FakeHttpPost, released: bool
+) -> None:
+    ledger, trial, manifest = completed_study(tmp_path)
+    select_candidate(ledger, trial, manifest)
+    if released:
+        release_final(
+            ledger,
+            trial,
+            manifest,
+            tmp_path / "grant",
+            keys=evaluator_keys(tmp_path / "validation"),
+        )
+    frozen = trial["policy"]
+    policy = tmp_path / "policy.json"
+    policy.write_text(dump_json_str(encode_research_policy(frozen)), "utf-8")
+    recipe = tmp_path / "run.json"
+    recipe.write_text(
+        dump_json_str(
+            {
+                "name": "synthetic-selection-evidence",
+                "experiment": {
+                    "research_attempt": f"{research_policy_digest(frozen)}:1",
+                    "request_sha256": sha256(
+                        dump_json_str(encode_research_trial(trial)).encode()
+                    ).hexdigest(),
+                },
+                "cpus": frozen["cpus"],
+                "mem_gb": frozen["mem_gb"],
+                "minutes": 1,
+                "partition": "free",
+                "gpu": None,
+                "requeue": False,
+            }
+        ),
+        "utf-8",
+    )
+    before = ledger.read_bytes()
+    report = report_preparation(policy, ledger, recipe, TASK)
+    attempt = narrow_json_to_dict(require_list(report, "attempts")[0])
+    assert attempt["selection"] == ("released" if released else "selected")
+    assert attempt["final_manifest_digest"] == sha256(manifest.read_bytes()).hexdigest()
+    assert ledger.read_bytes() == before
+    assert sent_arguments(board.bodies[-1])["body"] == (
+        "RESEARCH PREPARATION LOAD-REPORT\n" + dump_json_str(report)
+    )
 
 
 def test_refused_attempt_owns_no_recipe(tmp_path: Path, board: FakeHttpPost) -> None:

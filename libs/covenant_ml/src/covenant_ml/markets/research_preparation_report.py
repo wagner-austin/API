@@ -147,6 +147,8 @@ def report_preparation(policy_path: Path, ledger: Path, recipe_path: Path, task:
             ],
             "candidate": row["candidate"],
             "job_id": row["job_id"],
+            "selection": row["selection"],
+            "final_manifest_digest": row["final_manifest_digest"],
         }
         for row in attempts
     ]
