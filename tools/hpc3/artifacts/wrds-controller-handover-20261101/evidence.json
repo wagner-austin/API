@@ -1,0 +1,384 @@
+{
+  "task": "04c0cdbe-278f-41bb-8141-a170fc0e5324",
+  "measured_at": "2026-11-01T10:22:17.734542+00:00",
+  "scope": "Session-assembled evidence index. Service-authored reports and four automatic queue closures preserve their identities and timestamps. Original native allocations recovered without resubmission. Six corrected normal requests are progressing separately; no licensed final release.",
+  "runtime": {
+    "source_commit": "b53b0ea343de96df607ad7dbc877c07ec5220668",
+    "source_archive_sha256": "5847ad91a6ed640c974351854c97339ae4b3fb5a237a49951e5871a420504315",
+    "controller_python": "/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "first_party_wheel_sha256": {
+      "board_watch-0.1.0-py3-none-any.whl": "ac5f25ae219ba4916bad9b6b7594ba75176215a2a13ac32028ea47f8fd36b6a1",
+      "fleet-0.1.0-py3-none-any.whl": "6b2a87978df884d9834ece89d78137cdc3fdab02effc56b482d8b6be421c9e9e",
+      "hpc3-0.1.0-py3-none-any.whl": "8c33b45c0c20bf03d318a65b3292eec09d8be260184f04441d11f47bc0a116a0",
+      "monorepo_guards-0.1.0-py3-none-any.whl": "4c9ce4de40525af72544ac74beac4068eb9aad33ac601321bf1932eabafebd6c",
+      "platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea"
+    },
+    "all_wheel_sha256": {
+      "annotated_doc-0.0.4-py3-none-any.whl": "571ac1dc6991c450b25a9c2d84a3705e2ae7a53467b5d111c24fa8baabbed320",
+      "annotated_types-0.7.0-py3-none-any.whl": "1f02e8b43a8fbbc3f3e0d4f0f4bfc8131bcb4eebe8849b8e5c773f3a1c582a53",
+      "anyio-4.12.0-py3-none-any.whl": "dad2376a628f98eeca4881fc56cd06affd18f659b17a747d3ff0307ced94b1bb",
+      "board_watch-0.1.0-py3-none-any.whl": "ac5f25ae219ba4916bad9b6b7594ba75176215a2a13ac32028ea47f8fd36b6a1",
+      "certifi-2025.11.12-py3-none-any.whl": "97de8790030bbd5c2d96b7ec782fc2f7820ef8dba6db909ccf95449f2d062d4b",
+      "fastapi-0.124.0-py3-none-any.whl": "91596bdc6dde303c318f06e8d2bc75eafb341fc793a0c9c92c0bc1db1ac52480",
+      "fleet-0.1.0-py3-none-any.whl": "6b2a87978df884d9834ece89d78137cdc3fdab02effc56b482d8b6be421c9e9e",
+      "h11-0.16.0-py3-none-any.whl": "63cf8bbe7522de3bf65932fda1d9c2772064ffb3dae62d55932da54b31cb6c86",
+      "hpc3-0.1.0-py3-none-any.whl": "8c33b45c0c20bf03d318a65b3292eec09d8be260184f04441d11f47bc0a116a0",
+      "httpcore-1.0.9-py3-none-any.whl": "2d400746a40668fc9dec9810239072b40b4484b640a8c38fd654a024c7a1bf55",
+      "httpx-0.28.1-py3-none-any.whl": "d909fcccc110f8c7faf814ca82a9a4d816bc5a6dbfea25d6591d6985b8ba59ad",
+      "idna-3.11-py3-none-any.whl": "771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea",
+      "markdown_it_py-4.0.0-py3-none-any.whl": "87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147",
+      "mdurl-0.1.2-py3-none-any.whl": "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8",
+      "monorepo_guards-0.1.0-py3-none-any.whl": "4c9ce4de40525af72544ac74beac4068eb9aad33ac601321bf1932eabafebd6c",
+      "platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "pydantic-2.12.5-py3-none-any.whl": "e561593fccf61e8a20fc46dfc2dfe075b8be7d0188df33f221ad1f0139180f9d",
+      "pydantic_core-2.41.5-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl": "f31d95a179f8d64d90f6831d71fa93290893a33148d890ba15de25642c5d075b",
+      "pygments-2.19.2-py3-none-any.whl": "86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b",
+      "rich-14.2.0-py3-none-any.whl": "76bc51fe2e57d2b1be1f96c524b890b816e334ab4c1e45888799bfaab0021edd",
+      "starlette-0.50.0-py3-none-any.whl": "9e5391843ec9b6e472eed1365a78c8098cfceb7a74bfd4d6b1c0c0095efb3bca",
+      "typing_extensions-4.15.0-py3-none-any.whl": "f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548",
+      "typing_inspection-0.4.2-py3-none-any.whl": "4ed1cacbdc298c220f1bd249ed5287caa16f34d44ef4e9c3d0cbad5b521545e7",
+      "websockets-17.3-cp311-cp311-manylinux1_x86_64.manylinux_2_28_x86_64.manylinux_2_5_x86_64.whl": "5ad409b7ea102339041281117cf2dadfe71edbb653dc48037cc55d516fb7f448"
+    },
+    "requirements_sha256": "8efad4c0efed65ff21ec2498d598afea18cacb50797bb9c84fbd28f16346ef0c",
+    "builder": "loki",
+    "purpose": "Native queue adapter; compute SIF is unchanged"
+  },
+  "service_evidence": {
+    "runtime_report": {
+      "id": "6322f701-0787-49eb-90a1-8703898de4e8",
+      "author": "hpc-report-04c0cdbe",
+      "created_at": "2026-11-01T10:09:24.747071+00:00",
+      "body_sha256": "5468812456de324d8f6f1907c37bad5c2d309b9bb92ea6f2762215c81c623c8d",
+      "measurement": {
+        "kind": "HPC3_CONTROLLER_EVIDENCE",
+        "source_commit": "b53b0ea343de96df607ad7dbc877c07ec5220668",
+        "controller_python": "/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python",
+        "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+        "site_packages": "/home/corvis/research-control/wrds-queue-b53b0ea34/lib/python3.11/site-packages",
+        "verified_wheels": {
+          "board_watch-0.1.0-py3-none-any.whl": {
+            "sha256": "ac5f25ae219ba4916bad9b6b7594ba75176215a2a13ac32028ea47f8fd36b6a1",
+            "installed_files": 9
+          },
+          "fleet-0.1.0-py3-none-any.whl": {
+            "sha256": "6b2a87978df884d9834ece89d78137cdc3fdab02effc56b482d8b6be421c9e9e",
+            "installed_files": 186
+          },
+          "hpc3-0.1.0-py3-none-any.whl": {
+            "sha256": "8c33b45c0c20bf03d318a65b3292eec09d8be260184f04441d11f47bc0a116a0",
+            "installed_files": 134
+          },
+          "monorepo_guards-0.1.0-py3-none-any.whl": {
+            "sha256": "4c9ce4de40525af72544ac74beac4068eb9aad33ac601321bf1932eabafebd6c",
+            "installed_files": 60
+          },
+          "platform_core-0.1.0-py3-none-any.whl": {
+            "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+            "installed_files": 96
+          }
+        },
+        "installed_files": 485,
+        "selfcheck_sha256": "69d544204b2eb0cf20b2d4a159938c92dcaefd4bfdf2ee0f9c2f3a4b33ad292e",
+        "selfcheck": "image self-check OK",
+        "dependency_check": "No broken requirements found.",
+        "provenance_sha256": "8d8a6969f7e53a5d2a20cafce664e0a04c3e4d4b139584325a884b2360381f86"
+      }
+    },
+    "handover_reports": [
+      {
+        "id": "466fc804-d35c-4a29-ac94-65700df5c996",
+        "author": "hpc-report-a9b2927c",
+        "created_at": "2026-11-01T10:21:26.39689+00:00",
+        "body_sha256": "98f6995b66002d1af10df70bd21bd6ebeb3b94be6469cbe4ec631d633a8e19e8",
+        "handover_sha256": "beb3c0159732573f1d56628ce6db33a846d238c50065597a180a263da3317497",
+        "request_sha256": "4244ff35f2064b4905e08745086a46f849526164616d6f12066778370b280de0",
+        "replacement_sha256": "e75e1383dfc9a9836ae344b51c8fe9ff0d851619572c6261bd3fc0cc1f9552f8",
+        "original_python": "/home/corvis/research-control/wrds-selection-report-9b6cbf367/bin/python",
+        "native_observation": {
+          "state": "complete",
+          "native_job_id": "58708603",
+          "record_sha256": "649889fe71795fd20bafd5a6b08bdecce711d7a5d28811fe6eb85a7ea262869c"
+        },
+        "replacement_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "replacement_provenance_sha256": "f6c8fac74af41e674d14a6d1050bed0912efedbc05e3e91d0db4c293f1583d18"
+      },
+      {
+        "id": "f095afee-be47-4390-9171-87de95544f8d",
+        "author": "hpc-report-a9b2927c",
+        "created_at": "2026-11-01T10:18:27.359371+00:00",
+        "body_sha256": "dcb23d5b989c66e9d935f10d6994c97c91a60e5f90da8b1c622dc81eb7cdcb54",
+        "handover_sha256": "56eadb9d8568fecbd159570a7de90264badc474e5247f348155fc73288a6a3ef",
+        "request_sha256": "e4cc89392eb4f0cc5641e53dbdf1e97b61e4e789ac2691a32d6a098ba83cc3ba",
+        "replacement_sha256": "c3f78f84a8c4e403234c20ec3f06e2873b2b10176fcbfdf5a6ae4010ff6ed198",
+        "original_python": "/home/corvis/research-control/wrds-selection-report-9b6cbf367/bin/python",
+        "native_observation": {
+          "state": "complete",
+          "native_job_id": "58708611",
+          "record_sha256": "6d973877b4ef8f6a8ed13a2a1f710721bfc0e4434ffbc4073d0de8ddad4926c8"
+        },
+        "replacement_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "replacement_provenance_sha256": "f6c8fac74af41e674d14a6d1050bed0912efedbc05e3e91d0db4c293f1583d18"
+      },
+      {
+        "id": "118b09cd-aa53-4a36-8b65-dcd3a3460162",
+        "author": "hpc-report-a9b2927c",
+        "created_at": "2026-11-01T10:15:30.147431+00:00",
+        "body_sha256": "2bdd2199e6198005fe71f05cac7474b7f39bd992f370dd4bb218efe27fc511c3",
+        "handover_sha256": "732326e2b0a39cef6f5ab75737b3da03a1ce49d27f170860c00d012dab4f0e95",
+        "request_sha256": "5b656ced3ccabe709c33a7576eadf81da00f4ed884ce27b18af1eaae7c1cdd1e",
+        "replacement_sha256": "e0a882bd5a2b425f31299741c96d13f7af0b271b2bbd55d4149e2fd3171e74c8",
+        "original_python": "/home/corvis/research-control/wrds-selection-report-9b6cbf367/bin/python",
+        "native_observation": {
+          "state": "complete",
+          "native_job_id": "58708606",
+          "record_sha256": "d41dae205d60a9a7113744cf026db7369ef309649dcaf77575b073e0f2be052f"
+        },
+        "replacement_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "replacement_provenance_sha256": "f6c8fac74af41e674d14a6d1050bed0912efedbc05e3e91d0db4c293f1583d18"
+      },
+      {
+        "id": "d74b2bf8-c258-4afe-b07b-a549d7759a06",
+        "author": "hpc-report-a9b2927c",
+        "created_at": "2026-11-01T10:12:25.208768+00:00",
+        "body_sha256": "65f1a8ed195725061ecf0d98d445d727c8dba16c568e1c6765e50a1dc91d5104",
+        "handover_sha256": "c7697d8d9752637e1698e9f045b19c79cdfa3d28c37ca7511cb8073ad8206fcd",
+        "request_sha256": "46f578777eebb9ff69c4b1d28db2291f7b17838b7f159a24d453d88894b0279d",
+        "replacement_sha256": "f4e6dbf95c74d461fc12903c512e61140d97cf51e1585e6a7025162c1cb87050",
+        "original_python": "/home/corvis/research-control/wrds-selection-report-9b6cbf367/bin/python",
+        "native_observation": {
+          "state": "complete",
+          "native_job_id": "58708609",
+          "record_sha256": "798dcf7a0b7a982724e1047a0fbc648afa280e3374f03a3c8c27a392093faf39"
+        },
+        "replacement_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "replacement_provenance_sha256": "f6c8fac74af41e674d14a6d1050bed0912efedbc05e3e91d0db4c293f1583d18"
+      }
+    ]
+  },
+  "plans": [
+    {
+      "attempt": 1,
+      "original": "4244ff35f2064b4905e08745086a46f849526164616d6f12066778370b280de0",
+      "replacement": "e75e1383dfc9a9836ae344b51c8fe9ff0d851619572c6261bd3fc0cc1f9552f8",
+      "handover": "beb3c0159732573f1d56628ce6db33a846d238c50065597a180a263da3317497",
+      "native_job_id": "58708603",
+      "record_sha256": "649889fe71795fd20bafd5a6b08bdecce711d7a5d28811fe6eb85a7ea262869c"
+    },
+    {
+      "attempt": 2,
+      "original": "5b656ced3ccabe709c33a7576eadf81da00f4ed884ce27b18af1eaae7c1cdd1e",
+      "replacement": "e0a882bd5a2b425f31299741c96d13f7af0b271b2bbd55d4149e2fd3171e74c8",
+      "handover": "732326e2b0a39cef6f5ab75737b3da03a1ce49d27f170860c00d012dab4f0e95",
+      "native_job_id": "58708606",
+      "record_sha256": "d41dae205d60a9a7113744cf026db7369ef309649dcaf77575b073e0f2be052f"
+    },
+    {
+      "attempt": 3,
+      "original": "46f578777eebb9ff69c4b1d28db2291f7b17838b7f159a24d453d88894b0279d",
+      "replacement": "f4e6dbf95c74d461fc12903c512e61140d97cf51e1585e6a7025162c1cb87050",
+      "handover": "c7697d8d9752637e1698e9f045b19c79cdfa3d28c37ca7511cb8073ad8206fcd",
+      "native_job_id": "58708609",
+      "record_sha256": "798dcf7a0b7a982724e1047a0fbc648afa280e3374f03a3c8c27a392093faf39"
+    },
+    {
+      "attempt": 4,
+      "original": "e4cc89392eb4f0cc5641e53dbdf1e97b61e4e789ac2691a32d6a098ba83cc3ba",
+      "replacement": "c3f78f84a8c4e403234c20ec3f06e2873b2b10176fcbfdf5a6ae4010ff6ed198",
+      "handover": "56eadb9d8568fecbd159570a7de90264badc474e5247f348155fc73288a6a3ef",
+      "native_job_id": "58708611",
+      "record_sha256": "6d973877b4ef8f6a8ed13a2a1f710721bfc0e4434ffbc4073d0de8ddad4926c8"
+    }
+  ],
+  "preservation": {
+    "journal_sha256_before": "f63af8a51690b8dc92565849e962687dbf5aed7806dbad5e3b7a3bc7ebaf14ca",
+    "journal_sha256_after": "f63af8a51690b8dc92565849e962687dbf5aed7806dbad5e3b7a3bc7ebaf14ca",
+    "original_requests_verified": 4,
+    "markers_match_verified_plans": 4
+  },
+  "refusal_probes": {
+    "scope": "Actual installed CLI against isolated copies; original requests and journal are not modified. Session-captured measurements, not independent audit verdict.",
+    "probes": [
+      {
+        "probe": "changed-request",
+        "exit_status": 2,
+        "stdout": "",
+        "stderr": "usage: RESEARCH_SPEC_DRIFT: private specification bytes changed\n",
+        "marker_created": false
+      },
+      {
+        "probe": "changed-artifact",
+        "exit_status": 2,
+        "stdout": "",
+        "stderr": "usage: RESEARCH_INPUT_DRIFT: recipe differs from its frozen bytes\n",
+        "marker_created": false
+      },
+      {
+        "probe": "changed-native",
+        "exit_status": 2,
+        "stdout": "",
+        "stderr": "usage: RESEARCH_HANDOVER_RESULT: original allocation or verified result changed\n",
+        "marker_created": false
+      },
+      {
+        "probe": "changed-record",
+        "exit_status": 2,
+        "stdout": "",
+        "stderr": "usage: RESEARCH_HANDOVER_RESULT: original allocation or verified result changed\n",
+        "marker_created": false
+      }
+    ]
+  },
+  "fresh_requests": [
+    {
+      "number": 5,
+      "withdrawn_sha256": "20a7022f25eb9f1e302dbfed8fcdbd7fd3ab50dbf4be327ce70143a04f2b4be4",
+      "specSha256": "ad15cc91bf41c01a5feb3a73cf90f2ef52ce19def6a4a1b2673e9d7567512082",
+      "attempt": "selection-report-9b6cbf367-5"
+    },
+    {
+      "number": 6,
+      "withdrawn_sha256": "a593d632d17eaa45ac7eb463040122e30832d68ecd35f65716393208e12bb430",
+      "specSha256": "436992d303a39522db41a3116a32cf5f634028ba839a9d0c13be432ec126fb58",
+      "attempt": "selection-report-9b6cbf367-6"
+    },
+    {
+      "number": 7,
+      "withdrawn_sha256": "7716caa60f8dcfb6641f095bbc6378bf4a8ad3eee8e340b282a85956720579ac",
+      "specSha256": "a3fff1185f1d96696fff70e5ac0c9d446b025e3b4d3e58923e4c8a659681f7ad",
+      "attempt": "selection-report-9b6cbf367-7"
+    },
+    {
+      "number": 8,
+      "withdrawn_sha256": "3ae107b223f62b59cdc9cd229c8222cf6f23754392b32fd7e726ac78b68207f0",
+      "specSha256": "f34a0454dca5088466bce1f362ee6c8066ea0275d8e719702bfb33185f4d33f7",
+      "attempt": "selection-report-9b6cbf367-8"
+    },
+    {
+      "number": 9,
+      "withdrawn_sha256": "94abcdd6863588e274164f43167ac6f2d24823d91d5eb0c3fd1b7c0e2c105ae3",
+      "specSha256": "544fb81c6cf986fb8117004fe5dcd0b3c3570b9f956fa40d49d5fa7c6082ef4b",
+      "attempt": "selection-report-9b6cbf367-9"
+    },
+    {
+      "number": 10,
+      "withdrawn_sha256": "44ad9bba524376a6d45a9c0bc7b05a605c71d38427cabb39176efa82d9f8ce15",
+      "specSha256": "74531e4eba142b4e6bec04fbd37f3cf1babf4b7ccf64925afbdc96b5811c2c75",
+      "attempt": "selection-report-9b6cbf367-10"
+    }
+  ],
+  "checks": {
+    "package": "cb35e08b-98d5-4f93-9490-e7a61b66b3df",
+    "package_passed": 2627,
+    "package_skipped": 44,
+    "coverage": "100% statements and branches",
+    "host_execution": "69740785-701e-40ee-8eec-f3ff0de6598d",
+    "host_passed": 97,
+    "host_skipped": 0,
+    "repair_audit": "44198e74-3ea3-450e-b481-75dab8b828b3",
+    "repair_verdict": "VERIFIED"
+  },
+  "placement": {
+    "host": "diphtheria",
+    "before_sha256": "137f14f2c64f20326d10d9fadc206a5489fec52b286a4162612a4c22456aa339",
+    "after_sha256": "54f7ca2b4c2317455fc483af831624603d9f20a61123d3741e41351ad89cccf3",
+    "previous_retained": true
+  },
+  "limits": [
+    "Runtime and requests remain owner-writable; hashes are remeasured before handover completion.",
+    "Original controller binary and request are retained; this does not remeasure every old installed wheel.",
+    "Normal-path completion and independent operational review remain pending; no winner or licensed baseline result is established."
+  ],
+  "recovered_queue": [
+    {
+      "id": "320b4b70-a5e3-4c84-8e91-c37ed099d7ca",
+      "status": "passed",
+      "claimed_by": "fleet-research-diphtheria",
+      "claimed_at": "2026-11-01T01:47:22.179574+00:00",
+      "closed_at": "2026-11-01T10:18:27.4132+00:00",
+      "research_request": {
+        "attempt": "selection-report-9b6cbf367-4",
+        "backend": "hpc3",
+        "specSha256": "e4cc89392eb4f0cc5641e53dbdf1e97b61e4e789ac2691a32d6a098ba83cc3ba"
+      },
+      "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58708611\",\"record_sha256\":\"6d973877b4ef8f6a8ed13a2a1f710721bfc0e4434ffbc4073d0de8ddad4926c8\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":\"56eadb9d8568fecbd159570a7de90264badc474e5247f348155fc73288a6a3ef\"}"
+    },
+    {
+      "id": "490bc5e5-88fc-454d-8f9c-0f11a8cc8630",
+      "status": "passed",
+      "claimed_by": "fleet-research-diphtheria",
+      "claimed_at": "2026-11-01T01:47:08.527801+00:00",
+      "closed_at": "2026-11-01T10:12:25.259654+00:00",
+      "research_request": {
+        "attempt": "selection-report-9b6cbf367-3",
+        "backend": "hpc3",
+        "specSha256": "46f578777eebb9ff69c4b1d28db2291f7b17838b7f159a24d453d88894b0279d"
+      },
+      "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58708609\",\"record_sha256\":\"798dcf7a0b7a982724e1047a0fbc648afa280e3374f03a3c8c27a392093faf39\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":\"c7697d8d9752637e1698e9f045b19c79cdfa3d28c37ca7511cb8073ad8206fcd\"}"
+    },
+    {
+      "id": "ecd1aff4-21bb-4920-a95e-78e8775642d8",
+      "status": "passed",
+      "claimed_by": "fleet-research-diphtheria",
+      "claimed_at": "2026-11-01T01:46:25.438026+00:00",
+      "closed_at": "2026-11-01T10:21:26.454829+00:00",
+      "research_request": {
+        "attempt": "selection-report-9b6cbf367-1",
+        "backend": "hpc3",
+        "specSha256": "4244ff35f2064b4905e08745086a46f849526164616d6f12066778370b280de0"
+      },
+      "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58708603\",\"record_sha256\":\"649889fe71795fd20bafd5a6b08bdecce711d7a5d28811fe6eb85a7ea262869c\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":\"beb3c0159732573f1d56628ce6db33a846d238c50065597a180a263da3317497\"}"
+    },
+    {
+      "id": "f2a5c21c-2e7e-4c30-8109-f640aa1d054c",
+      "status": "passed",
+      "claimed_by": "fleet-research-diphtheria",
+      "claimed_at": "2026-11-01T01:47:05.333028+00:00",
+      "closed_at": "2026-11-01T10:15:30.199014+00:00",
+      "research_request": {
+        "attempt": "selection-report-9b6cbf367-2",
+        "backend": "hpc3",
+        "specSha256": "5b656ced3ccabe709c33a7576eadf81da00f4ed884ce27b18af1eaae7c1cdd1e"
+      },
+      "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58708606\",\"record_sha256\":\"d41dae205d60a9a7113744cf026db7369ef309649dcaf77575b073e0f2be052f\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":\"732326e2b0a39cef6f5ab75737b3da03a1ce49d27f170860c00d012dab4f0e95\"}"
+    }
+  ],
+  "scheduler": [
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-11-01T10:12:01.684501+00:00",
+      "ended_at": "2026-11-01T10:12:27.364493+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-11-01T10:15:03.828064+00:00",
+      "ended_at": "2026-11-01T10:15:35.227251+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-11-01T10:18:01.188284+00:00",
+      "ended_at": "2026-11-01T10:18:32.191361+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    },
+    {
+      "host": "diphtheria",
+      "runner": "hub-runner",
+      "job": "fleet-research",
+      "started_at": "2026-11-01T10:21:03.567177+00:00",
+      "ended_at": "2026-11-01T10:21:29.172511+00:00",
+      "exit_code": 0,
+      "timed_out": false
+    }
+  ]
+}

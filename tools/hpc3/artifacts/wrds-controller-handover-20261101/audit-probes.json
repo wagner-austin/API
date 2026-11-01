@@ -1,0 +1,66 @@
+{
+  "measured_at": "2026-11-01T10:22:35.797187+00:00",
+  "scope": "Read-only live queries over service-authored reports and queue rows. Runtime and four original closures matched; six negative probes returned zero. Normal-path completion remains pending and reads zero.",
+  "checks": [
+    {
+      "name": "runtime",
+      "file": "runtime-audit.sql",
+      "actual": 1,
+      "required_for_completion": 1
+    },
+    {
+      "name": "runtime.wrong_wheel",
+      "expected": 0,
+      "actual": 0,
+      "replace": "6b2a87978df884d9834ece89d78137cdc3fdab02effc56b482d8b6be421c9e9e",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "name": "runtime.wrong_file_count",
+      "expected": 0,
+      "actual": 0,
+      "replace": "='485'",
+      "with": "='484'"
+    },
+    {
+      "name": "recovery",
+      "file": "recovery-audit.sql",
+      "actual": 4,
+      "required_for_completion": 4
+    },
+    {
+      "name": "recovery.wrong_native_state",
+      "expected": 0,
+      "actual": 0,
+      "replace": "='COMPLETED'",
+      "with": "='FAILED'"
+    },
+    {
+      "name": "recovery.wrong_controller",
+      "expected": 0,
+      "actual": 0,
+      "replace": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+      "with": "/absent/controller"
+    },
+    {
+      "name": "recovery.wrong_record",
+      "expected": 0,
+      "actual": 0,
+      "replace": "=e.record_sha",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'"
+    },
+    {
+      "name": "recovery.missing_plan",
+      "expected": 0,
+      "actual": 0,
+      "replace": "=e.handover_sha",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'"
+    },
+    {
+      "name": "normal",
+      "file": "normal-audit.sql",
+      "actual": 0,
+      "required_for_completion": 1
+    }
+  ]
+}
