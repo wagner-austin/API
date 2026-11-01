@@ -13,11 +13,11 @@ _deps:
 	poetry lock
 	poetry sync --no-cache --with dev
 
-# The two steps that REWRITE sources (ruff's fixes and its formatter), which
-# must finish before anything reads the tree.
+# Check the committed source without repairing the disposable fleet checkout.
+# Otherwise fleet can pass a different tree from the one GitHub validates.
 _lint-prep: _deps
-	poetry run ruff check . --fix
-	poetry run ruff format .
+	poetry run ruff check .
+	poetry run ruff format --check .
 
 _lint-guard:
 	$(MAKETOOLS) guard
@@ -47,7 +47,7 @@ check:
 	@echo "=== ALL CHECKS PASSED ==="
 
 # The guard, mypy and the suite read the tree and write nothing another of
-# them reads, so once _lint-prep has synced and formatted, they run side by
+# them reads, so once _lint-prep has synced and checked, they run side by
 # side (tools/maketools ``concurrent``) and the check is charged the longest
 # of the three instead of their sum, with the lock and sync run once instead
 # of twice. On serendipity at 37ba0350f the check took 363 s with the guard
