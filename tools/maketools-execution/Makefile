@@ -22,9 +22,15 @@ include ../../scripts/make/shell.mk
 # is the build its service's compose file declares, from the repository
 # root, which tools/maketools/tests/test_execution_images.py holds to those
 # files and to the registry's steps.
-.PHONY: lint test check _check-unbudgeted image-data-bank-api image-github-stats-api \
+.PHONY: lint test check _check-unbudgeted images image-data-bank-api image-github-stats-api \
 	image-grandma-api image-music-wrapped-api image-opportunity-radar-api image-qr-api \
 	image-transcript-api image-turkic-api
+
+# The one install step the registry ran before its per-service steps. A push
+# is checked against the ROLLED registry, so it stays until the fleet rolls
+# past API 01c53162d's steps and is then removed.
+images: image-data-bank-api image-github-stats-api image-grandma-api image-music-wrapped-api \
+	image-opportunity-radar-api image-qr-api image-transcript-api image-turkic-api
 
 image-data-bank-api:
 	docker build --quiet --file ../../services/data-bank-api/Dockerfile --target api ../..
