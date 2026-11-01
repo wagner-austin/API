@@ -9,12 +9,9 @@ Shared Python libraries for the monorepo. Each library is a standalone Poetry pa
 | [covenant-domain](./covenant_domain) | Pure business logic for covenant monitoring | None |
 | [covenant-ml](./covenant_ml) | Pluggable ML backends, Optuna optimizers, DART boosting, feature explainers | covenant-domain, platform-ml, xgboost, lightgbm, torch, optuna |
 | [covenant-persistence](./covenant_persistence) | PostgreSQL repository layer for covenants | covenant-domain, psycopg |
-| [instrument-io](./instrument_io) | Readers/writers for analytical chemistry formats | rainbow-api, pyteomics, openpyxl |
 | [monorepo-guards](./monorepo_guards) | Code quality enforcement rules | None |
 | [platform-core](./platform_core) | Shared utilities: errors, validation, logging, service config | FastAPI, httpx |
-| [platform-discord](./platform_discord) | Discord bot helpers and embed utilities | discord.py, platform-workers |
 | [platform-ml](./platform_ml) | ML artifacts, manifests, device selection, explainers (SHAP, permutation, gradient) | platform-core, shap, torch |
-| [platform-music](./platform_music) | Music analytics for Music Wrapped | None |
 | [platform-workers](./platform_workers) | Redis/RQ background job processing | platform-core, redis, rq |
 | [cleargbm](./cleargbm) | From-scratch interpretable gradient boosting (pure stdlib) | None |
 | [platform-calendar](./platform_calendar) | Google Calendar API for competition deadlines | platform-core |
@@ -22,7 +19,8 @@ Shared Python libraries for the monorepo. Each library is a standalone Poetry pa
 | [platform-devpost](./platform_devpost) | Devpost hackathon discovery + capability matching | platform-core, platform-codebase, httpx |
 | [platform-kaggle](./platform_kaggle) | Kaggle competition discovery + capability matching | platform-core, platform-codebase, kaggle |
 | [platform-stt](./platform_stt) | Speech-to-text with Whisper, chunking, language detection | platform-core, numpy, openai, fasttext-wheel |
-| [procart](./procart) | Procedural art core (neon visuals, HDR pipeline) | numpy, Pillow |
+
+instrument_io, platform_discord, platform_email, platform_music and procart were archived on 2026-11-01 and live on at the tag `archive/api-packages-2026-11-01`.
 
 ## Design Principles
 

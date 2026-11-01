@@ -1,1 +1,0 @@
-Windows CP1252 encoding: smart quotes test and em-dash — character
