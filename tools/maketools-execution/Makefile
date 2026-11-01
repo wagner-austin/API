@@ -21,14 +21,11 @@ include ../../scripts/make/shell.mk
 # s; warm, the whole check took 31 s (MCPs board task eb6586e4). Each line
 # is the build its service's compose file declares, from the repository
 # root, which tools/maketools/tests/test_execution_images.py holds to those
-# files and to the registry's steps.
-.PHONY: lint test check _check-unbudgeted image-data-bank-api image-github-stats-api \
-	image-grandma-api image-music-wrapped-api image-opportunity-radar-api image-qr-api \
-	image-transcript-api image-turkic-api
-
-image-data-bank-api:
-	docker build --quiet --file ../../services/data-bank-api/Dockerfile --target api ../..
-	docker build --quiet --file ../../services/data-bank-api/Dockerfile --target worker ../..
+# files and to the registry's steps. data-bank-api, music-wrapped-api,
+# qr-api and turkic-api left with their packages, archived on 2026-11-01
+# (MCPs board task a276f973).
+.PHONY: lint test check _check-unbudgeted image-github-stats-api image-grandma-api \
+	image-opportunity-radar-api image-transcript-api
 
 image-github-stats-api:
 	docker build --quiet --file ../../services/github-stats-api/Dockerfile ../..
@@ -40,24 +37,12 @@ image-github-stats-api:
 image-grandma-api:
 	docker build --progress plain --file ../../services/grandma-api/Dockerfile ../..
 
-image-music-wrapped-api:
-	docker build --quiet --file ../../services/music-wrapped-api/Dockerfile --target api ../..
-	docker build --quiet --file ../../services/music-wrapped-api/Dockerfile --target worker ../..
-
 image-opportunity-radar-api:
 	docker build --quiet --file ../../services/opportunity-radar-api/Dockerfile ../..
-
-image-qr-api:
-	docker build --quiet --file ../../services/qr-api/Dockerfile --target api ../..
-	docker build --quiet --file ../../services/qr-api/Dockerfile --target worker ../..
 
 image-transcript-api:
 	docker build --quiet --file ../../services/transcript-api/Dockerfile --target api ../..
 	docker build --quiet --file ../../services/transcript-api/Dockerfile --target worker ../..
-
-image-turkic-api:
-	docker build --quiet --file ../../services/turkic-api/Dockerfile --target api ../..
-	docker build --quiet --file ../../services/turkic-api/Dockerfile --target worker ../..
 
 # This directory holds no code of its own, only this recipe, so its lint is
 # the grammar every tracked Makefile keeps to.
