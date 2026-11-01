@@ -51,6 +51,17 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
    before ``HOME`` moves, since Poetry under a fresh ``HOME`` reads no
    configuration and finds no venv. Opt-in, because only the suites whose
    recipes pass it have been measured under it.
+
+7. THE HUB REFUSED, when the recipe asks (``--hub-offline``). Item 5's
+   ``HF_HOME`` lies beside item 6's ``HOME``, not inside it, so a test that
+   resolves a hub id downloads into the run's own cache, which the launcher
+   removes, and item 6 sees nothing: two platform_langid tests pulled the
+   3.86 GB MMS-LID-126 checkpoint that way on pendragon, 240 s of fleet job
+   f2af5334 (MCPs board task abb0a10e). Asked, the launcher sets
+   ``HF_HUB_OFFLINE``, under which ``huggingface_hub`` and ``transformers``
+   resolve a hub id from the empty cache alone and raise, so such a test
+   fails by name. Opt-in, because Model-Trainer's suite loads
+   ``sshleifer/tiny-gpt2`` from the hub by design.
 """
 
 from __future__ import annotations
@@ -96,6 +107,9 @@ CACHE_HOMES: Final[Sequence[tuple[str, str]]] = (
 #: The prefix of the run's own ``HOME``, item 6 above, followed by the same
 #: token as its coverage files.
 HOME_PREFIX: Final[str] = ".home-"
+
+#: What refuses the Hugging Face hub to a run that asks, item 7 above.
+HUB_OFFLINE: Final[tuple[str, str]] = ("HF_HUB_OFFLINE", "1")
 
 #: The question that names the venv interpreter Poetry runs a project in.
 POETRY_EXECUTABLE_ARGV: Final[Sequence[str]] = ("poetry", "env", "info", "--executable")
@@ -225,6 +239,7 @@ def run_tests(
     serial: bool = False,
     runner: Runner = Runner.POETRY,
     own_home: bool = False,
+    hub_offline: bool = False,
 ) -> int:
     """Run the project's suite under the launcher's protections.
 
@@ -236,6 +251,8 @@ def run_tests(
         runner: How pytest is reached (see :func:`pytest_argv`).
         own_home: Run under a ``HOME`` of the run's own and fail on any
             file left there (item 6 above).
+        hub_offline: Refuse the Hugging Face hub to the suite (item 7
+            above).
 
     Returns:
         pytest's exit status, 1 when it passed but left a file under its own
@@ -261,6 +278,8 @@ def run_tests(
     if own_home:
         home.mkdir(exist_ok=True)
         environment["HOME"] = str(home)
+    if hub_offline:
+        environment[HUB_OFFLINE[0]] = HUB_OFFLINE[1]
     parallel = () if serial else PARALLEL_ARGV
     argv = [
         *leading,
@@ -297,6 +316,7 @@ __all__ = [
     "COVERAGE_PREFIX",
     "COVERAGE_ROOTS",
     "HOME_PREFIX",
+    "HUB_OFFLINE",
     "NO_WORKER_RESTART",
     "PARALLEL_ARGV",
     "POETRY_EXECUTABLE_ARGV",

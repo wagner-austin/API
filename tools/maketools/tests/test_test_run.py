@@ -9,6 +9,7 @@ from platform_core.errors import AppError
 
 from maketools.commands import CommandResult
 from maketools.test_run import (
+    HUB_OFFLINE,
     NO_WORKER_RESTART,
     POETRY_EXECUTABLE_ARGV,
     PYTEST_ARGV,
@@ -84,6 +85,16 @@ def test_this_runs_coverage_files_are_removed_after_the_suite(world: World, tmp_
     assert sorted(p.name for p in runs.iterdir()) == [".caches-deadbeef", ".coverage-other"]
     assert len(world.removed_files) == 2
     assert world.removed_trees == [runs.resolve() / ".caches-deadbeef"]
+    assert "HOME" not in world.inheriting_calls[0]["env"]
+    assert HUB_OFFLINE[0] not in world.inheriting_calls[0]["env"]
+
+
+def test_a_hub_offline_run_sets_the_variable_the_hub_clients_read(
+    world: World, tmp_path: Path
+) -> None:
+    assert run_tests(tmp_path, [], sweep=False, hub_offline=True) == 0
+    assert HUB_OFFLINE == ("HF_HUB_OFFLINE", "1")
+    assert world.inheriting_calls[0]["env"]["HF_HUB_OFFLINE"] == "1"
     assert "HOME" not in world.inheriting_calls[0]["env"]
 
 

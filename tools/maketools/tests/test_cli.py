@@ -95,6 +95,15 @@ def test_test_own_home_runs_the_suite_under_the_runs_home(world: World, cwd: Pat
     assert call["env"]["HOME"] == str((cwd / "runs").resolve() / ".home-deadbeef")
 
 
+def test_test_hub_offline_refuses_the_hub_to_the_suite(world: World, cwd: Path) -> None:
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    assert dispatch(["test", "--own-home", "--hub-offline", "--no-sweep", "-k", "x"]) == 0
+    call = world.inheriting_calls[0]
+    assert call["argv"][-2:] == ("-k", "x")
+    assert call["env"]["HF_HUB_OFFLINE"] == "1"
+    assert call["env"]["HOME"] == str((cwd / "runs").resolve() / ".home-deadbeef")
+
+
 def test_test_serial_and_venv_runner_flags(world: World, cwd: Path) -> None:
     (cwd / ".venv" / "bin").mkdir(parents=True)
     (cwd / ".venv" / "bin" / "python").write_bytes(b"")

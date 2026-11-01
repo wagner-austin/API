@@ -43,6 +43,9 @@ RUNNER_FLAG: Final[str] = "--runner"
 #: The flag that runs a suite under a HOME of its own (test_run item 6).
 OWN_HOME_FLAG: Final[str] = "--own-home"
 
+#: The flag that refuses the Hugging Face hub to a suite (test_run item 7).
+HUB_OFFLINE_FLAG: Final[str] = "--hub-offline"
+
 #: The flag that sets the sweep's minimum age.
 OLDER_THAN_FLAG: Final[str] = "--older-than-minutes"
 
@@ -83,7 +86,9 @@ def command_guard(arguments: Sequence[str]) -> int:
 
 
 def command_test(arguments: Sequence[str]) -> int:
-    """``test [--no-sweep] [--serial] [--own-home] [--runner poetry|venv] [pytest args...]``.
+    """``test [--no-sweep] [--serial] [--own-home] [--hub-offline] [--runner poetry|venv] [...]``.
+
+    Everything after the launcher's flags is passed to pytest.
 
     Args:
         arguments: The launcher's flags first, then anything for pytest.
@@ -97,9 +102,11 @@ def command_test(arguments: Sequence[str]) -> int:
     sweep = True
     serial = False
     own_home = False
+    hub_offline = False
     runner = Runner.POETRY
     remaining = list(arguments)
-    while remaining and remaining[0] in (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, RUNNER_FLAG):
+    flags = (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, HUB_OFFLINE_FLAG, RUNNER_FLAG)
+    while remaining and remaining[0] in flags:
         flag = remaining.pop(0)
         if flag == NO_SWEEP_FLAG:
             sweep = False
@@ -107,10 +114,18 @@ def command_test(arguments: Sequence[str]) -> int:
             serial = True
         elif flag == OWN_HOME_FLAG:
             own_home = True
+        elif flag == HUB_OFFLINE_FLAG:
+            hub_offline = True
         else:
             runner = require_runner(remaining.pop(0) if remaining else "")
     return run_tests(
-        Path.cwd(), remaining, sweep=sweep, serial=serial, runner=runner, own_home=own_home
+        Path.cwd(),
+        remaining,
+        sweep=sweep,
+        serial=serial,
+        runner=runner,
+        own_home=own_home,
+        hub_offline=hub_offline,
     )
 
 
@@ -560,6 +575,7 @@ __all__ = [
     "COMMANDS",
     "CRATE_FLAG",
     "GIT_COMMIT_FLAG",
+    "HUB_OFFLINE_FLAG",
     "NO_SWEEP_FLAG",
     "OLDER_THAN_FLAG",
     "OWN_HOME_FLAG",
