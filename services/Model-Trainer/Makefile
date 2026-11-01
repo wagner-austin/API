@@ -11,7 +11,7 @@ lint: _lint-prep _lint-guard _lint-mypy
 _deps:
 	$(MAKETOOLS) venv-check
 	poetry lock
-	poetry sync --with dev
+	poetry sync --no-cache --with dev
 
 # The two steps that REWRITE sources (ruff's fixes and its formatter), which
 # must finish before anything reads the tree.
