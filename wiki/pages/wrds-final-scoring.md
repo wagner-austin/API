@@ -4,6 +4,9 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/tests/markets/test_research_ranking.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_selection_records.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/private-delivery.json"
   - "libs/covenant_ml/src/covenant_ml/markets/research_delivery.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_native_final.py"
@@ -29,6 +32,9 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_final.py"
   - "libs/covenant_ml/tests/markets/test_crsp_final.py"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "b9f28bbe664535cfd134feecc4e6ae635597df48"
+  "libs/covenant_ml/src/covenant_ml/markets/research_selection_records.py": "fc12c6f233f2ccd6ec15aeaea55ca85c8190b4e9"
+  "libs/covenant_ml/tests/markets/test_research_ranking.py": "52af5cedf8815dc54831cd0bd623098535482026"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/private-delivery.json": "0a92649b4cc3a607199c258c0521bee3cdd0c4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_delivery.py": "fed59a35e1266cdb2e4236539056a5758d84f358"
   "libs/covenant_ml/src/covenant_ml/markets/research_native_final.py": "ffe230f47ba39421a668a7d6b6299b50cb075e9a"
@@ -42,20 +48,20 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_release.py": "03ce1fd2f4c5a63a2fb0c4379f9ab305a688724c"
   "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
   "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "9686350a06789e4f05d869da140948b6a56d0d19"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "a36df5c2e20b454eabd26f3acfc75f07f1c3485e"
-  "libs/covenant_ml/tests/markets/test_research_selection.py": "b2939285c746d390261861ed80edae3455000a84"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "92d38ea8211b08cf4480fa72a91e51761d6424bf"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "e304c4b9211fd47a97a364033f38c93c1a88c839"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
+  "libs/covenant_ml/tests/markets/test_research_selection.py": "1a612f02d15aa6986831516ffb1f7f58db894aef"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
   "libs/covenant_ml/scripts/research_proposals.py": "f23c7f9e828d129ffc1a1d55188094dc998aea50"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
-  "libs/covenant_ml/tests/markets/test_research_final.py": "426b4a91c5644f4b3db51cac54727545b870ccf1"
+  "libs/covenant_ml/tests/markets/test_research_final.py": "9f903a82aebf9c42ec8bfd989a7496462c9e430b"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
-fact_checked: 2026-10-30
+fact_checked: 2026-10-31
 confidence: medium
 ---
 
@@ -85,7 +91,17 @@ never be selected, so no request field authorizes final scoring.
 `holdout_start` and scores every decision from `holdout_start` through
 `holdout_end` with the validation study's shared fold, arm and record code. Changing every outcome
 after the last final decision changes no fit or selection in the tests.
-Choosing which attempt to select remains an evaluator decision.[^final]
+The evaluator requests selection, but the journal enforces the frozen winner
+and final seed. Complete seed groups must share the exact monthly calendar and
+reference returns. All required initial candidates need every seed; incomplete
+optional candidates cannot win. Ranking uses the mean of monthly paired returns
+averaged over seeds, then fewer leaves and candidate digest for exact ties.
+The existing monthly RunRecord observations carry returns and dates, without
+security identifiers or holdings. They rely on the trusted native runtime and
+verified record, not an independent recomputation of the result payload.
+Tests reject wrong winners, noncanonical final seeds and direct-event bypasses.
+Installed-runtime and native rehearsal status remain in
+[[wrds-baseline-readiness]].[^final][^ranking]
 
 The worker uses `research_trial --final-grant G --final-manifest M --scratch S`
 with its request and output paths. It requires no journal or long-lived key
@@ -142,5 +158,7 @@ to the existing queue.[^native]
 [^grant]: `libs/covenant_ml/src/covenant_ml/markets/research_release.py`, `write_final_grant` and `consume_final_grant`; `libs/covenant_ml/tests/markets/test_research_release.py`, `test_two_real_processes_cannot_redeem_the_same_grant`; `libs/covenant_ml/tests/markets/test_research_trial_cli.py`, `test_real_final_worker_needs_neither_journal_nor_long_lived_keys`. These are Linux process tests using synthetic data, not native scheduler runs.
 
 [^selection]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_transition` and `_final_identity`; `libs/covenant_ml/tests/markets/test_research_selection.py`, real SQLite selection, release and atomic refusal cases; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission".
+
+[^ranking]: `libs/covenant_ml/src/covenant_ml/markets/research_ranking.py`, `winning_attempt`, `_paired` and `_series`; `libs/covenant_ml/src/covenant_ml/markets/research_selection_records.py`, exact selection-policy codec; `libs/covenant_ml/tests/markets/test_research_ranking.py`, seed completeness, calendar and lineage refusals, averaging and both tie rules; `libs/covenant_ml/tests/markets/test_research_selection.py`, direct-event winner and final-seed refusals. API `a00c077b125ceb436e73b8f5327a2dda6b798663` passed full fleet checks `86e7d08b-0ba3-4e7e-875a-d4e5059e6437` and `ca5aed46-a588-4138-900f-871553960ef2`: 5,038 tests, 100% statement and branch coverage, typing, lint and guards. These tests do not constitute a native queue rehearsal or a licensed study.
 
 [^final]: `libs/covenant_ml/src/covenant_ml/markets/research_final.py`, `select_candidate` and `execute_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_final.py`, `run_crsp_final`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_fold`, `crsp_arms` and `crsp_known_panel`; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `require_trial_lineage` and `publish_monthly_record`; `libs/covenant_ml/scripts/research_proposals.py` and `libs/covenant_ml/scripts/research_trial.py`; `libs/covenant_ml/tests/markets/test_research_final.py` and `test_crsp_final.py`, real journals, extracts and trainers; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission". Fleet job 379d582f-130b-47c4-8579-56ec1be8d586 passed make check for libs/covenant_ml at API 06636dbbebd56771e170b45a7f190309f396cde1 on Colossus at 2026-10-30T05:45:28Z: 4,786 tests, 100.00% coverage. The earlier job 2e9095f9 at bddfcab33 ran every test green but failed the test-quality guard on one substring assertion, repaired in 06636dbbe. On main at 85e408c1c08cd3ff5faaf88416f4d62965ed64a3, job 8054c71b passed libs/covenant_ml on Colossus at 2026-10-30T05:57:25Z: 4,786 tests, 100.00% coverage. Board task 364a4ba8-0ff0-461c-ba7f-dfe7a4b039ba.
