@@ -181,7 +181,20 @@ def test_encrypted_monthly_study_publishes_rejected_orders_and_cleans_plaintext(
     assert require_list(period, "unfilled") == [8]
     assert require_float(period, "cash") > 0
     assert len(require_list(period, "held")) == 5
-    assert require_list(period, "receivables") == []
+    # Stock 8 was owned in the preceding month. Its terminal receivable stays
+    # locked at this entry close; rejecting a new order must not erase it or
+    # create a second claim. Convert normalized weights back across the return.
+    (previous,) = [item for item in months if item["decision"] == "2019-01-31"]
+    (prior_claim,) = require_list(previous, "receivables")
+    (current_claim,) = require_list(period, "receivables")
+    prior = narrow_json_to_dict(prior_claim)
+    current = narrow_json_to_dict(current_claim)
+    assert (current["permno"], current["valued"]) == (8, "2019-03-01")
+    assert require_float(current, "amount") == pytest.approx(
+        require_float(prior, "amount") / (1 + require_float(period, "net_return"))
+    )
+    (following,) = [item for item in months if item["decision"] == "2019-03-29"]
+    assert require_list(following, "receivables") == []
     assert list(tmp_path.glob("research-plaintext-*")) == []
 
 
