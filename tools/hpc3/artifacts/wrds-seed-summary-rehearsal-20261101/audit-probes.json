@@ -1,0 +1,22 @@
+{
+ "board_task": "673a4bc4-8693-4764-8a8d-cca0483e279f",
+ "measured_at": "2026-11-01T17:44Z",
+ "how": "psql -U corvis_owner -d corvis -At -v ON_ERROR_STOP=1 inside demure's mcp-postgres, each statement in a READ ONLY transaction that is rolled back, the role and form the audit program uses.",
+ "probes": [
+  {
+   "name": "attempt_evidence",
+   "query": "SELECT count(DISTINCT doc#>>'{ledger,job_id}') FROM (SELECT substring(body from position(chr(10) in body)+1)::jsonb AS doc FROM agent_task_updates WHERE task_id='673a4bc4-8693-4764-8a8d-cca0483e279f' AND author='hpc-report-673a4bc4' AND body LIKE 'HPC3 ATTEMPT LOAD-REPORT%') r WHERE doc->>'kind'='HPC3_ATTEMPT_EVIDENCE' AND doc#>>'{ledger,image_digest}'='14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e' AND doc#>>'{ledger,image_drift,image_commit}'='b3843a3d3b83cbae77dc4f855be2c4fbaa17b492' AND doc#>>'{ledger,experiment,research_attempt}' IN ('b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0:1','b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0:2','b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0:3','b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0:4','b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0:5') AND doc#>>'{ledger,submitter}'='fleet-research-diphtheria' AND doc#>>'{accounting,job,state}'='COMPLETED' AND doc#>>'{accounting,exit_code}'='0:0' AND doc#>>'{accounting,job,cpu_count}'='4' AND doc#>>'{accounting,job,gpu_count}'='0' AND doc#>>'{accounting,job,partition}'='free' AND doc#>>'{measurement,dataset,bundle_sha256}'='e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14' AND doc#>>'{measurement,verified_files,/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/research_trial.py}'='aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765' AND doc#>>'{measurement,record_sha256}' IS NOT NULL",
+   "output": "5"
+  },
+  {
+   "name": "queue_journal_join",
+   "query": "SELECT count(*) FROM fleet_dispatch_jobs j CROSS JOIN LATERAL (SELECT substring(u.body from position(chr(10) in u.body)+1)::jsonb AS doc FROM agent_task_updates u WHERE u.id='ecbd196b-c807-4878-a57a-c2014ec8c13b' AND u.author='hpc-report-673a4bc4') s CROSS JOIN LATERAL jsonb_array_elements(s.doc->'attempts') a WHERE j.id IN ('a7d5cc03-5849-4ccb-86c1-3eb96e976f3a','f8cd4f5c-5c2f-427e-95be-b033e4b7c4b8','0fdf43ef-aff0-4afb-a237-ed9ecf3c8fa6','e4d1f2c6-0dfa-40b5-b06a-af5bf62ae6db','2a7451e0-9e05-4e97-85f1-26367815ed1e') AND j.task_id='673a4bc4-8693-4764-8a8d-cca0483e279f' AND j.project='research/hpc3' AND j.command='research' AND j.status='passed' AND j.exit_code=0 AND j.claimed_by='fleet-research-diphtheria' AND j.research_request->>'attempt'=('summary-b3843a3d3-'||(a->>'number')) AND j.detail LIKE '%\"state\":\"complete\",\"native_job_id\":\"'||(a->>'job_id')||'\",\"record_sha256\":\"'||(a->>'record_sha256')||'\"%' AND a->>'status'='complete'",
+   "output": "5"
+  },
+  {
+   "name": "summary_reading",
+   "query": "SELECT count(*) FROM (SELECT substring(body from position(chr(10) in body)+1)::jsonb AS doc FROM agent_task_updates WHERE id='ecbd196b-c807-4878-a57a-c2014ec8c13b' AND author='hpc-report-673a4bc4' AND body LIKE 'RESEARCH SUMMARY LOAD-REPORT%') s CROSS JOIN LATERAL jsonb_array_elements(s.doc->'results') r WHERE s.doc->>'kind'='RESEARCH_SUMMARY_EVIDENCE' AND s.doc->>'recomputed_matches'='true' AND s.doc->>'policy_digest'='b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0' AND s.doc->>'summary_code_sha256'='ad45b133ef0cf70965a71838bad92f1e3a0dd726279246ac970ee6bc7acf7b2e' AND s.doc->>'reporter_sha256'='d10beeaddb9778d6aa5d2d9910fddf5e3efd52fb2bd2554514524c012ad9141b' AND s.doc->>'journal_sha256'='5d631699905d6f0333410b28c198cd57781d66e53e0ae141efa45ac0952822df' AND s.doc->>'journal_sha256_after'='5d631699905d6f0333410b28c198cd57781d66e53e0ae141efa45ac0952822df' AND s.doc->>'payload_sha256'='a5a68ac00ac14cfa80fc48116ad9b6a3259a1e03eaedf8bdf347d82af0d26d93' AND s.doc->>'record_sha256'='328dae11f8c81a546338e93dd749ce12e8d613f5618f71009ad30c1b562da14e' AND s.doc->'required_seeds'='[11,23,37,53,71]'::jsonb AND r->'seeds'='[11,23,37,53,71]'::jsonb AND r->'attempts'='[1,2,3,4,5]'::jsonb AND r->>'n_seeds'='5' AND r#>>'{interval,method}'='moving_block_bootstrap' AND r#>>'{interval,confidence}'='0.9'",
+   "output": "4"
+  }
+ ]
+}

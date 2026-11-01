@@ -133,6 +133,6 @@
   "summary_code_sha256": "ad45b133ef0cf70965a71838bad92f1e3a0dd726279246ac970ee6bc7acf7b2e",
   "exit": "exit=0"
  },
- "measurement_boundary": "Attempt evidence and the summary reading are service-authored board reports read by audit-probes.sql. The summarize and reporter invocations were session-operated on ziggurat with the installed controller interpreter; their captured outputs are here.",
+ "measurement_boundary": "Attempt evidence and the summary reading are service-authored board reports read by the queries in audit-probes.json. The summarize and reporter invocations were session-operated on ziggurat with the installed controller interpreter; their captured outputs are here.",
  "private_evidence": "/home/corvis/research-data/wrds/experiments/summary-b3843a3d3"
 }
