@@ -67,25 +67,39 @@ MEASURED: Final[frozenset[str]] = frozenset(
 )
 
 
-def _cuda_packages() -> tuple[str, ...]:
-    """The registered API packages whose poetry lock pulls a CUDA wheel.
+def _api_installs() -> dict[str, tuple[InstallStep, ...]]:
+    """The install steps of every registered project in this repository.
 
     Returns:
-        Their paths, sorted.
+        Each project's steps, keyed by its path.
     """
-    workspace = decode_fleet_workspace(shipped_document())
-    found: list[str] = []
-    for project in workspace["projects"].values():
+    installs: dict[str, tuple[InstallStep, ...]] = {}
+    for project in decode_fleet_workspace(shipped_document())["projects"].values():
         source = project["source"]
-        if source is None or source["remote"] != API:
-            continue
-        lock = REPO_ROOT / source["path"] / "poetry.lock"
-        if lock.is_file() and CUDA_WHEEL.search(lock.read_text(encoding="utf-8")):
-            found.append(source["path"])
-    return tuple(sorted(found))
+        if source is not None and source["remote"] == API:
+            installs[source["path"]] = source["install"]
+    return installs
 
 
-CUDA_PACKAGES: Final[tuple[str, ...]] = _cuda_packages()
+#: Every registered API project's install steps, keyed by path.
+API_INSTALLS: Final[dict[str, tuple[InstallStep, ...]]] = _api_installs()
+
+
+def _pulls_cuda(path: str) -> bool:
+    """Whether a package's poetry lock pulls a CUDA wheel.
+
+    Args:
+        path: The package's directory in the repository.
+
+    Returns:
+        True when its lock exists and names one.
+    """
+    lock = REPO_ROOT / path / "poetry.lock"
+    return lock.is_file() and CUDA_WHEEL.search(lock.read_text(encoding="utf-8")) is not None
+
+
+#: The registered API packages whose poetry lock pulls a CUDA wheel, sorted.
+CUDA_PACKAGES: Final[tuple[str, ...]] = tuple(sorted(filter(_pulls_cuda, API_INSTALLS)))
 
 
 def _recipe_deps(path: str) -> tuple[InstallStep, ...]:
@@ -111,19 +125,12 @@ def test_the_scan_finds_every_measured_package() -> None:
 
 @pytest.mark.parametrize("path", CUDA_PACKAGES)
 def test_the_package_locks_and_syncs_before_its_check(path: str) -> None:
-    project = decode_fleet_workspace(shipped_document())["projects"][path]
-    source = project["source"]
-    assert source is not None
     expected = _recipe_deps(path)
-    assert expected
-    assert source["install"][: len(expected)] == expected
+    assert expected[-1]["argv"][3] == "sync"
+    assert API_INSTALLS[path][: len(expected)] == expected
 
 
 def test_grandma_api_still_installs_its_web_dependencies_after_them() -> None:
-    source = decode_fleet_workspace(shipped_document())["projects"]["services/grandma-api"][
-        "source"
-    ]
-    assert source is not None
-    assert source["install"][-1] == InstallStep(
+    assert API_INSTALLS["services/grandma-api"][-1] == InstallStep(
         phase="install", argv=("npm", "ci", "--prefix", "services/grandma-api/web")
     )
