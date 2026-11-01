@@ -69,6 +69,8 @@ def poll(
     log: pathlib.Path,
     task_id: str,
     environment: tuple[tuple[str, str], ...] = (),
+    *,
+    completed_only: bool = False,
 ) -> JSONObject:
     """Submit or reconcile validation/final work through its existing controller.
 
@@ -77,6 +79,7 @@ def poll(
         log: Private controller transcript.
         task_id: Queue-owned board task for fresh native evidence.
         environment: Private native report credentials.
+        completed_only: Refuse any journal state that could invoke a submission or transition.
 
     Returns:
         Metadata only: state, native job id and verified record digest.
@@ -86,6 +89,8 @@ def poll(
         OSError: Missing input or process failure; journal state remains authoritative.
     """
     phase = _require_phase(document)
+    if completed_only and phase != "validation":
+        raise ValueError("RESEARCH_HANDOVER_PHASE: only completed validation may be handed over")
     python = str(research_control.require_path(document, "python"))
     script = research_control.verified_input(document, "script")
     policy = research_control.verified_input(document, "policy")
@@ -126,6 +131,8 @@ def poll(
         )
     row = _attempt(research_control.invoke((*prefix, "status"), log, 60, environment), number)
     state = require_str(row, "status")
+    if completed_only and state != "complete":
+        raise ValueError("RESEARCH_HANDOVER_STATE: original journal attempt must be complete")
     if state in {"admitted", "submitting", "running"}:
         action = "submit" if state == "admitted" else "reconcile"
         row = _attempt(
