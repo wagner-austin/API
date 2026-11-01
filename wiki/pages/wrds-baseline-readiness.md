@@ -13,6 +13,9 @@ source_paths:
   - "libs/covenant_ml/tests/markets/_encrypted_fixtures.py"
   - "libs/covenant_ml/tests/markets/_crsp_study_fixtures.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_records.py"
+  - "libs/covenant_ml/tests/markets/test_research_resources.py"
+  - "tools/hpc3/src/hpc3/cli/preflight.py"
   - "tools/hpc3/artifacts/wrds-selection-runtime-20261031/provenance.json"
   - "libs/covenant_ml/tests/markets/test_research_selection.py"
   - "libs/covenant_ml/tests/markets/test_research_ranking.py"
@@ -95,7 +98,10 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/rehearsal.json": "2110dc8a0914e163292a4581392ca1cdc98ef678"
   "libs/covenant_ml/tests/markets/_encrypted_fixtures.py": "a33f5a8fc188f1d4c6392ded63cd51a3782fcc64"
   "libs/covenant_ml/tests/markets/_crsp_study_fixtures.py": "1abd8aa0b8a1bf768c06d2e4619ba863d8ec2c65"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b39678f6d1546459a16d4df77bec6b6a91b29a9f"
+  "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "4504084dce81b5cddbf86e861fef069108e753a5"
+  "libs/covenant_ml/tests/markets/test_research_resources.py": "2ec39a15d817dfd4b9f8b8453ae00a658b29a79f"
+  "tools/hpc3/src/hpc3/cli/preflight.py": "4bb9e9bcbe89d6b04cf3c531beb67601b94f3776"
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/provenance.json": "70c5b43e9d2fba6feb801e351ec0d74ed342f3ee"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
   "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "b9f28bbe664535cfd134feecc4e6ae635597df48"
@@ -189,8 +195,8 @@ queue receipts. Six unstarted references were withdrawn and replaced with
 corrected-controller references to the same admissions; their candidate budgets
 and journal were preserved. Recovery passed independent audit `eefb349e` at
 10:46:40 UTC. The ten-trial selection repetition subsequently completed, with
-service-authored winner and refusal reports. Its independent selection review
-and the substantive baseline remain ahead.[^handover-progress][^selection-complete]
+service-authored winner and refusal reports. Selection passed independent audit
+`72d4a03d` at 12:27:53 UTC. The substantive baseline remains unrun.[^handover-progress][^selection-complete][^selection-verified]
 
 At 10:36:38 UTC the first fresh normal request also closed automatically:
 admission 5, native job `58719001`, exit `0:0`, with matching native and queue
@@ -229,7 +235,7 @@ completed, the measured controller refused wrong candidate attempt 6 and wrong
 seed attempt 2 with unchanged journals, selected attempt 1 at seed 11, then
 refused repeated selection without changing the selected state. These outcomes
 are program-authored reports, bound to the installed reporter and native queue
-evidence. Independent selection review remains pending.[^selection-complete]
+evidence. Independent selection audit now verifies all three criteria.[^selection-complete][^selection-verified]
 Licensed evaluator decoding and the
 substantive study remain ahead. Earlier runtime measurements below retain
 their historical scope.[^licensed-collection][^licensed-staging][^staging-review][^selection-runtime][^baseline-freeze][^selection-enforcement][^selection-rehearsal]
@@ -641,10 +647,26 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    separate native rehearsal covers two synthetic candidates and five seeds;
    neither is a licensed result. Seed-aggregated
    uncertainty reporting remains tracked by board task `fc2dba58` before the study report.
-   The native recipe still fixes one CPU and 4 GiB: the planned licensed
-   allocation cannot yet pass through that owner. Board task `42a8d507` tracks
-   correcting this before preflight and licensed submission. The licensed
-   baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal]
+   The native recipe now reads mandatory `cpus` and `mem_gb` from the existing
+   evaluator-owned policy, including them in the journal and request identities.
+   The 7,200-second evaluation retains a 121-minute scheduler request for
+   termination grace and minute rounding. Fleet checks passed 5,066 research
+   tests and 2,162 HPC3 tests with full statement and branch coverage. The
+   installed controller and real resource preflight remain to be measured under
+   board task `42a8d507`; tests alone do not establish that deployment. The licensed
+   baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract]
+
+[^selection-verified]: Live board audit `72d4a03d-251a-4e20-bd91-35dae56df2aa`, computed VERIFIED at `2026-11-01T12:27:53.357Z`, closed selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. It covers candidate/seed ranking, journal selection restrictions and the installed synthetic rehearsal with accurate unrun-baseline documentation.
+
+The resource change is published at API `11c0bdbdd167d953d5464f9367242370f51c5765`.
+Its first checks caught test formatting and an unprotected preflight fixture;
+the corrected checks passed. The existing preflight command can publish a
+service-authored resolved job specification and scheduler verdict with
+`--report-task`. This is admission evidence, not a job or a study result.
+Older policies without allocation fields are rejected by the new codec;
+historical controllers and journals remain unchanged.[^resource-contract]
+
+[^resource-contract]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py`, `ResearchPolicy` and policy codecs; `research_cluster.py`, `prepare_bundle`; `libs/covenant_ml/tests/markets/test_research_resources.py`, invalid/missing fields, proposer overrides, changed journal identity and both recipe phases; `tools/hpc3/src/hpc3/cli/preflight.py`, optional measured report. Fleet jobs `3f008e0a-1158-4431-832e-b08fad47b5c2` and `a4f2e56a-8df1-4ec4-9ed1-dc46db4f73ea` passed at that revision. Test repair reviews are tracked by `26680bbe` and `25af84f3`; native allocation measurement remains task `42a8d507`.
 
 [^licensed-collection]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json`, native extraction receipt, cleanup observation, runtime inspection and preserved interrupted collection. Board tasks `a622165c-bb63-4714-933b-10d527f21478` and `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; separate verifier task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`. Extraction receipt timestamps delimit database capture, not encryption or the whole allocation. Native report author `load-report-a622165c`; installed-controller report `fd164407-3505-4207-bc2d-d0e26fa69a1f`, author `hpc-report-da2a55dc`; image build `58662034`, SHA-256 `0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912`. None of these measurements is a substantive study result.
 

@@ -50,9 +50,9 @@ source_git_blobs:
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
-  "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "a01b838f45939f407d83bef6f9d49ccc5599be13"
+  "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "4504084dce81b5cddbf86e861fef069108e753a5"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b39678f6d1546459a16d4df77bec6b6a91b29a9f"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
@@ -131,7 +131,12 @@ statement and branch coverage, and both updated wiki pages passed their
 code-path audits without errors or warnings. Recovery passed independent audit
 at 10:46:40 UTC. All ten synthetic queue receipts had passed by 11:18:37 UTC;
 the maintained selector subsequently published winner and refusal evidence.
-Independent selection review remains separate from the verified recovery.[^normal-live][^selection-complete]
+Selection passed independent audit `72d4a03d` at 12:27:53 UTC on November 1;
+the recovery and selection milestones are now independently verified.
+[[wrds-baseline-readiness]] records that verdict and the remaining licensed
+allocation measurement. CPU and RAM are mandatory evaluator-owned policy
+fields, included in the journal identity and used by validation and final
+recipes. Proposals cannot override them.[^normal-live][^selection-complete][^admission][^paths]
 
 [^selection-complete]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, recovery audit `eefb349e`, ten native/queue pairs and four service-authored selection outcomes. [[wrds-baseline-readiness]] records the remaining licensed-study prerequisites.
 
