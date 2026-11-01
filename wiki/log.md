@@ -494,3 +494,15 @@ RESEARCH.md registration, with a keep, archive or delete recommendation per
 package. Nothing is archived until the operator picks (board task `a276f973`);
 the Discord group's Railway state is unread without a credential and waits on
 the operator. Linked from the infrastructure hub, whose count is now 7.
+
+## [2026-11-01] maintenance | archive of twelve API packages
+
+The operator had thirteen packages archived (board task `a276f973`); twelve
+left in this change and data-bank-api follows with its callers' service mode.
+Removed art-trainer-publishes-loras-another-repo-consumes, whose subject left,
+and its services-hub link (services 21 pages, total 62). service-port-map
+lists the seven services that remain, re-measured at seven `PathPrefix`
+routers, with README.md and docker-compose.yml repinned; monorepo-discipline
+repins README.md after its quoted lines moved unchanged. The clients and libs
+hubs and api-package-use-inventory record what left and the tag
+`archive/api-packages-2026-11-01` that keeps it.

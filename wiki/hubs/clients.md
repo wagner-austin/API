@@ -1,8 +1,7 @@
 # Clients
 
-Clients in `clients/`. Three consume the platform's service surface; the fourth consumes nothing and is a measurement instrument rather than a user-facing client:
+Clients in `clients/`. DiscordBot, the one that integrated the platform's services, was archived on 2026-11-01 ([[api-package-use-inventory]]); of the three left, NavProbe consumes nothing and is a measurement instrument rather than a user-facing client:
 
-- **DiscordBot** — integrates all platform services behind a Discord command interface (`platform_discord`, `platform_core`, `platform_workers`).
 - **TankpitBot** — tankpit.com WebSocket protocol reverse-engineering and game bot logic (`platform_core`).
 - **RustedWarfareBot** — headless Rusted Warfare client: a Java agent inside the game's JVM dispatches orders and serialises simulation state, a Python package plans and evaluates. Deliberately standalone — `monorepo_guards` is its only in-repo dependency.
 - **NavProbe** — a reproducibility instrument for simulated navigation, not a bot: it drives someone else's simulator (MJX on JAX, MuJoCo-Warp) and answers whether a fixed seed and a fixed action sequence produce the same bytes. Standalone like RustedWarfareBot — `monorepo_guards` is its only in-repo dependency.

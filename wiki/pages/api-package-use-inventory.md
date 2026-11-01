@@ -6,19 +6,13 @@ related:
   - "[[monorepo-discipline]]"
 source_paths:
   - docs/RESEARCH.md
-  - tools/fleet/registry/projects/tools/maketools-execution.json
   - tools/hpc3-execution/Makefile
-  - libs/instrument_io/README.md
-  - libs/platform_email/README.md
-  - clients/DiscordBot/README.md
   - services/covenant-radar-api/data/external
 source_git_blobs:
   "docs/RESEARCH.md": c7b63ba14027eadb70362b5ec5459e58535f37e9
-  "tools/fleet/registry/projects/tools/maketools-execution.json": 9ea933aef985aa21b20f5c1e7b2f76555e89431c
   "tools/hpc3-execution/Makefile": 87ea0da9f4efa4e161e77d8d62c6ec5f2bcb8af2
-  "libs/instrument_io/README.md": 5ffc43ec73a09abf047c0820618a19526ce051a7
-  "libs/platform_email/README.md": d5d40db3466802e34fadada700076e7dff1398dd
-  "clients/DiscordBot/README.md": 24619b510f30acea0344a5715d5933d8cfa5afcb
+provenance:
+  - "The archived packages' own files are cited at API da1c233ec, the commit the tag archive/api-packages-2026-11-01 names, since they left HEAD with the archive. tools/fleet/registry/projects/tools/maketools-execution.json is cited at API 5f661ee41, the last commit with its eight install steps, which are the measurement; the archive cut it to four."
 fact_checked: "2026-11-01"
 confidence: medium
 hubs: [infrastructure]
@@ -26,7 +20,7 @@ hubs: [infrastructure]
 
 # Which API packages are used, measured 2026-11-01
 
-The operator asked on 2026-11-01 whether the monorepo carries old code nobody uses that could be archived.[^ask] This page is that inventory: every top-level package under `services/`, `libs/`, `clients/` and `tools/` at API `adda8c020`, what each is measured to be used by, and a recommendation. **Nothing moves until the operator picks**: the picks are recorded as a ruling on board task `a276f973` first.
+The operator asked on 2026-11-01 whether the monorepo carries old code nobody uses that could be archived.[^ask] This page is that inventory: every top-level package under `services/`, `libs/`, `clients/` and `tools/` at API `adda8c020`, what each is measured to be used by, and a recommendation. **Nothing moved until the operator picked**: the picks were recorded as rulings on board task `a276f973` first, and are below.
 
 ## What the size actually is
 
@@ -108,21 +102,26 @@ One row per package, each column read as the list above says, at API `adda8c020`
 
 `clients/docs` is one 19 KB document, not a package, and is left out.[^size]
 
-## The Discord group is the operator's question
+## The Discord group was the operator's question
 
-`clients/DiscordBot` is a bot with slash commands for QR codes, YouTube transcripts and digit recognition, so it calls `qr-api`, `transcript-api` and `handwriting-ai`.[^discord] None of those has a live default Railway host except `transcript-api`, which `grandma-api` and its own callers also use. Whether the bot still runs on Railway under some other service name cannot be read without a Railway credential, so the group (DiscordBot, `handwriting-ai`, `qr-api`, `turkic-api`, `libs/platform_discord`, and `data-bank-api`, which the trainers and covenant-radar-api call for file exchange) waits on the operator.
+`clients/DiscordBot` is a bot with slash commands for QR codes, YouTube transcripts and digit recognition, so it calls `qr-api`, `transcript-api` and `handwriting-ai`.[^discord] None of those has a live default Railway host except `transcript-api`, which is kept. Whether the bot still ran on Railway under some other service name could not be read without a Railway credential, so the group (DiscordBot, `handwriting-ai`, `qr-api`, `turkic-api` and `libs/platform_discord`) was put to the operator. `data-bank-api` was first put in the group by mistake: it is the file store covenant-radar-api's train and predict workers and Model-Trainer's corpus fetch call through `platform_core.data_bank_client`, while the research itself runs as batch jobs on local data and never calls it.
+
+## What the operator picked
+
+On 2026-11-01 the operator picked every archive recommendation above, the whole Discord group, and `data-bank-api` with the service mode that calls it.[^picks] So thirteen packages leave the monorepo, `services/data-bank-api` last, once nothing calls it: `libs/instrument_io`, `libs/platform_email`, `libs/platform_music`, `libs/platform_discord`, `libs/procart`, `services/Art-Trainer`, `services/handwriting-ai`, `services/music-wrapped-api`, `services/procart-api`, `services/qr-api`, `services/turkic-api`, `services/data-bank-api` and `clients/DiscordBot`. Their history is at the tag `archive/api-packages-2026-11-01`, on API `da1c233ec`, the last commit holding all thirteen. `tools/hpc3-execution` was not asked about and stays.
 
 ## Archiving is not just deleting a directory
 
 `libs/platform_core` names several services in shared configuration and client code, so archiving a service also trims those references, and every package that imported it must pass `make check` on the fleet after. Each archived package's history stays at a named tag. `tools/hpc3-execution` is a recipe for a fleet project that was never registered, so it has no history worth tagging.[^hpc3x]
 
 [^ask]: [synthesis] -- MCPs board task a276f973, its spec's OPERATOR block, dated 2026-11-01.
+[^picks]: [synthesis] -- MCPs board task a276f973, notes 226e1b90 and bc8f96d4: the two RULING lines recording the operator's picks and the correction that put data-bank-api to the operator on its own.
 [^size]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `git ls-tree -r -l origin/main` summed per package; `services/covenant-radar-api/data/external` holds 33 dataset directories.
 [^fleet]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `fleet_dispatch_jobs` closed in the 30 days to 2026-11-01T20:44Z, summed closed_at minus claimed_at per project.
-[^mxe]: `tools/fleet/registry/projects/tools/maketools-execution.json` -- eight `install` steps, one `image-<service>` phase per deployed service.
+[^mxe]: API `5f661ee41`, `tools/fleet/registry/projects/tools/maketools-execution.json` -- eight `install` steps, one `image-<service>` phase per deployed service. API `0ebe2e4dd` cut them to the four kept services.
 [^probe]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `curl -D - https://<host>.up.railway.app/healthz` at 2026-11-01T20:46:56Z, and `docker ps` on demure, diphtheria and emerald at 20:41Z.
 [^deps]: [synthesis] -- MCPs board task a276f973, note e96f59e1: 101 `path = "..."` dependency edges across every manifest at origin/main.
 [^solo]: [synthesis] -- MCPs board task a276f973, note e96f59e1: the last-own-change rule as stated there.
 [^research]: `docs/RESEARCH.md` -- searched for each package's path.
-[^discord]: `clients/DiscordBot/README.md:3` -- "Modular Python Discord bot with slash commands for QR code generation, YouTube transcripts, and handwritten digit recognition."
+[^discord]: API `da1c233ec` (the archive tag), `clients/DiscordBot/README.md:3` -- "Modular Python Discord bot with slash commands for QR code generation, YouTube transcripts, and handwritten digit recognition."
 [^hpc3x]: `tools/hpc3-execution/Makefile:7` -- "the fleet project tools/hpc3-execution, which requires the `hpc3` capability"; no file under `tools/fleet/registry/projects` declares that path (MCPs board task a276f973, note e96f59e1).
