@@ -35,7 +35,7 @@ source_git_blobs:
   "tools/fleet/tests/test_research_native_process.py": "0ac7c3d85462d0a8e2862f9377902c723c87817e"
   "tools/fleet/tests/test_research_wrds.py": "128047efa432f77d6b3b51259356f270f7c8cf99"
   "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
-  "tools/fleet/tests/test_research_hpc.py": "8c1875d1ef7e09f922da71b2e072001729300e35"
+  "tools/fleet/tests/test_research_hpc.py": "e134e6da8d6c21d182edb5932cecbb5e9221493c"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
@@ -46,7 +46,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_hpc.py": "daead9502e635ddc7abf3243eac2b7b838714094"
+  "tools/fleet/src/fleet/core/research_hpc.py": "57345e52787e51c50ea26bf0158e46cac6ede41e"
   "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
@@ -66,6 +66,14 @@ confidence: medium
 # WRDS admission and shared queue ownership
 
 - Research entry point: [[wrds-equity-research-protocol]].
+
+The completion inspector now takes the exact artifact from the persisted
+`run.json`, in addition to the native attempt and workspace host. An old queue
+request still pins its original controller: repairing the journal through a
+new runtime does not replace that terminal inspection. The November 1 recovery
+and pending controller handover are recorded in [[wrds-baseline-readiness]].[^handover]
+
+[^handover]: `tools/fleet/src/fleet/core/research_hpc.py`, `poll`; `tools/fleet/tests/test_research_hpc.py`, `test_complete_attempt_requires_fresh_native_identity_and_record`. Board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` retains original request and native allocation identities during controller replacement.
 
 The fleet research lane has an implementation in the existing fleet package:
 it claims shared dispatch rows, uses existing resource leases during bounded
