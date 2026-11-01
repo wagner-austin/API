@@ -13,8 +13,8 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "35c5af1aa9768da3ddd0d9c49818d699751cbe6c"
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "97ee0fc04a51497e2130087475c5780de6757d5d"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "1e2632628d99a7ba38c0ddb819510633b0c55fca"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
 fact_checked: 2026-11-01
@@ -50,27 +50,26 @@ The holding-window terminal interval is `[entry, exit)`, so an event
 **before entry**. A real closing trade on entry can accrue a subsequent
 terminal value; a later conventional terminal record is not a purchase.[^path]
 
-The shared outcome path now calls the existing fill validator before
-constructing labels and checks an ordinary exit's fill. The validator rejects
-terminal records even if a contradictory trade-price flag is present.
-Regression cases cover events before entry, exactly on entry and exactly on
-exit, endpoint quote prices, missing entry rows, and a verified-file reproduction
-that preserves decision-time selection.[^path][^tests]
+The first correction at API `d3fac047a` checked label execution endpoints and
+refused the conventional terminal record as a fill. The subsequent version-2
+rule distinguishes confirmed rejected new purchases from missing evidence:
+their allocations remain cash in the same outcome path used by labels and
+holdings. Contradictory evidence still fails, and held terminal losses remain
+owed values. Current rules are in [[crsp-monthly-holdings-validation]].[^path][^tests]
 
-This is a fail-closed validation correction, not permission to drop unfillable
-securities or impute their returns. It does not turn the stopped study into a
-successful one. Installed-runtime identity is tracked separately in
+Neither correction rewrites the stopped study or supplies a successful result.
+Installed-runtime identity is tracked separately in
 [[wrds-installed-runtime]].[^path][^stopped]
 
 ## Next study requirements
 
-Define how unfillable orders affect targets and portfolio cash before running
-a new preregistration. Do not select the historical universe by future outcomes.
-Freeze changed rules and runtime explicitly, rehearse them through the existing
-queue and preserve this failed journal. Cleanup of the original failed
+Version 2 needs new verified protocol/bundle and runtime identities before a
+new preregistration. The staged licensed bundle embeds version 1 and cannot
+be silently reinterpreted. Rehearse changed inputs through the existing queue
+and preserve this failed journal. Cleanup of the original failed
 allocation remains an evidence gap in [[wrds-cleanup-evidence]].[^diagnostic]
 
 [^stopped]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `native`, `queue`, `diagnostic` and `study_action`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `terminal_report`, `interpretation`, `repair_status` and `cleanup_limit`; its repair-status field is the historical pre-correction observation.
 [^path]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`.
-[^tests]: `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, boundary arithmetic and verified-extract label-refusal cases.
+[^tests]: `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, boundary arithmetic and verified-extract cash labels with unchanged selection.

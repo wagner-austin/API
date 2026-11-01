@@ -22,7 +22,7 @@ source_git_blobs:
   "tools/fleet/tests/test_research_proposer_remote.py": "2a2adc547b340ce0e001feccb0da45a228a33d9b"
   "tools/fleet/tests/test_research_proposer_hub.py": "ebe36dcf0b906c9973e9504009fe7b16ce9bbdce"
   "tools/fleet/tests/test_research_proposal_report.py": "dce73cf7233c68b374610ca8062e7fe1273f943b"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "18c05453efb28a9ab7504e9dd1436bc9a135cfcc"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "1a612f02d15aa6986831516ffb1f7f58db894aef"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"

@@ -10,7 +10,7 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py"
   - "libs/covenant_ml/tests/markets/test_crsp_extract.py"
   - "libs/covenant_ml/tests/markets/test_crsp_panel.py"
-  - "libs/covenant_ml/docs/crsp-monthly-v1.json"
+  - "libs/covenant_ml/docs/crsp-monthly.json"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
   - "libs/covenant_ml/tests/markets/test_crsp_protocol.py"
@@ -26,10 +26,10 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "67792a2f1fd38cf8927a88d68adb04f1e8eb7c98"
   "libs/covenant_ml/tests/markets/test_crsp_extract.py": "4b0707b97313b908c6c5790e92dc03592e1d764f"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
-  "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
+  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "46cdf20ad4459526d15e5ba16b0d231494b4f9a9"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "aaa7e06eea6ce338fae20a0e2cf64670e1e86886"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
@@ -63,7 +63,7 @@ do not prove field semantics, historical completeness or publication availabilit
 | Use | Selected input and constraint |
 |---|---|
 | Target return | `crsp_a_stock.stkdlysecuritydata`: `permno`, `dlycaldt`, `dlyret`, `dlyretmissflg`, `dlyretdurflg`, `dlydelflg`. Compound the held interval `(entry close, exit close]`; never substitute vendor calendar-month returns. |
-| Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Ordinary entry/exit requires a finite positive `TR` closing trade. A selected security without an executable price makes the run incomplete; future fill prices cannot change pre-decision selection. |
+| Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Ordinary entry/exit requires a finite positive `TR` closing trade. Version 2 permits only a confirmed pre-entry terminal rejection to retain its equal cash slot; missing or contradictory fill evidence makes the run incomplete. Future execution cannot change pre-decision selection. |
 | Ordinary daily completeness | Require finite return, missingness flag `NA`, nonterminal flag `N`, and duration in `D1,D2,D3,D4,DU`, with independent session and previous-date checks. An absent or unknown flag is an explicit validation error. |
 | Terminal reconciliation | `stkdelists`: `permno,delistingdt,delret,delretmisstype,deldlydt,delamtdt,delnextdt`. Require finite return at least -1 and missingness flag `NA`. Value once at the latest stored/amount/present next-price date; retain a receivable until modeled reinvestment at the next rebalance strictly after that date. Missing terminal value makes the held outcome incomplete; a valuation date after the scored exit also fails. |
 | Membership evidence | `dsenames`: `permno,namedt,nameendt,shrcd,exchcd`. Exactly one inclusive effective interval must apply at decision time. Preserve numeric codes 10/11 and 1/2/3 directly; do not infer equivalent mnemonic classifications or extrapolate after December 2024. Entry membership does not filter later held outcomes. |
@@ -105,6 +105,6 @@ This is input construction; the holdings and validation study in [[crsp-monthly-
 
 [^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
 
-[^frozen]: `libs/covenant_ml/docs/crsp-monthly-v1.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
+[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
 
 [^ciz-contract]: External tech-wiki pages `crsp-ciz-daily-return-contract`, `crsp-ciz-daily-return-quality`, `crsp-ciz-aggregate-return-quality`, field and flag dictionaries plus Application notes. Their single captured vendor guide is https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d, pp. 14-18, 49, 63, 81-82 and 90-92; text capture SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e. Application constraints are study choices rather than vendor guarantees; the frozen-rules and holdings footnotes cite their implementation separately.

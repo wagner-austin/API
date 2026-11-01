@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_unfilled.py"
   - "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
@@ -13,14 +15,16 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "97ee0fc04a51497e2130087475c5780de6757d5d"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "35c5af1aa9768da3ddd0d9c49818d699751cbe6c"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
-  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5405a53dde0ea6e01263202358c951ad170d055c"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "1e2632628d99a7ba38c0ddb819510633b0c55fca"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "1526ae0f641a66fb686d80f028740abc40491f2d"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "50dcf2341e759b4805b719757302d34165f68fa7"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
 fact_checked: 2026-11-01
@@ -32,30 +36,42 @@ confidence: medium
 - Research entry point: [[wrds-equity-research-protocol]].
 
 Monthly holdings start from one unit of cash. At each rebalance close the
-investable value, held positions plus terminal values dated strictly before
-that close, is split equally across the selection; traded notional is measured
-against the drifted pre-trade positions and its frozen cost is paid from the
-portfolio. Positions compound their own ordinary daily returns, checked against
+investable value, cash and held positions plus terminal values dated strictly
+before that close, is split equally across the decision-time selection.
+Version 2 solves `slots × x + rate × turnover(x) = investable` on the linear
+segments between prior position values. This charges actual buys and sells
+against post-cost targets; the earlier pre-fee-target approximation is removed.
+Positions compound their own ordinary daily returns, checked against
 the declared predecessor session. A position delisted inside a window stops at
 its delisting date and becomes a receivable worth its `stkdelists` multiplier,
 applied once and never combined with the daily delisting-flagged row; it is
 reinvested only at a rebalance strictly after its valuation date. The last
 window pays the cost of liquidating its positions. A missing or non-ordinary
-held return, a missing or non-`TR` fill, an unresolved terminal event or a value
+held return, an unverifiable fill, an unresolved owned terminal event or a value
 dated after the scored exit refuses the whole evaluation. Hand-calculated cases
 check two-month drift, turnover and liquidation and a three-month delisting
 whose value waits one month before reinvestment.[^holdings]
 
-Label construction uses the same execution validator: entry must be a closing
-trade, and an ordinary exit must also be tradable. Terminal daily records are
-never fills, even with a contradictory trade flag. The terminal interval is
+Label construction uses the same order outcome as holdings. Exactly one event
+at decision close, before entry, plus an entry-day terminal row with `DD`
+duration and a non-`TR` price flag confirms a rejected purchase. Its equal
+allocation remains zero-interest cash without replacement or redistribution;
+its gross label multiplier is one and remains in the universe benchmark.
+Missing rows/events and contradictory trade flags still refuse evaluation.
+The monthly payload retains unfilled selections and cash weights alongside
+held positions; weights describe the end value before final liquidation.[^unfilled]
+
+Executed entry and ordinary exit must be closing trades. The terminal interval is
 `[entry, exit)`: a delisting on entry is included, while a last ordinary trade
 on exit can be sold before the subsequent terminal outcome. Tests cover these
 boundaries and the pre-entry delisting found by the licensed baseline, without
-filtering decision-time selection using later outcomes. See
-[[wrds-baseline-20261101]] for that incident and the remaining study-rule gap.[^execution]
+filtering decision-time selection using later outcomes. The encrypted synthetic
+study runs the real trainers and emits the rejected order and cash weight,
+then verifies private plaintext removal.[^execution][^unfilled]
 
-[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic and verified-extract label refusal.
+[^unfilled]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry_filled` and `_rebalance_notional`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, hand-calculated mixed/all-rejected portfolios, contradictory evidence, held-loss refusals, encrypted study and old protocol rejection; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `_encode_series`.
+
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic and verified-extract cash labels with unchanged selection.
 
 The validation study builds decisions only up to the day before the final
 period. Labels are whether a security's window multiplier, terminal value

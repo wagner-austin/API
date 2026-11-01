@@ -1,10 +1,12 @@
 ---
-title: Frozen CRSP monthly study design
+title: CRSP monthly protocol and frozen study boundaries
 tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[wrds-proposer-isolation]]", "[[wrds-baseline-readiness]]"]
 source_paths:
-  - "libs/covenant_ml/docs/crsp-monthly-v1.json"
+  - "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json"
+  - "libs/covenant_ml/tests/markets/test_crsp_unfilled.py"
+  - "libs/covenant_ml/docs/crsp-monthly.json"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
   - "libs/covenant_ml/tests/markets/test_crsp_protocol.py"
@@ -17,18 +19,20 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/docs/crsp-monthly-v1.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "221b2b1c6d526a02786d78837a228b1bd5203e7f"
+  "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5405a53dde0ea6e01263202358c951ad170d055c"
+  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "46cdf20ad4459526d15e5ba16b0d231494b4f9a9"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "28789469447c10b67050d3fd4995471c29d85893"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "aaa7e06eea6ce338fae20a0e2cf64670e1e86886"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "35c5af1aa9768da3ddd0d9c49818d699751cbe6c"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
-  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "1526ae0f641a66fb686d80f028740abc40491f2d"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "50dcf2341e759b4805b719757302d34165f68fa7"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
@@ -37,31 +41,43 @@ fact_checked: 2026-11-01
 confidence: medium
 ---
 
-# Frozen CRSP monthly study design
+# CRSP monthly protocol and frozen study boundaries
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-The design is frozen in `libs/covenant_ml/docs/crsp-monthly-v1.json`. Its codec
-and calendar, membership, execution-price and terminal-value validators are
-implemented, and so are holdings evaluation and the validation study. The implemented process
+The current version-2 design is `libs/covenant_ml/docs/crsp-monthly.json`.
+It declares confirmed rejected-order cash and actual traded-notional costs.
+The stopped November 1 study used version 1; its admitted journal and encrypted
+bundle remain unchanged. Version 2 requires new runtime and input identities
+before another study, as recorded in [[wrds-baseline-readiness]]. Its codec,
+validators, holdings evaluation and validation study share one implementation. The process
 boundary and deployment limits are in [[wrds-proposer-isolation]] and
 [[wrds-baseline-readiness]]. These are study assumptions, not
 profitability findings.[^frozen][^holdings]
 
 | Decision | Rule |
 |---|---|
-| Question and target | Can lagged return/volume features improve monthly stock selection over fixed momentum? Target each eligible stock's total return from the close of the first trading session of the next month to the corresponding close one month later, minus the eligible universe's equal-weight return. |
+| Question and target | Can lagged return/volume features improve monthly stock selection over fixed momentum? Target each selected order's value from the first trading close of the next month to the corresponding close one month later, relative to the eligible universe's equal-weight order value. A confirmed rejected purchase keeps a cash multiplier of one in both the row label and benchmark. |
 | Information and execution | Decide after month-end close using only observations dated through that close; execute at the next month's first trading-session close. Features cannot use that execution session's price or volume. Include distributions and delisting outcomes in targets. No fill at the same close that supplies the signal. |
 | Historical universe | At each decision date, common shares with effective share codes 10/11 and exchange codes 1/2/3, absolute closing price at least $5, and at least 252 prior sessions. Rank by trailing 60-session median absolute-price-times-volume; take at most 1,000. Resolve ties by PERMNO. Use effective-dated membership, including later-delisted securities; never today's constituent list. |
 | Historical availability | Preserve extraction vintage and source mappings. Effective dates govern membership. A current CRSP history is a revised historical backtest, not a proven as-published archive. Compustat stays outside v1; later financial features require report/publication availability and revision handling, not fiscal-period dates alone. |
 | Calendar and missingness | Establish an independent exchange-session calendar. No forward-filled return labels or silent dropping of held positions. Missing required prices, returns or delisting outcomes make the affected evaluation incomplete; log the failure. Eligibility excludes insufficient pre-decision history with counted reasons. |
 | Development and final period | Train 2000–2014; tune on 2015–2021 through expanding chronological folds, retaining only windows whose exit is before January 2022 (decisions through October 2021). Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
 | Baselines and model family | Equal-weight eligible universe and fixed 12-to-2-month momentum (compound months t-12 through t-2, then select the top decile). Candidate: fixed boosted-tree family using lagged returns, volatility and volume; compare ClearGBM/LightGBM on identical rows and seeds. No Compustat or LLM text signals in v1. |
-| Portfolio and costs | Long-only, no leverage, equal-weight top decile, deterministic PERMNO ties, monthly rebalance. Primary all-in cost is 10 basis points times absolute traded notional, including entry/exit and turnover; report fixed 5/25-bp sensitivities. Costs are declared assumptions, not calibrated capacity or actual execution claims. |
+| Portfolio and costs | Long-only, no leverage, equal-weight top decile, deterministic PERMNO ties, monthly rebalance. Rejected orders retain their equal cash slots without replacement or redistribution. Solve the post-cost allocation budget; primary cost is 10 basis points times actual absolute traded notional, with fixed 5/25-bp sensitivities. Retained cash earns zero interest and has no trade fee. Costs are declared assumptions, not calibrated capacity or actual execution claims. |
 | Primary measurement | Mean monthly net-return difference versus momentum on the same dates. Report annualized return, volatility, drawdown and turnover secondarily. Use paired 12-month moving-block bootstrap, 10,000 draws, seed 7, with intervals and sample length; 36 final decisions limit inference. |
 | Trial accounting | At most 20 distinct validation candidates under v1, five fixed seeds 11/23/37/53/71 each, identical candidate budget. Select one candidate on primary validation score, tie by fewer leaves then candidate id. Evaluate the selected candidate once on the sealed final period. Seeds are repetitions, not extra hypotheses or independent market histories. |
 
-The date change preceded outcome inspection: WRDS compute probes `40544368`
+The rejected-order rule requires exactly one event at the decision close,
+before entry, plus an entry-day terminal row with `DD` duration and a non-`TR`
+price flag. Missing or contradictory evidence still fails. The rule does not
+filter the decision-time universe and does not erase a held security's loss.
+Tests exercise mixed/all-cash selections, labels that retain rejected orders,
+and unknown terminal values for securities never purchased.[^unfilled]
+
+[^unfilled]: `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, mixed/all-rejected accounting, encrypted study and old protocol rejection. `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json` preserves the original version-1 settings; it is historical evidence, not a supported alternate runtime protocol.
+
+The earlier date change preceded outcome inspection: WRDS compute probes `40544368`
 and `40544470` found legacy membership only through December 2024 and CIZ
 returns/calendar through December 2025. The second probe also confirmed
 terminal-event dates through 2025-12-30, with stored dates through 2025-12-31.
@@ -74,7 +90,7 @@ edge needs a later prospective frozen follow-up.[^request]
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 
-[^frozen]: `libs/covenant_ml/docs/crsp-monthly-v1.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
+[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
 
 [^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544470 on 2026-10-29, extending the three-relation probe 40544368 with stkdelists coverage. No security observations were returned or scored.
 

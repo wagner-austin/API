@@ -4,9 +4,11 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/docs/crsp-monthly.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
 source_git_blobs:
+  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
 provenance:
@@ -39,9 +41,13 @@ or investment performance.[^stop][^diagnostic]
 
 ## Work required before a new baseline
 
-1. Specify unfillable-entry handling without future-outcome universe filtering;
-   retain and test entry-date and exit-date terminal boundaries.
-2. Freeze and install the corrected evaluator and any amended study rules,
+The current protocol declares rejected-order cash and actual traded-notional
+costs. These version-2 rules differ from the stopped study's installed inputs.[^current]
+
+1. Prepare a separately verified version-2 bundle: retain the original CSV/SQL
+   identities and extraction vintage, and record changed protocol/manifest
+   identities. The current staged bundle embeds version 1 and remains historical.
+2. Freeze and install the version-2 evaluator and amended study rules,
    then rehearse proposal → admission → queue → native job → verified result.
 3. Close the failed allocation's cleanup-evidence gap.
 4. Run the new fixed candidate/seed study. Select only after all required
@@ -51,5 +57,6 @@ The original failed journal remains immutable. Current diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
+[^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule` and `cost_rule`; this is the current rule document, not an installed runtime or a completed study.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
