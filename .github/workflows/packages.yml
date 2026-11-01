@@ -238,11 +238,17 @@ jobs:
     # On lavender every runner's job runs in the one CI slice tools/fleet
     # runners.json declares: throttled at 16 GB and bounded at 18 GB with
     # 2 GB of swap, out of the host's 31 GB. Every pool member is named
-    # twice -- here and in the make check step's worker cap, Model-Trainer
-    # at 8 -- so a package joins the pool and takes its share of the box in
+    # twice -- here and in the make check step's worker cap, each at 8 --
+    # so a package joins the pool and takes its share of the box in
     # one edit. services/handwriting-ai was the pool's other member until
     # the operator had it archived on 2026-11-01 (MCPs board task a276f973).
-    runs-on: ${{ contains(fromJSON('["services/Model-Trainer"]'), matrix.package) && fromJSON('["self-hosted", "lavender"]') || 'ubuntu-latest' }}
+    #
+    # libs/covenant_nn joined it 2026-11-01 (MCPs board task 2c71e82c): its
+    # four train_on_cuda cases train the MLP and LSTM backends on CUDA in
+    # FP16, as covenant-radar-api does on its GPU, and assert a device rather
+    # than skip without one, so a hosted CPU runner fails all four (run at
+    # 18c0ee375) where lavender's card passes them.
+    runs-on: ${{ contains(fromJSON('["services/Model-Trainer", "libs/covenant_nn"]'), matrix.package) && fromJSON('["self-hosted", "lavender"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -452,7 +458,7 @@ jobs:
       - name: make check
         run: |
           set -euo pipefail
-          workers='${{ matrix.package == 'services/Model-Trainer' && '8' || '' }}'
+          workers='${{ contains(fromJSON('["services/Model-Trainer", "libs/covenant_nn"]'), matrix.package) && '8' || '' }}'
           if [ -n "$workers" ]; then
             export PYTEST_XDIST_AUTO_NUM_WORKERS="$workers"
           fi
