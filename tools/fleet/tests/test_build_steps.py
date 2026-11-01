@@ -3,16 +3,18 @@
 The lines are BuildKit's ``--progress plain`` output for grandma-api's
 runtime image, with the step numbers and seconds of its cold build on
 colossus on 2026-11-01 (133 s in all): the builder and runtime stages build
-side by side, so their headers interleave and are printed again when a step
-resumes, and the internal steps carry no stage.
+side by side, so their titles interleave and are printed again when a step
+resumes, and the export reports its progress under its own number.
 """
 
 from __future__ import annotations
 
 from fleet.core.build_steps import read_build_steps
 
+BUILD_DEFINITION = "#1 [internal] load build definition from Dockerfile\n"
+
 COLD_BUILD = (
-    "#1 [internal] load build definition from Dockerfile\n"
+    BUILD_DEFINITION + "#1 transferring dockerfile: 4.21kB done\n"
     "#1 DONE 0.0s\n"
     "#6 [builder  1/10] FROM docker.io/library/python:3.11.9-slim-bookworm@sha256:8fb0991\n"
     "#6 DONE 3.1s\n"
@@ -27,19 +29,21 @@ COLD_BUILD = (
     "#10 DONE 7.9s\n"
     "#11 [runtime-base 3/9] RUN addgroup --system app\n"
     "#11 CACHED\n"
-    "#13 [runtime-base 5/9] RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu\n"
+    "#13 [runtime-base 5/9] RUN pip install --extra-index-url https://download.pytorch.org\n"
     "#13 11.63    184.1/184.1 MB 36.8 MB/s eta 0:00:00\n"
     "#13 DONE 33.0s\n"
-    "#23 [runtime-base 8/9] RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu\n"
+    "#23 [runtime-base 8/9] RUN pip install --extra-index-url https://download.pytorch.org\n"
     "#23 DONE 27.8s\n"
     "#25 exporting to image\n"
+    "#25 exporting layers 25.6s done\n"
+    "#25 naming to docker.io/library/eb6586e4-cold:measure done\n"
     "#25 DONE 40.3s\n"
 )
 
 
-def test_a_cold_build_names_its_three_slowest_steps_slowest_first() -> None:
+def test_every_titled_step_counts_and_the_export_was_this_build_s_slowest() -> None:
     assert read_build_steps(COLD_BUILD) == (
-        "runtime-base-5/9-RUN-pip:33s,runtime-base-8/9-RUN-pip:28s,runtime-base-2/9-RUN-apt-get:25s"
+        "exporting-to-image:40s,runtime-base-5/9-RUN-pip:33s,runtime-base-8/9-RUN-pip:28s"
     )
 
 
@@ -51,14 +55,20 @@ def test_a_from_step_loses_its_tag_and_digest() -> None:
     assert read_build_steps(tail) == "builder-1/10-FROM-docker.io/library/python:3s"
 
 
-def test_a_step_whose_header_left_the_tail_is_not_counted() -> None:
+def test_a_step_whose_title_left_the_tail_is_not_counted() -> None:
     tail = "#20 DONE 33.0s\n#21 [api 1/1] RUN true\n#21 DONE 1.0s\n"
     assert read_build_steps(tail) == "api-1/1-RUN-true:1s"
 
 
-def test_a_later_build_s_header_renames_a_reused_number() -> None:
-    tail = "#5 [builder 4/4] RUN make\n#5 DONE 2.0s\n#5 [runtime 2/3] COPY\n#5 DONE 9.0s\n"
-    assert read_build_steps(tail) == "runtime-2/3-COPY:9s,builder-4/4-RUN-make:2s"
+def test_a_second_build_names_its_steps_afresh() -> None:
+    tail = (
+        BUILD_DEFINITION + "#5 exporting to image\n#5 DONE 2.0s\n"
+        f"{BUILD_DEFINITION}#5 [runtime 2/3] COPY\n#5 DONE 9.0s\n"
+        f"{BUILD_DEFINITION}#5 resolving provenance for metadata file\n#5 DONE 4.0s\n"
+    )
+    assert read_build_steps(tail) == (
+        "runtime-2/3-COPY:9s,resolving-provenance-for:4s,exporting-to-image:2s"
+    )
 
 
 def test_a_tie_is_broken_by_name() -> None:
