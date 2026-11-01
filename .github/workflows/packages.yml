@@ -28,12 +28,13 @@ name: packages
 # locally rather than debugged through pushes.
 #
 # WHAT THIS DOES NOT COVER, deliberately:
-#   * clients/NavProbe and services/turkic-api keep their own workflows. The
-#     first MUST run on windows-latest -- its tests call the real Win32
-#     boundary -- and folding a per-package runner into this matrix to serve
-#     one package would put a hardcoded OS table here. The second is
-#     established and green. Both are excluded by the selector's caller below,
-#     not by a rule inside the selector.
+#   * clients/NavProbe keeps its own workflow. It MUST run on windows-latest
+#     -- its tests call the real Win32 boundary -- and folding a per-package
+#     runner into this matrix to serve one package would put a hardcoded OS
+#     table here. It is excluded by the selector's caller below, not by a
+#     rule inside the selector. services/turkic-api kept its own workflow too
+#     until the operator had it archived on 2026-11-01 (MCPs board task
+#     a276f973).
 #   * clients/TankpitBot keeps its own workflow on windows-latest. Its suite
 #     is written against Windows separators and a case-insensitive filesystem
 #     -- 17 failures on ubuntu, none of them a defect in the bot, all of them
@@ -160,7 +161,7 @@ jobs:
           # leaves them out by name, since each runs host cases against what
           # a hosted runner lacks (board tasks 465689f5, 46934cd6, 715b9ec5).
           selected="$(python scripts/ci_select_packages.py < changed.txt \
-            | python -c "import json,sys; own={'clients/NavProbe','services/turkic-api','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels','libs/covenant_ml'}; \
+            | python -c "import json,sys; own={'clients/NavProbe','libs/cleargbm_rs','clients/TankpitBot','clients/OrderedKernels','libs/covenant_ml'}; \
                          print(json.dumps([p for p in json.load(sys.stdin) if p not in own]))")"
           echo "selected: $selected"
           echo "packages=$selected" >> "$GITHUB_OUTPUT"
@@ -234,19 +235,14 @@ jobs:
     # tree. The check against the real jar is `make execution`, run where
     # the pinned game is.
     #
-    # services/handwriting-ai joins for MEMORY, not GPU: twice (runs
-    # 34261012178 and 34263882633) the hosted 16GB VM received "a shutdown
-    # signal" at ~98%, mid-way through a real MNIST training test, with
-    # orphan python processes reaped after -- the OOM killer taking the
-    # runner agent, reported as infrastructure rather than as a failed
-    # assertion. Sixteen xdist workers each holding torch plus real
-    # training does not fit in 16GB. On lavender every runner's job runs in
-    # the one CI slice tools/fleet runners.json declares: throttled at 16 GB
-    # and bounded at 18 GB with 2 GB of swap, out of the host's 31 GB.
-    # Every pool member is named twice -- here and in the make check step's
-    # worker cap, handwriting-ai at 2 and Model-Trainer at 8 -- so a package
-    # joins the pool and takes its share of the box in one edit.
-    runs-on: ${{ contains(fromJSON('["services/Model-Trainer", "services/handwriting-ai"]'), matrix.package) && fromJSON('["self-hosted", "lavender"]') || 'ubuntu-latest' }}
+    # On lavender every runner's job runs in the one CI slice tools/fleet
+    # runners.json declares: throttled at 16 GB and bounded at 18 GB with
+    # 2 GB of swap, out of the host's 31 GB. Every pool member is named
+    # twice -- here and in the make check step's worker cap, Model-Trainer
+    # at 8 -- so a package joins the pool and takes its share of the box in
+    # one edit. services/handwriting-ai was the pool's other member until
+    # the operator had it archived on 2026-11-01 (MCPs board task a276f973).
+    runs-on: ${{ contains(fromJSON('["services/Model-Trainer"]'), matrix.package) && fromJSON('["self-hosted", "lavender"]') || 'ubuntu-latest' }}
     strategy:
       # One package's failure must not cancel the rest: the first run of this
       # workflow is a survey, and a survey that stops at the first red tells
@@ -445,48 +441,20 @@ jobs:
       # PER JOB. Run 34285840438 measured what 32 torch workers do to that
       # machine: Model-Trainer -- green solo two hours earlier -- lost an
       # xdist worker to the OOM killer mid-suite (INTERNALERROR after
-      # "replacing crashed worker gw4"), and handwriting-ai's calibration
-      # candidates starved into their own wall-clock timeouts (stage A
-      # circuit breaker, 2/2 failures). At 8 each, two co-tenant suites sum
+      # "replacing crashed worker gw4"). At 8 each, two co-tenant suites sum
       # to exactly the worker count one green solo run used. Hosted runners
       # keep `auto`: they are one job per VM by construction.
-      # handwriting-ai additionally runs CPU-ONLY here, because the pool has
-      # ONE 4GB GTX 1630 and Model-Trainer's suite digests it by design --
-      # two concurrent torch suites on one small card is the failure worker
-      # counts cannot fix. Measured across runs 34285840438 and 34287862046:
-      # with both suites on the GPU, Model-Trainer lost workers (KeyError:
-      # WorkerController gw8) and two statistical training tests, and
-      # handwriting-ai's calibration timed out in both stages -- while each
-      # was green with the card to itself. It came to this pool for the
-      # 26GB, not the GPU.
-      #
-      # AND handwriting-ai runs -n 2, NOT the pool's 8, because two is the
-      # only concurrency its calibration has ever passed at. The hosted
-      # runners it was green on are 2-core VMs -- `-n auto` there created
-      # exactly 2 workers -- and every calibration test spawns its own
-      # 8-thread training candidate under a 45-second wall-clock budget, so
-      # worker count multiplies whole TRAINING RUNS, not just test
-      # processes. At 8 workers the candidates starved each other into the
-      # stage-A/B circuit breaker three runs straight (34285840438,
-      # 34287862046, 34289840729 -- the last one CPU-only, which acquitted
-      # the GPU and convicted the concurrency). The hosted 16GB VM
-      # OOM-killed the runner at ~98% AT that 2-worker setting, which is
-      # why the answer is 26GB at 2 workers rather than either half alone.
       #
       # The cap reaches pytest as PYTEST_XDIST_AUTO_NUM_WORKERS, which is
       # what `-n auto` (the launcher's spelling) reads, and it is exported
       # only when set: xdist reads the variable with int(), so an empty
-      # string would be a crash rather than "auto". The GPU mask is exported
-      # the same way, because an EMPTY CUDA_VISIBLE_DEVICES hides every card.
+      # string would be a crash rather than "auto".
       - name: make check
         run: |
           set -euo pipefail
-          workers='${{ matrix.package == 'services/handwriting-ai' && '2' || (matrix.package == 'services/Model-Trainer' && '8' || '') }}'
+          workers='${{ matrix.package == 'services/Model-Trainer' && '8' || '' }}'
           if [ -n "$workers" ]; then
             export PYTEST_XDIST_AUTO_NUM_WORKERS="$workers"
-          fi
-          if [ '${{ matrix.package }}' = 'services/handwriting-ai' ]; then
-            export CUDA_VISIBLE_DEVICES=-1
           fi
           make check
 
