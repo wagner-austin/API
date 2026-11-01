@@ -428,3 +428,13 @@ service-report index and GitHub lint failure with the subsequent strict fleet
 pass. The seven HPC pages had no source-pin errors; their 29 older citation
 warnings remain explicitly tracked on existing task 52668052 rather than
 being treated as verified historical measurements.
+
+## [2026-11-01] maintenance | completed-controller handover implementation
+
+Updated queue admission and baseline readiness with the published handover
+contract, failed lint measurement, repaired 2,627-test fleet check and explicit
+pending installation. Refreshed reviewed source pins in the existing ownership,
+evaluation reuse and CRSP contract pages after lifting terminal verification
+from poll into one shared implementation. No pages or hub counts changed.
+Board tasks 04c0cdbe and 9dc6f80c distinguish operational recovery from the
+lint repair; no live queue closure or licensed final evaluation is claimed.
