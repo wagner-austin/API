@@ -421,3 +421,10 @@ auto-fixing: the branch is corrected and the package's lint gate now checks
 without rewriting source. Installed-runtime identities remain historical.
 Published-page audits and search refreshes are recorded on a9b2927c. This
 maintenance pass does not certify unrelated wiki pages or the substantive study.
+
+The final published-page pass found three uncited paragraphs in readiness and
+final scoring. Added locators to the recorded independent audit, recovery
+service-report index and GitHub lint failure with the subsequent strict fleet
+pass. The seven HPC pages had no source-pin errors; their 29 older citation
+warnings remain explicitly tracked on existing task 52668052 rather than
+being treated as verified historical measurements.
