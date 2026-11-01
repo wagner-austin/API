@@ -94,7 +94,7 @@ monthly study now uses or replaces each seam:[^equity][^window][^sampling][^spli
 | `compare_moving_block` | Requires identical consecutive month identities and records a distinct moving-block percentile method. | Compares each candidate and the equal-weight universe with momentum at the primary cost. Its uncentered sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
 
 The existing controller reports descriptive validation uncertainty from settled
-journal records:
+journal records through its existing proposal command.[^seed-summary]
 
 ```bash
 python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite \
