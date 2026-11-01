@@ -56,7 +56,7 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     assert len(names) == 5 * 3 * 2 + 4 * 4 + 5 * 16
     assert "mean_net_return.momentum.10bps" in names
     assert "equal_weight_vs_momentum.net_return.ci_low" in names
-    assert result["kind"] == "research-monthly-validation-v1"
+    assert result["kind"] == "research-monthly-validation-v2"
     assert result["partition"] == "validation"
     assert result["attempt"] == 1
     assert len(require_list(result, "folds")) == 2
@@ -91,6 +91,8 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     month = narrow_json_to_dict(require_list(first, "months")[0])
     assert (first["arm"], first["cost_bps"], month["decision"]) == ("momentum", 10, "2018-07-31")
     assert len(require_list(month, "held")) == 3
+    assert require_list(month, "unfilled") == []
+    assert require_float(month, "cash") == 0.0
     assert require_dict(result, "source")["extracted_at"] == "2026-10-29T00:00:00+00:00"
     assert require_dict(result, "dataset")["bundle_sha256"] == trial["policy"]["dataset_digest"]
     assert list(tmp_path.glob("research-plaintext-*")) == []

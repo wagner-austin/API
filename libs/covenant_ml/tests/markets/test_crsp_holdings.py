@@ -109,24 +109,27 @@ def terminal_rows() -> tuple[list[JSONObject], list[JSONObject]]:
 def test_drifted_weights_turnover_and_final_liquidation_match_hand_arithmetic() -> None:
     evidence = outcomes(drift_rows(), [])
     first, second = evaluate_crsp_holdings(evidence, (W1, W2), ((1, 2), (2, 3)), 10)
-    # Entry: one unit of cash bought equally, 1.0 of notional at 10 bp.
-    assert first.turnover == pytest.approx(1.0)
-    assert first.cost == pytest.approx(0.001)
-    assert first.net_return == pytest.approx(0.4995 * 1.1 + 0.4995 - 1)
+    # Two purchases x and their fees: 2*x*1.001 = 1.
+    entry = 0.5 / 1.001
+    start = entry * 2.1
+    assert first.turnover == pytest.approx(2 * entry)
+    assert first.cost == pytest.approx(0.002 * entry)
+    assert first.net_return == pytest.approx(start - 1)
     assert [permno for permno, _ in first.held] == [1, 2]
-    assert first.held[0][1] == pytest.approx(0.54945 / 1.04895)
-    assert first.held[1][1] == pytest.approx(0.4995 / 1.04895)
+    assert first.held[0][1] == pytest.approx(1.1 / 2.1)
+    assert first.held[1][1] == pytest.approx(1 / 2.1)
     assert first.receivables == ()
-    # Rebalance from drifted 0.54945/0.4995 to 0.524475 each in stocks 2 and 3.
-    traded = 0.54945 + (0.524475 - 0.4995) + 0.524475
-    each = (1.04895 - 0.001 * traded) / 2
+    # Sell stock 1; buy x-entry of stock 2 and x of stock 3.
+    # 2*x + .001*(1.1*entry + x-entry + x) = start.
+    each = (start - 0.0001 * entry) / 2.002
+    traded = 1.1 * entry + (each - entry) + each
     before_exit = each * 0.95 + each * 1.02
     assert second.selected == (2, 3)
     assert [permno for permno, _ in second.held] == [2, 3]
     assert second.held[0][1] == pytest.approx(each * 0.95 / before_exit)
-    assert second.turnover == pytest.approx((traded + before_exit) / 1.04895)
-    assert second.cost == pytest.approx(0.001 * (traded + before_exit) / 1.04895)
-    assert second.net_return == pytest.approx(before_exit * 0.999 / 1.04895 - 1)
+    assert second.turnover == pytest.approx((traded + before_exit) / start)
+    assert second.cost == pytest.approx(0.001 * (traded + before_exit) / start)
+    assert second.net_return == pytest.approx(before_exit * 0.999 / start - 1)
 
 
 def test_terminal_value_counts_once_and_waits_for_a_strictly_later_rebalance() -> None:
@@ -139,23 +142,25 @@ def test_terminal_value_counts_once_and_waits_for_a_strictly_later_rebalance() -
     selections = ((4, 5), (5,), (5,))
     first, second, third = evaluate_crsp_holdings(evidence, (W1, W2, W3), selections, 10)
     # The daily +50% delisting copy is ignored; -40% applies once.
-    assert first.net_return == pytest.approx(0.4995 * 0.6 + 0.4995 - 1)
+    entry = 0.5 / 1.001
+    assert first.net_return == pytest.approx(entry * 1.6 - 1)
     ((held, weight),) = first.held
     assert held == 5
-    assert weight == pytest.approx(0.4995 / 0.7992)
+    assert weight == pytest.approx(1 / 1.6)
     (owed,) = first.receivables
     assert (owed.permno, owed.valued) == (4, "2020-03-02")
-    assert owed.amount == pytest.approx(0.2997 / 0.7992)
+    assert owed.amount == pytest.approx(0.6 / 1.6)
     # Valued at 2020-03-02, which is not strictly before this entry: still locked cash.
     assert second.turnover == 0.0
     assert second.cost == 0.0
     assert second.net_return == pytest.approx(0.0)
     assert second.receivables[0].valued == "2020-03-02"
     # Released at 2020-04-01 and reinvested in stock 5, which then gains 10%.
-    invested = 0.7992 - 0.001 * 0.2997
-    assert third.turnover == pytest.approx((0.2997 + invested * 1.1) / 0.7992)
+    start = entry * 1.6
+    invested = (start + 0.001 * entry) / 1.001
+    assert third.turnover == pytest.approx((invested - entry + invested * 1.1) / start)
     assert third.receivables == ()
-    assert third.net_return == pytest.approx(invested * 1.1 * 0.999 / 0.7992 - 1)
+    assert third.net_return == pytest.approx(invested * 1.1 * 0.999 / start - 1)
 
 
 def test_index_reads_declared_sessions_and_keys_from_verified_files(tmp_path: Path) -> None:

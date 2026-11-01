@@ -22,7 +22,7 @@ from covenant_ml.markets.validation import read_document
 
 def protocol_document() -> JSONObject:
     """Read the committed design so tests cannot silently use a different protocol."""
-    return read_document(Path(__file__).parents[2] / "docs" / "crsp-monthly-v1.json")
+    return read_document(Path(__file__).parents[2] / "docs" / "crsp-monthly.json")
 
 
 def calendar_rows() -> tuple[tuple[str, str], ...]:
@@ -63,6 +63,9 @@ def test_frozen_protocol_roundtrip_preserves_dates_and_cost_order() -> None:
     assert protocol["holdout_end"] == "2024-12-31"
     assert protocol["coverage_end"] == "2025-02-28"
     assert protocol["cost_bps"] == (10, 5, 25)
+    assert protocol["version"] == 2
+    assert protocol["entry_rule"] == "confirmed-terminal-entry-cash"
+    assert protocol["cost_rule"] == "actual-traded-notional"
     assert protocol["share_codes"] == (10, 11)
     assert protocol["membership_columns"] == ("permno", "namedt", "nameendt", "shrcd", "exchcd")
     assert protocol["returns_columns"] == (
@@ -127,6 +130,8 @@ def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> No
         ("calendar_group", "CRSP"),
         ("execution_flag", "BA"),
         ("terminal_rule", "zero-on-delist"),
+        ("entry_rule", "drop-unfilled"),
+        ("cost_rule", "pre-fee-target-notional"),
         ("exchange_codes", [1, 2, 3, 4]),
         ("cost_bps", [5, 10, 25]),
         ("share_codes", [11, 10]),
@@ -137,7 +142,7 @@ def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> No
         ("selection_fraction", 0.0),
         ("selection_fraction", nan),
         ("selection_fraction", 1.1),
-        ("version", 2),
+        ("version", 1),
         ("liquidity_window", 253),
     ],
 )

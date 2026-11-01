@@ -7,7 +7,7 @@ from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
-from platform_core.json_utils import JSONObject
+from platform_core.json_utils import JSONObject, require_str
 
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 
@@ -128,6 +128,23 @@ def study_sources(directory: Path) -> CrspSources:
     return load_crsp_sources(path)
 
 
+def pre_entry_rows() -> dict[str, list[JSONObject]]:
+    """Move the delisting to a decision date, retaining its next-day terminal copy."""
+    rows = study_rows()
+    rows["returns"] = [
+        row
+        for row in rows["returns"]
+        if row["permno"] != DELISTED or require_str(row, "dlycaldt") <= "2019-03-01"
+    ]
+    for row in rows["returns"]:
+        if row["permno"] == DELISTED and row["dlycaldt"] == "2019-03-01":
+            row.update({"dlydelflg": "Y", "dlyretdurflg": "DD", "dlyprcflg": "DP"})
+    rows["delists"][0].update(
+        {"delistingdt": "2019-02-28", "deldlydt": "2019-03-01", "delamtdt": "2019-03-01"}
+    )
+    return rows
+
+
 def final_manifest(directory: Path) -> Path:
     """Stage the evaluator's extract through the final period's last exit."""
     path, _ = write_sources(directory, study_rows(FINAL_END), study_protocol())
@@ -140,6 +157,7 @@ __all__ = [
     "VALIDATION_END",
     "final_manifest",
     "study_protocol",
+    "pre_entry_rows",
     "study_rows",
     "study_sources",
 ]

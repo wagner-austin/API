@@ -60,7 +60,7 @@ def test_selected_candidate_is_released_once_and_scored_on_the_final_period(
     assert record["label"] == "final-1"
     result = narrow_json_to_dict(load_json_str(output.read_text()))
     assert (result["kind"], result["partition"], result["attempt"]) == (
-        "research-monthly-final-v1",
+        "research-monthly-final-v2",
         "final",
         1,
     )
