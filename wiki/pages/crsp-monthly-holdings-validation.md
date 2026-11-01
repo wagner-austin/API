@@ -16,7 +16,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5405a53dde0ea6e01263202358c951ad170d055c"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "775b48d296b172368cd046dee3cb8dda34c0c8c8"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "1e2632628d99a7ba38c0ddb819510633b0c55fca"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
@@ -67,6 +67,7 @@ on exit can be sold before the subsequent terminal outcome. Tests cover these
 boundaries and the pre-entry delisting found by the licensed baseline, without
 filtering decision-time selection using later outcomes. The encrypted synthetic
 study runs the real trainers and emits the rejected order and cash weight,
+checks that a prior holding's receivable survives exactly once until its release,
 then verifies private plaintext removal.[^execution][^unfilled]
 
 [^unfilled]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry_filled` and `_rebalance_notional`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, hand-calculated mixed/all-rejected portfolios, contradictory evidence, held-loss refusals, encrypted study and old protocol rejection; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `_encode_series`.

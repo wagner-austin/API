@@ -20,7 +20,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5405a53dde0ea6e01263202358c951ad170d055c"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "775b48d296b172368cd046dee3cb8dda34c0c8c8"
   "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "46cdf20ad4459526d15e5ba16b0d231494b4f9a9"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
