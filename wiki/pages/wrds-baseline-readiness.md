@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
@@ -102,6 +103,7 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py"
   - "libs/covenant_ml/scripts/research_summary_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json": "95d1eda8dca5ca000fec5c8de18586e2267ef673"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
@@ -226,8 +228,14 @@ task `fc2dba58` has since passed independent audit `bfeda225` at
 attempt, native job `58733020`, failed after 35 minutes 31 seconds with exit
 `1:0`. Peak memory was about 36.2 GiB against the frozen 128-GiB request.
 The evaluator stopped while constructing outcome labels: `crsp_window_path`
-rejected a missing or non-ordinary held return. The traceback alone does not
-identify which row predicate failed. The shared queue reconciled the failure
+rejected a missing held return. Three bounded diagnostic jobs subsequently
+confirmed that this security delisted on the decision date: its entry-day row
+is a terminal record without the accepted trade-price flag, and no later daily
+rows exist. Panel eligibility retained it, while label construction searched
+for ordinary returns after entry. This explains the failure; an eligibility
+and entry-handling correction remains unimplemented. Any changed rules need
+a new preregistration rather than an in-place retry.[^licensed-return-diagnostic]
+The shared queue reconciled the failure
 as `b799f91b`; no completed validation RunRecord or seed summary exists.
 Attempts 2–15 remain unsubmitted. This preregistration is stopped without
 retry, replacement or candidate selection; the final holdout remains
@@ -257,6 +265,8 @@ about performance. Independent audit `8643120c` verified this rehearsal at
 grant.[^summary-rehearsal][^licensed-baseline-start]
 
 [^licensed-baseline-stopped]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json` retains the failed shared-queue receipt, native accounting observation and bounded traceback interpretation. Service-authored native report `89775442-a833-4556-a6e0-a62dacf2f486`, by `hpc-report-c6bc5d05` at 21:15:06 UTC, records `FAILED`, 2,131 seconds and exit `1:0`. The queue failure notification was recorded but did not resume this board-only Codex session; its registered inbox starts no turn, as measured by `task_whereis` at 22:09 UTC. Cleanup after this licensed failure has not yet been independently measured.
+
+[^licensed-return-diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `report`, `coverage_report` and `terminal_report`: native jobs `58737368`, `58737429` and `58737536` completed `0:0` in 74, 71 and 70 seconds using the frozen image and validation bundle. They inspected only the training-era failure, produced metadata rather than prices or returns, and asserted removal of their own decrypted directories. This is diagnostic evidence, not an independent audit or verification of the original failed job's cleanup. The preserved run-document digests bind the probes; no fitting, final-data access or additional baseline attempt occurred.
 
 [^licensed-baseline-start]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json`, frozen plan/runtime/policy identities, prerequisite audit IDs and service report references; companion `preparation-report.json` is program reading `bcc5a3b7-81cb-4a8e-9b35-3711a5e50b33` by `hpc-report-c6bc5d05` at 20:36:00 UTC, covering all 15 admissions and the exact first recipe. Companion `preflight-report.json` is service reading `9c54e66f-edb1-42b8-9983-0a00241c7012` at 20:35:36 UTC. `first-dispatch.json`, live `dispatch_get` receipt for queue `b799f91b-4c5b-4f96-9332-b781b9ae1330`, retains the controller's native-job progress at 20:39:14 UTC. These are preparation and running-state observations, not completed-study evidence. Board task `c6bc5d05-22f5-4462-a1f7-eb40de1f28f1` owns execution; final release is outside this milestone.
 
