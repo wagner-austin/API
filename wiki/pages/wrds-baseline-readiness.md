@@ -91,6 +91,8 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_writer.py"
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_preparation_report.py"
+  - "libs/covenant_ml/scripts/research_preparation.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
@@ -179,6 +181,8 @@ source_git_blobs:
   "tools/fleet/src/fleet/cli/research_propose.py": "c354898c0f5ad752fafd1f86e4650e6a02daee78"
   "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
   "tools/fleet/tests/test_research_proposal_host.py": "6c9656d052b58508be9ee7461010dba26bc457d1"
+  "libs/covenant_ml/src/covenant_ml/markets/research_preparation_report.py": "acf13dc48ad22eebd76d97807d8e42d1c3be065e"
+  "libs/covenant_ml/scripts/research_preparation.py": "ccb410066e3b258267bb0bc356b335e0b95290de"
 provenance:
   - "2026-10-30 independent audit 02c6e4a1-669d-43db-99c8-bedfc0f9754a reopened encryption task e6729a16: the submitted A2 mapping omitted the real container execution lane, and A3 read only queue status. Read-only native-report query against demure mcp-postgres at 21:29 UTC returned 1 for the service-authored report joined to queue 120da295 by RunRecord digest and ciphertext input identities; changed bundle digest and deliberately excluding a present sha256 field each returned 0. These query checks bind the recorded synthetic run and detect an age-key marker, not arbitrary secret formats or licensed-row leakage."
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
@@ -197,25 +201,33 @@ The maintained controller inspector verified 585 application files, generated
 selfcheck and dependencies. Native image build `58719937` completed in 80
 seconds with exit `0:0`; inspection verified 14 identities and both selfchecks.
 The dependency pins are preserved. The new reporter needs no extract or key;
-its numerical and real-process checks passed, but the new native queue-to-summary
-rehearsal has not run. Independent runtime audit `9534d13c` verified task
-`b1934ce6` at `2026-11-01T14:52:04.858Z`. Reporting task `fc2dba58` remains
-pending its strict-check review. The substantive baseline and controlled final
+its numerical and real-process checks passed. Independent runtime audit
+`9534d13c` verified task `b1934ce6` at `2026-11-01T14:52:04.858Z`. Reporting
+task `fc2dba58` has since passed independent audit `bfeda225` at
+`2026-11-01T17:08:32.158Z`.[^summary-reporting-audit] The substantive baseline and controlled final
 evaluation have not run.[^summary-runtime][^summary-runtime-audit]
 
-The next synthetic rehearsal has five admitted seeds (`11`, `23`, `37`, `53`,
+The synthetic rehearsal now in progress has five admitted seeds (`11`, `23`, `37`, `53`,
 `71`) for one required candidate in a fresh journal. Its frozen policy requests
 four CPUs, 16 GiB and a 600-second evaluator deadline; the existing recipe
 generator produces 11 native scheduler minutes on `free`, with no GPU or
-requeue. The queue documents are prepared privately, but they have not been
-registered or dispatched. Reporting review and the complete synthetic
-queue-to-summary rehearsal remain gates before licensed evaluation. The
-licensed study's separately frozen 128-GiB and 7,200-second requests are
-unchanged.[^summary-preparation][^resource-live]
+requeue. The evaluator's own reading of policy `b61af26e`, its journal and the
+attempt-1 recipe posted these values at `2026-11-01T17:27:11Z`.[^summary-preparation-reading]
+The five frozen requests were registered and dispatched through the shared
+queue at `2026-11-01T17:11Z`. At that reading attempt 1 had completed as native
+job `58721392`, attempts 2 and 3 were running and attempts 4 and 5 were still
+admitted. No seed summary has been produced from this journal, so the complete
+synthetic queue-to-summary rehearsal remains the gate before licensed
+evaluation. The licensed study's separately frozen 128-GiB and 7,200-second
+requests are unchanged.[^summary-preparation][^resource-live]
 
 [^summary-runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, exact source, controller and image identities, service report IDs and construction scope; its `runtime-audit.sql` and `audit-probes.json` retain the positive service-report join and six altered-evidence refusals. Full source check `e67de880` passed 5,078 tests, 100% statement and branch coverage, strict typing and guards in 248 seconds. The final typing correction passed independent audit `df6e94b8` at `2026-11-01T14:30:42.133Z`. See [[wrds-evaluation-reuse]] for the summary command and provenance.
 
 [^summary-runtime-audit]: Live board audit `9534d13c-2c95-4784-b171-df43d2b7dff9`, `VERDICT: VERIFIED`, closed by `audit-verifier` at `2026-11-01T14:52:04.858Z`; both criteria read the exact program-authored controller, staging and native-image reports through the retained `runtime-audit.sql`. Strict-check audit `f296cc7c-8fcc-4d2f-bb0d-fad3d79d4eec` remained `HELD UNREVIEWED` at `14:52:28.043Z`, requiring independent check-adequacy review.
+
+[^summary-reporting-audit]: Live board audit `bfeda225-e45d-4517-b571-83ee11f79358`, `VERDICT: VERIFIED`, moved reporting task `fc2dba58-52d8-42d9-9c4f-8169ae933206` from audit to done; `audit-verifier` wrote it at `2026-11-01T17:08:32.158Z`.
+
+[^summary-preparation-reading]: Program reading `d5ceb286-c615-42ff-a2b7-2a72719b56bd` on board task `e1621f6f-7c31-4ec1-bae1-8657053e707f`, posted by the service identity `hpc-report-e1621f6f` at `2026-11-01T17:27:11.890Z` as `RESEARCH PREPARATION LOAD-REPORT`. `libs/covenant_ml/scripts/research_preparation.py` ran `research_preparation_report.report_preparation` (reporter SHA-256 `a4ea071c9cda4bb1e7c83b7b7d7450c64f91ecc273ca7079a6b546a155ac1bcc`) over `policy.json`, `attempts.sqlite` (SHA-256 `1df3b252d6549e97df3424bdf124f06e40874c12f124d3c50f3fd60220bcb550` at that instant) and `recipe-preflight/run.json` (SHA-256 `ce681d61ce12458e471fa13d08f1ae5cf9f272d05a7acd5023dd183b90554d80`); it refuses a recipe naming another policy, an attempt the journal never admitted or an allocation the policy does not freeze. Dispatch: note `ce50913c-1d5a-4ddc-bfcf-33e725a0895b` on task `673a4bc4` at `2026-11-01T17:12:11Z`; attempt 1's native submission is `HPC3 ATTEMPT LOAD-REPORT` `0c75b01d-5818-4796-bab7-07da1f749fce` by `hpc-report-673a4bc4` at `2026-11-01T17:16:02Z`. The journal states are that instant's; the rehearsal was still running.
 
 [^summary-preparation]: Board task `673a4bc4-8693-4764-8a8d-cca0483e279f`, preparation note `318aa5e3-1ea7-4814-8987-67dfacedd3cf` and prerequisite update `173f4d67-2319-4a90-b7ec-03d4a2b2c761`. Session-captured local controller results under `/home/corvis/research-data/wrds/experiments/summary-b3843a3d3`: initialization and five admissions each returned zero; policy SHA-256 `b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0`; `recipe-preflight/run.json` was generated by the existing `research_cluster.prepare_bundle`. These are preparation observations, not native execution evidence. Live diphtheria queue placement still names `wrds-queue-b53b0ea34` and the existing shared private request root.
 
