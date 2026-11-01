@@ -165,7 +165,7 @@ class TestInstalledHooks:
         written = list((tmp_path / "artifacts").glob("run-x-*.tar.gz"))
         assert len(written) == 1
         assert not (tmp_path / "settings-store").exists()
-        assert result["sha256"] == hashlib.sha256(written[0].read_bytes()).hexdigest()
+        assert result["file_id"] == hashlib.sha256(written[0].read_bytes()).hexdigest()
 
     def test_a_published_event_reaches_the_log_not_a_file(self, tmp_path: pathlib.Path) -> None:
         """Nothing may be written per-event to the shared filesystem: /pub is

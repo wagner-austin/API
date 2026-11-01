@@ -1,8 +1,8 @@
 """Tests for the three services a cluster run supplies for itself.
 
-The refusals carry the weight here. On a compute node there is nothing to fall
-back to: no data bank to fetch a missing corpus from, no upload service to
-re-request an artifact from. Every one of these failures has to be a refusal
+The refusals carry the weight here. There is nothing to fall back to: no
+service to fetch a missing corpus from, no upload service to re-request an
+artifact from. Every one of these failures has to be a refusal
 with a message naming the fix, because the alternative is a job that burns
 hours and then cannot say what was wrong.
 """
@@ -98,16 +98,31 @@ class TestLocalArtifacts:
         result = store.upload_artifact(
             self._run_dir(tmp_path), artifact_name="run-abc", request_id="r1"
         )
-        expected = tmp_path / "artifacts" / f"run-abc-{result['sha256'][:12]}.tar.gz"
+        expected = tmp_path / "artifacts" / f"run-abc-{result['file_id'][:12]}.tar.gz"
         assert expected.is_file()
 
-    def test_no_partial_file_is_left_behind(self, tmp_path: pathlib.Path) -> None:
-        """The tarball is written under a .partial name and renamed once its
+    def test_nothing_but_the_tarball_is_left_behind(self, tmp_path: pathlib.Path) -> None:
+        """The tarball is written in a staging directory and renamed once its
         digest is known, so a reader never sees a name it can trust holding
-        bytes still being written."""
+        bytes still being written, and the staging directory goes with it."""
         store = LocalArtifacts(tmp_path / "artifacts")
-        store.upload_artifact(self._run_dir(tmp_path), artifact_name="run-abc", request_id="r1")
-        assert list((tmp_path / "artifacts").glob("*.partial")) == []
+        result = store.upload_artifact(
+            self._run_dir(tmp_path), artifact_name="run-abc", request_id="r1"
+        )
+        assert sorted(p.name for p in (tmp_path / "artifacts").iterdir()) == [
+            f"run-abc-{result['file_id'][:12]}.tar.gz"
+        ]
+
+    def test_a_failed_pack_propagates_and_leaves_the_store_empty(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A directory that is not there fails the save, and the staging
+        directory the attempt made is gone with it rather than accumulating
+        one leftover per failed save."""
+        store = LocalArtifacts(tmp_path / "artifacts")
+        with pytest.raises(FileNotFoundError):
+            store.upload_artifact(tmp_path / "never-written", artifact_name="x", request_id="r1")
+        assert sorted(p.name for p in (tmp_path / "artifacts").iterdir()) == []
 
     def test_two_uploads_of_one_name_do_not_share_a_staging_file(
         self, tmp_path: pathlib.Path
@@ -115,7 +130,7 @@ class TestLocalArtifacts:
         """The staging name must not be derived from artifact_name.
 
         Deriving it makes uniqueness the CALLER's property: two runs handed
-        the same name write the same .partial and one tars into the other's
+        the same name write the same staging file and one tars into the other's
         file. The preflight round-trip was exactly such a caller -- it passed
         a constant -- and the collision killed an arm of the Kazakh A/B.
 
@@ -136,8 +151,9 @@ class TestLocalArtifacts:
         b = store.upload_artifact(second, artifact_name="same-name", request_id="r2")
 
         assert a["file_id"] != b["file_id"]
-        assert list(artifacts.glob("*.partial")) == []
-        assert len(list(artifacts.glob("same-name-*.tar.gz"))) == 2
+        assert sorted(p.name for p in artifacts.iterdir()) == sorted(
+            [f"same-name-{a['file_id'][:12]}.tar.gz", f"same-name-{b['file_id'][:12]}.tar.gz"]
+        )
 
     def test_the_reported_digest_is_of_the_bytes_on_disk(self, tmp_path: pathlib.Path) -> None:
         """Computed from the written file rather than reported from memory,
@@ -147,9 +163,8 @@ class TestLocalArtifacts:
         result = store.upload_artifact(
             self._run_dir(tmp_path), artifact_name="run-abc", request_id="r1"
         )
-        written = (tmp_path / "artifacts" / f"run-abc-{result['sha256'][:12]}.tar.gz").read_bytes()
-        assert result["sha256"] == hashlib.sha256(written).hexdigest()
-        assert result["file_id"] == result["sha256"]
+        written = (tmp_path / "artifacts" / f"run-abc-{result['file_id'][:12]}.tar.gz").read_bytes()
+        assert result["file_id"] == hashlib.sha256(written).hexdigest()
         assert result["size"] == len(written)
 
     def test_it_creates_its_output_directory(self, tmp_path: pathlib.Path) -> None:

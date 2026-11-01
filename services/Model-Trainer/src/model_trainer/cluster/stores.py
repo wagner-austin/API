@@ -17,7 +17,6 @@ is nothing to download from.
 from __future__ import annotations
 
 import hashlib
-import os
 import tarfile
 import tempfile
 from pathlib import Path
@@ -118,53 +117,51 @@ class LocalArtifacts:
 
         Returns:
             The stored record, whose ``file_id`` is the tarball's digest.
+
+        Raises:
+            FileNotFoundError: When ``dir_path`` does not exist or a file
+                under it vanishes while it is packed. The staging directory
+                is removed either way, so a failed save leaves nothing in the
+                store.
         """
         self.root.mkdir(parents=True, exist_ok=True)
-        # mkstemp, not a name built from artifact_name. The staging file is
-        # transient and nobody reads it by name, so its only requirement is to
-        # be unique -- and deriving it from the caller's name makes uniqueness
-        # the CALLER's property. Two runs handed the same artifact_name would
-        # write the same .partial and one would tar into the other's file.
+        # A fresh staging directory per upload, not a name built from
+        # artifact_name. The staging file is transient and nobody reads it by
+        # name, so its only requirement is to be unique -- and deriving it from
+        # the caller's name makes uniqueness the CALLER's property. Two runs
+        # handed the same artifact_name would write the same staging file and
+        # one would tar into the other's.
         #
         # That is not hypothetical here: the preflight round-trip called this
         # with a constant name, and the sibling collision it created killed an
         # arm of the Kazakh A/B 19 seconds in. Fixing the caller fixed that
         # instance; taking the name out of the caller's hands fixes the class.
-        handle, staged_path = tempfile.mkstemp(
-            dir=self.root, prefix=".upload-", suffix=f"{_TARBALL_SUFFIX}.partial"
-        )
-        os.close(handle)
-        staging = Path(staged_path)
-        # A pack that fails (the directory is gone, a file vanishes mid-walk)
-        # must not leave its staging file behind: nothing would ever read or
-        # remove it, and every failed save would add one to the store.
-        try:
+        #
+        # The directory's own context removes it however the block ends, so a
+        # pack that fails (the directory is gone, a file vanishes mid-walk)
+        # leaves no staging file behind and the failure still propagates.
+        # Staging inside the root keeps the final rename on one filesystem,
+        # and _by_digest reads only the root's own tarballs, never a staging
+        # directory's.
+        with tempfile.TemporaryDirectory(dir=self.root, prefix=".upload-") as staging_dir:
+            staging = Path(staging_dir) / f"staged{_TARBALL_SUFFIX}"
             with tarfile.open(staging, "w:gz") as tar:
                 tar.add(dir_path, arcname=dir_path.name)
-        except BaseException:
-            staging.unlink()
-            raise
 
-        digest = hashlib.sha256(staging.read_bytes()).hexdigest()
-        # Named for the artifact AND its digest. The name alone collides:
-        # every run of one project picks the same one, so a second run would
-        # overwrite the first and the first's recorded file_id would name
-        # bytes no longer on disk. The digest alone is unreadable to whoever
-        # has to find a run's output in a directory listing.
-        target = self.root / f"{artifact_name}-{digest[:12]}{_TARBALL_SUFFIX}"
-        staging.replace(target)
+            digest = hashlib.sha256(staging.read_bytes()).hexdigest()
+            # Named for the artifact AND its digest. The name alone collides:
+            # every run of one project picks the same one, so a second run
+            # would overwrite the first and the first's recorded file_id would
+            # name bytes no longer on disk. The digest alone is unreadable to
+            # whoever has to find a run's output in a directory listing.
+            target = self.root / f"{artifact_name}-{digest[:12]}{_TARBALL_SUFFIX}"
+            staging.replace(target)
         size = target.stat().st_size
         _log.info(
             "artifact written",
             extra={"path": str(target), "sha256": digest, "request_id": request_id},
         )
-        return StoredArtifact(
-            file_id=digest,
-            size=size,
-            sha256=digest,
-            content_type="application/gzip",
-            created_at=None,
-        )
+        return StoredArtifact(file_id=digest, size=size)
 
     def download_artifact(
         self,

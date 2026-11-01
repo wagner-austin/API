@@ -292,9 +292,6 @@ class _FakeStore:
         return StoredArtifact(
             file_id="finetuned-file-id",
             size=1,
-            sha256="x",
-            content_type="application/gzip",
-            created_at=None,
         )
 
     def download_artifact(
@@ -541,9 +538,6 @@ class _RecordingStore:
         return StoredArtifact(
             file_id="finetuned-file-id",
             size=1,
-            sha256="x",
-            content_type="application/gzip",
-            created_at=None,
         )
 
     def download_artifact(

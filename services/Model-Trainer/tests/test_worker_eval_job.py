@@ -198,9 +198,6 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
             return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
-                sha256="x",
-                content_type="application/gzip",
-                created_at=None,
             )
 
         def download_artifact(
@@ -281,9 +278,6 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
             return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
-                sha256="x",
-                content_type="application/gzip",
-                created_at=None,
             )
 
         def download_artifact(
@@ -384,9 +378,6 @@ def test_eval_job_reuses_artifacts_another_job_already_fetched(
             return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
-                sha256="x",
-                content_type="application/gzip",
-                created_at=None,
             )
 
         def download_artifact(
