@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-runtime-20261031/audit-probes.json"
@@ -85,6 +86,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json": "f9591661ebbbf616d0d3ccc93fb48cb94b1dc11d"
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/audit-probes.json": "3c9042d974d318d0558fb76f0ee76810c3ef038f"
@@ -186,6 +188,14 @@ corrected-controller references to the same admissions; their candidate budgets
 and journal were preserved. The complete selection rehearsal and substantive
 baseline remain unfinished. See [[wrds-research-queue-admission]] for the
 contract, deployed measurements and remaining review.[^handover-progress]
+
+At 10:36:38 UTC the first fresh normal request also closed automatically:
+admission 5, native job `58719001`, exit `0:0`, with matching native and queue
+result digests and no handover. This verifies normal submission and completion
+after recovery; it does not complete the ten-trial selection study. Independent
+review of the operational milestone remains ahead.[^normal-completion]
+
+[^normal-completion]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, queue receipt `eecf34ae-f66a-4b6a-a3ab-3f0f108d87c0` and service-authored native report `1caa931e-6106-452f-9506-09cdc5085442`. `normal-audit.sql` joins the queue and native result identities; `audit-probes.json` records the matching query and altered-evidence refusals.
 
 [^handover-progress]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json`, runtime, service evidence, original handover plans, preservation measurements and replacement requests. Repair audit `44198e74-3ea3-450e-b481-75dab8b828b3` verified both criteria at `2026-11-01T09:59:06.953Z`; operational recovery remains task `04c0cdbe-278f-41bb-8141-a170fc0e5324`, and the complete selection rehearsal remains `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`.
 

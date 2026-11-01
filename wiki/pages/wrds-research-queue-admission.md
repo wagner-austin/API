@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/fleet/src/fleet/core/research_handover.py"
   - "tools/fleet/tests/test_research_handover.py"
@@ -33,6 +34,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/fleet/src/fleet/core/research_handover.py": "446e3e549dbd2b655a142f266f76bf9fe8e9c756"
   "tools/fleet/tests/test_research_handover.py": "949c9f364f842519ee3512543af90c246ad956f4"
@@ -116,6 +118,18 @@ across activation and those probes. Six unclaimed references were withdrawn
 before any native submission, then replaced with corrected references to the
 same admitted trials. This is still a synthetic operational rehearsal; no
 licensed final grant was released.[^handover-live]
+
+The first fresh normal request completed through that same scheduled path at
+10:36:38 UTC. Queue receipt `eecf34ae` identifies native job `58719001` and the
+same canonical result digest as the fresh native inspection, with a null
+handover digest. The normal-path audit query matches exactly one receipt;
+changed result, attempt and handover expectations each match zero. At the
+published evidence revision, the fleet suite passed 2,634 tests with full
+statement and branch coverage, and both updated wiki pages passed their
+code-path audits without errors or warnings. Operational independent review
+and completion of the remaining selection trials are separate steps.[^normal-live]
+
+[^normal-live]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, native report `1caa931e`, queue receipt, verification jobs and audit queries; `audit-probes.json`, normal completion and three altered normal-evidence queries. Fleet check `90c37d46` at API `52345cc13` passed 2,634 cases and skipped 44 separate host-lane cases; the previously measured execution lane passed 97 cases with zero skips.
 
 [^handover-live]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json`, service report `6322f701`, wheel identities, handover plans, preservation and refusal measurements. The evidence index distinguishes service-authored reports from session-captured probes and placement readbacks. Operational review is tracked by `04c0cdbe` separately from the verified lint repair.
 
