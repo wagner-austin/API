@@ -23,8 +23,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -59,14 +57,7 @@ class _FakeSpmRunProto(Protocol):
 class _FakeCorpusFetcher:
     """Fake corpus fetcher that returns a local path."""
 
-    def __init__(
-        self: _FakeCorpusFetcher,
-        api_url: str,
-        api_key: str,
-        cache_dir: Path,
-        *,
-        corpus_path: Path,
-    ) -> None:
+    def __init__(self: _FakeCorpusFetcher, *, corpus_path: Path) -> None:
         self._corpus_path = corpus_path
 
     def fetch(self: _FakeCorpusFetcher, fid: str) -> Path:
@@ -168,10 +159,8 @@ def test_sentencepiece_worker_trains_and_writes_artifacts_with_mocked_cli(
     corpus.mkdir()
     (corpus / "a.txt").write_text("hello world\nthis is spm\n", encoding="utf-8")
 
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
-        return _FakeCorpusFetcher(api_url, api_key, cache_dir, corpus_path=corpus)
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
+        return _FakeCorpusFetcher(corpus_path=corpus)
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
 

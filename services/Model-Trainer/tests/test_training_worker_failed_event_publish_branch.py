@@ -25,8 +25,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -76,9 +74,7 @@ def test_training_worker_failed_event_publish_branch(
     _test_hooks.service_container_from_settings = _fail_container
 
     # Stub corpus fetcher via hook
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
         return _FakeCorpusFetcher(tmp_path)
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory

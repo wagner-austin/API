@@ -6,7 +6,6 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import torch
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
@@ -32,6 +31,7 @@ from model_trainer.core.contracts.model import (
     ScoreOutcome,
     TrainOutcome,
 )
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoded
 from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
@@ -235,17 +235,14 @@ class _HfLmBackend(ModelBackend):
 class _FakeArtifactStore:
     """Fake artifact store for testing."""
 
-    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-        pass
-
     def upload_artifact(
         self,
         dir_path: Path,
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
+    ) -> StoredArtifact:
+        return StoredArtifact(
             file_id="uploaded-file-id",
             size=1,
             sha256="x",
@@ -322,7 +319,7 @@ def _create_corpus_fetcher_factory(
 ) -> CorpusFetcherFactoryProto:
     """Create a corpus fetcher factory for testing."""
 
-    def _factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+    def _factory(root: Path) -> CorpusFetcherProto:
         return _FakeCorpusFetcher(corpus_path)
 
     return _factory
@@ -331,9 +328,7 @@ def _create_corpus_fetcher_factory(
 def _create_artifact_store_factory() -> ArtifactStoreFactoryProto:
     """Create an artifact store factory for testing."""
 
-    def _factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeArtifactStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _factory(root: Path) -> ArtifactStoreProto:
+        return _FakeArtifactStore()
 
     return _factory

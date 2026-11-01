@@ -358,8 +358,6 @@ class TestTrainingJobWithGgufExport:
         settings["app"]["runs_root"] = str(tmp_path / "runs")
         settings["app"]["logs_root"] = str(tmp_path / "logs")
         settings["app"]["data_root"] = str(tmp_path / "data")
-        settings["app"]["data_bank_api_url"] = "http://data-bank.local"
-        settings["app"]["data_bank_api_key"] = "secret"
         _test_hooks.load_settings = lambda: settings
 
         # Corpus

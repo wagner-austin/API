@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import torch
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_ml.wandb_publisher import WandbPublisher
@@ -28,6 +27,7 @@ from model_trainer.core.contracts.model import (
     ScoreOutcome,
     TrainOutcome,
 )
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import ListEncoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -49,8 +49,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -469,10 +467,7 @@ class _FakeArtifactStore:
 
     def __init__(
         self: _FakeArtifactStore,
-        base_url: str,
-        api_key: str,
         *,
-        timeout_seconds: float = 600.0,
         include_manifest: bool = True,
         manifest_content: str | None = None,
     ) -> None:
@@ -485,8 +480,8 @@ class _FakeArtifactStore:
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
+    ) -> StoredArtifact:
+        return StoredArtifact(
             file_id="fake-upload-id",
             size=1,
             sha256="x",

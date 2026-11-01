@@ -17,7 +17,6 @@ from platform_workers.redis import (
 
 from model_trainer.core._hook_defaults import (
     _default_artifact_store,
-    _default_corpus_cache_cleanup_service_factory,
     _default_corpus_fetcher_factory,
     _default_count_model_parameters,
     _default_datetime_utcnow_iso,
@@ -28,7 +27,6 @@ from model_trainer.core._hook_defaults import (
     _default_freeze_embeddings,
     _default_get_directory_size_bytes,
     _default_host_probe,
-    _default_httpx_client_factory,
     _default_installed_version,
     _default_load_gpt2_model,
     _default_load_prepared_gpt2_from_handle,
@@ -86,7 +84,6 @@ from model_trainer.core._hook_protocols import (
     GpuMaxMemoryAllocatedProto,
     GpuResetPeakMemoryStatsProto,
     HostProbeProto,
-    HttpxClientFactoryProto,
     InstalledVersionProto,
     KVStoreFactoryProto,
     LoadSettingsProto,
@@ -114,7 +111,6 @@ from model_trainer.core._hook_protocols import (
 )
 from model_trainer.core._hook_protocols_ml import (
     ApplyDeterminismProto,
-    CorpusCacheCleanupServiceFactoryProto,
     CorpusFetcherFactoryProto,
     CudaDeviceNameProto,
     CudaDriverVersionProto,
@@ -265,8 +261,6 @@ corpus_fetcher_factory: CorpusFetcherFactoryProto = _default_corpus_fetcher_fact
 
 load_tokenizer_for_training: LoadTokenizerProto = _default_load_tokenizer_for_training
 
-httpx_client_factory: HttpxClientFactoryProto = _default_httpx_client_factory
-
 apply_determinism_hook: ApplyDeterminismProto = _default_apply_determinism
 
 pin_torch_threads: PinTorchThreadsProto = _default_pin_torch_threads
@@ -336,10 +330,6 @@ path_unlink: PathUnlinkProto = _default_path_unlink
 time_sleep: TimeSleepProto = _default_time_sleep
 
 path_iterdir: PathIterdirProto = _default_path_iterdir
-
-corpus_cache_cleanup_service_factory: CorpusCacheCleanupServiceFactoryProto = (
-    _default_corpus_cache_cleanup_service_factory
-)
 
 tokenizer_cleanup_service_factory: TokenizerCleanupServiceFactoryProto = (
     _default_tokenizer_cleanup_service_factory

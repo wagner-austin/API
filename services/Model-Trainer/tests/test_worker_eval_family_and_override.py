@@ -4,7 +4,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Literal, Protocol
 
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
@@ -29,6 +28,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
 )
 from model_trainer.core.contracts.queue import EvalJobPayload
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
@@ -46,10 +46,6 @@ class _FakeStoreForEval:
     def __init__(
         self,
         manifest: dict[str, str | int | float | bool | dict[str, str | int | float | None] | None],
-        base_url: str,
-        api_key: str,
-        *,
-        timeout_seconds: float = 600.0,
     ) -> None:
         self._manifest = manifest
 
@@ -59,7 +55,7 @@ class _FakeStoreForEval:
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
+    ) -> StoredArtifact:
         raise NotImplementedError
 
     def download_artifact(
@@ -157,8 +153,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -247,8 +241,6 @@ def test_eval_job_uses_manifest_family_and_path_override(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     def _load_settings() -> Settings:
@@ -261,10 +253,8 @@ def test_eval_job_uses_manifest_family_and_path_override(
     manifest = _create_eval_manifest(run_id)
 
     # Create fake artifact store using extracted class
-    def _fake_artifact_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStoreForEval(manifest, base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_artifact_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStoreForEval(manifest)
 
     _test_hooks.artifact_store_factory = _fake_artifact_store_factory
 

@@ -108,7 +108,7 @@ class ClozeJobPayload(TypedDict):
     Attributes:
         run_id: Training run whose model is scored.
         request_id: Identifier the caller polls for the result.
-        items_file_id: Data-bank file holding the newline-delimited item set.
+        items_file_id: Staged corpus file holding the newline-delimited item set.
         max_seq_len: Token budget each rendered candidate is truncated to.
     """
 
@@ -128,7 +128,7 @@ class BaselineClozeJobPayload(TypedDict):
 
     Attributes:
         hub_model_id: HuggingFace model id scored with no training applied.
-        items_file_id: Data-bank file holding the newline-delimited item set.
+        items_file_id: Staged corpus file holding the newline-delimited item set.
         max_seq_len: Token budget each rendered candidate is truncated to.
         device: Torch device string the scoring tensors are placed on.
     """

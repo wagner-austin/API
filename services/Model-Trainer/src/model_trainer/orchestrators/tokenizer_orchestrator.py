@@ -47,7 +47,7 @@ class TokenizerOrchestrator:
                 "sentencepiece backend unavailable",
                 model_trainer_status_for(ModelTrainerErrorCode.UNSUPPORTED_BACKEND),
             )
-        # Pass corpus_file_id through; worker will resolve via Data Bank
+        # Pass corpus_file_id through; the worker resolves it under the corpus root
         fid = req["corpus_file_id"].strip()
         if fid == "":  # should not occur due to schema min_length
             raise AppError(

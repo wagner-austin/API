@@ -37,16 +37,13 @@ def test_tokenizer_worker_sentencepiece_missing_cli(tmp_path: Path) -> None:
 
     # Create fake corpus fetcher
     class _FakeCorpusFetcher:
-        def __init__(self, api_url: str, api_key: str, cache_dir: Path) -> None:
-            self._tmp = tmp_path
-
         def fetch(self, fid: str) -> Path:
-            p = self._tmp / "corpus.txt"
+            p = tmp_path / "corpus.txt"
             p.write_text("x\n", encoding="utf-8")
             return p
 
-    def _fake_fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        return _FakeCorpusFetcher(api_url, api_key, cache_dir)
+    def _fake_fetcher_factory(root: Path) -> CorpusFetcherProto:
+        return _FakeCorpusFetcher()
 
     _test_hooks.corpus_fetcher_factory = _fake_fetcher_factory
 

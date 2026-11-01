@@ -148,7 +148,8 @@ class TestInstalledHooks:
         (staged / "abc123").write_bytes(b"corpus bytes")
         cluster_entry.install_cluster_hooks(corpus_dir=staged, artifacts_dir=tmp_path / "a")
 
-        fetcher = _test_hooks.corpus_fetcher_factory("http://unused", "key", tmp_path / "cache")
+        # The settings-derived root is ignored: the flag-named directory wins.
+        fetcher = _test_hooks.corpus_fetcher_factory(tmp_path / "settings-corpus")
         assert fetcher.fetch("abc123").read_bytes() == b"corpus bytes"
 
     def test_the_artifact_store_writes_to_the_given_directory(self, tmp_path: pathlib.Path) -> None:
@@ -159,10 +160,11 @@ class TestInstalledHooks:
             corpus_dir=tmp_path / "c", artifacts_dir=tmp_path / "artifacts"
         )
 
-        store = _test_hooks.artifact_store_factory("http://unused", "key")
+        store = _test_hooks.artifact_store_factory(tmp_path / "settings-store")
         result = store.upload_artifact(run, artifact_name="run-x", request_id="r1")
         written = list((tmp_path / "artifacts").glob("run-x-*.tar.gz"))
         assert len(written) == 1
+        assert not (tmp_path / "settings-store").exists()
         assert result["sha256"] == hashlib.sha256(written[0].read_bytes()).hexdigest()
 
     def test_a_published_event_reaches_the_log_not_a_file(self, tmp_path: pathlib.Path) -> None:

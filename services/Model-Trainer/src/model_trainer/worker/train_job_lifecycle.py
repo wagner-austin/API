@@ -16,6 +16,7 @@ from platform_workers.redis import RedisStrProto
 from model_trainer.core import _test_hooks
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import GgufExportConfig, TrainOutcome
+from model_trainer.core.services.data.store_roots import artifact_store_root
 from model_trainer.core.services.export.gguf_export import GgufExportResult, export_lora_to_gguf
 from model_trainer.worker.job_utils import (
     emit_completed_metrics,
@@ -98,13 +99,7 @@ def _upload_and_persist_pointer(
         },
     )
 
-    # No credential check here. Whether these are required is a property of
-    # the store the factory returns, not of this call site: the HTTP-backed
-    # store validates them itself, and a filesystem-backed one needs neither.
-    # Checking here refused an implementation that would have worked.
-    store = _test_hooks.artifact_store_factory(
-        settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
-    )
+    store = _test_hooks.artifact_store_factory(artifact_store_root(settings))
     base = _Path(out_dir)
     fid_resp = store.upload_artifact(base, artifact_name=f"model-{run_id}", request_id=run_id)
     r.set(artifact_file_id_key(run_id), fid_resp["file_id"])

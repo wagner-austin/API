@@ -39,8 +39,6 @@ def test_training_worker_loads_pretrained_model(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     # Settings via hook

@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.json_utils import dump_json_str
 from platform_core.trainer_keys import EVAL_KEY_PREFIX, artifact_file_id_key
@@ -31,6 +30,7 @@ from model_trainer.core.contracts.model import (
     TrainOutcome,
 )
 from model_trainer.core.contracts.queue import EvalJobPayload
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
 from model_trainer.core.services.model.unavailable_backend import UNAVAILABLE_CAPABILITIES
@@ -46,8 +46,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -162,19 +160,14 @@ class _Container:
 
 
 class _FakeStore:
-    def __init__(
-        self: _FakeStore, base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> None:
-        pass
-
     def upload_artifact(
         self: _FakeStore,
         dir_path: Path,
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
+    ) -> StoredArtifact:
+        return StoredArtifact(
             file_id="fake-upload-id",
             size=1,
             sha256="x",
@@ -260,8 +253,6 @@ def test_worker_eval_backend_raises(tmp_path: Path, settings_factory: _SettingsF
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     def _load_settings() -> Settings:
@@ -273,10 +264,8 @@ def test_worker_eval_backend_raises(tmp_path: Path, settings_factory: _SettingsF
     fake.set(artifact_file_id_key("run-err"), "fid-test")
 
     # Mock ArtifactStore via hook
-    def _fake_artifact_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_artifact_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     _test_hooks.artifact_store_factory = _fake_artifact_store_factory
 

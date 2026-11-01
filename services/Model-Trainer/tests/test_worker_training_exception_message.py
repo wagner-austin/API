@@ -29,14 +29,11 @@ def test_training_worker_sets_status_message_on_exception(tmp_path: Path) -> Non
     (tmp_path / "corpus").mkdir()
 
     class _FakeCorpusFetcher:
-        def __init__(self, api_url: str, api_key: str, cache_dir: Path) -> None:
-            self._tmp = tmp_path
-
         def fetch(self, fid: str) -> Path:
-            return self._tmp / "corpus"
+            return tmp_path / "corpus"
 
-    def _fake_fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        return _FakeCorpusFetcher(api_url, api_key, cache_dir)
+    def _fake_fetcher_factory(root: Path) -> CorpusFetcherProto:
+        return _FakeCorpusFetcher()
 
     _test_hooks.corpus_fetcher_factory = _fake_fetcher_factory
 
@@ -104,14 +101,11 @@ def test_training_worker_sets_status_failed_when_corpus_fetch_raises(tmp_path: P
     _test_hooks.kv_store_factory = _fake_kv
 
     class _RaisingCorpusFetcher:
-        def __init__(self, api_url: str, api_key: str, cache_dir: Path) -> None:
-            self._cache_dir = cache_dir
-
         def fetch(self, fid: str) -> Path:
-            raise RuntimeError(f"corpus {fid} not found in data bank")
+            raise RuntimeError(f"corpus {fid} not staged")
 
-    def _raising_fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        return _RaisingCorpusFetcher(api_url, api_key, cache_dir)
+    def _raising_fetcher_factory(root: Path) -> CorpusFetcherProto:
+        return _RaisingCorpusFetcher()
 
     _test_hooks.corpus_fetcher_factory = _raising_fetcher_factory
 
@@ -152,10 +146,10 @@ def test_training_worker_sets_status_failed_when_corpus_fetch_raises(tmp_path: P
         },
     }
 
-    with pytest.raises(RuntimeError, match="corpus deadbeef not found in data bank"):
+    with pytest.raises(RuntimeError, match="corpus deadbeef not staged"):
         train_job.process_train_job(encode_train_job_payload(payload))
 
     status_data = fake.hgetall(job_key("trainer", "run-corpus-fetch-fails"))
     assert status_data["status"] == "failed"
-    assert "corpus deadbeef not found in data bank" in status_data.get("error", "")
+    assert "corpus deadbeef not staged" in status_data.get("error", "")
     fake.assert_only_called({"set", "hset", "hgetall", "publish", "expire"})

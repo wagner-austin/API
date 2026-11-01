@@ -1,37 +1,18 @@
-"""The HTTP client factory and the tree remover, run for real through failures.
+"""The tree remover, run for real through failures.
 
-Every service test that needs a client or a removal installs a fake, so none
-shows the production client failing to reach a host or the production remover
-refusing a tree that is already gone. These call the implementations
-themselves (``effect-seam-twin``, board task cc7222ca).
+Every service test that needs a removal installs a fake, so none shows the
+production remover refusing a tree that is already gone. These call the
+implementation itself (``effect-seam-twin``, board task cc7222ca). The HTTP
+client factory beside it left with data-bank-api on 2026-11-01.
 """
 
 from __future__ import annotations
 
-import socket
 from pathlib import Path
 
-import httpx
 import pytest
 
-from model_trainer.core._hook_defaults import (
-    _default_httpx_client_factory,
-    _default_shutil_rmtree,
-)
-
-
-def test_a_client_from_the_factory_raises_when_nothing_answers() -> None:
-    """The corpus fetch must fail loudly on a dead host, not return nothing.
-
-    The port is one a listener held and released, so nothing is bound to it.
-    """
-    released = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    released.bind(("127.0.0.1", 0))
-    bound: tuple[str, int] = released.getsockname()
-    released.close()
-    client = _default_httpx_client_factory(timeout_seconds=10.0)
-    with client, pytest.raises(httpx.ConnectError):
-        client.get(f"http://127.0.0.1:{bound[1]}/corpus.txt")
+from model_trainer.core._hook_defaults import _default_shutil_rmtree
 
 
 def test_the_remover_clears_a_populated_tree(tmp_path: Path) -> None:

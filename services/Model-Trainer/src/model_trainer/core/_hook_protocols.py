@@ -10,9 +10,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Protocol
 
-import httpx
 import torch
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.environment_record import HostProbe
 from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_workers.redis import (
@@ -22,6 +20,7 @@ from platform_workers.redis import (
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.services.registries import ModelRegistry
 from model_trainer.core.types import LMModelProto, TorchStateValue
 
@@ -107,18 +106,6 @@ class ShutilWhichProto(Protocol):
         ...
 
 
-class HttpxClientFactoryProto(Protocol):
-    """Protocol for httpx.Client factory.
-
-    Tests inject fake transports by returning httpx.Client(transport=MockTransport(...)).
-    Production returns httpx.Client(timeout=timeout_seconds).
-    """
-
-    def __call__(self, *, timeout_seconds: float = 30.0) -> httpx.Client:
-        """Create httpx.Client instance."""
-        ...
-
-
 class KVStoreFactoryProto(Protocol):
     """Protocol for redis_for_kv factory."""
 
@@ -160,7 +147,7 @@ class LoadSettingsProto(Protocol):
 
 
 class ArtifactStoreProto(Protocol):
-    """Protocol for ArtifactStore."""
+    """Protocol for the artifact store, a directory of digest-named tarballs."""
 
     def upload_artifact(
         self,
@@ -168,8 +155,8 @@ class ArtifactStoreProto(Protocol):
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        """Upload a directory as a tarball artifact."""
+    ) -> StoredArtifact:
+        """Store a directory as a tarball artifact."""
         ...
 
     def download_artifact(
@@ -180,21 +167,15 @@ class ArtifactStoreProto(Protocol):
         request_id: str,
         expected_root: str,
     ) -> Path:
-        """Download and extract a tarball artifact."""
+        """Extract a stored tarball artifact."""
         ...
 
 
 class ArtifactStoreFactoryProto(Protocol):
-    """Protocol for ArtifactStore factory."""
+    """Protocol for the artifact store factory."""
 
-    def __call__(
-        self,
-        base_url: str,
-        api_key: str,
-        *,
-        timeout_seconds: float = 600.0,
-    ) -> ArtifactStoreProto:
-        """Create ArtifactStore instance."""
+    def __call__(self, root: Path) -> ArtifactStoreProto:
+        """Create the store over a directory of tarballs."""
         ...
 
 

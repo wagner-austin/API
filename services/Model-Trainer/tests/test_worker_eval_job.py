@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError
 from platform_core.json_utils import JSONValue, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, eval_key
@@ -18,6 +17,7 @@ from model_trainer.core._hook_protocols import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import EvalJobPayload
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.infra.paths import model_dir as _model_dir
@@ -38,8 +38,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -90,8 +88,6 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     _test_hooks.load_settings = lambda: settings_for_train
@@ -187,22 +183,19 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
 
     shutil.rmtree(run_dir)
 
-    # Configure data-bank and pointer
+    # Configure the artifact pointer
     file_id = "fid-eval-1"
     fake.set(artifact_file_id_key(run_id), file_id)
 
     class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
         def upload_artifact(
             self,
             dir_path: Path,
             *,
             artifact_name: str,
             request_id: str,
-        ) -> FileUploadResponse:
-            return FileUploadResponse(
+        ) -> StoredArtifact:
+            return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
                 sha256="x",
@@ -224,10 +217,8 @@ def test_eval_job_success(tmp_path: Path, settings_factory: _SettingsFactory) ->
                 tf.extractall(dest_dir)
             return out
 
-    def _fake_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     _test_hooks.artifact_store_factory = _fake_store_factory
 
@@ -253,8 +244,6 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     _test_hooks.load_settings = lambda: settings
@@ -263,7 +252,7 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
     file_id = "fid-missing"
     fake.set(artifact_file_id_key(run_id), file_id)
 
-    # Stub DataBankClient to return an archive without manifest.json
+    # Stub the artifact store to return an archive without manifest.json
 
     tar_root = tmp_path / "db_missing"
     tar_root.mkdir()
@@ -282,17 +271,14 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
                 tf.add(str(abs_path), arcname=str(arcname))
 
     class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
         def upload_artifact(
             self,
             dir_path: Path,
             *,
             artifact_name: str,
             request_id: str,
-        ) -> FileUploadResponse:
-            return FileUploadResponse(
+        ) -> StoredArtifact:
+            return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
                 sha256="x",
@@ -314,10 +300,8 @@ def test_eval_job_missing_manifest(tmp_path: Path, settings_factory: _SettingsFa
                 tf.extractall(dest_dir)
             return out
 
-    def _fake_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     _test_hooks.artifact_store_factory = _fake_store_factory
 
@@ -363,8 +347,6 @@ def test_eval_job_reuses_artifacts_another_job_already_fetched(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     _test_hooks.load_settings = lambda: settings
@@ -392,17 +374,14 @@ def test_eval_job_reuses_artifacts_another_job_already_fetched(
     downloads: list[str] = []
 
     class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
         def upload_artifact(
             self,
             dir_path: Path,
             *,
             artifact_name: str,
             request_id: str,
-        ) -> FileUploadResponse:
-            return FileUploadResponse(
+        ) -> StoredArtifact:
+            return StoredArtifact(
                 file_id="fake-upload-id",
                 size=1,
                 sha256="x",
@@ -425,10 +404,8 @@ def test_eval_job_reuses_artifacts_another_job_already_fetched(
                 tf.extractall(dest_dir)
             return out
 
-    def _fake_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     _test_hooks.artifact_store_factory = _fake_store_factory
 
@@ -460,8 +437,6 @@ def test_eval_job_artifact_pointer_missing(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     _test_hooks.load_settings = lambda: settings

@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import torch
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.determinism_record import DeterminismRecord
 from platform_ml.wandb_publisher import WandbPublisher
 from platform_workers.redis import RedisStrProto
@@ -35,6 +34,7 @@ from model_trainer.core.contracts.model import (
     ScoreOutcome,
     TrainOutcome,
 )
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.encoding import Encoded
 from model_trainer.core.services.dataset.local_text_builder import LocalTextDatasetBuilder
@@ -164,8 +164,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -284,19 +282,14 @@ class _FakeCorpusFetcher:
 
 
 class _FakeStore:
-    def __init__(
-        self: _FakeStore, base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> None:
-        pass
-
     def upload_artifact(
         self: _FakeStore,
         dir_path: Path,
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
+    ) -> StoredArtifact:
+        return StoredArtifact(
             file_id="finetuned-file-id",
             size=1,
             sha256="x",
@@ -385,7 +378,7 @@ def _create_corpus_fetcher_factory(
 ) -> CorpusFetcherFactoryProto:
     """Create a corpus fetcher factory for testing."""
 
-    def _factory(api_url: str, api_key: str, cache_dir: Path) -> _FakeCorpusFetcher:
+    def _factory(root: Path) -> _FakeCorpusFetcher:
         return _FakeCorpusFetcher(corpus_path)
 
     return _factory
@@ -394,10 +387,8 @@ def _create_corpus_fetcher_factory(
 def _create_artifact_store_factory() -> ArtifactStoreFactoryProto:
     """Create an artifact store factory for testing."""
 
-    def _factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     return _factory
 
@@ -531,18 +522,12 @@ class _RecordingStore:
         downloads: One (file_id, expected_root) per download_artifact call.
     """
 
-    def __init__(
-        self: _RecordingStore,
-        base_url: str,
-        api_key: str,
-        *,
-        timeout_seconds: float = 600.0,
-    ) -> None:
+    def __init__(self: _RecordingStore) -> None:
         self.downloads: list[tuple[str, str]] = []
 
     def upload_artifact(
         self: _RecordingStore, dir_path: Path, *, artifact_name: str, request_id: str
-    ) -> FileUploadResponse:
+    ) -> StoredArtifact:
         """Return a fixed upload response.
 
         Args:
@@ -553,7 +538,7 @@ class _RecordingStore:
         Returns:
             A response carrying a fixed file id.
         """
-        return FileUploadResponse(
+        return StoredArtifact(
             file_id="finetuned-file-id",
             size=1,
             sha256="x",

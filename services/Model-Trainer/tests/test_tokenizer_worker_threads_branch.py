@@ -20,8 +20,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -68,9 +66,7 @@ def test_tokenizer_worker_respects_threads_env_branch(
     (tmp_path / "c" / "a.txt").write_text("hi\n", encoding="utf-8")
 
     # Stub corpus fetcher via hook
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
         return _FakeCorpusFetcher(tmp_path / "c")
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory

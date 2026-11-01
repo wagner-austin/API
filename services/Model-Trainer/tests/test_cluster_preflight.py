@@ -1,10 +1,11 @@
 """Tests for the checks that prove a run can finish before it starts.
 
-Two of these reproduce failures that actually cost A100 time, and they are
-written as the failure rather than as the fix: a directory that exists but
-cannot be written, and an artifact store whose credentials are absent. Both
-were checkable in under a second and both were discovered only after the
-expensive work was already done.
+Two of these reproduce failures that actually cost A100 time: a directory
+that exists but cannot be written, and an artifact store whose credentials
+were absent. Both were checkable in under a second and both were discovered
+only after the expensive work was already done. The second store left with
+data-bank-api on 2026-11-01, so its test now proves the default that
+replaced it passes the same round trip.
 """
 
 from __future__ import annotations
@@ -13,11 +14,11 @@ import hashlib
 import pathlib
 
 import pytest
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError, ModelTrainerErrorCode
 
 from model_trainer.cluster import preflight
 from model_trainer.cluster.stores import LocalArtifacts
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 
 
 class _RefusingStore:
@@ -39,7 +40,7 @@ class _RefusingStore:
 
     def upload_artifact(
         self, dir_path: pathlib.Path, *, artifact_name: str, request_id: str
-    ) -> FileUploadResponse:
+    ) -> StoredArtifact:
         """Claim success without storing anything retrievable.
 
         Args:
@@ -50,7 +51,7 @@ class _RefusingStore:
         Returns:
             A plausible response naming bytes that are not there.
         """
-        return FileUploadResponse(
+        return StoredArtifact(
             file_id="0" * 64,
             size=1,
             sha256="0" * 64,
@@ -205,15 +206,23 @@ class TestCheckArtifactRoundTrip:
         assert excinfo.value.code is ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED
         assert "different bytes" in excinfo.value.message
 
-    def test_an_unconfigured_http_store_is_refused_at_construction(self) -> None:
-        """The failure that cost 49 minutes. The credential check now belongs
-        to the store that needs credentials, so it fires when that store is
-        BUILT -- during preflight -- rather than after training finishes."""
+    def test_the_production_default_store_passes_the_round_trip(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The failure that cost 49 minutes was an HTTP store with no
+        credentials, refused only after training finished. That store left
+        with data-bank-api on 2026-11-01; the default is now the filesystem
+        store over the root it is given, which needs nothing to be refused
+        for, and preflight proves it saves and reads back before any work."""
         from model_trainer.core._hook_defaults import _default_artifact_store
 
-        with pytest.raises(AppError) as excinfo:
-            _default_artifact_store("", "")
-        assert excinfo.value.code is ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED
+        store = _default_artifact_store(tmp_path / "artifacts")
+        preflight.check_artifact_round_trip(
+            store, tmp_path / "scratch", tmp_path / "artifacts", token="r1"
+        )
+        assert isinstance(store, LocalArtifacts)
+        assert store.root == tmp_path / "artifacts"
+        assert sorted(p.name for p in store.root.iterdir()) == []
 
     def test_a_store_needing_no_credentials_is_not_refused(self, tmp_path: pathlib.Path) -> None:
         """The other half: a filesystem store was refused for lacking

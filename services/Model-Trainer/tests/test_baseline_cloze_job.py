@@ -47,8 +47,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
     ) -> Settings: ...
 
 
@@ -100,7 +98,7 @@ def _install_fetcher(items_path: Path) -> None:
         def fetch(self, file_id: str) -> Path:
             return items_path
 
-    def _factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+    def _factory(root: Path) -> CorpusFetcherProto:
         return _FakeFetcher()
 
     _test_hooks.corpus_fetcher_factory = _factory
@@ -112,8 +110,6 @@ def _make_settings(tmp_path: Path, settings_factory: _SettingsFactory) -> Settin
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
 

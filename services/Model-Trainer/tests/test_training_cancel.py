@@ -4,7 +4,6 @@ import threading
 from pathlib import Path
 from typing import Literal, Protocol
 
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.trainer_keys import cancel_key, heartbeat_key
 from platform_workers.redis import RedisStrProto
 from platform_workers.testing import FakeRedis
@@ -12,6 +11,7 @@ from platform_workers.testing import FakeRedis
 from model_trainer.core import _test_hooks
 from model_trainer.core._hook_protocols import ArtifactStoreProto
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.services.tokenizer.bpe_backend import BPEBackend
 from model_trainer.worker.train_job import process_train_job
@@ -26,8 +26,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -46,17 +44,14 @@ class _FakeCorpusFetcher:
 
 
 class _FakeStore:
-    def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-        pass
-
     def upload_artifact(
         self,
         dir_path: Path,
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
-        return FileUploadResponse(
+    ) -> StoredArtifact:
+        return StoredArtifact(
             file_id="fake-file-id",
             size=1,
             sha256="x",
@@ -119,18 +114,14 @@ def test_training_cancellation_with_redis(
     _ = BPEBackend().train(cfg_tok)
 
     # Stub corpus fetcher via hook
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
         return _FakeCorpusFetcher(corpus)
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
 
     # Stub artifact store via hook
-    def _fake_artifact_store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _fake_artifact_store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
     _test_hooks.artifact_store_factory = _fake_artifact_store_factory
 

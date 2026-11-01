@@ -210,18 +210,18 @@ class SpmEncodeIdsProto(Protocol):
 
 
 class CorpusFetcherProto(Protocol):
-    """Protocol for CorpusFetcher."""
+    """Protocol for the corpus store, which resolves a corpus id to its file."""
 
     def fetch(self, file_id: str) -> Path:
-        """Fetch a corpus file from the data bank API."""
+        """Resolve a corpus id, its SHA-256 digest, to the staged file."""
         ...
 
 
 class CorpusFetcherFactoryProto(Protocol):
-    """Protocol for CorpusFetcher factory."""
+    """Protocol for the corpus store factory."""
 
-    def __call__(self, api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        """Create CorpusFetcher instance."""
+    def __call__(self, root: Path) -> CorpusFetcherProto:
+        """Create the store over a directory of staged corpora."""
         ...
 
 
@@ -276,27 +276,6 @@ class SpmDecodeIdsProto(Protocol):
     """Protocol for spm_decode_ids hook."""
 
     def __call__(self, model_path: str, ids: list[int]) -> str: ...
-
-
-class CorpusCacheCleanupResultProto(Protocol):
-    """Protocol for CorpusCacheCleanupResult-like objects."""
-
-    @property
-    def deleted_files(self) -> int: ...
-    @property
-    def bytes_freed(self) -> int: ...
-
-
-class CorpusCacheCleanupServiceProto(Protocol):
-    """Protocol for CorpusCacheCleanupService-like objects."""
-
-    def clean(self) -> CorpusCacheCleanupResultProto: ...
-
-
-class CorpusCacheCleanupServiceFactoryProto(Protocol):
-    """Protocol for CorpusCacheCleanupService factory."""
-
-    def __call__(self, *, settings: Settings) -> CorpusCacheCleanupServiceProto: ...
 
 
 class TokenizerCleanupResultProto(Protocol):

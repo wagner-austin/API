@@ -42,7 +42,7 @@ def model_eval_dir(settings: Settings, run_id: str) -> Path:
 # Training checkpoints (resume state for interrupted runs).
 #
 # Deliberately OUTSIDE models_dir: the artifact uploader ships the whole
-# model directory to the data bank and the cleanup service deletes it
+# model directory to the artifact store and the cleanup service deletes it
 # afterwards, and checkpoint state must be visible to neither.
 def checkpoints_dir(settings: Settings) -> Path:
     return artifacts_root(settings) / "checkpoints"

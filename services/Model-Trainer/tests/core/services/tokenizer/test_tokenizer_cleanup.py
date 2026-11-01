@@ -11,7 +11,6 @@ from platform_core.logging import LogLevel
 from model_trainer.core.config.settings import (
     AppConfig,
     CleanupConfig,
-    CorpusCacheCleanupConfig,
     LoggingConfig,
     RedisConfig,
     RQConfig,
@@ -33,12 +32,6 @@ def _settings_with_tokenizer_cleanup(cfg: TokenizerCleanupConfig, artifacts_root
         "grace_period_seconds": 0,
         "dry_run": False,
     }
-    corpus_cache: CorpusCacheCleanupConfig = {
-        "enabled": False,
-        "max_bytes": 0,
-        "min_free_bytes": 0,
-        "eviction_policy": "lru",
-    }
     app: AppConfig = {
         "data_root": "/tmp",
         "artifacts_root": str(artifacts_root),
@@ -46,10 +39,7 @@ def _settings_with_tokenizer_cleanup(cfg: TokenizerCleanupConfig, artifacts_root
         "logs_root": "/tmp/logs",
         "threads": 1,
         "tokenizer_sample_max_lines": 100,
-        "data_bank_api_url": "http://localhost",
-        "data_bank_api_key": "test",
         "cleanup": cleanup,
-        "corpus_cache_cleanup": corpus_cache,
         "tokenizer_cleanup": cfg,
     }
     logging_cfg: LoggingConfig = {"level": LogLevel.INFO}

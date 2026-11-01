@@ -46,8 +46,6 @@ class TestProcessScoreJob:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -100,8 +98,6 @@ class TestProcessScoreJob:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -146,8 +142,6 @@ class TestProcessScoreJob:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -209,8 +203,6 @@ class TestProcessGenerateJob:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -268,8 +260,6 @@ class TestProcessGenerateJob:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -319,8 +309,6 @@ class TestArtifactDownloadPaths:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -344,16 +332,8 @@ class TestArtifactDownloadPaths:
         # Create factory function that captures manifest content
         manifest_content = _make_manifest("char_lstm", "tok123")
 
-        def _make_fake_store(
-            base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> ArtifactStoreProto:
-            return _FakeArtifactStore(
-                base_url,
-                api_key,
-                timeout_seconds=timeout_seconds,
-                include_manifest=True,
-                manifest_content=manifest_content,
-            )
+        def _make_fake_store(root: Path) -> ArtifactStoreProto:
+            return _FakeArtifactStore(include_manifest=True, manifest_content=manifest_content)
 
         _test_hooks.artifact_store_factory = _make_fake_store
 
@@ -388,8 +368,6 @@ class TestArtifactDownloadPaths:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -399,16 +377,8 @@ class TestArtifactDownloadPaths:
         _test_hooks.kv_store_factory = lambda url: fake_redis
 
         # Create factory without manifest
-        def _make_fake_store_no_manifest(
-            base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> ArtifactStoreProto:
-            return _FakeArtifactStore(
-                base_url,
-                api_key,
-                timeout_seconds=timeout_seconds,
-                include_manifest=False,
-                manifest_content=None,
-            )
+        def _make_fake_store_no_manifest(root: Path) -> ArtifactStoreProto:
+            return _FakeArtifactStore(include_manifest=False, manifest_content=None)
 
         _test_hooks.artifact_store_factory = _make_fake_store_no_manifest
 
@@ -439,8 +409,6 @@ class TestArtifactDownloadPaths:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -463,16 +431,8 @@ class TestArtifactDownloadPaths:
 
         manifest_content = _make_manifest("char_lstm", "tok123")
 
-        def _make_fake_store(
-            base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> ArtifactStoreProto:
-            return _FakeArtifactStore(
-                base_url,
-                api_key,
-                timeout_seconds=timeout_seconds,
-                include_manifest=True,
-                manifest_content=manifest_content,
-            )
+        def _make_fake_store(root: Path) -> ArtifactStoreProto:
+            return _FakeArtifactStore(include_manifest=True, manifest_content=manifest_content)
 
         _test_hooks.artifact_store_factory = _make_fake_store
 
@@ -512,8 +472,6 @@ class TestArtifactDownloadPaths:
 
         settings = settings_factory(
             artifacts_root=str(artifacts_root),
-            data_bank_api_url="http://test.api",
-            data_bank_api_key="test-key",
         )
 
         fake_redis = FakeRedis()
@@ -522,16 +480,8 @@ class TestArtifactDownloadPaths:
         _test_hooks.load_settings = lambda: settings
         _test_hooks.kv_store_factory = lambda url: fake_redis
 
-        def _make_fake_store_no_manifest(
-            base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-        ) -> ArtifactStoreProto:
-            return _FakeArtifactStore(
-                base_url,
-                api_key,
-                timeout_seconds=timeout_seconds,
-                include_manifest=False,
-                manifest_content=None,
-            )
+        def _make_fake_store_no_manifest(root: Path) -> ArtifactStoreProto:
+            return _FakeArtifactStore(include_manifest=False, manifest_content=None)
 
         _test_hooks.artifact_store_factory = _make_fake_store_no_manifest
 
