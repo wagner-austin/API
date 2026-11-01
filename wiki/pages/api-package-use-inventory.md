@@ -42,6 +42,8 @@ Two packages hold most of it. `services/covenant-radar-api` tracks 352 MB, 330 M
 
 ## The table
 
+One row per package, each column read as the list above says, at API `adda8c020` and the instants named in the footnotes.[^probe][^deps][^solo][^fleet][^size][^research]
+
 | Package | Deploy | Imported by | Last own change | Fleet min/30d | Size | RESEARCH.md | Recommendation |
 |---|---|---|---|---|---|---|---|
 | `clients/DiscordBot` | none (Railway fallback) | none | 2026-10-08 `8cc3872e6` | 7 | 545 KB | no | operator: the Discord group |
@@ -104,7 +106,7 @@ Two packages hold most of it. `services/covenant-radar-api` tracks 352 MB, 330 M
 | `tools/maketools` | none | none | 2026-11-01 `1ed3ada33` | 125 | 475 KB | no | keep: fleet tooling |
 | `tools/maketools-execution` | none | none | 2026-11-01 `78c46a140` | 1043 | 3 KB | no | keep: fleet tooling |
 
-`clients/docs` is one 19 KB document, not a package, and is left out.
+`clients/docs` is one 19 KB document, not a package, and is left out.[^size]
 
 ## The Discord group is the operator's question
 
