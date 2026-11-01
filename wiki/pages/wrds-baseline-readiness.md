@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-runtime-20261031/audit-probes.json"
   - "tools/hpc3/artifacts/wrds-selection-runtime-20261031/rehearsal.json"
@@ -84,6 +85,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json": "f9591661ebbbf616d0d3ccc93fb48cb94b1dc11d"
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/audit-probes.json": "3c9042d974d318d0558fb76f0ee76810c3ef038f"
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/rehearsal.json": "2110dc8a0914e163292a4581392ca1cdc98ef678"
@@ -176,13 +178,16 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-**November 1, 09:50 UTC update:** the controller handover code is published
-and its repaired fleet check passed 2,627 tests with full statement and branch
-coverage. Installation and the four original queue closures remain pending;
-the substantive baseline has not run. See [[wrds-research-queue-admission]]
-for the exact handover contract and its test limitations.[^handover-progress]
+**November 1 deployment update:** the handover repair passed independent audit,
+the replacement queue runtime is installed, and all four retained allocations
+passed handover verification. The scheduled runner closed all four original
+queue receipts. Six unstarted references were withdrawn and replaced with
+corrected-controller references to the same admissions; their candidate budgets
+and journal were preserved. The complete selection rehearsal and substantive
+baseline remain unfinished. See [[wrds-research-queue-admission]] for the
+contract, deployed measurements and remaining review.[^handover-progress]
 
-[^handover-progress]: Live fleet check `b240c7d5-c9c1-4f2b-a16f-7114f3d1aa60` at API `a9340a200794d62ac4cf2c1133cf093ce1d0aeac`, completed `2026-11-01T09:50:20Z`; root-cause repair `9dc6f80c-899c-4e79-9399-e669a24b9f4b`, handover task `04c0cdbe-278f-41bb-8141-a170fc0e5324` and selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. Live `dispatch_list(project="research/hpc3", status="live")` on this pass retained the original four running requests and six queued requests.
+[^handover-progress]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json`, runtime, service evidence, original handover plans, preservation measurements and replacement requests. Repair audit `44198e74-3ea3-450e-b481-75dab8b828b3` verified both criteria at `2026-11-01T09:59:06.953Z`; operational recovery remains task `04c0cdbe-278f-41bb-8141-a170fc0e5324`, and the complete selection rehearsal remains `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`.
 
 **Current reading, November 1:** the licensed extraction and encrypted collection
 have completed through the shared queue. All 24 declared outputs and the
@@ -203,8 +208,9 @@ review reopened this selection milestone on November 1 at 00:13 UTC: the
 winner/refusal captures were session-authored, while the audit requires the
 maintained controller's own service report. The repair adds that measurement
 to the existing select command. Four fresh native allocations have since been
-recovered without resubmission, but their shared-queue requests still pin the
-old controller; recorded controller handover remains task `04c0cdbe`.
+recovered without resubmission. Their shared-queue requests retain the old
+controller identity, with recorded handovers now activating the verified
+replacement under task `04c0cdbe`.[^handover-progress]
 The controller measured refusal to select while six attempts remain unsettled,
 with an unchanged journal. Winner and wrong-candidate/wrong-seed service reports
 still require the complete fresh rehearsal.[^selection-recovery]
@@ -690,10 +696,10 @@ has now passed maintained wheel/member inspection (584 files), the frozen
 self-check and dependency check. Its direct reconciliation recovered jobs
 `58708603`, `58708606`, `58708609` and `58708611`, each completed with native
 exit `0:0`, using a separate cluster configuration and the original journal.
-The original pinned configuration and runtime were preserved. The shared
-queue's separate terminal inspector still uses that old runtime, so these
-four queue entries remain running and six remain queued. This is a partial
-operational recovery, not a passed queue rehearsal. The service-authored
+The original pinned configuration and runtime were preserved. At the recorded
+02:01 UTC measurement, the shared queue's separate terminal inspector still
+used that old runtime: four entries remained running and six remained queued.
+The deployment update above supersedes that queue state. The service-authored
 selection refusal recorded `RESEARCH-008`, exit 2, no selected candidate and
 identical before/after journal hashes. No final grant was released.[^selection-recovery]
 

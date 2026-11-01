@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/fleet/src/fleet/core/research_handover.py"
   - "tools/fleet/tests/test_research_handover.py"
   - "tools/fleet/src/fleet/cli/research_native.py"
@@ -32,6 +33,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/fleet/src/fleet/core/research_handover.py": "446e3e549dbd2b655a142f266f76bf9fe8e9c756"
   "tools/fleet/tests/test_research_handover.py": "949c9f364f842519ee3512543af90c246ad956f4"
   "tools/fleet/src/fleet/cli/research_native.py": "cb18c34d46e6e12e2aab0be7696f7ab8719cda86"
@@ -75,7 +77,7 @@ The completion inspector now takes the exact artifact from the persisted
 `run.json`, in addition to the native attempt and workspace host. An old queue
 request still pins its original controller: repairing the journal through a
 new runtime does not replace that terminal inspection. The November 1 recovery
-and pending controller handover are recorded in [[wrds-baseline-readiness]].[^handover]
+and recorded controller handover are tracked in [[wrds-baseline-readiness]].[^handover]
 
 [^handover]: `tools/fleet/src/fleet/core/research_hpc.py`, `poll`; `tools/fleet/tests/test_research_hpc.py`, `test_complete_attempt_requires_fresh_native_identity_and_record`. Board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` retains original request and native allocation identities during controller replacement.
 
@@ -91,17 +93,35 @@ controller identities; only then is an exclusive marker written under the
 existing poll lock. Subsequent queue ticks repeat verification and retain the
 plan digest in their observation.[^handover-implementation]
 
-This is published and package-tested, not installed recovery evidence. The
-first check stopped at lint (poll complexity and an unmarked regex); the
-terminal verifier was lifted into `_verified_completion`, and the repaired
-check passed 2,627 tests with 100% statement and branch coverage. Independent
-audit of the repair and installation remain ahead. The live reading during
-this November 1 pass still showed four running and six queued requests;
-no handover was activated and no licensed final grant released.[^handover-check]
+The first check stopped at lint (poll complexity and an unmarked regex).
+The terminal verifier was lifted into `_verified_completion`; the repaired
+check passed 2,627 tests with 100% statement and branch coverage, and independent
+audit verified both repair criteria. The separate Linux execution lane passed
+97 real host cases with zero skips before the fleet release advanced.[^handover-check]
+
+The installed queue adapter now uses `wrds-queue-b53b0ea34`, built on Loki
+from published source with 24 hash-pinned wheels. The maintained inspector
+verified all 485 application files across its five first-party wheels, its
+generated symbol/version check and dependency consistency. All four original
+requests have verified handover markers targeting the measured
+`wrds-selection-recovery-f38df09fe` proposal controller. The scheduled runner
+closed all four original receipts through the same queue and resource lease;
+each completion observation includes the handover digest and original native
+allocation. The last closure was at 10:21:26 UTC.[^handover-live]
+
+Installed CLI probes against isolated copies refused changed request bytes,
+artifact checksum, native allocation and result digest without creating a
+marker. The original request hashes and full journal output remained unchanged
+across activation and those probes. Six unclaimed references were withdrawn
+before any native submission, then replaced with corrected references to the
+same admitted trials. This is still a synthetic operational rehearsal; no
+licensed final grant was released.[^handover-live]
+
+[^handover-live]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json`, service report `6322f701`, wheel identities, handover plans, preservation and refusal measurements. The evidence index distinguishes service-authored reports from session-captured probes and placement readbacks. Operational review is tracked by `04c0cdbe` separately from the verified lint repair.
 
 [^handover-implementation]: `tools/fleet/src/fleet/core/research_handover.py`, `poll` and `record`; `tools/fleet/src/fleet/core/research_hpc.py`, `poll` and `_verified_completion`; `tools/fleet/src/fleet/cli/research_native.py`, `main`; `tools/fleet/src/fleet/contracts/research_worker.py`, `decode_observation`. `tools/fleet/tests/test_research_handover.py` covers unchanged original requests, altered inputs and runtime reports, a real failed controller process, exclusive marker/readback and publication failure. `tools/fleet/tests/test_research_hpc.py` rejects unsettled attempts and final-grant handover.
 
-[^handover-check]: Live fleet job `cbcfa409-1a43-4242-9a92-06e69583f8f2` at API `3f3f51d2e8f3f9a4f596e9d403c061ba2b969866` stopped before tests with Ruff C901/RUF043. Root-cause task `9dc6f80c-899c-4e79-9399-e669a24b9f4b` repairs that failure. Fleet job `b240c7d5-c9c1-4f2b-a16f-7114f3d1aa60` at API `a9340a200794d62ac4cf2c1133cf093ce1d0aeac` passed on Lavender at `2026-11-01T09:50:20Z`: 2,627 passed, 44 host cases skipped in this ordinary lane, 100% statement and branch coverage, lint, typing and guards. These unit/process tests do not substitute for the four real queue closures required by `04c0cdbe`.
+[^handover-check]: Live fleet job `cbcfa409-1a43-4242-9a92-06e69583f8f2` at API `3f3f51d2e8f3f9a4f596e9d403c061ba2b969866` stopped before tests with Ruff C901/RUF043. Repair task `9dc6f80c` passed independent audit `44198e74` at `2026-11-01T09:59:06.953Z`. Fleet jobs `b240c7d5` at `a9340a200` and `cb35e08b` at `b53b0ea34` each passed 2,627 tests, with 44 host cases skipped in the ordinary lane and 100% statement and branch coverage. Host execution job `69740785-701e-40ee-8eec-f3ff0de6598d` at `b53b0ea343de96df607ad7dbc877c07ec5220668` passed 97 cases, zero skips, at `2026-11-01T10:09:22Z`. These checks are distinct from the four real queue closures required by `04c0cdbe`.
 
 The fleet research lane has an implementation in the existing fleet package:
 it claims shared dispatch rows, uses existing resource leases during bounded
