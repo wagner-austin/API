@@ -523,3 +523,8 @@ repinned after reading each diff. monorepo-discipline re-sweeps its package
 counts to 23 of 23 and repins README.md; platform-workers-rq-pattern re-lists
 its three consumers and the readyz helper each calls. The services hub, the
 index and api-package-use-inventory record the archive.
+
+## [2026-11-01] decomposition | WRDS readiness evidence
+Pages written: wrds-installed-runtime, wrds-operational-rehearsals, wrds-licensed-data-evidence, wrds-cleanup-evidence, wrds-baseline-20261101.
+Pages updated: wrds-baseline-readiness, wrds-equity-research-protocol, crsp-monthly-holdings-validation, crsp-monthly-study-design, wrds-evaluation-reuse, wrds-integration-ownership-review, wrds-research-queue-admission, libs hub and index.
+Notes: Replaced the 95,523-byte readiness diary with a short current-status page and focused fact/evidence pages. Underlying run artifacts remain authoritative; superseded narrative remains in git at fbff31147581c22e1a91a13108e89217c41a4380. Preserved the stopped licensed study and its cleanup gap, corrected the distinction between pre-entry and entry-date delisting, and documented the shared endpoint-validation correction. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1.
