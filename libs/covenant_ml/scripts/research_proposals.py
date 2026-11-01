@@ -123,7 +123,7 @@ def main(argv: list[str] | None = None, pin: PinProtocol = pin_single_thread) ->
                 code, measurement = report_selection(ledger_path, trial, final_manifest, task)
                 sys.stdout.write(dump_json_str(measurement) + "\n")
                 return code
-            elif action == "release":
+            if action == "release":
                 access: Path = args.access
                 destination: Path = args.directory
                 keys = EvaluatorKeys(decode_research_access(read_document(access)))
