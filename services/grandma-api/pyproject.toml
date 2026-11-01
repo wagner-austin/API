@@ -13,12 +13,22 @@ packages = [
 readme = "README.md"
 include = ["src/grandma_api/py.typed"]
 
+# torch comes from the PyTorch CPU index, as in the Dockerfile. Poetry reads
+# only the root project's sources, so platform_langid's own source does not
+# reach this venv: torch and torchaudio are declared here, at its constraints.
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 fastapi = "^0.124"
 hypercorn = "^0.18"
 python-multipart = "^0.0.18"
 typing-extensions = "^4.12.2"
+torch = { version = "^2.0.0", source = "pytorch-cpu" }
+torchaudio = { version = "^2.0.0", source = "pytorch-cpu" }
 platform-core = { path = "../../libs/platform_core", develop = true }
 platform-stt = { path = "../../libs/platform_stt", develop = true }
 platform-langid = { path = "../../libs/platform_langid", develop = true }
