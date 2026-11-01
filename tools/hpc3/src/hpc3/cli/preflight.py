@@ -23,16 +23,20 @@ from collections.abc import Sequence
 from platform_core import cli_args
 from platform_core.cli_boundary import run_cli
 from platform_core.cluster_layout import log_dir, qualified_name, script_dir
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import JSONValue, dump_json_str, load_json_str
+from platform_core.load_report import post_load_report, report_identity
 
 from hpc3.cli import _config, _test_hooks
-from hpc3.contracts.job import JobSpec
+from hpc3.contracts.drift import encode_image_drift
+from hpc3.contracts.job import JobSpec, encode_job_spec
+from hpc3.contracts.preflight import encode_preflight_result
 from hpc3.contracts.run import resolve_run, resolve_sweep
 from hpc3.contracts.sweep import expand_sweep
 from hpc3.contracts.workspace import Workspace, require_project_config, workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core.budget import check_projection
 from hpc3.core.certification import require_inputs_certified
+from hpc3.core.digest import sha256_hex
 from hpc3.core.drift import describe_drift
 from hpc3.core.inputs import (
     declared_inputs,
@@ -41,7 +45,7 @@ from hpc3.core.inputs import (
 )
 from hpc3.core.preflight import preflight
 
-_FLAGS = (_config.CONFIG_FLAG, "--run", "--sweep")
+_FLAGS = (_config.CONFIG_FLAG, "--run", "--sweep", "--report-task")
 
 
 def _load_specs(workspace: Workspace, parsed: dict[str, str]) -> list[JobSpec]:
@@ -95,6 +99,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
+    if "--report-task" in parsed:
+        report_identity(parsed["--report-task"], "hpc")
     workspace = _config.load_workspace(parsed)
     cluster = workspace_cluster(workspace)
     root = workspace["root"]
@@ -122,6 +128,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     budget = require_project_config(workspace, specs[0]["project"])["budget"]
     projected = check_projection(budget, specs, cluster)
 
+    reports: list[JSONValue] = []
     for spec in specs:
         project = spec["project"]
         admission = preflight(
@@ -134,6 +141,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             repo=pathlib.Path(require_project_config(workspace, project)["repo"]),
         )
         result = admission["verdict"]
+        reports.append(
+            {
+                "spec": encode_job_spec(spec),
+                "verdict": encode_preflight_result(result),
+                "image_drift": encode_image_drift(admission["image_drift"]),
+            }
+        )
         _test_hooks.emit(
             f"OK {qualified_name(project, spec['name'])}: "
             f"would start {result['start_estimate']} "
@@ -156,6 +170,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         f"spend is measured after the fact, not projected"
     )
     _test_hooks.emit("start estimates are a snapshot of the queue, not a reservation")
+    if "--report-task" in parsed:
+        payload = dump_json_str(
+            {
+                "kind": "HPC3_PREFLIGHT_EVIDENCE",
+                "observed_at": _test_hooks.now_iso(),
+                "host": workspace["host"],
+                "workspace": parsed[_config.CONFIG_FLAG],
+                "reporter_sha256": sha256_hex(core_hooks.read_bytes(pathlib.Path(__file__))),
+                "queued": False,
+                "admissions": reports,
+            }
+        )
+        post_load_report(
+            post=_test_hooks.http_post,
+            read_text=_config.stack_file_text,
+            task_id=parsed["--report-task"],
+            body="HPC3 PREFLIGHT LOAD-REPORT\n" + payload,
+            family="hpc",
+        )
+        _test_hooks.emit(payload)
     return 0
 
 
