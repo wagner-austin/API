@@ -65,19 +65,23 @@ The holdout split is **by file**. A within-file split would leak the
 held-out remainder's style into training — the same defect tracked for the
 trainer's own validation split (board task `f8706e51`).
 
-## Uploading to the data bank
+## Staging for Model-Trainer
 
-The emitter writes files; it does not talk to the network. Upload the
-training corpus the same way the wiki ablation corpora were uploaded
-(multipart `POST /files` on data-bank-api) and record the returned
-`file_id` next to the manifest, e.g. in `runs/file_ids.txt`:
+The emitter writes files; it does not talk to the network. Model-Trainer
+resolves a `corpus_file_id` to the file named by that SHA-256 under its
+corpus root, `services/Model-Trainer/corpus` (mounted read-only at
+`/data/corpus`), so stage the training corpus there under its digest and
+record the digest next to the manifest, e.g. in `runs/file_ids.txt`:
 
 ```
-curl -sS -X POST "$DATA_BANK_URL/files" -F "file=@runs/code-corpus.jsonl"
+digest="$(sha256sum runs/code-corpus.jsonl | cut -d' ' -f1)"
+cp runs/code-corpus.jsonl "services/Model-Trainer/corpus/$digest"
 ```
 
-A future training run then references that `file_id` as its
-`corpus_file_id`.
+A future training run then references that digest as its
+`corpus_file_id`. On HPC3 the same file is staged with `hpc3-stage`.
+Until 2026-11-01 corpora were uploaded to data-bank-api instead; that
+service was archived then (MCPs board task a9566810).
 
 ## Development
 
