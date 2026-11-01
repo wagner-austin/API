@@ -1,0 +1,64 @@
+{
+  "job": {
+    "researchRequest": {
+      "backend": "hpc3",
+      "specSha256": "a02a172597fdbb62df133841329684ad21cb2abcc0243181dc72ddcb3cc4b722",
+      "attempt": "licensed-baseline-20261101-1"
+    },
+    "id": "b799f91b-4c5b-4f96-9332-b781b9ae1330",
+    "project": "research/hpc3",
+    "command": "research",
+    "status": "running",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "c6bc5d05-22f5-4462-a1f7-eb40de1f28f1",
+    "node": "ziggurat",
+    "runId": "b799f91b-4c5b-4f96-9332-b781b9ae1330",
+    "exitCode": null,
+    "detail": "",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": "2026-11-01T22:39:14.893Z",
+    "createdAt": "2026-11-01T20:36:16.170Z",
+    "updatedAt": "2026-11-01T20:39:14.893Z",
+    "claimedAt": "2026-11-01T20:39:02.869Z",
+    "closedAt": null,
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "06bb116c-88c5-4247-993c-4569db193712",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued research hpc3 specification a02a172597fdbb62df133841329684ad21cb2abcc0243181dc72ddcb3cc4b722 attempt licensed-baseline-20261101-1 on ziggurat for task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1",
+      "createdAt": "2026-11-01T20:36:16.170Z"
+    },
+    {
+      "id": "dfd63155-0732-4a69-b720-61b294d2745c",
+      "kind": "claimed",
+      "actor": "fleet-research-diphtheria",
+      "body": "claimed by fleet-research-diphtheria under a 7200s lease",
+      "createdAt": "2026-11-01T20:39:02.869Z"
+    },
+    {
+      "id": "ec3c9124-eb65-49e7-be6c-49ec81ee3079",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "started make research for research/hpc3 on ziggurat as run b799f91b-4c5b-4f96-9332-b781b9ae1330",
+      "createdAt": "2026-11-01T20:39:02.893Z"
+    },
+    {
+      "id": "7987cdc3-eada-41ac-94c7-09429be44434",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"58733020\",\"record_sha256\":null,\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+      "createdAt": "2026-11-01T20:39:14.893Z"
+    }
+  ]
+}
