@@ -156,42 +156,68 @@ def poll(
         state = require_str(row, "status")
     native = require_str(row, "job_id")
     if state == "complete":
-        cluster = narrow_json_to_dict(load_json_str(_test_hooks.read_text(cluster_path)))
-        recipe = narrow_json_to_dict(load_json_str(_test_hooks.read_text(directory / "run.json")))
-        measured = research_control.invoke(
-            (
-                python,
-                "-m",
-                "hpc3.cli.execution_inspect",
-                "--config",
-                require_str(cluster, "workspace"),
-                "--attempt",
-                require_str(document, "native_attempt"),
-                "--artifact",
-                require_str(recipe, "artifact"),
-                "--checksums",
-                str(directory / "checksums.txt"),
-                "--report-task",
-                task_id,
-            ),
-            log,
-            300,
-            environment,
-        )
-        recorded = decode_run_record(narrow_json_to_dict(load_json_str(require_str(row, "record"))))
-        observed = decode_run_record(require_dict(measured, "record"))
-        if (
-            require_str(require_dict(measured, "ledger"), "job_id") != native
-            or observed != recorded
-        ):
-            raise ValueError("RESEARCH_RECEIPT_DRIFT: native observation differs from the journal")
-        digest = hashlib.sha256(dump_json_str(encode_run_record(observed)).encode()).hexdigest()
-        return {"state": "complete", "native_job_id": native, "record_sha256": digest}
+        return _verified_completion(document, row, log, task_id, environment)
     if state in {"failed", "timeout", "interrupted", "refused"}:
         return {"state": "failed", "native_job_id": native, "record_sha256": None}
     if state != "running":
         raise ValueError(f"RESEARCH_CONTROLLER_STATE: unexpected admitted-controller state {state}")
     return {"state": "running", "native_job_id": native, "record_sha256": None}
+
+
+def _verified_completion(
+    document: JSONObject,
+    row: JSONObject,
+    log: pathlib.Path,
+    task_id: str,
+    environment: tuple[tuple[str, str], ...],
+) -> JSONObject:
+    """Compare a fresh native inspection with the journal's completed allocation.
+
+    Args:
+        document: Original or explicitly handed-over private request.
+        row: Completed journal attempt from the maintained controller.
+        log: Private process transcript.
+        task_id: Queue-owned reporting task.
+        environment: Private report credentials.
+
+    Returns:
+        Completion metadata only after allocation and RunRecord equality.
+
+    Raises:
+        ValueError: Frozen input drift, controller failure or mismatched evidence.
+        OSError: Unavailable private input or process.
+    """
+    cluster_path = research_control.verified_input(document, "cluster")
+    cluster = narrow_json_to_dict(load_json_str(_test_hooks.read_text(cluster_path)))
+    directory = research_control.require_path(document, "directory")
+    recipe = narrow_json_to_dict(load_json_str(_test_hooks.read_text(directory / "run.json")))
+    measured = research_control.invoke(
+        (
+            str(research_control.require_path(document, "python")),
+            "-m",
+            "hpc3.cli.execution_inspect",
+            "--config",
+            require_str(cluster, "workspace"),
+            "--attempt",
+            require_str(document, "native_attempt"),
+            "--artifact",
+            require_str(recipe, "artifact"),
+            "--checksums",
+            str(directory / "checksums.txt"),
+            "--report-task",
+            task_id,
+        ),
+        log,
+        300,
+        environment,
+    )
+    native = require_str(row, "job_id")
+    recorded = decode_run_record(narrow_json_to_dict(load_json_str(require_str(row, "record"))))
+    observed = decode_run_record(require_dict(measured, "record"))
+    if require_str(require_dict(measured, "ledger"), "job_id") != native or observed != recorded:
+        raise ValueError("RESEARCH_RECEIPT_DRIFT: native observation differs from the journal")
+    digest = hashlib.sha256(dump_json_str(encode_run_record(observed)).encode()).hexdigest()
+    return {"state": "complete", "native_job_id": native, "record_sha256": digest}
 
 
 __all__ = ["poll"]
