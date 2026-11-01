@@ -280,12 +280,17 @@ same artifact, runtime, timestamp and compute-checksum checks used by replay
 verification. The program posts its measurement and emits structured JSON for
 the journal controller. Missing or ambiguous submissions never authorize retry.
 
-The installed Ziggurat controller is
-`/home/corvis/research-control/wrds-encrypted-44fa91cea/bin/python`, with the
-proposal entrypoint under the adjacent `entrypoint/` working directory. Its
-policy, journal and cluster configuration are under
-`/home/corvis/research-data/wrds/experiments/encrypted-synthetic-44fa91cea/`.
-It uses installed wheels rather than relying on this temporary worktree.
+Add `--scope inputs` to measure a terminal allocation's frozen inputs even when
+it failed. This requires every supplied remote checksum and its retained
+compute-side receipt, and reports `HPC3_INPUT_EVIDENCE` without reading a result.
+Live allocations are refused in this scope. The default observation still
+reports failed jobs when checksum receipts are missing, so a failed checksum
+gate cannot prevent queue reconciliation. Owner-writable logs do not provide
+attestation against a hostile account owner.
+
+Installed controller and image identities are recorded in
+[`wrds-installed-runtime`](../../wiki/pages/wrds-installed-runtime.md).
+They use frozen wheels; newly checked source does not update an installed study.
 
 Use `cluster.json` as the installed-controller configuration reference; its
 `report_task` must name the task owning a new run. Preserve the existing journal

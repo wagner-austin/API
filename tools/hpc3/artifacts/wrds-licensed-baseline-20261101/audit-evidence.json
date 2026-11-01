@@ -1,0 +1,50 @@
+{
+  "kind": "wrds-stopped-study-audit-evidence",
+  "observed_at": "2026-11-01T23:56:45.751070Z",
+  "scope": "Post-failure launch and journal readings; no successful validation or final evaluation.",
+  "reporter_source": "9b7fdabcd903aa917340f0a98a48266f0a6a87d5",
+  "reporter_execution": "Checked repository source paths with the existing controller interpreter; this does not replace the frozen installed study runtime. The journal reader uses current covenant_ml, platform_core and platform_ml source together.",
+  "service_author": "hpc-report-c6bc5d05",
+  "service_reports": {
+    "terminal_inputs": "bf146dd4-8b9b-41fe-b1ff-f6ad45ca2711",
+    "post_failure_journal": "8f71ee41-4065-43b5-94e9-3ed570f26ffe"
+  },
+  "verification": {
+    "hpc3_fleet": "9bbdde5d-713a-487e-95a9-afd9b077a728",
+    "hpc3_tests": 2170,
+    "covenant_ml_fleet": "705f3972-b2f3-4a41-8ec0-7bbe3d6fd0d9",
+    "covenant_ml_tests": 5136,
+    "statement_and_branch_coverage_percent": 100
+  },
+  "launch": {
+    "job_id": "58733020",
+    "native_state": "FAILED",
+    "verified_files_and_compute_receipts": 16,
+    "stdout_sha256": "d1d4c986d210bf2a34db730c8673d3418f290264a74e2541d0b5260ff3925356",
+    "external_entrypoint_sha256": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+    "image_sha256": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+    "validation_bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+    "identity_boundary": "The external launcher is bound by the separately frozen input checksum gate, not the image-drift module comparison. image_drift remains not_compared; owner-writable stdout is evidence, not hostile-owner attestation."
+  },
+  "journal": {
+    "policy_sha256": "47d4ee174b2a2477c3d1e1f789ed0f0dc78d5e2f44b298dcf30461f5378c1547",
+    "journal_sha256": "bbdce97e25d585adfd574274ce5bca652240f10e04f25c4a26aa27cc3e4949b6",
+    "failed_attempt": 1,
+    "failed_native_job": "58733020",
+    "remaining_admitted_unsubmitted": 14,
+    "selected_or_released_attempts": 0,
+    "final_manifest_bindings": 0
+  },
+  "allocation": {
+    "scope": "Session-invoked native accounting and partition inspection, not a new service load report.",
+    "requested_cpus": 4,
+    "allocated_cpus": 8,
+    "requested_mem_gib": 128,
+    "sacct_fields": "JobID,ReqCPUS,AllocCPUS,ReqMem,ReqTRES,AllocTRES",
+    "sacct_row": "58733020|8|8|128G|billing=4,cpu=4,mem=128G,node=1|billing=8,cpu=8,mem=128G,node=1",
+    "partition": "free",
+    "max_mem_per_cpu_mib": 18432,
+    "interpretation": "Eight allocated CPUs are consistent with ceil(128 GiB / 18 GiB per CPU); the site-specific adjustment path was not traced. Four CPUs was the recipe request, not an enforced allocation ceiling. The original request is preserved; the next study must freeze a feasible CPU/memory pair."
+  },
+  "remaining": "Original failed-allocation scratch cleanup remains unverified. A separate version-2 encrypted bundle, installed runtime and new preregistration are still required; no retry, candidate selection or final release occurred."
+}
