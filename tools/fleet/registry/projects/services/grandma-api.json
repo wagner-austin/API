@@ -10,6 +10,27 @@
     "path": "services/grandma-api",
     "install": [
       {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/grandma-api",
+          "lock"
+        ]
+      },
+      {
+        "phase": "deps",
+        "argv": [
+          "poetry",
+          "-C",
+          "services/grandma-api",
+          "sync",
+          "--no-cache",
+          "--with",
+          "dev"
+        ]
+      },
+      {
         "phase": "install",
         "argv": [
           "npm",
