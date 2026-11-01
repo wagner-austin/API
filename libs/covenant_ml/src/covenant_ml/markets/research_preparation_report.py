@@ -98,9 +98,7 @@ def encode_prepared_recipe(recipe: PreparedRecipe) -> JSONObject:
     }
 
 
-def report_preparation(
-    policy_path: Path, ledger: Path, recipe_path: Path, task: str
-) -> JSONObject:
+def report_preparation(policy_path: Path, ledger: Path, recipe_path: Path, task: str) -> JSONObject:
     """Measure the policy, journal and recipe, then publish the reading as the program.
 
     Args:
