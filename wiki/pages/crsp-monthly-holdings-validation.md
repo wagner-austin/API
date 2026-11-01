@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py"
   - "libs/covenant_ml/docs/MARKET_RESEARCH.md"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py"
@@ -12,8 +13,9 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "97ee0fc04a51497e2130087475c5780de6757d5d"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "35c5af1aa9768da3ddd0d9c49818d699751cbe6c"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
@@ -44,6 +46,17 @@ dated after the scored exit refuses the whole evaluation. Hand-calculated cases
 check two-month drift, turnover and liquidation and a three-month delisting
 whose value waits one month before reinvestment.[^holdings]
 
+Label construction uses the same execution validator: entry must be a closing
+trade, and an ordinary exit must also be tradable. Terminal daily records are
+never fills, even with a contradictory trade flag. The terminal interval is
+`[entry, exit)`: a delisting on entry is included, while a last ordinary trade
+on exit can be sold before the subsequent terminal outcome. Tests cover these
+boundaries and the pre-entry delisting found by the licensed baseline, without
+filtering decision-time selection using later outcomes. See
+[[wrds-baseline-20261101]] for that incident and the remaining study-rule gap.[^execution]
+
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic and verified-extract label refusal.
+
 The validation study builds decisions only up to the day before the final
 period. Labels are whether a security's window multiplier, terminal value
 included, beats the eligible universe's equal-weight multiplier, available at
@@ -66,6 +79,6 @@ December 2021. Tests exclude an exit equal to the boundary and verify that
 changing later returns and prices leaves validation output unchanged. This
 temporal exclusion does not establish process or credential isolation.[^holdings][^boundary]
 
-[^holdings]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `evaluate_crsp_holdings` and `crsp_window_path`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation` and `crsp_study_rows`; `libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py`, `decode_research_evaluation`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_crsp_study.py` and `test_research_trial.py`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Monthly holdings and validation study". Initial integration evidence: fleet job 48a2d9c8-b9f6-4c6b-8a65-917bd3828f37 passed make check for libs/covenant_ml at API fd3f7723bd6eb7f5fbc5caa3157efed306bf3949: 4743 tests, 100% coverage. Board task 8f7247a1-aa1a-41d7-be0e-f2b8e97c1d2d. The substantive monthly CRSP study has not run.
+[^holdings]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `evaluate_crsp_holdings` and `crsp_window_path`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation` and `crsp_study_rows`; `libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py`, `decode_research_evaluation`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_crsp_study.py` and `test_research_trial.py`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Monthly holdings and validation study". Initial integration evidence: fleet job 48a2d9c8-b9f6-4c6b-8a65-917bd3828f37 passed make check for libs/covenant_ml at API fd3f7723bd6eb7f5fbc5caa3157efed306bf3949: 4743 tests, 100% coverage. Board task 8f7247a1-aa1a-41d7-be0e-f2b8e97c1d2d. This was synthetic integration evidence; the later licensed attempt stopped before fitting, as recorded in [[wrds-baseline-20261101]].
 
 [^boundary]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation`; `libs/covenant_ml/tests/markets/test_crsp_study.py`, `test_holdout_boundary_excludes_equal_and_later_exits` and `test_changed_holdout_outcomes_cannot_change_validation`; `libs/covenant_ml/tests/markets/test_research_trial.py`, `test_real_trainers_emit_the_admitted_shared_monthly_record`. Fleet job 9152ad13-99d3-4c5b-9686-6082ed67f8fb passed full make check at API cbe6d15998b6d8443ac89f46a8e72d367258fcf8: 4767 tests, 100% statement/branch coverage, strict typing and guards clean, 2026-10-30T02:34:54Z. Board task b1d24135-ad6d-4d32-a0d4-cef6abc83813 tracks independent review.

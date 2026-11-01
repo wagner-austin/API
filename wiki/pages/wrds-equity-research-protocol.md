@@ -26,6 +26,9 @@ start with [[wrds-baseline-readiness]] for that boundary.[^contract]
 | Question | Authoritative page |
 |---|---|
 | What has run, and what remains before the baseline? | [[wrds-baseline-readiness]] |
+| Which exact runtime and datasets are installed? | [[wrds-installed-runtime]] and [[wrds-licensed-data-evidence]] |
+| What did the synthetic operational and cleanup probes establish? | [[wrds-operational-rehearsals]] and [[wrds-cleanup-evidence]] |
+| Why did the licensed baseline stop? | [[wrds-baseline-20261101]] |
 | What are the frozen target, universe, dates and costs? | [[crsp-monthly-study-design]] |
 | Which CRSP relations, flags and date rules construct the panel? | [[crsp-monthly-data-contract]] |
 | How do holdings, turnover, label purging and uncertainty work? | [[crsp-monthly-holdings-validation]] |
