@@ -34,6 +34,7 @@ class ResearchObservation(TypedDict):
     record_sha256: ReadOnly[str | None]
     controller_python: ReadOnly[str]
     controller_python_sha256: ReadOnly[str]
+    handover_sha256: ReadOnly[str | None]
 
 
 def decode_observation(value: JSONValue) -> ResearchObservation:
@@ -55,13 +56,21 @@ def decode_observation(value: JSONValue) -> ResearchObservation:
         "record_sha256",
         "controller_python",
         "controller_python_sha256",
+        "handover_sha256",
     }:
         raise ValueError("RESEARCH_OBSERVATION: unexpected observation fields")
     python = require_str(row, "controller_python")
     if not pathlib.PurePosixPath(python).is_absolute():
         raise ValueError("RESEARCH_OBSERVATION: executing controller path must be absolute")
     python_digest = require_digest(require_str(row, "controller_python_sha256"))
+    handover = (
+        None
+        if row["handover_sha256"] is None
+        else require_digest(require_str(row, "handover_sha256"))
+    )
     state = require_member(row, "state", ResearchState)
+    if handover is not None and state is not ResearchState.COMPLETE:
+        raise ValueError("RESEARCH_OBSERVATION: handover requires completed validation")
     native = require_str(row, "native_job_id")
     digest = row["record_sha256"]
     if state is ResearchState.COMPLETE:
@@ -78,6 +87,7 @@ def decode_observation(value: JSONValue) -> ResearchObservation:
         record_sha256=pin,
         controller_python=python,
         controller_python_sha256=python_digest,
+        handover_sha256=handover,
     )
 
 
@@ -96,6 +106,7 @@ def encode_observation(value: ResearchObservation) -> JSONObject:
         "record_sha256": value["record_sha256"],
         "controller_python": value["controller_python"],
         "controller_python_sha256": value["controller_python_sha256"],
+        "handover_sha256": value["handover_sha256"],
     }
 
 
