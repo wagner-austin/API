@@ -108,7 +108,7 @@ def test_verified_extract_preserves_selection_and_labels_rejected_order_cash(
         for permno in (7, 6, 5, 4, 3)
     ]
     benchmark = sum(multipliers) / 6
-    assert [int(label) for label in labels.labels] == [
+    assert [int(labels.labels.flat[index]) for index in range(len(multipliers))] == [
         int(value > benchmark) for value in multipliers
     ]
     assert labels.features.shape == (6, 2)
