@@ -67,11 +67,14 @@ def _encode_series(series: CrspSeries, seed: int) -> JSONObject:
             }
             owed.append(receivable)
         selected: list[JSONValue] = list(period.selected)
+        unfilled: list[JSONValue] = list(period.unfilled)
         month: JSONObject = {
             "decision": period.window.decision,
             "entry": period.window.entry,
             "exit": period.window.exit,
             "selected": selected,
+            "unfilled": unfilled,
+            "cash": period.cash,
             "turnover": period.turnover,
             "cost": period.cost,
             "net_return": period.net_return,
@@ -233,7 +236,7 @@ def publish_monthly_record(
         entry: JSONObject = {"decision": decision.window.decision, "counts": counts}
         exclusions.append(entry)
     encoded: JSONObject = {
-        "kind": f"research-monthly-{partition}-v1",
+        "kind": f"research-monthly-{partition}-v2",
         "attempt": trial["number"],
         "policy_digest": research_policy_digest(policy),
         "candidate_digest": candidate_digest(proposal),

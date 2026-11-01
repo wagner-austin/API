@@ -4,8 +4,10 @@ Portfolio value starts at one unit of reinvestable cash. At every rebalance,
 the first trading close of a month, the investable value (held positions plus
 cash whose terminal valuation date lies strictly before that close) is split
 equally across the selected securities. Traded notional is measured against
-the drifted pre-trade positions, and its cost is paid out of the portfolio,
-so the evaluation is self-financing. Positions then compound their own
+the drifted pre-trade positions and actual post-cost targets. The budget
+equation pays that cost from the portfolio. A confirmed pre-entry delisting
+rejects a new purchase: its equal allocation stays in zero-interest cash,
+without replacement or redistribution. Positions then compound their own
 ordinary daily returns to the next rebalance. A security delisted inside the
 window stops compounding at its delisting date and becomes a receivable worth
 its terminal multiplier, applied once and dated by ``crsp_terminal_value``; it
@@ -49,12 +51,15 @@ class CrspPath(NamedTuple):
     """One security's value multipliers across one window.
 
     Args:
+        filled: Whether the selected purchase executed; a rejected purchase
+            retains cash with growth one and no terminal claim.
         growth: Compounded ordinary daily returns after entry, through the exit
             or, for a delisted security, through its delisting date.
         terminal: Terminal valuation date and multiplier when the security was
             delisted inside the window, else None.
     """
 
+    filled: bool
     growth: float
     terminal: tuple[str, float] | None
 
@@ -72,7 +77,9 @@ class CrspPeriod(NamedTuple):
 
     Args:
         window: Decision, entry and exit closes.
-        selected: Securities bought to equal weight at the entry close.
+        selected: Decision-time selections, including rejected purchases.
+        unfilled: Selections whose confirmed terminal record prevented purchase.
+        cash: Reinvestable cash as a share of the pre-liquidation end value.
         turnover: Traded notional over the start value, liquidation included.
         cost: Transaction cost over the start value.
         net_return: End value over start value, minus one.
@@ -84,6 +91,8 @@ class CrspPeriod(NamedTuple):
 
     window: CrspWindow
     selected: tuple[int, ...]
+    unfilled: tuple[int, ...]
+    cash: float
     turnover: float
     cost: float
     net_return: float
@@ -170,8 +179,8 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
     The daily series' own delisting-flagged rows after the delisting date are
     never compounded: the terminal multiplier comes from ``stkdelists`` alone,
     so a terminal outcome is counted exactly once. Label construction uses this
-    same path as holdings and must prove a tradable entry, plus a tradable exit
-    when the position does not terminate inside the window.
+    same path as holdings: a confirmed rejected order retains cash, while an
+    executed order requires a tradable exit or an in-window terminal event.
 
     Args:
         outcomes: Indexed evidence.
@@ -185,15 +194,17 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
         ValueError: CRSP-004 for an unexecutable entry or ordinary exit;
             CRSP-009 for a missing or non-ordinary held return or a
             terminal value dated after the exit; CRSP-005 propagates for an
-            unresolved terminal event.
+            unresolved terminal event; CRSP-010 for contradictory terminal-entry
+            evidence.
     """
+    days = _sessions_after(outcomes.sessions, window.entry, window.exit)
+    if not _entry_filled(outcomes, permno, window):
+        return CrspPath(False, 1.0, None)
     terminal = _terminal_row(outcomes, permno, window)
     end = window.exit if terminal is None else require_str(terminal, "delistingdt")
-    days = _sessions_after(outcomes.sessions, window.entry, end)
-    _require_fill(outcomes, permno, window.entry)
     growth = 1.0
     previous = window.entry
-    for day in days:
+    for day in days[: bisect_right(days, end)]:
         row = outcomes.returns.get((permno, day))
         if row is None or not crsp_ordinary_return(row, previous):
             raise ValueError(f"[CRSP-009] held return for {permno} on {day} is not ordinary")
@@ -203,11 +214,50 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
         raise ValueError("[CRSP-009] compounded held return is not finite")
     if terminal is None:
         _require_fill(outcomes, permno, window.exit)
-        return CrspPath(growth, None)
+        return CrspPath(True, growth, None)
     valued, multiplier = crsp_terminal_value(terminal)
     if valued > window.exit:
         raise ValueError(f"[CRSP-009] terminal value for {permno} is dated after the exit")
-    return CrspPath(growth, (valued, multiplier))
+    return CrspPath(True, growth, (valued, multiplier))
+
+
+def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bool:
+    """Distinguish one confirmed rejected new purchase from unverifiable evidence.
+
+    A terminal daily row is a rejected order only when exactly one event at
+    the decision close precedes entry, the duration is DD and the price is
+    not marked as a closing trade. No terminal return is imputed: no security
+    was bought. Missing or contradictory evidence still refuses evaluation.
+
+    Args:
+        outcomes: Indexed verified source records.
+        permno: Selected security.
+        window: Decision and execution dates.
+
+    Returns:
+        True for a verified closing trade, False for a confirmed rejection.
+
+    Raises:
+        ValueError: CRSP-010 for inconsistent terminal-entry evidence;
+            CRSP-004/009 propagate for other unexecutable entries.
+    """
+    row = outcomes.returns.get((permno, window.entry))
+    if row is not None and row["dlydelflg"] == "Y":
+        events = [
+            item
+            for item in outcomes.delists.get(permno, ())
+            if require_str(item, "delistingdt") == window.decision
+        ]
+        if (
+            len(events) != 1
+            or window.decision >= window.entry
+            or row["dlyretdurflg"] != "DD"
+            or row["dlyprcflg"] == "TR"
+        ):
+            raise ValueError(f"[CRSP-010] inconsistent terminal entry for {permno}")
+        return False
+    _require_fill(outcomes, permno, window.entry)
+    return True
 
 
 def _require_fill(outcomes: CrspOutcomes, permno: int, day: str) -> None:
@@ -225,8 +275,6 @@ def _require_fill(outcomes: CrspOutcomes, permno: int, day: str) -> None:
     row = outcomes.returns.get((permno, day))
     if row is None:
         raise ValueError(f"[CRSP-009] no execution record for {permno} on {day}")
-    if row["dlydelflg"] != "N":
-        raise ValueError(f"[CRSP-004] terminal record for {permno} on {day} is not a fill")
     require_crsp_execution_price(row, outcomes.protocol)
 
 
@@ -292,30 +340,31 @@ def evaluate_crsp_holdings(
         investable = cash + sum(positions.values())
         investable += sum(item.amount for item in receivables if item.valued < window.entry)
         receivables = [item for item in receivables if item.valued >= window.entry]
-        target = investable / len(selected)
-        traded = 0.0
-        for permno in sorted(set(positions) | set(selected)):
+        paths = {permno: crsp_window_path(outcomes, permno, window) for permno in selected}
+        filled = tuple(permno for permno in selected if paths[permno].filled)
+        unfilled = tuple(permno for permno in selected if not paths[permno].filled)
+        for permno in positions:
             _require_fill(outcomes, permno, window.entry)
-            traded += abs((target if permno in selected else 0.0) - positions.get(permno, 0.0))
+        each, traded = _rebalance_notional(investable, positions, filled, len(selected), rate)
         cost = rate * traded
-        each = (investable - cost) / len(selected)
-        cash = 0.0
+        cash = each * len(unfilled)
         positions = {}
-        for permno in selected:
-            path = crsp_window_path(outcomes, permno, window)
+        for permno in filled:
+            path = paths[permno]
             if path.terminal is None:
                 positions[permno] = each * path.growth
             else:
                 valued, multiplier = path.terminal
                 amount = each * path.growth * multiplier
                 receivables.append(CrspReceivable(permno, valued, amount))
-        end = sum(positions.values()) + sum(item.amount for item in receivables)
+        end = cash + sum(positions.values()) + sum(item.amount for item in receivables)
         if not end > 0:
             raise ValueError("[CRSP-009] portfolio value was exhausted; weights are undefined")
         held = tuple((permno, positions[permno] / end) for permno in sorted(positions))
         owed = tuple(
             CrspReceivable(item.permno, item.valued, item.amount / end) for item in receivables
         )
+        cash_weight = cash / end
         if index == len(windows) - 1:
             for permno in positions:
                 _require_fill(outcomes, permno, window.exit)
@@ -324,9 +373,57 @@ def evaluate_crsp_holdings(
             cost += rate * liquidated
             end -= rate * liquidated
         periods.append(
-            CrspPeriod(window, selected, traded / start, cost / start, end / start - 1, held, owed)
+            CrspPeriod(
+                window,
+                selected,
+                unfilled,
+                cash_weight,
+                traded / start,
+                cost / start,
+                end / start - 1,
+                held,
+                owed,
+            )
         )
     return tuple(periods)
+
+
+def _rebalance_notional(
+    investable: float,
+    positions: dict[int, float],
+    filled: tuple[int, ...],
+    slots: int,
+    rate: float,
+) -> tuple[float, float]:
+    """Solve the self-financing equal-allocation budget on its linear segments.
+
+    Every slot, including a rejected order's cash, receives x. Actual turnover
+    T(x) is the sum of sells outside filled plus abs(x - prior) inside filled.
+    Solve slots*x + rate*T(x) = investable. Its slope is strictly positive
+    under the frozen cost rates; breakpoints are prior position values.
+
+    Args:
+        investable: Nonnegative cash and held value available to allocate.
+        positions: Drifted pre-trade position values.
+        filled: Purchases supported by execution evidence.
+        slots: Positive count of decision-time selections.
+        rate: Frozen cost per unit of actual traded notional.
+
+    Returns:
+        Equal post-cost slot value and actual traded notional.
+    """
+    prior = sorted(positions.get(permno, 0.0) for permno in filled)
+    sold = sum(amount for permno, amount in positions.items() if permno not in filled)
+    intercept = sold + sum(prior)
+    slope = -len(prior)
+    for boundary in prior:
+        if slots * boundary + rate * (intercept + slope * boundary) >= investable:
+            break
+        intercept -= 2 * boundary
+        slope += 2
+    each = (investable - rate * intercept) / (slots + rate * slope)
+    traded = sold + sum(abs(each - value) for value in prior)
+    return each, traded
 
 
 __all__ = [

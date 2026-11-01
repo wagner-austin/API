@@ -92,7 +92,7 @@ def evaluation_digest(value: ResearchEvaluation) -> str:
         Digest naming the validation-only monthly holdings study.
     """
     document: JSONObject = {
-        "kind": "crsp-monthly-holdings-validation-v1",
+        "kind": "crsp-monthly-holdings-validation-v2",
         "settings": encode_research_evaluation(value),
     }
     return sha256(dump_json_str(document).encode()).hexdigest()

@@ -5,6 +5,9 @@ label is whether the security's window value multiplier, terminal value
 included once, beats the eligible universe's equal-weight multiplier; that
 label becomes available at the window's exit close. The existing binary
 trainers rank securities by predicted probability of beating the universe.
+An order rejected by the protocol's confirmed pre-entry delisting rule retains
+its cash multiplier of one in both the label benchmark and holdings. The
+decision-time universe is never filtered by later execution or outcomes.
 
 Validation decisions are scored in consecutive expanding folds. Each fold fits
 on every earlier decision except the declared stopping months immediately

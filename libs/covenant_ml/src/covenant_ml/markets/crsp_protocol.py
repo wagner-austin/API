@@ -41,6 +41,8 @@ class CrspProtocol(TypedDict):
     exchange_codes: ReadOnly[tuple[int, ...]]
     calendar_group: ReadOnly[str]
     execution_flag: ReadOnly[str]
+    entry_rule: ReadOnly[str]
+    cost_rule: ReadOnly[str]
     terminal_rule: ReadOnly[str]
     min_price: ReadOnly[float]
     min_history: ReadOnly[int]
@@ -84,6 +86,8 @@ def encode_crsp_protocol(record: CrspProtocol) -> JSONObject:
         "exchange_codes": list(record["exchange_codes"]),
         "calendar_group": record["calendar_group"],
         "execution_flag": record["execution_flag"],
+        "entry_rule": record["entry_rule"],
+        "cost_rule": record["cost_rule"],
         "terminal_rule": record["terminal_rule"],
         "min_price": record["min_price"],
         "min_history": record["min_history"],
@@ -194,7 +198,7 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
     minimum = require_bounded_int(document, "min_history", 252, 10000)
     liquidity = require_bounded_int(document, "liquidity_window", 1, minimum)
     return CrspProtocol(
-        version=require_bounded_int(document, "version", 1, 1),
+        version=require_bounded_int(document, "version", 2, 2),
         library=_require_fixed(document, "library", "crsp_a_stock"),
         membership=_require_fixed(document, "membership", "dsenames"),
         returns=_require_fixed(document, "returns", "stkdlysecuritydata"),
@@ -246,6 +250,8 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
         exchange_codes=_require_codes(document, "exchange_codes", (1, 2, 3)),
         calendar_group=_require_fixed(document, "calendar_group", "CIZ"),
         execution_flag=_require_fixed(document, "execution_flag", "TR"),
+        entry_rule=_require_fixed(document, "entry_rule", "confirmed-terminal-entry-cash"),
+        cost_rule=_require_fixed(document, "cost_rule", "actual-traded-notional"),
         terminal_rule=_require_fixed(document, "terminal_rule", "dated-value-next-rebalance"),
         min_price=price,
         min_history=minimum,
