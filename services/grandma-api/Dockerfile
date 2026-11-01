@@ -68,9 +68,11 @@ WORKDIR /workspace
 # torch, torchaudio and transformers, platform_stt for numpy), which
 # tests/test_dockerfile_model_layer.py pins to their pyproject files: with
 # bare names this layer took transformers 5 and numpy 2, and the install
-# below spent 106 s replacing them.
+# below spent 106 s replacing them. torchaudio stays below 2.9, whose load
+# needs the separate torchcodec package, which platform_langid's default
+# audio loader does not install (MCPs board task 3e7cfd51).
 RUN pip install --extra-index-url https://download.pytorch.org/whl/cpu \
-        "torch>=2.0.0,<3.0.0" "torchaudio>=2.0.0,<3.0.0" "transformers>=4.30.0,<5.0.0" "numpy<2.0" \
+        "torch>=2.0.0,<3.0.0" "torchaudio>=2.0.0,<2.9" "transformers>=4.30.0,<5.0.0" "numpy<2.0" \
     && rm -rf /root/.cache
 
 COPY --from=builder /workspace/services/grandma-api/dist/*.whl /workspace/dist/
