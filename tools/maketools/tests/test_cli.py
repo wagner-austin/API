@@ -205,7 +205,7 @@ def test_lint_makefiles_reports_the_count_and_the_violations(world: World) -> No
     assert world.lines == [
         "lint-makefiles: 1 tracked Makefile(s) in the portable grammar, "
         "every one beginning with the shell prologue and every check printing the pass banner "
-        "under the five-minute budget"
+        "under the five-minute budget, every poetry install and sync passing --no-cache"
     ]
     bad = root / "tools" / "maketools" / "runs" / "bad" / "Makefile"
     bad.parent.mkdir(parents=True, exist_ok=True)

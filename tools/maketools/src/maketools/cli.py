@@ -25,6 +25,7 @@ from maketools.lift import drifted_lifts, read_lift_lock, refresh_lifts
 from maketools.makefile_banner_rule import lint_banners
 from maketools.makefile_budget_rule import lint_budgets
 from maketools.makefile_grammar import lint_grammar, render_violation
+from maketools.makefile_poetry_cache_rule import lint_poetry_caches
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
 from maketools.test_run import Runner, run_tests
 from maketools.venv_check import check_venv
@@ -157,20 +158,26 @@ def command_reap_stale(arguments: Sequence[str]) -> int:
 
 
 def command_lint_makefiles(arguments: Sequence[str]) -> int:
-    """``lint-makefiles``: the grammar, banner and budget rules over every tracked Makefile.
+    """``lint-makefiles``: the grammar, banner, budget and poetry cache rules over every Makefile.
 
     Args:
         arguments: None expected.
 
     Returns:
-        1 when any Makefile is outside the grammar, or a ``check:`` target
+        1 when any Makefile is outside the grammar, a ``check:`` target
         does not print the pass banner last or does not run under the
-        five-minute budget, else 0.
+        five-minute budget, or a recipe runs ``poetry install`` or ``sync``
+        without ``--no-cache``, else 0.
     """
     require_no_arguments("lint-makefiles", arguments)
     repo_root = repository_root()
     examined, grammar_violations = lint_grammar(repo_root)
-    violations = [*grammar_violations, *lint_banners(repo_root), *lint_budgets(repo_root)]
+    violations = [
+        *grammar_violations,
+        *lint_banners(repo_root),
+        *lint_budgets(repo_root),
+        *lint_poetry_caches(repo_root),
+    ]
     for violation in violations:
         _test_hooks.write_error(render_violation(violation, repo_root))
     if violations:
@@ -181,7 +188,7 @@ def command_lint_makefiles(arguments: Sequence[str]) -> int:
     _test_hooks.write_line(
         f"lint-makefiles: {examined} tracked Makefile(s) in the portable grammar, "
         "every one beginning with the shell prologue and every check printing the pass banner "
-        "under the five-minute budget"
+        "under the five-minute budget, every poetry install and sync passing --no-cache"
     )
     return 0
 
