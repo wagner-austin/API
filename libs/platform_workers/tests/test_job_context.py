@@ -44,8 +44,8 @@ def test_job_context_publishes_started_and_progress() -> None:
     redis = FakeRedis()
     ctx: JobContext = make_job_context(
         redis=redis,
-        domain=JobDomain.TURKIC,
-        events_channel="turkic:events",
+        domain=JobDomain.COVENANT,
+        events_channel="covenant:events",
         job_id="job-1",
         user_id=7,
         queue_name="queue-x",
@@ -54,13 +54,13 @@ def test_job_context_publishes_started_and_progress() -> None:
     ctx.publish_started()
     started = _last(redis)
     assert started == {
-        "type": "turkic.job.started.v1",
-        "domain": JobDomain.TURKIC,
+        "type": "covenant.job.started.v1",
+        "domain": JobDomain.COVENANT,
         "job_id": "job-1",
         "user_id": 7,
         "queue": "queue-x",
     }
-    assert '"domain":"turkic"' in redis.published[-1].payload.replace(" ", "")
+    assert '"domain":"covenant"' in redis.published[-1].payload.replace(" ", "")
 
     ctx.publish_progress(50, "halfway")
     progress = _last(redis)

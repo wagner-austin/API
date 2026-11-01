@@ -132,13 +132,13 @@ run_rq_worker(config)
 Publish job lifecycle events to Redis using the generic event schema:
 
 ```python
-from platform_core.job_events import default_events_channel
+from platform_core.job_events import JobDomain, default_events_channel
 from platform_workers.job_context import JobContext, make_job_context
 
 ctx: JobContext = make_job_context(
     redis=redis_client,
-    domain="turkic",
-    events_channel=default_events_channel("turkic"),
+    domain=JobDomain.COVENANT,
+    events_channel=default_events_channel(JobDomain.COVENANT),
     job_id="abc123",
     user_id=42,
     queue_name="default",
