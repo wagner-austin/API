@@ -1,6 +1,6 @@
 # platform-ml
 
-Shared ML artifact handling: tarball utilities, versioned manifest schemas, remote artifact storage, and Weights & Biases integration.
+Shared ML artifact handling: tarball utilities, versioned manifest schemas, and Weights & Biases integration.
 
 ## Installation
 
@@ -13,52 +13,12 @@ platform-ml = { path = "../libs/platform_ml", develop = true }
 
 ```python
 from pathlib import Path
-from platform_ml import ArtifactStore, create_tarball, extract_tarball
-
-# Upload artifacts
-store = ArtifactStore(base_url="http://data-bank-api:8000", api_key="secret")
-resp = store.upload_artifact(Path("./model-output"), artifact_name="model-v1", request_id="req-123")
-
-# Download and extract
-root = store.download_artifact(
-    file_id="model-v1.tar.gz", dest_dir=Path("./downloaded"), request_id="req-456"
-)
+from platform_ml import create_tarball, extract_tarball
 ```
 
-## ArtifactStore
-
-Remote artifact storage wrapping `DataBankClient`. Upload directories as tarballs and download them back with integrity checks.
-
-```python
-from pathlib import Path
-from platform_ml import ArtifactStore, ArtifactStoreError
-
-store = ArtifactStore(
-    base_url="http://data-bank-api:8000",
-    api_key="secret",
-    timeout_seconds=600.0,
-)
-
-# Upload a directory as a tarball
-resp = store.upload_artifact(
-    Path("./model-output"),
-    artifact_name="model-v1",
-    request_id="req-123",
-)
-print(resp["file_id"], resp["sha256"])
-
-# Download and extract
-try:
-    root = store.download_artifact(
-        file_id="model-v1.tar.gz",
-        dest_dir=Path("./downloaded"),
-        request_id="req-456",
-        expected_root="model-v1",
-    )
-    print(root)  # Path to extracted directory
-except ArtifactStoreError as e:
-    print(f"Failed: {e}")
-```
+The HTTP artifact store that wrapped data-bank-api's client left with that
+service on 2026-11-01; Model-Trainer now stores artifacts on the filesystem
+(`model_trainer.cluster.stores.LocalArtifacts`).
 
 ## Manifest Schema
 
@@ -561,13 +521,6 @@ ShapTreeWrapper uses dynamic import to isolate the untyped `shap` library:
 - All outputs converted to strict Python types (`float`, `list[float]`)
 
 ## API Reference
-
-### Artifact Store
-
-| Type | Description |
-|------|-------------|
-| `ArtifactStore` | Remote artifact storage client |
-| `ArtifactStoreError` | Store operation error |
 
 ### Manifest
 
