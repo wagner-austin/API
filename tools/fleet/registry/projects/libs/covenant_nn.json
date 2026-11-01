@@ -3,6 +3,7 @@
   "minimum_workers": 2,
   "expected_minutes": 16,
   "required_tags": [
+    "gpu",
     "rust"
   ],
   "source": {
