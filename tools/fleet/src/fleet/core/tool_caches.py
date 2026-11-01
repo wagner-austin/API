@@ -134,15 +134,20 @@ def sh_build_lines(*, tools: str, marker: str, run_as: str) -> tuple[str, ...]:
 
     Returns:
         The lines. They leave ``$tool_cache`` naming the generation the
-        build reads.
+        build reads, ``$generation`` its name, and ``$generation_began``
+        ``yes`` when this build started it, else ``no``: a build that began
+        its generation fetched every package it installs, and its verdict
+        line says so (:mod:`fleet.core.run_summary`).
     """
     current = f'"$tools/{names.CURRENT_GENERATION_NAME}"'
     return (
         f"tools={tools}",
         f'{run_as}mkdir -p "$tools"',
         "now=$(date +%s)",
+        "generation_began=no",
         f"if ! {run_as}test -f {current} || "
         f"[ $((now - $({run_as}cat {current}))) -ge {GENERATION_SECONDS} ]; then",
+        "    generation_began=yes",
         f'    {run_as}mkdir -p "$tools/$now"',
         f'    printf \'%s\\n\' "$now" | {run_as}tee "$tools/$now/.pending" > /dev/null',
         f'    {run_as}mv -f "$tools/$now/.pending" {current}',

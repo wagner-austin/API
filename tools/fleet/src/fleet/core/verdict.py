@@ -29,6 +29,7 @@ from typing_extensions import TypedDict
 
 from fleet.core.ci_load import read_ci_load
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
+from fleet.core.run_summary import read_run_summary
 
 #: The line every package's ``make check`` prints last when it passed.
 CHECK_BANNER: Final = "=== ALL CHECKS PASSED ==="
@@ -141,6 +142,13 @@ class Verdict(TypedDict):
         ci: The host's CI load over the check
             (:func:`fleet.core.ci_load.read_ci_load`): what else the
             machine ran while the total was taken.
+        generation: The cache generation the build read, and
+        began: whether this build began it, and
+        phases: each phase's seconds, all three read off the build's last
+            line (:mod:`fleet.core.run_summary`): a check that began its
+            generation fetched every package it installs, and the phases
+            say whether that fetch fell before the budget's clock or inside
+            it (MCPs board tasks abb0a10e and 74d10d85).
     """
 
     job_id: str
@@ -158,6 +166,9 @@ class Verdict(TypedDict):
     workers: int
     slowest: str
     ci: str
+    generation: str
+    began: str
+    phases: str
 
 
 def read_slowest(tail: str) -> str:
@@ -308,6 +319,7 @@ def judge(
         The verdict, with the counts read or marked unread.
     """
     ended = datetime.datetime.fromtimestamp(ended_unix, tz=datetime.UTC)
+    summary = read_run_summary(tail)
     return Verdict(
         job_id=job_id,
         project=project,
@@ -324,6 +336,9 @@ def judge(
         workers=workers,
         slowest=read_slowest(tail),
         ci=read_ci_load(tail),
+        generation=summary["generation"],
+        began=summary["began"],
+        phases=summary["phases"],
     )
 
 
@@ -337,10 +352,11 @@ def render_verdict(verdict: Verdict) -> str:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
-        slowest=<...> ci=<...>``, one line, so a closure can quote it and a
-        reader can grep a thread for the prefix. ``workers``, ``slowest``
-        and ``ci`` come after every field the readers in MCPs' maketools
-        and session-audit match, each of which they match one by one.
+        slowest=<...> ci=<...> generation=<...> began=<...> phases=<...>``,
+        one line, so a closure can quote it and a reader can grep a thread
+        for the prefix. ``workers`` and every field after it come after every
+        field the readers in MCPs' maketools and session-audit match, each
+        of which they match one by one.
     """
     return (
         f"{VERDICT_PREFIX} {verdict['job_id'][:8]} {verdict['project']} "
@@ -349,7 +365,9 @@ def render_verdict(verdict: Verdict) -> str:
         f"coverage={verdict['coverage']} budget={verdict['budget']} "
         f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
         f"run={verdict['run_id']} workers={verdict['workers']} "
-        f"slowest={verdict['slowest']} ci={verdict['ci']}"
+        f"slowest={verdict['slowest']} ci={verdict['ci']} "
+        f"generation={verdict['generation']} began={verdict['began']} "
+        f"phases={verdict['phases']}"
     )
 
 

@@ -69,6 +69,7 @@ from fleet.core.names import (
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: How a script file is run by path; the path is appended.
@@ -422,11 +423,14 @@ def build_script(
         command = " ".join(step["argv"])
         lines.append(f"printf '$ %s\\n' '{command}' >> '{log}'")
         lines.extend(sh_phase_lines(phase=step["phase"], command=command, log=log))
-        lines.append(f'if [ "$status" -ne 0 ]; then {written}; exit 0; fi')
+        lines.append(
+            f'if [ "$status" -ne 0 ]; then {sh_run_summary_line(log)}; {written}; exit 0; fi'
+        )
     lines.append(f"cd '{names.recipe_directory(target, path)}'")
     lines.extend(sh_ci_load_start_lines(CI_CPU_STAT))
     lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log))
     lines.extend(sh_ci_load_end_lines(CI_CPU_STAT, log))
+    lines.append(sh_run_summary_line(log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"
 

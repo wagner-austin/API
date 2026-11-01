@@ -57,8 +57,10 @@ def sh_phase_lines(*, phase: str, command: str, log: str) -> list[str]:
         log: The transcript's path, appended to.
 
     Returns:
-        The lines, ending with the phase's closing line; ``$status`` holds
-        the command's exit status after them.
+        The lines, ending with the phase's closing line and its entry in
+        ``$phases``, the run's ``<phase>:<seconds>s`` list, comma-joined in
+        order, which :mod:`fleet.core.run_summary` prints where the verdict
+        reads it; ``$status`` holds the command's exit status after them.
     """
     return [
         'phase_started="$(date +%s)"',
@@ -67,8 +69,10 @@ def sh_phase_lines(*, phase: str, command: str, log: str) -> list[str]:
         f"{command} >> '{log}' 2>&1",
         "status=$?",
         "set -e",
+        'phase_seconds="$(( $(date +%s) - phase_started ))"',
         f"printf '{PHASE_MARKER} %s ended %s after %s s, exit %s\\n' '{phase}' {SH_UTC_STAMP} "
-        f'"$(( $(date +%s) - phase_started ))" "$status" >> \'{log}\'',
+        f'"$phase_seconds" "$status" >> \'{log}\'',
+        f'phases="${{phases:+$phases,}}{phase}:${{phase_seconds}}s"',
     ]
 
 

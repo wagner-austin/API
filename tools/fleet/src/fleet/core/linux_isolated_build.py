@@ -72,6 +72,7 @@ from fleet.core.names import (
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: The user whose rootless daemon a docker project's build runs against.
@@ -200,6 +201,7 @@ def isolated_build_lines(
             )
         )
         lines.append('if [ "$status" -ne 0 ]; then')
+        lines.append(f"  {sh_run_summary_line(log)}")
         lines.append('  sudo -n rm -rf "$exec_root"')
         lines.append(f"  printf '%s\\n' \"$status\" > '{result}'")
         lines.append("  exit 0")
@@ -215,6 +217,7 @@ def isolated_build_lines(
         )
     )
     lines.extend(sh_ci_load_end_lines(CI_CPU_STAT, log))
+    lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
     return lines

@@ -20,8 +20,37 @@ from tests._host_bash import host_bash
 DAY: Final = 86400
 
 
-def _read(tools: pathlib.Path, marker: pathlib.Path) -> str:
+def _run(tools: pathlib.Path, marker: pathlib.Path) -> tuple[str, str]:
     """Run the build's lines once, as a build starting now does.
+
+    Args:
+        tools: The generations directory.
+        marker: The run directory's marker file.
+
+    Returns:
+        The ``$tool_cache`` and the ``$generation_began`` the lines left.
+    """
+    lines = tool_caches.sh_build_lines(
+        tools=f"'{tools.as_posix()}'", marker=f"'{marker.as_posix()}'", run_as=""
+    )
+    tools.parent.mkdir(parents=True, exist_ok=True)
+    script = tools.parent / "build.sh"
+    script.write_text(
+        "set -eu\n"
+        + "".join(f"{line}\n" for line in lines)
+        + 'printf \'%s %s\\n\' "$tool_cache" "$generation_began"\n',
+        encoding="utf-8",
+    )
+    ran = subprocess.run(
+        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
+    )
+    assert ran.returncode == 0, ran.stderr
+    cache, began = ran.stdout.split()
+    return cache, began
+
+
+def _read(tools: pathlib.Path, marker: pathlib.Path) -> str:
+    """Run the build's lines once and keep the cache they left.
 
     Args:
         tools: The generations directory.
@@ -30,20 +59,7 @@ def _read(tools: pathlib.Path, marker: pathlib.Path) -> str:
     Returns:
         The ``$tool_cache`` the lines left.
     """
-    lines = tool_caches.sh_build_lines(
-        tools=f"'{tools.as_posix()}'", marker=f"'{marker.as_posix()}'", run_as=""
-    )
-    tools.parent.mkdir(parents=True, exist_ok=True)
-    script = tools.parent / "build.sh"
-    script.write_text(
-        "set -eu\n" + "".join(f"{line}\n" for line in lines) + "printf '%s\\n' \"$tool_cache\"\n",
-        encoding="utf-8",
-    )
-    ran = subprocess.run(
-        [host_bash(), script.as_posix()], capture_output=True, text=True, check=False, timeout=60
-    )
-    assert ran.returncode == 0, ran.stderr
-    return ran.stdout.strip()
+    return _run(tools, marker)[0]
 
 
 def _generation(tools: pathlib.Path, *, days_ago: int) -> str:
@@ -121,3 +137,14 @@ def test_a_generation_two_weeks_old_is_followed_by_a_new_one_and_kept(
     # The old one stays for the builds that read it; the removal judges it.
     assert (tools / old).is_dir()
     assert not (tools / generation / ".pending").exists()
+
+
+def test_a_build_says_whether_it_began_its_generation(tmp_path: pathlib.Path) -> None:
+    tools = tmp_path / "cache" / "tools"
+    marker = tmp_path / names.GENERATION_MARKER_NAME
+
+    first = _run(tools, marker)
+    second = _run(tools, marker)
+
+    assert first[1] == "yes"
+    assert second == (first[0], "no")

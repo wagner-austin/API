@@ -32,6 +32,7 @@ from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
 from fleet.core.phase_markers import SH_UTC_STAMP
+from fleet.core.run_summary import sh_run_summary_line
 from tests.conftest import DEMO_PROJECT
 
 TARGET = "/home/corvis/fleet/stage/slime-execution-1790600000"
@@ -172,12 +173,15 @@ class TestIsolatedText:
         assert "fleet-phase %s started" in lines[first - 2] and "'install'" in lines[first - 2]
         assert "'workspace-build'" in lines[second - 2]
         assert "'check'" in lines[recipe - 2]
-        assert lines[first + 1 : first + 9] == [
+        assert lines[first + 1 : first + 12] == [
             "status=$?",
             "set -e",
+            'phase_seconds="$(( $(date +%s) - phase_started ))"',
             f"printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'install' {SH_UTC_STAMP} "
-            f'"$(( $(date +%s) - phase_started ))" "$status" >> \'{log}\'',
+            f'"$phase_seconds" "$status" >> \'{log}\'',
+            'phases="${phases:+$phases,}install:${phase_seconds}s"',
             'if [ "$status" -ne 0 ]; then',
+            f"  {sh_run_summary_line(log)}",
             '  sudo -n rm -rf "$exec_root"',
             f"  printf '%s\\n' \"$status\" > '{result}'",
             "  exit 0",
@@ -187,13 +191,16 @@ class TestIsolatedText:
     def test_the_copy_is_removed_before_the_status_is_written_last(self) -> None:
         lines = _isolated().splitlines()
         ci_load = sh_ci_load_end_lines(CI_CPU_STAT, names.log_path(TARGET))
+        loaded = len(ci_load)
 
-        assert lines[-4 - len(ci_load)] == "set -e"
-        assert lines[-3 - len(ci_load)].startswith(
+        assert lines[-7 - loaded] == "set -e"
+        assert lines[-5 - loaded].startswith(
             "printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'check'"
         )
-        assert lines[-2 - len(ci_load) : -2] == ci_load
-        assert lines[-2:] == [
+        assert lines[-4 - loaded] == 'phases="${phases:+$phases,}check:${phase_seconds}s"'
+        assert lines[-3 - loaded : -3] == ci_load
+        assert lines[-3:] == [
+            sh_run_summary_line(names.log_path(TARGET)),
             'sudo -n rm -rf "$exec_root"',
             f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'",
         ]

@@ -26,6 +26,7 @@ from fleet.core.dialect import PROLOGUE, SH_INVOCATION
 from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.names import CACHE_VARIABLE
 from fleet.core.phase_markers import SH_UTC_STAMP
+from fleet.core.run_summary import sh_run_summary_line
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 TARGET = "/home/corvis/fleet/stage/run-1"
@@ -195,15 +196,19 @@ class TestBuildScript:
             f"printf 'fleet-phase %s started %s\\n' 'install' {SH_UTC_STAMP} >> '{log}'",
             "set +e",
         ]
-        assert lines[first + 1 : first + 4] == [
+        assert lines[first + 1 : first + 6] == [
             "status=$?",
             "set -e",
+            'phase_seconds="$(( $(date +%s) - phase_started ))"',
             f"printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'install' {SH_UTC_STAMP} "
-            f'"$(( $(date +%s) - phase_started ))" "$status" >> \'{log}\'',
+            f'"$phase_seconds" "$status" >> \'{log}\'',
+            'phases="${phases:+$phases,}install:${phase_seconds}s"',
         ]
-        assert lines[first + 4] == (
-            f'if [ "$status" -ne 0 ]; then printf \'%s\\n\' "$status" > '
-            f"'{TARGET}/{names.RESULT_NAME}'; exit 0; fi"
+        # A failed step still prints the run's summary, so its verdict says
+        # which generation it read and how long the step took.
+        assert lines[first + 6] == (
+            f'if [ "$status" -ne 0 ]; then {sh_run_summary_line(log)}; '
+            f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'; exit 0; fi"
         )
         assert f"'workspace-build' {SH_UTC_STAMP}" in lines[second - 2]
 
@@ -228,6 +233,7 @@ class TestBuildScript:
         assert lines.index("set +e") < lines.index(recipe)
         assert lines.index(recipe) + 1 == lines.index("status=$?")
         assert lines.index("status=$?") + 1 == lines.index("set -e")
+        assert lines[-2] == sh_run_summary_line(f"{TARGET}/{names.RESULT_NAME}.log")
         assert lines[-1] == f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'"
 
 

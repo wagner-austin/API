@@ -39,6 +39,28 @@ def _run(log: pathlib.Path, command: str) -> str:
     return completed.stdout
 
 
+def test_each_phase_adds_its_seconds_to_the_run_s_list(tmp_path: pathlib.Path) -> None:
+    log = tmp_path / "result.txt.log"
+    lines = [
+        "set -eu",
+        *sh_phase_lines(phase="deps", command="true", log=log.as_posix()),
+        *sh_phase_lines(phase="check", command="sleep 1", log=log.as_posix()),
+        'printf "%s" "$phases"',
+    ]
+    completed = subprocess.run(
+        [host_bash(), "-c", "\n".join(lines) + "\n"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=60,
+    )
+    assert completed.returncode == 0, completed.stderr
+    listed = re.fullmatch(r"deps:(\d+)s,check:(\d+)s", completed.stdout)
+    assert listed is not None, completed.stdout
+    assert int(listed.group(1)) <= 1
+    assert 1 <= int(listed.group(2)) <= 3
+
+
 def _stamp(text: str) -> datetime:
     """Read one phase line's stamp."""
     return datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=UTC)
