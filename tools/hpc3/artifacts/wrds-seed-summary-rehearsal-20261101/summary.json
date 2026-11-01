@@ -1,0 +1,1230 @@
+{
+ "kind": "research-validation-seed-summary-v1",
+ "interpretation": "Descriptive after-search validation uncertainty; no multiplicity adjustment.",
+ "selection_uses_interval": false,
+ "final_scoring": "The selected candidate uses its fixed final seed, not this seed average.",
+ "policy": {
+  "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+  "dataset_digest": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14",
+  "code_digest": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+  "image_digest": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+  "features": [
+   "momentum",
+   "liquidity"
+  ],
+  "seeds": [
+   11,
+   23,
+   37,
+   53,
+   71
+  ],
+  "max_candidates": 1,
+  "max_seconds": 600,
+  "cpus": 4,
+  "mem_gb": 16,
+  "max_trees": 200,
+  "max_leaves": 31,
+  "selection": {
+   "primary": "lightgbm",
+   "reference": "momentum",
+   "cost_bps": 10,
+   "first_month": 24222,
+   "last_month": 24237,
+   "final_seed": 11,
+   "required_candidates": [
+    "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345"
+   ]
+  }
+ },
+ "evaluation": {
+  "design": {
+   "version": 1,
+   "library": "crsp_a_stock",
+   "membership": "dsenames",
+   "returns": "stkdlysecuritydata",
+   "calendar": "metaexchangecalendar",
+   "delists": "stkdelists",
+   "membership_columns": [
+    "permno",
+    "namedt",
+    "nameendt",
+    "shrcd",
+    "exchcd"
+   ],
+   "returns_columns": [
+    "permno",
+    "dlycaldt",
+    "dlyprevdt",
+    "dlyret",
+    "dlyretmissflg",
+    "dlyretdurflg",
+    "dlydelflg",
+    "dlyprc",
+    "dlyprcflg",
+    "dlyvol"
+   ],
+   "calendar_columns": [
+    "caldt",
+    "exchangegroup",
+    "tradingflg"
+   ],
+   "delists_columns": [
+    "permno",
+    "delistingdt",
+    "deldlydt",
+    "delamtdt",
+    "delnextdt",
+    "delret",
+    "delretmisstype"
+   ],
+   "source_sha256": "bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e",
+   "history_start": "2016-01-01",
+   "train_start": "2017-01-01",
+   "validation_start": "2018-07-01",
+   "holdout_start": "2020-01-01",
+   "holdout_end": "2020-06-30",
+   "coverage_end": "2020-08-31",
+   "share_codes": [
+    10,
+    11
+   ],
+   "exchange_codes": [
+    1,
+    2,
+    3
+   ],
+   "calendar_group": "CIZ",
+   "execution_flag": "TR",
+   "terminal_rule": "dated-value-next-rebalance",
+   "min_price": 5.0,
+   "min_history": 252,
+   "liquidity_window": 60,
+   "max_universe": 6,
+   "selection_fraction": 0.5,
+   "cost_bps": [
+    10,
+    5,
+    25
+   ],
+   "bootstrap_block_months": 3,
+   "bootstrap_draws": 200,
+   "bootstrap_seed": 7
+  },
+  "stopping_months": 6,
+  "fold_months": 12,
+  "confidence": 0.9
+ },
+ "results": [
+  {
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "arm": "cleargbm",
+   "reference": "momentum",
+   "cost_bps": 10,
+   "inputs": [
+    {
+     "attempt": 1,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 11,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "26c4592fc0ceddde13547f8496c920535ab91aea20175ee23e32ffff782534b5",
+     "payload_sha256": "a2cd272f67e82ccd54544480aae2f1d46b9756afbe7d713cfccdaa564911cae9"
+    },
+    {
+     "attempt": 2,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 23,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "77e832043fffe5e81029a7f502368017aa3ed9030f04d4f858b32a34b710d46f",
+     "payload_sha256": "6c3eb2004035607bc56d8abd85b48ff222828f36550b17207ab8cd87dc99ba50"
+    },
+    {
+     "attempt": 3,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 37,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "0e8e24c304fc2e093a680f3764d7775e7f176344efbb864ae98c0056a7481711",
+     "payload_sha256": "786e378acf8e3f9230ae910ce9e2a86a2df3ea54bb12c20c2f67d7519a627391"
+    },
+    {
+     "attempt": 4,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 53,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "35ec6ca82a7da25010466cdbe5e4f11dfc54a77a6a64517a8162364d40899bf2",
+     "payload_sha256": "e16c2a0d0d09f9920a4d38a0dfde3fe5c65dd69a2c970cbc65cd51621f19f072"
+    },
+    {
+     "attempt": 5,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 71,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "83595e51010df1a50cf1cc90bf83658a9862bc13f73853db0d7ff8471bb645de",
+     "payload_sha256": "3398668c265f86b02ff23c4fd348535b011acd8df834fd1e4de9c318ade8abbc"
+    }
+   ],
+   "calendar": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03"
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01"
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01"
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03"
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01"
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01"
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01"
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01"
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01"
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03"
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01"
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01"
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02"
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01"
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01"
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02"
+    }
+   ],
+   "mean_paired_differences": [
+    -0.0222051154195273,
+    0.03974690098074518,
+    -0.05652260383586216,
+    -0.06540098094652591,
+    -0.005433106104310914,
+    0.04030319477202471,
+    0.01715394190281483,
+    0.0013920002078264826,
+    -0.012862042727042833,
+    -0.02185018356436441,
+    0.028110608840154927,
+    -0.0885194942388301,
+    0.05106507052470377,
+    0.01798866210555894,
+    0.06717756380430018,
+    -0.00957325861404379
+   ],
+   "n_months": 16,
+   "n_seeds": 5,
+   "interval": {
+    "method": "moving_block_bootstrap",
+    "estimate": -0.0012143026445236502,
+    "std_error": 0.009420431587129139,
+    "ci_low": -0.015766716766974623,
+    "ci_high": 0.013341868933694637,
+    "confidence": 0.9,
+    "p_value": 0.7263681592039801,
+    "n_units": 5
+   }
+  },
+  {
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "arm": "lightgbm",
+   "reference": "momentum",
+   "cost_bps": 10,
+   "inputs": [
+    {
+     "attempt": 1,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 11,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "26c4592fc0ceddde13547f8496c920535ab91aea20175ee23e32ffff782534b5",
+     "payload_sha256": "a2cd272f67e82ccd54544480aae2f1d46b9756afbe7d713cfccdaa564911cae9"
+    },
+    {
+     "attempt": 2,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 23,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "77e832043fffe5e81029a7f502368017aa3ed9030f04d4f858b32a34b710d46f",
+     "payload_sha256": "6c3eb2004035607bc56d8abd85b48ff222828f36550b17207ab8cd87dc99ba50"
+    },
+    {
+     "attempt": 3,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 37,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "0e8e24c304fc2e093a680f3764d7775e7f176344efbb864ae98c0056a7481711",
+     "payload_sha256": "786e378acf8e3f9230ae910ce9e2a86a2df3ea54bb12c20c2f67d7519a627391"
+    },
+    {
+     "attempt": 4,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 53,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "35ec6ca82a7da25010466cdbe5e4f11dfc54a77a6a64517a8162364d40899bf2",
+     "payload_sha256": "e16c2a0d0d09f9920a4d38a0dfde3fe5c65dd69a2c970cbc65cd51621f19f072"
+    },
+    {
+     "attempt": 5,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 71,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "83595e51010df1a50cf1cc90bf83658a9862bc13f73853db0d7ff8471bb645de",
+     "payload_sha256": "3398668c265f86b02ff23c4fd348535b011acd8df834fd1e4de9c318ade8abbc"
+    }
+   ],
+   "calendar": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03"
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01"
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01"
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03"
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01"
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01"
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01"
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01"
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01"
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03"
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01"
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01"
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02"
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01"
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01"
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02"
+    }
+   ],
+   "mean_paired_differences": [
+    -0.0222051154195273,
+    0.03974690098074518,
+    -0.05652260383586216,
+    -0.06540098094652591,
+    -0.005433106104310914,
+    0.04030319477202471,
+    0.01715394190281483,
+    0.034511574538107936,
+    -0.012223008639285937,
+    -0.0218501835643643,
+    0.02811060884015515,
+    -0.0885194942388301,
+    0.05106507052470377,
+    0.056709105026076845,
+    0.06783418732424651,
+    -0.00957325861404379
+   ],
+   "n_months": 16,
+   "n_seeds": 5,
+   "interval": {
+    "method": "moving_block_bootstrap",
+    "estimate": 0.0033566770341327823,
+    "std_error": 0.010970899173382552,
+    "ci_low": -0.011851236287964965,
+    "ci_high": 0.021645801814971666,
+    "confidence": 0.9,
+    "p_value": 0.8557213930348259,
+    "n_units": 5
+   }
+  },
+  {
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "arm": "xgboost",
+   "reference": "momentum",
+   "cost_bps": 10,
+   "inputs": [
+    {
+     "attempt": 1,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 11,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "26c4592fc0ceddde13547f8496c920535ab91aea20175ee23e32ffff782534b5",
+     "payload_sha256": "a2cd272f67e82ccd54544480aae2f1d46b9756afbe7d713cfccdaa564911cae9"
+    },
+    {
+     "attempt": 2,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 23,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "77e832043fffe5e81029a7f502368017aa3ed9030f04d4f858b32a34b710d46f",
+     "payload_sha256": "6c3eb2004035607bc56d8abd85b48ff222828f36550b17207ab8cd87dc99ba50"
+    },
+    {
+     "attempt": 3,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 37,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "0e8e24c304fc2e093a680f3764d7775e7f176344efbb864ae98c0056a7481711",
+     "payload_sha256": "786e378acf8e3f9230ae910ce9e2a86a2df3ea54bb12c20c2f67d7519a627391"
+    },
+    {
+     "attempt": 4,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 53,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "35ec6ca82a7da25010466cdbe5e4f11dfc54a77a6a64517a8162364d40899bf2",
+     "payload_sha256": "e16c2a0d0d09f9920a4d38a0dfde3fe5c65dd69a2c970cbc65cd51621f19f072"
+    },
+    {
+     "attempt": 5,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 71,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "83595e51010df1a50cf1cc90bf83658a9862bc13f73853db0d7ff8471bb645de",
+     "payload_sha256": "3398668c265f86b02ff23c4fd348535b011acd8df834fd1e4de9c318ade8abbc"
+    }
+   ],
+   "calendar": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03"
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01"
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01"
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03"
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01"
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01"
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01"
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01"
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01"
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03"
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01"
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01"
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02"
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01"
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01"
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02"
+    }
+   ],
+   "mean_paired_differences": [
+    -0.026372253014471658,
+    0.007897089261038603,
+    -0.016164100910753154,
+    -0.015769139630648743,
+    0.0016558433630791125,
+    0.04095306822489553,
+    0.004724087140558608,
+    0.0005913750303285781,
+    0.01290862559570427,
+    -0.012211645482699707,
+    0.000670837582492978,
+    -2.220446049250313e-16,
+    2.220446049250313e-16,
+    0.0,
+    0.019585650389509324,
+    -0.008911313052744507
+   ],
+   "n_months": 16,
+   "n_seeds": 5,
+   "interval": {
+    "method": "moving_block_bootstrap",
+    "estimate": 0.0005973827810180771,
+    "std_error": 0.003414899781770062,
+    "ci_low": -0.003745474412271451,
+    "ci_high": 0.007774085959967613,
+    "confidence": 0.9,
+    "p_value": 0.5771144278606966,
+    "n_units": 5
+   }
+  },
+  {
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "arm": "equal_weight",
+   "reference": "momentum",
+   "cost_bps": 10,
+   "inputs": [
+    {
+     "attempt": 1,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 11,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "26c4592fc0ceddde13547f8496c920535ab91aea20175ee23e32ffff782534b5",
+     "payload_sha256": "a2cd272f67e82ccd54544480aae2f1d46b9756afbe7d713cfccdaa564911cae9"
+    },
+    {
+     "attempt": 2,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 23,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "77e832043fffe5e81029a7f502368017aa3ed9030f04d4f858b32a34b710d46f",
+     "payload_sha256": "6c3eb2004035607bc56d8abd85b48ff222828f36550b17207ab8cd87dc99ba50"
+    },
+    {
+     "attempt": 3,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 37,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "0e8e24c304fc2e093a680f3764d7775e7f176344efbb864ae98c0056a7481711",
+     "payload_sha256": "786e378acf8e3f9230ae910ce9e2a86a2df3ea54bb12c20c2f67d7519a627391"
+    },
+    {
+     "attempt": 4,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 53,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "35ec6ca82a7da25010466cdbe5e4f11dfc54a77a6a64517a8162364d40899bf2",
+     "payload_sha256": "e16c2a0d0d09f9920a4d38a0dfde3fe5c65dd69a2c970cbc65cd51621f19f072"
+    },
+    {
+     "attempt": 5,
+     "proposal": {
+      "hypothesis": "Synthetic operational rehearsal of the frozen monthly evaluator; no performance hypothesis.",
+      "parent": "root",
+      "protocol_digest": "3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca",
+      "partition": "validation",
+      "features": [
+       "momentum",
+       "liquidity"
+      ],
+      "seed": 71,
+      "seconds": 600,
+      "config": {
+       "n_estimators": 3,
+       "max_depth": 2,
+       "learning_rate": 0.05,
+       "max_bins": 16,
+       "min_data_in_leaf": 20,
+       "num_leaves": 4,
+       "reg_alpha": 0.0,
+       "reg_lambda": 0.0,
+       "n_jobs": 1,
+       "repeats": 1,
+       "warmups": 0
+      }
+     },
+     "record_sha256": "83595e51010df1a50cf1cc90bf83658a9862bc13f73853db0d7ff8471bb645de",
+     "payload_sha256": "3398668c265f86b02ff23c4fd348535b011acd8df834fd1e4de9c318ade8abbc"
+    }
+   ],
+   "calendar": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03"
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01"
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01"
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03"
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01"
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01"
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01"
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01"
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01"
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03"
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01"
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01"
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02"
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01"
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01"
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02"
+    }
+   ],
+   "mean_paired_differences": [
+    -0.03947363774774648,
+    0.020254760245129066,
+    -0.028257527713801522,
+    -0.03271494148885479,
+    -0.04386787989545082,
+    0.0037900016721825747,
+    -0.010798854675196146,
+    -0.009995951891917487,
+    0.00017740878499283852,
+    -0.008151090750364132,
+    0.014726529889837026,
+    -0.044263998906410196,
+    0.021324330566306227,
+    0.028131533164076794,
+    0.04571560999302038,
+    -0.009718814822597732
+   ],
+   "n_months": 16,
+   "n_seeds": 5,
+   "interval": {
+    "method": "moving_block_bootstrap",
+    "estimate": -0.00582015772354965,
+    "std_error": 0.0071204956811352985,
+    "ci_low": -0.017044146246033086,
+    "ci_high": 0.005446805270825247,
+    "confidence": 0.9,
+    "p_value": 0.4577114427860697,
+    "n_units": 5
+   }
+  }
+ ],
+ "journal_snapshot_sha256": "0cc7f66577a4a961ee21feaf84f00685701df6c0d0ddb20d0545a677662d4452",
+ "policy_digest": "b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0",
+ "reporter_sha256": "ad45b133ef0cf70965a71838bad92f1e3a0dd726279246ac970ee6bc7acf7b2e",
+ "attempts": [
+  {
+   "number": 1,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "status": "complete"
+  },
+  {
+   "number": 2,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "status": "complete"
+  },
+  {
+   "number": 3,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "status": "complete"
+  },
+  {
+   "number": 4,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "status": "complete"
+  },
+  {
+   "number": 5,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "status": "complete"
+  }
+ ]
+}

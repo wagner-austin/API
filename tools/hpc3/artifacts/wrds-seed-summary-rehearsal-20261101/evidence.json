@@ -1,0 +1,138 @@
+{
+ "board_task": "673a4bc4-8693-4764-8a8d-cca0483e279f",
+ "scope": "Synthetic operational rehearsal only. Five fixed seeds of one synthetic candidate ran through the existing shared queue on synthetic encrypted data; the licensed CRSP baseline has not run, and no licensed data was opened and no final grant released.",
+ "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+ "reporter_commit": "ef969f32d8e766fd1ae08b8b3b2f438c50f0006d",
+ "dispatch": "dispatch_submit research/hpc3 on node ziggurat; fleet-research-diphtheria claimed each request and the wrds-queue-b53b0ea34 adapter submitted and reconciled the native jobs through the installed research_proposals controller.",
+ "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+ "queue_controller_python": "/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python",
+ "image_sha256": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+ "policy_sha256": "b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0",
+ "trials": [
+  {
+   "attempt": 1,
+   "seed": 11,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "queue_id": "a7d5cc03-5849-4ccb-86c1-3eb96e976f3a",
+   "spec_sha256": "1e2f26a6b5185d3510d3a65f64b25c0ef3b7b1ab5a6e617fc577ac2eb4792e13",
+   "queue_attempt": "summary-b3843a3d3-1",
+   "native_job_id": "58721392",
+   "journal_record_sha256": "26c4592fc0ceddde13547f8496c920535ab91aea20175ee23e32ffff782534b5",
+   "trial_sha256": "83117913dced882bfb2c20d79d6e575f8dbd7f9e7f373bd7c4f1a68c2494d99a",
+   "attempt_report_ids": [
+    "0c75b01d-5818-4796-bab7-07da1f749fce",
+    "15ff8455-227a-4e3c-8931-4f4eb0b613a9",
+    "f567f1d2-0611-4981-95d2-775ac7e346de"
+   ]
+  },
+  {
+   "attempt": 2,
+   "seed": 23,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "queue_id": "f8cd4f5c-5c2f-427e-95be-b033e4b7c4b8",
+   "spec_sha256": "5e5434e1340e183440a9d18a1d84d914d90245a635c9c6fef3494536a97b812b",
+   "queue_attempt": "summary-b3843a3d3-2",
+   "native_job_id": "58721481",
+   "journal_record_sha256": "77e832043fffe5e81029a7f502368017aa3ed9030f04d4f858b32a34b710d46f",
+   "trial_sha256": "b279d67f079b44a76746b0d162c281fa3c0deda1b071cf821310e4006a1b67c4",
+   "attempt_report_ids": [
+    "542994b4-b365-41d4-b029-146e681ca670",
+    "cc4def8c-51fc-4319-8611-8ba3d0258ad8"
+   ]
+  },
+  {
+   "attempt": 3,
+   "seed": 37,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "queue_id": "0fdf43ef-aff0-4afb-a237-ed9ecf3c8fa6",
+   "spec_sha256": "bc06c258d531fe0f4044fd61d1b5463937435e77a93e6c5212d260d06769be6b",
+   "queue_attempt": "summary-b3843a3d3-3",
+   "native_job_id": "58721691",
+   "journal_record_sha256": "0e8e24c304fc2e093a680f3764d7775e7f176344efbb864ae98c0056a7481711",
+   "trial_sha256": "70a67147176de996e718905afbfe9321d0b4a4bcf3b0bc9eb8ddd4df5e297454",
+   "attempt_report_ids": [
+    "6c080854-280c-4d23-b0c7-a6709046e243",
+    "0d950d16-4ee7-4c21-aef0-96ad192e1794"
+   ]
+  },
+  {
+   "attempt": 4,
+   "seed": 53,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "queue_id": "e4d1f2c6-0dfa-40b5-b06a-af5bf62ae6db",
+   "spec_sha256": "299215234a9a1dac904f7bbdcd439742ad615c3899e71b4fcd7d8db4ed9aeedc",
+   "queue_attempt": "summary-b3843a3d3-4",
+   "native_job_id": "58721976",
+   "journal_record_sha256": "35ec6ca82a7da25010466cdbe5e4f11dfc54a77a6a64517a8162364d40899bf2",
+   "trial_sha256": "ad1ab75f53f5c8aa32c4865f6c4efd24fc1c0a4e589a1a22a826684ff5ed570d",
+   "attempt_report_ids": [
+    "d6483d11-74b3-4dc9-bdd4-8531b50d0f83",
+    "535fb17d-9e86-4840-a7d9-d13b43c8aa82"
+   ]
+  },
+  {
+   "attempt": 5,
+   "seed": 71,
+   "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+   "queue_id": "2a7451e0-9e05-4e97-85f1-26367815ed1e",
+   "spec_sha256": "088bb001ab1db370eccea0c6e8c521a77b2e4a215328079c34590cf81efb6387",
+   "queue_attempt": "summary-b3843a3d3-5",
+   "native_job_id": "58722099",
+   "journal_record_sha256": "83595e51010df1a50cf1cc90bf83658a9862bc13f73853db0d7ff8471bb645de",
+   "trial_sha256": "5f05a20456570d34df068bb333fb8c7d4d7f1c4992cbe16db3831ae6dee2f3f3",
+   "attempt_report_ids": [
+    "e194991e-8f67-469b-8a00-bd90630a4f35",
+    "560714c3-aac8-4c9e-b270-207ba31f7b0f"
+   ]
+  }
+ ],
+ "summarize": {
+  "argv": [
+   "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+   "/home/corvis/research-control/wrds-summary-b3843a3d3/entrypoint/scripts/research_proposals.py",
+   "--policy",
+   "policy.json",
+   "--ledger",
+   "attempts.sqlite",
+   "summarize",
+   "--trial",
+   "trial-1.json",
+   "--out",
+   "summary/result.json"
+  ],
+  "cwd": "/home/corvis/research-data/wrds/experiments/summary-b3843a3d3",
+  "started_at": "2026-11-01T17:43:35.854968120Z",
+  "finished_at": "2026-11-01T17:43:36.205697802Z",
+  "exit": "exit=0",
+  "stdout": "summary/result.json.runrecord.json",
+  "stderr": "",
+  "journal_sha256_before": "5d631699905d6f0333410b28c198cd57781d66e53e0ae141efa45ac0952822df",
+  "journal_sha256_after": "5d631699905d6f0333410b28c198cd57781d66e53e0ae141efa45ac0952822df",
+  "status_identical": true,
+  "payload_sha256": "a5a68ac00ac14cfa80fc48116ad9b6a3259a1e03eaedf8bdf347d82af0d26d93",
+  "record_sha256": "328dae11f8c81a546338e93dd749ce12e8d613f5618f71009ad30c1b562da14e"
+ },
+ "summary_report": {
+  "update_id": "ecbd196b-c807-4878-a57a-c2014ec8c13b",
+  "author": "hpc-report-673a4bc4",
+  "argv": [
+   "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+   "-m",
+   "scripts.research_summary_report",
+   "--ledger",
+   "attempts.sqlite",
+   "--trial",
+   "trial-1.json",
+   "--summary",
+   "summary/result.json",
+   "--report-task",
+   "673a4bc4-8693-4764-8a8d-cca0483e279f"
+  ],
+  "pythonpath": "/home/corvis/research-control/summary-report-ef969f32d/src",
+  "reporter_sha256": "d10beeaddb9778d6aa5d2d9910fddf5e3efd52fb2bd2554514524c012ad9141b",
+  "summary_code_sha256": "ad45b133ef0cf70965a71838bad92f1e3a0dd726279246ac970ee6bc7acf7b2e",
+  "exit": "exit=0"
+ },
+ "measurement_boundary": "Attempt evidence and the summary reading are service-authored board reports read by audit-probes.sql. The summarize and reporter invocations were session-operated on ziggurat with the installed controller interpreter; their captured outputs are here.",
+ "private_evidence": "/home/corvis/research-data/wrds/experiments/summary-b3843a3d3"
+}

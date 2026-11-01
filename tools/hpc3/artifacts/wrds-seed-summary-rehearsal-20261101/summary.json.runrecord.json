@@ -1,0 +1,132 @@
+{
+ "experiment": "566fa837f3e54f5d132ed97894d2b804058f377fab9f6fcc30c17dc9cfb4ab5e",
+ "label": "validation-seed-summary",
+ "fingerprint": {
+  "image_digest": "",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+   "machine": "x86_64",
+   "logical_cores": 6
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "observations": [
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.cleargbm_vs_momentum.ci_high",
+   "value": 0.013341868933694637
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.cleargbm_vs_momentum.ci_low",
+   "value": -0.015766716766974623
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.cleargbm_vs_momentum.estimate",
+   "value": -0.0012143026445236502
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.cleargbm_vs_momentum.p_value",
+   "value": 0.7263681592039801
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.cleargbm_vs_momentum.std_error",
+   "value": 0.009420431587129139
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.equal_weight_vs_momentum.ci_high",
+   "value": 0.005446805270825247
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.equal_weight_vs_momentum.ci_low",
+   "value": -0.017044146246033086
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.equal_weight_vs_momentum.estimate",
+   "value": -0.00582015772354965
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.equal_weight_vs_momentum.p_value",
+   "value": 0.4577114427860697
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.equal_weight_vs_momentum.std_error",
+   "value": 0.0071204956811352985
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.lightgbm_vs_momentum.ci_high",
+   "value": 0.021645801814971666
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.lightgbm_vs_momentum.ci_low",
+   "value": -0.011851236287964965
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.lightgbm_vs_momentum.estimate",
+   "value": 0.0033566770341327823
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.lightgbm_vs_momentum.p_value",
+   "value": 0.8557213930348259
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.lightgbm_vs_momentum.std_error",
+   "value": 0.010970899173382552
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.xgboost_vs_momentum.ci_high",
+   "value": 0.007774085959967613
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.xgboost_vs_momentum.ci_low",
+   "value": -0.003745474412271451
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.xgboost_vs_momentum.estimate",
+   "value": 0.0005973827810180771
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.xgboost_vs_momentum.p_value",
+   "value": 0.5771144278606966
+  },
+  {
+   "name": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345.xgboost_vs_momentum.std_error",
+   "value": 0.003414899781770062
+  }
+ ],
+ "payload_digest": "c43ed25100e219b707d9055258959903bbcf2fba3f4a311f8fec48a283a494ef"
+}
