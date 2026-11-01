@@ -17,7 +17,6 @@ def test_standardization_rule_flags_expected_duplicates(tmp_path: Path) -> None:
     rule = StandardizationRule()
 
     files: list[Path] = []
-    files.append(_write(tmp_path / "clients/DiscordBot/src/clubbot/utils/validators.py", "x"))
     files.append(
         _write(
             tmp_path / "services/foo/src/foo/request_context.py",
@@ -31,21 +30,32 @@ def test_standardization_rule_flags_expected_duplicates(tmp_path: Path) -> None:
         )
     )
     files.append(
-        _write(tmp_path / "services/foo/src/foo/data_bank_client.py", "class DataBankClient: pass")
-    )
-    files.append(
         _write(
             tmp_path / "services/foo/src/foo/fastapi_adapter.py", "class FastAPIAppAdapter: pass"
         )
     )
 
     violations = rule.run(files)
-    kinds = {v.kind for v in violations}
-    assert "qr-legacy-validators" in kinds
-    assert "duplicate-request-id-middleware" in kinds
-    assert "duplicate-model-trainer-client" in kinds
-    assert "duplicate-data-bank-client" in kinds
-    assert "duplicate-fastapi-adapter" in kinds
+    assert sorted(v.kind for v in violations) == [
+        "duplicate-fastapi-adapter",
+        "duplicate-model-trainer-client",
+        "duplicate-request-id-middleware",
+    ]
+
+
+def test_standardization_rule_no_longer_names_the_retired_clients(tmp_path: Path) -> None:
+    """The Discord bot's validators and data-bank's client left on 2026-11-01.
+
+    Neither path nor class name means anything to this rule now, so a file
+    carrying either is judged only by the checks that remain.
+    """
+    rule = StandardizationRule()
+    files = [
+        _write(tmp_path / "clients/DiscordBot/src/clubbot/utils/validators.py", "x"),
+        _write(tmp_path / "services/foo/src/foo/data_bank_client.py", "class DataBankClient: pass"),
+    ]
+
+    assert rule.run(files) == []
 
 
 def test_standardization_rule_skips_allowed_locations(tmp_path: Path) -> None:
@@ -61,12 +71,6 @@ def test_standardization_rule_skips_allowed_locations(tmp_path: Path) -> None:
         _write(
             tmp_path / "libs/platform_core/src/platform_core/model_trainer_client.py",
             "class HTTPModelTrainerClient: pass",
-        )
-    )
-    files.append(
-        _write(
-            tmp_path / "libs/platform_core/src/platform_core/data_bank_client.py",
-            "class DataBankClient: pass",
         )
     )
     files.append(

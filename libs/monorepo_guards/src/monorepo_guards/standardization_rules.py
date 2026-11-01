@@ -11,7 +11,6 @@ class StandardizationRule(Rule):
     name = "standardization"
 
     _PLATFORM_CORE_PATH = "libs/platform_core/src/platform_core/"
-    _LEGACY_BOT_VALIDATORS = "clients/DiscordBot/src/clubbot/utils/validators.py"
 
     def run(self, files: list[Path]) -> list[Violation]:
         out: list[Violation] = []
@@ -20,18 +19,6 @@ class StandardizationRule(Rule):
             if not as_posix.endswith(".py"):
                 continue
             if "libs/monorepo_guards" in as_posix:
-                continue
-
-            # Block reintroduction of legacy QR validators in the bot.
-            if as_posix.endswith(self._LEGACY_BOT_VALIDATORS):
-                out.append(
-                    Violation(
-                        file=path,
-                        line_no=1,
-                        kind="qr-legacy-validators",
-                        line=as_posix,
-                    )
-                )
                 continue
 
             # RequestIdMiddleware must come from platform_core (allow adapters with adapter names).
@@ -55,17 +42,6 @@ class StandardizationRule(Rule):
                         file=path,
                         line_no=1,
                         kind="duplicate-model-trainer-client",
-                        line=as_posix,
-                    )
-                )
-
-            # DataBank client must come from platform_core.
-            if "class DataBankClient" in text and self._PLATFORM_CORE_PATH not in as_posix:
-                out.append(
-                    Violation(
-                        file=path,
-                        line_no=1,
-                        kind="duplicate-data-bank-client",
                         line=as_posix,
                     )
                 )

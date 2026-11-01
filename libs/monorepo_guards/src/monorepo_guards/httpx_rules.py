@@ -9,35 +9,25 @@ from monorepo_guards.util import module_nodes, parse_source
 
 
 class HttpxRule:
-    """Prevent direct httpx imports outside the canonical data_bank_client module.
+    """Prevent direct httpx imports outside a dependency-injection hook module.
 
-    All HTTP requests should use the centralized DataBankClient from platform_core
-    to ensure consistent correlation headers, error handling, and retry logic.
-
-    Exceptions:
-    - Services that need direct streaming access to external APIs may be allowlisted
-      in _ALLOWED_PATHS until a streaming API is added to DataBankClient.
+    A module that talks HTTP takes its transport through its package's hooks,
+    so a test can drive the real code against a fake transport and every
+    caller shares one place where the client is built. platform_core's
+    data-bank client was once exempt as the canonical HTTP client; it left
+    with data-bank-api on 2026-11-01, and nothing replaced the exemption.
     """
 
     name = "httpx"
 
-    _CANONICAL_PATH: ClassVar[str] = "libs/platform_core/src/platform_core/data_bank_client.py"
-
-    # No service code should import httpx directly; use DataBankClient instead.
-    #
-    # Exception: a dependency-injection hook module has to name the transport
-    # types it injects, or the Protocol it declares cannot match the real
-    # signature. That applies to the whole hook module regardless of how it is
-    # divided — a registry large enough to split into its contracts and its
-    # production implementations does not stop being a hook module.
+    # A dependency-injection hook module has to name the transport types it
+    # injects, or the Protocol it declares cannot match the real signature.
+    # That applies to the whole hook module regardless of how it is divided —
+    # a registry large enough to split into its contracts and its production
+    # implementations does not stop being a hook module.
     _ALLOWED_PATHS: ClassVar[frozenset[str]] = frozenset(
         ["_test_hooks.py", "_hook_protocols.py", "_hook_defaults.py"]
     )
-
-    def _is_canonical(self, path: Path) -> bool:
-        posix = path.as_posix()
-        resolved = path.resolve().as_posix()
-        return posix.endswith(self._CANONICAL_PATH) or resolved.endswith(self._CANONICAL_PATH)
 
     def _is_allowed(self, path: Path) -> bool:
         name = path.name
@@ -47,9 +37,7 @@ class HttpxRule:
         posix = path.as_posix()
         if "/tests/" in posix or "/scripts/" in posix:
             return False
-        if self._is_allowed(path):
-            return False
-        return not self._is_canonical(path)
+        return not self._is_allowed(path)
 
     def _check_import_node(self, path: Path, node: ast.Import) -> list[Violation]:
         violations: list[Violation] = []
