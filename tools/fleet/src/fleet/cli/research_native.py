@@ -19,12 +19,22 @@ from fleet.core import (
     _test_hooks,
     file_turn,
     research_control,
+    research_handover,
     research_hpc,
     research_wrds,
     staging,
 )
 
-_FLAGS = ("--root", "--backend", "--digest", "--attempt", "--tenant", "--task", "--env-file")
+_FLAGS = (
+    "--root",
+    "--backend",
+    "--digest",
+    "--attempt",
+    "--tenant",
+    "--task",
+    "--env-file",
+    "--handover",
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -65,10 +75,23 @@ def main(argv: Sequence[str] | None = None) -> int:
             poll_seconds=1,
         ),
     ):
-        poll = (
-            research_hpc.poll if request["backend"] is ResearchBackend.HPC3 else research_wrds.poll
-        )
-        result = poll(document, directory / "controller.jsonl", task, environment)
+        marker = directory / "handover.sha256"
+        handover = flags.get("--handover")
+        if handover is not None and _test_hooks.file_exists(marker):
+            raise ValueError("RESEARCH_HANDOVER_EXISTS: this request already has a handover")
+        if handover is not None or _test_hooks.file_exists(marker):
+            digest = handover if handover is not None else _test_hooks.read_text(marker).strip()
+            result = research_handover.poll(root, request, document, digest, task, environment)
+            if handover is not None:
+                research_handover.record(marker, digest)
+        else:
+            poll = (
+                research_hpc.poll
+                if request["backend"] is ResearchBackend.HPC3
+                else research_wrds.poll
+            )
+            result = poll(document, directory / "controller.jsonl", task, environment)
+            result["handover_sha256"] = None
         result["controller_python"] = sys.executable
         result["controller_python_sha256"] = staging.digest(
             _test_hooks.read_bytes(pathlib.Path(sys.executable))
