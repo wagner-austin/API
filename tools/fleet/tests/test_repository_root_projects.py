@@ -93,6 +93,21 @@ def test_rabbit_is_checked_from_its_directory_in_dashboards() -> None:
     )
 
 
+def test_extraction_eval_is_checked_from_its_directory_in_the_wiki() -> None:
+    """The wiki's one Python package, a poetry project whose check reads
+    nothing beside it; its recipes run under either platform's shell since
+    MCPs board task 22cb1ba7, whose review found it on no node."""
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "wiki/tools/extraction-eval")
+    assert project["required_tags"] == ()
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/wiki.git",
+        path="tools/extraction-eval",
+        install=(),
+        companions=(),
+    )
+
+
 def test_the_dashboards_root_carries_the_validator_and_the_wikis_it_reads() -> None:
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "Dashboards")
