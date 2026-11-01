@@ -155,7 +155,9 @@ def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:
     Each case builds a service's image and starts and removes its container
     through the real compose path (board task 465689f5), so the project
     requires ``docker``, which makes the runner isolate it, and ``linux``,
-    the only platform that tag is carried on.
+    the only platform that tag is carried on. Its images are built first,
+    as an install step outside the timed check, so the check's own builds
+    read a warm cache (MCPs board task eb6586e4).
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "tools/maketools-execution")
@@ -163,7 +165,12 @@ def test_the_deploy_cases_run_isolated_on_a_rootless_daemon() -> None:
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
         path="tools/maketools-execution",
-        install=(),
+        install=(
+            InstallStep(
+                phase="images",
+                argv=("make", "-j", "8", "-C", "tools/maketools-execution", "images"),
+            ),
+        ),
         companions=(),
     )
 
