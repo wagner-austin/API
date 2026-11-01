@@ -1,0 +1,85 @@
+{
+  "scope": "Training-era diagnosis, not a study retry or independent audit",
+  "diagnosis_of": "58733020",
+  "native": {
+    "job_id": "58737368",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 74,
+    "node": "hpc3-14-07"
+  },
+  "image_sha256": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+  "private_run_directory": "/home/corvis/research-data/wrds/experiments/licensed-baseline-b3843a3d3-20261101",
+  "run_documents": {
+    "diagnostic-run.json": "c624967973dc78c8dc91a13fb2f7f2a1d36610f4c740c3e1276ecebf9d2c58d2",
+    "diagnostic-coverage-run.json": "f698f577304fe35066f1c6788900e5b8e00eca5e00b5a2e079b15917841412d0",
+    "diagnostic-terminal-run.json": "27f39674ea2c63bda32ce74db965797b18801f61ec5de8f0338740d722e6ec8a"
+  },
+  "report": {
+    "kind": "crsp-return-diagnostic",
+    "bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+    "native_job_id": "58737368",
+    "matched_rows": 0,
+    "previous_session": "2000-03-01",
+    "ordinary": false,
+    "scope": "Training-era failure diagnosis only; no fitting, validation score or final data",
+    "diagnostic_plaintext_removed": true
+  },
+  "coverage_native": {
+    "job_id": "58737429",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 71,
+    "node": "hpc3-14-12"
+  },
+  "coverage_report": {
+    "kind": "crsp-return-coverage-diagnostic",
+    "bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+    "native_job_id": "58737429",
+    "security_rows": 545,
+    "entry_row_present": true,
+    "failing_day_present": false,
+    "later_rows_exist": false,
+    "march_session_count": 23,
+    "march_row_count": 1,
+    "terminal_event_count": 1,
+    "terminal_events_in_window": 0,
+    "terminal_on_entry": false,
+    "terminal_on_failure": false,
+    "scope": "Training-era missing-row diagnosis only; no fitting, scores or final data",
+    "diagnostic_plaintext_removed": true
+  },
+  "terminal_native": {
+    "job_id": "58737536",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 70,
+    "node": "hpc3-14-07"
+  },
+  "terminal_report": {
+    "kind": "crsp-return-coverage-diagnostic",
+    "bundle_sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+    "native_job_id": "58737536",
+    "security_rows": 545,
+    "entry_row_present": true,
+    "failing_day_present": false,
+    "later_rows_exist": false,
+    "march_session_count": 23,
+    "march_row_count": 1,
+    "terminal_event_count": 1,
+    "terminal_before_entry": true,
+    "terminal_on_decision": true,
+    "terminal_after_window": false,
+    "entry_is_terminal_record": true,
+    "entry_has_trade_price_flag": false,
+    "terminal_events_in_window": 0,
+    "terminal_on_entry": false,
+    "terminal_on_failure": false,
+    "scope": "Training-era missing-row diagnosis only; no fitting, scores or final data",
+    "diagnostic_plaintext_removed": true
+  },
+  "interpretation": "The security delisted on the decision date. Its entry-day row is terminal and lacks the accepted trade-price flag; there are no later rows. Panel eligibility retained it, and label construction sought ordinary post-entry returns because the terminal event preceded the holding window. This explains the observed failure without establishing a source extraction defect.",
+  "repair_status": "Not implemented. Review decision-date eligibility and entry feasibility against vendor semantics, add a regression case, and version any changed study rules before a new preregistration; do not discard securities based on future outcomes.",
+  "cleanup_limit": "The diagnostic asserted its own decrypted directory was removed. Cleanup of failed baseline job 58733020 remains independently unverified.",
+  "study_action": "No baseline retry, remaining seed submission, candidate selection or final grant."
+}
