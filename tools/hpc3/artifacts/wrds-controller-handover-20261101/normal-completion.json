@@ -1,0 +1,62 @@
+{
+  "measured_at": "2026-11-01T10:37:06.916028+00:00",
+  "scope": "Session-captured index of live queue and service-authored native evidence; normal-audit.sql independently checks these sources. This completes one fresh synthetic normal request, not the full ten-trial study or licensed baseline.",
+  "source_commit": "52345cc13cf6928b2c0bb9520adbb70153f1c5ce",
+  "queue": {
+    "id": "eecf34ae-f66a-4b6a-a3ab-3f0f108d87c0",
+    "status": "passed",
+    "claimed_by": "fleet-research-diphtheria",
+    "claimed_at": "2026-11-01T10:15:13.014946+00:00",
+    "closed_at": "2026-11-01T10:36:38.822367+00:00",
+    "exit_code": 0,
+    "research_request": {
+      "attempt": "selection-report-9b6cbf367-5",
+      "backend": "hpc3",
+      "specSha256": "ad15cc91bf41c01a5feb3a73cf90f2ef52ce19def6a4a1b2673e9d7567512082"
+    },
+    "observation": {
+      "state": "complete",
+      "native_job_id": "58719001",
+      "record_sha256": "72effd337bd54fb26e1b9c478d4e5783f2e8f778be697ed1c3f6e97492be8afd",
+      "controller_python": "/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+      "handover_sha256": null
+    }
+  },
+  "native_report": {
+    "id": "1caa931e-6106-452f-9506-09cdc5085442",
+    "created_at": "2026-11-01T10:36:38.69424+00:00",
+    "author": "hpc-report-a9b2927c",
+    "body_sha256": "65ed911fbdd3dba485be9f3e44f882feee376d2fdd79e9990f4461d040c293df",
+    "native_job_id": "58719001",
+    "native_attempt": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:5",
+    "request_sha256": "4b5dbd2c26a46866f67d3ba5092129b1ed7f0e3ef5e3ac3cdcba7a3a738cfa66",
+    "artifact": "/data/homezvol1/wagnera3/research/selection-report-9b6cbf367/attempts/c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e/5/result/evaluation.json",
+    "native_state": "COMPLETED",
+    "exit_code": "0:0",
+    "bundle_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14",
+    "record_sha256": "72effd337bd54fb26e1b9c478d4e5783f2e8f778be697ed1c3f6e97492be8afd"
+  },
+  "checks": {
+    "runtime-audit.sql": 1,
+    "recovery-audit.sql": 4,
+    "normal-audit.sql": 1,
+    "altered_evidence_probes": 9
+  },
+  "verification": {
+    "fleet_job": "90c37d46-e224-4752-a354-45e6f61becc2",
+    "fleet_tests_passed": 2634,
+    "fleet_tests_skipped_separate_host_lane": 44,
+    "fleet_statement_and_branch_coverage_percent": 100,
+    "hpc3_job": "fea85f4b-0c1c-4421-a74c-e3c0d9cd34f4",
+    "hpc3_tests_passed": 2160,
+    "host_execution_job": "69740785-701e-40ee-8eec-f3ff0de6598d",
+    "host_execution_tests_passed": 97,
+    "wiki_audits": [
+      "f7e502b0-5f5e-4ef0-96ca-7d9e9cb151ac",
+      "fc225449-54e4-4c4b-b109-387713272cf0"
+    ],
+    "wiki_errors": 0,
+    "wiki_warnings": 0
+  }
+}

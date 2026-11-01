@@ -1,6 +1,6 @@
 {
-  "measured_at": "2026-11-01T10:22:35.797187+00:00",
-  "scope": "Read-only live queries over service-authored reports and queue rows. Runtime and four original closures matched; six negative probes returned zero. Normal-path completion remains pending and reads zero.",
+  "measured_at": "2026-11-01T10:37:06.139552+00:00",
+  "scope": "Read-only live queries over service-authored reports and queue rows. Runtime, four retained closures and one fresh normal completion matched; all nine altered-evidence probes returned zero.",
   "checks": [
     {
       "name": "runtime",
@@ -59,8 +59,29 @@
     {
       "name": "normal",
       "file": "normal-audit.sql",
-      "actual": 0,
+      "actual": 1,
       "required_for_completion": 1
+    },
+    {
+      "name": "normal.wrong_record",
+      "expected": 0,
+      "actual": 0,
+      "replace": "=j.outcome->>'record_sha256'",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'"
+    },
+    {
+      "name": "normal.wrong_attempt",
+      "expected": 0,
+      "actual": 0,
+      "replace": "afe1e:5'",
+      "with": "afe1e:6'"
+    },
+    {
+      "name": "normal.unexpected_handover",
+      "expected": 0,
+      "actual": 0,
+      "replace": "='null'::jsonb",
+      "with": "='\"unexpected\"'::jsonb"
     }
   ]
 }
