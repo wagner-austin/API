@@ -28,10 +28,8 @@ from model_trainer.api.schemas.tokenizers import (
 )
 from model_trainer.core._hook_protocols import (
     ArtifactStoreProto,
-    DiskUsageProto,
     PathIterator,
     RandomLikeProto,
-    ScandirIterator,
     ServiceContainerProto,
 )
 from model_trainer.core._hook_protocols_ml import (
@@ -344,25 +342,6 @@ def _default_spm_decode_ids(model_path: str, ids: list[int]) -> str:
     )
 
     return _decode(model_path, ids)
-
-
-def _default_os_scandir(path: str) -> ScandirIterator:
-    """Production os.scandir - used as default hook."""
-    import os
-
-    return os.scandir(path)
-
-
-def _default_shutil_disk_usage(path: str) -> DiskUsageProto:
-    """Production shutil.disk_usage - used as default hook."""
-    import shutil
-
-    return shutil.disk_usage(path)
-
-
-def _default_path_unlink(path: Path) -> None:
-    """Production Path.unlink - used as default hook."""
-    path.unlink()
 
 
 def _default_time_sleep(seconds: float) -> None:

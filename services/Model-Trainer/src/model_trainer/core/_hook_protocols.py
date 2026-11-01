@@ -7,7 +7,6 @@ bindings stay in :mod:`model_trainer.core._test_hooks`.
 from __future__ import annotations
 
 from pathlib import Path
-from types import TracebackType
 from typing import Protocol
 
 import torch
@@ -254,74 +253,6 @@ class RetrySleepProto(Protocol):
     """
 
     def __call__(self, seconds: float) -> None: ...
-
-
-class OsScandirProto(Protocol):
-    """Protocol for os.scandir hook."""
-
-    def __call__(self, path: str) -> ScandirIterator: ...
-
-
-class ScandirIterator(Protocol):
-    """Protocol for os.scandir context manager."""
-
-    def __enter__(self) -> ScandirIteratorContext: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_val: BaseException | None,
-        exc_tb: TracebackType | None,
-    ) -> bool | None: ...
-
-
-class ScandirIteratorContext(Protocol):
-    """Protocol for iterating os.scandir entries."""
-
-    def __iter__(self) -> ScandirIteratorContext: ...
-    def __next__(self) -> DirEntryProto: ...
-
-
-class DirEntryProto(Protocol):
-    """Protocol for os.DirEntry-like objects."""
-
-    @property
-    def path(self) -> str: ...
-    def is_file(self) -> bool: ...
-    def stat(self) -> StatResultProto: ...
-
-
-class StatResultProto(Protocol):
-    """Protocol for stat result."""
-
-    @property
-    def st_size(self) -> int: ...
-    @property
-    def st_atime(self) -> float: ...
-    @property
-    def st_mtime(self) -> float: ...
-
-
-class DiskUsageProto(Protocol):
-    """Protocol for shutil.disk_usage result."""
-
-    @property
-    def total(self) -> int: ...
-    @property
-    def used(self) -> int: ...
-    @property
-    def free(self) -> int: ...
-
-
-class ShutilDiskUsageProto(Protocol):
-    """Protocol for shutil.disk_usage hook."""
-
-    def __call__(self, path: str) -> DiskUsageProto: ...
-
-
-class PathUnlinkProto(Protocol):
-    """Protocol for Path.unlink hook."""
-
-    def __call__(self, path: Path) -> None: ...
 
 
 class TimeSleepProto(Protocol):
