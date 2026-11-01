@@ -396,6 +396,22 @@ success; they never authorize a replacement native job. Stop an active native
 job through its controller and reconcile; generic queue cancellation is only
 available before a research request is claimed.
 
+For an already-completed HPC3 validation attempt whose original request pins
+a defective controller, the evaluator can invoke `fleet.cli.research_native`
+with its usual reference flags and `--handover <plan-sha256>`. The plan lives at
+`root/<plan-sha256>/handover.json` and has exactly `request_sha256`,
+`replacement_sha256`, `provenance`, `selfcheck`, `wheels_dir`, `native_job_id`,
+`record_sha256`, `recipe` and `checksums`. The four file inputs use the same
+`{path, sha256}` contract. The replacement request may change only `python`;
+all other fields must equal the original. Its installed runtime is checked
+against the pinned provenance and wheels before native result verification.
+Unsettled or final attempts refuse without submission. Successful verification
+and report publication precede an exclusive `handover.sha256` marker under the
+original request's poll lock. Ordinary ticks remeasure the same handover and
+include its digest in their completion observation; requests with no handover
+explicitly report `handover_sha256: null`. Install matching adapter and consumer
+versions before use; the strict observation decoder rejects an older shape.
+
 **The netboot runner arms machines, and nothing is typed** (MCPs board task
 83102d9d). A `netboot-arm` row (MCPs migs 807 and 809, queued only by
 `dispatch_netboot_arm`) names one roster machine as its requested node. The
