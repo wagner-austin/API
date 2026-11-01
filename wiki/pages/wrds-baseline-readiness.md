@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
@@ -90,6 +91,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
@@ -184,6 +186,16 @@ confidence: medium
 ---
 
 # WRDS substantive baseline readiness
+
+**November 1 resource measurement:** the new controller at
+`wrds-resources-11c0bdbdd` passed installed-file verification for 584 application
+files, generated selfcheck and dependency consistency. Matching image build
+`58719730` completed in 85 seconds with exit `0:0`; inspection verified 14
+identities and both selfchecks. At 13:30:03 UTC the maintained native preflight
+accepted the frozen four-CPU, 128-GiB, 121-minute request on `free`, using the
+existing recipe and synthetic ciphertext. Nothing was queued by preflight;
+this establishes scheduler feasibility, not measured study memory usage or a
+licensed result. Independent resource review remains task `42a8d507`.[^resource-live]
 
 
 - Research entry point: [[wrds-equity-research-protocol]].
@@ -632,7 +644,7 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    `58698691`; licensed evaluator decoding follows the remaining allocation fix.
    The verifier corrections and licensed staging passed independent audit;
    the sealed final bundle and its key remain evaluator-owned.[^verifier-integrity][^staging-review][^selection-runtime]
-4. Complete independent selection review before licensed validation. Recovery
+4. Independent selection review passed before licensed validation. Recovery
    (`04c0cdbe`) passed audit, all ten repeated synthetic attempts passed the
    shared queue, and the maintained reporter now records winner, wrong-candidate,
    wrong-seed and repeated-selection outcomes.[^selection-complete]
@@ -652,9 +664,9 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    The 7,200-second evaluation retains a 121-minute scheduler request for
    termination grace and minute rounding. Fleet checks passed 5,066 research
    tests and 2,162 HPC3 tests with full statement and branch coverage. The
-   installed controller and real resource preflight remain to be measured under
-   board task `42a8d507`; tests alone do not establish that deployment. The licensed
-   baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract]
+   installed controller, matching image and real resource preflight are now
+   measured; independent resource audit remains under board task `42a8d507`.
+   The licensed baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract][^resource-live]
 
 [^selection-verified]: Live board audit `72d4a03d-251a-4e20-bd91-35dae56df2aa`, computed VERIFIED at `2026-11-01T12:27:53.357Z`, closed selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. It covers candidate/seed ranking, journal selection restrictions and the installed synthetic rehearsal with accurate unrun-baseline documentation.
 
@@ -666,7 +678,18 @@ service-authored resolved job specification and scheduler verdict with
 Older policies without allocation fields are rejected by the new codec;
 historical controllers and journals remain unchanged.[^resource-contract]
 
-[^resource-contract]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py`, `ResearchPolicy` and policy codecs; `research_cluster.py`, `prepare_bundle`; `libs/covenant_ml/tests/markets/test_research_resources.py`, invalid/missing fields, proposer overrides, changed journal identity and both recipe phases; `tools/hpc3/src/hpc3/cli/preflight.py`, optional measured report. Fleet jobs `3f008e0a-1158-4431-832e-b08fad47b5c2` and `a4f2e56a-8df1-4ec4-9ed1-dc46db4f73ea` passed at that revision. Test repair reviews are tracked by `26680bbe` and `25af84f3`; native allocation measurement remains task `42a8d507`.
+The preflight report retains its image-drift caveat: the separately staged
+entrypoint is outside the image environment. Its bytes are pinned in the
+generated checksum file; a separate native readback verified all 16 declared
+inputs. The retained audit query joins service-authored controller, image,
+staging and preflight reports in order. Its positive case matches once, while
+changed CPU, memory, walltime, reporter, request and runtime expectations each
+match zero. No admission journal was created for this preflight fixture, and
+no licensed data or final permission was opened.[^resource-live]
+
+[^resource-live]: `tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json`, measured controller/image summary, exact allocation, service report IDs, synthetic scope and artifact digests. `resource-audit.sql` and `audit-probes.json` retain the matching and six altered-evidence queries. `preflight.json` retains the scheduler's snapshot and external-entrypoint caveat; `input-readback.log` is explicitly session-invoked checksum evidence, not a service report.
+
+[^resource-contract]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py`, `ResearchPolicy` and policy codecs; `research_cluster.py`, `prepare_bundle`; `libs/covenant_ml/tests/markets/test_research_resources.py`, invalid/missing fields, proposer overrides, changed journal identity and both recipe phases; `tools/hpc3/src/hpc3/cli/preflight.py`, optional measured report. Fleet jobs `3f008e0a-1158-4431-832e-b08fad47b5c2` and `a4f2e56a-8df1-4ec4-9ed1-dc46db4f73ea` passed at that revision. Test repairs passed independent audits `bb45f5b0` and `1e829e45`; the former also required fresh fleet check `7bc56f1d`, which passed 5,066 tests at `ac8010418` with full coverage. Operational resource audit remains task `42a8d507`.
 
 [^licensed-collection]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json`, native extraction receipt, cleanup observation, runtime inspection and preserved interrupted collection. Board tasks `a622165c-bb63-4714-933b-10d527f21478` and `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; separate verifier task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`. Extraction receipt timestamps delimit database capture, not encryption or the whole allocation. Native report author `load-report-a622165c`; installed-controller report `fd164407-3505-4207-bc2d-d0e26fa69a1f`, author `hpc-report-da2a55dc`; image build `58662034`, SHA-256 `0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912`. None of these measurements is a substantive study result.
 

@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
@@ -35,6 +36,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
@@ -133,10 +135,21 @@ at 10:46:40 UTC. All ten synthetic queue receipts had passed by 11:18:37 UTC;
 the maintained selector subsequently published winner and refusal evidence.
 Selection passed independent audit `72d4a03d` at 12:27:53 UTC on November 1;
 the recovery and selection milestones are now independently verified.
-[[wrds-baseline-readiness]] records that verdict and the remaining licensed
-allocation measurement. CPU and RAM are mandatory evaluator-owned policy
+[[wrds-baseline-readiness]] records that verdict and the licensed allocation
+preflight. CPU and RAM are mandatory evaluator-owned policy
 fields, included in the journal identity and used by validation and final
 recipes. Proposals cannot override them.[^normal-live][^selection-complete][^admission][^paths]
+
+The frozen resource controller and matching image are now installed and
+verified. Native preflight on November 1 at 13:30:03 UTC accepted the generated
+four-CPU, 128-GiB, 121-minute recipe through the same controller configuration.
+It used synthetic ciphertext and queued no evaluation. The existing queue
+adapter remains installed; this new interpreter is an evaluator-owned setting
+for future requests, and old requests retain their original runtime identities.
+This measurement does not execute the licensed baseline or replace the prior
+shared-queue rehearsal. Independent resource audit remains pending.[^resource-live]
+
+[^resource-live]: `tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json`, frozen runtime, native image build, service-authored preflight, synthetic scope and exact input digests. Its retained audit query joins controller, image, staged request and scheduler reports; all six altered-evidence probes return zero.
 
 [^selection-complete]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, recovery audit `eefb349e`, ten native/queue pairs and four service-authored selection outcomes. [[wrds-baseline-readiness]] records the remaining licensed-study prerequisites.
 
