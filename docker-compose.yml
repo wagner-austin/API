@@ -14,18 +14,16 @@
 #
 # Port map:
 #   - 6379:  Redis (this file)
-#   - 8000:  turkic-api
 #   - 8001:  data-bank-api
-#   - 8002:  qr-api
 #   - 8003:  transcript-api
-#   - 8004:  handwriting-ai
 #   - 8005:  Model-Trainer
-#   - 8006:  music-wrapped-api
 #   - 8007:  covenant-radar-api
 #   - 8008:  grandma-api
 #   - 8009:  github-stats-api
 #   - 8010:  opportunity-radar-api
-#   - 8011:  Art-Trainer
+# 8000, 8002, 8004, 8006 and 8011 were turkic-api, qr-api, handwriting-ai,
+# music-wrapped-api and Art-Trainer, archived on 2026-11-01 at the tag
+# archive/api-packages-2026-11-01 (MCPs board task a276f973).
 # =============================================================================
 
 services:

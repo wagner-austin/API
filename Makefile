@@ -4,7 +4,7 @@ include scripts/make/shell.mk
 # enforces (see its README); anything with logic is a maketools command.
 MAKETOOLS := $(PYTHON) tools/maketools/scripts/run.py
 
-.PHONY: align-commit commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
+.PHONY: align-commit commit-tasks executed services-executed infra fleet-roll up-databank up-trainer up-transcript up-covenant up-grandma up-github-stats up-opportunity up-all down clean status logs lint test install-hooks check-hooks lint-makefiles
 
 # ---------------------------------------------------------------------------
 # The main checkout
@@ -93,23 +93,8 @@ up-databank: infra
 up-trainer: infra
 	$(MAKETOOLS) compose-up services/Model-Trainer --git-commit --build-progress plain
 
-up-art-trainer: infra
-	$(MAKETOOLS) compose-up services/Art-Trainer --build-progress plain
-
-up-handwriting: infra
-	$(MAKETOOLS) compose-up services/handwriting-ai
-
-up-qr: infra
-	$(MAKETOOLS) compose-up services/qr-api
-
 up-transcript: infra
 	$(MAKETOOLS) compose-up services/transcript-api
-
-up-turkic: infra
-	$(MAKETOOLS) compose-up services/turkic-api
-
-up-music: infra
-	$(MAKETOOLS) compose-up services/music-wrapped-api
 
 up-covenant: infra
 	$(MAKETOOLS) compose-up services/covenant-radar-api
@@ -123,20 +108,17 @@ up-github-stats: infra
 up-opportunity: infra
 	$(MAKETOOLS) compose-up services/opportunity-radar-api
 
-up-discord: infra
-	$(MAKETOOLS) compose-up clients/DiscordBot
-
 # ---------------------------------------------------------------------------
 # All Services
 # ---------------------------------------------------------------------------
-up-all: infra up-databank up-trainer up-art-trainer up-handwriting up-qr up-transcript up-turkic up-music up-covenant up-grandma up-github-stats up-opportunity up-discord
+up-all: infra up-databank up-trainer up-transcript up-covenant up-grandma up-github-stats up-opportunity
 	@echo "All services started"
 
 # ---------------------------------------------------------------------------
 # Stop/Cleanup
 # ---------------------------------------------------------------------------
 down:
-	$(MAKETOOLS) compose-down services/data-bank-api services/Model-Trainer services/Art-Trainer services/handwriting-ai services/qr-api services/transcript-api services/turkic-api services/music-wrapped-api services/covenant-radar-api services/grandma-api services/github-stats-api services/opportunity-radar-api clients/DiscordBot
+	$(MAKETOOLS) compose-down services/data-bank-api services/Model-Trainer services/transcript-api services/covenant-radar-api services/grandma-api services/github-stats-api services/opportunity-radar-api
 	docker compose down
 
 clean: down
