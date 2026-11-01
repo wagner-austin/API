@@ -324,16 +324,7 @@ def _selection(
             for prior in history
         ):
             raise ValueError("[RESEARCH-008] selection requires settled, unsealed validation")
-        completed = tuple(
-            SeedResult(
-                prior["number"],
-                decode_research_proposal(narrow_json_to_dict(load_json_str(prior["request"]))),
-                decode_run_record(narrow_json_to_dict(load_json_str(prior["record"]))),
-            )
-            for prior in history
-            if prior["status"] == "complete"
-        )
-        if row["number"] != winning_attempt(policy, completed):
+        if row["number"] != winning_attempt(policy, completed_results(history)):
             raise ValueError("RESEARCH_SELECTION_WINNER: require the winner's fixed final seed")
         return "selected", digest
     if row["selection"] != "selected" or digest != row["final_manifest_digest"]:
@@ -374,6 +365,29 @@ def _final_identity(event: JSONObject, row: ResearchAttempt) -> str:
     if (candidate, payload) != (row["candidate"], record["payload_digest"]):
         raise ValueError("[RESEARCH-009] selected candidate or validation evidence changed")
     return final_digest
+
+
+def completed_results(history: tuple[ResearchAttempt, ...]) -> tuple[SeedResult, ...]:
+    """Decode the journal's completed evidence for selection and descriptive summaries.
+
+    Args:
+        history: Validated journal snapshot.
+
+    Returns:
+        Exact admitted proposals and shared records, retaining attempt identities.
+
+    Raises:
+        ValueError: Malformed proposal or shared record.
+    """
+    return tuple(
+        SeedResult(
+            prior["number"],
+            decode_research_proposal(narrow_json_to_dict(load_json_str(prior["request"]))),
+            decode_run_record(narrow_json_to_dict(load_json_str(prior["record"]))),
+        )
+        for prior in history
+        if prior["status"] == "complete"
+    )
 
 
 def research_journal(policy: ResearchPolicy) -> EventJournal[tuple[ResearchAttempt, ...]]:
@@ -449,6 +463,7 @@ def research_policy_digest(policy: ResearchPolicy) -> str:
 __all__ = [
     "ResearchAttempt",
     "admit_proposal",
+    "completed_results",
     "decode_research_attempt",
     "encode_research_attempt",
     "research_journal",

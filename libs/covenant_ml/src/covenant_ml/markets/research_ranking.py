@@ -31,10 +31,21 @@ class SeedResult(NamedTuple):
     record: RunRecord
 
 
+class CandidateMean(NamedTuple):
+    """Complete seed evidence and its chronological mean paired differences."""
+
+    candidate: str
+    results: tuple[SeedResult, ...]
+    windows: tuple[CrspWindow, ...]
+    differences: tuple[float, ...]
+    final_attempt: int
+    leaves: int
+
+
 def monthly_selection_observations(
     series: tuple[CrspSeries, ...], selection: ResearchSelection
 ) -> tuple[Observation, ...]:
-    """Publish the two primary series using the existing named-scalar record.
+    """Publish every arm at the primary cost using the existing named-scalar record.
 
     Args:
         series: All computed arms and costs from the actual evaluator.
@@ -53,7 +64,6 @@ def monthly_selection_observations(
         )
         for item in series
         if item.cost_bps == selection["cost_bps"]
-        and item.arm in {selection["primary"], selection["reference"]}
         for period in item.periods
     )
 
@@ -92,7 +102,7 @@ def _series(
 
 
 def _paired(
-    item: SeedResult, policy: ResearchPolicy
+    item: SeedResult, policy: ResearchPolicy, arm: str
 ) -> tuple[tuple[tuple[CrspWindow, float], ...], tuple[float, ...]]:
     """Validate lineage and pair both arms on identical decision, entry and exit dates."""
     record = item.record
@@ -106,7 +116,7 @@ def _paired(
         raise ValueError("RESEARCH_SELECTION_LINEAGE: result differs from admitted study")
     selection = policy["selection"]
     reference = _series(record, selection, selection["reference"])
-    primary = _series(record, selection, selection["primary"])
+    primary = _series(record, selection, arm)
     if tuple(row[0] for row in primary) != tuple(row[0] for row in reference):
         raise ValueError("RESEARCH_SELECTION_CALENDAR: paired arm calendars differ")
     differences = tuple(left[1] - right[1] for left, right in zip(primary, reference, strict=True))
@@ -115,15 +125,19 @@ def _paired(
     return reference, differences
 
 
-def winning_attempt(policy: ResearchPolicy, completed: Sequence[SeedResult]) -> int:
-    """Rank complete candidate/seed groups and return the winner's fixed final seed.
+def candidate_means(
+    policy: ResearchPolicy, completed: Sequence[SeedResult], arm: str
+) -> tuple[CandidateMean, ...]:
+    """Validate and average paired months once for ranking and uncertainty.
 
     Args:
         policy: Immutable journal policy, including required initial candidates.
         completed: All completed attempts, read under the existing journal lock.
+        arm: Primary model for ranking, or a recorded arm for descriptive reporting.
 
     Returns:
-        Canonical final-seed attempt of the highest-scoring eligible candidate.
+        Complete candidates in digest order, with seeds in numeric order.
+        Incomplete optional candidates remain ineligible.
 
     Raises:
         ValueError: RESEARCH_SELECTION_* for changed evidence, duplicate seeds,
@@ -131,10 +145,12 @@ def winning_attempt(policy: ResearchPolicy, completed: Sequence[SeedResult]) -> 
         OverflowError: A finite-input sum exceeds the representable range.
     """
     selection = policy["selection"]
-    grouped: dict[str, dict[int, tuple[SeedResult, tuple[float, ...]]]] = {}
+    grouped: dict[
+        str, dict[int, tuple[SeedResult, tuple[tuple[CrspWindow, float], ...], tuple[float, ...]]]
+    ] = {}
     common: tuple[tuple[CrspWindow, float], ...] | None = None
     for item in completed:
-        reference, differences = _paired(item, policy)
+        reference, differences = _paired(item, policy, arm)
         if common is None:
             common = reference
         elif reference != common:
@@ -144,22 +160,62 @@ def winning_attempt(policy: ResearchPolicy, completed: Sequence[SeedResult]) -> 
         seed = item.proposal["seed"]
         if seed in group:
             raise ValueError("RESEARCH_SELECTION_SEEDS: duplicate candidate seed")
-        group[seed] = item, differences
+        group[seed] = item, reference, differences
     seeds = tuple(sorted(policy["seeds"]))
     eligible = {key: rows for key, rows in grouped.items() if tuple(sorted(rows)) == seeds}
     if not set(selection["required_candidates"]) <= set(eligible):
         raise ValueError("RESEARCH_SELECTION_SEEDS: required baselines lack complete seed evidence")
-    ranked: list[tuple[float, int, str, int]] = []
-    for candidate, rows in eligible.items():
-        columns = tuple(rows[seed][1] for seed in seeds)
+    averaged: list[CandidateMean] = []
+    for candidate, rows in sorted(eligible.items()):
+        columns = tuple(rows[seed][2] for seed in seeds)
         means = tuple(
             fsum(column[month] for column in columns) / len(seeds)
             for month in range(len(columns[0]))
         )
-        score = fsum(means) / len(means)
         chosen = rows[selection["final_seed"]][0]
-        ranked.append((-score, chosen.proposal["config"]["num_leaves"], candidate, chosen.number))
+        averaged.append(
+            CandidateMean(
+                candidate,
+                tuple(rows[seed][0] for seed in seeds),
+                tuple(window for window, _ in rows[seeds[0]][1]),
+                means,
+                chosen.number,
+                chosen.proposal["config"]["num_leaves"],
+            )
+        )
+    return tuple(averaged)
+
+
+def winning_attempt(policy: ResearchPolicy, completed: Sequence[SeedResult]) -> int:
+    """Rank complete seed means, breaking exact ties by leaves then candidate digest.
+
+    Args:
+        policy: Frozen admission and selection settings.
+        completed: Completed journal evidence.
+
+    Returns:
+        The winner's fixed final-seed attempt; intervals never affect selection.
+
+    Raises:
+        ValueError: Shared pairing, lineage and seed validation failures.
+        OverflowError: A finite-input sum exceeds the representable range.
+    """
+    ranked = tuple(
+        (
+            -fsum(item.differences) / len(item.differences),
+            item.leaves,
+            item.candidate,
+            item.final_attempt,
+        )
+        for item in candidate_means(policy, completed, policy["selection"]["primary"])
+    )
     return min(ranked)[3]
 
 
-__all__ = ["SeedResult", "monthly_selection_observations", "winning_attempt"]
+__all__ = [
+    "CandidateMean",
+    "SeedResult",
+    "candidate_means",
+    "monthly_selection_observations",
+    "winning_attempt",
+]
