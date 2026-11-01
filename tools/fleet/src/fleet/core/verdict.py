@@ -105,6 +105,14 @@ VITEST_FILE: Final[re.Pattern[str]] = re.compile(
     re.MULTILINE,
 )
 
+#: pytest's ``--durations`` line for one test's call phase, as
+#: ``653.99s call     tests/test_service_entry.py::test_...[grandma-api]``.
+#: Its setup and teardown lines name the same test and never match, so a
+#: pytest suite's slowest entries are its slowest tests (MCPs board task
+#: eb6586e4: tools/maketools-execution's verdict read ``slowest=unread``
+#: while its transcript timed each deploy case).
+PYTEST_CALL: Final[re.Pattern[str]] = re.compile(r"^(\d+)\.(\d\d)s call +(\S+)$", re.MULTILINE)
+
 #: How many of the slowest files a verdict names.
 SLOWEST_FILES: Final = 3
 
@@ -178,16 +186,23 @@ def read_slowest(tail: str) -> str:
         tail: The transcript's last lines.
 
     Returns:
-        ``<file>:<s>s,...`` for the :data:`SLOWEST_FILES` slowest files
-        vitest timed, slowest first and seconds rounded, else ``unread``
-        (a pytest suite, which times no file, or a run that stopped before
-        any file finished).
+        ``<name>:<s>s,...`` for the :data:`SLOWEST_FILES` slowest entries,
+        slowest first and seconds rounded: the files vitest timed and the
+        tests pytest's ``--durations`` timed (:data:`PYTEST_CALL`), else
+        ``unread`` (a pytest suite run without ``--durations``, or a run
+        that stopped before anything finished).
     """
-    # Each file as (-milliseconds, name), so the natural order is slowest
+    plain = ANSI.sub("", tail)
+    # Each entry as (-milliseconds, name), so the natural order is slowest
     # first and a tie is broken by name.
     ranked: list[tuple[int, str]] = sorted(
-        (-int(match.group(2)), str(match.group(1)))
-        for match in VITEST_FILE.finditer(ANSI.sub("", tail))
+        [
+            *((-int(match.group(2)), str(match.group(1))) for match in VITEST_FILE.finditer(plain)),
+            *(
+                (-(int(match.group(1)) * 1000 + int(match.group(2)) * 10), str(match.group(3)))
+                for match in PYTEST_CALL.finditer(plain)
+            ),
+        ]
     )
     if not ranked:
         return "unread"
@@ -379,6 +394,7 @@ __all__ = [
     "FAILED",
     "LOG_TAIL_LINES",
     "PASSED",
+    "PYTEST_CALL",
     "PYTEST_TOTAL",
     "SLOWEST_FILES",
     "VERDICT_PREFIX",

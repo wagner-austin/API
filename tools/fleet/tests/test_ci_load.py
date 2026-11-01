@@ -124,6 +124,27 @@ class TestTheReading:
         assert verdict.read_slowest(tied) == "tests/a.test.ts:2s,tests/b.test.ts:2s"
         assert verdict.read_slowest("771 passed, 4 skipped in 20.06s\n") == "unread"
 
+    def test_a_pytest_suite_run_with_durations_names_its_slowest_tests(self) -> None:
+        """The durations block of fleet job 5844f96c, tools/maketools-execution
+        on loki with its build cache emptied (MCPs board task eb6586e4): only
+        each test's call line counts, never its setup or teardown."""
+        case = (
+            "tests/test_service_entry.py::test_the_service_deploys_and_passes_its_own_healthcheck"
+        )
+        tail = (
+            "============================= slowest durations ==============================\n"
+            f"653.99s call     {case}[grandma-api]\n"
+            f"584.83s call     {case}[turkic-api]\n"
+            f"581.73s call     {case}[transcript-api]\n"
+            f"512.52s call     {case}[opportunity-radar-api]\n"
+            f"1.14s teardown {case}[grandma-api]\n"
+            f"900.00s setup    {case}[qr-api]\n"
+            "======================== 8 passed in 664.10s (0:11:04) =========================\n"
+        )
+        assert verdict.read_slowest(tail) == (
+            f"{case}[grandma-api]:654s,{case}[turkic-api]:585s,{case}[transcript-api]:582s"
+        )
+
     def test_both_reach_the_line_a_closure_cites(self) -> None:
         tail = (
             LAVENDER_TAIL
