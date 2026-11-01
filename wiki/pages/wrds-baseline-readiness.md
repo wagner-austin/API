@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json"
@@ -86,6 +87,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json": "f9591661ebbbf616d0d3ccc93fb48cb94b1dc11d"
@@ -185,15 +187,16 @@ the replacement queue runtime is installed, and all four retained allocations
 passed handover verification. The scheduled runner closed all four original
 queue receipts. Six unstarted references were withdrawn and replaced with
 corrected-controller references to the same admissions; their candidate budgets
-and journal were preserved. The complete selection rehearsal and substantive
-baseline remain unfinished. See [[wrds-research-queue-admission]] for the
-contract, deployed measurements and remaining review.[^handover-progress]
+and journal were preserved. Recovery passed independent audit `eefb349e` at
+10:46:40 UTC. The ten-trial selection repetition subsequently completed, with
+service-authored winner and refusal reports. Its independent selection review
+and the substantive baseline remain ahead.[^handover-progress][^selection-complete]
 
 At 10:36:38 UTC the first fresh normal request also closed automatically:
 admission 5, native job `58719001`, exit `0:0`, with matching native and queue
 result digests and no handover. This verifies normal submission and completion
-after recovery; it does not complete the ten-trial selection study. Independent
-review of the operational milestone remains ahead.[^normal-completion]
+after recovery. The full set of ten queue receipts had passed by 11:18:37 UTC;
+the recovery milestone is now independently verified.[^normal-completion][^selection-complete]
 
 [^normal-completion]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, queue receipt `eecf34ae-f66a-4b6a-a3ab-3f0f108d87c0` and service-authored native report `1caa931e-6106-452f-9506-09cdc5085442`. `normal-audit.sql` joins the queue and native result identities; `audit-probes.json` records the matching query and altered-evidence refusals.
 
@@ -206,7 +209,7 @@ collection timeout. The final bundle remains sealed. The verifier corrections
 passed the complete package suite; licensed ciphertext integrity also passed
 without opening either partition. Encrypted training/validation staging to HPC3
 completed at 20:58:58 UTC and passed independent audit at 21:58:49 UTC.
-The selection runtime now freezes source `a00c077b1`: installed-controller
+The original selection runtime froze source `a00c077b1`: installed-controller
 inspection verified 583 application files, selfcheck and dependencies; native
 image build `58698691` completed in 117 seconds with exit `0:0`, and inspection
 verified all 14 frozen identities and both selfchecks. Candidate and seed rules
@@ -221,15 +224,18 @@ to the existing select command. Four fresh native allocations have since been
 recovered without resubmission. Their shared-queue requests retain the old
 controller identity, with recorded handovers now activating the verified
 replacement under task `04c0cdbe`.[^handover-progress]
-The controller measured refusal to select while six attempts remain unsettled,
-with an unchanged journal. Winner and wrong-candidate/wrong-seed service reports
-still require the complete fresh rehearsal.[^selection-recovery]
+The earlier unsettled refusal preserved its journal. After all ten attempts
+completed, the measured controller refused wrong candidate attempt 6 and wrong
+seed attempt 2 with unchanged journals, selected attempt 1 at seed 11, then
+refused repeated selection without changing the selected state. These outcomes
+are program-authored reports, bound to the installed reporter and native queue
+evidence. Independent selection review remains pending.[^selection-complete]
 Licensed evaluator decoding and the
 substantive study remain ahead. Earlier runtime measurements below retain
 their historical scope.[^licensed-collection][^licensed-staging][^staging-review][^selection-runtime][^baseline-freeze][^selection-enforcement][^selection-rehearsal]
 
 The installed selection controller is
-`/home/corvis/research-control/wrds-selection-a00c077b1/bin/python`.
+`/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python`.[^selection-complete]
 Its image is
 `/data/homezvol1/wagnera3/research-images/selection-a00c077b1/research-selection.sif`,
 SHA-256 `870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e`.
@@ -620,12 +626,10 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    `58698691`; licensed evaluator decoding follows the remaining allocation fix.
    The verifier corrections and licensed staging passed independent audit;
    the sealed final bundle and its key remain evaluator-owned.[^verifier-integrity][^staging-review][^selection-runtime]
-4. The synthetic selection rehearsal passed through the existing evaluator-owned
-   journal transition; its independent review reopened for missing program-authored
-   winner/refusal evidence. Repeat those measurements through the maintained
-   reporter and complete review before licensed validation. First finish the
-   recorded controller handover (`04c0cdbe`) for the four retained allocations,
-   then complete the six remaining admitted attempts through the shared queue.
+4. Complete independent selection review before licensed validation. Recovery
+   (`04c0cdbe`) passed audit, all ten repeated synthetic attempts passed the
+   shared queue, and the maintained reporter now records winner, wrong-candidate,
+   wrong-seed and repeated-selection outcomes.[^selection-complete]
    The initial three candidates use both features, momentum alone and liquidity alone, each over
    seeds 11, 23, 37, 53 and 71 with the shared 200-tree configuration. Rank the
    five-seed mean monthly LightGBM-minus-momentum net return at 10 bps; break
@@ -696,8 +700,8 @@ ledger. Jobs `58708603`, `58708606` and `58708609` were submitted, but the
 existing inspector refused ambiguous `research_attempt` matches. The correction
 adds the exact frozen artifact path and workspace host to that same lookup;
 duplicate exact matches still refuse. Recovery must retain these allocations
-and their journals. The repair and subsequent measured selection are not yet
-independently verified. See the active `a9b2927c` thread, including finding
+and their journals. Recovery subsequently passed independent audit; the
+selection measurement awaits its separate review. See the active `a9b2927c` thread, including finding
 `26b741fd-14fd-434a-b368-293c2662ba2f`.[^selection-recovery]
 
 The installed controller at
@@ -714,3 +718,5 @@ selection refusal recorded `RESEARCH-008`, exit 2, no selected candidate and
 identical before/after journal hashes. No final grant was released.[^selection-recovery]
 
 [^selection-recovery]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json`, session-assembled index of service reports: controller `a05f83c7`, native allocations `8937ff37`, `ccdaf960`, `ff26bbab`, `491cbaa6`, and unsettled selection `2edf1ef3`. Source `f38df09fe86566f5201bc59f9f28968276e72423` passed full fleet checks `835ae032` (5,041 tests) and `2163a86b` (2,160 tests), both at 100% statement and branch coverage. Live dispatch reading at 2026-11-01T02:01 UTC showed four running and six queued; board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` records the handover gap. Selection milestone `a9b2927c` remains open after the independent audit rejection.
+
+[^selection-complete]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, fresh controller report `9d77722e` verifying 584 installed files, ten queue/native receipt pairs, and service-authored selection reports `e2831b84` (wrong candidate), `a100f9a7` (wrong seed), `baa53190` (winner), `62033c80` (repeated selection). `selection-audit.sql`, `controller-audit.sql` and `native-audit.sql` query those live program records; `selection-audit-probes.json` records positive outputs and eight altered-evidence refusals. The synthetic policy covers two candidates, five seeds each and 16 months; it is not the substantive licensed study. Recovery audit `eefb349e-642b-423c-9e18-3fa09fbb4281` verified `04c0cdbe` at `2026-11-01T10:46:40.205Z`. No final grant was released.

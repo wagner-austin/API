@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json"
   - "tools/fleet/src/fleet/core/research_handover.py"
@@ -34,6 +35,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/evidence.json": "a459d565961af14af29569de9287297e140fd53c"
   "tools/fleet/src/fleet/core/research_handover.py": "446e3e549dbd2b655a142f266f76bf9fe8e9c756"
@@ -126,8 +128,12 @@ handover digest. The normal-path audit query matches exactly one receipt;
 changed result, attempt and handover expectations each match zero. At the
 published evidence revision, the fleet suite passed 2,634 tests with full
 statement and branch coverage, and both updated wiki pages passed their
-code-path audits without errors or warnings. Operational independent review
-and completion of the remaining selection trials are separate steps.[^normal-live]
+code-path audits without errors or warnings. Recovery passed independent audit
+at 10:46:40 UTC. All ten synthetic queue receipts had passed by 11:18:37 UTC;
+the maintained selector subsequently published winner and refusal evidence.
+Independent selection review remains separate from the verified recovery.[^normal-live][^selection-complete]
+
+[^selection-complete]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, recovery audit `eefb349e`, ten native/queue pairs and four service-authored selection outcomes. [[wrds-baseline-readiness]] records the remaining licensed-study prerequisites.
 
 [^normal-live]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, native report `1caa931e`, queue receipt, verification jobs and audit queries; `audit-probes.json`, normal completion and three altered normal-evidence queries. Fleet check `90c37d46` at API `52345cc13` passed 2,634 cases and skipped 44 separate host-lane cases; the previously measured execution lane passed 97 cases with zero skips.
 
