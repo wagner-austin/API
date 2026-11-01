@@ -25,14 +25,15 @@ lint:
 # 2026-08-19 incident that motivated both.
 #
 # --own-home runs the suite under a HOME of the run's own and fails it on any
-# file left there, so a test that fetches a model from the Hugging Face hub
-# into ~/.cache fails by name: two such tests pulled the 3.86 GB MMS-LID-126
-# checkpoint on pendragon, 240 s of fleet job f2af5334's 634 s (MCPs board
+# file left there. --hub-offline refuses the Hugging Face hub, so a test that
+# resolves a hub id fails by name: two such tests pulled the 3.86 GB
+# MMS-LID-126 checkpoint on pendragon, 240 s of fleet job f2af5334's 634 s,
+# into the run's own HF_HOME, which --own-home alone never sees (MCPs board
 # task abb0a10e).
 test:
 	poetry lock
 	poetry sync --no-cache --with dev
-	$(PYTHON) ../../tools/maketools/scripts/run.py test --own-home
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --own-home --hub-offline
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
