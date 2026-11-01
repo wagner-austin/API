@@ -76,5 +76,5 @@ class TestTheBudgetOnTheLine:
             "ended=2026-10-05T02:48:10Z "
             "log=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log "
             "run=services-grandma-api-loki-1791168143 workers=2 slowest=unread ci=unread "
-            "generation=unread began=unread phases=unread"
+            "generation=unread began=unread phases=unread steps=unread"
         )

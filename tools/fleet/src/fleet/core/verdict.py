@@ -27,6 +27,7 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
+from fleet.core.build_steps import read_build_steps
 from fleet.core.ci_load import read_ci_load
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
 from fleet.core.run_summary import read_run_summary
@@ -157,6 +158,10 @@ class Verdict(TypedDict):
             generation fetched every package it installs, and the phases
             say whether that fetch fell before the budget's clock or inside
             it (MCPs board tasks abb0a10e and 74d10d85).
+        steps: The slowest docker build steps the tail timed
+            (:func:`fleet.core.build_steps.read_build_steps`), or
+            ``unread``: which step inside a build a phase's seconds went to
+            (MCPs board task eb6586e4).
     """
 
     job_id: str
@@ -177,6 +182,7 @@ class Verdict(TypedDict):
     generation: str
     began: str
     phases: str
+    steps: str
 
 
 def read_slowest(tail: str) -> str:
@@ -354,6 +360,7 @@ def judge(
         generation=summary["generation"],
         began=summary["began"],
         phases=summary["phases"],
+        steps=read_build_steps(ANSI.sub("", tail)),
     )
 
 
@@ -367,7 +374,8 @@ def render_verdict(verdict: Verdict) -> str:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
-        slowest=<...> ci=<...> generation=<...> began=<...> phases=<...>``,
+        slowest=<...> ci=<...> generation=<...> began=<...> phases=<...>
+        steps=<...>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
         field the readers in MCPs' maketools and session-audit match, each
@@ -382,7 +390,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"run={verdict['run_id']} workers={verdict['workers']} "
         f"slowest={verdict['slowest']} ci={verdict['ci']} "
         f"generation={verdict['generation']} began={verdict['began']} "
-        f"phases={verdict['phases']}"
+        f"phases={verdict['phases']} steps={verdict['steps']}"
     )
 
 
