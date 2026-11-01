@@ -33,8 +33,12 @@ image-data-bank-api:
 image-github-stats-api:
 	docker build --quiet --file ../../services/github-stats-api/Dockerfile ../..
 
+# grandma-api's build alone prints its steps, the slowest cold build here
+# (189 s on loki): the verdict's steps= reads each step's seconds off them
+# (API tools/fleet build_steps.py). Every other build stays quiet, so these
+# lines stay inside the transcript tail the verdict reads.
 image-grandma-api:
-	docker build --quiet --file ../../services/grandma-api/Dockerfile ../..
+	docker build --progress plain --file ../../services/grandma-api/Dockerfile ../..
 
 image-music-wrapped-api:
 	docker build --quiet --file ../../services/music-wrapped-api/Dockerfile --target api ../..
