@@ -33,6 +33,9 @@ def _document(directory: pathlib.Path) -> JSONObject:
         "directory": str(directory / "work"),
         "native_attempt": "policy-trial-1",
     }
+    work = directory / "work"
+    work.mkdir()
+    (work / "run.json").write_text('{"artifact":"/cluster/study/attempt-1/result.json"}')
     for key, content in (
         ("script", "# installed controller"),
         ("policy", "{}"),
@@ -128,6 +131,7 @@ def test_complete_attempt_requires_fresh_native_identity_and_record(
             "record_sha256": original_digest,
         }
     assert runner.calls[1][2] == "hpc3.cli.execution_inspect"
+    assert runner.calls[1][7:9] == ("--artifact", "/cluster/study/attempt-1/result.json")
     assert runner.calls[1][-2:] == ("--report-task", "task")
 
 

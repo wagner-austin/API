@@ -150,6 +150,7 @@ def poll(
     native = require_str(row, "job_id")
     if state == "complete":
         cluster = narrow_json_to_dict(load_json_str(_test_hooks.read_text(cluster_path)))
+        recipe = narrow_json_to_dict(load_json_str(_test_hooks.read_text(directory / "run.json")))
         measured = research_control.invoke(
             (
                 python,
@@ -159,6 +160,8 @@ def poll(
                 require_str(cluster, "workspace"),
                 "--attempt",
                 require_str(document, "native_attempt"),
+                "--artifact",
+                require_str(recipe, "artifact"),
                 "--checksums",
                 str(directory / "checksums.txt"),
                 "--report-task",
