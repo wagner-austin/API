@@ -91,7 +91,7 @@ class TrainingRunMetadata(TypedDict):
 class ModelManifestV2(TypedDict):
     """Standardized model manifest schema v2.
 
-    file_id and file_sha256 reference the remote artifact stored in data-bank-api.
+    file_id and file_sha256 reference the stored artifact tarball.
     created_at is an ISO 8601 timestamp string for portability across languages.
     """
 
