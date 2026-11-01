@@ -1,0 +1,92 @@
+{
+  "measured_at": "2026-10-31T23:57:26.300655+00:00",
+  "runtime_query": "WITH reports AS (\n SELECT id,substring(body from position(chr(10) in body)+1)::jsonb AS doc FROM agent_task_updates\n WHERE task_id='a9b2927c-3775-46cc-b86e-2aeb0c2c4479' AND author='hpc-report-a9b2927c'\n AND id IN ('13f03279-9e40-456e-8d93-6e31e702cac4','9c35e4b9-a936-4840-a110-e28bcabfc549')\n)\nSELECT count(*) FROM reports c CROSS JOIN reports i\nWHERE c.id='13f03279-9e40-456e-8d93-6e31e702cac4' AND i.id='9c35e4b9-a936-4840-a110-e28bcabfc549'\nAND c.doc->>'kind'='HPC3_CONTROLLER_EVIDENCE'\nAND c.doc->>'source_commit'='a00c077b125ceb436e73b8f5327a2dda6b798663'\nAND c.doc->>'controller_python'='/home/corvis/research-control/wrds-selection-a00c077b1/bin/python'\nAND c.doc->>'controller_python_sha256'='ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4'\nAND c.doc->>'installed_files'='583'\nAND c.doc#>>'{verified_wheels,covenant_ml-0.1.0-py3-none-any.whl,sha256}'='5c7ed1221fe73afaeaced7c1c81f14a13fb7ce78d2f5898824f81ec0244dea3a'\nAND c.doc#>>'{verified_wheels,covenant_ml-0.1.0-py3-none-any.whl,installed_files}'='353'\nAND c.doc->>'selfcheck_sha256'='e69de9b66e326815fd6e0dfdd23b026b7513d800275cb950691234ee33d79f11'\nAND c.doc->>'selfcheck'='image self-check OK'\nAND c.doc->>'dependency_check'='No broken requirements found.'\nAND i.doc->>'kind'='HPC3_IMAGE_BUILD_EVIDENCE'\nAND i.doc#>>'{accounting,job,job_id}'='58698691'\nAND i.doc#>>'{accounting,job,state}'='COMPLETED'\nAND i.doc#>>'{accounting,exit_code}'='0:0'\nAND i.doc->>'selfcheck_passes'='2' AND i.doc->>'dependency_check'='passed'\nAND (SELECT count(*) FROM jsonb_object_keys(i.doc->'verified_files'))=14\nAND i.doc#>>'{verified_files,/data/homezvol1/wagnera3/research-images/selection-a00c077b1/research-selection.sif}'='870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e'\nAND i.doc#>>'{verified_files,/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/covenant_ml-0.1.0-py3-none-any.whl}'=c.doc#>>'{verified_wheels,covenant_ml-0.1.0-py3-none-any.whl,sha256}'\nAND i.doc#>>'{verified_files,/data/homezvol1/wagnera3/research-images/selection-a00c077b1/selfcheck.py}'=c.doc->>'selfcheck_sha256';\n",
+  "runtime_expected": 1,
+  "runtime_actual": 1,
+  "runtime_negative_probes": [
+    {
+      "name": "installed_count",
+      "replace": "='583'",
+      "with": "='584'",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "selfcheck_count",
+      "replace": "='2'",
+      "with": "='3'",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "file_count",
+      "replace": "=14",
+      "with": "=15",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "wrong_wheel",
+      "replace": "5c7ed1221fe73afaeaced7c1c81f14a13fb7ce78d2f5898824f81ec0244dea3a",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "wrong_image",
+      "replace": "870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    }
+  ],
+  "scope": "Read-only queries over service-authored board reports; no database mutation.",
+  "native_measured_at": "2026-10-31T23:59:50.364568+00:00",
+  "native_query": "WITH expected(number,spec_sha,request_sha) AS (VALUES\n(1,'675485a2e9e317fdafe3a447ba5f9b3ced5d9b76b6a6be909605c0e67b4b0329','23c89dc6deed544013b7d2d507d2d8801f5fab022879216e1d75593821559eb0'),\n(2,'a6a51eb08a4ca6ae5bf442dee9e13ab466a32227b0aa0f021a895a86c49e0969','1dfcbc2afe071b7d657f391db6e9f32df9ceb4ad8e71d48b1e5df3ae04ced98b'),\n(3,'5604ad82f28461dda7864157870a55ac6fb36a4a31a77f94128d11b6f8b2bbb8','a280705994e5a3d3a9482ca3c2ae055444f79d81649e8c86bab3058f6700e6fd'),\n(4,'aa2e249f9fbbd2ba1453db5c93faefec3362c44ab02387bc73cb80c7de40ce60','8d8d95857c0001982c15d96fa9d4785341b85012cd00db6c8331e22beff6bd35'),\n(5,'cf56aed20970bcca591ff4181f77c7654830a01a76bd20c3d1562518e8f841a5','4b5dbd2c26a46866f67d3ba5092129b1ed7f0e3ef5e3ac3cdcba7a3a738cfa66'),\n(6,'734a4fccc11d8935ef82b641ccc74df6c66ec56bfdc98dc0853175f9a66bfa2e','7c6f8d0497a2928d3abb03c1d29d5001b47d34899c94af0be7b449f5a2f91cba'),\n(7,'60e763c49b38d66d8a1abc7ea23d23aff70ca01c61607c0bbbeffc82e00408d2','84339b6981ab08b3a5e3dc95ee3144f96c9410c50530d08b162375e379b7e6dc'),\n(8,'77325a1883603ce0182ebd843647d8748714d0a5da7dbc2b98a7728f9b9fdfa1','4a600dd903d9980d575ae1a126f445b53bf313ff229da996562840df4f5a0263'),\n(9,'3e1c6681436bf7483b74ba6672b6e04f5b99dfb4c8bda5067dd124b234923629','5f204d85670a1d0712709010dd4257329fee6533ea555a390b4184b54688d7a8'),\n(10,'d8fae29c6ed2b3381c0925fa6b70817de0612eced9d5358d47dc863c27971bc4','baa91a1c6782325af922a740506383a2fa64c142fea0ec2d52d5dcd4d6d4f54c')\n), native AS (\n SELECT id,created_at,substring(body from position(chr(10) in body)+1)::json AS doc\n FROM agent_task_updates\n WHERE task_id='a9b2927c-3775-46cc-b86e-2aeb0c2c4479'\n AND author='hpc-report-a9b2927c' AND body LIKE 'HPC3 ATTEMPT LOAD-REPORT%'\n), jobs AS (\n SELECT j.*,substring(j.detail from position('{\"state\"' in j.detail))::json AS outcome\n FROM fleet_dispatch_jobs j JOIN expected e ON j.research_request->>'specSha256'=e.spec_sha\n WHERE j.task_id='a9b2927c-3775-46cc-b86e-2aeb0c2c4479'\n AND j.status='passed' AND j.exit_code=0\n AND j.project='research/hpc3' AND j.command='research'\n AND j.claimed_by='fleet-research-diphtheria'\n), matched AS (\n SELECT e.number,j.id FROM expected e JOIN jobs j ON j.research_request->>'specSha256'=e.spec_sha\n WHERE EXISTS (\n SELECT 1 FROM native n WHERE n.created_at BETWEEN j.claimed_at AND j.closed_at\n AND n.doc->>'kind'='HPC3_ATTEMPT_EVIDENCE'\n AND n.doc#>>'{ledger,job_id}'=j.outcome->>'native_job_id'\n AND n.doc#>>'{ledger,experiment,research_attempt}'='c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:'||e.number\n AND n.doc#>>'{ledger,experiment,request_sha256}'=e.request_sha\n AND n.doc#>>'{accounting,job,state}'='COMPLETED'\n AND n.doc#>>'{accounting,exit_code}'='0:0'\n AND n.doc#>>'{ledger,image_digest}'='870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e'\n AND n.doc#>>'{ledger,image_drift,image_commit}'='a00c077b125ceb436e73b8f5327a2dda6b798663'\n AND n.doc#>>'{measurement,verified_files,/data/homezvol1/wagnera3/research-images/selection-a00c077b1/research-selection.sif}'='870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e'\n AND n.doc#>>'{measurement,verified_files,/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/research_trial.py}'='aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765'\n AND n.doc#>>'{measurement,dataset,bundle_sha256}'='e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14'\n AND n.doc#>>'{record,label}'=e.number::text\n AND n.doc#>>'{record,experiment}'='3f9724b74004133a6f5d1ad095c5f61ede3c782a0d41d839983122abe923b4ca'\n AND n.doc#>>'{record,fingerprint,image_digest}'=n.doc#>>'{ledger,image_digest}'\n AND length(n.doc#>>'{record,payload_digest}')=64\n AND encode(sha256(convert_to((n.doc->'record')::text,'UTF8')),'hex')=j.outcome->>'record_sha256'\n AND (SELECT count(*) FROM json_array_elements(n.doc#>'{record,observations}') o WHERE o->>'name' LIKE 'monthly_net_return.lightgbm.10bps.%')=16\n AND (SELECT count(*) FROM json_array_elements(n.doc#>'{record,observations}') o WHERE o->>'name' LIKE 'monthly_net_return.momentum.10bps.%')=16\n )\n)\nSELECT CASE WHEN count(*)=10 AND count(DISTINCT number)=10 AND count(DISTINCT id)=10 THEN 1 ELSE 0 END FROM matched;\n",
+  "native_expected": 1,
+  "native_actual": 1,
+  "native_negative_probes": [
+    {
+      "name": "wrong_image",
+      "replace": "870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "wrong_bundle",
+      "replace": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "missing_month",
+      "replace": "=16",
+      "with": "=17",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "wrong_request",
+      "replace": "23c89dc6deed544013b7d2d507d2d8801f5fab022879216e1d75593821559eb0",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "closure_before_evidence",
+      "replace": "n.created_at BETWEEN j.claimed_at AND j.closed_at",
+      "with": "n.created_at < j.claimed_at",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "wrong_record_digest",
+      "replace": "=j.outcome->>'record_sha256'",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'",
+      "expected": 0,
+      "actual": 0
+    }
+  ]
+}

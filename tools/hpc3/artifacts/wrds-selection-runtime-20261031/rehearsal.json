@@ -1,0 +1,327 @@
+{
+  "board_task": "a9b2927c-3775-46cc-b86e-2aeb0c2c4479",
+  "measured_at": "2026-11-01T00:00:15.904546+00:00",
+  "source_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+  "scope": "Synthetic operational rehearsal only. Licensed baseline and final evaluation remain unrun.",
+  "dispatch": "Existing dispatch_submit research/hpc3 lane and fleet.cli.tick research lane; scheduled and explicitly invoked ticks, shared capacity and resource leases, native submission and reconciliation through maintained controllers.",
+  "controller_python": "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+  "policy_sha256": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e",
+  "selection_policy": {
+    "primary": "lightgbm",
+    "reference": "momentum",
+    "cost_bps": 10,
+    "first_month": 24222,
+    "last_month": 24237,
+    "final_seed": 11,
+    "required_candidates": [
+      "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+      "ceff2865c66fffdcce6160234df55db32c3a7021f348025be6cca5783f94c0ba"
+    ]
+  },
+  "entrypoint_provenance": "Native image drift reports entrypoint scripts outside the image environment. Exact scripts/__init__.py and scripts/research_trial.py hashes are separately required by native checksum verification; library implementations resolve inside the frozen image.",
+  "trials": [
+    {
+      "attempt": 1,
+      "features": [
+        "momentum",
+        "liquidity"
+      ],
+      "seed": 11,
+      "queue_id": "9a9a5caf-3c84-4b5b-87e7-e8fd5973e74c",
+      "spec_sha256": "675485a2e9e317fdafe3a447ba5f9b3ced5d9b76b6a6be909605c0e67b4b0329",
+      "state": "passed",
+      "native_job_id": "58701586",
+      "canonical_record_sha256": "649889fe71795fd20bafd5a6b08bdecce711d7a5d28811fe6eb85a7ea262869c",
+      "closed_at": "2026-10-31T23:49:52.320356+00:00",
+      "native_report_ids": [
+        "3e1d2ce3-1835-44b6-b283-9f0b669fbc72",
+        "5cad5cad-396f-4490-93cc-84648cd90eb9"
+      ]
+    },
+    {
+      "attempt": 2,
+      "features": [
+        "momentum",
+        "liquidity"
+      ],
+      "seed": 23,
+      "queue_id": "4afa9e47-e981-4030-b70c-d81c3e7f1e5e",
+      "spec_sha256": "a6a51eb08a4ca6ae5bf442dee9e13ab466a32227b0aa0f021a895a86c49e0969",
+      "state": "passed",
+      "native_job_id": "58702189",
+      "canonical_record_sha256": "d41dae205d60a9a7113744cf026db7369ef309649dcaf77575b073e0f2be052f",
+      "closed_at": "2026-10-31T23:53:28.265231+00:00",
+      "native_report_ids": [
+        "66152577-fa27-4ee1-9f6b-1bd3f6dd8c5e",
+        "bbd5f98e-a10a-43a6-86ba-dfb3142be600"
+      ]
+    },
+    {
+      "attempt": 3,
+      "features": [
+        "momentum",
+        "liquidity"
+      ],
+      "seed": 37,
+      "queue_id": "64b00ee1-1a24-46bc-998f-f9aa1b9908fa",
+      "spec_sha256": "5604ad82f28461dda7864157870a55ac6fb36a4a31a77f94128d11b6f8b2bbb8",
+      "state": "passed",
+      "native_job_id": "58702197",
+      "canonical_record_sha256": "798dcf7a0b7a982724e1047a0fbc648afa280e3374f03a3c8c27a392093faf39",
+      "closed_at": "2026-10-31T23:54:07.798243+00:00",
+      "native_report_ids": [
+        "d08081dd-4759-41f2-88db-20cc1fe4e150",
+        "be4d0360-c56b-43b7-b7e0-40cf6df6cf85"
+      ]
+    },
+    {
+      "attempt": 4,
+      "features": [
+        "momentum",
+        "liquidity"
+      ],
+      "seed": 53,
+      "queue_id": "265c46cf-8d1d-4daf-8966-4641525dae68",
+      "spec_sha256": "aa2e249f9fbbd2ba1453db5c93faefec3362c44ab02387bc73cb80c7de40ce60",
+      "state": "passed",
+      "native_job_id": "58702217",
+      "canonical_record_sha256": "6d973877b4ef8f6a8ed13a2a1f710721bfc0e4434ffbc4073d0de8ddad4926c8",
+      "closed_at": "2026-10-31T23:55:36.710658+00:00",
+      "native_report_ids": [
+        "48526772-3c4d-4936-857b-abd31ef36ebd",
+        "569be846-c93a-4ec5-8ca7-b6eaceb2a139"
+      ]
+    },
+    {
+      "attempt": 5,
+      "features": [
+        "momentum",
+        "liquidity"
+      ],
+      "seed": 71,
+      "queue_id": "c518d145-a685-4e15-9523-8c0dfbc15d78",
+      "spec_sha256": "cf56aed20970bcca591ff4181f77c7654830a01a76bd20c3d1562518e8f841a5",
+      "state": "passed",
+      "native_job_id": "58702229",
+      "canonical_record_sha256": "72effd337bd54fb26e1b9c478d4e5783f2e8f778be697ed1c3f6e97492be8afd",
+      "closed_at": "2026-10-31T23:56:16.917107+00:00",
+      "native_report_ids": [
+        "1e7a700d-737d-4062-833e-4cc9d85bab42",
+        "ceb6122b-2df2-4494-86d7-9b4f598f587c"
+      ]
+    },
+    {
+      "attempt": 6,
+      "features": [
+        "momentum"
+      ],
+      "seed": 11,
+      "queue_id": "f5c21a14-dec4-40d4-91d4-2e9d037a31c7",
+      "spec_sha256": "734a4fccc11d8935ef82b641ccc74df6c66ec56bfdc98dc0853175f9a66bfa2e",
+      "state": "passed",
+      "native_job_id": "58702231",
+      "canonical_record_sha256": "eaabcf0f38ea8237304b036e83941df9c693b538a051c29d79b153229a3f38b4",
+      "closed_at": "2026-10-31T23:56:44.27332+00:00",
+      "native_report_ids": [
+        "93c2291d-338d-4600-9d8b-a504c1dec22c",
+        "5b1e3ed4-417b-4895-896c-aec22ed078b8"
+      ]
+    },
+    {
+      "attempt": 7,
+      "features": [
+        "momentum"
+      ],
+      "seed": 23,
+      "queue_id": "04790a63-343f-491c-a934-9d91e533d38d",
+      "spec_sha256": "60e763c49b38d66d8a1abc7ea23d23aff70ca01c61607c0bbbeffc82e00408d2",
+      "state": "passed",
+      "native_job_id": "58702234",
+      "canonical_record_sha256": "fd0cd378b312cef967d11fa42d579223ea9ccde21e3e24750277eec7711ea19a",
+      "closed_at": "2026-10-31T23:57:24.86016+00:00",
+      "native_report_ids": [
+        "9e9af319-31c6-467b-921a-82429ceccc66",
+        "2bf21a0c-5dc1-44fa-8ae2-983ae8b8ec78"
+      ]
+    },
+    {
+      "attempt": 8,
+      "features": [
+        "momentum"
+      ],
+      "seed": 37,
+      "queue_id": "e3c34127-69fe-49a7-a493-af751b241dd2",
+      "spec_sha256": "77325a1883603ce0182ebd843647d8748714d0a5da7dbc2b98a7728f9b9fdfa1",
+      "state": "passed",
+      "native_job_id": "58702241",
+      "canonical_record_sha256": "bceaa2975ee9a4090e03dcc37432f62b9c313b97e2f6adf4c187de79f1be421e",
+      "closed_at": "2026-10-31T23:58:17.401046+00:00",
+      "native_report_ids": [
+        "6ed3ae32-cae7-4798-ae71-102ad71f737d",
+        "b60cab95-3a33-4760-ab45-77706ddd4064"
+      ]
+    },
+    {
+      "attempt": 9,
+      "features": [
+        "momentum"
+      ],
+      "seed": 53,
+      "queue_id": "7609a7c2-005a-482f-8f8d-8fe5ca00c497",
+      "spec_sha256": "3e1c6681436bf7483b74ba6672b6e04f5b99dfb4c8bda5067dd124b234923629",
+      "state": "passed",
+      "native_job_id": "58702255",
+      "canonical_record_sha256": "f34527a5cfd7602dd3ecfe8afb90824036815d40cf90fc987710a3bd5a0863d3",
+      "closed_at": "2026-10-31T23:58:44.931764+00:00",
+      "native_report_ids": [
+        "f58de00b-10a5-42bd-b8cc-084210b1b58f",
+        "f9e56dac-04d4-4ac3-89f6-51fffe93c43a"
+      ]
+    },
+    {
+      "attempt": 10,
+      "features": [
+        "momentum"
+      ],
+      "seed": 71,
+      "queue_id": "2ff7213c-ed74-4b54-b9bc-bd4871961ac6",
+      "spec_sha256": "d8fae29c6ed2b3381c0925fa6b70817de0612eced9d5358d47dc863c27971bc4",
+      "state": "passed",
+      "native_job_id": "58702258",
+      "canonical_record_sha256": "6ff3f1c46f55da5036ab8878da6b15b7333de26e54002dcd0cf24e031f53e807",
+      "closed_at": "2026-10-31T23:59:13.107713+00:00",
+      "native_report_ids": [
+        "8218acc0-aab4-4070-a0a0-f85b140c03d0",
+        "7ac53617-b6a0-44df-88d3-8c83eeedcdcd"
+      ]
+    }
+  ],
+  "winner": {
+    "winning_attempt": 1,
+    "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+    "wrong_candidate_attempt": 6,
+    "wrong_seed_attempt": 2,
+    "final_seed": 11,
+    "owner": "covenant_ml.markets.research_ranking.winning_attempt",
+    "scope": "Synthetic operational rehearsal only; not a licensed performance result."
+  },
+  "unsettled_refusal": {
+    "measured_at": "2026-10-31T23:56:18.139142+00:00",
+    "argv": [
+      "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+      "/home/corvis/research-control/wrds-selection-a00c077b1/entrypoint/scripts/research_proposals.py",
+      "--policy",
+      "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/policy.json",
+      "--ledger",
+      "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/attempts.sqlite",
+      "select",
+      "--trial",
+      "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/trial-1.json",
+      "--final-manifest",
+      "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/final/bundle.json"
+    ],
+    "exit_code": 1,
+    "stderr_last_line": "ValueError: [RESEARCH-008] selection requires settled, unsealed validation",
+    "scope": "Session-operated installed CLI against synthetic native journal; no final key used."
+  },
+  "selection_probes": [
+    {
+      "probe": "wrong-candidate",
+      "attempt": 6,
+      "measured_at": "2026-10-31T23:59:34.145119+00:00",
+      "argv": [
+        "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+        "/home/corvis/research-control/wrds-selection-a00c077b1/entrypoint/scripts/research_proposals.py",
+        "--policy",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/policy.json",
+        "--ledger",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/attempts.sqlite",
+        "select",
+        "--trial",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/trial-6.json",
+        "--final-manifest",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/final/bundle.json"
+      ],
+      "exit_code": 1,
+      "stderr_last_line": "ValueError: RESEARCH_SELECTION_WINNER: require the winner's fixed final seed",
+      "journal_sha256_before": "28b6eebac463ac30c0dfd6e3cfed84f2aa8f4add763ee359c00beafb3c02d43a",
+      "journal_sha256_after": "28b6eebac463ac30c0dfd6e3cfed84f2aa8f4add763ee359c00beafb3c02d43a",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c24bb3be63f05a41108d1005e855fd9756133b77cf6e1421d9988a9b6ddb097c"
+    },
+    {
+      "probe": "wrong-seed",
+      "attempt": 2,
+      "measured_at": "2026-10-31T23:59:34.490734+00:00",
+      "argv": [
+        "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+        "/home/corvis/research-control/wrds-selection-a00c077b1/entrypoint/scripts/research_proposals.py",
+        "--policy",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/policy.json",
+        "--ledger",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/attempts.sqlite",
+        "select",
+        "--trial",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/trial-2.json",
+        "--final-manifest",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/final/bundle.json"
+      ],
+      "exit_code": 1,
+      "stderr_last_line": "ValueError: RESEARCH_SELECTION_WINNER: require the winner's fixed final seed",
+      "journal_sha256_before": "28b6eebac463ac30c0dfd6e3cfed84f2aa8f4add763ee359c00beafb3c02d43a",
+      "journal_sha256_after": "28b6eebac463ac30c0dfd6e3cfed84f2aa8f4add763ee359c00beafb3c02d43a",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "c24bb3be63f05a41108d1005e855fd9756133b77cf6e1421d9988a9b6ddb097c"
+    },
+    {
+      "probe": "winner",
+      "attempt": 1,
+      "measured_at": "2026-10-31T23:59:34.849562+00:00",
+      "argv": [
+        "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+        "/home/corvis/research-control/wrds-selection-a00c077b1/entrypoint/scripts/research_proposals.py",
+        "--policy",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/policy.json",
+        "--ledger",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/attempts.sqlite",
+        "select",
+        "--trial",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/trial-1.json",
+        "--final-manifest",
+        "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2/final/bundle.json"
+      ],
+      "exit_code": 0,
+      "stderr_last_line": "",
+      "journal_sha256_before": "28b6eebac463ac30c0dfd6e3cfed84f2aa8f4add763ee359c00beafb3c02d43a",
+      "journal_sha256_after": "f157882b94fffe396b280067b2dd24d3be49c624516468488ebb179d04c42719",
+      "stdout_sha256": "21809f83e64d0559dde186fe14fa1d48fff41fb83a5733354ad79ff0bd383a16",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "selected": {
+        "number": 1,
+        "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+        "selection": "selected",
+        "final_manifest_digest": "696a9726d90451eff2d97510e6aa85cdd3349d02b19fb9583cb938cc0718decf"
+      }
+    }
+  ],
+  "measurement_boundary": "Native verification and runtime inspections are service-authored board reports. Selection probes are captured stdout/stderr from session-operated installed CLI calls against the live private synthetic journal, not an independent service attestation.",
+  "final_state": "Exactly attempt 1 selected at seed 11; no final grant released and no final allocation submitted in this rehearsal.",
+  "private_evidence": "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2",
+  "evidence_sha256": {
+    "policy.json": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e",
+    "cluster.json": "126273376bfb5e6181cbc9eabd377440cba395519b36f6343282d63667eb6606",
+    "hpc3.json": "75ecd0417158f1c992d970d0c44129dd435c9a32155b5c5dfdd47eb20f61acbd",
+    "queue-references.json": "9f947ecca376c4e1def557bf790a2e504089c4d9ccc7f8f7c12442d5ecf06244",
+    "queue-readback.jsonl": "808576880154047eb82f55e8af8613ba3598d4d34c512141738a34a06ed02dbd",
+    "status-selected.json": "decfaccc3fee9b55a1d25fb80efcfcffbf2d722d66c50e814143b1acb923c3d7",
+    "winning-attempt.json": "2ba341fcef1d3c64c5b4d8e9f862dfe91b5c8b50fe950ed8e12de6c2b947b1bf",
+    "selection-probes.json": "bb3fae29b5e39e644bc62cb95abe4bf315712872197f026dc7ede50c5cf43aea",
+    "select-unsettled.json": "6751fbda39436a1973338451bfae3944599a1a341d733ee668093da2e61be71b",
+    "select-wrong-candidate.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "select-wrong-candidate.stderr": "c24bb3be63f05a41108d1005e855fd9756133b77cf6e1421d9988a9b6ddb097c",
+    "select-wrong-seed.stdout": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "select-wrong-seed.stderr": "c24bb3be63f05a41108d1005e855fd9756133b77cf6e1421d9988a9b6ddb097c",
+    "select-winner.stdout": "21809f83e64d0559dde186fe14fa1d48fff41fb83a5733354ad79ff0bd383a16",
+    "select-winner.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -1,0 +1,442 @@
+{
+  "board_task": "a9b2927c-3775-46cc-b86e-2aeb0c2c4479",
+  "source_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+  "service_reports": {
+    "controller": "13f03279-9e40-456e-8d93-6e31e702cac4",
+    "build_staging": "d0bf402d-b285-483c-9050-5b173571ec80",
+    "wheel_staging": "71e613dc-1527-4606-974f-22e245d28ebe",
+    "image": "9c35e4b9-a936-4840-a110-e28bcabfc549",
+    "fresh_validation_staging": "7566806a-e122-4e9d-8c48-61cdbee2778c"
+  },
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+    "controller_python": "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-selection-a00c077b1/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "5c7ed1221fe73afaeaced7c1c81f14a13fb7ce78d2f5898824f81ec0244dea3a",
+        "installed_files": 353
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "9fb2f51fdf2dd7c47baff2ab60cf66137271de5d8741f3c2aca085fcc359cf3d",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      }
+    },
+    "installed_files": 583,
+    "selfcheck_sha256": "e69de9b66e326815fd6e0dfdd23b026b7513d800275cb950691234ee33d79f11",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "11be3ef604c98beaf2b925f7f37433d348acd29965b2ffeaefc13bc63e574fbf"
+  },
+  "image": {
+    "kind": "HPC3_IMAGE_BUILD_EVIDENCE",
+    "ledger": {
+      "job_id": "58698691",
+      "project": "cleargbm",
+      "name": "cleargbm.image-selection-a00c077b1",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-10-31T23:40:18.537460+00:00",
+      "log_dir": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1",
+      "deterministic": false,
+      "experiment": {
+        "kind": "image-build",
+        "image_dir": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1"
+      },
+      "image_digest": "",
+      "submitter": "codex-wrds-1027",
+      "artifact": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/research-selection.sif",
+      "image_drift": {
+        "image_commit": "",
+        "head": "",
+        "modules": []
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58698691",
+        "name": "cleargbm.image-selection-a00c077b1",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 117,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-14-08"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-10-31T23:40:23",
+      "ended_at": "2026-10-31T23:42:20"
+    },
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/build.sbatch": "39db95e7a85d80538cc3860860769ea3cef694a136f58cfb0b52be2897630e7c",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/build.sh": "03e5439878dc680d9b4b51fb42ab5fb2c3f152a86a9158dbbefd4f84e98f85c2",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/image.def": "68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/requirements.txt": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/selfcheck.py": "e69de9b66e326815fd6e0dfdd23b026b7513d800275cb950691234ee33d79f11",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/covenant_ml-0.1.0-py3-none-any.whl": "5c7ed1221fe73afaeaced7c1c81f14a13fb7ce78d2f5898824f81ec0244dea3a",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/GIT_COMMIT": "71cd9a9ce7c2d30c223c4e48bd348f3d44f87e374dd0cd640fe653989ff14a38",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/research-selection.sif": "870a9da433e8cd15628724c73f845100e5ddd264969b55364e23c56e04c5d47e",
+      "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/build-58698691.out": "abf46c6d7acd75e66f87f62117059de19ebf0a72e8aae08d3d82a6b99bfdc922"
+    },
+    "image_mtime": 1793490135,
+    "log_mtime": 1793490140,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "staging": {
+    "build": {
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "host": "hpc3",
+      "manifest": {
+        "destination": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1",
+        "files": [
+          {
+            "name": "build.sbatch",
+            "sha256": "39db95e7a85d80538cc3860860769ea3cef694a136f58cfb0b52be2897630e7c",
+            "size_bytes": 2146
+          },
+          {
+            "name": "build.sh",
+            "sha256": "03e5439878dc680d9b4b51fb42ab5fb2c3f152a86a9158dbbefd4f84e98f85c2",
+            "size_bytes": 749
+          },
+          {
+            "name": "image.def",
+            "sha256": "68ae558095b81dc58ac6854d91e408bd9c984dde462af0a81824684462607e7b",
+            "size_bytes": 3203
+          },
+          {
+            "name": "requirements.txt",
+            "sha256": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+            "size_bytes": 900
+          },
+          {
+            "name": "selfcheck.py",
+            "sha256": "e69de9b66e326815fd6e0dfdd23b026b7513d800275cb950691234ee33d79f11",
+            "size_bytes": 7049
+          }
+        ],
+        "provenance": {
+          "source_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+          "board_task": "a9b2927c-3775-46cc-b86e-2aeb0c2c4479",
+          "prior_spec_sha256": "4b7485593b3af77dda805c02438d3b9af49333f3d516803082a8f40c1940ab1d",
+          "controller_provenance_sha256": "11be3ef604c98beaf2b925f7f37433d348acd29965b2ffeaefc13bc63e574fbf"
+        }
+      },
+      "manifest_sha256": "b9aa1970fe0b9dbedcd6e1c6e9909ceb0579c1ba8a7d39ea3d5668ee3b69f815",
+      "expected_sha256": "7d6fa2d18c6b38397470af199222da19d9a1230fed4b94ce6a9d845f792b9801",
+      "verified_files": 5,
+      "certification_path": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/build-stage-digests.txt",
+      "certification_sha256": "a9192983a4816d01e6ae0609a20ea82b5c27d914f63fbc81185e44cfc054da61",
+      "controller_python": "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    },
+    "wheels": {
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "host": "hpc3",
+      "manifest": {
+        "destination": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels",
+        "files": [
+          {
+            "name": "cleargbm-0.1.0-py3-none-any.whl",
+            "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+            "size_bytes": 34972
+          },
+          {
+            "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+            "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+            "size_bytes": 618460
+          },
+          {
+            "name": "covenant_domain-0.1.0-py3-none-any.whl",
+            "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+            "size_bytes": 11753
+          },
+          {
+            "name": "covenant_ml-0.1.0-py3-none-any.whl",
+            "sha256": "5c7ed1221fe73afaeaced7c1c81f14a13fb7ce78d2f5898824f81ec0244dea3a",
+            "size_bytes": 795041
+          },
+          {
+            "name": "platform_core-0.1.0-py3-none-any.whl",
+            "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+            "size_bytes": 286120
+          },
+          {
+            "name": "platform_ml-0.1.0-py3-none-any.whl",
+            "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+            "size_bytes": 52844
+          }
+        ],
+        "provenance": {
+          "source_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+          "board_task": "a9b2927c-3775-46cc-b86e-2aeb0c2c4479",
+          "prior_spec_sha256": "4b7485593b3af77dda805c02438d3b9af49333f3d516803082a8f40c1940ab1d",
+          "controller_provenance_sha256": "11be3ef604c98beaf2b925f7f37433d348acd29965b2ffeaefc13bc63e574fbf"
+        }
+      },
+      "manifest_sha256": "3a592853a9817970cab89a1eb10bd61dad02de776c2a2f8f5e657913e1a95ad3",
+      "expected_sha256": "7d6fa2d18c6b38397470af199222da19d9a1230fed4b94ce6a9d845f792b9801",
+      "verified_files": 6,
+      "certification_path": "/data/homezvol1/wagnera3/research-images/selection-a00c077b1/wheels/wheels-stage-digests.txt",
+      "certification_sha256": "125eb4a004bdf9717d34ad26f1b5d3909563e2e72c1216db58aad954f8a51f43",
+      "controller_python": "/home/corvis/research-control/wrds-selection-a00c077b1/bin/python",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    }
+  },
+  "specification": {
+    "base_image": "python:3.11.16-slim-bookworm@sha256:528257d48c1da0dcecc2e725d1ae34498d60c965f1241e39cd6a85a8859bdf84",
+    "env_prefix": "/opt/env",
+    "git_commit": "a00c077b125ceb436e73b8f5327a2dda6b798663",
+    "system_packages": [
+      "libgomp1=12.2.0-14+deb12u1"
+    ],
+    "extra_index_urls": [],
+    "requirements": [
+      "alembic==1.17.2",
+      "annotated-doc==0.0.4",
+      "annotated-types==0.7.0",
+      "anyio==4.12.0",
+      "certifi==2025.11.12",
+      "cffi==2.1.1",
+      "cloudpickle==3.1.2",
+      "colorlog==6.10.1",
+      "cryptography==50.0.2",
+      "fastapi==0.124.0",
+      "greenlet==3.3.0",
+      "h11==0.16.0",
+      "httpcore==1.0.9",
+      "httpx==0.28.1",
+      "idna==3.11",
+      "joblib==1.5.2",
+      "lightgbm==4.6.0",
+      "llvmlite==0.46.0",
+      "mako==1.3.10",
+      "markdown-it-py==4.0.0",
+      "markupsafe==3.0.3",
+      "mdurl==0.1.2",
+      "numba==0.63.1",
+      "numpy==2.3.5",
+      "nvidia-nccl-cu12==2.27.5",
+      "optuna==4.6.0",
+      "packaging==25.0",
+      "pandas==2.3.3",
+      "polars-runtime-32==1.36.1",
+      "polars==1.36.1",
+      "pycparser==3.11",
+      "pydantic-core==2.41.5",
+      "pydantic==2.12.5",
+      "pygments==2.19.2",
+      "pyrage==1.4.0",
+      "python-dateutil==2.9.0.post0",
+      "pytz==2025.2",
+      "pyyaml==6.0.3",
+      "rich==14.2.0",
+      "scikit-learn==1.7.2",
+      "scipy==1.16.3",
+      "sentencepiece==0.2.1",
+      "shap==0.51.0",
+      "six==1.17.0",
+      "slicer==0.0.8",
+      "sqlalchemy==2.0.45",
+      "starlette==0.50.0",
+      "threadpoolctl==3.6.0",
+      "tqdm==4.67.1",
+      "typing-extensions==4.15.0",
+      "typing-inspection==0.4.2",
+      "tzdata==2025.3",
+      "xgboost==3.1.2"
+    ],
+    "wheels": [
+      "cleargbm-0.1.0-py3-none-any.whl",
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+      "covenant_domain-0.1.0-py3-none-any.whl",
+      "covenant_ml-0.1.0-py3-none-any.whl",
+      "platform_core-0.1.0-py3-none-any.whl",
+      "platform_ml-0.1.0-py3-none-any.whl"
+    ],
+    "expected_versions": {
+      "pycparser": "3.11",
+      "certifi": "2025.11.12",
+      "pytz": "2025.2",
+      "scikit-learn": "1.7.2",
+      "pydantic-core": "2.41.5",
+      "polars-runtime-32": "1.36.1",
+      "xgboost": "3.1.2",
+      "six": "1.17.0",
+      "markupsafe": "3.0.3",
+      "cffi": "2.1.1",
+      "sqlalchemy": "2.0.45",
+      "pydantic": "2.12.5",
+      "cloudpickle": "3.1.2",
+      "markdown-it-py": "4.0.0",
+      "pyyaml": "6.0.3",
+      "httpcore": "1.0.9",
+      "alembic": "1.17.2",
+      "scipy": "1.16.3",
+      "mdurl": "0.1.2",
+      "polars": "1.36.1",
+      "typing-inspection": "0.4.2",
+      "joblib": "1.5.2",
+      "optuna": "4.6.0",
+      "nvidia-nccl-cu12": "2.27.5",
+      "h11": "0.16.0",
+      "starlette": "0.50.0",
+      "llvmlite": "0.46.0",
+      "numpy": "2.3.5",
+      "packaging": "25.0",
+      "annotated-types": "0.7.0",
+      "idna": "3.11",
+      "greenlet": "3.3.0",
+      "mako": "1.3.10",
+      "anyio": "4.12.0",
+      "numba": "0.63.1",
+      "threadpoolctl": "3.6.0",
+      "annotated-doc": "0.0.4",
+      "tzdata": "2025.3",
+      "lightgbm": "4.6.0",
+      "pyrage": "1.4.0",
+      "colorlog": "6.10.1",
+      "shap": "0.51.0",
+      "pygments": "2.19.2",
+      "rich": "14.2.0",
+      "python-dateutil": "2.9.0.post0",
+      "slicer": "0.0.8",
+      "typing-extensions": "4.15.0",
+      "sentencepiece": "0.2.1",
+      "pandas": "2.3.3",
+      "tqdm": "4.67.1",
+      "fastapi": "0.124.0",
+      "httpx": "0.28.1",
+      "cryptography": "50.0.2"
+    },
+    "required_symbols": [
+      {
+        "module": "covenant_ml.markets.research_trial",
+        "attribute": "execute_trial"
+      },
+      {
+        "module": "covenant_ml.markets.research_final",
+        "attribute": "execute_final"
+      },
+      {
+        "module": "covenant_ml.markets.research_keys",
+        "attribute": "EvaluatorKeys"
+      },
+      {
+        "module": "covenant_ml.markets.encrypted_storage",
+        "attribute": "decrypted_bundle"
+      },
+      {
+        "module": "covenant_ml.evaluation.evidence",
+        "attribute": "require_private_directory"
+      },
+      {
+        "module": "pyrage",
+        "attribute": "decrypt_io"
+      },
+      {
+        "module": "cleargbm_rs",
+        "attribute": "train_gradient_boosting_rs"
+      },
+      {
+        "module": "covenant_ml.markets.research_release",
+        "attribute": "consume_final_grant"
+      },
+      {
+        "module": "covenant_ml.markets.research_native_final",
+        "attribute": "reconcile_final_attempt"
+      },
+      {
+        "module": "covenant_ml.markets.crsp_verify",
+        "attribute": "verify_crsp_extraction"
+      },
+      {
+        "module": "covenant_ml.markets.crsp_writer",
+        "attribute": "extract_crsp"
+      },
+      {
+        "module": "platform_core.load_report",
+        "attribute": "post_load_report"
+      },
+      {
+        "module": "covenant_ml.markets.encrypted_storage",
+        "attribute": "verify_encrypted_bundle"
+      },
+      {
+        "module": "covenant_ml.markets.research_ranking",
+        "attribute": "winning_attempt"
+      },
+      {
+        "module": "covenant_ml.markets.research_selection_records",
+        "attribute": "decode_research_selection"
+      }
+    ],
+    "smoke_commands": [
+      "/opt/env/bin/python -m pip check"
+    ],
+    "labels": {
+      "org.corvis.env-source": "/home/corvis/research-build/encrypted-44fa91cea/python/cpython-3.11.16-linux-x86_64-gnu"
+    },
+    "project": "cleargbm"
+  },
+  "controller_construction": "Fresh venv using the previously verified interpreter; copied the prior frozen site-packages and replaced covenant_ml from the verified wheel. Entrypoint scripts copied from the exact source revision. No system-site-packages or editable source paths.",
+  "source_member_readback": {
+    "wheel_members": 353,
+    "all_match_source": true,
+    "measurement_kind": "session-operated byte comparison of wheel members against the frozen working tree"
+  },
+  "private_evidence": "/home/corvis/research-data/wrds/runtime/selection-a00c077b1",
+  "evidence_sha256": {
+    "build-stage.json": "b9aa1970fe0b9dbedcd6e1c6e9909ceb0579c1ba8a7d39ea3d5668ee3b69f815",
+    "build-stage.log": "cb4cf6cb40027e66623a8e8d118ae095aa164f6475adb03e01918158b60df2c6",
+    "commit.sha256": "1c9209650b33a9c302c8768cbccb27203d3a1b09d4c577c00b4c3415da68c6fa",
+    "controller-inspection.json": "7dd920071c94bcc5487fa60fe1f57f782ecbe322ba85dc9beab0587790fc121b",
+    "controller-provenance.json": "11be3ef604c98beaf2b925f7f37433d348acd29965b2ffeaefc13bc63e574fbf",
+    "frozen-inputs.sha256": "7d6fa2d18c6b38397470af199222da19d9a1230fed4b94ce6a9d845f792b9801",
+    "image-expected.sha256": "1caa174a249bc8190b608b93e49c82eafc069450c7d6e3dc24ccb75ea4da470b",
+    "image-inspection.json": "9ce2df8c89f227534fee4394a84b4d171f921f0565469c981115d4e7fdfecebb",
+    "image-output.sha256": "a45e3b5236b4e335374d49bcee273de82888b17d9075b8d8b942c07e8527cce0",
+    "image-spec.json": "12f7498b6ecc8f8391c280b0345d00c1b350559d23389e115425822968cc5b89",
+    "image-submit.log": "e6a57eefe4802348b1e5b1b070011737ad02e11929b1f63ba7a282987ded7f4c",
+    "wheels-stage.json": "3a592853a9817970cab89a1eb10bd61dad02de776c2a2f8f5e657913e1a95ad3",
+    "wheels-stage.log": "576f38d4aaa3bdbfa4e95bdfa815d10b090d09cf4fe88b2299707fd748a9cbe0"
+  },
+  "limits": [
+    "No licensed partition opened, no licensed data or keys in image inputs.",
+    "Runtime inspection measures frozen files and retained native build evidence; synthetic selection rehearsal is a separate measurement.",
+    "The current native trial recipe requests one CPU and four GiB; licensed allocation plumbing and pooled-seed uncertainty reporting remain pending."
+  ],
+  "preserved_failure": {
+    "queue": "436d535d-44f9-4d1b-b1a0-5a72b9f065b7",
+    "native_job": "58700181",
+    "state": "FAILED",
+    "elapsed_seconds": 8,
+    "refusal": "CRSP-007: require CIZ/Y sessions or N/A/N closed calendar days",
+    "cause": "Old synthetic fixture calendar flags do not satisfy the current reader contract.",
+    "remaining_attempts": "2 through 10 interrupted before submission, through existing journal transitions; no retry of the consumed seed."
+  },
+  "fresh_fixture": {
+    "directory": "/home/corvis/research-data/wrds/experiments/selection-synthetic-a00c077b1-v2",
+    "validation_bundle_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14",
+    "final_bundle_sha256": "696a9726d90451eff2d97510e6aa85cdd3349d02b19fb9583cb938cc0718decf",
+    "source_sha256": {
+      "libs/covenant_ml/tests/markets/_crsp_study_fixtures.py": "ec345e292c6fa5b820b2f1916b4fd4d96a48125e68a4eb715499ef7909e29876",
+      "libs/covenant_ml/tests/markets/_crsp_fixtures.py": "08a035b2ff97bd2cfbb01aa6ffc25717dd791d9ef882beffaf57fdb60b08a06a",
+      "libs/covenant_ml/tests/markets/_encrypted_fixtures.py": "8ab5f2b5e0b74295310dddc31553d4dd01cc77b6d2b85072e472f4060d9ee7dc"
+    },
+    "generation": "Called existing study_rows, study_protocol, write_sources, load_crsp_sources and seal_extract; isolated pytest fixture dependencies did not modify the frozen installed controller."
+  }
+}
