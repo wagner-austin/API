@@ -506,3 +506,20 @@ routers, with README.md and docker-compose.yml repinned; monorepo-discipline
 repins README.md after its quoted lines moved unchanged. The clients and libs
 hubs and api-package-use-inventory record what left and the tag
 `archive/api-packages-2026-11-01` that keeps it.
+
+## [2026-11-01] maintenance | data-bank-api archived with its callers' service mode
+
+data-bank-api left the monorepo (board task `a9566810`) once covenant-radar-api
+and Model-Trainer stopped storing through it. service-port-map lists six
+services, re-measured at six `PathPrefix` routers, and now cites
+covenant-radar-api's Dockerfile and compose and grandma-api's compose in place
+of data-bank-api's deleted files; it also corrects the claim that every router
+targets container port 8000 (grandma-api's targets 8080) and drops the private
+DNS example, whose only instance left with the service.
+covenant-radar-service-architecture says a missing model is now an error rather
+than a download; model-trainer-service-architecture's HTTP row names the
+filesystem stores; the cloze-scoring, declared-config and covenant pages are
+repinned after reading each diff. monorepo-discipline re-sweeps its package
+counts to 23 of 23 and repins README.md; platform-workers-rq-pattern re-lists
+its three consumers and the readyz helper each calls. The services hub, the
+index and api-package-use-inventory record the archive.

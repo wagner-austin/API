@@ -17,11 +17,12 @@ source_paths:
 source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/model/cloze/score.py": 8c6dc9f6e0575ef110b3b7ddccb11ce778591fe5
   "services/Model-Trainer/src/model_trainer/core/contracts/cloze.py": c4e1e0ebaefc2fbb47a123d50d4c68ad4fa242ca
-  "services/Model-Trainer/src/model_trainer/cli/score_baseline.py": ce1944988c83f47c08378aa94536f5a2a409b098
+  "services/Model-Trainer/src/model_trainer/cli/score_baseline.py": 8d24aec5d211366c2737086f051e2426a33507dc
   "services/Model-Trainer/src/model_trainer/cli/score_run.py": 7da2bc858f6ed213b0e19d54deabcd4915170697
-  "services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py": 4d2eedae3cb07a886317d9b1618bd005f7b49c43
-  "services/Model-Trainer/src/model_trainer/worker/cloze_job.py": 5d914f43283c0c04cea638cfa73a77153f5a53d9
+  "services/Model-Trainer/src/model_trainer/worker/baseline_cloze_job.py": ff9f0a6f9f7d3140619837bdcc415795f87d55b3
+  "services/Model-Trainer/src/model_trainer/worker/cloze_job.py": 4addb4780d0498cf78c09fee32bfa459272b3f78
 provenance:
+  - "score_baseline.py, baseline_cloze_job.py and cloze_job.py repinned 2026-11-01 for MCPs board task a9566810 after reading each diff: the two queue jobs now resolve the item file under the settings' corpus root instead of fetching it from data-bank-api into artifacts_root/cloze, and score_baseline.py changes only its docstring's reason the item set is a path. No sentence here described the fetch, and the table's door, model and where-it-runs columns are unchanged"
   - "2026-10-30: research-index consolidation; historical measurements cite immutable API 4a145beef docs/RESEARCH.md lines 1608-1762. Existing code pins were compared with HEAD and are unchanged. This is citation maintenance, not a new experiment."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section under mi. The floor section [^research] cites, its Provenance: bullet and its generation table, is untouched"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the floor section, its Provenance bullet and generation table that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
