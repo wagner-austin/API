@@ -263,11 +263,12 @@ def test_lstm_backend_capabilities_returns_dict() -> None:
 
 def test_lstm_backend_train_on_cuda(tmp_path: Path) -> None:
     """LSTMBackend trains on CUDA with mixed precision."""
-    # Skip if CUDA not available
     import torch
 
-    if not torch.cuda.is_available():
-        pytest.skip("CUDA not available")
+    # Asserted rather than skipped: covenant-radar-api trains these backends
+    # on its GPU, and the fleet runs this package only on a node with a CUDA
+    # device, so a run without one has not tested the path production uses.
+    assert torch.cuda.is_available()
 
     backend = create_lstm_backend()
     dataset = load_us_bankruptcy_sample()
