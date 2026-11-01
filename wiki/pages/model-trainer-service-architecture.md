@@ -24,8 +24,9 @@ source_git_blobs:
   "services/Model-Trainer/src/model_trainer/core/services/queue/rq_adapter.py": 09a397ac1ad9036bde1c5889f8d1214c6d7b0957
   "services/Model-Trainer/src/model_trainer/core/services/container.py": e3165ede22b989b0679c5b8b3122a95785e107fc
   "services/Model-Trainer/src/model_trainer/cluster/entry.py": 67c8783d843179348bfdcd6b59641fa4cbab6a27
-  "docs/RESEARCH.md": 8c60ab08d693f3de13928f96dcfec1a61b768f44
+  "docs/RESEARCH.md": c7b63ba14027eadb70362b5ec5459e58535f37e9
 provenance:
+  - "docs/RESEARCH.md repinned 2026-11-01 from 8c60ab08 to c7b63ba1 after reading the diff: +4/-2 inside the WRDS paragraph of the covenant section only, rewording what the October 28-29 jobs and the later rehearsals concern. The mi section, its Runs list and the registered headings this page cites are unchanged (audit a5e04d51 found the stale pin, MCPs board task a276f973)."
   - "2026-10-30: checked the compact registry: all four project sections and the full qualified producing-command list remain. Only the registry pin changes; all six implementation pins match HEAD."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: Model-Trainer's pyproject.toml changed only its pytest addopts, --dist loadgroup instead of loadscope with the comment saying why (06956410e, MCPs board task 2f90d785), and the [tool.poetry.scripts] block this page cites at :54-59 is unchanged on those lines. docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section and added cartridge_trait_repair_sweep to the mi runs list; the mi Runs: bullet [^research] cites, and the floor, mi-cu128 and cartridge-qa projects this page names, all still stand"
   - "docs/RESEARCH.md repinned 2026-10-07 from fa186d5d to 501940c6 on a mechanical argument rather than a re-reading: the diff is +17/-0, one paragraph appended to the turkic-lstm section by c0c80420b (board task bc12f18b); the mi section and its Runs bullet that this page cites are byte-identical. Check with: git diff fa186d5df657233450dfac204982ad9eff07173d 501940c688722b74b5b1a49b1825b2a22e2322e4"
