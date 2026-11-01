@@ -24,7 +24,6 @@ Thirteen packages nothing used were archived on 2026-11-01 and live on only at t
 
 | Service | Port | Description |
 |---------|------|-------------|
-| [data-bank-api](services/data-bank-api) | 8001 | Content-addressed file storage with atomic writes |
 | [Model-Trainer](services/Model-Trainer) | 8005 | Language model training with LoRA/QLoRA/Unsloth fine-tuning, GPT-2, Char-LSTM, CUDA support |
 | [transcript-api](services/transcript-api) | 8003 | YouTube video transcription |
 | [covenant-radar-api](services/covenant-radar-api) | 8007 | Multi-domain risk prediction with pluggable domains (Covenant, Weather/McKinnon, Esports), Kafka streaming (XGBoost, LightGBM, ClearGBM, LogReg, RF, MLP, LSTM) |
@@ -69,7 +68,6 @@ Thirteen packages nothing used were archived on 2026-11-01 and live on only at t
 make infra
 
 # Start a specific service
-make up-databank      # data-bank-api
 make up-trainer       # Model-Trainer (GPU)
 make up-transcript    # transcript-api
 make up-covenant      # covenant-radar-api
@@ -101,23 +99,21 @@ make logs
 ## Architecture
 
 ```
-                              +--------------+
-                              | Traefik (80) |
-                              +------+-------+
-                                     |
-                         +-----------+-----------+
-                         |                       |
-                   +-----v-----+           +-----v-----+
-                   | Discord   |           |  Services |
-                   |   Bot     |           | (FastAPI) |
-                   +-----+-----+           +-----+-----+
-                         |                       |
-           +-------------+-------------+---------+
-           |             |             |
-     +-----v-----+ +-----v-----+ +-----v-----+
-     |   Redis   | | PostgreSQL| | data-bank |
-     | (pub/sub) | | (covenant)| | (storage) |
-     +-----+-----+ +-----------+ +-----------+
+                 +--------------+
+                 | Traefik (80) |
+                 +------+-------+
+                        |
+                  +-----v-----+
+                  |  Services |
+                  | (FastAPI) |
+                  +-----+-----+
+                        |
+           +------------+------------+
+           |                         |
+     +-----v-----+             +-----v-----+
+     |   Redis   |             | PostgreSQL|
+     | (pub/sub) |             | (covenant)|
+     +-----+-----+             +-----------+
            |
      +-----v-----+
      | RQ Workers|
