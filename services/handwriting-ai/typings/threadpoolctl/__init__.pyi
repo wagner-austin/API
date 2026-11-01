@@ -1,6 +1,0 @@
-from __future__ import annotations
-
-from contextlib import AbstractContextManager
-
-def threadpool_limits(*, limits: int) -> AbstractContextManager[None]: ...
-def threadpool_info() -> list[dict[str, object]]: ...
