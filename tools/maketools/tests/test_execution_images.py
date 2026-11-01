@@ -26,6 +26,10 @@ REGISTRY: Final[Path] = (
     REPO_ROOT / "tools" / "fleet" / "registry" / "projects" / "tools" / "maketools-execution.json"
 )
 
+#: The services whose build prints its steps for the verdict's steps= field:
+#: the slowest cold build, alone, so its lines stay inside the tail.
+PRINTS_STEPS: Final[frozenset[str]] = frozenset({"grandma-api"})
+
 #: One install step of the registry entry: its phase and its argv list.
 STEP: Final[re.Pattern[str]] = re.compile(r'"phase": "[^"]+",\n +"argv": \[[^\]]*\]')
 
@@ -56,7 +60,8 @@ def _declared_builds(service: str) -> list[str]:
         parts = [line.strip().partition(": ") for line in block.splitlines()[1:]]
         fields = {key: value for key, _, value in parts}
         target = f" --target {fields['target']}" if "target" in fields else ""
-        lines.append(f"docker build --quiet --file ../../{fields['dockerfile']}{target} ../..")
+        output = "--progress plain" if service in PRINTS_STEPS else "--quiet"
+        lines.append(f"docker build {output} --file ../../{fields['dockerfile']}{target} ../..")
     return lines
 
 
