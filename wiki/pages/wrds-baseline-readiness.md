@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json"
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
   - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
@@ -99,6 +101,8 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py"
   - "libs/covenant_ml/scripts/research_summary_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json": "95d1eda8dca5ca000fec5c8de18586e2267ef673"
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
@@ -214,24 +218,21 @@ The dependency pins are preserved. The new reporter needs no extract or key;
 its numerical and real-process checks passed. Independent runtime audit
 `9534d13c` verified task `b1934ce6` at `2026-11-01T14:52:04.858Z`. Reporting
 task `fc2dba58` has since passed independent audit `bfeda225` at
-`2026-11-01T17:08:32.158Z`.[^summary-reporting-audit] The substantive baseline and controlled final
-evaluation have not run.[^summary-runtime][^summary-runtime-audit]
+`2026-11-01T17:08:32.158Z`.[^summary-reporting-audit][^summary-runtime][^summary-runtime-audit]
 
-The synthetic rehearsal now in progress has five admitted seeds (`11`, `23`, `37`, `53`,
-`71`) for one required candidate in a fresh journal. Its frozen policy requests
-four CPUs, 16 GiB and a 600-second evaluator deadline; the existing recipe
-generator produces 11 native scheduler minutes on `free`, with no GPU or
-requeue. The evaluator's own reading of policy `b61af26e`, its journal and the
-attempt-1 recipe posted these values at `2026-11-01T17:27:11Z`.[^summary-preparation-reading]
-The five frozen requests were registered and dispatched through the shared
-queue at `2026-11-01T17:11Z`. At that reading attempt 1 had completed as native
-job `58721392`, attempts 2 and 3 were running and attempts 4 and 5 were still
-admitted. No seed summary has been produced from this journal, so the complete
-synthetic queue-to-summary rehearsal remains the gate before licensed
-evaluation. The licensed study's separately frozen 128-GiB and 7,200-second
-requests are unchanged.[^summary-preparation][^resource-live]
+**Licensed baseline, November 1 at 20:39 UTC:** policy `47d4ee17` has all
+15 required admissions: three frozen feature sets, each with seeds `11`, `23`,
+`37`, `53` and `71`. The maintained preparation reporter checked the journal,
+policy and first recipe; native preflight accepted four CPUs, 128 GiB and
+121 scheduler minutes on `free`, with a 7,200-second evaluator deadline.
+Attempt 1 is the only dispatched request: shared queue `b799f91b` reports
+native job `58733020` running. No completed licensed result or seed summary
+has been verified yet. Subsequent attempts require the previous attempt's
+verified completion; any required failure stops this preregistration without
+retry or replacement. Only the train/validation decryption identity was
+staged; the final holdout remains unreleased.[^licensed-baseline-start]
 
-**Synthetic queue-to-summary rehearsal, completed later on November 1:** all
+**Synthetic queue-to-summary rehearsal, completed November 1:** all
 five queue requests passed by `2026-11-01T17:42:36Z` as native jobs
 `58721392`, `58721481`, `58721691`, `58721976` and `58722099`, each with a
 service-authored attempt report binding image `14b1b5c9`, source `b3843a3d3`,
@@ -242,9 +243,11 @@ after. The evaluator's reporter recomputed the four arms' seed-averaged
 moving-block results through the same `validation_summary` owner, confirmed
 the payload and RunRecord bytes, and posted that reading at `17:43:47Z`. This
 is an operational rehearsal on synthetic data, so its intervals say nothing
-about performance. It supersedes the earlier "no seed summary" reading above
-for this journal. The licensed baseline has not run, no licensed data was
-opened, and no final grant was released.[^summary-rehearsal]
+about performance. Independent audit `8643120c` verified this rehearsal at
+18:00:41 UTC. The rehearsal used no licensed data and released no final
+grant.[^summary-rehearsal][^licensed-baseline-start]
+
+[^licensed-baseline-start]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json`, frozen plan/runtime/policy identities, prerequisite audit IDs and service report references; companion `preparation-report.json` is program reading `bcc5a3b7-81cb-4a8e-9b35-3711a5e50b33` by `hpc-report-c6bc5d05` at 20:36:00 UTC, covering all 15 admissions and the exact first recipe. Companion `preflight-report.json` is service reading `9c54e66f-edb1-42b8-9983-0a00241c7012` at 20:35:36 UTC. `first-dispatch.json`, live `dispatch_get` receipt for queue `b799f91b-4c5b-4f96-9332-b781b9ae1330`, retains the controller's native-job progress at 20:39:14 UTC. These are preparation and running-state observations, not completed-study evidence. Board task `c6bc5d05-22f5-4462-a1f7-eb40de1f28f1` owns execution; final release is outside this milestone.
 
 [^summary-rehearsal]: Board task `673a4bc4-8693-4764-8a8d-cca0483e279f`. `tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json` records the five queue jobs (`a7d5cc03`, `f8cd4f5c`, `0fdf43ef`, `e4d1f2c6`, `2a7451e0`, all `passed` by `fleet-research-diphtheria`), their spec digests, native job IDs, journal record digests and `HPC3 ATTEMPT LOAD-REPORT` IDs, plus the `summarize` argv, times, exit status and journal digests before and after. `summary-report.json` is the `RESEARCH SUMMARY LOAD-REPORT` that `hpc-report-673a4bc4` posted as update `ecbd196b-c807-4878-a57a-c2014ec8c13b`, written by `libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py`, `report_summary`, through `libs/covenant_ml/scripts/research_summary_report.py`. It refuses on a different summary-code hash, changed journal rows, another policy, results the owner does not reproduce, or a RunRecord that `run_record` does not rebuild. `audit-probes.json` holds the three read-only board queries over those reports, which returned 5, 5 and 4 at `2026-11-01T17:44Z`. The reporter landed in API `ef969f32d`; fleet check `3ba66ef9` passed `libs/covenant_ml` on Colossus with 5,105 tests and 100% coverage.
 
@@ -253,10 +256,6 @@ opened, and no final grant was released.[^summary-rehearsal]
 [^summary-runtime-audit]: Live board audit `9534d13c-2c95-4784-b171-df43d2b7dff9`, `VERDICT: VERIFIED`, closed by `audit-verifier` at `2026-11-01T14:52:04.858Z`; both criteria read the exact program-authored controller, staging and native-image reports through the retained `runtime-audit.sql`. Strict-check audit `f296cc7c-8fcc-4d2f-bb0d-fad3d79d4eec` remained `HELD UNREVIEWED` at `14:52:28.043Z`, requiring independent check-adequacy review.
 
 [^summary-reporting-audit]: Live board audit `bfeda225-e45d-4517-b571-83ee11f79358`, `VERDICT: VERIFIED`, moved reporting task `fc2dba58-52d8-42d9-9c4f-8169ae933206` from audit to done; `audit-verifier` wrote it at `2026-11-01T17:08:32.158Z`.
-
-[^summary-preparation-reading]: Program reading `d5ceb286-c615-42ff-a2b7-2a72719b56bd` on board task `e1621f6f-7c31-4ec1-bae1-8657053e707f`, posted by the service identity `hpc-report-e1621f6f` at `2026-11-01T17:27:11.890Z` as `RESEARCH PREPARATION LOAD-REPORT`. `libs/covenant_ml/scripts/research_preparation.py` ran `research_preparation_report.report_preparation` (reporter SHA-256 `a4ea071c9cda4bb1e7c83b7b7d7450c64f91ecc273ca7079a6b546a155ac1bcc`) over `policy.json`, `attempts.sqlite` (SHA-256 `1df3b252d6549e97df3424bdf124f06e40874c12f124d3c50f3fd60220bcb550` at that instant) and `recipe-preflight/run.json` (SHA-256 `ce681d61ce12458e471fa13d08f1ae5cf9f272d05a7acd5023dd183b90554d80`); it refuses a recipe naming another policy, an attempt the journal never admitted or an allocation the policy does not freeze. Dispatch: note `ce50913c-1d5a-4ddc-bfcf-33e725a0895b` on task `673a4bc4` at `2026-11-01T17:12:11Z`; attempt 1's native submission is `HPC3 ATTEMPT LOAD-REPORT` `0c75b01d-5818-4796-bab7-07da1f749fce` by `hpc-report-673a4bc4` at `2026-11-01T17:16:02Z`. The journal states are that instant's; the rehearsal was still running.
-
-[^summary-preparation]: Board task `673a4bc4-8693-4764-8a8d-cca0483e279f`, preparation note `318aa5e3-1ea7-4814-8987-67dfacedd3cf` and prerequisite update `173f4d67-2319-4a90-b7ec-03d4a2b2c761`. Session-captured local controller results under `/home/corvis/research-data/wrds/experiments/summary-b3843a3d3`: initialization and five admissions each returned zero; policy SHA-256 `b61af26e6bb095d6aed94e127e9b803492b0748c6ada3f4508eb77a202a266f0`; `recipe-preflight/run.json` was generated by the existing `research_cluster.prepare_bundle`. These are preparation observations, not native execution evidence. Live diphtheria queue placement still names `wrds-queue-b53b0ea34` and the existing shared private request root.
 
 **November 1 resource measurement:** the new controller at
 `wrds-resources-11c0bdbdd` passed installed-file verification for 584 application
@@ -280,7 +279,7 @@ corrected-controller references to the same admissions; their candidate budgets
 and journal were preserved. Recovery passed independent audit `eefb349e` at
 10:46:40 UTC. The ten-trial selection repetition subsequently completed, with
 service-authored winner and refusal reports. Selection passed independent audit
-`72d4a03d` at 12:27:53 UTC. The substantive baseline remains unrun.[^handover-progress][^selection-complete][^selection-verified]
+`72d4a03d` at 12:27:53 UTC. The baseline had not started at that reading.[^handover-progress][^selection-complete][^selection-verified]
 
 At 10:36:38 UTC the first fresh normal request also closed automatically:
 admission 5, native job `58719001`, exit `0:0`, with matching native and queue
@@ -400,7 +399,8 @@ evidence corrections; it does not establish a study result.[^evidence-correction
 
 [^staging-review]: Live board audit `18e302d9-4c55-483f-b8d0-c204f14d1378`, computed VERIFIED at `2026-10-31T21:58:49.057Z`, closed task `a622165c-bb63-4714-933b-10d527f21478`. Its three criteria cover licensed collection and cleanup, encrypted staging and confinement, and accurate readiness documentation.
 
-The substantive baseline and controlled final evaluation have not run.[^licensed-staging]
+The collection and staging measurement alone establishes no baseline or final
+evaluation result.[^licensed-staging]
 
 The refreshed study image freezes runtime source `3b20b14e9`, whose evaluator
 and controller production files match published API `d3c4912a5`. Native build
@@ -448,7 +448,7 @@ container-isolation lane and read queue status without retained input
 identities. The accepted mapping uses `tools/fleet-execution-linux` for
 proposer isolation, evaluator tests for dataset binding, and the service-generated
 native report joined to the queue's RunRecord digest. This accepts the encrypted
-synthetic workflow; the substantive baseline remains unrun.[^audit-mapping]
+synthetic workflow; it establishes no substantive baseline result.[^audit-mapping]
 
 [^audit-mapping]: Live board audit `acd2c6c4-6534-4144-ad5a-f7e68a216436`, computed VERIFIED result at 2026-10-30T21:38:54Z, supersedes rejected audit `02c6e4a1-669d-43db-99c8-bedfc0f9754a` and check review `9312e8df-7856-4b3a-b77b-d15f31d43cb7`; service-written native report `548e2973-d926-44bb-98fc-016ab7f375b7` for WRDS job `40550033` and queue `120da295-8f12-4b90-ba0e-a2af14d5d3b6`. Fresh fleet execution job `ecf1339b` passed 95 actual host cases with zero skips at API `a813b1ebe`. `tools/fleet/tests/_host.py`, execution-only marker selection; `tools/fleet/tests/test_research_proposer_host.py`, `test_actual_proposer_denies_private_data_credentials_policy_and_network` and real timeout/cleanup cases. `libs/covenant_ml/tests/markets/test_research_execution.py`, `test_changed_dataset_cannot_complete`, refuses mismatched bundle digests, verified inputs and partitions. The ordinary fleet suite skips the rootless Docker cases; only its execution lane runs them.
 
@@ -734,10 +734,10 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    separate native rehearsal covers two synthetic candidates and five seeds;
    neither is a licensed result. Seed-averaged uncertainty now reuses the same
    ranking inputs and moving-block estimator, with the controller command and
-   provenance contract in [[wrds-evaluation-reuse]]. Task `fc2dba58` owns its
-   independent review. The matching `b3843a3d3` controller and image are now
-   installed and inspected; the synthetic queue-to-summary rehearsal remains
-   before the licensed baseline.[^summary-runtime]
+   provenance contract in [[wrds-evaluation-reuse]]. Reporting task `fc2dba58`
+   and the synthetic queue-to-summary rehearsal passed independent audit. The
+   matching `b3843a3d3` controller and image are installed; licensed attempt 1
+   is now running through the shared queue.[^summary-reporting-audit][^summary-runtime][^licensed-baseline-start]
    The native recipe now reads mandatory `cpus` and `mem_gb` from the existing
    evaluator-owned policy, including them in the journal and request identities.
    The 7,200-second evaluation retains a 121-minute scheduler request for
@@ -745,7 +745,7 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    tests and 2,162 HPC3 tests with full statement and branch coverage. The
    installed controller, matching image and real resource preflight are now
    measured and independently verified by audit `967229c0` for task `42a8d507`.
-   The licensed baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract][^resource-live]
+   No completed licensed result is verified yet.[^licensed-baseline-start][^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract][^resource-live]
 
 [^selection-verified]: Live board audit `72d4a03d-251a-4e20-bd91-35dae56df2aa`, computed VERIFIED at `2026-11-01T12:27:53.357Z`, closed selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. It covers candidate/seed ranking, journal selection restrictions and the installed synthetic rehearsal with accurate unrun-baseline documentation.
 
