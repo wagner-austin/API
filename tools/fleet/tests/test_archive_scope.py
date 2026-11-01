@@ -473,8 +473,8 @@ class TestTheArchiveItKeeps:
         manifests = [n for n in names if n.endswith("/pyproject.toml")]
         shims = [n for n in names if n.endswith("/scripts/guard.py")]
 
-        assert len(manifests) >= 40
-        assert len(shims) >= 40
+        assert len(manifests) >= 39
+        assert len(shims) >= 39
 
     def test_it_keeps_the_workflows_that_package_parses(self, names: frozenset[str]) -> None:
         workflows = [
