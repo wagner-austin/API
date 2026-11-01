@@ -35,15 +35,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     flags = cli_args.parse_single_flags(
         list(argv) if argv is not None else list(sys.argv[1:]),
-        ("--config", "--attempt", "--checksums", "--report-task"),
+        ("--config", "--attempt", "--artifact", "--checksums", "--report-task"),
     )
     task = cli_args.require_flag(flags, "--report-task")
     report_identity(task, "hpc")
     attempt = cli_args.require_flag(flags, "--attempt")
+    artifact = cli_args.require_flag(flags, "--artifact")
     workspace = _config.load_workspace(flags)
     cluster = workspace_cluster(workspace)
     entries = ledger.read(pathlib.Path(workspace["ledger"]), cluster)
-    matches = [row for row in entries if row["experiment"].get("research_attempt") == attempt]
+    matches = [
+        row
+        for row in entries
+        if row["experiment"].get("research_attempt") == attempt
+        and row["artifact"] == artifact
+        and row["host"] == workspace["host"]
+    ]
     if len(matches) != 1:
         raise ValueError("HPC_RESEARCH_RECOVERY: require exactly one recorded attempt")
     entry = ledger.require_entry(entries, matches[0]["job_id"], workspace["host"])

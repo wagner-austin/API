@@ -25,6 +25,8 @@ def arguments(root: Path, copies: int = 1) -> list[str]:
         workspace,
         "--attempt",
         "study:1",
+        "--artifact",
+        "/pub/result-101.json",
         "--checksums",
         str(checksums),
         "--report-task",
@@ -56,6 +58,35 @@ def test_ambiguous_recovery_never_guesses(tmp_path: Path, fake_run: FakeRun, cop
     with pytest.raises(ValueError, match="HPC_RESEARCH_RECOVERY"):
         execution_inspect.main(arguments(tmp_path, copies))
     assert fake_run.commands() == []
+
+
+def test_repeated_policy_in_another_study_or_host_cannot_shadow_this_attempt(
+    tmp_path: Path, fake_run: FakeRun, emitted: list[str]
+) -> None:
+    args = arguments(tmp_path)
+    ledger.append(
+        tmp_path / "ledger.jsonl", entry("102", experiment={"research_attempt": "study:1"})
+    )
+    ledger.append(
+        tmp_path / "ledger.jsonl",
+        entry(
+            "103",
+            experiment={"research_attempt": "study:1"},
+            artifact="/pub/result-101.json",
+            host="another-host",
+        ),
+    )
+    ledger.append(
+        tmp_path / "ledger.jsonl", entry("104", experiment={"research_attempt": "other:1"})
+    )
+    accepting_board(2)
+    value = entry(experiment={"research_attempt": "study:1"})
+    fake_run.add("-j 101 ", stdout=accounting_row(value))
+    serve(fake_run, value, *documents())
+    assert execution_inspect.main(args) == 0
+    report = narrow_json_to_dict(load_json_str(emitted[0]))
+    assert require_dict(report, "ledger")["job_id"] == "101"
+    assert require_dict(report, "ledger")["artifact"] == "/pub/result-101.json"
 
 
 def test_entrypoint_reads_arguments(tmp_path: Path, fake_run: FakeRun, argv: list[str]) -> None:

@@ -267,10 +267,14 @@ single-attempt verification use:
 ```bash
 python -m hpc3.cli.execution_inspect --config runs/hpc3.json \
   --attempt POLICY_SHA256:ATTEMPT_NUMBER --checksums /private/attempt/checksums.txt \
+  --artifact /exact/frozen/output/result.json \
   --report-task FULL_TASK_UUID
 ```
 
-This resolves one `research_attempt` in the shared ledger. Pending and failed
+This resolves one `research_attempt` with the exact frozen output path and
+workspace host in the shared ledger. Repeated policies in separate study roots
+cannot shadow each other; two submissions matching all three remain ambiguous.
+Pending and failed
 allocations report their native state; completed allocations must also pass the
 same artifact, runtime, timestamp and compute-checksum checks used by replay
 verification. The program posts its measurement and emits structured JSON for
