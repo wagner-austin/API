@@ -45,6 +45,8 @@ def test_submit_complete_and_refuse_duplicate(tmp_path: Path) -> None:
     assert len(scheduler.calls) == 2
     row = reconcile_attempt(path, trial, cluster, directory)
     assert (row["status"], row["job_id"]) == ("complete", "123")
+    call = scheduler.calls[-1]
+    assert call[call.index("--artifact") + 1] == recipe["artifact"]
     assert research_journal(trial["policy"]).read(path) == (row,)
     with pytest.raises(ValueError, match="require submitting or running"):
         reconcile_attempt(path, trial, cluster, directory)

@@ -242,6 +242,8 @@ def observe_attempt(
         (
             "--attempt",
             attempt_identity(trial, final=final),
+            "--artifact",
+            require_str(read_document(directory / "run.json"), "artifact"),
             "--checksums",
             str(directory / "checksums.txt"),
             "--report-task",
