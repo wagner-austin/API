@@ -26,7 +26,6 @@ from covenant_ml.explainers.registry import ExplainerRegistry
 from covenant_ml.types import BackendName, PredictorProtocol
 
 from covenant_radar_api.worker._hook_defaults import (
-    _real_data_bank_uploader,
     _real_dataset_loader,
     _real_dataset_registry,
     _real_explainer_registry,
@@ -41,7 +40,6 @@ from covenant_radar_api.worker._hook_defaults import (
     _real_timeseries_registry,
 )
 from covenant_radar_api.worker._hook_protocols import (
-    DataBankUploaderProtocol,
     DatasetLoaderCallable,
     DatasetRegistryFactoryProtocol,
     ExplainerRegistryFactoryProtocol,
@@ -101,10 +99,7 @@ logreg_loader: LogRegLoaderProtocol = _real_logreg_loader
 
 random_forest_loader: RandomForestLoaderProtocol = _real_random_forest_loader
 
-data_bank_uploader: DataBankUploaderProtocol = _real_data_bank_uploader
-
 __all__ = [
-    "DataBankUploaderProtocol",
     "DatasetConfig",
     "DatasetLoaderCallable",
     "DatasetRegistry",
@@ -127,7 +122,6 @@ __all__ = [
     "TimeSeriesDatasetRegistry",
     "TimeSeriesLoaderCallable",
     "TimeSeriesRegistryFactoryProtocol",
-    "data_bank_uploader",
     "dataset_loader",
     "dataset_registry_factory",
     "explainer_registry_factory",

@@ -312,34 +312,3 @@ def _real_random_forest_loader(model_path: Path) -> PredictorProtocol:
     from covenant_radar_api.worker._model_loaders import load_random_forest_model
 
     return load_random_forest_model(model_path)
-
-
-def _real_data_bank_uploader(
-    model_path: Path,
-    data_bank_url: str,
-    data_bank_key: str,
-) -> str:
-    """Real implementation uploading model to data-bank.
-
-    Args:
-        model_path: Path to the model file to upload.
-        data_bank_url: Base URL for data-bank-api.
-        data_bank_key: API key for authentication.
-
-    Returns:
-        file_id from data-bank-api.
-
-    Raises:
-        DataBankClientError: On upload failure.
-    """
-    from platform_core.data_bank_client import DataBankClient
-    from platform_core.logging import get_logger
-
-    log = get_logger(__name__)
-    client = DataBankClient(data_bank_url, data_bank_key)
-    file_id = model_path.name
-    content_type = "application/octet-stream"
-    with model_path.open("rb") as f:
-        response = client.upload(file_id, f, content_type=content_type)
-    log.info("Uploaded model to data-bank", extra={"file_id": response["file_id"]})
-    return response["file_id"]

@@ -1,8 +1,7 @@
 """Background job for training regressors on external CSV data.
 
 Orchestrates the regression training pipeline: parse config, load
-regression dataset, train regressor via backend, copy active file,
-and optionally upload to data-bank.
+regression dataset, train regressor via backend and copy active file.
 
 Separated from train_external_job.py (classifier) for clear separation
 of concerns.
@@ -343,31 +342,6 @@ def run_external_regression_training(
 
 
 # =============================================================================
-# Data-bank upload
-# =============================================================================
-
-
-def _upload_regression_model_to_data_bank(
-    model_path: Path,
-    data_bank_url: str,
-    data_bank_key: str,
-) -> str:
-    """Upload trained regression model to data-bank-api.
-
-    Args:
-        model_path: Path to the model file.
-        data_bank_url: URL for data-bank-api.
-        data_bank_key: API key for data-bank-api.
-
-    Returns:
-        file_id from data-bank-api.
-    """
-    from covenant_radar_api.worker import _test_hooks as hooks
-
-    return hooks.data_bank_uploader(model_path, data_bank_url, data_bank_key)
-
-
-# =============================================================================
 # RQ job entry point
 # =============================================================================
 
@@ -383,35 +357,13 @@ def process_external_regression_train_job(
     Returns:
         Training result with model info and feature importances.
     """
-    import tempfile
-
     from covenant_radar_api.core.config import load_settings
 
     settings = load_settings()
 
-    # Get data-bank config
-    data_bank_url = settings["app"]["data_bank_api_url"]
-    data_bank_key = settings["app"]["data_bank_api_key"]
-
     # Get directories from settings
     data_root = Path(settings["app"]["data_root"])
     external_dir = data_root / "external"
-
-    if data_bank_url and data_bank_key:
-        # TemporaryDirectory removes the tree on scope exit, including the
-        # paths where run_external_regression_training raises.
-        with tempfile.TemporaryDirectory(prefix="covenant_regression_model_") as temp_dir:
-            result = run_external_regression_training(
-                config_json,
-                external_dir,
-                Path(temp_dir),
-            )
-            result["model_file_id"] = _upload_regression_model_to_data_bank(
-                Path(str(result["active_model_path"])),
-                data_bank_url,
-                data_bank_key,
-            )
-            return result
 
     output_dir = Path(settings["app"]["models_root"])
     output_dir.mkdir(parents=True, exist_ok=True)

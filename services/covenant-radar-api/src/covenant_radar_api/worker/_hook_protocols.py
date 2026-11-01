@@ -353,31 +353,3 @@ class RandomForestLoaderProtocol(Protocol):
             FileNotFoundError: If model file doesn't exist.
         """
         ...
-
-
-class DataBankUploaderProtocol(Protocol):
-    """Protocol for data-bank model uploader function.
-
-    Uploads trained model files to data-bank-api for centralized storage.
-    """
-
-    def __call__(
-        self,
-        model_path: Path,
-        data_bank_url: str,
-        data_bank_key: str,
-    ) -> str:
-        """Upload model to data-bank-api.
-
-        Args:
-            model_path: Path to the model file to upload.
-            data_bank_url: Base URL for data-bank-api.
-            data_bank_key: API key for authentication.
-
-        Returns:
-            file_id from data-bank-api.
-
-        Raises:
-            DataBankClientError: On upload failure.
-        """
-        ...

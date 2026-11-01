@@ -23,9 +23,6 @@ and `streaming.config.load_streaming_config` (streaming).
 | `APP__ACTIVE_MODEL_PATH_XGB` | string | `/data/models/active_xgb.ubj` | Active model path when the backend is `xgboost` |
 | `APP__ACTIVE_MODEL_PATH_MLP` | string | `/data/models/active_mlp.pt` | Active model path for the other backends |
 | `LOGGING__LEVEL` | string | `INFO` | Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL) |
-| `DATA_BANK_API_URL` | string | - | URL for data-bank-api |
-| `DATA_BANK_API_KEY` | string | - | API key for data-bank-api uploads/downloads |
-| `DATA_BANK_MODEL_FILE_ID` | string | - | Model file_id (SHA256) to download from data-bank at startup |
 | `GEMINI_API_KEY` | string | - | Google AI API key for Gemini integration |
 
 There is no `APP__ACTIVE_MODEL_PATH`. The active path is derived from
@@ -113,9 +110,8 @@ STREAMING__DOMAIN=weather
 MODEL_PATH=/data/models/weather.ubj
 WEATHER__STATE_PATH=/data/models/weather_state.json
 WEATHER__STATION_MAP_PATH=/data/models/weather_stations.json
-
-# Data Bank (optional, for centralized model storage)
-DATA_BANK_API_URL=http://data-bank-api.railway.internal:8080
-DATA_BANK_API_KEY=your-data-bank-api-key
-DATA_BANK_MODEL_FILE_ID=2d768b7fdb6b4919f6ddf1ace2bfef23433ec19f2ae2f7c3c454d9f9e23cfede
 ```
+
+Models are read from and written to `APP__MODELS_ROOT` only. The optional
+data-bank download at startup and upload after training were removed on
+2026-11-01 with data-bank-api itself (MCPs board task a9566810).

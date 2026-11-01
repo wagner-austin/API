@@ -29,7 +29,6 @@ from covenant_persistence import (
     MeasurementRepository,
 )
 from numpy.typing import NDArray
-from platform_core.config.covenant_radar import Settings
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, load_json_str
 from platform_core.logging import get_logger
 from platform_core.members import find_member
@@ -394,76 +393,12 @@ def run_training(
     return result_config
 
 
-def _upload_model_to_data_bank(
-    model_path: Path,
-    data_bank_url: str,
-    data_bank_key: str,
-) -> str:
-    """Upload trained model to data-bank and return file_id.
-
-    Uses the data_bank_uploader hook from _test_hooks for dependency injection.
-
-    Args:
-        model_path: Path to the model file to upload.
-        data_bank_url: Base URL of the data-bank API.
-        data_bank_key: API key for authentication.
-
-    Returns:
-        The file_id assigned by data-bank.
-    """
-    from covenant_radar_api.worker import _test_hooks as hooks
-
-    return hooks.data_bank_uploader(model_path, data_bank_url, data_bank_key)
-
-
-def _train_and_upload(
-    config_json: str,
-    settings: Settings,
-    model_output_dir: Path,
-    data_bank_url: str,
-    data_bank_key: str,
-) -> dict[str, JSONValue]:
-    """Train into a caller-owned directory and upload the model to data-bank.
-
-    The caller owns `model_output_dir` and is responsible for removing it; this
-    function does not clean up after itself.
-
-    Args:
-        config_json: JSON string with training configuration.
-        settings: Resolved service settings.
-        model_output_dir: Directory the trained model is written into.
-        data_bank_url: Base URL of the data-bank API.
-        data_bank_key: API key for the data-bank API.
-
-    Returns:
-        Job result with model metrics and the assigned `model_file_id`.
-
-    Raises:
-        ValueError: If the training config is invalid or the data is insufficient.
-    """
-    # Imported here, not at module scope: core.container defers its own
-    # worker imports to break the container <-> worker cycle.
-    from covenant_radar_api.core.container import ServiceContainer
-
-    with ServiceContainer.from_settings(
-        settings,
-        model_output_dir=model_output_dir,
-    ) as container:
-        result = run_training(config_json, container)
-
-    result["model_file_id"] = _upload_model_to_data_bank(
-        Path(str(result["active_model_path"])),
-        data_bank_url,
-        data_bank_key,
-    )
-    return result
-
-
 def process_train_job(config_json: str) -> dict[str, JSONValue]:
     """RQ job entry point for model training.
 
     This is the function that RQ calls. It loads the ServiceContainer from
-    environment variables and passes it as the provider to run_training.
+    environment variables and passes it as the provider to run_training,
+    which writes the model under the settings' models root.
 
     Args:
         config_json: JSON string with training configuration
@@ -471,28 +406,10 @@ def process_train_job(config_json: str) -> dict[str, JSONValue]:
     Returns:
         Job result with model_id and training metrics.
     """
-    import tempfile
-
     from covenant_radar_api.core.config import load_settings
     from covenant_radar_api.core.container import ServiceContainer
 
     settings = load_settings()
-
-    # Get data-bank config
-    data_bank_url = settings["app"]["data_bank_api_url"]
-    data_bank_key = settings["app"]["data_bank_api_key"]
-
-    if data_bank_url and data_bank_key:
-        # TemporaryDirectory removes the tree on scope exit, including the
-        # paths where run_training raises on bad config or insufficient data.
-        with tempfile.TemporaryDirectory(prefix="covenant_train_") as temp_dir:
-            return _train_and_upload(
-                config_json,
-                settings,
-                Path(temp_dir),
-                data_bank_url,
-                data_bank_key,
-            )
 
     model_output_dir = Path(settings["app"]["models_root"])
     model_output_dir.mkdir(parents=True, exist_ok=True)
