@@ -29,6 +29,8 @@ class ResearchPolicy(TypedDict):
     seeds: ReadOnly[tuple[int, ...]]
     max_candidates: ReadOnly[int]
     max_seconds: ReadOnly[int]
+    cpus: ReadOnly[int]
+    mem_gb: ReadOnly[int]
     max_trees: ReadOnly[int]
     max_leaves: ReadOnly[int]
     selection: ReadOnly[ResearchSelection]
@@ -84,6 +86,8 @@ def encode_research_policy(policy: ResearchPolicy) -> JSONObject:
         "seeds": list(policy["seeds"]),
         "max_candidates": policy["max_candidates"],
         "max_seconds": policy["max_seconds"],
+        "cpus": policy["cpus"],
+        "mem_gb": policy["mem_gb"],
         "max_trees": policy["max_trees"],
         "max_leaves": policy["max_leaves"],
         "selection": encode_research_selection(policy["selection"]),
@@ -124,6 +128,8 @@ def decode_research_policy(document: JSONObject) -> ResearchPolicy:
         seeds=seeds,
         max_candidates=ceiling,
         max_seconds=require_bounded_int(document, "max_seconds", 1, 259200),
+        cpus=require_bounded_int(document, "cpus", 1, 2**31 - 1),
+        mem_gb=require_bounded_int(document, "mem_gb", 1, 2**31 - 1),
         max_trees=require_bounded_int(document, "max_trees", 1, 10000),
         max_leaves=require_bounded_int(document, "max_leaves", 2, 1024),
         selection=selection,
