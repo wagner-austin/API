@@ -26,6 +26,8 @@ changes do not update these installed bytes. Current study status is in
 
 ## Installed identities
 
+Controller inspection and native image inspection recorded these identities.[^runtime]
+
 | Component | Verified identity |
 |---|---|
 | Controller interpreter | `/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python` |

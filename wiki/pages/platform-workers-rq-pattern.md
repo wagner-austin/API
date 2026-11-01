@@ -7,8 +7,9 @@ source_paths:
   - libs/platform_workers
   - libs/platform_workers/README.md
 source_git_blobs:
-  "libs/platform_workers/README.md": b5204d1d51000d9ee256eb8f26973dc917ed2cb4
+  "libs/platform_workers/README.md": 17f1d684b39bf6758617b70a72a378f0041524e7
 provenance:
+  - "2026-11-01 pin review: the README diff changes only the job-event example's string domain to JobDomain.COVENANT. The shared Redis/RQ pattern and introductory description cited here are unchanged; board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
   - "repinned 2026-09-11 on a checked argument: the tree's diff is +330/-9, the additions being a health module and an rq_harness with their tests, and the nine deletions being two type aliases inlined -- PublishFn and ClockFn removed from local_kv in the same sweep that inlined ProgressCallback across covenant_ml and covenant_nn -- plus one import line moving. No page in this wiki cites either removed name (grepped), and no behaviour of the RQ pattern this page describes was withdrawn."
 fact_checked: "2026-08-14"
 confidence: high

@@ -29,6 +29,8 @@ cleanup after node failure.[^hpc3][^wrds]
 
 ## Recorded observations
 
+The allocation-specific receipts support these observations.[^hpc3][^wrds][^collection][^diagnostics]
+
 | Subject | Observer or receipt | What was measured |
 |---|---|---|
 | HPC3 synthetic forced-kill job `58629286` | Later job `58630827`, same node `hpc3-22-05` | Scratch absent several hours after termination. |
@@ -48,7 +50,7 @@ that same observer without resubmitting it. The evidence retains the initial
 error and the first observation; eventual scheduler accounting is not grounds
 to create a duplicate observer.[^wrds]
 
-## Unverified boundary
+## Failed licensed allocation
 
 Cleanup after the failed licensed HPC3 baseline `58733020` has not been
 independently measured. The successful diagnostic cleanup assertions do not

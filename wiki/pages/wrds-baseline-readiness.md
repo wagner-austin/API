@@ -51,13 +51,5 @@ The original failed journal remains immutable. Current diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
-## Navigation
-
-Start at [[wrds-equity-research-protocol]] for the full research system.
-Implementation ownership is in [[wrds-research-queue-admission]];
-shared statistics are in [[evaluation-numerical-contracts]].
-Historical run detail belongs in the cited artifacts and dated incident pages,
-rather than being appended to this status page.
-
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
