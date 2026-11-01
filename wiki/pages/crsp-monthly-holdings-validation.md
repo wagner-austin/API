@@ -16,8 +16,8 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "775b48d296b172368cd046dee3cb8dda34c0c8c8"
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "1e2632628d99a7ba38c0ddb819510633b0c55fca"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "7f848a9ca758b48c41f3dca9c891bc167b654fb0"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "360c80d81411228346f695f26427b80ce15f6276"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"

@@ -14,7 +14,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "1e2632628d99a7ba38c0ddb819510633b0c55fca"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "360c80d81411228346f695f26427b80ce15f6276"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
 fact_checked: 2026-11-01
