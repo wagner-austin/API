@@ -6,7 +6,15 @@ import pathlib
 
 import pytest
 from platform_core.errors import AppError, Hpc3ErrorCode
-from platform_core.json_utils import JSONValue, dump_json_str
+from platform_core.json_utils import (
+    JSONValue,
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_list,
+)
+from platform_core.mcp_testing import sent_arguments
 
 from hpc3.cli import preflight as preflight_cli
 from tests.conftest import (
@@ -17,6 +25,7 @@ from tests.conftest import (
     write_workspace,
 )
 from tests.healthy_cluster import HEAD_COMMIT, IMAGE_COMMIT, script_healthy_environment
+from tests.wrds_board import TASK, accepting_board
 
 _LINE = (
     "sbatch: Job 1 to start at 2026-08-22T03:23:00 a using 4 processors "
@@ -83,6 +92,44 @@ def _args(tmp_path: pathlib.Path, flag: str) -> list[str]:
 
 
 class TestPreflightCli:
+    def test_report_binds_resolved_allocation_to_scheduler_verdict(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
+    ) -> None:
+        _write(tmp_path / "doc.json", _run_payload(cpus=4, mem_gb=128, minutes=121))
+        _ok(fake_run)
+        board = accepting_board(2)
+        args = [*_args(tmp_path, "--run"), "--report-task", TASK]
+        assert preflight_cli.main(args) == 0
+        report = narrow_json_to_dict(load_json_str(emitted[-1]))
+        assert report["kind"] == "HPC3_PREFLIGHT_EVIDENCE"
+        assert report["queued"] is False
+        admissions = require_list(report, "admissions")
+        assert len(admissions) == 1
+        admission = narrow_json_to_dict(admissions[0])
+        spec = require_dict(admission, "spec")
+        assert (spec["cpus"], spec["mem_gb"], spec["minutes"]) == (4, 128, 121)
+        assert require_dict(admission, "verdict") == {
+            "start_estimate": "2026-08-22T03:23:00",
+            "node_list": "hpc3-gpu-16-02",
+            "partition": "free-gpu",
+            "processors": 4,
+        }
+        assert sent_arguments(board.bodies[-1])["body"] == (
+            "HPC3 PREFLIGHT LOAD-REPORT\n" + emitted[-1]
+        )
+
+    def test_refused_preflight_never_publishes_success(
+        self, tmp_path: pathlib.Path, fake_run: FakeRun
+    ) -> None:
+        _write(tmp_path / "doc.json", _run_payload())
+        script_healthy_environment(fake_run)
+        fake_run.add("--test-only", stdout="allocation failure: bad account\nrc=1\n")
+        board = accepting_board(2)
+        with pytest.raises(AppError) as caught:
+            preflight_cli.main([*_args(tmp_path, "--run"), "--report-task", TASK])
+        assert caught.value.code is Hpc3ErrorCode.PREFLIGHT_REJECTED
+        assert board.bodies == []
+
     def test_a_single_run_reports_the_verdict(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
