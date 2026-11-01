@@ -133,7 +133,7 @@ def test_this_repository_declares_the_roots_ci_selects_its_packages_by() -> None
     )
     changed = [
         "clients/NavProbe/src/x.py",
-        "services/turkic-api/src/x.py",
+        "services/transcript-api/src/x.py",
         "libs/platform_core/src/x.py",
         "tools/maketools/src/x.py",
     ]
@@ -143,7 +143,7 @@ def test_this_repository_declares_the_roots_ci_selects_its_packages_by() -> None
         text=True,
         check=True,
     ).stdout
-    for package in ("clients/NavProbe", "services/turkic-api", "libs/platform_core"):
+    for package in ("clients/NavProbe", "services/transcript-api", "libs/platform_core"):
         assert f'"{package}"' in selected
 
 
