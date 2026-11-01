@@ -95,7 +95,10 @@ class TestPreflightCli:
     def test_report_binds_resolved_allocation_to_scheduler_verdict(
         self, tmp_path: pathlib.Path, fake_run: FakeRun, emitted: list[str]
     ) -> None:
-        _write(tmp_path / "doc.json", _run_payload(cpus=4, mem_gb=128, minutes=121))
+        _write(
+            tmp_path / "doc.json",
+            _run_payload(cpus=4, mem_gb=128, minutes=121, deterministic=True),
+        )
         _ok(fake_run)
         board = accepting_board(2)
         args = [*_args(tmp_path, "--run"), "--report-task", TASK]
