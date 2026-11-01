@@ -298,9 +298,6 @@ class _FakeStore:
         return StoredArtifact(
             file_id="deadbeef",
             size=1,
-            sha256="x",
-            content_type="application/gzip",
-            created_at=None,
         )
 
     def download_artifact(

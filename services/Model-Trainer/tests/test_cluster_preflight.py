@@ -51,13 +51,7 @@ class _RefusingStore:
         Returns:
             A plausible response naming bytes that are not there.
         """
-        return StoredArtifact(
-            file_id="0" * 64,
-            size=1,
-            sha256="0" * 64,
-            content_type="application/gzip",
-            created_at=None,
-        )
+        return StoredArtifact(file_id="0" * 64, size=1)
 
     def download_artifact(
         self, file_id: str, *, dest_dir: pathlib.Path, request_id: str, expected_root: str

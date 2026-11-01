@@ -177,9 +177,6 @@ def _install_store_and_fetcher(tar_path: Path, items_path: Path) -> None:
             return StoredArtifact(
                 file_id="unused",
                 size=1,
-                sha256="x",
-                content_type="application/gzip",
-                created_at=None,
             )
 
         def download_artifact(
@@ -285,9 +282,6 @@ def test_cloze_job_reuses_already_downloaded_model(
             return StoredArtifact(
                 file_id="unused",
                 size=1,
-                sha256="x",
-                content_type="application/gzip",
-                created_at=None,
             )
 
         def download_artifact(

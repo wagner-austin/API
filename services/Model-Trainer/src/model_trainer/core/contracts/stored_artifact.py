@@ -4,7 +4,13 @@ This shape was data-bank-api's upload response, imported from
 ``platform_core.data_bank_protocol`` while the trainer could upload there.
 data-bank-api was archived on 2026-11-01 (MCPs board task a9566810), and the
 filesystem store every run now writes through is the only producer, so the
-record lives with its one owner.
+record lives with its one owner and carries only what a caller reads: the
+response's ``sha256`` repeated ``file_id``, and its ``content_type`` and
+``created_at`` were a constant and a None no caller looked at.
+
+It stays inside the process -- only ``file_id`` reaches Redis, as a plain
+string -- so it has no encoder or decoder, like the other in-process outcomes
+under ``core.contracts``.
 """
 
 from __future__ import annotations
@@ -18,17 +24,10 @@ class StoredArtifact(TypedDict):
     Attributes:
         file_id: The tarball's SHA-256 digest, the id it is read back by.
         size: Its size in bytes.
-        sha256: The same digest, kept as its own field for the pointers that
-            record it.
-        content_type: Its media type.
-        created_at: When it was stored, or None when the store does not say.
     """
 
     file_id: str
     size: int
-    sha256: str
-    content_type: str
-    created_at: str | None
 
 
 __all__ = ["StoredArtifact"]
