@@ -463,3 +463,12 @@ wrong-seed, winner and repeated-selection reports through the existing service
 reporter. Updated readiness and queue ownership with those reports and live
 audit queries, while retaining independent selection review and licensed
 execution as unfinished. No final grant was released.
+
+## [2026-11-01] maintenance | verified selection and explicit resource policy
+
+Recorded selection audit `72d4a03d` as VERIFIED and refreshed the readiness and
+queue pages' source pins. The existing policy and recipe now carry mandatory
+CPU and RAM requests; full suites passed 5,066 research and 2,162 HPC3 tests.
+Documented the two corrected test defects and the remaining installed-controller
+and native-preflight measurement. Licensed validation and final scoring remain
+unrun; no study result is inferred from package checks.
