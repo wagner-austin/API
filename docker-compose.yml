@@ -5,16 +5,14 @@
 #
 # Usage:
 #   docker compose up -d                    # Start Redis + create network
-#   cd services/data-bank-api && docker compose up -d   # Then start services
+#   cd services/transcript-api && docker compose up -d   # Then start services
 #
 # Or use Makefile:
 #   make infra                              # Start Redis
 #   make up-trainer                         # Start Redis + Model-Trainer
-#   make up SERVICE=data-bank-api           # Start Redis + specific service
 #
 # Port map:
 #   - 6379:  Redis (this file)
-#   - 8001:  data-bank-api
 #   - 8003:  transcript-api
 #   - 8005:  Model-Trainer
 #   - 8007:  covenant-radar-api
@@ -23,7 +21,8 @@
 #   - 8010:  opportunity-radar-api
 # 8000, 8002, 8004, 8006 and 8011 were turkic-api, qr-api, handwriting-ai,
 # music-wrapped-api and Art-Trainer, archived on 2026-11-01 at the tag
-# archive/api-packages-2026-11-01 (MCPs board task a276f973).
+# archive/api-packages-2026-11-01 (MCPs board task a276f973). 8001 was
+# data-bank-api, archived the same day (MCPs board task a9566810).
 # =============================================================================
 
 services:
