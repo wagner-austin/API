@@ -1,0 +1,77 @@
+{
+  "measured_at": "2026-11-01T12:06:28.626800+00:00",
+  "scope": "Session-run read-only counterfactual queries against real service reports and queue rows; no report, journal or native state mutated. Independent audit must rerun the positive queries.",
+  "checks": [
+    {
+      "name": "controller",
+      "expected": "1",
+      "actual": "1"
+    },
+    {
+      "name": "selection",
+      "expected": "1",
+      "actual": "1"
+    },
+    {
+      "name": "native",
+      "expected": "10|10",
+      "actual": "10|10"
+    },
+    {
+      "name": "controller.wrong_wheel",
+      "replace": "aa9abbdd47a80dcf73b3cdc3157f155708b7a3ee690e0e59c23c5ad36aa066ab",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "selection.wrong_reporter",
+      "replace": "='1c88e60d02d591f72e1a3eb223350265f2a4dbfd20ca114b28fb925e7add32b8'",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "selection.wrong_refusal_code",
+      "replace": "doc->>'exit_status'=code",
+      "with": "doc->>'exit_status'='0'",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "selection.changed_refusal_journal",
+      "replace": "c.doc->>'journal_sha256_before'=c.doc->>'journal_sha256_after'",
+      "with": "c.doc->>'journal_sha256_before'<>c.doc->>'journal_sha256_after'",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "selection.wrong_selected_seed",
+      "replace": "\"seed\":11",
+      "with": "\"seed\":23",
+      "expected": "0",
+      "actual": "0"
+    },
+    {
+      "name": "native.wrong_native_state",
+      "replace": "='COMPLETED'",
+      "with": "='FAILED'",
+      "expected": "0|0",
+      "actual": "0|0"
+    },
+    {
+      "name": "native.wrong_record",
+      "replace": "=j.record_sha",
+      "with": "='0000000000000000000000000000000000000000000000000000000000000000'",
+      "expected": "0|0",
+      "actual": "0|0"
+    },
+    {
+      "name": "native.wrong_dataset",
+      "replace": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": "0|0",
+      "actual": "0|0"
+    }
+  ]
+}
