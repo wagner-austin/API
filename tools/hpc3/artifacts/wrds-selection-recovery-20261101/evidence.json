@@ -1,0 +1,123 @@
+{
+  "board_task": "a9b2927c-3775-46cc-b86e-2aeb0c2c4479",
+  "handover_task": "04c0cdbe-278f-41bb-8141-a170fc0e5324",
+  "source_commit": "f38df09fe86566f5201bc59f9f28968276e72423",
+  "scope": "Session-assembled index of service-authored synthetic recovery reports. Four existing native allocations reconciled through the maintained CLI with a separately frozen corrected cluster config. This does not close the old shared-queue requests or complete winner/refusal selection evidence. No licensed data opened and no final grant released.",
+  "original_cluster_sha256": "5e5e0ca48153399cdc876c62bb249684af55beb5ce954c763e0ba0217a9961a4",
+  "recovery_cluster_sha256": "aa513e25453780ad334e3faa092b3c706cbbaa0a867043e43a2e32f03c23b5a5",
+  "reports": [
+    {
+      "id": "a05f83c7-eb84-4485-9ee0-26a2dc2e1f0f",
+      "created_at": "2026-11-01T01:59:36.282343+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "db536f6cd007a9e1e2361caa1871d501bf50cc388343a2ad8b87069c2284ee0e",
+      "kind": "HPC3_CONTROLLER_EVIDENCE",
+      "measurement": {
+        "kind": "HPC3_CONTROLLER_EVIDENCE",
+        "source_commit": "f38df09fe86566f5201bc59f9f28968276e72423",
+        "controller_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+        "site_packages": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/lib/python3.11/site-packages",
+        "verified_wheels": {
+          "covenant_ml-0.1.0-py3-none-any.whl": {
+            "sha256": "aa9abbdd47a80dcf73b3cdc3157f155708b7a3ee690e0e59c23c5ad36aa066ab",
+            "installed_files": 354
+          },
+          "hpc3-0.1.0-py3-none-any.whl": {
+            "sha256": "3ea1734a7e559bb95f27334d65573e98986d94b857d3297df74871ac4bfbfa00",
+            "installed_files": 134
+          },
+          "platform_core-0.1.0-py3-none-any.whl": {
+            "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+            "installed_files": 96
+          }
+        },
+        "installed_files": 584,
+        "selfcheck_sha256": "e69de9b66e326815fd6e0dfdd23b026b7513d800275cb950691234ee33d79f11",
+        "selfcheck": "image self-check OK",
+        "dependency_check": "No broken requirements found.",
+        "provenance_sha256": "f6c8fac74af41e674d14a6d1050bed0912efedbc05e3e91d0db4c293f1583d18"
+      }
+    },
+    {
+      "id": "8937ff37-7145-4724-af9d-f5d406f0d9d0",
+      "created_at": "2026-11-01T02:00:06.313922+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "1500d6fcd2ae52c8ca04002decf9d37827f1a65f05151aa42bc89ce0ad94b0fc",
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "job_id": "58708603",
+      "artifact": "/data/homezvol1/wagnera3/research/selection-report-9b6cbf367/attempts/c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e/1/result/evaluation.json",
+      "native_attempt": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:1",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "dataset_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14"
+    },
+    {
+      "id": "ccdaf960-d552-4565-809d-487140ac8c48",
+      "created_at": "2026-11-01T02:00:20.659607+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "6b338a695b5405673acb25d59a383d9019bc84e8651acb53145e50a28c8f410c",
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "job_id": "58708606",
+      "artifact": "/data/homezvol1/wagnera3/research/selection-report-9b6cbf367/attempts/c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e/2/result/evaluation.json",
+      "native_attempt": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:2",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "dataset_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14"
+    },
+    {
+      "id": "ff26bbab-8e09-4dd3-9b3d-fcadbdc3cc3b",
+      "created_at": "2026-11-01T02:00:33.147065+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "af094a48907e346b2f66dc6306423cbc3546c5c672d8dbb580ce1407091b399c",
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "job_id": "58708609",
+      "artifact": "/data/homezvol1/wagnera3/research/selection-report-9b6cbf367/attempts/c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e/3/result/evaluation.json",
+      "native_attempt": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:3",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "dataset_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14"
+    },
+    {
+      "id": "491cbaa6-f404-4631-8e3b-78d3178d27a6",
+      "created_at": "2026-11-01T02:00:46.622841+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "a38fa5ad02a768f14ef0577f2caff79219bb991ac7147ab3027e936012f826e2",
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "job_id": "58708611",
+      "artifact": "/data/homezvol1/wagnera3/research/selection-report-9b6cbf367/attempts/c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e/4/result/evaluation.json",
+      "native_attempt": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e:4",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "dataset_sha256": "e0b1f3b799d1a52ab79c0073e00d9b648ad1b042a70f334405e4a31e69f07b14"
+    },
+    {
+      "id": "2edf1ef3-43f6-458a-acd5-10949c97ed7e",
+      "created_at": "2026-11-01T02:01:10.849819+00:00",
+      "author": "hpc-report-a9b2927c",
+      "body_sha256": "d57a8a6e82b24a5c7f7ea56b18f0663adbb86a86cdf65caeb19ee559a08b38f5",
+      "kind": "RESEARCH_SELECTION_EVIDENCE",
+      "measurement": {
+        "kind": "RESEARCH_SELECTION_EVIDENCE",
+        "started_at": "2026-11-01T02:01:10.773768+00:00",
+        "finished_at": "2026-11-01T02:01:10.785844+00:00",
+        "controller_python": "/home/corvis/research-control/wrds-selection-recovery-f38df09fe/bin/python",
+        "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+        "reporter_sha256": "1c88e60d02d591f72e1a3eb223350265f2a4dbfd20ca114b28fb925e7add32b8",
+        "policy_digest": "c28c7c78284a67970c4989dbc1e95048280a71e694722718d4013e25765afe1e",
+        "request_sha256": "23c89dc6deed544013b7d2d507d2d8801f5fab022879216e1d75593821559eb0",
+        "ledger": "/home/corvis/research-data/wrds/experiments/selection-report-9b6cbf367/attempts.sqlite",
+        "journal_sha256_before": "48c11c7732dba5551937e74dfb59e51831183f5a65a7daf2b4c9011673770c90",
+        "journal_sha256_after": "48c11c7732dba5551937e74dfb59e51831183f5a65a7daf2b4c9011673770c90",
+        "final_manifest_digest": "696a9726d90451eff2d97510e6aa85cdd3349d02b19fb9583cb938cc0718decf",
+        "attempt": 1,
+        "seed": 11,
+        "exit_status": 2,
+        "messages": [
+          "usage: [RESEARCH-008] selection requires settled, unsealed validation"
+        ],
+        "selected": []
+      }
+    }
+  ]
+}
