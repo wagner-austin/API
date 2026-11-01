@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import pytest
 
-from fleet.contracts.source import InstallStep
+from fleet.contracts.source import InstallStep, ProjectSource
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
 
@@ -44,15 +44,23 @@ def _deps(path: str) -> tuple[InstallStep, ...]:
     )
 
 
-@pytest.mark.parametrize("path", ["libs/covenant_ml", "services/grandma-api"])
-def test_the_package_locks_and_syncs_before_its_check(path: str) -> None:
+#: grandma-api's web dependencies, installed after its poetry ones.
+NPM_CI_WEB = InstallStep(
+    phase="install", argv=("npm", "ci", "--prefix", "services/grandma-api/web")
+)
+
+
+@pytest.mark.parametrize(
+    ("path", "after"),
+    [("libs/covenant_ml", ()), ("services/grandma-api", (NPM_CI_WEB,))],
+)
+def test_the_package_locks_and_syncs_before_its_check(
+    path: str, after: tuple[InstallStep, ...]
+) -> None:
     project = require_project(decode_fleet_workspace(shipped_document()), path)
-    assert project["source"]["path"] == path
-    assert project["source"]["install"][:2] == _deps(path)
-
-
-def test_grandma_api_still_installs_its_web_dependencies_after_them() -> None:
-    project = require_project(decode_fleet_workspace(shipped_document()), "services/grandma-api")
-    assert project["source"]["install"][2:] == (
-        InstallStep(phase="install", argv=("npm", "ci", "--prefix", "services/grandma-api/web")),
+    assert project["source"] == ProjectSource(
+        remote="https://github.com/wagner-austin/API.git",
+        path=path,
+        install=(*_deps(path), *after),
+        companions=(),
     )
