@@ -156,8 +156,8 @@ __all__ = [
     "FINAL_END",
     "VALIDATION_END",
     "final_manifest",
-    "study_protocol",
     "pre_entry_rows",
+    "study_protocol",
     "study_rows",
     "study_sources",
 ]
