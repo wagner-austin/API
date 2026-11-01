@@ -23,7 +23,7 @@ source_paths:
   - services/covenant-radar-api/README.md
 source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/api/main.py": b9b2dfc969687cc4bb6a578279cf5c017af6fd65
-  "services/covenant-radar-api/src/covenant_radar_api/core/container.py": 31a494a56801ad91a7b034f374145c69050188e7
+  "services/covenant-radar-api/src/covenant_radar_api/core/container.py": 9890346a78aa3f559d91ab51fae751d4b4e77cf6
   "services/covenant-radar-api/src/covenant_radar_api/core/model_paths.py": 323fb99967f7affadda00519ef3df6b2d9a76dd3
   "services/covenant-radar-api/src/covenant_radar_api/worker_entry.py": b5efe0cf5061309837c9f991380e8ed2487eb168
   "services/covenant-radar-api/src/covenant_radar_api/api/routes/ml.py": 037a5368517af92277438abe3e211ae5ba8a63aa
@@ -31,15 +31,16 @@ source_git_blobs:
   "services/covenant-radar-api/src/covenant_radar_api/api/routes/evaluate.py": 091c69d1d73c13b59c04101de8b8c7d82ce514e4
   "services/covenant-radar-api/src/covenant_radar_api/worker/evaluate_job.py": 09cfcc5396bdedfc4b50131f54774655772e049c
   "libs/covenant_domain/src/covenant_domain/rules.py": 9420c46c2e125feb2834be050292dc1e0fa938fa
-  "libs/platform_core/src/platform_core/config/covenant_radar.py": 7846daf5cc69c4b2609c9f07e403dd8c6411b2ae
+  "libs/platform_core/src/platform_core/config/covenant_radar.py": a91cd02f39c846391066985aaefb7de89639d9aa
   "services/covenant-radar-api/pyproject.toml": 15a4bee017f291001ca546a6e8b72648c671b120
   "services/covenant-radar-api/README.md": 34f48ed308cbe2cbffc9e867e2b4a41748c9a90b
 provenance:
+  - "container.py and config/covenant_radar.py re-read 2026-11-01 for MCPs board task a9566810: the change deletes the data-bank fields, constructor parameters, settings keys and both download helpers and touches nothing else; load_model_now now warns and returns False on a missing file and get_model raises FileNotFoundError, which the download sentence now says. from_settings' hook-built Redis, PostgreSQL and RQ client, ensure_schema, the XGBOOST-conditional backend_model_path and the four MLBackend members are unchanged"
   - "container.py re-read 2026-10-30 for MCPs board task c76eb277: API 69ae0b79f and 6820fc2d8 moved both data-bank downloads from /tmp/models into the container's model output directory and changed nothing else (git diff ed8fa72fd 31a494a56: 8 lines each way, all in those two branches); the download sentence was rewritten to say so"
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: pyproject.toml's only change is db91ba401, pytest addopts distributing with --dist loadgroup instead of loadscope plus the comment saying why. The [tool.poetry.scripts] block this page cites at :68-70 is unchanged and still on those lines"
   - "every claim read from code at API commit 2e0511ee7 on 2026-10-05; no process was started to observe it"
   - "'nothing enqueues run_batch_evaluation' is a grep over services/ and libs/ for the symbol outside tests/, which found only its definition and __all__"
-fact_checked: "2026-10-08"
+fact_checked: "2026-11-01"
 confidence: high
 hubs: [services]
 ---
@@ -78,10 +79,11 @@ that to the shared harness — the pattern in [[platform-workers-rq-pattern]].[^
 or `lightgbm` deployment reads its artifact from the setting named for MLP.[^container]
 The README states this as "derived from `APP__ML_BACKEND` plus
 `APP__ACTIVE_MODEL_PATH_XGB` / `_MLP`", which is accurate and easy to misread
-as one path per backend.[^readme] If the model is absent locally and data-bank
-is configured, both `load_model_now` and `get_model` try a download into the
-container's own model output directory first, never a shared `/tmp`
-directory another user may own.[^container]
+as one path per backend.[^readme] The model is read from that local path and
+nowhere else: if the file is absent, `load_model_now` logs a warning and
+returns False, and `get_model` raises `FileNotFoundError` saying to train a
+model first.[^container] Until 2026-11-01 both first tried a download from
+data-bank-api; that path left with the service.
 
 ## Rules are exact; risk is learned — and they never share a code path
 

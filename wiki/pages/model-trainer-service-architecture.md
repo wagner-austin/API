@@ -19,13 +19,14 @@ source_paths:
   - docs/RESEARCH.md
 source_git_blobs:
   "services/Model-Trainer/pyproject.toml": 8447a1668e848a5705f836ec3bb1f8af3a04ca35
-  "services/Model-Trainer/src/model_trainer/api/main.py": 19c915e2f19cd975e6deb3b31dfd3cecd52ed36a
+  "services/Model-Trainer/src/model_trainer/api/main.py": 84550b2dcdea2faf15540a244b1918958f011dd3
   "services/Model-Trainer/src/model_trainer/api/routes/runs.py": 5499dda1eac9e3c5e034e9c636e4a2bf5bf60c27
   "services/Model-Trainer/src/model_trainer/core/services/queue/rq_adapter.py": 09a397ac1ad9036bde1c5889f8d1214c6d7b0957
   "services/Model-Trainer/src/model_trainer/core/services/container.py": e3165ede22b989b0679c5b8b3122a95785e107fc
-  "services/Model-Trainer/src/model_trainer/cluster/entry.py": 67c8783d843179348bfdcd6b59641fa4cbab6a27
+  "services/Model-Trainer/src/model_trainer/cluster/entry.py": e97e5f012892df1e82e9483550acd2dc5bb222c8
   "docs/RESEARCH.md": c7b63ba14027eadb70362b5ec5459e58535f37e9
 provenance:
+  - "api/main.py and cluster/entry.py repinned 2026-11-01 for MCPs board task a9566810 after reading both diffs. main.py changes one comment and still mounts the three routers [^app] cites. entry.py's corpus and artifact hook overrides now take the settings-derived root and ignore it for the flag-named directories, its preflight builds the store from artifact_store_root, and its docstring says the service wires stores under its configured roots rather than data-bank-api; the progress, cancellation, staged-corpus and resume statements and _resume_for_execution are unchanged. The HTTP service row now names those stores, since data-bank-api was archived that day"
   - "docs/RESEARCH.md repinned 2026-11-01 from 8c60ab08 to c7b63ba1 after reading the diff: +4/-2 inside the WRDS paragraph of the covenant section only, rewording what the October 28-29 jobs and the later rehearsals concern. The mi section, its Runs list and the registered headings this page cites are unchanged (audit a5e04d51 found the stale pin, MCPs board task a276f973)."
   - "2026-10-30: checked the compact registry: all four project sections and the full qualified producing-command list remain. Only the registry pin changes; all six implementation pins match HEAD."
   - "re-read 2026-10-08 against API 38cbd5011 for MCPs board task 3d71a8e1: Model-Trainer's pyproject.toml changed only its pytest addopts, --dist loadgroup instead of loadscope with the comment saying why (06956410e, MCPs board task 2f90d785), and the [tool.poetry.scripts] block this page cites at :54-59 is unchanged on those lines. docs/RESEARCH.md changed only by 24b4ad65b, which rewrote the cartridge_trait_sweep section and added cartridge_trait_repair_sweep to the mi runs list; the mi Runs: bullet [^research] cites, and the floor, mi-cu128 and cartridge-qa projects this page names, all still stand"
@@ -44,7 +45,7 @@ running its code too). The two roles share one core and enter it three ways:[^re
 
 | way in | composition root | dependencies it wires |
 |---|---|---|
-| HTTP service | `api/main.py::create_app` + `modeltrainer-rq-worker` | Redis, RQ, data-bank-api |
+| HTTP service | `api/main.py::create_app` + `modeltrainer-rq-worker` | Redis, RQ, filesystem corpus and artifact stores under its configured roots |
 | one training job on a compute node | `modeltrainer-cluster-train` → `cluster/entry.py` | in-process store, staged corpus, local artifact dir |
 | measurement CLIs | `python -m model_trainer.cli.<name>` (three also as scripts) | the job's own determinism pin and fingerprint |
 

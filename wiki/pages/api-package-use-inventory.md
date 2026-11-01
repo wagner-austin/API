@@ -110,11 +110,14 @@ One row per package, each column read as the list above says, at API `adda8c020`
 
 On 2026-11-01 the operator picked every archive recommendation above, the whole Discord group, and `data-bank-api` with the service mode that calls it.[^picks] So thirteen packages leave the monorepo, `services/data-bank-api` last, once nothing calls it: `libs/instrument_io`, `libs/platform_email`, `libs/platform_music`, `libs/platform_discord`, `libs/procart`, `services/Art-Trainer`, `services/handwriting-ai`, `services/music-wrapped-api`, `services/procart-api`, `services/qr-api`, `services/turkic-api`, `services/data-bank-api` and `clients/DiscordBot`. Their history is at the tag `archive/api-packages-2026-11-01`, on API `da1c233ec`, the last commit holding all thirteen. `tools/hpc3-execution` was not asked about and stays.
 
+Removing `data-bank-api` meant replacing what its callers stored through it rather than only deleting a directory. covenant-radar-api now reads and writes its models only at the local paths its settings name, with no download at startup and no upload after training. Model-Trainer's service mode now uses the filesystem stores its cluster mode already used: a corpus is staged under `/data/corpus` by its SHA-256 and a finished run is packed into `/data/artifacts/store`. `platform_core`'s data-bank client, protocol, events and settings and `platform_ml`'s HTTP `ArtifactStore` went with it.[^dbank]
+
 ## Archiving is not just deleting a directory
 
 `libs/platform_core` names several services in shared configuration and client code, so archiving a service also trims those references, and every package that imported it must pass `make check` on the fleet after. Each archived package's history stays at a named tag. `tools/hpc3-execution` is a recipe for a fleet project that was never registered, so it has no history worth tagging.[^hpc3x]
 
 [^ask]: [synthesis] -- MCPs board task a276f973, its spec's OPERATOR block, dated 2026-11-01.
+[^dbank]: [synthesis] -- MCPs board task a9566810, which carried the operator's ruling "Archive it and strip the service mode"; the change is described from its own diff over `services/covenant-radar-api`, `services/Model-Trainer`, `libs/platform_core`, `libs/platform_ml` and `libs/monorepo_guards`.
 [^picks]: [synthesis] -- MCPs board task a276f973, notes 226e1b90 and bc8f96d4: the two RULING lines recording the operator's picks and the correction that put data-bank-api to the operator on its own.
 [^size]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `git ls-tree -r -l origin/main` summed per package; `services/covenant-radar-api/data/external` holds 33 dataset directories.
 [^fleet]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `fleet_dispatch_jobs` closed in the 30 days to 2026-11-01T20:44Z, summed closed_at minus claimed_at per project.
