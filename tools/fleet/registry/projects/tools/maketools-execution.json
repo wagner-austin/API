@@ -9,7 +9,19 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "tools/maketools-execution",
-    "install": [],
+    "install": [
+      {
+        "phase": "images",
+        "argv": [
+          "make",
+          "-j",
+          "8",
+          "-C",
+          "tools/maketools-execution",
+          "images"
+        ]
+      }
+    ],
     "companions": []
   }
 }
