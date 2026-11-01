@@ -34,10 +34,8 @@ from model_trainer.core._hook_defaults import (
     _default_load_tokenizer_for_training,
     _default_load_wandb_module,
     _default_model_dir,
-    _default_os_scandir,
     _default_os_utime,
     _default_path_iterdir,
-    _default_path_unlink,
     _default_random_factory,
     _default_random_getstate,
     _default_random_setstate,
@@ -48,7 +46,6 @@ from model_trainer.core._hook_defaults import (
     _default_rq_retry,
     _default_sample_token,
     _default_service_container_from_settings,
-    _default_shutil_disk_usage,
     _default_shutil_rmtree,
     _default_shutil_which,
     _default_split_corpus,
@@ -87,10 +84,8 @@ from model_trainer.core._hook_protocols import (
     InstalledVersionProto,
     KVStoreFactoryProto,
     LoadSettingsProto,
-    OsScandirProto,
     OsUtimeProto,
     PathIterdirProto,
-    PathUnlinkProto,
     PkgVersionProto,
     RandomFactoryProto,
     RandomGetstateProto,
@@ -101,7 +96,6 @@ from model_trainer.core._hook_protocols import (
     RQQueueFactoryProto,
     RQRetryFactoryProto,
     ServiceContainerFactoryProto,
-    ShutilDiskUsageProto,
     ShutilRmtreeProto,
     ShutilWhichProto,
     TimeMonotonicProto,
@@ -320,12 +314,6 @@ load_gpt2_model: LoadGpt2ModelProto = _default_load_gpt2_model
 sample_token: SampleTokenProto = _default_sample_token
 
 spm_decode_ids: SpmDecodeIdsProto = _default_spm_decode_ids
-
-os_scandir: OsScandirProto = _default_os_scandir
-
-shutil_disk_usage: ShutilDiskUsageProto = _default_shutil_disk_usage
-
-path_unlink: PathUnlinkProto = _default_path_unlink
 
 time_sleep: TimeSleepProto = _default_time_sleep
 

@@ -98,9 +98,6 @@ def _reset_test_hooks_impl(
     orig_sample_token = _test_hooks.sample_token
     orig_spm_decode_ids = _test_hooks.spm_decode_ids
     # Standard library hooks
-    orig_os_scandir = _test_hooks.os_scandir
-    orig_shutil_disk_usage = _test_hooks.shutil_disk_usage
-    orig_path_unlink = _test_hooks.path_unlink
     orig_time_sleep = _test_hooks.time_sleep
     orig_path_iterdir = _test_hooks.path_iterdir
     # Cleanup service hooks
@@ -169,9 +166,6 @@ def _reset_test_hooks_impl(
     _test_hooks.sample_token = orig_sample_token
     _test_hooks.spm_decode_ids = orig_spm_decode_ids
     # Standard library hooks
-    _test_hooks.os_scandir = orig_os_scandir
-    _test_hooks.shutil_disk_usage = orig_shutil_disk_usage
-    _test_hooks.path_unlink = orig_path_unlink
     _test_hooks.time_sleep = orig_time_sleep
     _test_hooks.path_iterdir = orig_path_iterdir
     # Cleanup service hooks
