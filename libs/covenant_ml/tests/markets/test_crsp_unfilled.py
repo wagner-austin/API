@@ -45,7 +45,8 @@ def test_all_rejected_orders_retain_cash_without_fees_or_terminal_losses(cost_bp
     (period,) = evaluate_crsp_holdings(evidence, (W1,), ((1,),), cost_bps)
     assert period.selected == period.unfilled == (1,)
     assert (period.cash, period.turnover, period.cost, period.net_return) == (1.0, 0.0, 0.0, 0.0)
-    assert period.held == period.receivables == ()
+    assert period.held == ()
+    assert period.receivables == ()
 
 
 @pytest.mark.parametrize("cost_bps", [5, 10, 25])
@@ -65,7 +66,9 @@ def test_mixed_rejection_preserves_equal_cash_slot_and_charges_only_actual_trade
     assert period.selected == (1, 2)
     assert period.unfilled == (1,)
     assert period.cash == pytest.approx(1 / 2.1)
-    assert period.held == ((2, pytest.approx(1.1 / 2.1)),)
+    ((permno, weight),) = period.held
+    assert permno == 2
+    assert weight == pytest.approx(1.1 / 2.1)
     assert period.turnover == pytest.approx(actual_trades)
     assert period.cost == pytest.approx(rate * actual_trades)
     assert period.net_return == pytest.approx(gross_end - rate * 1.1 * each - 1)
