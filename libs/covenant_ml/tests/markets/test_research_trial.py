@@ -9,9 +9,12 @@ from platform_core.json_utils import (
     load_json_str,
     narrow_json_to_dict,
     require_dict,
+    require_float,
+    require_int,
     require_list,
+    require_str,
 )
-from platform_core.run_record import decode_run_record
+from platform_core.run_record import Observation, decode_run_record
 from platform_core.testing import sample_run_fingerprint
 
 from covenant_ml.markets.research_trial import execute_trial
@@ -49,8 +52,8 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     result = narrow_json_to_dict(load_json_str(output.read_text()))
     assert (record["experiment"], record["label"]) == (trial["policy"]["protocol_digest"], "1")
     names = [observation["name"] for observation in record["observations"]]
-    # Five arms at three frozen costs, two means each, and four paired intervals.
-    assert len(names) == 5 * 3 * 2 + 4 * 4 + 2 * 16
+    # Five arms at three costs, four paired intervals, and five monthly series.
+    assert len(names) == 5 * 3 * 2 + 4 * 4 + 5 * 16
     assert "mean_net_return.momentum.10bps" in names
     assert "equal_weight_vs_momentum.net_return.ci_low" in names
     assert result["kind"] == "research-monthly-validation-v1"
@@ -58,6 +61,24 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
     assert result["attempt"] == 1
     assert len(require_list(result, "folds")) == 2
     assert len(require_list(result, "results")) == 15
+    expected: list[Observation] = []
+    for item in require_list(result, "results"):
+        series = narrow_json_to_dict(item)
+        if require_int(series, "cost_bps") == 10:
+            for period in require_list(series, "months"):
+                month_record = narrow_json_to_dict(period)
+                expected.append(
+                    Observation(
+                        name=f"monthly_net_return.{require_str(series, 'arm')}.10bps."
+                        f"{require_str(month_record, 'decision')}."
+                        f"{require_str(month_record, 'entry')}."
+                        f"{require_str(month_record, 'exit')}",
+                        value=require_float(month_record, "net_return"),
+                    )
+                )
+    assert [
+        row for row in record["observations"] if row["name"].startswith("monthly_net_return.")
+    ] == expected
     first = narrow_json_to_dict(require_list(result, "results")[0])
     months = [narrow_json_to_dict(item) for item in require_list(first, "months")]
     assert len(months) == 16
