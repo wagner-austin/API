@@ -30,7 +30,7 @@ source_paths:
 source_git_blobs:
   "CODE_STANDARDS.md": "474681549e2caa9dc26a049f53c793ab17eaf830"
   "libs/platform_core/src/platform_core/stage_manifest.py": "661ec21bf8846370ad93aefa4460371d1981547e"
-  "libs/covenant_ml/tests/markets/test_research_execution.py": "397dc3169486f1625090aa488dcf686fb13d7db4"
+  "libs/covenant_ml/tests/markets/test_research_execution.py": "cca5b4c2f6a233e61b4b8a08de553a39b6f06743"
   "libs/covenant_ml/src/covenant_ml/evaluation/resampling.py": "6d95079f002b370fa9a8920c3d361a4f803e6136"
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
