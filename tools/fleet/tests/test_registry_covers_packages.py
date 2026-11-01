@@ -85,8 +85,10 @@ def test_every_package_with_a_check_is_declared_or_excused() -> None:
 
     assert undeclared == []
     # Not a pass over nothing: the tree carried 57 such packages on
-    # 2026-10-11, and a walk that found none would read as clean.
-    assert len(checkable) >= 57
+    # 2026-10-11, and a walk that found none would read as clean. The
+    # archive of MCPs board task a276f973 took twelve packages out on
+    # 2026-11-01, which left 47.
+    assert len(checkable) >= 47
 
 
 def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None:
@@ -106,8 +108,9 @@ def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None
     assert missing == []
     # Not a pass over nothing: the registry's projects sourced from this
     # repository ran in 59 distinct paths on 2026-10-25, after board task
-    # e705f08c removed tools/ps-harness and the Windows TankpitBot twin.
-    assert len(declared) >= 59
+    # e705f08c removed tools/ps-harness and the Windows TankpitBot twin, and
+    # 47 after the archive of MCPs board task a276f973 on 2026-11-01.
+    assert len(declared) >= 47
 
 
 def test_every_excuse_names_a_package_that_still_needs_one() -> None:
