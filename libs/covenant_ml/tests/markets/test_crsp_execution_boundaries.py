@@ -22,7 +22,7 @@ from .test_crsp_holdings import W1, daily, outcomes
 
 
 def event(day: str) -> JSONObject:
-    """A dated forty-percent loss, resolved before the first window's exit."""
+    """A dated forty-percent loss for the requested boundary event."""
     return {
         "permno": 1,
         "delistingdt": day,
@@ -69,7 +69,7 @@ def test_terminal_record_before_entry_is_never_an_execution_even_with_trade_flag
         [daily(1, W1.entry, 0.5, dlydelflg="Y", dlyretdurflg="DD", dlyprcflg=flag)],
         [event(W1.decision)],
     )
-    with pytest.raises(ValueError, match="CRSP-004.*terminal record.*is not a fill"):
+    with pytest.raises(ValueError, match=r"CRSP-004.*terminal record.*is not a fill"):
         crsp_window_path(evidence, 1, W1)
 
 
@@ -79,7 +79,7 @@ def test_label_path_requires_trade_prices_at_both_ordinary_endpoints(day: str) -
     for row in rows:
         if row["dlycaldt"] == day:
             row["dlyprcflg"] = "BA"
-    with pytest.raises(ValueError, match="CRSP-004.*positive closing trade"):
+    with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
@@ -108,5 +108,5 @@ def test_verified_extract_preserves_selection_and_refuses_pre_entry_delisting_la
     panel = build_crsp_panel(sources, "2019-02-01", "2019-02-28")
     assert panel[0].window.entry == "2019-03-01"
     assert tuple(feature.permno for feature in panel[0].features) == (8, 7, 6, 5, 4, 3)
-    with pytest.raises(ValueError, match="CRSP-004.*terminal record for 8 on 2019-03-01"):
+    with pytest.raises(ValueError, match=r"CRSP-004.*terminal record for 8 on 2019-03-01"):
         crsp_study_rows(index_crsp_outcomes(sources), panel, ("momentum", "liquidity"))
