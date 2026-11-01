@@ -165,11 +165,13 @@ def _terminal_row(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> JS
 
 
 def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> CrspPath:
-    """Compound one security's ordinary returns and resolve any terminal event.
+    """Validate execution, compound ordinary returns and resolve a terminal event.
 
     The daily series' own delisting-flagged rows after the delisting date are
     never compounded: the terminal multiplier comes from ``stkdelists`` alone,
-    so a terminal outcome is counted exactly once.
+    so a terminal outcome is counted exactly once. Label construction uses this
+    same path as holdings and must prove a tradable entry, plus a tradable exit
+    when the position does not terminate inside the window.
 
     Args:
         outcomes: Indexed evidence.
@@ -180,15 +182,18 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
         The ordinary growth and, for an in-window delisting, its dated value.
 
     Raises:
-        ValueError: CRSP-009 for a missing or non-ordinary held return or a
+        ValueError: CRSP-004 for an unexecutable entry or ordinary exit;
+            CRSP-009 for a missing or non-ordinary held return or a
             terminal value dated after the exit; CRSP-005 propagates for an
             unresolved terminal event.
     """
     terminal = _terminal_row(outcomes, permno, window)
     end = window.exit if terminal is None else require_str(terminal, "delistingdt")
+    days = _sessions_after(outcomes.sessions, window.entry, end)
+    _require_fill(outcomes, permno, window.entry)
     growth = 1.0
     previous = window.entry
-    for day in _sessions_after(outcomes.sessions, window.entry, end):
+    for day in days:
         row = outcomes.returns.get((permno, day))
         if row is None or not crsp_ordinary_return(row, previous):
             raise ValueError(f"[CRSP-009] held return for {permno} on {day} is not ordinary")
@@ -197,6 +202,7 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
     if not isfinite(growth):
         raise ValueError("[CRSP-009] compounded held return is not finite")
     if terminal is None:
+        _require_fill(outcomes, permno, window.exit)
         return CrspPath(growth, None)
     valued, multiplier = crsp_terminal_value(terminal)
     if valued > window.exit:
@@ -219,6 +225,8 @@ def _require_fill(outcomes: CrspOutcomes, permno: int, day: str) -> None:
     row = outcomes.returns.get((permno, day))
     if row is None:
         raise ValueError(f"[CRSP-009] no execution record for {permno} on {day}")
+    if row["dlydelflg"] != "N":
+        raise ValueError(f"[CRSP-004] terminal record for {permno} on {day} is not a fill")
     require_crsp_execution_price(row, outcomes.protocol)
 
 
