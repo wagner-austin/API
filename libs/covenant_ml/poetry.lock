@@ -1564,7 +1564,7 @@ url = "../platform_core"
 [[package]]
 name = "platform-ml"
 version = "0.1.0"
-description = "Shared ML artifact handling: manifest schema, tarball helpers, and data-bank integration."
+description = "Shared ML artifact handling: manifest schema, tarball helpers, and Weights & Biases integration."
 optional = false
 python-versions = "^3.11"
 groups = ["main"]
