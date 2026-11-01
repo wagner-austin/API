@@ -159,3 +159,23 @@ verified file transport, certificate readback and an unchanged independent
 digest record. The receipt includes the executing controller identity. The
 full package check passed 2,131 tests at 100% coverage. Board task a622165c;
 no new staging controller or page was introduced.
+
+## [2026-11-01] audit | native recovery scope and older citation findings
+Pages updated: wrds-installed-controller-verification, image-build-flow,
+image-freshness, interpreter-availability, job-identity-on-cluster,
+one-ledger-per-repository, unsupported-shapes. Page counts are unchanged.
+The recovery inspector now distinguishes repeated policies by exact frozen
+artifact and workspace host in the existing shared ledger. Four native jobs
+were recovered; original queue requests still pin the old controller, so the
+API readiness page records the unresolved handover rather than a queue pass.
+Source comparisons found command-boundary imports and a private-stage console
+entry behind stale pins; reviewed README sections still support their cited
+claims. Removed job arrays from the unsupported-shapes opening, which had
+contradicted its own later paragraph and the maintained command reference.
+The page audits also returned 29 unresolved citation warnings: image-build-flow
+3, interpreter-availability 7, job-identity-on-cluster 14, unsupported-shapes 5.
+They include uncited historical measurements and wikilink-only support.
+This pass did not remeasure those historical environments or recover every
+primary incident record; adding citations without that evidence would overstate
+verification. The findings are retained under existing wiki task 52668052,
+post 7c001a6b, and remain deferred rather than marked verified.
