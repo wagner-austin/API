@@ -76,9 +76,14 @@ def test_real_trainers_emit_the_admitted_shared_monthly_record(tmp_path: Path) -
                         value=require_float(month_record, "net_return"),
                     )
                 )
-    assert [
-        row for row in record["observations"] if row["name"].startswith("monthly_net_return.")
-    ] == sorted(expected, key=lambda row: row["name"])
+    actual_monthly: dict[str, float] = {
+        row["name"]: row["value"]
+        for row in record["observations"]
+        if row["name"].startswith("monthly_net_return.")
+    }
+    expected_monthly: dict[str, float] = {row["name"]: row["value"] for row in expected}
+    assert len(actual_monthly) == len(expected_monthly) == 5 * 16
+    assert actual_monthly == expected_monthly
     first = narrow_json_to_dict(require_list(result, "results")[0])
     months = [narrow_json_to_dict(item) for item in require_list(first, "months")]
     assert len(months) == 16
