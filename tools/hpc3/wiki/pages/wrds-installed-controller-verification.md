@@ -12,7 +12,7 @@ source_paths:
   - "artifacts/research-queue-fresh-20261029/provenance.json"
   - "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
 source_git_blobs:
-  "src/hpc3/cli/execution_inspect.py": "97234adfb10e9f5f060b5b0f3b81300f4a646916"
+  "src/hpc3/cli/execution_inspect.py": "9687b9c7d4c20e71f26fef242421c779cac5527d"
   "src/hpc3/core/execution_evidence.py": "bf31a1091302ae2786425afa629677fccf07f681"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
@@ -180,6 +180,14 @@ Recipes disable requeue. The evidence reader uses allocation-only `sacct`
 and does not request historical duplicate records. Its one-row check is a
 query-result invariant, not proof that a job ID has only one historical
 execution. Results and local journals remain owner-writable evidence.[^query][^measure]
+
+The November 1 selection repetition exposed identical `research_attempt`
+values from separate study roots in the shared ledger. The current inspector
+also requires the exact frozen output artifact and workspace host; the caller
+passes `--artifact` from its persisted recipe. Multiple matches for all three
+still refuse recovery. This corrects lookup scope without creating another
+ledger or permitting resubmission. The retained jobs and independent-review
+status belong to the API wiki's `wrds-baseline-readiness` page.[^inspect]
 
 [^inspect]: `src/hpc3/cli/execution_inspect.py:23` `main`.
 [^measure]: `src/hpc3/core/execution_evidence.py:77` `allocation_document` and `:154` `measure`.

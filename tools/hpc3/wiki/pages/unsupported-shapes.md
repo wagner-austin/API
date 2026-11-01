@@ -10,7 +10,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
-  "README.md": "ac67efe201119ac5992ff0f63881cbe5ac01d528"
+  "README.md": "b506737230f2028e798d732e2ae914a2c102c3a1"
 fact_checked: 2026-10-16
 confidence: high
 ---
@@ -18,7 +18,7 @@ confidence: high
 # What this package cannot submit, as decisions rather than discoveries
 
 `JobSpec` describes **one single-node job**, with GPUs or without. The
-current table of inexpressible shapes — multi-node/MPI, job arrays, explicit
+current table of inexpressible shapes — multi-node/MPI, explicit
 `--qos`, `--constraint`/`--exclusive` — lives in the README's
 "What this cannot submit" section, where a test (`test_examples.py`) holds it
 present and holds lifted limits OUT of it; this page carries the reasoning
