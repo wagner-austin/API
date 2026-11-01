@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 
 from platform_core.logging import get_logger
 from platform_workers.redis import RedisStrProto
@@ -11,6 +10,7 @@ from ..core.config.settings import Settings
 from ..core.contracts.queue import TokenizerTrainPayload
 from ..core.contracts.tokenizer import TokenizerTrainConfig, TokenizerTrainStats
 from ..core.infra.paths import tokenizer_dir
+from ..core.services.data.store_roots import corpus_root
 from ..core.services.tokenizer.bpe_backend import BPEBackend
 from ..core.services.tokenizer.char_backend import CharBackend
 
@@ -55,13 +55,9 @@ def process_tokenizer_train_job(payload: TokenizerTrainPayload) -> None:
             "vocab_size": int(payload["vocab_size"]),
         },
     )
-    # Resolve corpus file id to local cache path
+    # Resolve the corpus file id to its staged path
     fid = str(payload["corpus_file_id"]).strip()
-    fetcher = _test_hooks.corpus_fetcher_factory(
-        api_url=settings["app"]["data_bank_api_url"],
-        api_key=settings["app"]["data_bank_api_key"],
-        cache_dir=Path(settings["app"]["data_root"]) / "corpus_cache",
-    )
+    fetcher = _test_hooks.corpus_fetcher_factory(corpus_root(settings))
     resolved_corpus = str(fetcher.fetch(fid))
 
     cfg = TokenizerTrainConfig(

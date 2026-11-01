@@ -5,7 +5,6 @@ from __future__ import annotations
 import time as _time
 from collections.abc import Callable
 from datetime import datetime
-from pathlib import Path
 
 from platform_core.determinism_record import DeterminismRecord
 from platform_core.job_events import ErrorKind, JobDomain, default_events_channel
@@ -23,6 +22,7 @@ from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue_encoding import decode_train_job_payload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import model_dir
+from model_trainer.core.services.data.store_roots import corpus_root
 from model_trainer.core.services.export.gguf_export import GgufExportResult
 from model_trainer.worker.job_utils import (
     build_cfg,
@@ -372,11 +372,7 @@ def process_train_job(payload_raw: JSONObject) -> None:
     try:
         threads, determinism = setup_env(settings)
         fid = str(req["corpus_file_id"]).strip()
-        fetcher = _test_hooks.corpus_fetcher_factory(
-            settings["app"]["data_bank_api_url"],
-            settings["app"]["data_bank_api_key"],
-            Path(settings["app"]["data_root"]) / "corpus_cache",
-        )
+        fetcher = _test_hooks.corpus_fetcher_factory(corpus_root(settings))
         resolved_corpus = str(fetcher.fetch(fid))
         cfg = build_cfg(req, resolved_corpus)
         _execute_training(

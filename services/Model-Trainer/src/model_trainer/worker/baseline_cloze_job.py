@@ -17,8 +17,6 @@ which items.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_core.comparability import encode_run_fingerprint
 from platform_core.json_utils import JSONValue, dump_json_str
 from platform_core.logging import get_logger
@@ -28,6 +26,7 @@ from model_trainer.core import _test_hooks
 from model_trainer.core.contracts.cloze import encode_cloze_item_outcome
 from model_trainer.core.contracts.queue import BaselineClozeJobPayload
 from model_trainer.core.run_fingerprint import capture_run_fingerprint, describe_run_fingerprint
+from model_trainer.core.services.data.store_roots import corpus_root
 from model_trainer.core.services.model.backends.hf_lm.io import load_prepared_hf_lm_from_hub
 from model_trainer.core.services.model.cloze import score_cloze_items
 from model_trainer.worker.cloze_job import ClozeCacheModel, parse_items
@@ -67,11 +66,7 @@ def process_baseline_cloze_job(payload: BaselineClozeJobPayload) -> None:
     r.set(key, dump_json_str(running))
 
     try:
-        api_url = settings["app"]["data_bank_api_url"]
-        api_key = settings["app"]["data_bank_api_key"]
-        cache_dir: Path = Path(settings["app"]["artifacts_root"]) / "cloze"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        fetcher = _test_hooks.corpus_fetcher_factory(api_url, api_key, cache_dir)
+        fetcher = _test_hooks.corpus_fetcher_factory(corpus_root(settings))
         items_path = fetcher.fetch(items_file_id)
         items = parse_items(items_path.read_text(encoding="utf-8"))
 

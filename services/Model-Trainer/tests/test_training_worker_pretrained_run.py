@@ -47,8 +47,6 @@ def test_training_worker_hf_lm_with_tokenizer_id_none(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
 
     _test_hooks.load_settings = lambda: settings
@@ -154,8 +152,6 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 
@@ -183,11 +179,9 @@ def test_continued_training_downloads_artifacts_when_absent_locally(
     _test_hooks.kv_store_factory = lambda url: fake
     fake.set(artifact_file_id_key(pretrained_run_id), "pretrained-file-id")
 
-    recording = _RecordingStore("http://data-bank-api.local", "secret-key")
+    recording = _RecordingStore()
 
-    def _store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
+    def _store_factory(root: Path) -> ArtifactStoreProto:
         return recording
 
     _test_hooks.service_container_from_settings = _create_service_container_factory(
@@ -268,8 +262,6 @@ def test_training_worker_passes_resume_flag_to_backend(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 

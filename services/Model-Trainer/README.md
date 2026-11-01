@@ -168,9 +168,6 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `APP__LOGS_ROOT` | string | `/data/logs` | Logs directory |
 | `APP__THREADS` | int | `0` | Thread count (0=auto) |
 | `APP__TOKENIZER_SAMPLE_MAX_LINES` | int | `10000` | Max lines for tokenizer sampling |
-| `APP__DATA_BANK_API_URL` | string | - | Data bank API URL (or use `API_GATEWAY_URL`) |
-| `APP__DATA_BANK_API_KEY` | string | - | Data bank API key |
-| `API_GATEWAY_URL` | string | - | Gateway URL (auto-appends `/data-bank` for data bank) |
 | `APP_ENV` | string | `dev` | Environment (`dev` or `prod`) |
 | `LOGGING__LEVEL` | string | `INFO` | Log level |
 | `HF_HOME` | string | `/hf-cache` | Hugging Face cache |
@@ -186,10 +183,6 @@ For complete API documentation, see [docs/api.md](./docs/api.md).
 | `APP__CLEANUP__VERIFY_UPLOAD` | bool | `true` | Verify upload before cleanup |
 | `APP__CLEANUP__GRACE_PERIOD_SECONDS` | int | `0` | Wait time before cleanup |
 | `APP__CLEANUP__DRY_RUN` | bool | `false` | Log deletions without deleting |
-| `APP__CORPUS_CACHE_CLEANUP__ENABLED` | bool | `false` | Enable corpus cache cleanup |
-| `APP__CORPUS_CACHE_CLEANUP__MAX_BYTES` | int | `10737418240` | Max cache size (10GB) |
-| `APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES` | int | `2147483648` | Min free space (2GB) |
-| `APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY` | string | `lru` | `lru` or `oldest` |
 | `APP__TOKENIZER_CLEANUP__ENABLED` | bool | `false` | Enable tokenizer cleanup |
 | `APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS` | int | `30` | Days before cleanup |
 
@@ -252,27 +245,29 @@ Lifecycle events carry `job_id` (run_id), `user_id`, `queue`, progress, and opti
 ## Running on a Slurm cluster
 
 `modeltrainer-cluster-train` runs one training job on a compute node that has
-no Redis, no data-bank API and no Docker. It is a **second composition root,
-not a second trainer**: it hands the same payload to the same
-`process_train_job` as the RQ worker, so the training code cannot drift
-between the two and does not know which one started it.
+no Redis and no Docker. It is a **second composition root, not a second
+trainer**: it hands the same payload to the same `process_train_job` as the RQ
+worker, so the training code cannot drift between the two and does not know
+which one started it.
 
 ```
-┌──────────────────┐                    ┌──────────────────────┐
-│  worker_entry    │                    │  cluster.entry       │
-│  Redis · RQ      │                    │  LocalKV · staged    │
-│  data-bank API   │                    │  corpus · local dir  │
-└────────┬─────────┘                    └──────────┬───────────┘
+┌──────────────────────┐                ┌──────────────────────┐
+│  worker_entry        │                │  cluster.entry       │
+│  Redis · RQ          │                │  LocalKV · staged    │
+│  stores under roots  │                │  corpus · local dir  │
+└────────┬─────────────┘                └──────────┬───────────┘
          │                                         │
          └────────► process_train_job(payload) ◄───┘
                         (identical)
 ```
 
-It works because the three service dependencies are already Protocols behind
-factory hooks — `kv_store_factory`, `corpus_fetcher_factory`,
-`artifact_store_factory`. The cluster root installs filesystem- and
-memory-backed implementations through the same hooks the service installs
-HTTP-backed ones through. Neither is a fake.
+It works because the three service dependencies are Protocols behind factory
+hooks — `kv_store_factory`, `corpus_fetcher_factory`, `artifact_store_factory`.
+Both roots build the same filesystem stores (`model_trainer.cluster.stores`):
+the service binds them to `APP__DATA_ROOT/corpus` and
+`APP__ARTIFACTS_ROOT/store`, the cluster root to the directories its
+`--corpus-dir` and `--artifacts-dir` flags name. Until 2026-11-01 the service
+stored both through data-bank-api over HTTP; that service was archived then.
 
 ### What differs on a compute node
 
@@ -281,8 +276,8 @@ HTTP-backed ones through. Neither is a fake.
 | job state | Redis, read by the API | in-process dict — **there is no reader** |
 | progress signal | Redis + events channel | the job's stdout, which Slurm captures |
 | cancellation | `runs:<id>:cancelled=1` | **`scancel`** — the key is never written, so the poll always answers False |
-| corpus | fetched from data-bank by file id | **pre-staged**, SHA-256 verified on both sides |
-| artifacts | uploaded to data-bank | tarball in a local directory |
+| corpus | staged under `APP__DATA_ROOT/corpus` by its SHA-256 | **pre-staged** under `--corpus-dir`, SHA-256 verified on both sides |
+| artifacts | tarball under `APP__ARTIFACTS_ROOT/store` | tarball under `--artifacts-dir` |
 
 Cancellation being Slurm's is correct rather than a gap: a second cancellation
 mechanism the scheduler did not know about would be the bug.
@@ -371,9 +366,9 @@ modeltrainer-score-baseline \
     --out          /pub/<user>/abl/records/gpt2-floor-a100.json
 ```
 
-The item set is a **path**, not a data-bank file id: a compute node has no
-data-bank, so the job stages the file. The parser, the scorer and the
-determinism pin are the same code the worker calls.
+The item set is a **path**, not a staged file id: a compute node has no
+service settings to resolve an id against, so the job stages the file. The
+parser, the scorer and the determinism pin are the same code the worker calls.
 
 It writes a `platform_core.run_record.RunRecord` — the accuracy, chance,
 correct and total as named observations, the fingerprint that produced them
@@ -727,9 +722,7 @@ Model-Trainer/
 │   ├── ERNIE_LORA_INTEGRATION.md
 │   └── PLUGGABLE_SYSTEMS_REFACTOR.md
 ├── scripts/
-│   ├── guard.py                # Code quality enforcement
-│   ├── cleanup_tokenizers.py
-│   └── cleanup_corpus_cache.py
+│   └── guard.py                # Code quality enforcement
 ├── Dockerfile
 ├── docker-compose.yml
 ├── pyproject.toml

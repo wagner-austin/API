@@ -28,14 +28,14 @@ services:
       # bind-mount writes cross the WSL/Windows file-sharing boundary at a few
       # MB/s, which turned each epoch's ~5.7GB checkpoint+best-model save into
       # a multi-minute stall (measured 2026-08-19 on run 3b1d6c5f). Nothing on
-      # the host needs these files: models upload to the data bank and are
-      # cleaned up; checkpoints are consumed by resume inside the containers.
+      # the host needs these files: a finished model is packed into the
+      # artifact store under ./artifacts/store and cleaned up; checkpoints are
+      # consumed by resume inside the containers.
       # Both services mount both volumes because the API's resume gate checks
       # checkpoint existence on the same path the worker writes.
       - trainer-checkpoints:/data/artifacts/checkpoints
       - trainer-model-staging:/data/artifacts/models
       - ./corpus:/data/corpus:ro
-      - ./corpus_cache:/data/corpus_cache
       - ./runs:/data/runs
       - ./logs:/data/logs
       - hf-cache:/hf-cache
@@ -89,7 +89,6 @@ services:
       - trainer-checkpoints:/data/artifacts/checkpoints
       - trainer-model-staging:/data/artifacts/models
       - ./corpus:/data/corpus:ro
-      - ./corpus_cache:/data/corpus_cache
       - ./runs:/data/runs
       - ./logs:/data/logs
       - hf-cache:/hf-cache

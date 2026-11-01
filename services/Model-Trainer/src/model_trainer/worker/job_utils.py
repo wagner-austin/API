@@ -43,6 +43,7 @@ from model_trainer.core.contracts.queue import TrainRequestPayload
 from model_trainer.core.contracts.tokenizer import TokenizerHandle
 from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.logging.types import LOGGING_EXTRA_FIELDS
+from model_trainer.core.services.data.store_roots import artifact_store_root
 from model_trainer.core.services.tokenizer.loader import load_tokenizer_from_dir
 from model_trainer.worker.trainer_job_store import TrainerJobStore
 
@@ -202,9 +203,7 @@ def materialize_run_artifacts(
             model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
         )
 
-    api_url = settings["app"]["data_bank_api_url"]
-    api_key = settings["app"]["data_bank_api_key"]
-    store = _test_hooks.artifact_store_factory(api_url, api_key)
+    store = _test_hooks.artifact_store_factory(artifact_store_root(settings))
     out_root = store.download_artifact(
         file_id.strip(),
         dest_dir=models_root,

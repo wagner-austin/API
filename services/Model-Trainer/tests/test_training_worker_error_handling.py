@@ -29,8 +29,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -116,9 +114,7 @@ def test_process_train_job_reraises_non_redis_error_on_handle_error(
     # Create fake corpus fetcher via hook
     fake_fetcher = _FakeCorpusFetcher(corpus_root, "deadbeef")
 
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
         return fake_fetcher
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory
@@ -210,9 +206,7 @@ def test_process_train_job_logs_redis_error_on_handle_error(
     # Create fake corpus fetcher via hook
     fake_fetcher = _FakeCorpusFetcher(corpus_root, "deadbeef")
 
-    def _fake_corpus_fetcher_factory(
-        api_url: str, api_key: str, cache_dir: Path
-    ) -> _FakeCorpusFetcher:
+    def _fake_corpus_fetcher_factory(root: Path) -> _FakeCorpusFetcher:
         return fake_fetcher
 
     _test_hooks.corpus_fetcher_factory = _fake_corpus_fetcher_factory

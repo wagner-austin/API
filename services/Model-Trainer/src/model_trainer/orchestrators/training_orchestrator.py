@@ -453,7 +453,7 @@ class TrainingOrchestrator:
                 "artifact pointer not found",
                 model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
             )
-        return ArtifactPointer(storage="data-bank", file_id=str(fid))
+        return ArtifactPointer(storage="local", file_id=str(fid))
 
     def get_evaluation(self: TrainingOrchestrator, run_id: str) -> EvaluateResponse:
         raw = get_with_retry(self._redis, eval_key(run_id))

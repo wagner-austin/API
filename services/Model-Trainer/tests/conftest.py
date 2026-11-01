@@ -48,8 +48,6 @@ class SettingsFactory(Protocol):
         runs_root: str | None = None,
         logs_root: str | None = None,
         data_root: str | None = None,
-        data_bank_api_url: str | None = None,
-        data_bank_api_key: str | None = None,
         threads: int | None = None,
         redis_url: str | None = None,
         app_env: Literal["dev", "prod"] | None = None,
@@ -79,7 +77,6 @@ def _reset_test_hooks_impl(
     orig_service_container = _test_hooks.service_container_from_settings
     orig_corpus_fetcher = _test_hooks.corpus_fetcher_factory
     orig_load_tokenizer = _test_hooks.load_tokenizer_for_training
-    orig_httpx_client = _test_hooks.httpx_client_factory
     # Training infrastructure hooks
     orig_cuda_is_available = _test_hooks.cuda_is_available
     orig_pkg_version = _test_hooks.pkg_version
@@ -107,7 +104,6 @@ def _reset_test_hooks_impl(
     orig_time_sleep = _test_hooks.time_sleep
     orig_path_iterdir = _test_hooks.path_iterdir
     # Cleanup service hooks
-    orig_corpus_cache_cleanup_service = _test_hooks.corpus_cache_cleanup_service_factory
     orig_tokenizer_cleanup_service = _test_hooks.tokenizer_cleanup_service_factory
     # JSON hooks
     orig_dump_json_str = _test_hooks.dump_json_str
@@ -133,8 +129,6 @@ def _reset_test_hooks_impl(
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
         redis_url="redis://localhost:6379/0",
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="test-key",
     )
 
     def _test_load_settings() -> Settings:
@@ -154,7 +148,6 @@ def _reset_test_hooks_impl(
     _test_hooks.service_container_from_settings = orig_service_container
     _test_hooks.corpus_fetcher_factory = orig_corpus_fetcher
     _test_hooks.load_tokenizer_for_training = orig_load_tokenizer
-    _test_hooks.httpx_client_factory = orig_httpx_client
     # Training infrastructure hooks
     _test_hooks.cuda_is_available = orig_cuda_is_available
     _test_hooks.pkg_version = orig_pkg_version
@@ -182,7 +175,6 @@ def _reset_test_hooks_impl(
     _test_hooks.time_sleep = orig_time_sleep
     _test_hooks.path_iterdir = orig_path_iterdir
     # Cleanup service hooks
-    _test_hooks.corpus_cache_cleanup_service_factory = orig_corpus_cache_cleanup_service
     _test_hooks.tokenizer_cleanup_service_factory = orig_tokenizer_cleanup_service
     # JSON hooks
     _test_hooks.dump_json_str = orig_dump_json_str
@@ -207,8 +199,6 @@ def _build_settings(
     runs_root: str | None = None,
     logs_root: str | None = None,
     data_root: str | None = None,
-    data_bank_api_url: str | None = None,
-    data_bank_api_key: str | None = None,
     threads: int | None = None,
     redis_url: str | None = None,
     app_env: Literal["dev", "prod"] | None = None,
@@ -221,8 +211,6 @@ def _build_settings(
         runs_root=runs_root,
         logs_root=logs_root,
         data_root=data_root,
-        data_bank_api_url=data_bank_api_url,
-        data_bank_api_key=data_bank_api_key,
         threads=threads,
     )
     if redis_url is not None:
@@ -241,8 +229,6 @@ def _apply_app_overrides(
     runs_root: str | None,
     logs_root: str | None,
     data_root: str | None,
-    data_bank_api_url: str | None,
-    data_bank_api_key: str | None,
     threads: int | None,
 ) -> None:
     if artifacts_root is not None:
@@ -253,10 +239,6 @@ def _apply_app_overrides(
         base["app"]["logs_root"] = logs_root
     if data_root is not None:
         base["app"]["data_root"] = data_root
-    if data_bank_api_url is not None:
-        base["app"]["data_bank_api_url"] = data_bank_api_url
-    if data_bank_api_key is not None:
-        base["app"]["data_bank_api_key"] = data_bank_api_key
     if threads is not None:
         base["app"]["threads"] = threads
 

@@ -18,7 +18,6 @@ from __future__ import annotations
 
 from platform_core.config.model_trainer import AppConfig as AppConfig
 from platform_core.config.model_trainer import CleanupConfig as CleanupConfig
-from platform_core.config.model_trainer import CorpusCacheCleanupConfig as CorpusCacheCleanupConfig
 from platform_core.config.model_trainer import LoggingConfig as LoggingConfig
 from platform_core.config.model_trainer import RedisConfig as RedisConfig
 from platform_core.config.model_trainer import RQConfig as RQConfig
@@ -31,7 +30,6 @@ from platform_core.config.model_trainer import load_settings as load_settings
 __all__ = [
     "AppConfig",
     "CleanupConfig",
-    "CorpusCacheCleanupConfig",
     "LoggingConfig",
     "RQConfig",
     "RedisConfig",

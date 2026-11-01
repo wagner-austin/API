@@ -107,11 +107,6 @@ def test_settings_env_int_invalid_uses_default() -> None:
     assert updated["app"]["threads"] == 0
 
 
-def test_settings_policy_unknown_defaults_lru() -> None:
-    settings = load_settings()
-    assert settings["app"]["corpus_cache_cleanup"]["eviction_policy"] in {"lru", "oldest"}
-
-
 def test_settings_app_env_unknown_defaults_dev() -> None:
     # Create a fake env that returns "staging" for APP_ENV and None for APP_CONFIG_FILE
     def _fake_env(key: str) -> str | None:
@@ -125,56 +120,3 @@ def test_settings_app_env_unknown_defaults_dev() -> None:
     config_test_hooks.get_env = _fake_env
     settings = load_settings()
     assert settings["app_env"] == "dev"
-
-
-def test_settings_policy_unknown_enabled_branch() -> None:
-    # Create a fake env that sets cleanup enabled with unknown policy
-    def _fake_env(key: str) -> str | None:
-        mapping: dict[str, str | None] = {
-            "APP__CORPUS_CACHE_CLEANUP__ENABLED": "true",
-            "APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY": "random-other",
-            "APP_CONFIG_FILE": None,
-        }
-        if key in mapping:
-            return mapping[key]
-        return config_test_hooks._default_get_env(key)
-
-    config_test_hooks.get_env = _fake_env
-    settings = load_settings()
-    cc = settings["app"]["corpus_cache_cleanup"]
-    assert cc["eviction_policy"] == "lru"
-    assert cc["enabled"] is True
-
-
-def test_settings_policy_oldest_branch() -> None:
-    # Create a fake env that sets cleanup enabled with oldest policy
-    def _fake_env(key: str) -> str | None:
-        mapping: dict[str, str | None] = {
-            "APP__CORPUS_CACHE_CLEANUP__ENABLED": "true",
-            "APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY": "oldest",
-            "APP_CONFIG_FILE": None,
-        }
-        if key in mapping:
-            return mapping[key]
-        return config_test_hooks._default_get_env(key)
-
-    config_test_hooks.get_env = _fake_env
-    settings = load_settings()
-    cc = settings["app"]["corpus_cache_cleanup"]
-    assert cc["eviction_policy"] == "oldest"
-
-
-def test_settings_eviction_policy_oldest() -> None:
-    # Create a fake env that sets eviction policy to oldest
-    def _fake_env(key: str) -> str | None:
-        mapping: dict[str, str | None] = {
-            "APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY": "oldest",
-            "APP_CONFIG_FILE": None,
-        }
-        if key in mapping:
-            return mapping[key]
-        return config_test_hooks._default_get_env(key)
-
-    config_test_hooks.get_env = _fake_env
-    settings = load_settings()
-    assert settings["app"]["corpus_cache_cleanup"]["eviction_policy"] == "oldest"

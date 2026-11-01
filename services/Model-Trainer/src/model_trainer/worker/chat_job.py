@@ -30,6 +30,7 @@ from model_trainer.core.contracts.conversation import (
 from model_trainer.core.contracts.model import GenerateConfig
 from model_trainer.core.infra.paths import models_dir
 from model_trainer.core.services.container import ServiceContainer
+from model_trainer.core.services.data.store_roots import artifact_store_root
 from model_trainer.worker.job_utils import (
     load_tokenizer_for_training,
     redis_client,
@@ -96,13 +97,7 @@ def _ensure_model_downloaded(settings: Settings, r: RedisStrProto, run_id: str) 
             model_trainer_status_for(ModelTrainerErrorCode.DATA_NOT_FOUND),
         )
 
-    from platform_core.data_bank_client import DataBankClient
-    from platform_ml import ArtifactStore
-
-    api_url = settings["app"]["data_bank_api_url"]
-    api_key = settings["app"]["data_bank_api_key"]
-    client = DataBankClient(api_url, api_key)
-    store = ArtifactStore(client)
+    store = _test_hooks.artifact_store_factory(artifact_store_root(settings))
     models_root = models_dir(settings)
     expected_root = f"model-{run_id}"
     normalized = models_root / run_id

@@ -2,7 +2,7 @@
 
 A real tokenizer is trained, a real tiny GPT-2 is trained and archived, and the
 job runs end to end against that artifact. The only fakes are redis, the
-data-bank artifact store and the corpus fetcher, matching how the perplexity
+artifact store and the corpus fetcher, matching how the perplexity
 eval job is tested.
 """
 
@@ -15,7 +15,6 @@ from pathlib import Path
 from typing import Literal, Protocol
 
 import pytest
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 from platform_core.trainer_keys import artifact_file_id_key, cloze_key
@@ -29,6 +28,7 @@ from model_trainer.core.config.settings import Settings
 from model_trainer.core.contracts.cloze import BLANK_MARKER, ClozeItem, encode_cloze_item
 from model_trainer.core.contracts.model import ModelTrainConfig
 from model_trainer.core.contracts.queue import ClozeJobPayload
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 from model_trainer.core.contracts.strategy_names import StrategyName
 from model_trainer.core.contracts.tokenizer import TokenizerTrainConfig
 from model_trainer.core.infra.paths import model_dir as _model_dir
@@ -49,8 +49,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -173,13 +171,10 @@ def _build_trained_run(tmp_path: Path, settings: Settings, run_id: str) -> Path:
 
 def _install_store_and_fetcher(tar_path: Path, items_path: Path) -> None:
     class _FakeStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
         def upload_artifact(
             self, dir_path: Path, *, artifact_name: str, request_id: str
-        ) -> FileUploadResponse:
-            return FileUploadResponse(
+        ) -> StoredArtifact:
+            return StoredArtifact(
                 file_id="unused",
                 size=1,
                 sha256="x",
@@ -200,12 +195,10 @@ def _install_store_and_fetcher(tar_path: Path, items_path: Path) -> None:
         def fetch(self, file_id: str) -> Path:
             return items_path
 
-    def _store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _FakeStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _store_factory(root: Path) -> ArtifactStoreProto:
+        return _FakeStore()
 
-    def _fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+    def _fetcher_factory(root: Path) -> CorpusFetcherProto:
         return _FakeFetcher()
 
     _test_hooks.artifact_store_factory = _store_factory
@@ -221,8 +214,6 @@ def test_cloze_job_scores_a_real_model(tmp_path: Path, settings_factory: _Settin
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 
@@ -277,8 +268,6 @@ def test_cloze_job_reuses_already_downloaded_model(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 
@@ -290,13 +279,10 @@ def test_cloze_job_reuses_already_downloaded_model(
     downloads: list[str] = []
 
     class _CountingStore:
-        def __init__(self, base_url: str, api_key: str, *, timeout_seconds: float = 600.0) -> None:
-            pass
-
         def upload_artifact(
             self, dir_path: Path, *, artifact_name: str, request_id: str
-        ) -> FileUploadResponse:
-            return FileUploadResponse(
+        ) -> StoredArtifact:
+            return StoredArtifact(
                 file_id="unused",
                 size=1,
                 sha256="x",
@@ -318,12 +304,10 @@ def test_cloze_job_reuses_already_downloaded_model(
         def fetch(self, file_id: str) -> Path:
             return items_path
 
-    def _store_factory(
-        base_url: str, api_key: str, *, timeout_seconds: float = 600.0
-    ) -> ArtifactStoreProto:
-        return _CountingStore(base_url, api_key, timeout_seconds=timeout_seconds)
+    def _store_factory(root: Path) -> ArtifactStoreProto:
+        return _CountingStore()
 
-    def _fetcher_factory(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
+    def _fetcher_factory(root: Path) -> CorpusFetcherProto:
         return _FakeFetcher()
 
     _test_hooks.artifact_store_factory = _store_factory
@@ -369,8 +353,6 @@ def test_cloze_job_missing_manifest_marks_failed(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 
@@ -417,8 +399,6 @@ def test_cloze_job_missing_artifact_pointer_marks_failed(
         runs_root=str(tmp_path / "runs"),
         logs_root=str(tmp_path / "logs"),
         data_root=str(tmp_path / "data"),
-        data_bank_api_url="http://data-bank-api.local",
-        data_bank_api_key="secret-key",
     )
     _test_hooks.load_settings = lambda: settings
 

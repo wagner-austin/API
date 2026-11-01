@@ -6,5 +6,5 @@ from typing_extensions import TypedDict
 
 
 class ArtifactPointer(TypedDict, total=True):
-    storage: Literal["data-bank"]
+    storage: Literal["local"]
     file_id: str

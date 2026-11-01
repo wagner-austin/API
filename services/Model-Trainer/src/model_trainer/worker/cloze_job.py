@@ -10,8 +10,6 @@ they stay separate.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from platform_core.comparability import encode_run_fingerprint
 from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import (
@@ -34,6 +32,7 @@ from model_trainer.core.contracts.cloze import (
 )
 from model_trainer.core.contracts.queue import ClozeJobPayload
 from model_trainer.core.run_fingerprint import capture_run_fingerprint
+from model_trainer.core.services.data.store_roots import corpus_root
 from model_trainer.core.services.model.cloze import score_cloze_items
 from model_trainer.worker.job_utils import (
     materialize_run_artifacts,
@@ -139,8 +138,6 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
 
     try:
         normalized = materialize_run_artifacts(settings, r, run_id, purpose="cloze evaluation")
-        api_url = settings["app"]["data_bank_api_url"]
-        api_key = settings["app"]["data_bank_api_key"]
 
         manifest_path = normalized / "manifest.json"
         if not manifest_path.exists():
@@ -152,9 +149,7 @@ def process_cloze_job(payload: ClozeJobPayload) -> None:
 
         manifest = load_manifest_from_text(manifest_path.read_text(encoding="utf-8"))
 
-        cache_dir: Path = Path(settings["app"]["artifacts_root"]) / "cloze"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-        fetcher = _test_hooks.corpus_fetcher_factory(api_url, api_key, cache_dir)
+        fetcher = _test_hooks.corpus_fetcher_factory(corpus_root(settings))
         items_path = fetcher.fetch(payload["items_file_id"])
         items = parse_items(items_path.read_text(encoding="utf-8"))
 

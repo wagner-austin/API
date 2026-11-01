@@ -7,14 +7,12 @@ from datetime import UTC
 from pathlib import Path
 from typing import Literal
 
-import httpx
 import torch
 from platform_core.environment_record import (
     HostProbe,
     installed_version,
     stdlib_host_probe,
 )
-from platform_core.errors import AppError, ModelTrainerErrorCode, model_trainer_status_for
 from platform_core.json_utils import _JSONInputValue as JSONInputValue
 from platform_ml.testing import (
     WandbModuleProtocol as WandbModuleLike,
@@ -37,7 +35,6 @@ from model_trainer.core._hook_protocols import (
     ServiceContainerProto,
 )
 from model_trainer.core._hook_protocols_ml import (
-    CorpusCacheCleanupServiceProto,
     CorpusFetcherProto,
     TokenizerCleanupServiceProto,
     TokenizerOrchestratorProto,
@@ -67,36 +64,23 @@ def _default_load_settings() -> Settings:
     return _load()
 
 
-def _default_artifact_store(
-    base_url: str,
-    api_key: str,
-    *,
-    timeout_seconds: float = 600.0,
-) -> ArtifactStoreProto:
-    """Production ArtifactStore - used as default hook.
+def _default_artifact_store(root: Path) -> ArtifactStoreProto:
+    """Production artifact store - used as default hook.
 
-    Validates its OWN credentials here rather than leaving that to callers.
-    The check used to live in ``_upload_and_persist_pointer``, which meant a
-    precondition belonging to this HTTP-backed store gated every store: a
-    filesystem-backed implementation that needs no credentials was refused
-    before the factory was ever reached. That cost a completed 20-epoch run,
-    which trained for 49 minutes and then failed to save.
+    The filesystem store a cluster run always used. The HTTP-backed store over
+    data-bank-api left with that service on 2026-11-01 (MCPs board task
+    a9566810), and with it the credential check that once refused a
+    filesystem store and cost a completed 20-epoch run its save.
 
-    Raises:
-        AppError: With ``ARTIFACT_UPLOAD_FAILED`` when either credential is
-            absent, since this store cannot reach the data bank without both.
+    Args:
+        root: Directory of stored tarballs.
+
+    Returns:
+        The store over ``root``.
     """
-    from platform_core.data_bank_client import DataBankClient
-    from platform_ml import ArtifactStore
+    from model_trainer.cluster.stores import LocalArtifacts
 
-    if base_url.strip() == "" or api_key.strip() == "":
-        raise AppError(
-            ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED,
-            "data-bank-api configuration missing for artifact upload",
-            model_trainer_status_for(ModelTrainerErrorCode.ARTIFACT_UPLOAD_FAILED),
-        )
-    client = DataBankClient(base_url, api_key, timeout_seconds=timeout_seconds)
-    return ArtifactStore(client)
+    return LocalArtifacts(root)
 
 
 def _default_service_container_from_settings(settings: Settings) -> ServiceContainerProto:
@@ -106,13 +90,18 @@ def _default_service_container_from_settings(settings: Settings) -> ServiceConta
     return ServiceContainer.from_settings(settings)
 
 
-def _default_corpus_fetcher_factory(
-    api_url: str, api_key: str, cache_dir: Path
-) -> CorpusFetcherProto:
-    """Production CorpusFetcher factory - used as default hook."""
-    from model_trainer.core.services.data.corpus_fetcher import CorpusFetcher
+def _default_corpus_fetcher_factory(root: Path) -> CorpusFetcherProto:
+    """Production corpus store - used as default hook.
 
-    return CorpusFetcher(api_url, api_key, cache_dir)
+    Args:
+        root: Directory of staged corpora, each named by its digest.
+
+    Returns:
+        The staged-corpus resolver over ``root``.
+    """
+    from model_trainer.cluster.stores import StagedCorpus
+
+    return StagedCorpus(root)
 
 
 def _default_load_tokenizer_for_training(settings: Settings, tokenizer_id: str) -> TokenizerHandle:
@@ -122,11 +111,6 @@ def _default_load_tokenizer_for_training(settings: Settings, tokenizer_id: str) 
     )
 
     return _load_tok(settings, tokenizer_id)
-
-
-def _default_httpx_client_factory(*, timeout_seconds: float = 30.0) -> httpx.Client:
-    """Production httpx.Client factory - used as default hook."""
-    return httpx.Client(timeout=timeout_seconds)
 
 
 def _default_env_git_commit() -> str | None:
@@ -391,17 +375,6 @@ def _default_time_sleep(seconds: float) -> None:
 def _default_path_iterdir(path: Path) -> PathIterator:
     """Production Path.iterdir - used as default hook."""
     return path.iterdir()
-
-
-def _default_corpus_cache_cleanup_service_factory(
-    *, settings: Settings
-) -> CorpusCacheCleanupServiceProto:
-    """Production CorpusCacheCleanupService factory."""
-    from model_trainer.core.services.data.corpus_cache_cleanup import (
-        CorpusCacheCleanupService,
-    )
-
-    return CorpusCacheCleanupService(settings=settings)
 
 
 def _default_tokenizer_cleanup_service_factory(

@@ -38,7 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(
         tokenizers.build_router(container), prefix="/tokenizers", tags=["tokenizers"]
     )
-    # Local artifacts routes removed: artifacts are now stored in data-bank-api
+    # No artifact routes: artifacts live in the store under artifacts_root/store
 
     # Errors
     install_exception_handlers_fastapi(app, logger_name="model-trainer")

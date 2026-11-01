@@ -39,5 +39,5 @@ def test_runs_artifact_pointer_404_then_200() -> None:
         "storage": str(obj_raw.get("storage", "")),
         "file_id": str(obj_raw.get("file_id", "")),
     }
-    assert body["storage"] == "data-bank" and body["file_id"] == "deadbeef"
+    assert body["storage"] == "local" and body["file_id"] == "deadbeef"
     fake.assert_only_called({"hget", "set", "get"})

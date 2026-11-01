@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 from typing import Literal, Protocol
 
-import httpx
-import pytest
 from platform_workers.rq_harness import RQClientQueue, RQRetryLike
 from platform_workers.testing import FakeRedisBytesClient
 
@@ -14,7 +13,6 @@ from model_trainer.core._hook_defaults import (
     _default_artifact_store,
     _default_corpus_fetcher_factory,
     _default_env_git_commit,
-    _default_httpx_client_factory,
     _default_load_settings,
     _default_rq_queue,
     _default_rq_retry,
@@ -38,8 +36,6 @@ class _SettingsFactory(Protocol):
         runs_root: str | None = ...,
         logs_root: str | None = ...,
         data_root: str | None = ...,
-        data_bank_api_url: str | None = ...,
-        data_bank_api_key: str | None = ...,
         threads: int | None = ...,
         redis_url: str | None = ...,
         app_env: Literal["dev", "prod"] | None = ...,
@@ -98,15 +94,6 @@ def test_default_env_git_commit_reads_the_build_stamp() -> None:
         config_test_hooks.get_env = original
 
 
-def test_default_httpx_client_factory_returns_client() -> None:
-    """Test that _default_httpx_client_factory returns an httpx.Client."""
-    client: httpx.Client = _default_httpx_client_factory(timeout_seconds=5.0)
-    # Verify the client is usable by checking timeout
-    assert client.timeout.connect == 5.0
-    # Clean up
-    client.close()
-
-
 def test_default_service_container_from_settings(
     tmp_path: Path, settings_factory: _SettingsFactory
 ) -> None:
@@ -122,51 +109,44 @@ def test_default_service_container_from_settings(
     assert container.settings is settings
 
 
-def test_default_corpus_fetcher_factory(tmp_path: Path) -> None:
-    """Test that _default_corpus_fetcher_factory creates a fetcher."""
-    cache_dir = tmp_path / "cache"
-    cache_dir.mkdir()
-    fetcher: CorpusFetcherProto = _default_corpus_fetcher_factory(
-        api_url="http://test.local",
-        api_key="test-key",
-        cache_dir=cache_dir,
-    )
-    # Fetcher protocol is satisfied - call a method to verify
-    method = fetcher.fetch
-    assert method == method  # type check
+def test_default_corpus_fetcher_resolves_a_file_staged_under_its_root(tmp_path: Path) -> None:
+    """The production hook reads corpora staged under the root it is given.
+
+    A corpus is staged under its SHA-256, the id every job names it by, so
+    the default fetcher must hand back that file and nothing else.
+    """
+    root = tmp_path / "corpora"
+    root.mkdir()
+    body = b"hello corpus\n"
+    digest = hashlib.sha256(body).hexdigest()
+    (root / digest).write_bytes(body)
+
+    fetcher: CorpusFetcherProto = _default_corpus_fetcher_factory(root)
+
+    assert fetcher.fetch(digest).read_bytes() == body
 
 
-def test_default_artifact_store_builds_a_real_store(tmp_path: Path) -> None:
-    """The production hook must construct a working ArtifactStore.
+def test_default_artifact_store_round_trips_a_model_directory(tmp_path: Path) -> None:
+    """The production hook must construct a working artifact store.
 
     Every job that needs a finished run's weights reaches them through this
-    factory, and after the five duplicated fetch blocks were replaced by one
-    shared helper nothing else exercised it. It is the seam between the workers
-    and the data bank, so it is worth asserting directly rather than only
-    through whichever job happened to touch it.
+    factory, so it is asserted directly: called exactly as the workers call
+    it, with the keyword names they pass, a stored directory reads back.
     """
-    from platform_core.data_bank_client import DataBankClientError
+    store: ArtifactStoreProto = _default_artifact_store(tmp_path / "store")
+    model = tmp_path / "model-run-x"
+    model.mkdir()
+    (model / "weights.bin").write_bytes(b"w")
 
-    store: ArtifactStoreProto = _default_artifact_store(
-        "http://127.0.0.1:1",
-        "test-key",
-        timeout_seconds=1.0,
+    stored = store.upload_artifact(model, artifact_name="model-run-x", request_id="run-x")
+    restored = store.download_artifact(
+        stored["file_id"],
+        dest_dir=tmp_path / "models",
+        request_id="run-x",
+        expected_root="model-run-x",
     )
 
-    # Called exactly as materialize_run_artifacts calls it, against a port
-    # nothing listens on. A real client attempts the transfer and reports a
-    # transport failure; a stub would return a path. This asserts the factory
-    # produced something that actually talks to the data bank, and pins the
-    # keyword names the workers pass.
-    dest = tmp_path / "models"
-    dest.mkdir()
-    with pytest.raises(DataBankClientError, match="transport error"):
-        store.download_artifact(
-            "some-file-id",
-            dest_dir=dest,
-            request_id="run-x",
-            expected_root="model-run-x",
-        )
+    assert (restored / "weights.bin").read_bytes() == b"w"
 
 
 def test_default_rq_queue_returns_queue() -> None:
@@ -396,32 +376,6 @@ def test_default_load_gpt2_model(tmp_path: Path, settings_factory: _SettingsFact
 
     max_seq_len = get_model_max_seq_len(loaded_model)
     assert max_seq_len >= 1
-
-
-def test_default_corpus_cache_cleanup_service_factory(
-    tmp_path: Path, settings_factory: _SettingsFactory
-) -> None:
-    """Test _default_corpus_cache_cleanup_service_factory creates cleanup service."""
-    from model_trainer.core._hook_defaults import (
-        _default_corpus_cache_cleanup_service_factory,
-    )
-    from model_trainer.core._hook_protocols_ml import (
-        CorpusCacheCleanupServiceProto,
-    )
-
-    settings = settings_factory(
-        artifacts_root=str(tmp_path / "artifacts"),
-        runs_root=str(tmp_path / "runs"),
-        logs_root=str(tmp_path / "logs"),
-        data_root=str(tmp_path / "data"),
-    )
-
-    service: CorpusCacheCleanupServiceProto = _default_corpus_cache_cleanup_service_factory(
-        settings=settings
-    )
-    # Verify service is returned and has clean method (per protocol)
-    clean_method = service.clean
-    assert clean_method == clean_method  # type check
 
 
 def test_default_tokenizer_cleanup_service_factory(

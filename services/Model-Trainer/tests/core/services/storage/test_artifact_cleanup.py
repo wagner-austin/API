@@ -14,7 +14,6 @@ from platform_workers.testing import FakeRedis
 from model_trainer.core.config.settings import (
     AppConfig,
     CleanupConfig,
-    CorpusCacheCleanupConfig,
     LoggingConfig,
     RedisConfig,
     RQConfig,
@@ -41,12 +40,6 @@ def _settings_with_cleanup(
         "grace_period_seconds": grace_period_seconds,
         "dry_run": dry_run,
     }
-    corpus_cache: CorpusCacheCleanupConfig = {
-        "enabled": False,
-        "max_bytes": 0,
-        "min_free_bytes": 0,
-        "eviction_policy": "lru",
-    }
     tokenizer_cleanup: TokenizerCleanupConfig = {
         "enabled": False,
         "min_unused_days": 0,
@@ -58,10 +51,7 @@ def _settings_with_cleanup(
         "logs_root": "/tmp/logs",
         "threads": 1,
         "tokenizer_sample_max_lines": 100,
-        "data_bank_api_url": "http://localhost",
-        "data_bank_api_key": "test",
         "cleanup": cleanup_cfg,
-        "corpus_cache_cleanup": corpus_cache,
         "tokenizer_cleanup": tokenizer_cleanup,
     }
     logging_cfg: LoggingConfig = {"level": LogLevel.INFO}

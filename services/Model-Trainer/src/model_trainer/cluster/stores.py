@@ -1,16 +1,17 @@
-"""The three services a cluster run supplies for itself.
+"""The filesystem stores every run reads corpora from and writes artifacts to.
 
-A compute node has no Redis, no data-bank API and no artifact service. It does
-have a filesystem and a corpus someone put there on purpose. Each of those
-three dependencies is already a Protocol behind a hook, so a cluster run
-implements them rather than doing without the trainer.
+They were written for a cluster run, since a compute node has no data-bank API
+and no artifact service, only a filesystem and a corpus someone put there on
+purpose. When data-bank-api was archived on 2026-11-01 (MCPs board task
+a9566810) the service deployment's HTTP-backed stores went with it, and these
+became the production default behind both hooks for every run; a cluster run
+binds them to the directories its flags name.
 
-The corpus is the interesting one. In the service deployment a file id is
-fetched over HTTP and cached; here the same id names a file that ``hpc3-stage``
-already placed and verified by SHA-256 on both sides of the transfer. That is
-a stronger guarantee than the fetch gives, not a weaker one -- but only if the
-id really is the digest, so a mismatch is refused rather than downloaded
-around, because there is nothing here to download from.
+The corpus is the interesting one. A file id names a file that ``hpc3-stage``
+(or whoever staged it) already placed and verified by SHA-256. That is a
+stronger guarantee than a fetch gives -- but only if the id really is the
+digest, so a mismatch is refused rather than downloaded around, because there
+is nothing to download from.
 """
 
 from __future__ import annotations
@@ -21,9 +22,10 @@ import tarfile
 import tempfile
 from pathlib import Path
 
-from platform_core.data_bank_protocol import FileUploadResponse
 from platform_core.errors import AppError, ModelTrainerErrorCode
 from platform_core.logging import get_logger
+
+from model_trainer.core.contracts.stored_artifact import StoredArtifact
 
 _log = get_logger(__name__)
 
@@ -73,12 +75,12 @@ class StagedCorpus:
             ModelTrainerErrorCode.CORPUS_NOT_FOUND,
             f"No staged corpus {file_id!r} under {self.root}. "
             f"Staged there: {present}. "
-            "A compute node cannot fetch one; stage it with hpc3-stage first.",
+            "Nothing fetches a corpus; stage it there first (hpc3-stage on a compute node).",
         )
 
 
 class LocalArtifacts:
-    """Writes run artifacts to the filesystem instead of an upload service.
+    """Writes run artifacts to the filesystem as digest-named tarballs.
 
     Attributes:
         root: Directory receiving tarballs.
@@ -100,7 +102,7 @@ class LocalArtifacts:
         *,
         artifact_name: str,
         request_id: str,
-    ) -> FileUploadResponse:
+    ) -> StoredArtifact:
         """Pack a directory into a tarball beside the run's other output.
 
         The digest is computed from the bytes actually written rather than
@@ -115,8 +117,7 @@ class LocalArtifacts:
             request_id: Correlation id, logged rather than sent anywhere.
 
         Returns:
-            A response shaped like the upload service's, whose ``file_id`` is
-            the tarball's digest.
+            The stored record, whose ``file_id`` is the tarball's digest.
         """
         self.root.mkdir(parents=True, exist_ok=True)
         # mkstemp, not a name built from artifact_name. The staging file is
@@ -134,8 +135,15 @@ class LocalArtifacts:
         )
         os.close(handle)
         staging = Path(staged_path)
-        with tarfile.open(staging, "w:gz") as tar:
-            tar.add(dir_path, arcname=dir_path.name)
+        # A pack that fails (the directory is gone, a file vanishes mid-walk)
+        # must not leave its staging file behind: nothing would ever read or
+        # remove it, and every failed save would add one to the store.
+        try:
+            with tarfile.open(staging, "w:gz") as tar:
+                tar.add(dir_path, arcname=dir_path.name)
+        except BaseException:
+            staging.unlink()
+            raise
 
         digest = hashlib.sha256(staging.read_bytes()).hexdigest()
         # Named for the artifact AND its digest. The name alone collides:
@@ -150,7 +158,7 @@ class LocalArtifacts:
             "artifact written",
             extra={"path": str(target), "sha256": digest, "request_id": request_id},
         )
-        return FileUploadResponse(
+        return StoredArtifact(
             file_id=digest,
             size=size,
             sha256=digest,

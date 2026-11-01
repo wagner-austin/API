@@ -1,8 +1,9 @@
 """Running one training job on a Slurm compute node.
 
 This is a composition root, not a second trainer. ``worker_entry`` wires the
-service deployment -- Redis, RQ, the data-bank API; this wires the cluster --
-an in-process store, a staged corpus, a local artifact directory. Both hand
+service deployment -- Redis, RQ, stores under its configured roots; this wires
+the cluster -- an in-process store, a staged corpus, a local artifact directory
+named by flag. Both hand
 the same payload to the same :func:`process_train_job`, so the training code
 has no idea which one started it and cannot drift between them.
 
@@ -45,8 +46,10 @@ from model_trainer.cluster import _test_hooks as cluster_hooks
 from model_trainer.cluster import preflight
 from model_trainer.cluster.stores import LocalArtifacts, StagedCorpus
 from model_trainer.core import _test_hooks
+from model_trainer.core._hook_protocols import ArtifactStoreProto
 from model_trainer.core._hook_protocols_ml import CorpusFetcherProto
 from model_trainer.core.config.settings import Settings
+from model_trainer.core.services.data.store_roots import artifact_store_root
 from model_trainer.core.services.training.checkpoint import checkpoint_exists
 from model_trainer.worker.job_utils import setup_job_logging
 
@@ -121,24 +124,35 @@ def install_cluster_hooks(*, corpus_dir: Path, artifacts_dir: Path) -> None:
         _log.info("kv store is in-process", extra={"configured_url": url})
         return LocalKV(publish=_publish_to_log, clock=time.monotonic)
 
-    def _corpus(api_url: str, api_key: str, cache_dir: Path) -> CorpusFetcherProto:
-        """Build the staged-corpus resolver, ignoring the API settings.
+    def _corpus(root: Path) -> CorpusFetcherProto:
+        """Build the staged-corpus resolver over the ``--corpus-dir`` directory.
 
         Args:
-            api_url: Data-bank URL, unused on a compute node.
-            api_key: Data-bank key, unused on a compute node.
-            cache_dir: Download cache, unused -- nothing is downloaded.
+            root: The settings-derived corpus root, unused: on a compute node
+                the corpus is wherever ``hpc3-stage`` put it, named by flag.
 
         Returns:
             A resolver reading the staged directory.
         """
+        _log.info("corpus root is the staged directory", extra={"settings_root": str(root)})
         return StagedCorpus(corpus_dir)
+
+    def _artifacts(root: Path) -> ArtifactStoreProto:
+        """Build the artifact store over the ``--artifacts-dir`` directory.
+
+        Args:
+            root: The settings-derived store root, unused: on a compute node
+                the artifacts land where the job script named by flag.
+
+        Returns:
+            A store writing under the named directory.
+        """
+        _log.info("artifact root is the named directory", extra={"settings_root": str(root)})
+        return LocalArtifacts(artifacts_dir)
 
     _test_hooks.kv_store_factory = _kv
     _test_hooks.corpus_fetcher_factory = _corpus
-    _test_hooks.artifact_store_factory = lambda base_url, api_key, **kwargs: LocalArtifacts(
-        artifacts_dir
-    )
+    _test_hooks.artifact_store_factory = _artifacts
 
 
 def _require_flag(parsed: dict[str, str], flag: str) -> str:
@@ -392,9 +406,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         token=token,
     )
     preflight.check_artifact_round_trip(
-        _test_hooks.artifact_store_factory(
-            settings["app"]["data_bank_api_url"], settings["app"]["data_bank_api_key"]
-        ),
+        _test_hooks.artifact_store_factory(artifact_store_root(settings)),
         artifacts_dir / f".preflight-{token}",
         artifacts_dir,
         token=token,

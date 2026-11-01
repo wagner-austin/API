@@ -75,7 +75,7 @@ Enqueue a model training job.
 | `num_epochs` | int | No | `1` | Number of training epochs (>= 1) |
 | `batch_size` | int | No | `4` | Training batch size (>= 1); see device defaults below |
 | `learning_rate` | float | No | `0.0005` | Learning rate (>= 0.0) |
-| `corpus_file_id` | string | Yes | - | File ID in data-bank for training corpus |
+| `corpus_file_id` | string | Yes | - | SHA-256 of the training corpus staged under `APP__DATA_ROOT/corpus` |
 | `tokenizer_id` | string\|null | Conditional | `null` | Tokenizer ID (required for non-`hf_lm` models; optional for `hf_lm` which uses HF tokenizer) |
 | `user_id` | int | No | `0` | User ID for event attribution |
 | `device` | string | No | `"auto"` | `"cpu"`, `"cuda"`, or `"auto"` (resolves to CUDA when available) |
@@ -338,8 +338,8 @@ Get artifact pointer (storage location and file ID) for a completed run.
 **Response (200):**
 ```json
 {
-  "storage": "data-bank",
-  "file_id": "model-artifact-uuid"
+  "storage": "local",
+  "file_id": "sha256-of-the-stored-tarball"
 }
 ```
 
@@ -661,7 +661,7 @@ Enqueue a tokenizer training job.
 | `method` | string | Yes | Tokenizer method (`bpe`, `sentencepiece`, or `char`) |
 | `vocab_size` | int | Yes | Vocabulary size (>= 100) |
 | `min_frequency` | int | Yes | Minimum token frequency (>= 1) |
-| `corpus_file_id` | string | Yes | File ID in data-bank for training corpus |
+| `corpus_file_id` | string | Yes | SHA-256 of the training corpus staged under `APP__DATA_ROOT/corpus` |
 | `holdout_fraction` | float | Yes | Fraction held out for validation (0.0-1.0) |
 | `seed` | int | Yes | Random seed for reproducibility |
 

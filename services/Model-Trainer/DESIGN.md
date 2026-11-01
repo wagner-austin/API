@@ -58,7 +58,7 @@ src/
       logging/types.py, utils.py
       services/
         container.py
-        data/corpus.py, corpus_fetcher.py, corpus_cache_cleanup.py
+        data/corpus.py, store_roots.py
         dataset/local_text_builder.py
         model/backends/, backend_factory.py, unavailable_backend.py
         queue/rq_adapter.py
@@ -77,8 +77,7 @@ src/
     worker_entry.py
 tests/
 scripts/
-  cleanup_tokenizers.py
-  cleanup_corpus_cache.py
+  guard.py
 ```
 
 
@@ -264,7 +263,7 @@ Benefits:
 ## 8. Logging (Centralized, Structured via platform_core)
 
 **Implementation:**
-- Uses `platform_core.logging` for all logging (shared with turkic-api, data-bank-api).
+- Uses `platform_core.logging` for all logging (shared with the other services).
 - `setup_logging()` called once at application startup (main.py, workers, scripts).
 - Module-level loggers: `logger = get_logger(__name__)`.
 - No wrapper classes or LoggingService—direct use of platform_core.
@@ -392,20 +391,20 @@ Notes:
 Upload and cleanup lifecycle:
 
 1. Training completes and the model is saved to `/data/artifacts/models/{run_id}/`.
-2. The worker uploads the entire run directory (weights, manifest, logs) as a tarball to `data-bank-api` and receives a `file_id`.
+2. The worker packs the entire run directory (weights, manifest, logs) into a tarball in the artifact store under `/data/artifacts/store` and receives its SHA-256 as the `file_id`.
 3. The worker persists `runs:artifact:{run_id}:file_id` in Redis and records the pointer in the run manifest.
 4. After upload and pointer persistence succeed, the local run directory is deleted by the `ArtifactCleanupService`, subject to `CleanupConfig`.
 
 Evaluation and log access:
 
-- Evaluation jobs download and extract the tarball from `data-bank-api` via `ArtifactDownloader`, recreating the complete directory structure locally.
+- Evaluation jobs extract the tarball from the artifact store (`materialize_run_artifacts`), recreating the complete directory structure locally.
 - Logs are included in the tarball and available after extraction.
 - The migration to download-based eval and log access is complete; no service depends on the original training directory after upload.
 
 Storage locations:
 
-- `data-bank-api` owns permanent storage for completed runs. Files are addressed by `file_id` (SHA256) and accessed via the `/files` API.
-- Local artifacts under `/data/artifacts/models/{run_id}` are temporary during training and may be recreated on-demand from data-bank for eval/inspection.
+- The artifact store under `/data/artifacts/store` (`model_trainer.cluster.stores.LocalArtifacts`) holds permanent storage for completed runs. Tarballs are addressed by `file_id`, their SHA-256. Until 2026-11-01 this storage was data-bank-api, which was archived then.
+- Local artifacts under `/data/artifacts/models/{run_id}` are temporary during training and may be recreated on-demand from the store for eval/inspection.
 
 Configuration:
 
@@ -422,7 +421,7 @@ Observability:
 
 Corpus cache and tokenizer artifacts:
 
-- Corpus cache entries live under `Settings.app.data_root / "corpus_cache"` and are treated as pure cache. They can be reclaimed by `CorpusCacheCleanupService` according to size and free-space thresholds in `CorpusCacheCleanupConfig`.
+- Corpora are staged under `Settings.app.data_root / "corpus"` (the read-only `./corpus` mount), each named by its SHA-256. They are inputs, not a cache: nothing fetches them back, so nothing evicts them.
 - Tokenizer artifacts live under `artifacts/tokenizers/{tokenizer_id}`. `TokenizerCleanupService` can delete tokenizers that are not referenced in any model manifest and older than `TokenizerCleanupConfig.min_unused_days`.
 
 ## 14. API Surface (MVP)
@@ -826,7 +825,7 @@ Response fields:
 
 ### Worker Jobs
 
-- `worker/generate_job.py`: downloads model from data-bank, runs generation, caches result.
+- `worker/generate_job.py`: restores the model from the artifact store, runs generation, caches result.
 - `worker/score_job.py`: downloads model, computes loss/perplexity/surprisal, caches result.
 
 Results are cached in Redis at `generate:{run_id}:{request_id}` and `score:{run_id}:{request_id}`.

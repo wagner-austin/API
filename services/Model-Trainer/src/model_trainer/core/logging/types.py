@@ -30,15 +30,9 @@ class LoggingExtra(TypedDict, total=False):
     method: str
     vocab_size: int
     reason: str
-    # Corpus fetcher fields
+    # Artifact store fields
     file_id: str
-    api_url: str
-    url: str
-    expected_size: int
-    actual_size: int
     size: int
-    resume_from: int
-    elapsed_seconds: float
     # Cluster event sink. A key absent from LOGGING_EXTRA_FIELDS below is
     # dropped by JsonFormatter without complaint, which is how every event
     # published by a cluster run rendered as a bare {"message": "event"}.
@@ -72,13 +66,7 @@ LOGGING_EXTRA_FIELDS: tuple[str, ...] = (
     "vocab_size",
     "reason",
     "file_id",
-    "api_url",
-    "url",
-    "expected_size",
-    "actual_size",
     "size",
-    "resume_from",
-    "elapsed_seconds",
     "channel",
     "event_body",
 )

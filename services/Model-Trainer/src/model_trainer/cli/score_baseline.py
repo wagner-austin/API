@@ -5,9 +5,9 @@ cluster can reach. ``POST /runs/baselines/cloze`` already does this, and
 needs an API, redis and an RQ worker to do it; a Slurm compute node has
 none of those. This runs the same scorer in-process.
 
-WHY THE ITEMS ARE A PATH AND NOT A FILE ID. The worker fetches its item set
-from the data-bank service by id. On a compute node there is no data-bank, so
-the item set is a file that the job staged. That is the only difference in
+WHY THE ITEMS ARE A PATH AND NOT A FILE ID. The worker resolves its item set
+by id under its configured corpus root. A compute node has no such settings,
+so the item set is a file that the job staged. That is the only difference in
 what is scored -- the parser, the scorer and the determinism pin are the
 same code the worker calls.
 
