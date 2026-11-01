@@ -454,3 +454,12 @@ with its queue receipt matching native job 58719001 and its verified result.
 Added the service/queue evidence index and matching read-only audit query
 results, including three altered-evidence refusals. Independent recovery
 review and the full ten-trial selection study remain separate work.
+
+## [2026-11-01] maintenance | service-authored synthetic selection evidence
+
+Recorded the verified recovery audit and completion of all ten repeated
+synthetic queue attempts. The measured controller published wrong-candidate,
+wrong-seed, winner and repeated-selection reports through the existing service
+reporter. Updated readiness and queue ownership with those reports and live
+audit queries, while retaining independent selection review and licensed
+execution as unfinished. No final grant was released.
