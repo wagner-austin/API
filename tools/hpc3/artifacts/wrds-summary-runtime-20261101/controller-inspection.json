@@ -1,0 +1,26 @@
+{
+  "kind": "HPC3_CONTROLLER_EVIDENCE",
+  "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+  "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "site_packages": "/home/corvis/research-control/wrds-summary-b3843a3d3/lib/python3.11/site-packages",
+  "verified_wheels": {
+    "covenant_ml-0.1.0-py3-none-any.whl": {
+      "sha256": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+      "installed_files": 355
+    },
+    "hpc3-0.1.0-py3-none-any.whl": {
+      "sha256": "760ad4644a21a9011a1a739c8ea660f1fd65170192a7f35fab627b02fab162dd",
+      "installed_files": 134
+    },
+    "platform_core-0.1.0-py3-none-any.whl": {
+      "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "installed_files": 96
+    }
+  },
+  "installed_files": 585,
+  "selfcheck_sha256": "b388907a6365e694ec6f2f483d598b84920297d79a511fcfb89057116888cfcb",
+  "selfcheck": "image self-check OK",
+  "dependency_check": "No broken requirements found.",
+  "provenance_sha256": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90"
+}

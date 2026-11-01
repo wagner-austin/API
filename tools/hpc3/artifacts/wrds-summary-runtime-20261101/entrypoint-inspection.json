@@ -1,0 +1,11 @@
+{
+  "origin": "Session readback of installed entrypoints against published source; separate from the wheel inspector.",
+  "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+  "path": "/home/corvis/research-control/wrds-summary-b3843a3d3/entrypoint/scripts",
+  "verified_files": {
+    "research_proposals.py": "13c2a739e2425399b4964dc1fe84830572caf7ae06ee8cfce758340108bfe644",
+    "research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+    "crsp_extraction.py": "ddd6c62b85f2ac6a5b6656270fc9b99d26fc6926556f92e7b6c26ab536f49e30",
+    "research_storage_probe.py": "3e4215c94c03267eb9d95255202e11df8cb440774d67efd282008c0141cd0ca6"
+  }
+}

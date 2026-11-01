@@ -1,0 +1,105 @@
+{
+  "task": "b1934ce6-d021-47f7-b91d-dd4365cf7b7e",
+  "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+  "scope": "Separately installed controller and native image build only. No research journal admission, research queue submission, evaluator execution, licensed decryption or final grant release.",
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+    "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-summary-b3843a3d3/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+        "installed_files": 355
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "760ad4644a21a9011a1a739c8ea660f1fd65170192a7f35fab627b02fab162dd",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      }
+    },
+    "installed_files": 585,
+    "selfcheck_sha256": "b388907a6365e694ec6f2f483d598b84920297d79a511fcfb89057116888cfcb",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90"
+  },
+  "image": {
+    "path": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/research-summary.sif",
+    "sha256": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+    "accounting": {
+      "job": {
+        "job_id": "58719937",
+        "name": "cleargbm.image-summary-b3843a3d3",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 80,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-15-01"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-01T14:31:37",
+      "ended_at": "2026-11-01T14:32:57"
+    },
+    "verified_files": 14,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "service_author": "hpc-report-b1934ce6",
+  "service_reports": {
+    "controller": "8f3e17b5-9c37-48ef-b1c1-b911ff6b091e",
+    "build_stage": "f521619f-ee3a-4ce4-b65d-a2ea724c3bab",
+    "wheels_stage": "485c30c4-3939-4048-8452-757dea4dc0a4",
+    "image": "52043d16-9e05-4170-8ca1-6fd2b7c12f35"
+  },
+  "image_verified_at": "2026-11-01T14:33:12.807183Z",
+  "construction": {
+    "archive_sha256": "ea423f962acf89471cb54a2f5f2bca4ab71c7312baf73b688b126267305213f8",
+    "new_wheel_build_host": "loki",
+    "new_wheel": "covenant_ml-0.1.0-py3-none-any.whl",
+    "preserved_wheels_from": "resources-11c0bdbdd; no application-source differences in the reused packages between the two revisions",
+    "capture_origin": "Verified resource image on HPC3; capture reported the same 53 requirements and six wheel names, then preserved the declared OS package and dependency smoke command.",
+    "controller_install": "Fresh Python 3.11 venv from the pinned 53 requirements, six image wheels and the unchanged hpc3 wheel.",
+    "entrypoint_evidence": "Separate session readback, not included in the 585-member wheel verification."
+  },
+  "checks": {
+    "fleet_job": "e67de880-ea70-47fd-93f5-dcb4a1438225",
+    "package": "libs/covenant_ml",
+    "tests_passed": 5078,
+    "coverage_percent": 100,
+    "check_seconds": 248,
+    "budget_seconds": 300,
+    "root_cause_audit": "df6e94b8-2d55-4acf-8fce-85246abb091d",
+    "root_cause_verdict": "VERIFIED"
+  },
+  "historical_state": "Earlier controllers, image files, journals, encrypted datasets, keys and final permissions preserved.",
+  "remaining": [
+    "Independent seed-summary and runtime audits",
+    "Synthetic shared-queue rehearsal of current reporting runtime",
+    "Licensed baseline and bounded experiments before selected fixed-seed final evaluation"
+  ],
+  "files": {
+    "audit-probes.json": "1eb4250614547dc6858ae9add0589eaa1d713c7d53fb996e080aa69117bce2e1",
+    "build-stage-report.json": "5746e8e559c82496416b2851917b9e6d14eff344dc622c4aedfbc9c55b459b48",
+    "build-stage.json": "fa36f222a315889649349177844f67e30c7cbb84f7a38d12bb299882149c17b7",
+    "controller-inspection.json": "19a06e96a037dda7b4a35ebb86ac0b27c3908485196bb041d4865d01f61acd02",
+    "controller-provenance.json": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90",
+    "entrypoint-inspection.json": "9544dda463a9415db027368268fdb74d11cb38b838ffc320a2f1d9be66b27a93",
+    "frozen-inputs.sha256": "5bfc5251df5bbe70256e769c67b2c45d407b80b2f329ed613e54add52ec2e02a",
+    "image-captured.json": "30e62360adf9c1310e46609f5bc0181c62785dfc0d29f17b49d04123a498f372",
+    "image-expected.sha256": "c786e736d8688c34161e5593097ca2896bf4005faf5aa7e1ed309acce8129f31",
+    "image-inspection.json": "690b7cbd3c594e385cc58d444d114b408a7f4b94a01ffd6b6d78153dcfcee775",
+    "image-spec.json": "c0fb1f470208cabb3611aa70cf45a0e5f15787769552c0c666e41760ba61ff29",
+    "image-submit.log": "26b4b71745fd8ff6b422f5f9e8358fc3fe5aa841d040dca2b1519748c5a980aa",
+    "image-watch.log": "d76269e5e68f94029ab4b014a90518c19d9215db17db96e3df3e516c49656f02",
+    "runtime-audit.sql": "e470af24cd216cc2fcebeb34fd63171d7e4e67ad8496f6fe1d373ec9b4f72f21",
+    "wheels-stage-report.json": "2c8d258c5de01a81c0dd72ecb12a89af67f854784ade6f926d95c081105131cf",
+    "wheels-stage.json": "7a3eb8c696206dccec9374c9a19c701782ed60d90b944e3e4a6539c2748d8a25"
+  }
+}

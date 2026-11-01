@@ -1,0 +1,5 @@
+final 58719937 cleargbm.image-summary-b3843a3d3 COMPLETED 80s 0.0000 SU on free @ hpc3-15-01
+total 0.0000 SU across 1 row(s)
+gpu-hours 0.00
+states COMPLETED=1
+budget OK cleargbm

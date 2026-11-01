@@ -1,0 +1,41 @@
+{
+  "destination": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels",
+  "files": [
+    {
+      "name": "cleargbm-0.1.0-py3-none-any.whl",
+      "sha256": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+      "size_bytes": 34972
+    },
+    {
+      "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+      "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+      "size_bytes": 618460
+    },
+    {
+      "name": "covenant_domain-0.1.0-py3-none-any.whl",
+      "sha256": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+      "size_bytes": 11753
+    },
+    {
+      "name": "covenant_ml-0.1.0-py3-none-any.whl",
+      "sha256": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+      "size_bytes": 800320
+    },
+    {
+      "name": "platform_core-0.1.0-py3-none-any.whl",
+      "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+      "size_bytes": 286120
+    },
+    {
+      "name": "platform_ml-0.1.0-py3-none-any.whl",
+      "sha256": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+      "size_bytes": 52844
+    }
+  ],
+  "provenance": {
+    "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+    "board_task": "b1934ce6-d021-47f7-b91d-dd4365cf7b7e",
+    "controller_provenance_sha256": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90",
+    "captured_spec_sha256": "30e62360adf9c1310e46609f5bc0181c62785dfc0d29f17b49d04123a498f372"
+  }
+}

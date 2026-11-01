@@ -1,0 +1,61 @@
+{
+  "kind": "HPC3_IMAGE_BUILD_EVIDENCE",
+  "ledger": {
+    "job_id": "58719937",
+    "project": "cleargbm",
+    "name": "cleargbm.image-summary-b3843a3d3",
+    "host": "hpc3",
+    "partition": "free",
+    "submitted_at": "2026-11-01T14:31:35.134490+00:00",
+    "log_dir": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3",
+    "deterministic": false,
+    "experiment": {
+      "kind": "image-build",
+      "image_dir": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3"
+    },
+    "image_digest": "",
+    "submitter": "",
+    "artifact": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/research-summary.sif",
+    "image_drift": {
+      "image_commit": "",
+      "head": "",
+      "modules": []
+    }
+  },
+  "accounting": {
+    "job": {
+      "job_id": "58719937",
+      "name": "cleargbm.image-summary-b3843a3d3",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 80,
+      "billing_tres": 8,
+      "gpu_count": 0,
+      "cpu_count": 8,
+      "node_list": "hpc3-15-01"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-11-01T14:31:37",
+    "ended_at": "2026-11-01T14:32:57"
+  },
+  "verified_files": {
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/build.sbatch": "91fe5adafbd2b4be33f10b0f2d336934dc00f270d8b0ecb3a355e6966177aee8",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/build.sh": "11b9eede91eff5d3c80ff0a0635f6b372cdf9eb201b17e3767e6669aed0a3da7",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/image.def": "f37575d20f32f65fd114ffe295a10fb3ce8ebfa3756a462da546c82b391889bc",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/requirements.txt": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/selfcheck.py": "b388907a6365e694ec6f2f483d598b84920297d79a511fcfb89057116888cfcb",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/cleargbm-0.1.0-py3-none-any.whl": "122696d5fd477b908e89c51143af6fd87f476faa58793a53f50001949871b793",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/covenant_domain-0.1.0-py3-none-any.whl": "307dda4c7b6744ec8b50b59645b34073c71621a883de3d879e2ae1386078c0d7",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/covenant_ml-0.1.0-py3-none-any.whl": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/wheels/platform_ml-0.1.0-py3-none-any.whl": "bfd11557f154e65eec17c46cbf405ed6dc8f56cf53bb3ea6bcb8e2cbde632501",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/GIT_COMMIT": "243dae65b81e7aa10dfb8f5d25c7a64f16adb50c431de8f0468ccfaee787afe4",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/research-summary.sif": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+    "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/build-58719937.out": "169b40c13ca44c15696f03c5a9d317145ecf94f7e36c6e5c2f0973875ffe5cea"
+  },
+  "image_mtime": 1793543573,
+  "log_mtime": 1793543577,
+  "selfcheck_passes": 2,
+  "dependency_check": "passed"
+}

@@ -1,0 +1,4 @@
+submitted 58719937 cleargbm.image-summary-b3843a3d3
+  building /data/homezvol1/wagnera3/research-images/summary-b3843a3d3/research-summary.sif
+  logs /data/homezvol1/wagnera3/research-images/summary-b3843a3d3/build-58719937.out
+watch: hpc3-watch --config /home/corvis/research-data/wrds/runtime/summary-b3843a3d3/capture-config.json --job 58719937

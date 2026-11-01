@@ -1,0 +1,47 @@
+{
+  "kind": "HPC3_STAGE_EVIDENCE",
+  "host": "hpc3",
+  "manifest": {
+    "destination": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3",
+    "files": [
+      {
+        "name": "build.sbatch",
+        "sha256": "91fe5adafbd2b4be33f10b0f2d336934dc00f270d8b0ecb3a355e6966177aee8",
+        "size_bytes": 2134
+      },
+      {
+        "name": "build.sh",
+        "sha256": "11b9eede91eff5d3c80ff0a0635f6b372cdf9eb201b17e3767e6669aed0a3da7",
+        "size_bytes": 745
+      },
+      {
+        "name": "image.def",
+        "sha256": "f37575d20f32f65fd114ffe295a10fb3ce8ebfa3756a462da546c82b391889bc",
+        "size_bytes": 3124
+      },
+      {
+        "name": "requirements.txt",
+        "sha256": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+        "size_bytes": 900
+      },
+      {
+        "name": "selfcheck.py",
+        "sha256": "b388907a6365e694ec6f2f483d598b84920297d79a511fcfb89057116888cfcb",
+        "size_bytes": 7325
+      }
+    ],
+    "provenance": {
+      "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+      "board_task": "b1934ce6-d021-47f7-b91d-dd4365cf7b7e",
+      "controller_provenance_sha256": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90",
+      "captured_spec_sha256": "30e62360adf9c1310e46609f5bc0181c62785dfc0d29f17b49d04123a498f372"
+    }
+  },
+  "manifest_sha256": "fa36f222a315889649349177844f67e30c7cbb84f7a38d12bb299882149c17b7",
+  "expected_sha256": "5bfc5251df5bbe70256e769c67b2c45d407b80b2f329ed613e54add52ec2e02a",
+  "verified_files": 5,
+  "certification_path": "/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/build-stage-digests.txt",
+  "certification_sha256": "9b3985d8c11ed85080885278e12c33b51c881c2d74f40e6ae4e4a83215cf795a",
+  "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+}

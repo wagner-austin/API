@@ -1,0 +1,10 @@
+{
+  "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+  "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "first_party_wheel_sha256": {
+    "covenant_ml-0.1.0-py3-none-any.whl": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+    "hpc3-0.1.0-py3-none-any.whl": "760ad4644a21a9011a1a739c8ea660f1fd65170192a7f35fab627b02fab162dd",
+    "platform_core-0.1.0-py3-none-any.whl": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea"
+  }
+}
