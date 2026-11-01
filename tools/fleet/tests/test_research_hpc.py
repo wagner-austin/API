@@ -156,3 +156,27 @@ def test_unknown_fields_and_states_and_nonpositive_trial_refuse(tmp_path: pathli
     require_dict(document, "trial")["sha256"] = hashlib.sha256(trial.read_bytes()).hexdigest()
     with pytest.raises(ValueError, match="RESEARCH_ATTEMPT_MISSING"):
         research_hpc.poll(document, tmp_path / "transcript", "task")
+
+
+@pytest.mark.parametrize("state", ["admitted", "submitting", "running", "failed"])
+def test_handover_never_submits_or_transitions_an_unsettled_attempt(
+    tmp_path: pathlib.Path, state: str
+) -> None:
+    runner = FakeRun([ok(dump_json_str({"attempts": [_row(state)]}))])
+    _test_hooks.run = runner
+    with pytest.raises(ValueError, match="RESEARCH_HANDOVER_STATE"):
+        research_hpc.poll(_document(tmp_path), tmp_path / "log", "task", completed_only=True)
+    assert len(runner.calls) == 1
+    assert runner.calls[0][-1] == "status"
+
+
+def test_handover_cannot_enter_final_grant_lifecycle(tmp_path: pathlib.Path) -> None:
+    document = _document(tmp_path)
+    document["phase"] = "final"
+    del document["native_attempt"]
+    document["remote_manifest"] = "/private/final.json"
+    runner = FakeRun([])
+    _test_hooks.run = runner
+    with pytest.raises(ValueError, match="RESEARCH_HANDOVER_PHASE"):
+        research_hpc.poll(document, tmp_path / "log", "task", completed_only=True)
+    assert runner.calls == []

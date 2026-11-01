@@ -59,6 +59,7 @@ def test_native_cli_resolves_authorized_bytes_and_emits_only_metadata(
         "state": "running",
         "native_job_id": "12345" if backend == "hpc3" else "123",
         "record_sha256": None,
+        "handover_sha256": None,
         "controller_python": sys.executable,
         "controller_python_sha256": hashlib.sha256(
             pathlib.Path(sys.executable).read_bytes()

@@ -25,6 +25,7 @@ def test_observation_roundtrip(state: str) -> None:
         observation(state="complete", native_job_id="", record_sha256="a" * 64),
         observation(state="failed", record_sha256="a" * 64),
         observation(controller_python="relative/python"),
+        observation(handover_sha256="a" * 64),
         {"state": "complete", "native_job_id": "123", "record_sha256": "a" * 64},
     ],
 )
@@ -36,6 +37,14 @@ def test_inconsistent_observation_refuses(value: JSONValue) -> None:
 def test_observation_rejects_invalid_executable_digest() -> None:
     with pytest.raises(ValueError, match="RESEARCH_REFERENCE_DIGEST"):
         decode_observation(observation(controller_python_sha256="changed"))
+
+
+def test_completed_handover_requires_a_valid_plan_digest() -> None:
+    wire = observation(state="complete", record_sha256="b" * 64, handover_sha256="a" * 64)
+    assert encode_observation(decode_observation(wire)) == wire
+    wire["handover_sha256"] = "changed"
+    with pytest.raises(ValueError, match="RESEARCH_REFERENCE_DIGEST"):
+        decode_observation(wire)
 
 
 def test_private_placement_roundtrip_and_invalid_boundaries() -> None:

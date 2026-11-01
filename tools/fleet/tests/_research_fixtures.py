@@ -60,6 +60,7 @@ def observation(**overrides: JSONValue) -> JSONObject:
         "record_sha256": None,
         "controller_python": "/private/runtime/bin/python",
         "controller_python_sha256": "b" * 64,
+        "handover_sha256": None,
     }
     row.update(overrides)
     return row
