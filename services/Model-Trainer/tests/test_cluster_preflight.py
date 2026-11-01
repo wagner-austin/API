@@ -210,13 +210,16 @@ class TestCheckArtifactRoundTrip:
         for, and preflight proves it saves and reads back before any work."""
         from model_trainer.core._hook_defaults import _default_artifact_store
 
-        store = _default_artifact_store(tmp_path / "artifacts")
-        preflight.check_artifact_round_trip(
-            store, tmp_path / "scratch", tmp_path / "artifacts", token="r1"
-        )
-        assert isinstance(store, LocalArtifacts)
-        assert store.root == tmp_path / "artifacts"
-        assert sorted(p.name for p in store.root.iterdir()) == []
+        root = tmp_path / "artifacts"
+        store = _default_artifact_store(root)
+        preflight.check_artifact_round_trip(store, tmp_path / "scratch", root, token="r1")
+        assert sorted(p.name for p in root.iterdir()) == []
+
+        run = tmp_path / "run"
+        run.mkdir()
+        (run / "w.txt").write_bytes(b"weights\n")
+        saved = store.upload_artifact(run, artifact_name="run", request_id="r2")
+        assert sorted(p.name for p in root.iterdir()) == [f"run-{saved['file_id'][:12]}.tar.gz"]
 
     def test_a_store_needing_no_credentials_is_not_refused(self, tmp_path: pathlib.Path) -> None:
         """The other half: a filesystem store was refused for lacking
