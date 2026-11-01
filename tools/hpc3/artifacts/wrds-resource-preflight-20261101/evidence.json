@@ -1,0 +1,90 @@
+{
+  "task": "42a8d507-0c77-44fd-99a1-a37aedde2f1e",
+  "source_commit": "11c0bdbdd167d953d5464f9367242370f51c5765",
+  "scope": "Installed runtime and synthetic scheduler resource feasibility only. No journal admission, research queue submission, evaluator execution, licensed data decryption or final grant release. Image build is the only new native job.",
+  "plan": "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json",
+  "plan_sha256": "29bd77a301fc6468829a40c7a24e6d8f67e591afb21c3edff32f716a6ecc1474",
+  "allocation": {
+    "cpus": 4,
+    "mem_gb": 128,
+    "evaluator_seconds": 7200,
+    "scheduler_minutes": 121,
+    "partition": "free"
+  },
+  "service_author": "hpc-report-42a8d507",
+  "service_reports": {
+    "controller": "712dca27-d5c6-417a-b3e6-e473ebd0501b",
+    "image": "22dfef1e-b1ae-4299-8047-44dea4d14e68",
+    "request_stage": "47471e03-4f43-4353-8722-071d5fbf5136",
+    "preflight": "32e4e280-5d1b-46bb-b3e1-10c1c2f5a7c7"
+  },
+  "image_build": "58719730",
+  "preflight_observed_at": "2026-11-01T13:30:03.048099+00:00",
+  "input_readback": {
+    "origin": "Session-invoked native sha256sum -c on generated checksums; not a service report. Ciphertext and entrypoint bytes verified without decrypting.",
+    "checks": 16,
+    "all_ok": true
+  },
+  "external_entrypoint": "Preflight drift inspector reports this script outside the image; generated checksums pin its bytes separately and native readback passed.",
+  "historical_state": "Prior controllers, journals, queue requests and final permissions unchanged.",
+  "remaining": [
+    "Independent resource milestone audit",
+    "Seed-aggregated moving-block uncertainty report",
+    "Licensed baseline and bounded agent search before fixed selection and controlled final evaluation"
+  ],
+  "files": {
+    "checksums.txt": "8711f510da1b3ee988656f316250c61fb3ca28d046de81af4ce9ca833842f33c",
+    "controller-inspection.json": "35cb25c0905763b51319fc634a7424345617a4191f667b6cc90dbf33062058ae",
+    "controller-provenance.json": "c6fa9e7d01bbc4a4d60732cbd9ab10de5cb33d932e485e6fed6a90d4014589fb",
+    "expected.txt": "f39b36c2ad6e96368438d39fd17bc349fd44f21415759069789367a633a2a391",
+    "image-expected.sha256": "d6130d766734bdf08a2e945ccf4a8e12d07b421f0402ce87e3162808f75e7318",
+    "image-inspection.json": "e45821ec4b2fe051c106d991c6a6d447ea83e1aac9185b9ba6a57de02512074b",
+    "image-spec.json": "6a79c028a5e2316d8720c060a1cabcff8072d58acdfa45aacff8be281c0572a9",
+    "input-readback.log": "ed6f42ceb37d30fb371bfaa3c672818c0ca9859c54283d0dd57c1bcc81fdc25d",
+    "policy.json": "32134f1d0e3d29765187defa2ff560841767f2e4ea08fb34d464cc6d0471097d",
+    "preflight.json": "cd32a405452e25c8dfc03864cbdcf8c8de3a802df38bad4deed7759783a72211",
+    "request-stage.json": "78f242d678656d71d4a910562a9cddfaee631615f71504a919174ad8cf690abf",
+    "request.json": "d0ba260478df2a1bea793a78e8fba0da334f50c39dac1cc4f648e9cb1003bd5d",
+    "run.json": "8dbbd8cafa89564b9f29084621af84e798aa95d66a94f4bb8b0bb7f300cea5e4",
+    "stage.json": "2b0bdf4facc07f373734e225ca111141768f89a7b229bbaea4d9465914880638",
+    "trial.json": "d0ba260478df2a1bea793a78e8fba0da334f50c39dac1cc4f648e9cb1003bd5d",
+    "resource-audit.sql": "3ccd688be7b49266cc72043c88702fa18a0a63499ef76650be601417afa0bc07",
+    "audit-probes.json": "3bb1729e7b90641ae3d278f124df0e3e56593dcaa2a4a6c12b7ad73fb1b9b5f7"
+  },
+  "controller": {
+    "controller_python": "/home/corvis/research-control/wrds-resources-11c0bdbdd/bin/python",
+    "source_commit": "11c0bdbdd167d953d5464f9367242370f51c5765",
+    "installed_files": 584,
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found."
+  },
+  "image": {
+    "path": "/data/homezvol1/wagnera3/research-images/resources-11c0bdbdd/research-resources.sif",
+    "sha256": "39c0129fff1c6c449e81e6a3f822f75864e21650efa566aeb27346546e66abd1",
+    "accounting": {
+      "job": {
+        "job_id": "58719730",
+        "name": "cleargbm.image-resources-11c0bdbdd",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 85,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-14-01"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-01T13:27:07",
+      "ended_at": "2026-11-01T13:28:32"
+    },
+    "verified_files": 14,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "scheduler_verdict": {
+    "start_estimate": "2026-11-01T05:38:03",
+    "processors": 4,
+    "node_list": "hpc3-14-31",
+    "partition": "free"
+  }
+}

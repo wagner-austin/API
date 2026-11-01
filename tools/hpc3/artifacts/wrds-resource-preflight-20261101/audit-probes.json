@@ -1,0 +1,56 @@
+{
+  "measured_at": "2026-11-01T13:31:32.524984+00:00",
+  "sql_sha256": "3ccd688be7b49266cc72043c88702fa18a0a63499ef76650be601417afa0bc07",
+  "scope": "Read-only live queries over the four measured service reports; positive and altered-evidence cases.",
+  "checks": [
+    {
+      "name": "matching",
+      "replace": null,
+      "with": null,
+      "expected": 1,
+      "actual": 1
+    },
+    {
+      "name": "changed_cpu",
+      "replace": "spec,cpus}'='4'",
+      "with": "spec,cpus}'='8'",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "changed_memory",
+      "replace": "spec,mem_gb}'='128'",
+      "with": "spec,mem_gb}'='64'",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "changed_walltime",
+      "replace": "spec,minutes}'='121'",
+      "with": "spec,minutes}'='120'",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "changed_reporter",
+      "replace": "a712064d3841314fc12e193a66672d589b0f5b05fae1438cd7e354eae6b129e4",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "changed_request",
+      "replace": "d0ba260478df2a1bea793a78e8fba0da334f50c39dac1cc4f648e9cb1003bd5d",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    },
+    {
+      "name": "changed_runtime",
+      "replace": "af12220e30cad45462970ed375029bdaa69442ffc3772043fbdcd55f1b970aec",
+      "with": "0000000000000000000000000000000000000000000000000000000000000000",
+      "expected": 0,
+      "actual": 0
+    }
+  ]
+}
