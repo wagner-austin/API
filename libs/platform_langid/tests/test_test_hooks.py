@@ -278,7 +278,11 @@ def _save_tiny_classifier(directory: Path) -> str:
     """
     mod = __import__(
         "transformers",
-        fromlist=["Wav2Vec2Config", "Wav2Vec2ForSequenceClassification", "Wav2Vec2FeatureExtractor"],
+        fromlist=[
+            "Wav2Vec2Config",
+            "Wav2Vec2ForSequenceClassification",
+            "Wav2Vec2FeatureExtractor",
+        ],
     )
     config_cls: _ConfigClass = mod.Wav2Vec2Config
     model_cls: _ModelClass = mod.Wav2Vec2ForSequenceClassification
