@@ -410,14 +410,16 @@ class TestTheStagedTreeItself:
     """
 
     def test_the_tree_holds_every_package_s_manifest_and_guard_shim(self) -> None:
-        """``libs/monorepo_guards`` asserts at least forty package roots and
-        no unshimmed package, over the whole monorepo. If a scope ever stops
-        carrying the shape, that package fails on a node and this says why."""
+        """``libs/monorepo_guards`` asserts at least thirty-nine package roots
+        and no unshimmed package, over the whole monorepo. If a scope ever
+        stops carrying the shape, that package fails on a node and this says
+        why. The floor was forty until data-bank-api was archived on
+        2026-11-01 (MCPs board task a9566810)."""
         manifests = list(REPO_ROOT.glob("*/*/pyproject.toml"))
         shims = list(REPO_ROOT.glob("*/*/scripts/guard.py"))
 
-        assert len(manifests) >= 40
-        assert len(shims) >= 40
+        assert len(manifests) >= 39
+        assert len(shims) >= 39
 
     def test_the_tree_holds_the_workflows_that_package_parses(self) -> None:
         workflows = sorted((REPO_ROOT / ".github" / "workflows").glob("*.y*ml"))
@@ -463,8 +465,8 @@ class TestTheArchiveItKeeps:
     def test_it_keeps_every_package_s_manifest_and_guard_shim(self, names: frozenset[str]) -> None:
         """WHY THIS IS NOT AN INCLUDE LIST, asserted rather than explained.
 
-        ``libs/monorepo_guards`` asserts at least forty package roots and no
-        unshimmed package, over the whole monorepo. Its dispatched check sees
+        ``libs/monorepo_guards`` asserts at least thirty-nine package roots and
+        no unshimmed package, over the whole monorepo. Its dispatched check sees
         exactly this tar, so if the scope ever stops carrying the shape, that
         package fails on a node and the reason is here.
         """
