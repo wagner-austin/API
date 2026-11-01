@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Protocol
+
 import pytest
 
 from platform_langid import _hook_defaults, _test_hooks
@@ -206,25 +209,113 @@ class TestDefaultAudioLoader:
         assert len(result) == expected_samples
 
 
+class _SavesPretrained(Protocol):
+    """A transformers object that writes itself to a directory."""
+
+    def save_pretrained(self, save_directory: str) -> None:
+        """Write the object's files into the directory."""
+        ...
+
+
+class _ConfigClass(Protocol):
+    """transformers.Wav2Vec2Config, with the fields a tiny classifier sets."""
+
+    def __call__(
+        self,
+        *,
+        hidden_size: int,
+        num_hidden_layers: int,
+        num_attention_heads: int,
+        intermediate_size: int,
+        conv_dim: tuple[int, ...],
+        conv_kernel: tuple[int, ...],
+        conv_stride: tuple[int, ...],
+        num_conv_pos_embeddings: int,
+        num_conv_pos_embedding_groups: int,
+        classifier_proj_size: int,
+        id2label: dict[int, str],
+        label2id: dict[str, int],
+    ) -> object:
+        """Build the configuration."""
+        ...
+
+
+class _ModelClass(Protocol):
+    """transformers.Wav2Vec2ForSequenceClassification, built from a configuration."""
+
+    def __call__(self, config: object) -> _SavesPretrained:
+        """Build a randomly initialised model."""
+        ...
+
+
+class _ExtractorClass(Protocol):
+    """transformers.Wav2Vec2FeatureExtractor, with its defaults."""
+
+    def __call__(self) -> _SavesPretrained:
+        """Build the feature extractor."""
+        ...
+
+
+#: The labels of the tiny classifier, MMS-LID-126's first and last.
+TINY_LABELS: dict[int, str] = {0: "ara", 1: "ina"}
+
+
+def _save_tiny_classifier(directory: Path) -> str:
+    """Save a two-label Wav2Vec2 classifier and its feature extractor.
+
+    The default factories are tested by loading this from disk, the same
+    ``from_pretrained`` path a hub id takes once resolved, so the suite
+    downloads nothing: MMS-LID-126 is a 3.86 GB checkpoint, and fetching it
+    in a check on a node without it took 240 s of fleet job f2af5334's 634 s
+    (MCPs board task abb0a10e).
+
+    Args:
+        directory: An empty directory.
+
+    Returns:
+        The directory, as the model id the factories take.
+    """
+    mod = __import__(
+        "transformers",
+        fromlist=["Wav2Vec2Config", "Wav2Vec2ForSequenceClassification", "Wav2Vec2FeatureExtractor"],
+    )
+    config_cls: _ConfigClass = mod.Wav2Vec2Config
+    model_cls: _ModelClass = mod.Wav2Vec2ForSequenceClassification
+    extractor_cls: _ExtractorClass = mod.Wav2Vec2FeatureExtractor
+    config = config_cls(
+        hidden_size=16,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        intermediate_size=32,
+        conv_dim=(8, 8),
+        conv_kernel=(10, 3),
+        conv_stride=(5, 2),
+        num_conv_pos_embeddings=16,
+        num_conv_pos_embedding_groups=2,
+        classifier_proj_size=8,
+        id2label=TINY_LABELS,
+        label2id={label: index for index, label in TINY_LABELS.items()},
+    )
+    model_cls(config).save_pretrained(str(directory))
+    extractor_cls().save_pretrained(str(directory))
+    return str(directory)
+
+
 class TestDefaultModelFactory:
     """Tests for _default_model_factory function."""
 
-    def test_loads_model_from_transformers(self) -> None:
-        """Load real MMS-LID model from HuggingFace."""
-        model = _test_hooks._default_model_factory("facebook/mms-lid-126")
-        # Verify model has expected id2label mapping for MMS-LID-126
-        # MMS-LID-126 has 126 languages
-        assert model.config.id2label[0] == "ara"
-        assert model.config.id2label[125] == "ina"
+    def test_loads_model_from_transformers(self, tmp_path: Path) -> None:
+        """Load a saved Wav2Vec2 classifier through transformers, labels intact."""
+        model = _test_hooks._default_model_factory(_save_tiny_classifier(tmp_path))
+        assert model.config.id2label == TINY_LABELS
 
 
 class TestDefaultProcessorFactory:
     """Tests for _default_processor_factory function."""
 
-    def test_loads_processor_from_transformers(self) -> None:
-        """Load real feature extractor from HuggingFace."""
-        processor = _test_hooks._default_processor_factory("facebook/mms-lid-126")
-        # Verify processor is callable
+    def test_loads_processor_from_transformers(self, tmp_path: Path) -> None:
+        """Load a saved feature extractor through transformers' AutoFeatureExtractor."""
+        processor = _test_hooks._default_processor_factory(_save_tiny_classifier(tmp_path))
         assert callable(processor)
 
 

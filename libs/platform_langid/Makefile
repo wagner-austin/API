@@ -23,10 +23,16 @@ lint:
 # adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
 # that dies cannot strand its xdist workers; its module header carries the
 # 2026-08-19 incident that motivated both.
+#
+# --own-home runs the suite under a HOME of the run's own and fails it on any
+# file left there, so a test that fetches a model from the Hugging Face hub
+# into ~/.cache fails by name: two such tests pulled the 3.86 GB MMS-LID-126
+# checkpoint on pendragon, 240 s of fleet job f2af5334's 634 s (MCPs board
+# task abb0a10e).
 test:
 	poetry lock
 	poetry sync --no-cache --with dev
-	$(PYTHON) ../../tools/maketools/scripts/run.py test
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --own-home
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
