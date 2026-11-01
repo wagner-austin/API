@@ -1,4 +1,10 @@
-"""Recover one research submission and measure its native execution evidence."""
+"""Recover one research submission and measure its native execution evidence.
+
+The default attempt scope reads live accounting and verifies completed results.
+Explicit ``--scope inputs`` instead requires terminal accounting and verifies
+the frozen runtime/input checksums, including after a failed allocation. This
+additional proof is not required to observe failure or reconcile its queue job.
+"""
 
 from __future__ import annotations
 
@@ -14,10 +20,16 @@ from platform_core.run_record import encode_run_record
 
 from hpc3.cli import _config, _test_hooks
 from hpc3.contracts.ledger import encode_ledger_entry
+from hpc3.contracts.status import decode_job_status, is_terminal
 from hpc3.contracts.workspace import workspace_cluster
 from hpc3.core import _test_hooks as core_hooks
 from hpc3.core import ledger
-from hpc3.core.execution_evidence import allocation_document, measure, parse_checksums
+from hpc3.core.execution_evidence import (
+    allocation_document,
+    measure,
+    measure_inputs,
+    parse_checksums,
+)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -35,8 +47,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     """
     flags = cli_args.parse_single_flags(
         list(argv) if argv is not None else list(sys.argv[1:]),
-        ("--config", "--attempt", "--artifact", "--checksums", "--report-task"),
+        ("--config", "--attempt", "--artifact", "--checksums", "--report-task", "--scope"),
     )
+    scope = flags.get("--scope", "attempt")
+    if scope not in {"attempt", "inputs"}:
+        raise ValueError("HPC_EVIDENCE_SCOPE: require attempt or inputs")
     task = cli_args.require_flag(flags, "--report-task")
     report_identity(task, "hpc")
     attempt = cli_args.require_flag(flags, "--attempt")
@@ -60,7 +75,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         "ledger": encode_ledger_entry(entry),
         "accounting": accounting,
     }
-    if require_str(require_dict(accounting, "job"), "state") == "COMPLETED":
+    if scope == "inputs":
+        state = decode_job_status(accounting["job"], cluster)["state"]
+        if not is_terminal(state):
+            raise ValueError("HPC_EVIDENCE_STATE: input evidence requires terminal accounting")
+        path = pathlib.Path(cli_args.require_flag(flags, "--checksums"))
+        report["kind"] = "HPC3_INPUT_EVIDENCE"
+        report["inputs"] = measure_inputs(
+            entry, parse_checksums(core_hooks.read_bytes(path).decode("utf-8"))
+        )
+    elif require_str(require_dict(accounting, "job"), "state") == "COMPLETED":
         path = pathlib.Path(cli_args.require_flag(flags, "--checksums"))
         measured = measure(
             entry, cluster, parse_checksums(core_hooks.read_bytes(path).decode("utf-8"))

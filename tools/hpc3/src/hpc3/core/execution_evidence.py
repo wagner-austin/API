@@ -151,6 +151,41 @@ def artifact_time(host: str, path: str, evidence: ExecutionEvidence) -> int:
     return instant
 
 
+def measure_inputs(entry: LedgerEntry, checksums: dict[str, str]) -> JSONObject:
+    """Measure frozen runtime/input bytes and their compute-side checksum receipt.
+
+    This proves neither successful execution nor a scientific result. It also
+    works after an unsuccessful allocation that reached its checksum gate.
+    Owner-writable logs are evidence, not hostile-owner attestation.
+
+    Args:
+        entry: Recorded allocation identifying its runtime and stdout.
+        checksums: Independently frozen input, entrypoint and image digests.
+
+    Returns:
+        Verified file identities, checksum count and retained stdout digest.
+
+    Raises:
+        ValueError: Unpinned runtime or missing checksum lines.
+        AppError: Remote files are altered or files/stdout cannot be read.
+    """
+    image = entry["image_digest"]
+    if not image or image not in checksums.values():
+        raise ValueError("HPC_EVIDENCE_IDENTITY: require checksummed runtime")
+    log = artifacts.download(entry["host"], log_path(entry))
+    logged = set(log["text"].splitlines())
+    for path, digest in checksums.items():
+        actual = parse_remote_digest(remote.remote_digest(entry["host"], path), path)
+        check_remote_digest(path, digest, actual)
+        if f"{path}: OK" not in logged:
+            raise ValueError("HPC_EVIDENCE_INPUTS: job log lacks a required compute checksum")
+    return {
+        "stdout_sha256": log["sha256"],
+        "verified_files": dict(checksums),
+        "compute_checksum_lines": len(checksums),
+    }
+
+
 def measure(entry: LedgerEntry, cluster: ClusterFacts, checksums: dict[str, str]) -> MeasuredRun:
     """Bind native accounting, input/runtime checks and benchmark result bytes.
 
@@ -168,8 +203,9 @@ def measure(entry: LedgerEntry, cluster: ClusterFacts, checksums: dict[str, str]
     """
     artifact = entry["artifact"]
     image = entry["image_digest"]
-    if artifact is None or not image or image not in checksums.values():
-        raise ValueError("HPC_EVIDENCE_IDENTITY: require artifact and checksummed runtime")
+    if artifact is None:
+        raise ValueError("HPC_EVIDENCE_IDENTITY: require result artifact")
+    inputs = measure_inputs(entry, checksums)
     evidence = accounting(entry, cluster)
     output = artifacts.download(entry["host"], artifact)
     record_path = str(run_record_sidecar(Path(artifact)))
@@ -186,13 +222,6 @@ def measure(entry: LedgerEntry, cluster: ClusterFacts, checksums: dict[str, str]
         raise ValueError("HPC_EVIDENCE_RESULT: manifest and record fingerprints differ")
     output_time = artifact_time(entry["host"], artifact, evidence)
     record_time = artifact_time(entry["host"], record_path, evidence)
-    log = artifacts.download(entry["host"], log_path(entry))
-    logged = set(log["text"].splitlines())
-    for path, digest in checksums.items():
-        actual = parse_remote_digest(remote.remote_digest(entry["host"], path), path)
-        check_remote_digest(path, digest, actual)
-        if f"{path}: OK" not in logged:
-            raise ValueError("HPC_EVIDENCE_INPUTS: job log lacks a required compute checksum")
     return MeasuredRun(
         record,
         {
@@ -200,11 +229,9 @@ def measure(entry: LedgerEntry, cluster: ClusterFacts, checksums: dict[str, str]
             "accounting": encode_execution_evidence(evidence),
             "result_sha256": output["sha256"],
             "record_sha256": sidecar["sha256"],
-            "stdout_sha256": log["sha256"],
+            **inputs,
             "result_mtime": output_time,
             "record_mtime": record_time,
-            "verified_files": dict(checksums),
-            "compute_checksum_lines": len(checksums),
             "dataset": require_dict(manifest, "dataset"),
         },
     )
@@ -268,6 +295,7 @@ __all__ = [
     "allocation_document",
     "artifact_time",
     "measure",
+    "measure_inputs",
     "parse_checksums",
     "replay_report",
 ]
