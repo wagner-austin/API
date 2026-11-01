@@ -5,7 +5,7 @@ build-backend = "poetry.core.masonry.api"
 [tool.poetry]
 name = "platform-ml"
 version = "0.1.0"
-description = "Shared ML artifact handling: manifest schema, tarball helpers, and data-bank integration."
+description = "Shared ML artifact handling: manifest schema, tarball helpers, and Weights & Biases integration."
 authors = ["Austin Wagner <austinwagner@msn.com>"]
 packages = [
   { include = "platform_ml", from = "src" },
