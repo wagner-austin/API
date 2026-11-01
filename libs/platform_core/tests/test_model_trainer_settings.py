@@ -27,14 +27,10 @@ def test_model_trainer_settings_defaults() -> None:
     assert cfg["app"]["logs_root"] == "/data/logs"
     assert cfg["app"]["threads"] == 0
     assert cfg["app"]["tokenizer_sample_max_lines"] == 10000
-    assert cfg["app"]["data_bank_api_url"] == ""
-    assert cfg["app"]["data_bank_api_key"] == ""
     assert cfg["app"]["cleanup"]["enabled"] is True
     assert cfg["app"]["cleanup"]["verify_upload"] is True
     assert cfg["app"]["cleanup"]["grace_period_seconds"] == 0
     assert cfg["app"]["cleanup"]["dry_run"] is False
-    assert cfg["app"]["corpus_cache_cleanup"]["enabled"] is False
-    assert cfg["app"]["corpus_cache_cleanup"]["eviction_policy"] == "lru"
     assert cfg["app"]["tokenizer_cleanup"]["enabled"] is False
     assert cfg["app"]["tokenizer_cleanup"]["min_unused_days"] == 30
     assert cfg["security"]["api_key"] == ""
@@ -58,16 +54,10 @@ def test_model_trainer_settings_env_overrides() -> None:
     env.set("APP__LOGS_ROOT", "/tmp/logs")
     env.set("APP__THREADS", "4")
     env.set("APP__TOKENIZER_SAMPLE_MAX_LINES", "500")
-    env.set("APP__DATA_BANK_API_URL", "http://db")
-    env.set("APP__DATA_BANK_API_KEY", "k")
     env.set("APP__CLEANUP__ENABLED", "false")
     env.set("APP__CLEANUP__VERIFY_UPLOAD", "false")
     env.set("APP__CLEANUP__GRACE_PERIOD_SECONDS", "5")
     env.set("APP__CLEANUP__DRY_RUN", "true")
-    env.set("APP__CORPUS_CACHE_CLEANUP__ENABLED", "true")
-    env.set("APP__CORPUS_CACHE_CLEANUP__MAX_BYTES", "123")
-    env.set("APP__CORPUS_CACHE_CLEANUP__MIN_FREE_BYTES", "456")
-    env.set("APP__CORPUS_CACHE_CLEANUP__EVICTION_POLICY", "oldest")
     env.set("APP__TOKENIZER_CLEANUP__ENABLED", "true")
     env.set("APP__TOKENIZER_CLEANUP__MIN_UNUSED_DAYS", "7")
     env.set("SECURITY__API_KEY", "sekret")
@@ -88,16 +78,10 @@ def test_model_trainer_settings_env_overrides() -> None:
     assert cfg["app"]["logs_root"] == "/tmp/logs"
     assert cfg["app"]["threads"] == 4
     assert cfg["app"]["tokenizer_sample_max_lines"] == 500
-    assert cfg["app"]["data_bank_api_url"] == "http://db"
-    assert cfg["app"]["data_bank_api_key"] == "k"
     assert cfg["app"]["cleanup"]["enabled"] is False
     assert cfg["app"]["cleanup"]["verify_upload"] is False
     assert cfg["app"]["cleanup"]["grace_period_seconds"] == 5
     assert cfg["app"]["cleanup"]["dry_run"] is True
-    assert cfg["app"]["corpus_cache_cleanup"]["enabled"] is True
-    assert cfg["app"]["corpus_cache_cleanup"]["max_bytes"] == 123
-    assert cfg["app"]["corpus_cache_cleanup"]["min_free_bytes"] == 456
-    assert cfg["app"]["corpus_cache_cleanup"]["eviction_policy"] == "oldest"
     assert cfg["app"]["tokenizer_cleanup"]["enabled"] is True
     assert cfg["app"]["tokenizer_cleanup"]["min_unused_days"] == 7
     assert cfg["security"]["api_key"] == "sekret"

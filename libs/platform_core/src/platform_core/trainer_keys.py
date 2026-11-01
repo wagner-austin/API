@@ -54,7 +54,7 @@ def baseline_cloze_key(hub_model_id: str, items_file_id: str) -> str:
 
     Args:
         hub_model_id: HuggingFace model id that was scored.
-        items_file_id: Data-bank file id of the item set.
+        items_file_id: Staged corpus file id of the item set.
 
     Returns:
         The Redis key holding the baseline result.

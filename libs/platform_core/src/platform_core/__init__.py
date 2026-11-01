@@ -21,12 +21,12 @@ own provenance format instead, which is exactly what happened: see
 ``docs/RESEARCH.md`` for the surfaces that did.
 
 WHAT THIS DOES NOT BREAK. Submodule imports -- ``from platform_core import
-cli_args``, ``json_utils``, ``job_keys`` -- are unaffected; Python resolves
-those against the package directory, not against this file. Thirty-two of the
-thirty-four bare-package imports in this monorepo were of that kind. The two
-that were not named ``DataBankClient``, and now say
-``from platform_core.data_bank_client import DataBankClient``, which is what
-every other consumer of every other module here already said.
+cli_args``, ``json_utils`` -- are unaffected; Python resolves those against
+the package directory, not against this file. Thirty-two of the thirty-four
+bare-package imports in this monorepo were of that kind. The two that were
+not named ``DataBankClient`` and moved to its own module, which is what every
+other consumer of every other module here already said; that client left
+with data-bank-api on 2026-11-01.
 
 So: import from the module. ``from platform_core.errors import AppError``,
 ``from platform_core.run_record import RunRecord``. It is one line longer and

@@ -6,7 +6,7 @@ from platform_core.job_types import BaseJobStatus, JobStatus, job_key
 
 
 def test_job_key_builds_expected_pattern() -> None:
-    assert job_key("turkic", "abc") == "turkic:job:abc"
+    assert job_key("transcript", "abc") == "transcript:job:abc"
 
 
 def test_job_status_members_are_the_stored_words_in_lifecycle_order() -> None:

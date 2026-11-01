@@ -42,22 +42,18 @@ def _is_failed(
 
 
 def test_event_type_and_channel() -> None:
-    assert make_event_type(JobDomain.TURKIC, EventSuffix.STARTED) == "turkic.job.started.v1"
+    assert make_event_type(JobDomain.TRANSCRIPT, EventSuffix.STARTED) == (
+        "transcript.job.started.v1"
+    )
     assert default_events_channel(JobDomain.TRANSCRIPT) == "transcript:events"
-    assert default_events_channel(JobDomain.QR) == "qr:events"
-    assert default_events_channel(JobDomain.MUSIC_WRAPPED) == "music_wrapped:events"
+    assert default_events_channel(JobDomain.TRAINER) == "trainer:events"
 
 
 def test_vocabularies_carry_the_wire_words_in_order() -> None:
     assert [member.value for member in JobDomain] == [
         "covenant",
-        "databank",
-        "digits",
-        "music_wrapped",
-        "qr",
         "trainer",
         "transcript",
-        "turkic",
     ]
     assert [member.value for member in EventSuffix] == [
         "started",
@@ -69,21 +65,21 @@ def test_vocabularies_carry_the_wire_words_in_order() -> None:
 
 
 def test_roundtrip_started_event() -> None:
-    event = make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=5, queue="primary")
+    event = make_started_event(domain=JobDomain.TRANSCRIPT, job_id="j1", user_id=5, queue="primary")
     decoded = _roundtrip(event)
     assert decoded == event
-    assert decoded["domain"] is JobDomain.TURKIC
+    assert decoded["domain"] is JobDomain.TRANSCRIPT
 
 
-def test_roundtrip_started_event_qr_domain() -> None:
-    event = make_started_event(domain=JobDomain.QR, job_id="q1", user_id=9, queue="qr-queue")
+def test_roundtrip_started_event_trainer_domain() -> None:
+    event = make_started_event(domain=JobDomain.TRAINER, job_id="q1", user_id=9, queue="trainer")
     decoded = _roundtrip(event)
     assert decoded == event
 
 
 def test_roundtrip_progress_event_with_message() -> None:
     event = make_progress_event(
-        domain=JobDomain.DIGITS,
+        domain=JobDomain.TRAINER,
         job_id="j2",
         user_id=7,
         progress=42,
@@ -95,7 +91,7 @@ def test_roundtrip_progress_event_with_message() -> None:
 
 def test_roundtrip_progress_event_with_payload() -> None:
     event = make_progress_event(
-        domain=JobDomain.DIGITS,
+        domain=JobDomain.TRAINER,
         job_id="j2",
         user_id=7,
         progress=42,
@@ -122,7 +118,7 @@ def test_roundtrip_progress_event_without_message() -> None:
 
 def test_roundtrip_completed_event() -> None:
     event = make_completed_event(
-        domain=JobDomain.DATABANK,
+        domain=JobDomain.COVENANT,
         job_id="j4",
         user_id=11,
         result_id="file-1",
@@ -147,14 +143,14 @@ def test_roundtrip_failed_event_user_kind() -> None:
 def test_encoded_event_carries_the_plain_words() -> None:
     encoded = encode_job_event(
         make_failed_event(
-            domain=JobDomain.TURKIC,
+            domain=JobDomain.TRANSCRIPT,
             job_id="j7",
             user_id=3,
             error_kind=ErrorKind.SYSTEM,
             message="m",
         )
     )
-    assert '"domain":"turkic"' in encoded.replace(" ", "")
+    assert '"domain":"transcript"' in encoded.replace(" ", "")
     assert '"error_kind":"system"' in encoded.replace(" ", "")
 
 
@@ -165,45 +161,45 @@ def test_encoded_event_carries_the_plain_words() -> None:
         ('{"type": "x.y.z"}', "Invalid job event type format: 'x.y.z'"),
         (
             '{"type": "unknown.job.started.v1"}',
-            "Invalid domain 'unknown': must be one of 'covenant', 'databank', 'digits', "
-            "'music_wrapped', 'qr', 'trainer', 'transcript', 'turkic'",
+            "Invalid domain 'unknown': must be one of 'covenant', 'trainer', 'transcript'",
         ),
         (
-            '{"type": "turkic.job.invalid.v1"}',
+            '{"type": "trainer.job.invalid.v1"}',
             "Invalid event suffix 'invalid': must be one of "
             "'started', 'progress', 'completed', 'failed'",
         ),
         (
-            '{"type": "turkic.job.started.v1", "domain": 1}',
+            '{"type": "trainer.job.started.v1", "domain": 1}',
             "Field 'domain' must be a string, got int",
         ),
         (
-            '{"type": "turkic.job.started.v1", "domain": "transcript"}',
-            "Job event domain mismatch: type says 'turkic', field says 'transcript'",
+            '{"type": "trainer.job.started.v1", "domain": "transcript"}',
+            "Job event domain mismatch: type says 'trainer', field says 'transcript'",
         ),
         (
-            '{"type": "turkic.job.started.v1", "domain": "turkic", "job_id": 1, "user_id": 2}',
+            '{"type": "trainer.job.started.v1", "domain": "trainer", "job_id": 1, "user_id": 2}',
             "Field 'job_id' must be a string, got int",
         ),
         (
-            '{"type": "turkic.job.started.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
+            '{"type": "trainer.job.started.v1", "domain": "trainer", "job_id": "j", "user_id": 1}',
             "Missing required field 'queue'",
         ),
         (
-            '{"type": "turkic.job.progress.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
+            '{"type": "trainer.job.progress.v1", "domain": "trainer", "job_id": "j", "user_id": 1}',
             "Missing required field 'progress'",
         ),
         (
-            '{"type": "turkic.job.completed.v1", "domain": "turkic", "job_id": "j", "user_id": 1}',
+            '{"type": "trainer.job.completed.v1", "domain": "trainer", "job_id": "j", '
+            '"user_id": 1}',
             "Missing required field 'result_id'",
         ),
         (
-            '{"type": "turkic.job.failed.v1", "domain": "turkic", '
+            '{"type": "trainer.job.failed.v1", "domain": "trainer", '
             '"job_id": "j", "user_id": 1, "message": "x"}',
             "Missing required field 'error_kind'",
         ),
         (
-            '{"type": "turkic.job.failed.v1", "domain": "turkic", '
+            '{"type": "trainer.job.failed.v1", "domain": "trainer", '
             '"job_id": "j", "user_id": 1, "error_kind": "oops", "message": "x"}',
             "Invalid error_kind 'oops': must be one of 'user', 'system'",
         ),
@@ -223,7 +219,7 @@ def test_decode_job_event_requires_object() -> None:
 def test_failed_event_system_kind() -> None:
     payload = encode_job_event(
         make_failed_event(
-            domain=JobDomain.TURKIC,
+            domain=JobDomain.TRANSCRIPT,
             job_id="j6",
             user_id=22,
             error_kind=ErrorKind.SYSTEM,
@@ -236,13 +232,13 @@ def test_failed_event_system_kind() -> None:
 
 
 def test_is_started_typeguard() -> None:
-    started = make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=1, queue="q")
-    progress = make_progress_event(domain=JobDomain.TURKIC, job_id="j2", user_id=1, progress=50)
+    started = make_started_event(domain=JobDomain.TRANSCRIPT, job_id="j1", user_id=1, queue="q")
+    progress = make_progress_event(domain=JobDomain.TRANSCRIPT, job_id="j2", user_id=1, progress=50)
     completed = make_completed_event(
-        domain=JobDomain.TURKIC, job_id="j3", user_id=1, result_id="r", result_bytes=100
+        domain=JobDomain.TRANSCRIPT, job_id="j3", user_id=1, result_id="r", result_bytes=100
     )
     failed = make_failed_event(
-        domain=JobDomain.TURKIC,
+        domain=JobDomain.TRANSCRIPT,
         job_id="j4",
         user_id=1,
         error_kind=ErrorKind.SYSTEM,
@@ -255,13 +251,13 @@ def test_is_started_typeguard() -> None:
 
 
 def test_is_progress_typeguard() -> None:
-    started = make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=1, queue="q")
-    progress = make_progress_event(domain=JobDomain.TURKIC, job_id="j2", user_id=1, progress=50)
+    started = make_started_event(domain=JobDomain.TRANSCRIPT, job_id="j1", user_id=1, queue="q")
+    progress = make_progress_event(domain=JobDomain.TRANSCRIPT, job_id="j2", user_id=1, progress=50)
     completed = make_completed_event(
-        domain=JobDomain.TURKIC, job_id="j3", user_id=1, result_id="r", result_bytes=100
+        domain=JobDomain.TRANSCRIPT, job_id="j3", user_id=1, result_id="r", result_bytes=100
     )
     failed = make_failed_event(
-        domain=JobDomain.TURKIC,
+        domain=JobDomain.TRANSCRIPT,
         job_id="j4",
         user_id=1,
         error_kind=ErrorKind.SYSTEM,
@@ -274,13 +270,13 @@ def test_is_progress_typeguard() -> None:
 
 
 def test_is_completed_typeguard() -> None:
-    started = make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=1, queue="q")
-    progress = make_progress_event(domain=JobDomain.TURKIC, job_id="j2", user_id=1, progress=50)
+    started = make_started_event(domain=JobDomain.TRANSCRIPT, job_id="j1", user_id=1, queue="q")
+    progress = make_progress_event(domain=JobDomain.TRANSCRIPT, job_id="j2", user_id=1, progress=50)
     completed = make_completed_event(
-        domain=JobDomain.TURKIC, job_id="j3", user_id=1, result_id="r", result_bytes=100
+        domain=JobDomain.TRANSCRIPT, job_id="j3", user_id=1, result_id="r", result_bytes=100
     )
     failed = make_failed_event(
-        domain=JobDomain.TURKIC,
+        domain=JobDomain.TRANSCRIPT,
         job_id="j4",
         user_id=1,
         error_kind=ErrorKind.SYSTEM,
@@ -293,13 +289,13 @@ def test_is_completed_typeguard() -> None:
 
 
 def test_is_failed_typeguard() -> None:
-    started = make_started_event(domain=JobDomain.TURKIC, job_id="j1", user_id=1, queue="q")
-    progress = make_progress_event(domain=JobDomain.TURKIC, job_id="j2", user_id=1, progress=50)
+    started = make_started_event(domain=JobDomain.TRANSCRIPT, job_id="j1", user_id=1, queue="q")
+    progress = make_progress_event(domain=JobDomain.TRANSCRIPT, job_id="j2", user_id=1, progress=50)
     completed = make_completed_event(
-        domain=JobDomain.TURKIC, job_id="j3", user_id=1, result_id="r", result_bytes=100
+        domain=JobDomain.TRANSCRIPT, job_id="j3", user_id=1, result_id="r", result_bytes=100
     )
     failed = make_failed_event(
-        domain=JobDomain.TURKIC,
+        domain=JobDomain.TRANSCRIPT,
         job_id="j4",
         user_id=1,
         error_kind=ErrorKind.SYSTEM,
