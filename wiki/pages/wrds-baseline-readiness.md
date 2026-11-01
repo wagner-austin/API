@@ -176,6 +176,14 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
+**November 1, 09:50 UTC update:** the controller handover code is published
+and its repaired fleet check passed 2,627 tests with full statement and branch
+coverage. Installation and the four original queue closures remain pending;
+the substantive baseline has not run. See [[wrds-research-queue-admission]]
+for the exact handover contract and its test limitations.[^handover-progress]
+
+[^handover-progress]: Live fleet check `b240c7d5-c9c1-4f2b-a16f-7114f3d1aa60` at API `a9340a200794d62ac4cf2c1133cf093ce1d0aeac`, completed `2026-11-01T09:50:20Z`; root-cause repair `9dc6f80c-899c-4e79-9399-e669a24b9f4b`, handover task `04c0cdbe-278f-41bb-8141-a170fc0e5324` and selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. Live `dispatch_list(project="research/hpc3", status="live")` on this pass retained the original four running requests and six queued requests.
+
 **Current reading, November 1:** the licensed extraction and encrypted collection
 have completed through the shared queue. All 24 declared outputs and the
 RunRecord were verified; the completed native allocation was reused after a

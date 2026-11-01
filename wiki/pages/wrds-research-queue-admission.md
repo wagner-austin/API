@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-holdings-validation]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "tools/fleet/src/fleet/core/research_handover.py"
+  - "tools/fleet/tests/test_research_handover.py"
   - "tools/fleet/src/fleet/cli/research_native.py"
   - "tools/fleet/src/fleet/contracts/research_worker.py"
   - "tools/fleet/tests/test_research_native_process.py"
@@ -30,12 +32,14 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "tools/fleet/src/fleet/cli/research_native.py": "ab22d29f01c1e7f072e12f204c6bcb2f52794242"
-  "tools/fleet/src/fleet/contracts/research_worker.py": "f42dd4b565b1cc5a9c2320b44969ee7676c7ea24"
-  "tools/fleet/tests/test_research_native_process.py": "0ac7c3d85462d0a8e2862f9377902c723c87817e"
+  "tools/fleet/src/fleet/core/research_handover.py": "446e3e549dbd2b655a142f266f76bf9fe8e9c756"
+  "tools/fleet/tests/test_research_handover.py": "949c9f364f842519ee3512543af90c246ad956f4"
+  "tools/fleet/src/fleet/cli/research_native.py": "cb18c34d46e6e12e2aab0be7696f7ab8719cda86"
+  "tools/fleet/src/fleet/contracts/research_worker.py": "316d6ef45c24e52b3a45ce402e925e9bf3b8cabe"
+  "tools/fleet/tests/test_research_native_process.py": "a98984d33895becc39d22bf12635e35857084407"
   "tools/fleet/tests/test_research_wrds.py": "128047efa432f77d6b3b51259356f270f7c8cf99"
   "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
-  "tools/fleet/tests/test_research_hpc.py": "e134e6da8d6c21d182edb5932cecbb5e9221493c"
+  "tools/fleet/tests/test_research_hpc.py": "b8bff1bc8cbd62078fa7bc9d8fd72b0494382504"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
@@ -46,7 +50,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_hpc.py": "57345e52787e51c50ea26bf0158e46cac6ede41e"
+  "tools/fleet/src/fleet/core/research_hpc.py": "053ee0e19441e00b3323196a5ffe8190b0451cc0"
   "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
   "tools/fleet/src/fleet/cli/tick.py": "596da64a093028b74c9bda926b6035da5c64cb72"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
@@ -74,6 +78,30 @@ new runtime does not replace that terminal inspection. The November 1 recovery
 and pending controller handover are recorded in [[wrds-baseline-readiness]].[^handover]
 
 [^handover]: `tools/fleet/src/fleet/core/research_hpc.py`, `poll`; `tools/fleet/tests/test_research_hpc.py`, `test_complete_attempt_requires_fresh_native_identity_and_record`. Board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` retains original request and native allocation identities during controller replacement.
+
+The published handover implementation adds an evaluator-owned, content-addressed
+plan beside the original request. It permits changing only the interpreter;
+policy, trial, script, cluster configuration, journal and attempt directory
+must remain identical. The plan pins the recipe, checksums, expected native
+job and result digest. The existing installed-controller inspection verifies
+the replacement before the same completion verifier reads the native result.
+Handover refuses unsettled validation and final-grant work before any submission
+or lifecycle transition. A verified service report records both request and
+controller identities; only then is an exclusive marker written under the
+existing poll lock. Subsequent queue ticks repeat verification and retain the
+plan digest in their observation.[^handover-implementation]
+
+This is published and package-tested, not installed recovery evidence. The
+first check stopped at lint (poll complexity and an unmarked regex); the
+terminal verifier was lifted into `_verified_completion`, and the repaired
+check passed 2,627 tests with 100% statement and branch coverage. Independent
+audit of the repair and installation remain ahead. The live reading during
+this November 1 pass still showed four running and six queued requests;
+no handover was activated and no licensed final grant released.[^handover-check]
+
+[^handover-implementation]: `tools/fleet/src/fleet/core/research_handover.py`, `poll` and `record`; `tools/fleet/src/fleet/core/research_hpc.py`, `poll` and `_verified_completion`; `tools/fleet/src/fleet/cli/research_native.py`, `main`; `tools/fleet/src/fleet/contracts/research_worker.py`, `decode_observation`. `tools/fleet/tests/test_research_handover.py` covers unchanged original requests, altered inputs and runtime reports, a real failed controller process, exclusive marker/readback and publication failure. `tools/fleet/tests/test_research_hpc.py` rejects unsettled attempts and final-grant handover.
+
+[^handover-check]: Live fleet job `cbcfa409-1a43-4242-9a92-06e69583f8f2` at API `3f3f51d2e8f3f9a4f596e9d403c061ba2b969866` stopped before tests with Ruff C901/RUF043. Root-cause task `9dc6f80c-899c-4e79-9399-e669a24b9f4b` repairs that failure. Fleet job `b240c7d5-c9c1-4f2b-a16f-7114f3d1aa60` at API `a9340a200794d62ac4cf2c1133cf093ce1d0aeac` passed on Lavender at `2026-11-01T09:50:20Z`: 2,627 passed, 44 host cases skipped in this ordinary lane, 100% statement and branch coverage, lint, typing and guards. These unit/process tests do not substitute for the four real queue closures required by `04c0cdbe`.
 
 The fleet research lane has an implementation in the existing fleet package:
 it claims shared dispatch rows, uses existing resource leases during bounded

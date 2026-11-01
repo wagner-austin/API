@@ -39,7 +39,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
-  "tools/fleet/src/fleet/core/research_hpc.py": "57345e52787e51c50ea26bf0158e46cac6ede41e"
+  "tools/fleet/src/fleet/core/research_hpc.py": "053ee0e19441e00b3323196a5ffe8190b0451cc0"
   "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "c63fd95cfe672e9e198cd1b5cab895e97466dc77"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
