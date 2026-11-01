@@ -26,6 +26,8 @@ def policy() -> ResearchPolicy:
         seeds=(11, 23),
         max_candidates=2,
         max_seconds=60,
+        cpus=1,
+        mem_gb=4,
         max_trees=200,
         max_leaves=31,
         selection=ResearchSelection(
