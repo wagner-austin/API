@@ -21,7 +21,7 @@ source_git_blobs:
   "src/hpc3/contracts/ledger.py": "b200073d657643908de5491eca70e1fabaeebb4c"
   "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
   "src/hpc3/core/array_submit.py": "205fb40432570438368f18ff26bcf9cbd8bee13a"
-  "src/hpc3/cli/trace.py": "1984bfe5a85fd601ab9dd37e59bfbcd299e4ecdb"
+  "src/hpc3/cli/trace.py": "58c782e75faac84ca2ef4f146543882b50c75366"
   "tests/test_entrypoint.py": "05b02dcc8b56ba5ab9f8b5418da36a423403f699"
   "tests/test_drift.py": "df99de375093bcc2970a59b784f5c53619150684"
   "README.md": "b506737230f2028e798d732e2ae914a2c102c3a1"
