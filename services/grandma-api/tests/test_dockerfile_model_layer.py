@@ -21,6 +21,7 @@ nothing here loads.
 
 from __future__ import annotations
 
+from importlib.metadata import version
 from pathlib import Path
 from typing import Final
 
@@ -173,6 +174,12 @@ def test_the_venv_takes_torch_from_the_cpu_index(pyproject: Path) -> None:
         package: require_str(require_dict(dependencies, package), "source")
         for package in sorted(FROM_CPU_INDEX)
     } == {"torch": CPU_SOURCE, "torchaudio": CPU_SOURCE}
+
+
+@pytest.mark.parametrize("distribution", sorted(FROM_CPU_INDEX))
+def test_the_venv_holds_the_cpu_build(distribution: str) -> None:
+    """Only the CPU index's wheels carry the ``+cpu`` local label."""
+    assert version(distribution).endswith("+cpu"), version(distribution)
 
 
 def test_the_service_declares_torch_at_platform_langid_s_constraints() -> None:
