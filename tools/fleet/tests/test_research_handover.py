@@ -79,7 +79,7 @@ def test_plan_drift_refuses_before_publication(tmp_path: pathlib.Path, field: st
     runner = replies(measured)
     _test_hooks.run = runner
     poster = reporting()
-    with pytest.raises(ValueError, match="RESEARCH_(HANDOVER|INPUT)_"):
+    with pytest.raises(ValueError, match=r"RESEARCH_(HANDOVER|INPUT)_"):
         research_handover.poll(tmp_path, request, document, digest, TASK, ())
     assert poster.bodies == []
 
