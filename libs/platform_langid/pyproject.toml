@@ -13,11 +13,19 @@ packages = [
 readme = "README.md"
 include = ["src/platform_langid/py.typed"]
 
+# The detector runs on DEFAULT_DEVICE "cpu" and no consumer reserves a GPU,
+# so torch comes from the PyTorch CPU index: PyPI's Linux wheel is the CUDA
+# build and brings 14 nvidia packages no test or deployment loads.
+[[tool.poetry.source]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+priority = "explicit"
+
 [tool.poetry.dependencies]
 python = "^3.11"
 platform-core = { path = "../platform_core", develop = true }
-torch = "^2.0.0"
-torchaudio = "^2.0.0"
+torch = { version = "^2.0.0", source = "pytorch-cpu" }
+torchaudio = { version = "^2.0.0", source = "pytorch-cpu" }
 transformers = "^4.30.0"
 soundfile = "^0.12.0"
 langcodes = "^3.5.1"
