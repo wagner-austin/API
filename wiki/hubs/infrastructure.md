@@ -14,4 +14,6 @@ The cross-service platform that makes the monorepo run — Redis (queues + RQ), 
 
 [loki's tunnel stall is the hub starting cloudflared](../pages/fleet-loki-tunnel-stall-cloudflared-start.md) -- why fleet ssh to loki timed out "during banner exchange": loki's connector and the hub's tunnels recorded nothing, a quiet machine on the same uplink saw no stall, and the seconds went into each per-call `cloudflared` hashing its own 40 MB executable on the CPU-starved hub; the A/B against one long-lived forwarder
 
+[Which API packages are used](../pages/api-package-use-inventory.md) -- the 2026-11-01 inventory of every top-level package: live deploy read from Railway and the hosts, importers, last own change, fleet minutes and size, with a keep, archive or delete recommendation for the operator to pick from
+
 <!-- Add pages here as they're written. Format: [Title](../pages/<slug>.md) -- one-line description -->

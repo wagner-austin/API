@@ -483,3 +483,14 @@ moving-block reading. The journal was byte-identical before and after, and
 Evidence is under `tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101`
 (board task `673a4bc4`). This is a synthetic operational rehearsal; the
 licensed baseline remains unrun and no final grant was released.
+
+## [2026-11-01] create | api-package-use-inventory
+
+Added the inventory the operator asked for of every top-level API package:
+live deploy read from each default Railway host and the stack's hosts,
+importers from every manifest's path dependencies, the last commit that is
+neither multi-package nor one of a sweep, 30 days of fleet minutes, size and
+RESEARCH.md registration, with a keep, archive or delete recommendation per
+package. Nothing is archived until the operator picks (board task `a276f973`);
+the Discord group's Railway state is unread without a credential and waits on
+the operator. Linked from the infrastructure hub, whose count is now 7.
