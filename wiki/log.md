@@ -402,3 +402,22 @@ the certificate under private directories; no final bundle or keys were sent.
 Verifier audit a90c5a79 independently passed both criteria. Readiness records
 the remaining compute-image update, licensed decoding and unrun study. Board
 task a622165c; no new page or page-count change.
+
+## [2026-11-01] audit | selection recovery and evidence corrections
+Pages updated: the WRDS readiness, final scoring, queue admission, integration,
+evaluation reuse and protocol pages; CRSP source, design and holdings pages;
+evaluation-numerical-contracts. No pages or hub memberships were added.
+The live board's reopened selection audit replaces the former pending-review
+description. Four retained native allocations were measured and reconciled by
+the corrected installed controller; their old queue requests still need the
+explicit handover recorded as 04c0cdbe. The service itself recorded refusal to
+select from an unsettled journal. These are synthetic operational measurements,
+not a licensed baseline or complete winner-selection rehearsal.
+Source-pin findings were traced to the selection reporter, exact-artifact
+recovery lookup, caller tests, prior collection-phase repair and formatting.
+The changed source and cited claims were reviewed before refreshing each pin.
+GitHub run 41262419379 also exposed a real RET505 failure hidden by fleet
+auto-fixing: the branch is corrected and the package's lint gate now checks
+without rewriting source. Installed-runtime identities remain historical.
+Published-page audits and search refreshes are recorded on a9b2927c. This
+maintenance pass does not certify unrelated wiki pages or the substantive study.
