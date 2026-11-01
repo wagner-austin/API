@@ -1,11 +1,12 @@
 """The images tools/maketools-execution builds before its timed check (MCPs board task eb6586e4).
 
-The fleet runs that project's ``images`` target as an install step, so the
-deploy cases' own builds read a warm build cache and the check's budget
-measures the deploys: on loki on 2026-11-01 with an empty build cache the
-eight cases took 460 to 654 s. A build the target misses is a build the
-check pays for again, so these cases hold the target to what the cases
-deploy: one target per service in :data:`tests.test_service_entry.SERVICES`,
+The fleet runs one ``image-<service>`` target per service as its own
+install step, so the deploy cases' own builds read a warm build cache, the
+check's budget measures the deploys, and the verdict's phases= names each
+build's seconds: on loki on 2026-11-01 with an empty build cache the eight
+cases took 460 to 654 s. A build a target misses is a build the check pays
+for again, so these cases hold the targets and the registry's steps to what
+the cases deploy: one per service in :data:`tests.test_service_entry.SERVICES`,
 each running exactly the builds that service's compose file declares.
 """
 
@@ -19,6 +20,17 @@ from tests.test_service_entry import REPO_ROOT, SERVICES
 
 #: The project's recipe.
 MAKEFILE: Final[Path] = REPO_ROOT / "tools" / "maketools-execution" / "Makefile"
+
+#: The project's fleet registry entry, whose install steps run the targets.
+REGISTRY: Final[Path] = (
+    REPO_ROOT / "tools" / "fleet" / "registry" / "projects" / "tools" / "maketools-execution.json"
+)
+
+#: One install step of the registry entry: its phase and its argv list.
+STEP: Final[re.Pattern[str]] = re.compile(r'"phase": "[^"]+",\n +"argv": \[[^\]]*\]')
+
+#: One quoted word of an argv list.
+WORD: Final[re.Pattern[str]] = re.compile(r'"([^"]+)"')
 
 #: One build block of a service's compose file: the repository root as its
 #: context, its Dockerfile, and the stage it targets when it names one.
@@ -67,12 +79,23 @@ def _recipe(target: str) -> list[str]:
     return recipe
 
 
-def test_the_images_target_names_one_target_per_deployed_service() -> None:
-    text = MAKEFILE.read_text(encoding="utf-8")
-    listed = text.split("\nIMAGES := ", 1)[1].split("\n\n", 1)[0]
+def test_the_fleet_builds_every_deployed_service_s_images_as_its_own_step() -> None:
+    """Each step's phase name is what the verdict's phases= carries."""
+    text = REGISTRY.read_text(encoding="utf-8")
+    blocks = [f"{found.group(0)}" for found in STEP.finditer(text)]
+    steps = [
+        (
+            block.split('"phase": "', 1)[1].split('"', 1)[0],
+            [f"{word.group(1)}" for word in WORD.finditer(block.split("[", 1)[1])],
+        )
+        for block in blocks
+    ]
 
-    assert listed.replace("\\\n", " ").split() == sorted(f"image-{service}" for service in SERVICES)
-    assert "images: $(IMAGES)" in text.splitlines()
+    assert text.count('"phase"') == len(blocks)
+    assert steps == [
+        (f"image-{service}", ["make", "-C", "tools/maketools-execution", f"image-{service}"])
+        for service in sorted(SERVICES)
+    ]
 
 
 def test_each_service_target_runs_the_builds_its_compose_file_declares() -> None:
