@@ -11,14 +11,75 @@
     "path": "tools/maketools-execution",
     "install": [
       {
-        "phase": "images",
+        "phase": "image-data-bank-api",
         "argv": [
           "make",
-          "-j",
-          "8",
           "-C",
           "tools/maketools-execution",
-          "images"
+          "image-data-bank-api"
+        ]
+      },
+      {
+        "phase": "image-github-stats-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-github-stats-api"
+        ]
+      },
+      {
+        "phase": "image-grandma-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-grandma-api"
+        ]
+      },
+      {
+        "phase": "image-music-wrapped-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-music-wrapped-api"
+        ]
+      },
+      {
+        "phase": "image-opportunity-radar-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-opportunity-radar-api"
+        ]
+      },
+      {
+        "phase": "image-qr-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-qr-api"
+        ]
+      },
+      {
+        "phase": "image-transcript-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-transcript-api"
+        ]
+      },
+      {
+        "phase": "image-turkic-api",
+        "argv": [
+          "make",
+          "-C",
+          "tools/maketools-execution",
+          "image-turkic-api"
         ]
       }
     ],
