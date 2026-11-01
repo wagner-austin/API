@@ -1,0 +1,68 @@
+{
+  "observed_at": "2026-11-01T22:09:00Z",
+  "scope": "Stopped preregistration, not completed validation",
+  "queue": {
+    "researchRequest": {
+      "backend": "hpc3",
+      "specSha256": "a02a172597fdbb62df133841329684ad21cb2abcc0243181dc72ddcb3cc4b722",
+      "attempt": "licensed-baseline-20261101-1"
+    },
+    "id": "b799f91b-4c5b-4f96-9332-b781b9ae1330",
+    "project": "research/hpc3",
+    "command": "research",
+    "status": "failed",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "c6bc5d05-22f5-4462-a1f7-eb40de1f28f1",
+    "node": "ziggurat",
+    "runId": "b799f91b-4c5b-4f96-9332-b781b9ae1330",
+    "exitCode": 1,
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"failed\",\"native_job_id\":\"58733020\",\"record_sha256\":null,\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-11-01T20:36:16.170Z",
+    "updatedAt": "2026-11-01T21:15:06.526Z",
+    "claimedAt": "2026-11-01T20:39:02.869Z",
+    "closedAt": "2026-11-01T21:15:06.526Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "terminal_event": {
+    "id": "2c2301be-1365-4033-90cd-5e9ce1472126",
+    "kind": "closed",
+    "actor": "fleet-research-diphtheria",
+    "body": "failed: Native controller outcome (adapter exit status): {\"state\":\"failed\",\"native_job_id\":\"58733020\",\"record_sha256\":null,\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+    "createdAt": "2026-11-01T21:15:06.526Z"
+  },
+  "service_report": {
+    "id": "89775442-a833-4556-a6e0-a62dacf2f486",
+    "author": "hpc-report-c6bc5d05",
+    "posted_at": "2026-11-01T21:15:06.333Z"
+  },
+  "native": {
+    "job_id": "58733020",
+    "state": "FAILED",
+    "elapsed_seconds": 2131,
+    "exit_code": "1:0",
+    "max_rss_kib": 37948836
+  },
+  "diagnostic": {
+    "stage": "crsp_study_rows -> crsp_window_path",
+    "error": "CRSP-009: held return is not ordinary",
+    "interpretation": "The same guard rejects missing rows and present rows failing return, predecessor or flag checks; the traceback alone does not identify which condition failed.",
+    "source": "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
+  },
+  "study_action": "Stop this preregistration. Attempts 2–15 remain unsubmitted; no retry, replacement, selection or final grant.",
+  "wake": {
+    "session": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "notification_post": "abbce245-7d61-4ffb-b10e-89c0c2b997f4",
+    "delivery": "task_whereis reports board-only inbox, no local socket, next-inbox-drain delivery starts no turn",
+    "resumption": "User status request at approximately 22:09 UTC"
+  }
+}
