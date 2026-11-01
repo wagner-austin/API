@@ -438,3 +438,13 @@ evaluation reuse and CRSP contract pages after lifting terminal verification
 from poll into one shared implementation. No pages or hub counts changed.
 Board tasks 04c0cdbe and 9dc6f80c distinguish operational recovery from the
 lint repair; no live queue closure or licensed final evaluation is claimed.
+
+## [2026-11-01] maintenance | installed controller handover and queue recovery
+
+Recorded the verified repair audit, separate frozen queue adapter, real Linux
+execution check, four installed handovers and four automatic queue closures.
+The original requests, native allocation IDs and journal were preserved.
+Updated readiness and queue ownership with service-report identities, actual
+tampering refusals and read-only audit queries. Six unstarted requests were
+replaced while retaining their admissions; their normal queue completion and
+the selection rehearsal remain pending. No licensed final grant was released.
