@@ -88,8 +88,6 @@ def command_guard(arguments: Sequence[str]) -> int:
 def command_test(arguments: Sequence[str]) -> int:
     """``test [--no-sweep] [--serial] [--own-home] [--hub-offline] [--runner poetry|venv] [...]``.
 
-    Everything after the launcher's flags is passed to pytest.
-
     Args:
         arguments: The launcher's flags first, then anything for pytest.
 
@@ -99,33 +97,24 @@ def command_test(arguments: Sequence[str]) -> int:
     Raises:
         AppError: ``MAKETOOLS_USAGE`` on an unknown runner.
     """
-    sweep = True
-    serial = False
-    own_home = False
-    hub_offline = False
+    switches = (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, HUB_OFFLINE_FLAG)
+    given: set[str] = set()
     runner = Runner.POETRY
     remaining = list(arguments)
-    flags = (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, HUB_OFFLINE_FLAG, RUNNER_FLAG)
-    while remaining and remaining[0] in flags:
+    while remaining and remaining[0] in (*switches, RUNNER_FLAG):
         flag = remaining.pop(0)
-        if flag == NO_SWEEP_FLAG:
-            sweep = False
-        elif flag == SERIAL_FLAG:
-            serial = True
-        elif flag == OWN_HOME_FLAG:
-            own_home = True
-        elif flag == HUB_OFFLINE_FLAG:
-            hub_offline = True
-        else:
+        if flag == RUNNER_FLAG:
             runner = require_runner(remaining.pop(0) if remaining else "")
+        else:
+            given.add(flag)
     return run_tests(
         Path.cwd(),
         remaining,
-        sweep=sweep,
-        serial=serial,
+        sweep=NO_SWEEP_FLAG not in given,
+        serial=SERIAL_FLAG in given,
         runner=runner,
-        own_home=own_home,
-        hub_offline=hub_offline,
+        own_home=OWN_HOME_FLAG in given,
+        hub_offline=HUB_OFFLINE_FLAG in given,
     )
 
 
