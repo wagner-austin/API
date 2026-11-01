@@ -26,12 +26,6 @@ from covenant_persistence import (
     ensure_schema,
 )
 from platform_core.config import MLBackend
-from platform_core.data_bank_client import (
-    DataBankClientError,
-)
-from platform_core.data_bank_client import (
-    NotFoundError as DataBankNotFoundError,
-)
 from platform_core.json_utils import JSONValue
 from platform_core.logging import get_logger
 from platform_core.queues import COVENANT_QUEUE
@@ -90,9 +84,6 @@ class ServiceContainer:
         _model: Cached model (lazy loaded, backend-aware).
         _model_info: Information about current model.
         _ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
-        _data_bank_url: URL for data-bank-api (empty if not configured).
-        _data_bank_key: API key for data-bank-api (empty if not configured).
-        _data_bank_model_file_id: Model file_id to download from data-bank.
     """
 
     settings: Settings
@@ -105,9 +96,6 @@ class ServiceContainer:
     _region_encoder: dict[str, int]
     _model_output_dir: Path
     _ml_backend: MLBackend
-    _data_bank_url: str
-    _data_bank_key: str
-    _data_bank_model_file_id: str
 
     def __init__(
         self: ServiceContainer,
@@ -120,9 +108,6 @@ class ServiceContainer:
         sector_encoder: dict[str, int],
         region_encoder: dict[str, int],
         ml_backend: MLBackend,
-        data_bank_url: str = "",
-        data_bank_key: str = "",
-        data_bank_model_file_id: str = "",
     ) -> None:
         """Initialize container with dependencies.
 
@@ -136,9 +121,6 @@ class ServiceContainer:
             sector_encoder: Sector to int encoding.
             region_encoder: Region to int encoding.
             ml_backend: ML backend type for inference (xgboost, mlp, lstm, or lightgbm).
-            data_bank_url: URL for data-bank-api (empty if not configured).
-            data_bank_key: API key for data-bank-api (empty if not configured).
-            data_bank_model_file_id: Model file_id to download from data-bank.
         """
         self.settings = settings
         self.redis = redis
@@ -154,9 +136,6 @@ class ServiceContainer:
         self._sector_encoder = sector_encoder
         self._region_encoder = region_encoder
         self._ml_backend = ml_backend
-        self._data_bank_url = data_bank_url
-        self._data_bank_key = data_bank_key
-        self._data_bank_model_file_id = data_bank_model_file_id
 
     @classmethod
     def from_settings(
@@ -213,11 +192,6 @@ class ServiceContainer:
         default_region_encoder: dict[str, int] = (
             region_encoder if region_encoder is not None else DEFAULT_REGION_ENCODER
         )
-        # Get data-bank config
-        data_bank_url = settings["app"]["data_bank_api_url"]
-        data_bank_key = settings["app"]["data_bank_api_key"]
-        data_bank_model_file_id = settings["app"]["data_bank_model_file_id"]
-
         container = cls(
             settings=settings,
             redis=redis,
@@ -228,9 +202,6 @@ class ServiceContainer:
             sector_encoder=default_sector_encoder,
             region_encoder=default_region_encoder,
             ml_backend=ml_backend,
-            data_bank_url=data_bank_url,
-            data_bank_key=data_bank_key,
-            data_bank_model_file_id=data_bank_model_file_id,
         )
 
         if eager_load_model:
@@ -366,103 +337,24 @@ class ServiceContainer:
         model_p = Path(model_path)
         return worker_hooks.lightgbm_loader(model_p)
 
-    def _get_model_file_id(self: ServiceContainer) -> str:
-        """Get the file_id to download from data-bank.
-
-        Returns the configured DATA_BANK_MODEL_FILE_ID if set, otherwise
-        returns an empty string indicating no model should be downloaded.
-
-        Returns:
-            File ID string (SHA256 hash) or empty string if not configured.
-        """
-        return self._data_bank_model_file_id
-
-    def _download_model_from_data_bank(self: ServiceContainer, dest_path: Path) -> bool:
-        """Download model from data-bank-api if configured.
-
-        Args:
-            dest_path: Local path where model should be saved.
-
-        Returns:
-            True if model was downloaded successfully, False if not configured
-            or model not found in data-bank.
-        """
-        if not self._data_bank_url or not self._data_bank_key:
-            _log.debug("Data-bank not configured, skipping download")
-            return False
-
-        file_id = self._get_model_file_id()
-        if not file_id:
-            _log.debug("No model file_id configured, skipping download")
-            return False
-
-        _log.info(
-            "Attempting to download model from data-bank",
-            extra={"file_id": file_id, "dest_path": str(dest_path)},
-        )
-
-        # Ensure parent directory exists
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-
-        client = _test_hooks.data_bank_client_factory(
-            self._data_bank_url,
-            self._data_bank_key,
-        )
-
-        try:
-            head_info = client.download_to_path(file_id, dest_path)
-            _log.info(
-                "Downloaded model from data-bank",
-                extra={
-                    "file_id": file_id,
-                    "size": head_info["size"],
-                    "dest_path": str(dest_path),
-                },
-            )
-            return True
-        except DataBankNotFoundError:
-            _log.warning(
-                "Model not found in data-bank",
-                extra={"file_id": file_id},
-            )
-            return False
-        except DataBankClientError as exc:
-            _log.warning(
-                "Failed to download model from data-bank",
-                extra={"file_id": file_id, "error": str(exc)},
-            )
-            return False
-
     def load_model_now(self: ServiceContainer) -> bool:
         """Eagerly load the ML model into memory.
 
         Call this at startup to ensure the model is loaded and ready
-        for predictions. If the model file doesn't exist locally and
-        data-bank is configured, attempts to download from data-bank.
-        If the model file doesn't exist after download attempt, logs
-        a warning and returns False.
+        for predictions. If the model file does not exist, logs a warning
+        and returns False.
 
         Returns:
             True if model was loaded successfully, False if file not found.
         """
         model_path = Path(self._model_info["model_path"])
 
-        # If model doesn't exist locally, try downloading from data-bank
         if not model_path.exists():
-            # Download into this container's model dir, never a /tmp dir another user owns
-            if self._data_bank_url and self._data_bank_key:
-                downloaded_path = self._model_output_dir / model_path.name
-                downloaded = self._download_model_from_data_bank(downloaded_path)
-                if downloaded:
-                    model_path = downloaded_path
-            else:
-                downloaded = False
-            if not downloaded:
-                _log.warning(
-                    "Model file not found, predictions will fail until model is trained",
-                    extra={"model_path": str(model_path), "backend": self._ml_backend},
-                )
-                return False
+            _log.warning(
+                "Model file not found, predictions will fail until model is trained",
+                extra={"model_path": str(model_path), "backend": self._ml_backend},
+            )
+            return False
 
         # Load model based on configured backend
         if self._ml_backend is MLBackend.XGBOOST:
@@ -488,33 +380,17 @@ class ServiceContainer:
     def get_model(self: ServiceContainer) -> PredictorProtocol:
         """Get the ML model, loading it if necessary.
 
-        If the model file doesn't exist locally and data-bank is configured,
-        attempts to download from data-bank first.
-
         Returns:
             Loaded model implementing PredictorProtocol.
 
         Raises:
-            FileNotFoundError: If model file doesn't exist locally or in data-bank.
+            FileNotFoundError: If the model file does not exist.
         """
         if self._model is None:
             model_path = Path(self._model_info["model_path"])
 
-            # If model doesn't exist locally, try downloading from data-bank
             if not model_path.exists():
-                # Download into this container's model dir, never a /tmp dir another user owns
-                if self._data_bank_url and self._data_bank_key:
-                    downloaded_path = self._model_output_dir / model_path.name
-                    downloaded = self._download_model_from_data_bank(downloaded_path)
-                    if downloaded:
-                        model_path = downloaded_path
-                else:
-                    downloaded = False
-                if not downloaded:
-                    raise FileNotFoundError(
-                        f"Model file not found: {model_path}. "
-                        "Train a model first or configure data-bank integration."
-                    )
+                raise FileNotFoundError(f"Model file not found: {model_path}. Train a model first.")
 
             if self._ml_backend is MLBackend.XGBOOST:
                 self._model = self._load_xgboost_model(str(model_path))

@@ -27,7 +27,6 @@ from covenant_radar_api.core.container import ServiceContainer
 from covenant_radar_api.integrations.datadog import _test_hooks as datadog_test_hooks
 from covenant_radar_api.integrations.datadog.tracing import reset_tracing_state
 from covenant_radar_api.seeding import _test_hooks as seeding_test_hooks
-from covenant_radar_api.worker import _test_hooks as worker_job_hooks
 
 # =============================================================================
 # Container And Store for Testing
@@ -96,9 +95,6 @@ def _make_test_settings(tmp_path: Path) -> Settings:
             "ml_backend": MLBackend.XGBOOST,
             "active_model_path_xgb": str(models_root / "active_xgb.ubj"),
             "active_model_path_mlp": str(models_root / "active_mlp.pt"),
-            "data_bank_api_url": "",
-            "data_bank_api_key": "",
-            "data_bank_model_file_id": "",
         },
         "datadog": {
             "enabled": False,
@@ -174,14 +170,12 @@ def _reset_test_hooks_impl() -> Generator[None, None, None]:
     orig_conn = _test_hooks.connection_factory
     orig_rq = _test_hooks.rq_client_factory
     orig_queue = _test_hooks.queue_factory
-    orig_data_bank = _test_hooks.data_bank_client_factory
     yield
     # Restore to production defaults
     _test_hooks.kv_factory = orig_kv
     _test_hooks.connection_factory = orig_conn
     _test_hooks.rq_client_factory = orig_rq
     _test_hooks.queue_factory = orig_queue
-    _test_hooks.data_bank_client_factory = orig_data_bank
 
 
 def _reset_config_hooks_impl() -> Generator[None, None, None]:
@@ -196,10 +190,8 @@ def _reset_config_hooks_impl() -> Generator[None, None, None]:
 def _reset_worker_hooks_impl() -> Generator[None, None, None]:
     """Reset worker entry test hooks after each test."""
     orig_runner = app_test_hooks.worker_runner
-    orig_data_bank_uploader = worker_job_hooks.data_bank_uploader
     yield
     app_test_hooks.worker_runner = orig_runner
-    worker_job_hooks.data_bank_uploader = orig_data_bank_uploader
 
 
 def _reset_seeding_hooks_impl() -> Generator[None, None, None]:

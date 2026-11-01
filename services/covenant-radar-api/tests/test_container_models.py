@@ -353,8 +353,8 @@ def test_container_get_model_lightgbm_backend_raises_file_not_found(
 ) -> None:
     """Test get_model raises FileNotFoundError when LightGBM model missing.
 
-    When the model file doesn't exist and data-bank is not configured,
-    get_model raises FileNotFoundError with a descriptive message.
+    When the model file doesn't exist, get_model raises FileNotFoundError
+    with a descriptive message.
     """
     # Create container with LightGBM backend but no model file
     model_path = tmp_path / "test_lightgbm.txt"
