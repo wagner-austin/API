@@ -8,6 +8,7 @@ from typing import Protocol
 import pytest
 
 from platform_langid import _hook_defaults, _test_hooks
+from platform_langid._hook_protocols import ModelConfigProtocol
 from platform_langid.testing import reset_hooks
 from platform_langid.types import default_detector_config
 
@@ -235,7 +236,7 @@ class _ConfigClass(Protocol):
         classifier_proj_size: int,
         id2label: dict[int, str],
         label2id: dict[str, int],
-    ) -> object:
+    ) -> ModelConfigProtocol:
         """Build the configuration."""
         ...
 
@@ -243,7 +244,7 @@ class _ConfigClass(Protocol):
 class _ModelClass(Protocol):
     """transformers.Wav2Vec2ForSequenceClassification, built from a configuration."""
 
-    def __call__(self, config: object) -> _SavesPretrained:
+    def __call__(self, config: ModelConfigProtocol) -> _SavesPretrained:
         """Build a randomly initialised model."""
         ...
 
