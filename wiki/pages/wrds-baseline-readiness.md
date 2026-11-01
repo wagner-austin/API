@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
   - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
@@ -101,6 +102,7 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/research_summary_report.py"
   - "libs/covenant_ml/scripts/research_summary_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/first-dispatch.json": "95d1eda8dca5ca000fec5c8de18586e2267ef673"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
@@ -220,17 +222,24 @@ its numerical and real-process checks passed. Independent runtime audit
 task `fc2dba58` has since passed independent audit `bfeda225` at
 `2026-11-01T17:08:32.158Z`.[^summary-reporting-audit][^summary-runtime][^summary-runtime-audit]
 
-**Licensed baseline, November 1 at 20:39 UTC:** policy `47d4ee17` has all
-15 required admissions: three frozen feature sets, each with seeds `11`, `23`,
-`37`, `53` and `71`. The maintained preparation reporter checked the journal,
-policy and first recipe; native preflight accepted four CPUs, 128 GiB and
-121 scheduler minutes on `free`, with a 7,200-second evaluator deadline.
-Attempt 1 is the only dispatched request: shared queue `b799f91b` reports
-native job `58733020` running. No completed licensed result or seed summary
-has been verified yet. Subsequent attempts require the previous attempt's
-verified completion; any required failure stops this preregistration without
-retry or replacement. Only the train/validation decryption identity was
-staged; the final holdout remains unreleased.[^licensed-baseline-start]
+**Licensed baseline stopped, November 1 at 21:15 UTC:** the first required
+attempt, native job `58733020`, failed after 35 minutes 31 seconds with exit
+`1:0`. Peak memory was about 36.2 GiB against the frozen 128-GiB request.
+The evaluator stopped while constructing outcome labels: `crsp_window_path`
+rejected a missing or non-ordinary held return. The traceback alone does not
+identify which row predicate failed. The shared queue reconciled the failure
+as `b799f91b`; no completed validation RunRecord or seed summary exists.
+Attempts 2–15 remain unsubmitted. This preregistration is stopped without
+retry, replacement or candidate selection; the final holdout remains
+unreleased. Diagnose the return evidence and frozen semantics before a new
+study.[^licensed-baseline-stopped]
+
+The maintained preparation reporter had verified all 15 admissions under
+policy `47d4ee17`: three feature sets, each with seeds `11`, `23`, `37`, `53`
+and `71`. Native preflight accepted four requested CPUs, 128 GiB and 121
+scheduler minutes on `free`, with a 7,200-second evaluator deadline.
+Preparation success did not establish that the real data would satisfy all
+outcome-accounting guards.[^licensed-baseline-start]
 
 **Synthetic queue-to-summary rehearsal, completed November 1:** all
 five queue requests passed by `2026-11-01T17:42:36Z` as native jobs
@@ -246,6 +255,8 @@ is an operational rehearsal on synthetic data, so its intervals say nothing
 about performance. Independent audit `8643120c` verified this rehearsal at
 18:00:41 UTC. The rehearsal used no licensed data and released no final
 grant.[^summary-rehearsal][^licensed-baseline-start]
+
+[^licensed-baseline-stopped]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json` retains the failed shared-queue receipt, native accounting observation and bounded traceback interpretation. Service-authored native report `89775442-a833-4556-a6e0-a62dacf2f486`, by `hpc-report-c6bc5d05` at 21:15:06 UTC, records `FAILED`, 2,131 seconds and exit `1:0`. The queue failure notification was recorded but did not resume this board-only Codex session; its registered inbox starts no turn, as measured by `task_whereis` at 22:09 UTC. Cleanup after this licensed failure has not yet been independently measured.
 
 [^licensed-baseline-start]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json`, frozen plan/runtime/policy identities, prerequisite audit IDs and service report references; companion `preparation-report.json` is program reading `bcc5a3b7-81cb-4a8e-9b35-3711a5e50b33` by `hpc-report-c6bc5d05` at 20:36:00 UTC, covering all 15 admissions and the exact first recipe. Companion `preflight-report.json` is service reading `9c54e66f-edb1-42b8-9983-0a00241c7012` at 20:35:36 UTC. `first-dispatch.json`, live `dispatch_get` receipt for queue `b799f91b-4c5b-4f96-9332-b781b9ae1330`, retains the controller's native-job progress at 20:39:14 UTC. These are preparation and running-state observations, not completed-study evidence. Board task `c6bc5d05-22f5-4462-a1f7-eb40de1f28f1` owns execution; final release is outside this milestone.
 
@@ -737,7 +748,7 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    provenance contract in [[wrds-evaluation-reuse]]. Reporting task `fc2dba58`
    and the synthetic queue-to-summary rehearsal passed independent audit. The
    matching `b3843a3d3` controller and image are installed; licensed attempt 1
-   is now running through the shared queue.[^summary-reporting-audit][^summary-runtime][^licensed-baseline-start]
+   failed and stopped the preregistration.[^summary-reporting-audit][^summary-runtime][^licensed-baseline-stopped]
    The native recipe now reads mandatory `cpus` and `mem_gb` from the existing
    evaluator-owned policy, including them in the journal and request identities.
    The 7,200-second evaluation retains a 121-minute scheduler request for
