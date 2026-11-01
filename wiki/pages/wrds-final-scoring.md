@@ -38,13 +38,13 @@ source_git_blobs:
   "libs/covenant_ml/Makefile": "ad7d5dbde8c784bb781e5de8cc764eed2c506cd0"
   "libs/covenant_ml/tests/markets/test_research_proposals_cli.py": "ab6a5c10d03eaaf5703f5c4d1a3928a354f38720"
   "libs/covenant_ml/src/covenant_ml/markets/research_selection_report.py": "ac537055599f353fae294d9f01310a6e0a40d1eb"
-  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "b9f28bbe664535cfd134feecc4e6ae635597df48"
+  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "ca12a77ffe77312243c3f2d8b7671245587fd00c"
   "libs/covenant_ml/src/covenant_ml/markets/research_selection_records.py": "fc12c6f233f2ccd6ec15aeaea55ca85c8190b4e9"
   "libs/covenant_ml/tests/markets/test_research_ranking.py": "52af5cedf8815dc54831cd0bd623098535482026"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/private-delivery.json": "0a92649b4cc3a607199c258c0521bee3cdd0c4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_delivery.py": "fed59a35e1266cdb2e4236539056a5758d84f358"
   "libs/covenant_ml/src/covenant_ml/markets/research_native_final.py": "ffe230f47ba39421a668a7d6b6299b50cb075e9a"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "db45435892a37a949f96b86048ae22546a48c15c"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b39678f6d1546459a16d4df77bec6b6a91b29a9f"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/tests/markets/test_research_native_final.py": "c2e7bfd5c740d172d2e6232a6d799581ea06138d"
   "libs/covenant_ml/tests/markets/test_research_delivery.py": "d38d19577a78209d5204a6f6dd2bd020f938f639"
@@ -55,13 +55,13 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_research_release.py": "c0ceda2139bf2a8286bdcccfa5dd93df5a90eb13"
   "libs/covenant_ml/tests/markets/test_research_trial_cli.py": "00143abf439078afa60a0dc8c8cb72fa02f2538e"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "18c05453efb28a9ab7504e9dd1436bc9a135cfcc"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "1a612f02d15aa6986831516ffb1f7f58db894aef"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "9f92edcdf641b2b3e20fe43ed45e699c38f6bbec"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "5dfbb04cddfeedacee45ce63478f31cd6e5ecb97"
+  "libs/covenant_ml/scripts/research_proposals.py": "6f3ee44f306eb77a768a20142a80c82ddf42b7d6"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "9f903a82aebf9c42ec8bfd989a7496462c9e430b"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
@@ -108,6 +108,11 @@ verified record, not an independent recomputation of the result payload.
 Tests reject wrong winners, noncanonical final seeds and direct-event bypasses.
 Installed-runtime and native rehearsal status remain in
 [[wrds-baseline-readiness]].[^final][^ranking]
+
+Validation uncertainty over those seed means is documented in
+[[wrds-evaluation-reuse]]. It is descriptive and does not enter ranking;
+the controlled final evaluation remains the winning candidate's fixed single
+seed, rather than a seed-averaged ensemble.[^ranking]
 
 The select command requires `--report-task` and publishes its own measurement
 through the shared service reporter: actual exit status, refusal messages,

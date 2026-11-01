@@ -4,6 +4,10 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]", "[[crsp-monthly-study-design]]", "[[wrds-proposer-isolation]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/research_summary.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py"
+  - "libs/covenant_ml/tests/markets/test_research_summary.py"
+  - "libs/covenant_ml/tests/markets/test_research_summary_cli.py"
   - "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py"
   - "libs/covenant_ml/src/covenant_ml/markets/equity_study.py"
   - "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py"
@@ -28,6 +32,10 @@ source_paths:
   - "tools/fleet/tests/test_research_proposal.py"
   - "tools/fleet/tests/test_research_proposal_host.py"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/research_summary.py": "5d4a45381791a4092af33872f5902f4d1f58b9c0"
+  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "ca12a77ffe77312243c3f2d8b7671245587fd00c"
+  "libs/covenant_ml/tests/markets/test_research_summary.py": "9fc46aa4fb3805c7d074de0b64de2cb58d1d3421"
+  "libs/covenant_ml/tests/markets/test_research_summary_cli.py": "daea34f30a49b7a8f287f897cb01c2036c431645"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
   "libs/covenant_ml/src/covenant_ml/markets/equity_study.py": "e4e44e46f0031df3686b09d5067a1cea49033eb8"
   "libs/covenant_ml/src/covenant_ml/markets/equity_outcomes.py": "2ff9370dd458fcc4cf3e5a7d21a490583f88ae05"
@@ -46,7 +54,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "36fe7e4cfcd45aa2ef8f3d83c4242473b5328df0"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "1526ae0f641a66fb686d80f028740abc40491f2d"
   "tools/fleet/src/fleet/core/research_proposal.py": "5d55b036810db1a301137b2385dd75d5c5269e00"
   "tools/fleet/src/fleet/cli/research_propose.py": "c354898c0f5ad752fafd1f86e4650e6a02daee78"
   "tools/fleet/tests/test_research_proposal.py": "414e637e3c4dc1a8656951f049c42dbd52bb1f28"
@@ -84,6 +92,37 @@ monthly study now uses or replaces each seam:[^equity][^window][^sampling][^spli
 | `purge_label_overlap` (also inside `ChronologicalGroupedSplits`) | Requires actual label availability strictly before the stopping and scoring boundaries. | `crsp_study` passes each window's exit close as availability, so each fold drops exactly the decision immediately before its stopping and scoring boundaries. |
 | `moving_block_weights` | Samples overlapping, noncircular blocks and truncates the last block to preserve the exact observation count. | Used through `compare_moving_block` with the frozen block length, draw count and seed. |
 | `compare_moving_block` | Requires identical consecutive month identities and records a distinct moving-block percentile method. | Compares each candidate and the equal-weight universe with momentum at the primary cost. Its uncentered sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
+
+The existing controller reports descriptive validation uncertainty from settled
+journal records:
+
+```bash
+python -m scripts.research_proposals --policy policy.json --ledger attempts.sqlite \
+  summarize --trial trial.json --out new-summary/result.json
+```
+
+The summary reuses `candidate_means`, the same pairing and seed aggregation
+used by ranking, and `compare_moving_block`. For each complete candidate and
+each of the four arms compared with momentum at the primary cost, it averages
+paired returns within each month before resampling consecutive months. It uses
+the frozen block length, draw count, bootstrap seed and confidence. Seeds do
+not increase the number of temporal observations. Missing required seeds,
+changed reference returns, incomplete calendars and nonfinite observations
+are refused; unsettled admission also prevents publication.[^seed-summary]
+
+The payload binds exact candidate proposals, attempt numbers, canonical
+RunRecord hashes, payload digests, the journal snapshot, monthly calendar and
+averaged differences. A shared RunRecord binds the complete document through
+its experiment hash and its numerical results through the payload digest.
+Its fingerprint describes the reporting process; each originating compute
+record remains separately identified for seed diagnostics. Reporting requires
+no extract, key or final manifest and creates a fresh output directory.
+Intervals after search are descriptive, without multiplicity adjustment; the
+sign-tail diagnostic is not a calibrated null test. They do not select the
+winner, and final scoring remains the selected fixed seed described in
+[[wrds-final-scoring]].[^seed-summary]
+
+[^seed-summary]: `libs/covenant_ml/src/covenant_ml/markets/research_summary.py`, `validation_summary` and `write_validation_summary`; `libs/covenant_ml/src/covenant_ml/markets/research_ranking.py`, `candidate_means` and `monthly_selection_observations`; `libs/covenant_ml/tests/markets/test_research_summary.py`, independent block-index and standard-library-statistics oracle at five seeds, 36 months, 12-month blocks and 10,000 draws, plus changed-evidence refusals; `libs/covenant_ml/tests/markets/test_research_summary_cli.py`, real trainers, journal, keyless reporting, exact process failure, provenance and unsettled-journal refusals. Full fleet check `e67de880-ea70-47fd-93f5-dcb4a1438225` passed at published API `b3843a3d3b83cbae77dc4f855be2c4fbaa17b492` on Lavender at `2026-11-01T14:26:04Z`: 5,078 tests, 100% statement and branch coverage, strict typing and guards, 248 seconds against the unchanged 300-second budget. This is source-level and real-process test evidence, not an installed cluster rehearsal. Independent reporting review is tracked by board task `fc2dba58-52d8-42d9-9c4f-8169ae933206`.
 
 The shared admission journal, queue, native scheduler adapters and RunRecord
 publisher compose with the monthly worker without another coordinator or

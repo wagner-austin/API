@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
@@ -91,6 +92,7 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_extraction.py"
   - "libs/platform_core/src/platform_core/load_report.py"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json": "33c89daaca1b44b266192b687fd048fb2afc60f0"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
@@ -105,8 +107,8 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_research_resources.py": "2ec39a15d817dfd4b9f8b8453ae00a658b29a79f"
   "tools/hpc3/src/hpc3/cli/preflight.py": "4bb9e9bcbe89d6b04cf3c531beb67601b94f3776"
   "tools/hpc3/artifacts/wrds-selection-runtime-20261031/provenance.json": "70c5b43e9d2fba6feb801e351ec0d74ed342f3ee"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
-  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "b9f28bbe664535cfd134feecc4e6ae635597df48"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "18c05453efb28a9ab7504e9dd1436bc9a135cfcc"
+  "libs/covenant_ml/src/covenant_ml/markets/research_ranking.py": "ca12a77ffe77312243c3f2d8b7671245587fd00c"
   "libs/covenant_ml/tests/markets/test_research_ranking.py": "52af5cedf8815dc54831cd0bd623098535482026"
   "libs/covenant_ml/tests/markets/test_research_selection.py": "1a612f02d15aa6986831516ffb1f7f58db894aef"
   "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json": "38c1d946ee0fa443d8913cb56100b91cd78bd9f8"
@@ -169,7 +171,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "2288c853df8b360d8d8654b9eb2578af2fb3982e"
   "libs/covenant_ml/src/covenant_ml/markets/research_final.py": "ffcbb67a5d68f2040f003deb67d3b1831f445c3f"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_final.py": "fa810eb315b13925c5664c35b883b80be0afee2d"
-  "libs/covenant_ml/scripts/research_proposals.py": "5dfbb04cddfeedacee45ce63478f31cd6e5ecb97"
+  "libs/covenant_ml/scripts/research_proposals.py": "6f3ee44f306eb77a768a20142a80c82ddf42b7d6"
   "libs/covenant_ml/scripts/research_trial.py": "11fbcce7a4f7721db03c3f09677e9d06cce6f895"
   "libs/covenant_ml/tests/markets/test_research_final.py": "9f903a82aebf9c42ec8bfd989a7496462c9e430b"
   "libs/covenant_ml/tests/markets/test_crsp_final.py": "67af9e640314ef33871e9a182d6511fb75dc0abc"
@@ -187,6 +189,21 @@ confidence: medium
 
 # WRDS substantive baseline readiness
 
+**November 1 summary runtime:** source `b3843a3d3` is installed in
+`/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python` and the matching
+HPC3 image at
+`/data/homezvol1/wagnera3/research-images/summary-b3843a3d3/research-summary.sif`.
+The maintained controller inspector verified 585 application files, generated
+selfcheck and dependencies. Native image build `58719937` completed in 80
+seconds with exit `0:0`; inspection verified 14 identities and both selfchecks.
+The dependency pins are preserved. The new reporter needs no extract or key;
+its numerical and real-process checks passed, but the new native queue-to-summary
+rehearsal has not run. Independent reporting and runtime reviews remain tasks
+`fc2dba58` and `b1934ce6`. The substantive baseline and controlled final
+evaluation have not run.[^summary-runtime]
+
+[^summary-runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, exact source, controller and image identities, service report IDs and construction scope; its `runtime-audit.sql` and `audit-probes.json` retain the positive service-report join and six altered-evidence refusals. Full source check `e67de880` passed 5,078 tests, 100% statement and branch coverage, strict typing and guards in 248 seconds. The final typing correction passed independent audit `df6e94b8` at `2026-11-01T14:30:42.133Z`. See [[wrds-evaluation-reuse]] for the summary command and provenance.
+
 **November 1 resource measurement:** the new controller at
 `wrds-resources-11c0bdbdd` passed installed-file verification for 584 application
 files, generated selfcheck and dependency consistency. Matching image build
@@ -195,7 +212,8 @@ identities and both selfchecks. At 13:30:03 UTC the maintained native preflight
 accepted the frozen four-CPU, 128-GiB, 121-minute request on `free`, using the
 existing recipe and synthetic ciphertext. Nothing was queued by preflight;
 this establishes scheduler feasibility, not measured study memory usage or a
-licensed result. Independent resource review remains task `42a8d507`.[^resource-live]
+licensed result. Independent audit `967229c0` verified resource task `42a8d507`
+at 13:44:22 UTC on November 1.[^resource-live]
 
 
 - Research entry point: [[wrds-equity-research-protocol]].
@@ -641,7 +659,10 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    subsequently passed independent collection review. Encrypted HPC3 staging
    completed at 20:58:58 UTC.[^licensed-start][^licensed-collection][^licensed-staging]
 3. The corrected verifier and enforced ranking are frozen in selection image
-   `58698691`; licensed evaluator decoding follows the remaining allocation fix.
+   `58698691`. The allocation correction subsequently passed native preflight
+   and independent audit. The matching seed-summary runtime is now installed
+   and inspected; its independent runtime audit and synthetic queue-to-summary
+   rehearsal precede licensed evaluator execution.[^summary-runtime]
    The verifier corrections and licensed staging passed independent audit;
    the sealed final bundle and its key remain evaluator-owned.[^verifier-integrity][^staging-review][^selection-runtime]
 4. Independent selection review passed before licensed validation. Recovery
@@ -657,15 +678,19 @@ The remaining sequence follows these measured gaps:[^final-rehearsal][^wrds-nati
    enforces this ranking and complete seed coverage; see [[wrds-final-scoring]].
    Fleet checks passed 5,038 tests at 100% statement and branch coverage. The
    separate native rehearsal covers two synthetic candidates and five seeds;
-   neither is a licensed result. Seed-aggregated
-   uncertainty reporting remains tracked by board task `fc2dba58` before the study report.
+   neither is a licensed result. Seed-averaged uncertainty now reuses the same
+   ranking inputs and moving-block estimator, with the controller command and
+   provenance contract in [[wrds-evaluation-reuse]]. Task `fc2dba58` owns its
+   independent review. The matching `b3843a3d3` controller and image are now
+   installed and inspected; the synthetic queue-to-summary rehearsal remains
+   before the licensed baseline.[^summary-runtime]
    The native recipe now reads mandatory `cpus` and `mem_gb` from the existing
    evaluator-owned policy, including them in the journal and request identities.
    The 7,200-second evaluation retains a 121-minute scheduler request for
    termination grace and minute rounding. Fleet checks passed 5,066 research
    tests and 2,162 HPC3 tests with full statement and branch coverage. The
    installed controller, matching image and real resource preflight are now
-   measured; independent resource audit remains under board task `42a8d507`.
+   measured and independently verified by audit `967229c0` for task `42a8d507`.
    The licensed baseline has not run.[^baseline-freeze][^selection-enforcement][^selection-runtime][^selection-rehearsal][^resource-contract][^resource-live]
 
 [^selection-verified]: Live board audit `72d4a03d-251a-4e20-bd91-35dae56df2aa`, computed VERIFIED at `2026-11-01T12:27:53.357Z`, closed selection task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479`. It covers candidate/seed ranking, journal selection restrictions and the installed synthetic rehearsal with accurate unrun-baseline documentation.
@@ -689,7 +714,7 @@ no licensed data or final permission was opened.[^resource-live]
 
 [^resource-live]: `tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json`, measured controller/image summary, exact allocation, service report IDs, synthetic scope and artifact digests. `resource-audit.sql` and `audit-probes.json` retain the matching and six altered-evidence queries. `preflight.json` retains the scheduler's snapshot and external-entrypoint caveat; `input-readback.log` is explicitly session-invoked checksum evidence, not a service report.
 
-[^resource-contract]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py`, `ResearchPolicy` and policy codecs; `research_cluster.py`, `prepare_bundle`; `libs/covenant_ml/tests/markets/test_research_resources.py`, invalid/missing fields, proposer overrides, changed journal identity and both recipe phases; `tools/hpc3/src/hpc3/cli/preflight.py`, optional measured report. Fleet jobs `3f008e0a-1158-4431-832e-b08fad47b5c2` and `a4f2e56a-8df1-4ec4-9ed1-dc46db4f73ea` passed at that revision. Test repairs passed independent audits `bb45f5b0` and `1e829e45`; the former also required fresh fleet check `7bc56f1d`, which passed 5,066 tests at `ac8010418` with full coverage. Operational resource audit remains task `42a8d507`.
+[^resource-contract]: `libs/covenant_ml/src/covenant_ml/markets/research_records.py`, `ResearchPolicy` and policy codecs; `research_cluster.py`, `prepare_bundle`; `libs/covenant_ml/tests/markets/test_research_resources.py`, invalid/missing fields, proposer overrides, changed journal identity and both recipe phases; `tools/hpc3/src/hpc3/cli/preflight.py`, optional measured report. Fleet jobs `3f008e0a-1158-4431-832e-b08fad47b5c2` and `a4f2e56a-8df1-4ec4-9ed1-dc46db4f73ea` passed at that revision. Test repairs passed independent audits `bb45f5b0` and `1e829e45`; the former also required fresh fleet check `7bc56f1d`, which passed 5,066 tests at `ac8010418` with full coverage. Operational resource audit `967229c0-0366-4aeb-bb54-138c86034d5d` independently verified task `42a8d507` at `2026-11-01T13:44:22.566Z`.
 
 [^licensed-collection]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json`, native extraction receipt, cleanup observation, runtime inspection and preserved interrupted collection. Board tasks `a622165c-bb63-4714-933b-10d527f21478` and `da2a55dc-dc5a-4f4b-9bb7-81fbcf75f320`; separate verifier task `9cbbc85f-c747-4a6d-a919-72846dd2c59a`. Extraction receipt timestamps delimit database capture, not encryption or the whole allocation. Native report author `load-report-a622165c`; installed-controller report `fd164407-3505-4207-bc2d-d0e26fa69a1f`, author `hpc-report-da2a55dc`; image build `58662034`, SHA-256 `0c1be9d7e373e11518138cdf4cc3fdd922ef46313896494a6458c26f38c1b912`. None of these measurements is a substantive study result.
 
@@ -723,7 +748,7 @@ no licensed data or final permission was opened.[^resource-live]
 
 [^baseline-freeze]: `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/plan.json`, frozen design reference, evaluation digest, decoded initial proposals, selection, uncertainty, limits, agent phase and explicit enforcement gap. Board task `dcbb1d84-ddd6-4eed-9ff2-492b8f82329e`. These are prospective choices, not measurements or deployed controls. The artifact is the single record of the exact choices; existing proposal/evaluation codecs produced its candidate and evaluation identities without opening licensed data. Planned allocation is four CPUs, 128 GiB and 7,200 seconds on free, one licensed job at a time, subject to the existing resource preflight.
 
-[^selection-enforcement]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_selection`; `libs/covenant_ml/src/covenant_ml/markets/research_ranking.py`, `winning_attempt`; `libs/covenant_ml/tests/markets/test_research_ranking.py` and `test_research_selection.py`. API `a00c077b125ceb436e73b8f5327a2dda6b798663` passed full checks `86e7d08b-0ba3-4e7e-875a-d4e5059e6437` on Lavender and `ca5aed46-a588-4138-900f-871553960ef2` on Lacrymal. Typing-repair audit `da860f4f-989a-42cc-92d0-ba7f71da1d88` verified both criteria at `2026-10-31T23:37:45.710Z`; native enforcement task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479` remains open. Preregistration audit `41a3ba63-e078-48c2-a3d6-635e16d2ea42` verified the corrected 26-check mapping at `2026-10-31T23:16:55.288Z`, leaving the frozen plan unchanged.
+[^selection-enforcement]: `libs/covenant_ml/src/covenant_ml/markets/research_journal.py`, `_selection`; `libs/covenant_ml/src/covenant_ml/markets/research_ranking.py`, `winning_attempt`; `libs/covenant_ml/tests/markets/test_research_ranking.py` and `test_research_selection.py`. API `a00c077b125ceb436e73b8f5327a2dda6b798663` passed full checks `86e7d08b-0ba3-4e7e-875a-d4e5059e6437` on Lavender and `ca5aed46-a588-4138-900f-871553960ef2` on Lacrymal. Typing-repair audit `da860f4f-989a-42cc-92d0-ba7f71da1d88` verified both criteria at `2026-10-31T23:37:45.710Z`; native enforcement task `a9b2927c-3775-46cc-b86e-2aeb0c2c4479` subsequently passed independent audit `72d4a03d-251a-4e20-bd91-35dae56df2aa` at `2026-11-01T12:27:53.357Z`. Preregistration audit `41a3ba63-e078-48c2-a3d6-635e16d2ea42` verified the corrected 26-check mapping at `2026-10-31T23:16:55.288Z`, leaving the frozen plan unchanged.
 
 [^selection-runtime]: `tools/hpc3/artifacts/wrds-selection-runtime-20261031/provenance.json`, maintained controller, staging and image inspection outputs and exact input identities; `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py`, `prepare_bundle`, fixed resource fields. The first synthetic queue request `436d535d-44f9-4d1b-b1a0-5a72b9f065b7` closed failed for native job `58700181` with `CRSP-007`; nine remaining admitted attempts were interrupted before submission, preserving the abandoned study. Fresh synthetic fixtures use `libs/covenant_ml/tests/markets/_crsp_study_fixtures.py`, `study_rows` and `study_protocol`, and `_encrypted_fixtures.py`, `seal_extract`. No licensed input was opened by these measurements.
 
@@ -745,8 +770,8 @@ ledger. Jobs `58708603`, `58708606` and `58708609` were submitted, but the
 existing inspector refused ambiguous `research_attempt` matches. The correction
 adds the exact frozen artifact path and workspace host to that same lookup;
 duplicate exact matches still refuse. Recovery must retain these allocations
-and their journals. Recovery subsequently passed independent audit; the
-selection measurement awaits its separate review. See the active `a9b2927c` thread, including finding
+and their journals. Recovery and selection subsequently passed independent audits `eefb349e` and
+`72d4a03d`. See the retained `a9b2927c` thread, including finding
 `26b741fd-14fd-434a-b368-293c2662ba2f`.[^selection-recovery]
 
 The installed controller at
@@ -762,6 +787,6 @@ The deployment update above supersedes that queue state. The service-authored
 selection refusal recorded `RESEARCH-008`, exit 2, no selected candidate and
 identical before/after journal hashes. No final grant was released.[^selection-recovery]
 
-[^selection-recovery]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json`, session-assembled index of service reports: controller `a05f83c7`, native allocations `8937ff37`, `ccdaf960`, `ff26bbab`, `491cbaa6`, and unsettled selection `2edf1ef3`. Source `f38df09fe86566f5201bc59f9f28968276e72423` passed full fleet checks `835ae032` (5,041 tests) and `2163a86b` (2,160 tests), both at 100% statement and branch coverage. Live dispatch reading at 2026-11-01T02:01 UTC showed four running and six queued; board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` records the handover gap. Selection milestone `a9b2927c` remains open after the independent audit rejection.
+[^selection-recovery]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/evidence.json`, session-assembled index of service reports: controller `a05f83c7`, native allocations `8937ff37`, `ccdaf960`, `ff26bbab`, `491cbaa6`, and unsettled selection `2edf1ef3`. Source `f38df09fe86566f5201bc59f9f28968276e72423` passed full fleet checks `835ae032` (5,041 tests) and `2163a86b` (2,160 tests), both at 100% statement and branch coverage. Live dispatch reading at 2026-11-01T02:01 UTC showed four running and six queued; board task `04c0cdbe-278f-41bb-8141-a170fc0e5324` records the handover gap. Selection milestone `a9b2927c` subsequently passed independent audit `72d4a03d` at `2026-11-01T12:27:53.357Z`.
 
 [^selection-complete]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, fresh controller report `9d77722e` verifying 584 installed files, ten queue/native receipt pairs, and service-authored selection reports `e2831b84` (wrong candidate), `a100f9a7` (wrong seed), `baa53190` (winner), `62033c80` (repeated selection). `selection-audit.sql`, `controller-audit.sql` and `native-audit.sql` query those live program records; `selection-audit-probes.json` records positive outputs and eight altered-evidence refusals. The synthetic policy covers two candidates, five seeds each and 16 months; it is not the substantive licensed study. Recovery audit `eefb349e-642b-423c-9e18-3fa09fbb4281` verified `04c0cdbe` at `2026-11-01T10:46:40.205Z`. No final grant was released.

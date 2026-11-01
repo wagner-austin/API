@@ -51,7 +51,7 @@ source_git_blobs:
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "4364697f4fd104f049ae98d96288b7adca34f810"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
-  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "5c39eb8bf7937aae20a7ab26b79b4d29bbfe1df0"
+  "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "18c05453efb28a9ab7504e9dd1436bc9a135cfcc"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "4504084dce81b5cddbf86e861fef069108e753a5"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b39678f6d1546459a16d4df77bec6b6a91b29a9f"
@@ -66,7 +66,7 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "47eaddf94090471d7dc84e188829de4d8cfaf1dd"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "b5081a606ba9f8d21673ef75c9a7da5a197c6dde"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "b797984c6422a9c99cfd4db6c09ef92a40c755f9"
-  "libs/covenant_ml/tests/markets/test_research_trial.py": "36fe7e4cfcd45aa2ef8f3d83c4242473b5328df0"
+  "libs/covenant_ml/tests/markets/test_research_trial.py": "1526ae0f641a66fb686d80f028740abc40491f2d"
 provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
@@ -147,7 +147,8 @@ It used synthetic ciphertext and queued no evaluation. The existing queue
 adapter remains installed; this new interpreter is an evaluator-owned setting
 for future requests, and old requests retain their original runtime identities.
 This measurement does not execute the licensed baseline or replace the prior
-shared-queue rehearsal. Independent resource audit remains pending.[^resource-live]
+shared-queue rehearsal. Independent resource audit `967229c0` verified task
+`42a8d507` at 13:44:22 UTC on November 1.[^resource-live]
 
 [^resource-live]: `tools/hpc3/artifacts/wrds-resource-preflight-20261101/evidence.json`, frozen runtime, native image build, service-authored preflight, synthetic scope and exact input digests. Its retained audit query joins controller, image, staged request and scheduler reports; all six altered-evidence probes return zero.
 
