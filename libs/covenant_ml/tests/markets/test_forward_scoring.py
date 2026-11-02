@@ -15,6 +15,7 @@ from platform_core.json_utils import (
     narrow_json_to_dict,
     require_dict,
     require_float,
+    require_int,
     require_list,
 )
 from platform_core.power_distributions import t_critical
@@ -31,10 +32,10 @@ from covenant_ml.markets.forward_scoring import (
 )
 from covenant_ml.markets.validation import read_document
 
-from ._forward_fixtures import forward_campaign, plan_document
+from ._forward_fixtures import forward_campaign, plan_document, restore_clock
 from ._server import ApiServer, api_server
 
-__all__ = ["api_server"]
+__all__ = ["api_server", "restore_clock"]
 
 
 def score(plan: ForwardPlan, root: Path, observed: str, url: str) -> JSONObject:
@@ -59,7 +60,7 @@ def saved_model_probability(root: Path, name: str) -> float:
 
 
 def test_declared_dates_score_from_archives_without_requests(
-    api_server: ApiServer, tmp_path: Path
+    api_server: ApiServer, tmp_path: Path, restore_clock: None
 ) -> None:
     outcomes = [
         ("binary", 1),
@@ -88,7 +89,7 @@ def test_declared_dates_score_from_archives_without_requests(
     assert [date["contracts"] for date in dates] == [1, 1, 1, 0, 0, 0]
     assert [date["paired_brier_difference"] for date in dates[3:]] == [None, None, None]
     differences: list[float] = []
-    for frozen, date, (_, yes) in zip(campaign["plans"][:3], dates[:3], outcomes, strict=True):
+    for frozen, date, (_, yes) in zip(campaign["plans"][:3], dates[:3], outcomes[:3], strict=True):
         probability = saved_model_probability(root, frozen["name"])
         model, reference = (probability - yes) ** 2, (0.5 - yes) ** 2
         assert (date["model_brier"], date["reference_brier"]) == pytest.approx((model, reference))
@@ -97,13 +98,12 @@ def test_declared_dates_score_from_archives_without_requests(
     assert report["mean_paired_brier_difference"] == pytest.approx(mean)
     comparison = require_dict(report, "comparison")
     interval = require_dict(comparison, "interval")
-    assert (interval["estimate"], interval["n_units"]) == (pytest.approx(mean), 3)
+    assert require_float(interval, "estimate") == pytest.approx(mean)
+    assert require_int(interval, "n_units") == 3
     power = require_dict(comparison, "power")
     expected_mde = t_critical(2, 0.05) * stdev(differences) / math.sqrt(3)
-    assert (power["replicates"], power["minimum_detectable_effect"]) == (
-        3,
-        pytest.approx(expected_mde),
-    )
+    assert require_int(power, "replicates") == 3
+    assert require_float(power, "minimum_detectable_effect") == pytest.approx(expected_mde)
     assert power["smallest_effect_of_interest"] == pytest.approx(0.005)
     probability = saved_model_probability(root, campaign["plans"][0]["name"])
     edge = max(probability, 1 - probability) - 0.64
@@ -138,7 +138,9 @@ def test_declared_dates_score_from_archives_without_requests(
     assert report["plan_sha256"] == "c" * 64
 
 
-def test_too_few_scored_dates_fail_every_criterion(api_server: ApiServer, tmp_path: Path) -> None:
+def test_too_few_scored_dates_fail_every_criterion(
+    api_server: ApiServer, tmp_path: Path, restore_clock: None
+) -> None:
     campaign, root, digest, observed = forward_campaign(
         api_server, tmp_path, [("binary", 1), ("binary", 0)]
     )
@@ -175,7 +177,12 @@ def test_too_few_scored_dates_fail_every_criterion(api_server: ApiServer, tmp_pa
     ],
 )
 def test_a_plan_the_campaign_does_not_answer_is_refused(
-    api_server: ApiServer, tmp_path: Path, section: str, field: str, value: JSONValue
+    api_server: ApiServer,
+    tmp_path: Path,
+    restore_clock: None,
+    section: str,
+    field: str,
+    value: JSONValue,
 ) -> None:
     campaign, root, digest, observed = forward_campaign(api_server, tmp_path, [("binary", 1)])
     document = plan_document(campaign, digest, days(campaign))
@@ -187,7 +194,7 @@ def test_a_plan_the_campaign_does_not_answer_is_refused(
 
 
 def test_a_capture_its_archives_do_not_reproduce_is_refused(
-    api_server: ApiServer, tmp_path: Path
+    api_server: ApiServer, tmp_path: Path, restore_clock: None
 ) -> None:
     campaign, root, _, _ = forward_campaign(api_server, tmp_path, [("binary", 1)])
     model = read_document(Path(campaign["models"][0]["path"]))

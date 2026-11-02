@@ -16,10 +16,11 @@ from ._paper_fixtures import cli_inputs, paper_plan
 
 
 def single_campaign(root: Path, days: int = 1) -> tuple[Campaign, Path, str]:
-    """Persist a campaign whose plans share one capture window, one event day apiece.
+    """Persist a campaign of consecutive event days, one plan apiece.
 
     The first plan is the frozen ``paper-test`` plan; each further plan is that plan
-    on the next event day, named for its offset.
+    moved whole days later, event day and capture window together, and named for
+    its offset, so every window still precedes its own event day.
     """
     plan = paper_plan()
     cli_inputs(root, plan)
@@ -27,12 +28,16 @@ def single_campaign(root: Path, days: int = 1) -> tuple[Campaign, Path, str]:
         narrow_json_to_dict(load_json_str((root / "plan.json").read_text("utf-8")))
     )
     first = date.fromisoformat(frozen["event_day"])
+    start = datetime.fromisoformat(frozen["window_start"])
+    end = datetime.fromisoformat(frozen["window_end"])
     later = tuple(
         decode_paper_plan(
             {
                 **encode_paper_plan(frozen),
                 "name": f"{frozen['name']}-{offset}",
                 "event_day": (first + timedelta(days=offset)).isoformat(),
+                "window_start": (start + timedelta(days=offset)).isoformat(),
+                "window_end": (end + timedelta(days=offset)).isoformat(),
             }
         )
         for offset in range(1, days)
