@@ -559,3 +559,7 @@ Notes: Publish immutable revision, complete encrypted readback, exact failed-spa
 Pages written: wrds-v3-refused-path-diagnosis
 Pages updated: wrds-baseline-readiness, wrds-baseline-v3-freeze, crsp-monthly-holdings-validation, crsp-monthly-study-design, wrds-baseline-20261101, libs hub, index
 Notes: Native 58766611 reproduced 262000 paths and all 27 refusals with seventeen verified inputs. Record source flags, relative timing, the unchanged study journal and a narrow missing-price diagnostic correction; retain the protocol stop and separate required review/checks from collection success. Board task a9ad53ae-2ea9-4728-a9bb-d9d4795640c5.
+
+## [2026-11-02] Qualification | CRSP outcome requirements
+Page added: crsp-outcome-qualification; linked from readiness and libs, total 72 pages.
+Notes: Re-read captured vendor definitions and existing path/partition owners. Separate execution assumptions, closed suspended spans, incomplete returns, late terminal values and prospective event-visibility checks. No new economic rule, vendor correction, candidate fitting or final release is claimed. Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3.
