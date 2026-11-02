@@ -293,7 +293,14 @@ Installed controller and image identities are recorded in
 They use frozen wheels; newly checked source does not update an installed study.
 
 Use `cluster.json` as the installed-controller configuration reference; its
-`report_task` must name the task owning a new run. Preserve the existing journal
+`report_task` must name the task owning a new run. Its required `binds` list
+declares data directories for that request: use `[]` for a home-only job or
+explicit paths such as `["/pub"]` when shared storage is required. Research
+preparation copies that list into the frozen image reference. The shared
+launcher disables site bind-paths and hostfs mounts and clears ambient bind
+environment variables for preflight, provenance reads and payload execution.
+Standard home, device and temporary mounts remain; this is not an isolation
+boundary. Preserve the existing journal
 and use a newly admitted attempt number and exclusive directory for each run.
 The [readiness record](../../wiki/pages/wrds-baseline-readiness.md) documents the
 frozen image, completed encrypted validation rehearsal and remaining final-key,
