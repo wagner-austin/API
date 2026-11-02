@@ -12,54 +12,60 @@ import sys
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import dump_json_str, load_json_str, narrow_json_to_dict
+from platform_core.json_utils import (
+    dump_json_str,
+    load_json_str,
+    narrow_json_to_dict,
+    narrow_json_to_list,
+)
+from platform_core.run_record import decode_observation
 
 from covenant_ml.markets.crsp_cohort_records import encode_crsp_cohort_plan
-from covenant_ml.markets.crsp_extraction_records import encode_crsp_limits
 from covenant_ml.markets.crsp_snapshot import PSQL
 
-from ._crsp_extraction_fixtures import FakeDatabase, database_rows, limits
+from ._crsp_extraction_fixtures import FakeDatabase, database_rows
 from ._crsp_process_fixtures import client_environment
 from ._crsp_refresh_fixtures import RefreshCase, refresh_case
-
-PROGRAM = """
-import sys
-from pathlib import Path
-from platform_core.json_utils import dump_json_str, require_str
-from covenant_ml.markets.crsp_cohort_records import decode_crsp_cohort_plan
-from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
-from covenant_ml.markets.crsp_refresh import compare_crsp_vintages
-from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
-from covenant_ml.markets.validation import read_document
-root = Path(sys.argv[1])
-request = read_document(root / 'refresh-request.json')
-result = compare_crsp_vintages(
-    root / 'cohort' / 'bundle.json', require_str(request, 'digest'),
-    decode_crsp_cohort_plan(request['plan']),
-    EvaluatorKeys(decode_research_access(read_document(root / 'access.json'))),
-    scratch=root / 'scratch', destination=root / 'fresh',
-    limits=decode_crsp_limits(request['limits']), setup=None,
-)
-print(dump_json_str(result))
-"""
 
 
 def _run(
     case: RefreshCase, body: str, seconds: int, max_bytes: int
 ) -> subprocess.CompletedProcess[str]:
     root = case.cohort.extraction.root
-    (root / "refresh-request.json").write_text(
-        dump_json_str(
-            {
-                "digest": case.digest,
-                "plan": encode_crsp_cohort_plan(case.cohort.plan),
-                "limits": encode_crsp_limits(limits(seconds=seconds, max_relation_bytes=max_bytes)),
-            }
-        )
+    (root / "plan.json").write_text(dump_json_str(encode_crsp_cohort_plan(case.cohort.plan)))
+    (root / "native-output").mkdir()
+    environment = client_environment(root, body)
+    environment.update(
+        WRDS_OUTPUT_DIR=str(root / "native-output"), TMPDIR=str(case.cohort.extraction.scratch)
     )
     return subprocess.run(
-        [sys.executable, "-c", PROGRAM, str(root)],
-        env=client_environment(root, body),
+        [
+            sys.executable,
+            "-m",
+            "scripts.crsp_extraction",
+            "refresh",
+            "--cohort",
+            str(case.cohort.destination / "bundle.json"),
+            "--cohort-sha256",
+            case.digest,
+            "--plan",
+            str(root / "plan.json"),
+            "--access",
+            str(root / "access.json"),
+            "--max-rows",
+            "20000",
+            "--max-relation-bytes",
+            str(max_bytes),
+            "--max-partition-bytes",
+            "4000000",
+            "--seconds",
+            str(seconds),
+            "--scratch-env",
+            "TMPDIR",
+            "--output-env",
+            "WRDS_OUTPUT_DIR",
+        ],
+        env=environment,
         capture_output=True,
         text=True,
         timeout=120,
@@ -75,12 +81,24 @@ def test_real_refresh_process_captures_and_encrypts_client_output(tmp_path: Path
     FakeDatabase(database_rows(), securities=(1,))(PSQL, source, seconds=1, max_file_bytes=1)
     (source / "extract.sql").unlink()
     result = _run(case, f'exec cp -R "{source}/." .\n', 120, 2_000_000)
-    assert (result.returncode, result.stderr) == (0, "")
-    public = narrow_json_to_dict(load_json_str(result.stdout))
+    assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
+    output = tmp_path / "native-output"
+    public = narrow_json_to_dict(load_json_str((output / "comparison.json").read_text()))
     assert public["kind"] == "CRSP_DIAGNOSTIC_REFRESH"
     assert public["plaintext_removed"] is True
     assert list(case.cohort.extraction.scratch.iterdir()) == []
-    assert (case.destination / "bundle.json").is_file()
+    assert (output / "comparison" / "bundle.json").is_file()
+    metrics = tuple(
+        decode_observation(value)
+        for value in narrow_json_to_list(load_json_str((output / "metrics.json").read_text()))
+    )
+    assert len(metrics) == 24
+    assert {item["name"] for item in metrics} == {
+        role + "." + name
+        for role in ("membership", "returns", "calendar", "delists")
+        for name in ("old", "fresh", "unchanged", "added", "removed", "changed")
+    }
+    assert all(item["value"] == 0 for item in metrics if item["name"].endswith(".changed"))
 
 
 @pytest.mark.parametrize(
@@ -106,4 +124,4 @@ def test_real_client_failures_remove_authenticated_plaintext_without_leaking_sql
     assert error in result.stderr
     assert "private SQL" not in result.stderr
     assert list(case.cohort.extraction.scratch.iterdir()) == []
-    assert not case.destination.exists()
+    assert list((tmp_path / "native-output").iterdir()) == []

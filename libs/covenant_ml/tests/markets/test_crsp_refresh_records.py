@@ -67,11 +67,18 @@ def test_refresh_codec_roundtrip_and_study_refusal(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize(
+    ("field", "value"), [("unknown", "extra"), ("kind", "study"), ("source", "crsp")]
+)
+def test_unknown_fields_and_identities_refuse(tmp_path: Path, field: str, value: str) -> None:
+    document = _document(tmp_path)
+    document[field] = value
+    with pytest.raises(ValueError, match="CRSP_REFRESH_RECORD"):
+        decode_crsp_refresh(document)
+
+
+@pytest.mark.parametrize(
     "mutation",
     [
-        "fields",
-        "kind",
-        "source",
         "synthetic",
         "setup",
         "protocol",
@@ -84,13 +91,7 @@ def test_refresh_codec_roundtrip_and_study_refusal(tmp_path: Path) -> None:
 )
 def test_ambiguous_refresh_metadata_refuses(tmp_path: Path, mutation: str) -> None:
     document = _document(tmp_path)
-    if mutation == "fields":
-        document["unknown"] = 1
-    elif mutation == "kind":
-        document["kind"] = "study"
-    elif mutation == "source":
-        document["source"] = "crsp"
-    elif mutation == "synthetic":
+    if mutation == "synthetic":
         document["source"] = "synthetic"
     elif mutation == "setup":
         document["setup_sha256"] = "f" * 64
