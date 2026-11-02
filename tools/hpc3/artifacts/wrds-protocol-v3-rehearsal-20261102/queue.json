@@ -1,0 +1,74 @@
+{
+  "job": {
+    "researchRequest": {
+      "backend": "hpc3",
+      "specSha256": "58c1bd2d4b60686feafc29116550dc2746f1ffbe5322988e47deff7b7fa68ccf",
+      "attempt": "protocol-v3-284bc096-1"
+    },
+    "modelEndpoint": null,
+    "model": null,
+    "id": "b45ef01a-d55e-4790-ba78-1a4ed5bda3f9",
+    "project": "research/hpc3",
+    "command": "research",
+    "status": "passed",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "284bc096-4b05-446b-9463-5ef5c49fa520",
+    "node": "ziggurat",
+    "runId": "b45ef01a-d55e-4790-ba78-1a4ed5bda3f9",
+    "exitCode": 0,
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58747974\",\"record_sha256\":\"ff3071f5a7a660ba1452c00b3939a6510d9788a51caea2e0e9081892423cf6e8\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-11-02T06:35:58.167Z",
+    "updatedAt": "2026-11-02T06:39:37.549Z",
+    "claimedAt": "2026-11-02T06:36:07.956Z",
+    "closedAt": "2026-11-02T06:39:37.549Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "c4456d11-c000-4954-b4a4-b8649e5755d1",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued research hpc3 specification 58c1bd2d4b60686feafc29116550dc2746f1ffbe5322988e47deff7b7fa68ccf attempt protocol-v3-284bc096-1 on ziggurat for task 284bc096-4b05-446b-9463-5ef5c49fa520",
+      "createdAt": "2026-11-02T06:35:58.167Z"
+    },
+    {
+      "id": "da42d423-291f-4ece-823e-d1084d2e8c89",
+      "kind": "claimed",
+      "actor": "fleet-research-diphtheria",
+      "body": "claimed by fleet-research-diphtheria under a 7200s lease",
+      "createdAt": "2026-11-02T06:36:07.956Z"
+    },
+    {
+      "id": "7df7763e-e37a-4524-8578-540833a9f75c",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "started make research for research/hpc3 on ziggurat as run b45ef01a-d55e-4790-ba78-1a4ed5bda3f9",
+      "createdAt": "2026-11-02T06:36:08.026Z"
+    },
+    {
+      "id": "7861cb64-b013-454f-b815-557740303f45",
+      "kind": "progress",
+      "actor": "fleet-research-diphtheria",
+      "body": "{\"state\":\"running\",\"native_job_id\":\"58747974\",\"record_sha256\":null,\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+      "createdAt": "2026-11-02T06:36:20.254Z"
+    },
+    {
+      "id": "f63198ea-5f26-46ca-9187-e2992bbc8365",
+      "kind": "closed",
+      "actor": "fleet-research-diphtheria",
+      "body": "passed: Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58747974\",\"record_sha256\":\"ff3071f5a7a660ba1452c00b3939a6510d9788a51caea2e0e9081892423cf6e8\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+      "createdAt": "2026-11-02T06:39:37.549Z"
+    }
+  ],
+  "waiting": []
+}

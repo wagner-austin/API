@@ -1,0 +1,556 @@
+{
+ "experiment": "3374ef950481739079ae784ab5a875136b6d57eadb78021bb08d077fdd46b6fe",
+ "label": "1",
+ "fingerprint": {
+  "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ },
+ "observations": [
+  {
+   "name": "cleargbm_vs_momentum.net_return.ci_high",
+   "value": 0.013845814435210418
+  },
+  {
+   "name": "cleargbm_vs_momentum.net_return.ci_low",
+   "value": -0.017559106524257323
+  },
+  {
+   "name": "cleargbm_vs_momentum.net_return.difference",
+   "value": -0.00053521395874713
+  },
+  {
+   "name": "cleargbm_vs_momentum.net_return.p_value",
+   "value": 0.6666666666666666
+  },
+  {
+   "name": "equal_weight_vs_momentum.net_return.ci_high",
+   "value": 0.00432126639467757
+  },
+  {
+   "name": "equal_weight_vs_momentum.net_return.ci_low",
+   "value": -0.01994644561893575
+  },
+  {
+   "name": "equal_weight_vs_momentum.net_return.difference",
+   "value": -0.007391852145131481
+  },
+  {
+   "name": "equal_weight_vs_momentum.net_return.p_value",
+   "value": 0.27860696517412936
+  },
+  {
+   "name": "lightgbm_vs_momentum.net_return.ci_high",
+   "value": 0.021444420810872576
+  },
+  {
+   "name": "lightgbm_vs_momentum.net_return.ci_low",
+   "value": -0.014128838036713205
+  },
+  {
+   "name": "lightgbm_vs_momentum.net_return.difference",
+   "value": 0.003929276753871294
+  },
+  {
+   "name": "lightgbm_vs_momentum.net_return.p_value",
+   "value": 0.9850746268656716
+  },
+  {
+   "name": "mean_net_return.cleargbm.10bps",
+   "value": 0.020599458377597045
+  },
+  {
+   "name": "mean_net_return.cleargbm.25bps",
+   "value": 0.019584014366452074
+  },
+  {
+   "name": "mean_net_return.cleargbm.5bps",
+   "value": 0.020938382711004955
+  },
+  {
+   "name": "mean_net_return.equal_weight.10bps",
+   "value": 0.013742820191212694
+  },
+  {
+   "name": "mean_net_return.equal_weight.25bps",
+   "value": 0.013411941047113685
+  },
+  {
+   "name": "mean_net_return.equal_weight.5bps",
+   "value": 0.013853213021759493
+  },
+  {
+   "name": "mean_net_return.lightgbm.10bps",
+   "value": 0.02506394909021547
+  },
+  {
+   "name": "mean_net_return.lightgbm.25bps",
+   "value": 0.02405559678117468
+  },
+  {
+   "name": "mean_net_return.lightgbm.5bps",
+   "value": 0.02540044638719395
+  },
+  {
+   "name": "mean_net_return.momentum.10bps",
+   "value": 0.021134672336344175
+  },
+  {
+   "name": "mean_net_return.momentum.25bps",
+   "value": 0.020611756687548125
+  },
+  {
+   "name": "mean_net_return.momentum.5bps",
+   "value": 0.021309117121175704
+  },
+  {
+   "name": "mean_net_return.xgboost.10bps",
+   "value": 0.017432398902495483
+  },
+  {
+   "name": "mean_net_return.xgboost.25bps",
+   "value": 0.017027790187827012
+  },
+  {
+   "name": "mean_net_return.xgboost.5bps",
+   "value": 0.017567433956185298
+  },
+  {
+   "name": "mean_turnover.cleargbm.10bps",
+   "value": 0.6638156022098819
+  },
+  {
+   "name": "mean_turnover.cleargbm.25bps",
+   "value": 0.6631714748142009
+  },
+  {
+   "name": "mean_turnover.cleargbm.5bps",
+   "value": 0.6640306467155335
+  },
+  {
+   "name": "mean_turnover.equal_weight.10bps",
+   "value": 0.21994863699474748
+  },
+  {
+   "name": "mean_turnover.equal_weight.25bps",
+   "value": 0.21979986189829906
+  },
+  {
+   "name": "mean_turnover.equal_weight.5bps",
+   "value": 0.21999833827153065
+  },
+  {
+   "name": "mean_turnover.lightgbm.10bps",
+   "value": 0.6608428700998936
+  },
+  {
+   "name": "mean_turnover.lightgbm.25bps",
+   "value": 0.6602845125875769
+  },
+  {
+   "name": "mean_turnover.lightgbm.5bps",
+   "value": 0.6610292837871712
+  },
+  {
+   "name": "mean_turnover.momentum.10bps",
+   "value": 0.34758867083212097
+  },
+  {
+   "name": "mean_turnover.momentum.25bps",
+   "value": 0.3473828511793796
+  },
+  {
+   "name": "mean_turnover.momentum.5bps",
+   "value": 0.3476573667406957
+  },
+  {
+   "name": "mean_turnover.xgboost.10bps",
+   "value": 0.2697415253916761
+  },
+  {
+   "name": "mean_turnover.xgboost.25bps",
+   "value": 0.26949169597550476
+  },
+  {
+   "name": "mean_turnover.xgboost.5bps",
+   "value": 0.2698249565788928
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+   "value": 0.033783629784751135
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+   "value": 0.051862099614124135
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+   "value": 0.06762504170476769
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+   "value": 0.03959200549686259
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+   "value": -0.011313463544125324
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+   "value": 0.07736224929700897
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+   "value": -0.02223882908218322
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+   "value": -0.05206730144635563
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+   "value": -0.039125469099341226
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+   "value": 0.0076641955144305385
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+   "value": 0.02461859033472935
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+   "value": 0.014068051106039592
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+   "value": 0.06952395829959834
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+   "value": -0.016444551267768004
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+   "value": 0.07119330260259371
+  },
+  {
+   "name": "monthly_net_return.cleargbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+   "value": 0.013487824726420072
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-07-31.2018-08-01.2018-09-03",
+   "value": 0.016515090187992465
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-08-31.2018-09-03.2018-10-01",
+   "value": 0.03236912559817706
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-09-28.2018-10-01.2018-11-01",
+   "value": 0.09589009565831619
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-10-31.2018-11-01.2018-12-03",
+   "value": 0.07227805205820714
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-11-30.2018-12-03.2019-01-01",
+   "value": -0.0497484331558965
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2018-12-31.2019-01-01.2019-02-01",
+   "value": 0.04084885128195914
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-01-31.2019-02-01.2019-03-01",
+   "value": -0.0900805730012042
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-02-28.2019-03-01.2019-04-01",
+   "value": -0.022650379637812246
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-03-29.2019-04-01.2019-05-01",
+   "value": -0.019797681728656147
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-04-30.2019-05-01.2019-06-03",
+   "value": 0.0047562309318598395
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-05-31.2019-06-03.2019-07-01",
+   "value": 0.010144320265082607
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-06-28.2019-07-01.2019-08-01",
+   "value": 0.04659192984921279
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-07-31.2019-08-01.2019-09-02",
+   "value": 0.05413725164851391
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-08-30.2019-09-02.2019-10-01",
+   "value": 0.013057965945250327
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-09-30.2019-10-01.2019-11-01",
+   "value": -0.005184911061948405
+  },
+  {
+   "name": "monthly_net_return.equal_weight.10bps.2019-10-31.2019-11-01.2019-12-02",
+   "value": 0.02075818822034914
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+   "value": 0.033783629784751135
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+   "value": 0.051862099614124135
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+   "value": 0.06762504170476769
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+   "value": 0.03959200549686259
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+   "value": -0.011313463544125324
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+   "value": 0.07736224929700897
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+   "value": -0.02223882908218322
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+   "value": -0.018947930204017083
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+   "value": -0.03913577105869548
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+   "value": 0.0076641955144305385
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+   "value": 0.02461859033472935
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+   "value": 0.014068051106039592
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+   "value": 0.06952395829959812
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+   "value": 0.021189549154271736
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+   "value": 0.07188198429946491
+  },
+  {
+   "name": "monthly_net_return.lightgbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+   "value": 0.01348782472641985
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-07-31.2018-08-01.2018-09-03",
+   "value": 0.05598876740941616
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-08-31.2018-09-03.2018-10-01",
+   "value": 0.012114402128963642
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-09-28.2018-10-01.2018-11-01",
+   "value": 0.12414761509274697
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-10-31.2018-11-01.2018-12-03",
+   "value": 0.10499299525960382
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-11-30.2018-12-03.2019-01-01",
+   "value": -0.005880559306886357
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2018-12-31.2019-01-01.2019-02-01",
+   "value": 0.03705883659797338
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-01-31.2019-02-01.2019-03-01",
+   "value": -0.03939278283443781
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-02-28.2019-03-01.2019-04-01",
+   "value": -0.053459072437388455
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-03-29.2019-04-01.2019-05-01",
+   "value": -0.012903572650136752
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-04-30.2019-05-01.2019-06-03",
+   "value": -0.0036866977866218953
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-05-31.2019-06-03.2019-07-01",
+   "value": 0.02083902075203814
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-06-28.2019-07-01.2019-08-01",
+   "value": 0.07190379719707041
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-07-31.2019-08-01.2019-09-02",
+   "value": 0.06837531669368246
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-08-30.2019-09-02.2019-10-01",
+   "value": -0.015786866036710867
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-09-30.2019-10-01.2019-11-01",
+   "value": -0.04548700178989362
+  },
+  {
+   "name": "monthly_net_return.momentum.10bps.2019-10-31.2019-11-01.2019-12-02",
+   "value": 0.019330559092087585
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-07-31.2018-08-01.2018-09-03",
+   "value": 0.029616488022665255
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-08-31.2018-09-03.2018-10-01",
+   "value": 0.020011498431669716
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-09-28.2018-10-01.2018-11-01",
+   "value": 0.10798351276011098
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-10-31.2018-11-01.2018-12-03",
+   "value": 0.08922384856774257
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-11-30.2018-12-03.2019-01-01",
+   "value": -0.004224712334670477
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2018-12-31.2019-01-01.2019-02-01",
+   "value": 0.07801190619757992
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-01-31.2019-02-01.2019-03-01",
+   "value": -0.03466889846800936
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-02-28.2019-03-01.2019-04-01",
+   "value": -0.052867894466383736
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-03-29.2019-04-01.2019-05-01",
+   "value": -0.035553772975341125
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-04-30.2019-05-01.2019-06-03",
+   "value": -0.038491605044623456
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-05-31.2019-06-03.2019-07-01",
+   "value": 0.021542206592951585
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-06-28.2019-07-01.2019-08-01",
+   "value": 0.07190379719707019
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-07-31.2019-08-01.2019-09-02",
+   "value": 0.06837531669368269
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-08-30.2019-09-02.2019-10-01",
+   "value": -0.015786866036710756
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-09-30.2019-10-01.2019-11-01",
+   "value": -0.045487001789893844
+  },
+  {
+   "name": "monthly_net_return.xgboost.10bps.2019-10-31.2019-11-01.2019-12-02",
+   "value": 0.019330559092087585
+  },
+  {
+   "name": "xgboost_vs_momentum.net_return.ci_high",
+   "value": 0.004626978788162604
+  },
+  {
+   "name": "xgboost_vs_momentum.net_return.ci_low",
+   "value": -0.009184296196237276
+  },
+  {
+   "name": "xgboost_vs_momentum.net_return.difference",
+   "value": -0.003702273433848692
+  },
+  {
+   "name": "xgboost_vs_momentum.net_return.p_value",
+   "value": 0.5771144278606966
+  }
+ ],
+ "payload_digest": "8bac59b95dbd3d490b076f9376d7a58b2d66896b365945c2ba6078e5e39e6015"
+}

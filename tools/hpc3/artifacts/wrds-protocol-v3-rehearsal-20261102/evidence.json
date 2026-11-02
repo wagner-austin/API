@@ -1,0 +1,259 @@
+{
+  "task": "284bc096-4b05-446b-9463-5ef5c49fa520",
+  "scope": "One synthetic protocol-v3 queue rehearsal; no licensed study, candidate selection or final release.",
+  "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+  "prerequisite_audits": {
+    "amendment": {
+      "task": "6f7a3cf9-ea63-452a-8b86-578dbc479361",
+      "audit": "87d6ea8b-73c2-401f-b6ee-ea5d84e81b89",
+      "status": "VERIFIED",
+      "at": "2026-11-02T06:19:39.423Z"
+    },
+    "runtime": {
+      "task": "eab6beb4-3c2c-44b2-92b1-9c8f6c853099",
+      "audit": "29717b73-7ca6-41c6-b0ad-fe8d843dd5fe",
+      "status": "VERIFIED",
+      "at": "2026-11-02T06:23:34.938Z"
+    }
+  },
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+  "image_sha256": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "queue": {
+    "researchRequest": {
+      "backend": "hpc3",
+      "specSha256": "58c1bd2d4b60686feafc29116550dc2746f1ffbe5322988e47deff7b7fa68ccf",
+      "attempt": "protocol-v3-284bc096-1"
+    },
+    "modelEndpoint": null,
+    "model": null,
+    "id": "b45ef01a-d55e-4790-ba78-1a4ed5bda3f9",
+    "project": "research/hpc3",
+    "command": "research",
+    "status": "passed",
+    "requestedNode": "ziggurat",
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": null,
+    "requiredTags": [],
+    "taskId": "284bc096-4b05-446b-9463-5ef5c49fa520",
+    "node": "ziggurat",
+    "runId": "b45ef01a-d55e-4790-ba78-1a4ed5bda3f9",
+    "exitCode": 0,
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58747974\",\"record_sha256\":\"ff3071f5a7a660ba1452c00b3939a6510d9788a51caea2e0e9081892423cf6e8\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027",
+    "claimedBy": "fleet-research-diphtheria",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-11-02T06:35:58.167Z",
+    "updatedAt": "2026-11-02T06:39:37.549Z",
+    "claimedAt": "2026-11-02T06:36:07.956Z",
+    "closedAt": "2026-11-02T06:39:37.549Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "queue_replay": "Repeats while running and after completion returned the original b45ef01a-d55e-4790-ba78-1a4ed5bda3f9. The service reread records exactly one completed attempt/native job.",
+  "native_accounting": {
+    "job": {
+      "job_id": "58747974",
+      "name": "cleargbm.research-ead91fcae200-1",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 10,
+      "billing_tres": 4,
+      "gpu_count": 0,
+      "cpu_count": 4,
+      "node_list": "hpc3-15-22"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-11-02T06:36:21",
+    "ended_at": "2026-11-02T06:36:31"
+  },
+  "native_input_verification": {
+    "verified_files": 16,
+    "compute_checksum_lines": 16
+  },
+  "result": {
+    "payload_sha256": "f9e7a03e84fd273c87ae82792f63164ef9f356a799feb4352970f2977d9dfabe",
+    "sidecar_sha256": "043f3bf8140aea0860b87e879f1490afafaff2c9983c2418cb0d5cb06a1416cd",
+    "arm_cost_cases": 15,
+    "months_per_case": 16,
+    "period_observations": 240,
+    "paired_comparisons": 4,
+    "absolute_tolerance": 1e-12,
+    "gap_case": [
+      {
+        "arm": "equal_weight",
+        "cost_bps": 10,
+        "entry_case": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "unfilled": [
+            8
+          ],
+          "cash": 0.14913768669389632,
+          "turnover": 0.14590556703901358,
+          "cost": 0.00014590556703901358,
+          "net_return": -0.022650379637812246,
+          "held": [
+            [
+              3,
+              0.14034812664135318
+            ],
+            [
+              4,
+              0.1399291330870444
+            ],
+            [
+              5,
+              0.1435048529310185
+            ],
+            [
+              6,
+              0.14386053367789253
+            ],
+            [
+              7,
+              0.15501976491667002
+            ]
+          ],
+          "receivables": [
+            {
+              "permno": 8,
+              "valued": "2019-03-01",
+              "amount": 0.12819990205212498
+            }
+          ]
+        },
+        "gap_expected_growth": 1.0394405891171332,
+        "gap_observed_growth": 1.0394405891171332
+      }
+    ]
+  },
+  "preflight_incident": {
+    "initial": "600-second TimeoutExpired while Apptainer waited on BeeGFS /pub metadata; diagnostic stat also observed D-state FhgfsOps_revalidateIntent.",
+    "diagnostic": "Exact image printed Python 3.11.16 with --no-mount bind-paths and without explicit /pub bind; diagnostic only, no frozen-request change.",
+    "recovery": "At 06:35:20Z bounded stat -L /pub returned directory and all four recorded remote probe PIDs were absent. Unchanged canonical preflight passed at 06:35:46Z before queue submission.",
+    "followup_task": "0a0e5913-7be2-4be5-8225-2833d21981f8",
+    "limit": "No permanent filesystem fix or cluster-wide recovery established."
+  },
+  "preparation_correction": "Initial operational prepare_bundle call reversed cluster and trial, raising KeyError before recipe creation or native submission. Correct signature used with existing admission preserved; journal verified unchanged.",
+  "service_reports": [
+    {
+      "id": "1a7586fe-a1c8-45db-a37d-9114a8ae568d",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:21:03.082982+00:00",
+      "header": "SYNTHETIC V3 PREPARED REQUEST LOAD-REPORT",
+      "payload_sha256": "e8adb8b0283a94194b7f868619a4271eb01a2e1b8dd223f66366f1bac450d252"
+    },
+    {
+      "id": "3a987028-e9ae-49c8-9abc-4427a5ffba5c",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:21:39.56172+00:00",
+      "header": "RESEARCH PREPARATION LOAD-REPORT",
+      "payload_sha256": "1c9fd1b5a8f09d9340a22b8a40ac453ea5bd45ed840c2fe5469bf24c1df1e893"
+    },
+    {
+      "id": "6007a330-c31c-4f26-999e-946ff16153aa",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:21:39.579434+00:00",
+      "header": "SYNTHETIC V3 FIXTURE AND QUEUE LOAD-REPORT",
+      "payload_sha256": "16367be87e3d61ad019a4090a4ff978e7a60f75537ca8328c03797ed84b0db38"
+    },
+    {
+      "id": "43caae14-c222-4e4f-92d4-e4898503b8cf",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:22:03.869233+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT",
+      "payload_sha256": "99f517c5fb610a392e542b994c798eedfba3646a3c8c45d4acabfee0a0fe56d5"
+    },
+    {
+      "id": "1d97136e-4610-469f-a90f-c215b117ae7b",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:22:18.443447+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT",
+      "payload_sha256": "3ee19ed628f75216a99982d2b32a2838f4ca5f3dc887c077da83589d04c374f9"
+    },
+    {
+      "id": "2ae1ee2b-4cd1-4a27-9b86-1d4b586b8d53",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:22:58.918095+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT",
+      "payload_sha256": "3fbdd21f3983a44689ea0bbe1bf90dfbf22bdf7ff253d0d4bcb3c347d828c339"
+    },
+    {
+      "id": "c1d7f3a6-0634-4506-9fa1-c2b2a820528f",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:23:18.24066+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT",
+      "payload_sha256": "7d72186103b89bbc68dd58b9480d298de524cc84fb64ef602023ef5476e2c792"
+    },
+    {
+      "id": "daeee3b8-ca5b-4634-8b2c-d1d38ecf8fd9",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:35:46.444561+00:00",
+      "header": "HPC3 PREFLIGHT LOAD-REPORT",
+      "payload_sha256": "e04ca8b076115f8e5e5191edf1ceabf6069297a3a1638e087f8324c7e7f8eb57"
+    },
+    {
+      "id": "fa90c2e4-63b3-4976-aa5f-3ed0057c5f8e",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:39:25.284504+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT",
+      "payload_sha256": "a64fe6ef5779980cba05bbcbfe8a40b2dd7cf8b2fdfc3e3c012d46bb1b8d7714"
+    },
+    {
+      "id": "19136016-2cd7-4177-8640-6499ae889f53",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:39:37.449105+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT",
+      "payload_sha256": "a64fe6ef5779980cba05bbcbfe8a40b2dd7cf8b2fdfc3e3c012d46bb1b8d7714"
+    },
+    {
+      "id": "ed1886c9-a93e-47aa-8ddd-8f6fc5aa8744",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:39:49.468699+00:00",
+      "header": "RESEARCH PREPARATION LOAD-REPORT",
+      "payload_sha256": "33f5c8ef1b2b72a3de0b5339cfec45241a1d4ab7886d045c927e399394a47f4d"
+    },
+    {
+      "id": "44f8b533-9bed-483d-9a7a-4bf55df989f3",
+      "author": "hpc-report-284bc096",
+      "created_at": "2026-11-02T06:39:49.513336+00:00",
+      "header": "SYNTHETIC V3 RESULT LOAD-REPORT",
+      "payload_sha256": "4a27025399aee274a3384a407afe214fb9af2e317c67962a56b5a688f42a8069"
+    }
+  ],
+  "remaining": [
+    "Independent adequacy review of this rehearsal evidence.",
+    "Licensed version-three qualification, new frozen study, validation, selection and controlled final scoring under task f61db3a7-a9dd-468c-96d2-d520271a9c3b.",
+    "Bermudan Asian study uses separate extraction under task 5bec93df-0073-4c31-9f7c-78684be4bdf7."
+  ],
+  "files": {
+    "completed-report.json": "33f5c8ef1b2b72a3de0b5339cfec45241a1d4ab7886d045c927e399394a47f4d",
+    "evaluation.json": "f9e7a03e84fd273c87ae82792f63164ef9f356a799feb4352970f2977d9dfabe",
+    "evaluation.json.runrecord.json": "043f3bf8140aea0860b87e879f1490afafaff2c9983c2418cb0d5cb06a1416cd",
+    "fixture-provenance.json": "16367be87e3d61ad019a4090a4ff978e7a60f75537ca8328c03797ed84b0db38",
+    "measure-fixture.py": "9518088fc001d273ad0ebfb1c5eb1af1b15427032a1d5479bd99c7273954f548",
+    "measure-result.py": "591fbf4c247d9906ff44b28605c02aa09e53737ff96adb914dcd696b6ec913f6",
+    "native-report.json": "14362ee9c6b13b42550f0cf4ad21685cba88b1302013e0e74a96fefe1a12c06c",
+    "policy.json": "ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57",
+    "preflight.json": "667c1429c1656047414c28d14a437a5a441fe5838b5567efa1097701088bf79b",
+    "preparation-report.json": "1c9fd1b5a8f09d9340a22b8a40ac453ea5bd45ed840c2fe5469bf24c1df1e893",
+    "proposal.json": "b1ee8bda280afa13100a8a4d738133441f1484625c36ee160d7756898f3246c7",
+    "queue-spec.json": "58c1bd2d4b60686feafc29116550dc2746f1ffbe5322988e47deff7b7fa68ccf",
+    "queue.json": "8d8f7add67f7f5f6f1de6b1d668349ea75a666f1087b3b2eeb6e7c1e15792b33",
+    "result-inspection.json": "4a27025399aee274a3384a407afe214fb9af2e317c67962a56b5a688f42a8069",
+    "service-reports.json": "e120b573fae2f8ac456ab31969bed183f0a64da3bbde7154361158979a0cbe08",
+    "trial.json": "e9c8730a9580fb962be726d51454a3f684ce8437a2bbd7e9e6b8621c37e52c90"
+  }
+}

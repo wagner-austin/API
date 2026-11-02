@@ -1,0 +1,812 @@
+{
+  "kind": "HPC3_ATTEMPT_EVIDENCE",
+  "ledger": {
+    "job_id": "58747974",
+    "project": "cleargbm",
+    "name": "cleargbm.research-ead91fcae200-1",
+    "host": "hpc3",
+    "partition": "free",
+    "submitted_at": "2026-11-02T06:36:13.895042+00:00",
+    "log_dir": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/cleargbm/logs",
+    "deterministic": true,
+    "experiment": {
+      "research_attempt": "ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57:1",
+      "request_sha256": "e9c8730a9580fb962be726d51454a3f684ce8437a2bbd7e9e6b8621c37e52c90"
+    },
+    "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+    "submitter": "fleet-research-diphtheria",
+    "artifact": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/attempts/ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57/1/result/evaluation.json",
+    "image_drift": {
+      "image_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+      "head": "e10dd53a65f4b8e80df2a4c9e66c5181e5590e9a",
+      "modules": [
+        {
+          "directory": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint",
+          "module": "scripts.research_trial",
+          "compared": [],
+          "changed": [],
+          "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+        }
+      ]
+    }
+  },
+  "accounting": {
+    "job": {
+      "job_id": "58747974",
+      "name": "cleargbm.research-ead91fcae200-1",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 10,
+      "billing_tres": 4,
+      "gpu_count": 0,
+      "cpu_count": 4,
+      "node_list": "hpc3-15-22"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-11-02T06:36:21",
+    "ended_at": "2026-11-02T06:36:31"
+  },
+  "measurement": {
+    "ledger": {
+      "job_id": "58747974",
+      "project": "cleargbm",
+      "name": "cleargbm.research-ead91fcae200-1",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-11-02T06:36:13.895042+00:00",
+      "log_dir": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/cleargbm/logs",
+      "deterministic": true,
+      "experiment": {
+        "research_attempt": "ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57:1",
+        "request_sha256": "e9c8730a9580fb962be726d51454a3f684ce8437a2bbd7e9e6b8621c37e52c90"
+      },
+      "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+      "submitter": "fleet-research-diphtheria",
+      "artifact": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/attempts/ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57/1/result/evaluation.json",
+      "image_drift": {
+        "image_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+        "head": "e10dd53a65f4b8e80df2a4c9e66c5181e5590e9a",
+        "modules": [
+          {
+            "directory": "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint",
+            "module": "scripts.research_trial",
+            "compared": [],
+            "changed": [],
+            "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+          }
+        ]
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58747974",
+        "name": "cleargbm.research-ead91fcae200-1",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 10,
+        "billing_tres": 4,
+        "gpu_count": 0,
+        "cpu_count": 4,
+        "node_list": "hpc3-15-22"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-02T06:36:21",
+      "ended_at": "2026-11-02T06:36:31"
+    },
+    "result_sha256": "f9e7a03e84fd273c87ae82792f63164ef9f356a799feb4352970f2977d9dfabe",
+    "record_sha256": "043f3bf8140aea0860b87e879f1490afafaff2c9983c2418cb0d5cb06a1416cd",
+    "stdout_sha256": "66ad572106b412ae55faf5827e5893d4f2f62daa1c99bd278f9bf616d3962fd5",
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/research-crsp-v3.sif": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/bundle.json": "a712deb4ba52aff2a715ac2bd5e09923cde58b87ea301d3756fefcbf862d0e81",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/calendar.csv.age": "1faf468fffd4336e103f911b7990b147df7f9a4ab4dd2af5d0665d5994fae0f7",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/calendar.sql.age": "fb2a267c8050a1d6d6e22aa2b849c8953b77c7ab0ea913e99be401ff5bd5dc1b",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/delists.csv.age": "68c4b3caf7ba3bbbea2f4f6e2be47b0c7cf9419bbaffeb2fb1ec00d49b7f3ff3",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/delists.sql.age": "f28f48a1fdc49d53095a4383893d10753c5274c4bae93e6de4e7d72fc422ca3b",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/manifest.json.age": "8c8fe40e36af6800fbfe6b93685e4b8ccb26304d203fffc99fe668cefc877a90",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/membership.csv.age": "d4d1003d35ef80c7a8917c15f002efbde978862364e376bb57e4b96e3c87e581",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/membership.sql.age": "ccc139e5cf95ee7337a1c51a3b8706deb215ad594c174d97be455eddb7fa7e35",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/protocol.json.age": "747871ae87db8d5c50045c4700494dc1dab191921807ad5f017214ddf86789a1",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/returns.csv.age": "b5958d8b7652b8eb3e080caccf1f52e911b563c5fc932de33a19cc1c8b07f96b",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/validation/returns.sql.age": "5f712925617fe522a10cd883412d389ef03bd5831793704a3f618e5e09e3041c",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint/scripts/research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/entrypoint/access.json": "2549731a66f04bb070da4e24c5af366bd14a1eee89cdf3f4087e5d917ab86b7b",
+      "/data/homezvol1/wagnera3/research/protocol-v3-rehearsal-284bc096/attempts/ead91fcae20057bb420067ec8c17994c6edf5249b73adb084013c7afc4589c57/1/request.json": "e9c8730a9580fb962be726d51454a3f684ce8437a2bbd7e9e6b8621c37e52c90"
+    },
+    "compute_checksum_lines": 16,
+    "result_mtime": 1793601390,
+    "record_mtime": 1793601390,
+    "dataset": {
+      "bundle_sha256": "a712deb4ba52aff2a715ac2bd5e09923cde58b87ea301d3756fefcbf862d0e81",
+      "bundle": {
+        "format": "age-v1",
+        "partition": "train-validation",
+        "recipient": "age1grghg7ar3k4jh47wtpl6p3jy3w84vgmptyn98cw8ft43zcawwaasacpps6",
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "d4e5b984a1a160fbeb808cfa5d425514d3b3ff17d66a93c97f8fba33bd2d59cd",
+          "size_bytes": 1221
+        },
+        "files": [
+          {
+            "plaintext": {
+              "name": "calendar.csv",
+              "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+              "size_bytes": 27410
+            },
+            "ciphertext": {
+              "name": "calendar.csv.age",
+              "sha256": "1faf468fffd4336e103f911b7990b147df7f9a4ab4dd2af5d0665d5994fae0f7",
+              "size_bytes": 27764
+            }
+          },
+          {
+            "plaintext": {
+              "name": "calendar.sql",
+              "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+              "size_bytes": 79
+            },
+            "ciphertext": {
+              "name": "calendar.sql.age",
+              "sha256": "fb2a267c8050a1d6d6e22aa2b849c8953b77c7ab0ea913e99be401ff5bd5dc1b",
+              "size_bytes": 328
+            }
+          },
+          {
+            "plaintext": {
+              "name": "delists.csv",
+              "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+              "size_bytes": 116
+            },
+            "ciphertext": {
+              "name": "delists.csv.age",
+              "sha256": "68c4b3caf7ba3bbbea2f4f6e2be47b0c7cf9419bbaffeb2fb1ec00d49b7f3ff3",
+              "size_bytes": 409
+            }
+          },
+          {
+            "plaintext": {
+              "name": "delists.sql",
+              "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+              "size_bytes": 111
+            },
+            "ciphertext": {
+              "name": "delists.sql.age",
+              "sha256": "f28f48a1fdc49d53095a4383893d10753c5274c4bae93e6de4e7d72fc422ca3b",
+              "size_bytes": 368
+            }
+          },
+          {
+            "plaintext": {
+              "name": "manifest.json",
+              "sha256": "d4e5b984a1a160fbeb808cfa5d425514d3b3ff17d66a93c97f8fba33bd2d59cd",
+              "size_bytes": 1221
+            },
+            "ciphertext": {
+              "name": "manifest.json.age",
+              "sha256": "8c8fe40e36af6800fbfe6b93685e4b8ccb26304d203fffc99fe668cefc877a90",
+              "size_bytes": 1513
+            }
+          },
+          {
+            "plaintext": {
+              "name": "membership.csv",
+              "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+              "size_bytes": 277
+            },
+            "ciphertext": {
+              "name": "membership.csv.age",
+              "sha256": "d4d1003d35ef80c7a8917c15f002efbde978862364e376bb57e4b96e3c87e581",
+              "size_bytes": 604
+            }
+          },
+          {
+            "plaintext": {
+              "name": "membership.sql",
+              "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+              "size_bytes": 74
+            },
+            "ciphertext": {
+              "name": "membership.sql.age",
+              "sha256": "ccc139e5cf95ee7337a1c51a3b8706deb215ad594c174d97be455eddb7fa7e35",
+              "size_bytes": 370
+            }
+          },
+          {
+            "plaintext": {
+              "name": "protocol.json",
+              "sha256": "daf6dcba45f14d67604f95071f4cc6e74dff0adadec0ac0750be26926de23304",
+              "size_bytes": 1222
+            },
+            "ciphertext": {
+              "name": "protocol.json.age",
+              "sha256": "747871ae87db8d5c50045c4700494dc1dab191921807ad5f017214ddf86789a1",
+              "size_bytes": 1555
+            }
+          },
+          {
+            "plaintext": {
+              "name": "returns.csv",
+              "sha256": "9b48fa43782cac4e23657a1aeb8dcc4964e3ec2e14be07d06f4a076c7815fb75",
+              "size_bytes": 483174
+            },
+            "ciphertext": {
+              "name": "returns.csv.age",
+              "sha256": "b5958d8b7652b8eb3e080caccf1f52e911b563c5fc932de33a19cc1c8b07f96b",
+              "size_bytes": 483542
+            }
+          },
+          {
+            "plaintext": {
+              "name": "returns.sql",
+              "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+              "size_bytes": 147
+            },
+            "ciphertext": {
+              "name": "returns.sql.age",
+              "sha256": "5f712925617fe522a10cd883412d389ef03bd5831793704a3f618e5e09e3041c",
+              "size_bytes": 433
+            }
+          }
+        ]
+      }
+    }
+  },
+  "record": {
+    "experiment": "3374ef950481739079ae784ab5a875136b6d57eadb78021bb08d077fdd46b6fe",
+    "label": "1",
+    "fingerprint": {
+      "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+      "gpu_model": "",
+      "driver_version": "",
+      "determinism": {
+        "stack": "cpu",
+        "settings": {
+          "MKL_NUM_THREADS": "1",
+          "NUMEXPR_NUM_THREADS": "1",
+          "OMP_NUM_THREADS": "1",
+          "OPENBLAS_NUM_THREADS": "1"
+        }
+      },
+      "host": {
+        "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+        "machine": "x86_64",
+        "logical_cores": 40
+      },
+      "packages": [
+        {
+          "name": "cleargbm",
+          "version": "0.1.0"
+        },
+        {
+          "name": "cleargbm_rs",
+          "version": "0.1.0"
+        },
+        {
+          "name": "lightgbm",
+          "version": "4.6.0"
+        },
+        {
+          "name": "numpy",
+          "version": "2.3.5"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.7.2"
+        },
+        {
+          "name": "xgboost",
+          "version": "3.1.2"
+        }
+      ]
+    },
+    "observations": [
+      {
+        "name": "cleargbm_vs_momentum.net_return.ci_high",
+        "value": 0.013845814435210418
+      },
+      {
+        "name": "cleargbm_vs_momentum.net_return.ci_low",
+        "value": -0.017559106524257323
+      },
+      {
+        "name": "cleargbm_vs_momentum.net_return.difference",
+        "value": -0.00053521395874713
+      },
+      {
+        "name": "cleargbm_vs_momentum.net_return.p_value",
+        "value": 0.6666666666666666
+      },
+      {
+        "name": "equal_weight_vs_momentum.net_return.ci_high",
+        "value": 0.00432126639467757
+      },
+      {
+        "name": "equal_weight_vs_momentum.net_return.ci_low",
+        "value": -0.01994644561893575
+      },
+      {
+        "name": "equal_weight_vs_momentum.net_return.difference",
+        "value": -0.007391852145131481
+      },
+      {
+        "name": "equal_weight_vs_momentum.net_return.p_value",
+        "value": 0.27860696517412936
+      },
+      {
+        "name": "lightgbm_vs_momentum.net_return.ci_high",
+        "value": 0.021444420810872576
+      },
+      {
+        "name": "lightgbm_vs_momentum.net_return.ci_low",
+        "value": -0.014128838036713205
+      },
+      {
+        "name": "lightgbm_vs_momentum.net_return.difference",
+        "value": 0.003929276753871294
+      },
+      {
+        "name": "lightgbm_vs_momentum.net_return.p_value",
+        "value": 0.9850746268656716
+      },
+      {
+        "name": "mean_net_return.cleargbm.10bps",
+        "value": 0.020599458377597045
+      },
+      {
+        "name": "mean_net_return.cleargbm.25bps",
+        "value": 0.019584014366452074
+      },
+      {
+        "name": "mean_net_return.cleargbm.5bps",
+        "value": 0.020938382711004955
+      },
+      {
+        "name": "mean_net_return.equal_weight.10bps",
+        "value": 0.013742820191212694
+      },
+      {
+        "name": "mean_net_return.equal_weight.25bps",
+        "value": 0.013411941047113685
+      },
+      {
+        "name": "mean_net_return.equal_weight.5bps",
+        "value": 0.013853213021759493
+      },
+      {
+        "name": "mean_net_return.lightgbm.10bps",
+        "value": 0.02506394909021547
+      },
+      {
+        "name": "mean_net_return.lightgbm.25bps",
+        "value": 0.02405559678117468
+      },
+      {
+        "name": "mean_net_return.lightgbm.5bps",
+        "value": 0.02540044638719395
+      },
+      {
+        "name": "mean_net_return.momentum.10bps",
+        "value": 0.021134672336344175
+      },
+      {
+        "name": "mean_net_return.momentum.25bps",
+        "value": 0.020611756687548125
+      },
+      {
+        "name": "mean_net_return.momentum.5bps",
+        "value": 0.021309117121175704
+      },
+      {
+        "name": "mean_net_return.xgboost.10bps",
+        "value": 0.017432398902495483
+      },
+      {
+        "name": "mean_net_return.xgboost.25bps",
+        "value": 0.017027790187827012
+      },
+      {
+        "name": "mean_net_return.xgboost.5bps",
+        "value": 0.017567433956185298
+      },
+      {
+        "name": "mean_turnover.cleargbm.10bps",
+        "value": 0.6638156022098819
+      },
+      {
+        "name": "mean_turnover.cleargbm.25bps",
+        "value": 0.6631714748142009
+      },
+      {
+        "name": "mean_turnover.cleargbm.5bps",
+        "value": 0.6640306467155335
+      },
+      {
+        "name": "mean_turnover.equal_weight.10bps",
+        "value": 0.21994863699474748
+      },
+      {
+        "name": "mean_turnover.equal_weight.25bps",
+        "value": 0.21979986189829906
+      },
+      {
+        "name": "mean_turnover.equal_weight.5bps",
+        "value": 0.21999833827153065
+      },
+      {
+        "name": "mean_turnover.lightgbm.10bps",
+        "value": 0.6608428700998936
+      },
+      {
+        "name": "mean_turnover.lightgbm.25bps",
+        "value": 0.6602845125875769
+      },
+      {
+        "name": "mean_turnover.lightgbm.5bps",
+        "value": 0.6610292837871712
+      },
+      {
+        "name": "mean_turnover.momentum.10bps",
+        "value": 0.34758867083212097
+      },
+      {
+        "name": "mean_turnover.momentum.25bps",
+        "value": 0.3473828511793796
+      },
+      {
+        "name": "mean_turnover.momentum.5bps",
+        "value": 0.3476573667406957
+      },
+      {
+        "name": "mean_turnover.xgboost.10bps",
+        "value": 0.2697415253916761
+      },
+      {
+        "name": "mean_turnover.xgboost.25bps",
+        "value": 0.26949169597550476
+      },
+      {
+        "name": "mean_turnover.xgboost.5bps",
+        "value": 0.2698249565788928
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+        "value": 0.033783629784751135
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+        "value": 0.051862099614124135
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+        "value": 0.06762504170476769
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+        "value": 0.03959200549686259
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+        "value": -0.011313463544125324
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+        "value": 0.07736224929700897
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+        "value": -0.02223882908218322
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+        "value": -0.05206730144635563
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+        "value": -0.039125469099341226
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+        "value": 0.0076641955144305385
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+        "value": 0.02461859033472935
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+        "value": 0.014068051106039592
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+        "value": 0.06952395829959834
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+        "value": -0.016444551267768004
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+        "value": 0.07119330260259371
+      },
+      {
+        "name": "monthly_net_return.cleargbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+        "value": 0.013487824726420072
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-07-31.2018-08-01.2018-09-03",
+        "value": 0.016515090187992465
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-08-31.2018-09-03.2018-10-01",
+        "value": 0.03236912559817706
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-09-28.2018-10-01.2018-11-01",
+        "value": 0.09589009565831619
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-10-31.2018-11-01.2018-12-03",
+        "value": 0.07227805205820714
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-11-30.2018-12-03.2019-01-01",
+        "value": -0.0497484331558965
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2018-12-31.2019-01-01.2019-02-01",
+        "value": 0.04084885128195914
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-01-31.2019-02-01.2019-03-01",
+        "value": -0.0900805730012042
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-02-28.2019-03-01.2019-04-01",
+        "value": -0.022650379637812246
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-03-29.2019-04-01.2019-05-01",
+        "value": -0.019797681728656147
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-04-30.2019-05-01.2019-06-03",
+        "value": 0.0047562309318598395
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-05-31.2019-06-03.2019-07-01",
+        "value": 0.010144320265082607
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-06-28.2019-07-01.2019-08-01",
+        "value": 0.04659192984921279
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-07-31.2019-08-01.2019-09-02",
+        "value": 0.05413725164851391
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-08-30.2019-09-02.2019-10-01",
+        "value": 0.013057965945250327
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-09-30.2019-10-01.2019-11-01",
+        "value": -0.005184911061948405
+      },
+      {
+        "name": "monthly_net_return.equal_weight.10bps.2019-10-31.2019-11-01.2019-12-02",
+        "value": 0.02075818822034914
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+        "value": 0.033783629784751135
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+        "value": 0.051862099614124135
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+        "value": 0.06762504170476769
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+        "value": 0.03959200549686259
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+        "value": -0.011313463544125324
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+        "value": 0.07736224929700897
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+        "value": -0.02223882908218322
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+        "value": -0.018947930204017083
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+        "value": -0.03913577105869548
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+        "value": 0.0076641955144305385
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+        "value": 0.02461859033472935
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+        "value": 0.014068051106039592
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+        "value": 0.06952395829959812
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+        "value": 0.021189549154271736
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+        "value": 0.07188198429946491
+      },
+      {
+        "name": "monthly_net_return.lightgbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+        "value": 0.01348782472641985
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-07-31.2018-08-01.2018-09-03",
+        "value": 0.05598876740941616
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-08-31.2018-09-03.2018-10-01",
+        "value": 0.012114402128963642
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-09-28.2018-10-01.2018-11-01",
+        "value": 0.12414761509274697
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-10-31.2018-11-01.2018-12-03",
+        "value": 0.10499299525960382
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-11-30.2018-12-03.2019-01-01",
+        "value": -0.005880559306886357
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2018-12-31.2019-01-01.2019-02-01",
+        "value": 0.03705883659797338
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-01-31.2019-02-01.2019-03-01",
+        "value": -0.03939278283443781
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-02-28.2019-03-01.2019-04-01",
+        "value": -0.053459072437388455
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-03-29.2019-04-01.2019-05-01",
+        "value": -0.012903572650136752
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-04-30.2019-05-01.2019-06-03",
+        "value": -0.0036866977866218953
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-05-31.2019-06-03.2019-07-01",
+        "value": 0.02083902075203814
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-06-28.2019-07-01.2019-08-01",
+        "value": 0.07190379719707041
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-07-31.2019-08-01.2019-09-02",
+        "value": 0.06837531669368246
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-08-30.2019-09-02.2019-10-01",
+        "value": -0.015786866036710867
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-09-30.2019-10-01.2019-11-01",
+        "value": -0.04548700178989362
+      },
+      {
+        "name": "monthly_net_return.momentum.10bps.2019-10-31.2019-11-01.2019-12-02",
+        "value": 0.019330559092087585
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-07-31.2018-08-01.2018-09-03",
+        "value": 0.029616488022665255
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-08-31.2018-09-03.2018-10-01",
+        "value": 0.020011498431669716
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-09-28.2018-10-01.2018-11-01",
+        "value": 0.10798351276011098
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-10-31.2018-11-01.2018-12-03",
+        "value": 0.08922384856774257
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-11-30.2018-12-03.2019-01-01",
+        "value": -0.004224712334670477
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2018-12-31.2019-01-01.2019-02-01",
+        "value": 0.07801190619757992
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-01-31.2019-02-01.2019-03-01",
+        "value": -0.03466889846800936
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-02-28.2019-03-01.2019-04-01",
+        "value": -0.052867894466383736
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-03-29.2019-04-01.2019-05-01",
+        "value": -0.035553772975341125
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-04-30.2019-05-01.2019-06-03",
+        "value": -0.038491605044623456
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-05-31.2019-06-03.2019-07-01",
+        "value": 0.021542206592951585
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-06-28.2019-07-01.2019-08-01",
+        "value": 0.07190379719707019
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-07-31.2019-08-01.2019-09-02",
+        "value": 0.06837531669368269
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-08-30.2019-09-02.2019-10-01",
+        "value": -0.015786866036710756
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-09-30.2019-10-01.2019-11-01",
+        "value": -0.045487001789893844
+      },
+      {
+        "name": "monthly_net_return.xgboost.10bps.2019-10-31.2019-11-01.2019-12-02",
+        "value": 0.019330559092087585
+      },
+      {
+        "name": "xgboost_vs_momentum.net_return.ci_high",
+        "value": 0.004626978788162604
+      },
+      {
+        "name": "xgboost_vs_momentum.net_return.ci_low",
+        "value": -0.009184296196237276
+      },
+      {
+        "name": "xgboost_vs_momentum.net_return.difference",
+        "value": -0.003702273433848692
+      },
+      {
+        "name": "xgboost_vs_momentum.net_return.p_value",
+        "value": 0.5771144278606966
+      }
+    ],
+    "payload_digest": "8bac59b95dbd3d490b076f9376d7a58b2d66896b365945c2ba6078e5e39e6015"
+  }
+}
