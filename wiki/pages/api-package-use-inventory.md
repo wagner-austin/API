@@ -24,7 +24,7 @@ The operator asked on 2026-11-01 whether the monorepo carries old code nobody us
 
 ## What the size actually is
 
-Two packages hold most of it. `services/covenant-radar-api` tracks 352 MB, 330 MB of it Kaggle loan datasets under `data/external`, which the ClearGBM and covenant_ml research reads, so they are needed but do not belong in git. `libs/instrument_io` tracks 119 MB, mostly instrument fixtures under `tests/fixtures`, and nothing imports it. Every other package is under 45 MB.[^size] Archiving the small services saves little fleet time: each uses 4 to 15 minutes of fleet checks a month. The exception is `tools/maketools-execution`, whose check deploys 8 of the services, at 1043 minutes a month.[^fleet][^mxe]
+Two packages hold most of it. `services/covenant-radar-api` tracks 352 MB, 330 MB of it Kaggle loan datasets under `data/external`, which the ClearGBM and covenant_ml research reads, so they are needed but do not belong in git. `libs/instrument_io` tracks 119 MB, mostly instrument fixtures under `tests/fixtures`, and nothing imports it. Every other package is under 45 MB.[^size] Archiving the small services saves little fleet time: each uses 4 to 15 minutes of fleet checks a month. The exception is `tools/maketools-execution`, whose check deploys 8 of the services, at 1052 minutes a month.[^fleet][^mxe]
 
 ## How each column was read
 
@@ -40,7 +40,7 @@ One row per package, each column read as the list above says, at API `adda8c020`
 
 | Package | Deploy | Imported by | Last own change | Fleet min/30d | Size | RESEARCH.md | Recommendation |
 |---|---|---|---|---|---|---|---|
-| `clients/DiscordBot` | none (Railway fallback) | none | 2026-10-08 `8cc3872e6` | 7 | 545 KB | no | operator: the Discord group |
+| `clients/DiscordBot` | none (Railway fallback) | none | 2026-10-08 `8cc3872e6` | 7 | 545 KB | no | archive: no deploy at its default host, no importer, serves no HTTP |
 | `clients/NavProbe` | none | none | 2026-10-31 `dda19cac4` | 67 | 1 MB | no | keep: research instrument, own wiki |
 | `clients/OrderedKernels` | none | none | 2026-10-30 `f561db26d` | 32 | 671 KB | yes | keep: research |
 | `clients/RustedWarfareBot` | none | none | 2026-10-25 `2a6920546` | 85 | 11 MB | yes | keep: research |
@@ -59,7 +59,7 @@ One row per package, each column read as the list above says, at API `adda8c020`
 | `libs/platform_codebase` | library | github-stats-api, opportunity-radar-api, platform_devpost, platform_kaggle | 2026-09-26 `b64cad69f` | 6 | 200 KB | no | keep: imported |
 | `libs/platform_core` | library | 44 | 2026-10-31 `e3ab602f2` | 166 | 2 MB | yes | keep: imported |
 | `libs/platform_devpost` | library | opportunity-radar-api | 2026-09-26 `2d3dfa7c7` | 6 | 261 KB | no | keep: imported |
-| `libs/platform_discord` | library | DiscordBot, handwriting-ai | 2026-09-25 `9e829fb05` | 5 | 427 KB | no | operator: the Discord group |
+| `libs/platform_discord` | library | DiscordBot, handwriting-ai | 2026-09-25 `9e829fb05` | 5 | 427 KB | no | archive with DiscordBot and handwriting-ai, its only importers |
 | `libs/platform_email` | library | none | 2026-10-18 `92da96636` | 13 | 621 KB | no | archive: no importer; corvis has outlook_ tools |
 | `libs/platform_kaggle` | library | github-stats-api, opportunity-radar-api | 2026-09-26 `a7a9108e8` | 8 | 456 KB | no | keep: imported |
 | `libs/platform_langid` | library | grandma-api | 2026-11-01 `cce1217d2` | 87 | 334 KB | no | keep: imported |
@@ -72,16 +72,16 @@ One row per package, each column read as the list above says, at API `adda8c020`
 | `services/Art-Trainer` | none (Railway fallback) | none | 2026-10-11 `d05227f68` | 89 | 875 KB | no | archive: no deploy, no importer |
 | `services/Model-Trainer` | none (Railway fallback) | none | 2026-10-31 `823d9ecf2` | 161 | 6 MB | yes | keep: research (mi, floor) |
 | `services/covenant-radar-api` | none (Railway fallback) | none | 2026-10-30 `6820fc2d8` | 193 | 352 MB | yes | keep: research (cleargbm); move data/external out of git |
-| `services/data-bank-api` | none (Railway fallback) | none | 2026-09-26 `c6b1f6b75` | 13 | 292 KB | no | operator: goes with its callers |
+| `services/data-bank-api` | none (Railway fallback) | none | 2026-09-26 `c6b1f6b75` | 13 | 292 KB | no | archive with the service mode that calls it: no deploy, called only by covenant-radar-api and Model-Trainer through platform_core |
 | `services/github-stats-api` | Railway (200) | none | 2026-09-26 `8710836c0` | 9 | 513 KB | no | keep: live |
 | `services/grandma-api` | Railway (200) and Pages | none | 2026-11-01 `5933006ef` | 107 | 760 KB | no | keep: live |
-| `services/handwriting-ai` | none (Railway fallback) | none | 2026-10-25 `fce5d6be8` | 68 | 1 MB | no | operator: the Discord group |
+| `services/handwriting-ai` | none (Railway fallback) | none | 2026-10-25 `fce5d6be8` | 68 | 1 MB | no | archive: no deploy, no importer, called by DiscordBot |
 | `services/music-wrapped-api` | none (Railway fallback) | none | 2026-10-08 `235dfe7fb` | 8 | 269 KB | no | archive with libs/platform_music: no deploy, no importer |
 | `services/opportunity-radar-api` | Railway (200) | none | 2026-09-26 `21858e490` | 8 | 257 KB | no | keep: live |
 | `services/procart-api` | none (Railway fallback) | none | 2026-10-08 `c8165824f` | 42 | 2 MB | no | archive with libs/procart: no deploy, no importer |
-| `services/qr-api` | none (Railway fallback) | none | 2026-09-26 `2c49437b2` | 13 | 166 KB | no | operator: the Discord group |
+| `services/qr-api` | none (Railway fallback) | none | 2026-09-26 `2c49437b2` | 13 | 166 KB | no | archive: no deploy, no importer, called by DiscordBot |
 | `services/transcript-api` | Railway (200) | none | 2026-09-26 `6bddd3497` | 13 | 602 KB | no | keep: live |
-| `services/turkic-api` | none (Railway fallback) | none | 2026-10-08 `55c6a02d0` | 18 | 907 KB | no | operator: the Discord group |
+| `services/turkic-api` | none (Railway fallback) | none | 2026-10-08 `55c6a02d0` | 18 | 907 KB | no | archive: no deploy, no importer |
 | `tools/board-watch` | sessions | 6 | 2026-10-29 `e0f3f1242` | 10 | 204 KB | no | keep: imported |
 | `tools/ci-wake` | hub pump | none | 2026-10-29 `d52fd1a6e` | 37 | 434 KB | no | keep: fleet tooling |
 | `tools/code-corpus` | none | none | 2026-10-07 `897d8ffa9` | 8 | 207 KB | no | keep: research |
@@ -94,11 +94,11 @@ One row per package, each column read as the list above says, at API `adda8c020`
 | `tools/fleet-health-wake` | hub pump | none | 2026-10-23 `451ae3a6f` | 8 | 165 KB | no | keep: fleet tooling |
 | `tools/fleet-wake` | fleet | none | 2026-10-30 `b83b023a0` | 64 | 182 KB | no | keep: fleet tooling |
 | `tools/hpc-wake` | hub pump | none | 2026-10-28 `fb77f0d61` | 68 | 256 KB | no | keep: fleet tooling |
-| `tools/hpc3` | none | RustedWarfareBot, hpc-wake | 2026-11-01 `9bdb73ad0` | 217 | 15 MB | yes | keep: research |
+| `tools/hpc3` | none | RustedWarfareBot, hpc-wake | 2026-11-01 `9bdb73ad0` | 218 | 15 MB | yes | keep: research |
 | `tools/hpc3-execution` | none | none | 2026-09-30 `4e8a0f44f` | 0 | 1 KB | no | delete: no registry entry, never run |
 | `tools/lock-wake` | hub pump | none | 2026-10-10 `35778d50c` | 7 | 239 KB | no | keep: fleet tooling |
 | `tools/maketools` | none | none | 2026-11-01 `1ed3ada33` | 125 | 475 KB | no | keep: fleet tooling |
-| `tools/maketools-execution` | none | none | 2026-11-01 `78c46a140` | 1043 | 3 KB | no | keep: fleet tooling |
+| `tools/maketools-execution` | none | none | 2026-11-01 `78c46a140` | 1052 | 3 KB | no | keep: fleet tooling |
 
 `clients/docs` is one 19 KB document, not a package, and is left out.[^size]
 
@@ -120,9 +120,9 @@ Removing `data-bank-api` meant replacing what its callers stored through it rath
 [^dbank]: [synthesis] -- MCPs board task a9566810, which carried the operator's ruling "Archive it and strip the service mode"; the change is described from its own diff over `services/covenant-radar-api`, `services/Model-Trainer`, `libs/platform_core`, `libs/platform_ml` and `libs/monorepo_guards`.
 [^picks]: [synthesis] -- MCPs board task a276f973, notes 226e1b90 and bc8f96d4: the two RULING lines recording the operator's picks and the correction that put data-bank-api to the operator on its own.
 [^size]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `git ls-tree -r -l origin/main` summed per package; `services/covenant-radar-api/data/external` holds 33 dataset directories.
-[^fleet]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `fleet_dispatch_jobs` closed in the 30 days to 2026-11-01T20:44Z, summed closed_at minus claimed_at per project.
+[^fleet]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `fleet_dispatch_jobs` closed after 2026-10-02T20:44Z and at or before 2026-11-01T20:44Z, summed closed_at minus claimed_at per project and floored to whole minutes. The first reading, at 20:44Z over a window it did not pin, gave `tools/hpc3` 217 and `tools/maketools-execution` 1043; the cells are the pinned window's, re-read on 2026-11-02.
 [^mxe]: API `5f661ee41`, `tools/fleet/registry/projects/tools/maketools-execution.json` -- eight `install` steps, one `image-<service>` phase per deployed service. API `0ebe2e4dd` cut them to the four kept services.
-[^probe]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `curl -D - https://<host>.up.railway.app/healthz` at 2026-11-01T20:46:56Z, and `docker ps` on demure, diphtheria and emerald at 20:41Z.
+[^probe]: [synthesis] -- MCPs board task a276f973, note e96f59e1: `curl -D - https://<host>.up.railway.app/healthz` at 2026-11-01T20:46:56Z, and `docker ps` on demure, diphtheria and emerald at 20:41Z. The served case `execution/tests/served/api-railway-health.test.ts` in MCPs asks the same fourteen hosts from a fleet lane and fails when any answers otherwise.
 [^deps]: [synthesis] -- MCPs board task a276f973, note e96f59e1: 101 `path = "..."` dependency edges across every manifest at origin/main.
 [^solo]: [synthesis] -- MCPs board task a276f973, note e96f59e1: the last-own-change rule as stated there.
 [^research]: `docs/RESEARCH.md` -- searched for each package's path.
