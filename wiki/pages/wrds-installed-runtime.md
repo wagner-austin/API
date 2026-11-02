@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
@@ -14,6 +15,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json": "bb969cf2a9f3f4048e33df6cc1067f6cf21aa16c"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
@@ -34,9 +36,10 @@ confidence: medium
 The separately installed version-3 runtime candidate uses source `087f67b4c`,
 including exact missing-price return spans. Controller and native image
 inspections and independent review passed. Its synthetic queue rehearsal
-completed as job `58747974`; independent rehearsal review and licensed
-qualification remain. Current study status is in
-[[wrds-baseline-readiness]].[^candidate][^v3]
+completed as job `58747974` and passed independent review. Licensed training-span
+qualification also passed as job `58748788`; this checks the previously failed
+interval, not the whole dataset. Current study status is in
+[[wrds-baseline-readiness]].[^candidate][^v3][^v3-preparation]
 
 ## Installed identities
 
@@ -98,7 +101,8 @@ evaluator-image identity are separate provenance fields.[^controller][^v2]
 Independent runtime audit `29717b73` passed on November 2 at 06:23 UTC.
 Queue `b45ef01a` then selected this exact evaluator and completed native job
 `58747974`; [[wrds-operational-rehearsals]] records the result and its limits.
-Licensed return-span qualification remains before a newly frozen study.
+The subsequent licensed qualification and new freeze are recorded in
+[[wrds-baseline-v3-freeze]].[^v3-preparation]
 No licensed decryption, study launch or final grant release was requested
 during installation.[^candidate][^v3]
 
@@ -123,3 +127,5 @@ of retained records, not a historical filesystem-access audit.[^source-scope]
 [^allocation]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json`, `allocation`, exact `sacct_row`, partition limit and bounded interpretation.
 
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
+
+[^v3-preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `rehearsal_audit`, `revision`, `staging`, `qualification`, `freeze`, `queue_submission` and `limits`; linked program reports retain exact inputs and observed boundaries.

@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
@@ -12,6 +13,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json": "c6de49289a168f4bd12cdcd78419acaa972f3107"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
@@ -48,7 +50,9 @@ The stock-7 ending weight divided by the rejected-order cash slot recovered
 the original daily-product growth across the missing-price span within
 `1e-12`; entry rejection preserved the old terminal receivable until its
 next rebalance. No candidate was selected and no final holdout was released.
-Independent review of this rehearsal evidence remains outstanding.[^v3]
+Independent audit `915920df` returned VERIFIED at 06:54:36 UTC on
+November 2. Its closure checks include actual replay calls, native runtime
+binding and the wiki's limits statement.[^v3][^v3-preparation]
 
 Initial preflight reached its 600-second timeout while Apptainer waited on
 `/pub` BeeGFS metadata. The unchanged canonical preflight passed after a bounded
@@ -128,3 +132,5 @@ Final-data permissions remain governed by [[wrds-proposer-isolation]] and
 [^measurement]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json`, `measurement`, `program`, `execution` and `interpretation`; service post `93e273e2-6e02-46a1-973f-f169925a3be3` binds regenerated fixture identities and the immutable queue selection, not a new historical process attestation.
 
 [^v3]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `prerequisite_audits`, `queue`, `queue_replay`, `native_accounting`, `native_input_verification`, `result`, `service_reports`, `preflight_incident` and `remaining`; sibling files retain program-authored fixture and result measurements, measurement programs and native evidence.
+
+[^v3-preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `rehearsal_audit`, `revision`, `staging`, `qualification`, `freeze`, `queue_submission` and `limits`; linked program reports retain exact inputs and observed boundaries.
