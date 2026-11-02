@@ -15,7 +15,7 @@ from covenant_ml.options.lsm import (
     fit_policy,
     simulated_value,
 )
-from covenant_ml.options.paths import decision_inputs, gbm_paths, put_payoffs
+from covenant_ml.options.paths import decision_inputs, exp_array, gbm_paths, put_payoffs
 from covenant_ml.options.types import (
     BASIS_TERMS,
     ERR_TOO_FEW_IN_THE_MONEY,
@@ -77,7 +77,7 @@ def test_base_policy_beats_holding_on_fresh_simulated_paths() -> None:
     years: NDArray[np.float64] = (chosen + 1).astype(np.float64) / 50.0
     exercised: NDArray[np.float64] = payoffs[rows, chosen]
     held: NDArray[np.float64] = payoffs[:, -1]
-    differences: NDArray[np.float64] = exercised * np.exp(-0.05 * years) - held * math.exp(-0.05)
+    differences: NDArray[np.float64] = exercised * exp_array(-0.05 * years) - held * math.exp(-0.05)
     average = mean(differences)
     spread: NDArray[np.float64] = differences - average
     error = math.sqrt(mean(spread * spread) / len(differences))
