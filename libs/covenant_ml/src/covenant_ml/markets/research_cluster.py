@@ -6,7 +6,7 @@ import shlex
 from hashlib import sha256
 from pathlib import Path, PurePosixPath
 
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str, require_str_list
 from platform_core.stage_manifest import StagedFile, StageManifest, encode_stage_manifest
 from typing_extensions import ReadOnly, TypedDict
 
@@ -25,6 +25,7 @@ class ResearchCluster(TypedDict):
     root: ReadOnly[str]
     entrypoint: ReadOnly[str]
     image: ReadOnly[str]
+    binds: ReadOnly[list[str]]
     checksums: ReadOnly[str]
     access: ReadOnly[str]
     access_digest: ReadOnly[str]
@@ -81,6 +82,7 @@ def encode_research_cluster(value: ResearchCluster) -> JSONObject:
         "root": value["root"],
         "entrypoint": value["entrypoint"],
         "image": value["image"],
+        "binds": list(value["binds"]),
         "checksums": value["checksums"],
         "access": value["access"],
         "access_digest": value["access_digest"],
@@ -109,6 +111,7 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
         root=require_nonempty(document, "root"),
         entrypoint=require_nonempty(document, "entrypoint"),
         image=require_nonempty(document, "image"),
+        binds=require_str_list(document, "binds"),
         checksums=require_nonempty(document, "checksums"),
         access=require_nonempty(document, "access"),
         access_digest=require_evidence_digest(require_nonempty(document, "access_digest")),
@@ -121,6 +124,7 @@ def decode_research_cluster(document: JSONObject) -> ResearchCluster:
         PurePosixPath(value["entrypoint"]),
         PurePosixPath(value["image"]),
         PurePosixPath(value["access"]),
+        *(PurePosixPath(path) for path in value["binds"]),
     )
     for path in paths:
         if not path.is_absolute() or ".." in path.parts:
@@ -250,7 +254,11 @@ def prepare_bundle(
         "partition": "free",
         "gpu": None,
         "requeue": False,
-        "image": {"path": cluster["image"], "sha256": policy["image_digest"], "binds": ["/pub"]},
+        "image": {
+            "path": cluster["image"],
+            "sha256": policy["image_digest"],
+            "binds": list(cluster["binds"]),
+        },
     }
     (directory / "run.json").write_text(dump_json_str(recipe))
 
