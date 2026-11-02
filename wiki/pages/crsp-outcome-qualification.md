@@ -10,6 +10,8 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
@@ -18,6 +20,8 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/tests/markets/test_crsp_study.py": "492918257f4b6a9dba5998f75f024bb0bb6fbbdb"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e; corpus 0264d5cc-4dec-4715-b17b-45f3c8e5fbec; reread November 2."
@@ -54,6 +58,23 @@ Counts and boundaries come from the frozen native diagnostic. The requirements
 are engineering interpretations for review, not vendor-imposed investment
 rules or permission to change the stopped study.[^cases][^owners][^vendor]
 
+## An incomplete member affects the whole label benchmark
+
+The target is relative to the full decision-time universe's mean multiplier.
+An unknown member therefore leaves that benchmark unverified, even for members
+with complete individual paths. The count of 27 refused paths is not a count
+of all affected labels. Dropping those rows and recomputing the mean changes
+the target; assigning the old labels to the retained rows does not repair it.
+The equal-weight comparison arm also holds every eligible member, so a small
+top-ranked portfolio cannot make the required universe comparison complete.[^labels]
+
+The synthetic regression keeps one stock's multiplier at 1.125 and all
+decision-time features unchanged. Changing a different member's multiplier
+from 1.25 to 4 changes the first stock's label from one to zero. Removing that
+peer's held observation preserves the decision-time universe and causes label
+construction to refuse. This is an evaluator contract check, not a measured
+count of affected months in the licensed dataset.[^labels]
+
 ## Qualification design
 
 A replacement must distinguish selection, order execution, owned exposure and
@@ -87,4 +108,5 @@ the original full-universe baseline.[^cases][^partition]
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
 [^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
 [^features]: `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision` and `_feature`.
+[^labels]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_study_rows`, the mean of every eligible member's multiplier, and `crsp_arms`, `EQUAL_WEIGHT` selection; `libs/covenant_ml/tests/markets/test_crsp_study.py`, `test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark`.
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting valuation predicate; `crsp_partition.py`, `check_crsp_partition`, dated-field checks.
