@@ -20,6 +20,7 @@ from platform_core.load_report import post_load_report, report_identity
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
+from covenant_ml.markets.crsp_revision import revise_crsp_protocol, verify_crsp_revision
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import extract_crsp
 from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
@@ -49,6 +50,15 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--open-final", action="store_true")
     mode.add_argument("--ciphertext-only", action="store_true")
     verify.add_argument("--report-task", required=True)
+    for name in ("revise-protocol", "verify-revision"):
+        revision = commands.add_parser(name)
+        revision.add_argument("--outputs", required=True, type=Path)
+        revision.add_argument("--receipt-sha256", required=True)
+        revision.add_argument("--previous-protocol", required=True, type=Path)
+        revision.add_argument("--protocol", required=True, type=Path)
+        revision.add_argument("--access", required=True, type=Path)
+        revision.add_argument("--destination", required=True, type=Path)
+        revision.add_argument("--report-task", required=True)
     return parser
 
 
@@ -101,25 +111,41 @@ def main(argv: list[str] | None = None) -> int:
             ),
         )
         return 0
-    collected: Path = args.collected
-    scratch: Path = args.scratch
-    open_final: bool = args.open_final
-    ciphertext_only: bool = args.ciphertext_only
     task: str = args.report_task
     report_identity(task, "wrds")  # refuses a malformed task before a bundle is opened
-    result = verify_crsp_extraction(
-        collected,
-        EvaluatorKeys(settings),
-        scratch=scratch,
-        open_final=open_final,
-        ciphertext_only=ciphertext_only,
-    )
+    if command in {"revise-protocol", "verify-revision"}:
+        outputs: Path = args.outputs
+        receipt_digest: str = args.receipt_sha256
+        previous_protocol: Path = args.previous_protocol
+        current_protocol: Path = args.protocol
+        destination: Path = args.destination
+        if command == "revise-protocol":
+            revise_crsp_protocol(
+                outputs, receipt_digest, previous_protocol, current_protocol, settings, destination
+            )
+        result = verify_crsp_revision(
+            outputs, receipt_digest, previous_protocol, current_protocol, settings, destination
+        )
+        heading = "WRDS PROTOCOL REVISION LOAD-REPORT\n"
+    else:
+        collected: Path = args.collected
+        scratch: Path = args.scratch
+        open_final: bool = args.open_final
+        ciphertext_only: bool = args.ciphertext_only
+        result = verify_crsp_extraction(
+            collected,
+            EvaluatorKeys(settings),
+            scratch=scratch,
+            open_final=open_final,
+            ciphertext_only=ciphertext_only,
+        )
+        heading = "WRDS EXTRACTION VERIFY LOAD-REPORT\n"
     payload = dump_json_str(result)
     post_load_report(
         post=_test_hooks.http_post,
         read_text=_test_hooks.stack_text,
         task_id=task,
-        body="WRDS EXTRACTION VERIFY LOAD-REPORT\n" + payload,
+        body=heading + payload,
         family="wrds",
     )
     sys.stdout.write(payload + "\n")

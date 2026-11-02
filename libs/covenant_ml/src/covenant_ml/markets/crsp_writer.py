@@ -21,7 +21,7 @@ from platform_core.stage_manifest import StagedFile
 
 from ..evaluation.evidence import require_private_directory
 from . import _test_hooks as hooks
-from .crsp_extract import CrspExtract, CrspRelation, encode_crsp_extract, load_crsp_sources
+from .crsp_extract import crsp_extract_from_records, encode_crsp_extract, load_crsp_sources
 from .crsp_extraction_records import (
     CRSP_RELATIONS,
     CrspExtractionReceipt,
@@ -80,22 +80,16 @@ def _seal_manifest(directory: Path, extracted_at: str, limits: CrspLimits) -> St
         ValueError: CRSP-012 when the CSVs exceed the partition budget, which is
             checked before the whole-file reader loads them.
     """
-    relations = {
-        name: CrspRelation(
-            csv=_record(directory / (name + ".csv")), query=_record(directory / (name + ".sql"))
-        )
+    records = tuple(
+        _record(directory / (name + suffix))
         for name in CRSP_RELATIONS
-    }
-    plaintext = sum(item["csv"]["size_bytes"] for item in relations.values())
+        for suffix in (".csv", ".sql")
+    )
+    plaintext = sum(item["size_bytes"] for item in records if item["name"].endswith(".csv"))
     if plaintext > limits["max_partition_bytes"]:
         raise ValueError("[CRSP-012] partition plaintext exceeds its byte budget")
-    manifest = CrspExtract(
-        extracted_at=extracted_at,
-        protocol=_record(directory / "protocol.json"),
-        membership=relations["membership"],
-        returns=relations["returns"],
-        calendar=relations["calendar"],
-        delists=relations["delists"],
+    manifest = crsp_extract_from_records(
+        extracted_at, _record(directory / "protocol.json"), records
     )
     with (directory / "manifest.json").open("x", encoding="utf-8") as stream:
         stream.write(dump_json_str(encode_crsp_extract(manifest)))

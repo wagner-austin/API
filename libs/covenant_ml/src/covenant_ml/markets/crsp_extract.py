@@ -17,6 +17,7 @@ from platform_core.stage_manifest import StagedFile, decode_staged_file, encode_
 from typing_extensions import ReadOnly, TypedDict
 
 from ..evaluation.evidence import read_evidence, require_evidence_filename
+from .crsp_extraction_records import CRSP_RELATIONS
 from .crsp_protocol import CrspProtocol, decode_crsp_protocol
 from .crsp_rows import decode_crsp_rows
 
@@ -114,6 +115,47 @@ def encode_crsp_extract(value: CrspExtract) -> JSONObject:
         "calendar": encode_crsp_relation(value["calendar"]),
         "delists": encode_crsp_relation(value["delists"]),
     }
+
+
+def crsp_extract_from_records(
+    extracted_at: str, protocol: StagedFile, records: tuple[StagedFile, ...]
+) -> CrspExtract:
+    """Assemble the canonical manifest from the eight exact relation file records.
+
+    Extraction and encrypted metadata revision share this ordering and naming
+    contract. This constructs metadata only; callers verify the file bytes.
+
+    Args:
+        extracted_at: Original UTC extraction vintage.
+        protocol: Frozen protocol file identity.
+        records: Exactly the four CSV/query pairs using the writer's filenames.
+
+    Returns:
+        The validated canonical manifest.
+
+    Raises:
+        ValueError: Missing, extra or duplicate relation file names.
+    """
+    by_name = {item["name"]: item for item in records}
+    expected = {role + suffix for role in CRSP_RELATIONS for suffix in (".csv", ".sql")}
+    if len(records) != len(expected) or set(by_name) != expected:
+        raise ValueError("[CRSP-006] require exactly the eight canonical relation files")
+    relations = {
+        role: CrspRelation(csv=by_name[role + ".csv"], query=by_name[role + ".sql"])
+        for role in CRSP_RELATIONS
+    }
+    return decode_crsp_extract(
+        encode_crsp_extract(
+            CrspExtract(
+                extracted_at=extracted_at,
+                protocol=protocol,
+                membership=relations["membership"],
+                returns=relations["returns"],
+                calendar=relations["calendar"],
+                delists=relations["delists"],
+            )
+        )
+    )
 
 
 def _read_staged(directory: Path, record: StagedFile) -> bytes:

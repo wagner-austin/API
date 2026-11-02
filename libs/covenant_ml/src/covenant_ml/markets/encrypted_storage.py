@@ -12,6 +12,7 @@ from contextlib import contextmanager
 from hashlib import file_digest, sha256
 from io import BufferedIOBase
 from pathlib import Path
+from shutil import copyfileobj
 from tempfile import TemporaryDirectory
 from typing import BinaryIO
 
@@ -149,6 +150,95 @@ def encrypted_stage_manifest(
     )
 
 
+def revise_encrypted_bundle(
+    path: Path,
+    expected_digest: str,
+    replacements: Path,
+    destination: Path,
+    *,
+    files: tuple[StagedFile, ...],
+    manifest: StagedFile,
+) -> EncryptedBundle:
+    """Replace declared plaintext metadata while retaining other ciphertext bytes.
+
+    The caller proves the domain-specific compatibility of the replacement
+    files. This storage operation preserves the original partition, recipient,
+    manifest filename and every non-replaced file. It acquires no identity and
+    decrypts nothing. The new manifest is published last, after copy readback;
+    a failure can leave an incomplete ciphertext directory, never a usable
+    published bundle. Existing destinations and originals are never replaced.
+
+    Args:
+        path: Original bundle alongside its ciphertext.
+        expected_digest: Independently pinned original bundle identity.
+        replacements: Directory containing the replacement metadata plaintext.
+        destination: New exclusive ciphertext directory.
+        files: Exact replacement identities, including the changed manifest.
+        manifest: Replacement manifest using the original manifest filename.
+
+    Returns:
+        Newly published bundle retaining original non-replaced file records.
+
+    Raises:
+        ValueError: Changed original bytes or invalid replacement inventory.
+        OSError: Existing destination or failed file access/copy.
+        Exception: Real age encryption failure; no final manifest is published.
+    """
+    original = verify_encrypted_bundle(path, expected_digest)
+    names = {item["plaintext"]["name"] for item in original["files"]}
+    replaced = {item["name"] for item in files}
+    if (
+        len(replaced) != len(files)
+        or not replaced <= names
+        or manifest not in files
+        or manifest["name"] != original["manifest"]["name"]
+        or manifest == original["manifest"]
+    ):
+        raise ValueError(
+            "ENCRYPTED_REVISION: require distinct existing replacements and new manifest"
+        )
+    destination.mkdir(mode=0o700, parents=False, exist_ok=False)
+    with TemporaryDirectory(prefix="encrypted-revision-", dir=destination.parent) as temporary:
+        sealed = encrypt_bundle(
+            replacements,
+            Path(temporary) / "sealed",
+            files=files,
+            manifest=manifest,
+            recipient=original["recipient"],
+            partition=original["partition"],
+        )
+        changed = {item["plaintext"]["name"]: item for item in sealed["files"]}
+        revised: list[EncryptedFile] = []
+        for previous in original["files"]:
+            name = previous["plaintext"]["name"]
+            if name in changed:
+                item = changed[name]
+                directory = Path(temporary) / "sealed"
+            else:
+                item = previous
+                directory = path.parent
+            cipher = item["ciphertext"]
+            with (
+                require_evidence_path(directory, cipher["name"]).open("rb") as source,
+                (destination / cipher["name"]).open("x+b") as target,
+            ):
+                copyfileobj(source, target)
+                target.flush()
+                _verify(target, cipher)
+            revised.append(item)
+        bundle = EncryptedBundle(
+            format=original["format"],
+            partition=original["partition"],
+            recipient=original["recipient"],
+            manifest=manifest,
+            files=tuple(revised),
+        )
+        decode_encrypted_bundle(encode_encrypted_bundle(bundle))
+        with (destination / "bundle.json").open("x", encoding="utf-8") as output:
+            output.write(dump_json_str(encode_encrypted_bundle(bundle)))
+    return bundle
+
+
 def read_encrypted_bundle(path: Path, expected_digest: str) -> EncryptedBundle:
     """Decode only metadata bytes matching the evaluator's frozen digest."""
     payload = path.read_bytes()
@@ -245,6 +335,7 @@ __all__ = [
     "encrypt_bundle",
     "encrypted_stage_manifest",
     "read_encrypted_bundle",
+    "revise_encrypted_bundle",
     "staged_record",
     "verify_encrypted_bundle",
 ]
