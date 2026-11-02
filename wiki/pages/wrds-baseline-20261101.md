@@ -77,8 +77,9 @@ Version-2 bundle lineage is recorded in [[wrds-protocol-revision]]. The new
 study still needs current runtime identities and a new preregistration.
 The originally staged bundle embeds version 1 and cannot be silently
 reinterpreted. Rehearse changed inputs through the existing queue
-and preserve this failed journal. Cleanup of the original failed
-allocation remains an evidence gap in [[wrds-cleanup-evidence]].[^diagnostic]
+and preserve this failed journal. The original allocation's later configured-path
+observation and remaining historical-path limitation are recorded separately
+in [[wrds-cleanup-evidence]].[^diagnostic]
 
 [^stopped]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `native`, `queue`, `diagnostic` and `study_action`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `terminal_report`, `interpretation`, `repair_status` and `cleanup_limit`; its repair-status field is the historical pre-correction observation.

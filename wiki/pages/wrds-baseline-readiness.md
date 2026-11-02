@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
   - "libs/covenant_ml/docs/crsp-monthly.json"
@@ -11,6 +12,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json": "7fc3888de5afbfcd89731034f8c401f855de4d28"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
   "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
@@ -38,7 +40,7 @@ See [[wrds-baseline-20261101]] for the cause and correction boundary.[^stop]
 | Data | [[wrds-licensed-data-evidence]] — version-2 validation staged and independently reread on HPC3; [[wrds-protocol-revision]] records lineage. |
 | Operations | [[wrds-operational-rehearsals]] — current version-2 queue rehearsal plus historical seed summary, selection and controlled final execution.[^v2] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
-| Cleanup | [[wrds-cleanup-evidence]] — bounded WRDS/HPC3 probes; failed licensed allocation still needs its own observation. |
+| Cleanup | [[wrds-cleanup-evidence]] — original failed job's configured paths observed absent on its node; historical-path and timing limits remain.[^cleanup] |
 | Scientific rules | [[crsp-monthly-study-design]] and [[crsp-monthly-holdings-validation]] — frozen target, chronology, accounting and uncertainty. |
 
 These links separate code contracts from installed-runtime measurements and
@@ -57,7 +59,8 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
 - [x] Rehearse proposal → admission → queue → native job → verified result
    with the installed version-2 runtime and pre-entry delisting fixture.[^v2]
 - [ ] Freeze amended licensed-study resource and candidate rules.
-- [ ] Close the failed allocation's cleanup-evidence gap.
+- [x] Observe the failed allocation's configured paths on its original node;
+   service verification passed, with independent task audit pending.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; final access stays a separate controlled step.
 
@@ -73,3 +76,5 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^runtime]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `remaining` and `scope`; installation observation only; subsequent rehearsal is recorded separately and the substantive study remains outstanding.
 
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
+
+[^cleanup]: `tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json`, `subject`, `observer`, `results`, `verified_measurement`, `service_reports` and `limits`; original expanded scratch path was not logged.
