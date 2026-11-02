@@ -15,6 +15,8 @@ from platform_core.json_utils import (
     JSONValue,
     dump_json_str,
     load_json_str,
+    narrow_json_to_dict,
+    require_dict,
 )
 
 from fleet.contracts.model_host import (
@@ -88,11 +90,8 @@ class TestNodeModels:
 
     def test_colossus_s_machine_file_declares_both_servers(self) -> None:
         machine = pathlib.Path(__file__).parents[1] / "registry" / "machines" / "colossus.json"
-        declared = load_json_str(machine.read_text(encoding="utf-8"))
-        assert isinstance(declared, dict)
-        dispatch = declared["dispatch"]
-        assert isinstance(dispatch, dict)
-        assert dispatch["models"] == COLOSSUS_MODELS
+        declared = narrow_json_to_dict(load_json_str(machine.read_text(encoding="utf-8")))
+        assert require_dict(declared, "dispatch")["models"] == COLOSSUS_MODELS
 
     @pytest.mark.parametrize(
         ("servers", "message"),
