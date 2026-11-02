@@ -66,7 +66,9 @@ class ImageReference(TypedDict):
             merely where it was read from.
         binds: Host directories the payload must be able to read, mounted at
             the same path inside. Required as a field and may be empty, but
-            on HPC3 an empty list is almost always wrong: ``/pub`` there is a
+            must explicitly include every required data filesystem. Site
+            bind-paths and hostfs mounts are disabled by the shared launcher.
+            Standard home and temporary mounts remain available. ``/pub`` is a
             SYMLINK to ``/dfs6b/pub``, and while apptainer binds the BeeGFS
             mounts it does not carry the symlink, so ``/pub/...`` does not
             resolve inside the container at all. Measured 2026-08-25 --
