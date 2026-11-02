@@ -268,6 +268,61 @@ def compare_dates(
     )
 
 
+#: Dispositions of an acquisition whose window has not yet produced its one result.
+OUTSTANDING = ("future", "due", "started_unfinished")
+
+
+def declared_plans(
+    plan: ForwardPlan, campaign: Campaign, evaluation: JSONObject
+) -> tuple[tuple[tuple[PaperPlan, JSONObject], ...], ...]:
+    """Select each declared date's campaign plans, refusing any still acquiring.
+
+    Args:
+        plan: Forward plan naming dates, series and forecast cycle.
+        campaign: Verified frozen manifest.
+        evaluation: The campaign evaluator's report.
+
+    Returns:
+        Per declared date, in order, each series' frozen plan and evaluated row.
+
+    Raises:
+        ValueError: FORWARD-004 when the campaign holds no single plan for a
+            declared date and series; FORWARD-007 while any declared capture or
+            settlement is future, due or started without a result, since a
+            snapshot taken later could still change which dates score.
+    """
+    rows = {
+        require_str(row, "name"): row
+        for row in (narrow_json_to_dict(value) for value in require_list(evaluation, "plans"))
+    }
+    declared: list[tuple[tuple[PaperPlan, JSONObject], ...]] = []
+    for day in plan["event_dates"]:
+        chosen: list[tuple[PaperPlan, JSONObject]] = []
+        for series in plan["series"]:
+            frozen = [
+                candidate
+                for candidate in campaign["plans"]
+                if (candidate["event_day"], candidate["series"], candidate["forecast_hour"])
+                == (day, series, plan["model"]["forecast_hour"])
+            ]
+            if len(frozen) != 1:
+                raise ValueError(f"[FORWARD-004] campaign holds no single plan for {day} {series}")
+            chosen.append((frozen[0], rows[frozen[0]["name"]]))
+        declared.append(tuple(chosen))
+    outstanding = [
+        frozen["name"]
+        for chosen in declared
+        for frozen, row in chosen
+        if row["capture"] in OUTSTANDING or row["settlement"] in OUTSTANDING
+    ]
+    if outstanding:
+        raise ValueError(
+            f"[FORWARD-007] {len(outstanding)} declared acquisitions are still outstanding, "
+            f"first {outstanding[0]}"
+        )
+    return tuple(declared)
+
+
 def score_forward_plan(
     plan: ForwardPlan,
     plan_sha256: str,
@@ -292,8 +347,9 @@ def score_forward_plan(
 
     Raises:
         ValueError: FORWARD-004 when the campaign is not the one the plan binds or
-            lacks a declared plan; FORWARD-005 when a capture does not reproduce;
-            campaign evaluator errors propagate.
+            lacks a declared plan; FORWARD-007 while a declared acquisition is
+            outstanding; FORWARD-005 when a capture does not reproduce; campaign
+            evaluator errors propagate. Nothing is written on any refusal.
         OSError: Required evidence is absent.
     """
     campaign = load_campaign_inputs(root, plan["campaign"]["manifest_sha256"])
@@ -308,40 +364,30 @@ def score_forward_plan(
     evaluation, evidence = evaluate_campaign(
         root, plan["campaign"]["manifest_sha256"], observed_at, market_archive
     )
-    rows = {
-        require_str(row, "name"): row
-        for row in (narrow_json_to_dict(value) for value in require_list(evaluation, "plans"))
-    }
+    declared = declared_plans(plan, campaign, evaluation)
     sources = set(evidence)
     dates: list[JSONValue] = []
     differences: list[float] = []
     contracts: list[ForwardContract] = []
-    for day in plan["event_dates"]:
+    for day, chosen in zip(plan["event_dates"], declared, strict=True):
         entries: list[JSONValue] = []
         scored: list[ForwardContract] = []
-        for series in plan["series"]:
-            frozen = [
-                candidate
-                for candidate in campaign["plans"]
-                if (candidate["event_day"], candidate["series"], candidate["forecast_hour"])
-                == (day, series, plan["model"]["forecast_hour"])
-            ]
-            if len(frozen) != 1:
-                raise ValueError(f"[FORWARD-004] campaign holds no single plan for {day} {series}")
-            row = rows[frozen[0]["name"]]
+        for frozen, row in chosen:
             outcomes = row["outcomes"]
             found: tuple[ForwardContract, ...] = ()
             if outcomes is not None and require_bool(narrow_json_to_dict(outcomes), "complete"):
                 saved, paths = replay_capture(
-                    root, campaign, frozen[0], market_archive, forecast_archive
+                    root, campaign, frozen, market_archive, forecast_archive
                 )
                 sources.update(paths)
-                found = eligible_contracts(saved, narrow_json_to_dict(outcomes), plan, series)
+                found = eligible_contracts(
+                    saved, narrow_json_to_dict(outcomes), plan, frozen["series"]
+                )
             scored.extend(found)
             entries.append(
                 {
-                    "name": frozen[0]["name"],
-                    "series": series,
+                    "name": frozen["name"],
+                    "series": frozen["series"],
                     "capture": row["capture"],
                     "settlement": row["settlement"],
                     "eligible": len(found),
@@ -436,9 +482,11 @@ def decide(
 
 
 __all__ = [
+    "OUTSTANDING",
     "ForwardContract",
     "compare_dates",
     "decide",
+    "declared_plans",
     "decode_forward_contract",
     "eligible_contracts",
     "encode_forward_contract",
