@@ -80,8 +80,9 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # installer cases MCPs board task 42fb4e26 deleted, and MCPs/execution,
     # the Windows lane MCPs board task 5b040fdb deleted.
     # 70 since execution-deploy and execution-linux share cached multi-root
-    # preparation (MCPs board task 007bfc7e).
-    assert len(prepared) == 70
+    # preparation (MCPs board task 007bfc7e). 71 since MCPs/participant-mcp,
+    # the chat app's subscription participants (MCPs board task 42512a6b).
+    assert len(prepared) == 71
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
