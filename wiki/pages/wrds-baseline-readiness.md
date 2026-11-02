@@ -4,11 +4,13 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
   - "libs/covenant_ml/docs/crsp-monthly.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
   "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
@@ -30,7 +32,7 @@ See [[wrds-baseline-20261101]] for the cause and correction boundary.[^stop]
 
 | Area | Evidence and current boundary |
 |---|---|
-| Runtime | [[wrds-installed-runtime]] — verified controller/image identities; repository changes require a new installation. |
+| Runtime | [[wrds-installed-runtime]] — version-2 controller/image installed; current-runtime queue rehearsal pending.[^runtime] |
 | Data | [[wrds-licensed-data-evidence]] — version-2 validation staged and independently reread on HPC3; [[wrds-protocol-revision]] records lineage. |
 | Operations | [[wrds-operational-rehearsals]] — synthetic queue, seed summary, selection and controlled final execution. |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
@@ -49,8 +51,9 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
 - [x] Stage the separately verified version-2 validation bundle described in
    [[wrds-protocol-revision]]. Transfer and complete remote readback passed;
    the staged version-1 bundle remains historical.[^stage]
-- [ ] Freeze and install the version-2 evaluator and amended study rules,
-   then rehearse proposal → admission → queue → native job → verified result.
+- [x] Install the separately frozen version-2 controller and HPC3 image.[^runtime]
+- [ ] Freeze amended study rules and rehearse proposal → admission → queue
+   → native job → verified result with the installed version-2 runtime.
 - [ ] Close the failed allocation's cleanup-evidence gap.
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; final access stays a separate controlled step.
@@ -63,3 +66,5 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
 [^stage]: `tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json`, `staging`, `readback` and `scope`; encrypted validation staging only, with no evaluator installation or final release.
+
+[^runtime]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `remaining` and `scope`; installation passed, with current-runtime queue rehearsal and substantive study still outstanding.

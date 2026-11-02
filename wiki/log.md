@@ -537,3 +537,7 @@ Notes: Compared new revision claims and each identity with both real service rep
 ## [2026-11-01] evidence audit | Version-2 validation staging
 Pages updated: wrds-licensed-data-evidence, wrds-baseline-readiness, wrds-protocol-revision.
 Notes: Compared new staging claims with the controller, transfer and separate complete-tree service reports. Recorded eleven files plus certificate, unchanged pinned identities, 1,789,968,348 bundle bytes and both mode-0700 directories; marked staging complete while retaining pending runtime, cleanup and study work. Historical metadata-revision evidence remains scoped to its observation time. Board task 1fe61b29-b95e-42e6-b389-76a81e274c84.
+
+## [2026-11-01] evidence audit | Corrected CRSP runtime installation
+Pages updated: wrds-installed-runtime, wrds-baseline-readiness.
+Notes: Bound the current controller and image identities to service inspections of 623 installed members, seven wheels and native build 58739821. Checked fourteen image files, two self-check passes and successful dependency checks. Retained the old queue adapter and stopped study as historical evidence; installation does not complete a current-runtime queue rehearsal, amended resource rules or a substantive baseline. Encrypted validation staging independently passed audit ac4a9dc7. Board task 1ec0dbcb-4c25-455f-9c16-b2b8e3177a68.
