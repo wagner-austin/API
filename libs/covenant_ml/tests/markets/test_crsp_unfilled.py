@@ -23,7 +23,7 @@ from covenant_ml.markets.research_trial import execute_trial
 from covenant_ml.markets.research_trial_records import decode_research_trial
 
 from ._crsp_fixtures import write_sources
-from ._crsp_study_fixtures import pre_entry_rows, study_protocol
+from ._crsp_study_fixtures import missing_price_rows, pre_entry_rows, study_protocol
 from ._encrypted_fixtures import create_access, evaluator_keys, seal_extract
 from ._trial_fixtures import frozen_request, trial_document
 from .test_crsp_execution_boundaries import event
@@ -144,12 +144,15 @@ def test_existing_position_cannot_be_reclassified_as_unfilled_cash() -> None:
         evaluate_crsp_holdings(outcomes(rows, []), (W1, W2), ((1, 2), (2, 3)), 10)
 
 
+@pytest.mark.parametrize("price_gap", [False, True])
 def test_encrypted_monthly_study_publishes_rejected_orders_and_cleans_plaintext(
     tmp_path: Path,
+    price_gap: bool,
 ) -> None:
     source = tmp_path / "source"
     source.mkdir()
-    manifest, _ = write_sources(source, pre_entry_rows(), study_protocol())
+    rows = missing_price_rows() if price_gap else pre_entry_rows()
+    manifest, _ = write_sources(source, rows, study_protocol())
     access = create_access(tmp_path)
     sealed = seal_extract(manifest, tmp_path / "encrypted", access, "train-validation")
     evaluation: JSONObject = {
@@ -205,15 +208,14 @@ def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> Non
     document = trial_document(tmp_path)
     evaluation = require_dict(document, "evaluation")
     old_design = dict(require_dict(evaluation, "design"))
-    old_design.pop("entry_rule")
-    old_design.pop("cost_rule")
-    old_design["version"] = 1
+    old_design.pop("held_return_rule")
+    old_design["version"] = 2
     old_evaluation = dict(evaluation)
     old_evaluation["design"] = old_design
     old_digest = sha256(
         dump_json_str(
             {
-                "kind": "crsp-monthly-holdings-validation-v1",
+                "kind": "crsp-monthly-holdings-validation-v2",
                 "settings": old_evaluation,
             }
         ).encode()
@@ -236,9 +238,8 @@ def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> Non
 
 def test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data(tmp_path: Path) -> None:
     old_design = study_protocol()
-    old_design.pop("entry_rule")
-    old_design.pop("cost_rule")
-    old_design["version"] = 1
+    old_design.pop("held_return_rule")
+    old_design["version"] = 2
     source = tmp_path / "source"
     source.mkdir()
     manifest, _ = write_sources(source, pre_entry_rows(), old_design)

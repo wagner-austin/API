@@ -69,7 +69,7 @@ def test_metadata_revision_preserves_originals_and_needs_no_keys(tmp_path: Path)
             max_plaintext_bytes=10_000_000,
         ) as manifest:
             sources = load_crsp_sources(manifest)
-            assert sources.protocol["version"] == 2
+            assert sources.protocol["version"] == 3
             assert len(sources.membership) == 3
             assert sources.manifest["extracted_at"] == revision["extracted_at"]
     assert not list(tmp_path.glob("crsp-revision-metadata-*"))

@@ -7,7 +7,7 @@ from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
-from platform_core.json_utils import JSONObject, require_str
+from platform_core.json_utils import JSONObject, require_float, require_str
 
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 
@@ -151,11 +151,41 @@ def final_manifest(directory: Path) -> Path:
     return path
 
 
+def missing_price_rows() -> dict[str, list[JSONObject]]:
+    """Replace two synthetic daily observations with one known two-session return.
+
+    The total held multiplier stays equal to the independent original path.
+    An MP/MR row and its NA/P1 successor reproduce the licensed diagnostic's
+    metadata pattern, without copying a licensed value or identifier.
+    """
+    rows = pre_entry_rows()
+    (gap,) = [
+        row for row in rows["returns"] if row["permno"] == 7 and row["dlycaldt"] == "2019-03-11"
+    ]
+    (close,) = [
+        row for row in rows["returns"] if row["permno"] == 7 and row["dlycaldt"] == "2019-03-12"
+    ]
+    close["dlyret"] = (1 + require_float(gap, "dlyret")) * (1 + require_float(close, "dlyret")) - 1
+    close.update({"dlyprevdt": "2019-03-08", "dlyretdurflg": "P1"})
+    gap.update(
+        {
+            "dlyret": None,
+            "dlyprevdt": None,
+            "dlyretmissflg": "MP",
+            "dlyretdurflg": "MR",
+            "dlyprc": None,
+            "dlyprcflg": "MP",
+        }
+    )
+    return rows
+
+
 __all__ = [
     "DELISTED",
     "FINAL_END",
     "VALIDATION_END",
     "final_manifest",
+    "missing_price_rows",
     "pre_entry_rows",
     "study_protocol",
     "study_rows",
