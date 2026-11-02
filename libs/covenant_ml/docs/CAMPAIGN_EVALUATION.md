@@ -96,7 +96,12 @@ digest (`FORWARD-001`), and any fee, hurdle or stress the quoted taker policy
 does not implement (`FORWARD-003`). `markets.forward_scoring` adds no second
 evaluator. It runs `evaluate_campaign` unchanged and requires the campaign's
 name, collector, protocol and fitted report to be the plan's (`FORWARD-004`).
-For every declared plan whose settlement snapshot is complete, it then
+It refuses the whole run and writes nothing while any declared capture or
+settlement is still `future`, `due` or `started_unfinished` (`FORWARD-007`),
+since a snapshot taken later could change which dates score; a window that
+closed without a result (`unrecorded_overdue`) or a recorded omission is
+reported as such. A second run into an existing output is refused
+(`MARKET-027`). For every declared plan whose settlement snapshot is complete, it then
 re-derives the capture from its archived exchange and forecast responses with
 `collect_paper_predictions` in replay mode, and refuses any difference from the
 sealed report (`FORWARD-005`). Scores come only from the declared dates:
