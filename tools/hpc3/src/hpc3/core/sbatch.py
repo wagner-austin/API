@@ -17,6 +17,8 @@ a successful job.
 
 from __future__ import annotations
 
+import shlex
+
 from platform_core.cluster_layout import qualified_name
 from platform_core.determinism_env import (
     CUBLAS_DETERMINISTIC_WORKSPACE,
@@ -31,7 +33,13 @@ from hpc3.contracts.cluster import describe_gpu_request
 from hpc3.contracts.dependency import dependency_argument
 from hpc3.contracts.experiment import comment_fragment
 from hpc3.contracts.job import JobSpec
-from hpc3.core.image_exec import APPTAINER_MODULE, bind_arguments, gpu_arguments
+from hpc3.core.image_exec import (
+    APPTAINER_EXEC,
+    APPTAINER_MODULE,
+    gpu_arguments,
+    mount_arguments,
+    run_inside_image,
+)
 
 MINUTES_PER_HOUR = 60
 MINUTES_PER_DAY = 1440
@@ -277,7 +285,7 @@ def payload_lines(spec: JobSpec) -> list[str]:
     env_bin = f"{spec['env_path']}/bin"
     if image is None:
         return [f'export PATH="{env_bin}:$PATH"', "", spec["command"]]
-    lines = ["apptainer exec \\"]
+    lines = [f"{APPTAINER_EXEC} \\"]
     # A container carries CUDA but not the DRIVER, which lives in the host
     # kernel. Without --nv a GPU job starts on a node with a working card and
     # dies reporting "Found no NVIDIA driver on your system" -- one line below
@@ -286,10 +294,10 @@ def payload_lines(spec: JobSpec) -> list[str]:
     # Binds come from image_exec so this and the preflight probe cannot drift
     # into mounting different directories -- a preflight that verified an
     # environment the job then could not reach would be worse than none.
-    lines.extend(f"    {argument} \\" for argument in bind_arguments(image))
+    lines.extend(f"    {argument} \\" for argument in mount_arguments(image))
     lines.extend(
         [
-            f'    "{image["path"]}" \\',
+            f"    {shlex.quote(image['path'])} \\",
             f'    env PATH="{env_bin}:$PATH" \\',
             f"    {spec['command']}",
         ]
@@ -328,7 +336,8 @@ def code_provenance_export(spec: JobSpec) -> str:
     # For an image run the stamp lives INSIDE the image, at a container path.
     # A bare `cat` would look on the host, find nothing, and export empty --
     # reporting an image that does know its commit as unstamped.
-    reader = f"cat {stamp}" if image is None else f'apptainer exec "{image["path"]}" cat {stamp}'
+    command = f"cat {shlex.quote(stamp)}"
+    reader = command if image is None else run_inside_image(image, command)
     return f"export GIT_COMMIT=\"$({reader} 2>/dev/null || echo '')\""
 
 

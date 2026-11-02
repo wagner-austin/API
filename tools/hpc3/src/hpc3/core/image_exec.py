@@ -37,8 +37,15 @@ loaded, so any command that reaches for it without loading first fails with
 """
 
 
-def bind_arguments(image: ImageReference) -> list[str]:
-    """Render the image's binds as ``--bind`` arguments.
+APPTAINER_EXEC = (
+    "env -u APPTAINER_BIND -u APPTAINER_BINDPATH -u APPTAINER_MOUNT "
+    "-u SINGULARITY_BIND -u SINGULARITY_BINDPATH -u SINGULARITY_MOUNT apptainer exec"
+)
+"""Ignore ambient mount requests; the image reference owns data mounts."""
+
+
+def mount_arguments(image: ImageReference) -> list[str]:
+    """Disable implicit site mounts and render the declared data mounts.
 
     Each directory is mounted at its own path, so a payload's absolute paths
     mean the same thing inside the container and out. Without them a job
@@ -50,10 +57,14 @@ def bind_arguments(image: ImageReference) -> list[str]:
         image: The image whose binds are rendered.
 
     Returns:
-        One ``--bind "path:path"`` argument per declared bind, in declaration
-        order. Empty when the image declares none.
+        Site-bind and host-filesystem suppression, followed by one safely
+        quoted bind per declared directory. Standard home, device and temporary
+        filesystem mounts remain available; this is not a security sandbox.
     """
-    return [f'--bind "{path}:{path}"' for path in image["binds"]]
+    return [
+        "--no-mount bind-paths,hostfs",
+        *(f"--bind {shlex.quote(f'{path}:{path}')}" for path in image["binds"]),
+    ]
 
 
 NVIDIA_FLAG = "--nv"
@@ -121,9 +132,9 @@ def run_inside_image(image: ImageReference, command: str) -> str:
     parts = [
         f"module load {APPTAINER_MODULE}",
         "&&",
-        "apptainer exec",
-        *bind_arguments(image),
-        f'"{image["path"]}"',
+        APPTAINER_EXEC,
+        *mount_arguments(image),
+        shlex.quote(image["path"]),
         "sh",
         "-c",
         shlex.quote(command),
@@ -153,8 +164,9 @@ def describe_location(image: ImageReference | None, host: str) -> str:
 
 __all__ = [
     "APPTAINER_MODULE",
+    "APPTAINER_EXEC",
     "NVIDIA_FLAG",
-    "bind_arguments",
+    "mount_arguments",
     "describe_location",
     "gpu_arguments",
     "run_inside_image",
