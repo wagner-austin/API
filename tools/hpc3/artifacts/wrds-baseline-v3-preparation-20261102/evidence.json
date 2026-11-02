@@ -1,0 +1,126 @@
+{
+  "kind": "LICENSED_V3_PREPARATION_AND_QUALIFICATION",
+  "task": "f61db3a7-a9dd-468c-96d2-d520271a9c3b",
+  "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+  "rehearsal_audit": {
+    "body": "audit -> done \u2014 audit 915920df-bbd2-4b6e-9cc1-aaea1bed9653 passed: VERDICT: VERIFIED [released 1 waiting task(s): f61db3a7-a9dd-468c-96d2-d520271a9c3b] @codex-wrds-1027",
+    "task": "284bc096-4b05-446b-9463-5ef5c49fa520",
+    "status": "done",
+    "audit_post": "b8dec81d-fd62-4714-9001-3ca6004d3407",
+    "created_at": "2026-11-02T06:54:36.726725+00:00"
+  },
+  "revision": {
+    "kind": "CRSP_PROTOCOL_REVISION_EVIDENCE",
+    "revision_sha256": "0f4c7aeba291707b6787ce0d71729754ed4a9dbdc2fc0c455aee6f122f64022f",
+    "revision": {
+      "extraction_sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+      "extracted_at": "2026-10-31T18:44:04.122752+00:00",
+      "previous_protocol": {
+        "name": "protocol.json",
+        "sha256": "6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b",
+        "size_bytes": 1251
+      },
+      "protocol": {
+        "name": "protocol.json",
+        "sha256": "af5cbced56bc26076db0a3dc769c98c45ba393a507473a18eda839e5ddf61ed9",
+        "size_bytes": 1392
+      },
+      "train_validation": {
+        "previous": {
+          "name": "bundle.json",
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+          "size_bytes": 2959
+        },
+        "current": {
+          "name": "bundle.json",
+          "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+          "size_bytes": 2959
+        },
+        "previous_manifest": {
+          "name": "manifest.json",
+          "sha256": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+          "size_bytes": 1242
+        },
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "34010eec6e22926aea80c22a9d5d1d4e9807b32c38c70d911ef0fbae90ed2db4",
+          "size_bytes": 1242
+        }
+      },
+      "final": {
+        "previous": {
+          "name": "bundle.json",
+          "sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+          "size_bytes": 2948
+        },
+        "current": {
+          "name": "bundle.json",
+          "sha256": "4c8382a7e72e0ddbff8ac6db6b5f76212d1c94cdc42c714860f6f86f322ad57e",
+          "size_bytes": 2948
+        },
+        "previous_manifest": {
+          "name": "manifest.json",
+          "sha256": "7a330b024227ef47558b68dad413bcdf6f5253441077cb08b8af21737325aa65",
+          "size_bytes": 1242
+        },
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "76fd4c7fa7ea4b933656843388d9c4965301ed521c3293f53fab0d437ba9eb4c",
+          "size_bytes": 1242
+        }
+      }
+    },
+    "retained_relation_ciphertexts": 16,
+    "opened_observations": false
+  },
+  "revision_reports_identical": true,
+  "staging": {
+    "verified_files": 11,
+    "readback": "validation-readback.json",
+    "private_directory_mode": "0700",
+    "initial_readback": "Refused STAGE_INVENTORY because new directories were 0755; owner corrected only new study directories and repeated complete readback successfully."
+  },
+  "qualification": {
+    "native_job": "58748788",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 76,
+    "cpu_count": 4,
+    "gpu_count": 0,
+    "verified_inputs": 16,
+    "result": "qualification-result.json",
+    "native_evidence": "qualification-evidence.json",
+    "scope": "Exact previously failed training interval only; not full dataset qualification."
+  },
+  "freeze": {
+    "policy_sha256": "2a3ae28753525fc7bd8818add1d369d2ff224f71557cb30cc49dd26b91025c06",
+    "candidate_count": 3,
+    "seed_count": 5,
+    "admitted_requests": 15,
+    "selection_unchanged": true,
+    "estimator_unchanged": true,
+    "report": "freeze-report.json",
+    "original_journal_unchanged": true
+  },
+  "queue_submission": {
+    "id": "766bc4c8-3849-400a-9879-09a968138b89",
+    "spec_sha256": "9c977eade9e3509a4290bd896ac93cd9d0ee142b1261a1214b2c714206cf7336",
+    "attempt": "licensed-v3-f61db3a7-1",
+    "evidence": "queue-launch.json",
+    "scope": "Queue controller reported native job 58749373 running at 07:16:37Z. Not a verified result; remaining 14 requests await verified first result.",
+    "native_job": "58749373",
+    "native_launch_evidence": "queue-native-launch.json"
+  },
+  "limits": [
+    "No licensed evaluation result or candidate selection yet.",
+    "Final ciphertext is separate, not staged or released.",
+    "Normal qualification plaintext removal does not establish forced-kill cleanup for a different allocation.",
+    "Native entrypoint is outside image; its digest is explicitly checked with the other inputs.",
+    "Unnecessary /pub bind remains tracked by task 0a0e5913; no frozen request was silently modified."
+  ],
+  "submission_incident": {
+    "observation": "Submission-time Apptainer thread in D/FhgfsOps_revalidateIntent for over 3 minutes; unchanged submission subsequently reached native job 58749373.",
+    "record": "board post bcf426ce-af9e-4c01-9fbd-ae5c983ea214",
+    "limit": "Intermittent metadata dependency, not an established storage-server cause or permanent recovery."
+  }
+}

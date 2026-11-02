@@ -1,0 +1,147 @@
+{
+  "kind": "HPC3_STAGE_INSPECTION",
+  "host": "hpc3",
+  "manifest": {
+    "destination": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation",
+    "files": [
+      {
+        "name": "bundle.json",
+        "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+        "size_bytes": 2959
+      },
+      {
+        "name": "calendar.csv.age",
+        "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+        "size_bytes": 150323
+      },
+      {
+        "name": "calendar.sql.age",
+        "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+        "size_bytes": 488
+      },
+      {
+        "name": "delists.csv.age",
+        "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+        "size_bytes": 438816
+      },
+      {
+        "name": "delists.sql.age",
+        "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+        "size_bytes": 843
+      },
+      {
+        "name": "manifest.json.age",
+        "sha256": "5b11bee1abbf503f5222a33939037ca44a74d9352919415d171c22ecb6dd4b15",
+        "size_bytes": 1481
+      },
+      {
+        "name": "membership.csv.age",
+        "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+        "size_bytes": 1323763
+      },
+      {
+        "name": "membership.sql.age",
+        "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+        "size_bytes": 740
+      },
+      {
+        "name": "protocol.json.age",
+        "sha256": "d83f682e286986e5195bda1a9c34a9165ad9ef26a70c6eb6dee1e9c71bd3c69f",
+        "size_bytes": 1697
+      },
+      {
+        "name": "returns.csv.age",
+        "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+        "size_bytes": 1788046370
+      },
+      {
+        "name": "returns.sql.age",
+        "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+        "size_bytes": 815
+      }
+    ],
+    "provenance": {
+      "encrypted_bundle": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+      "plaintext_manifest": "34010eec6e22926aea80c22a9d5d1d4e9807b32c38c70d911ef0fbae90ed2db4",
+      "partition": "train-validation",
+      "protocol_revision": "0f4c7aeba291707b6787ce0d71729754ed4a9dbdc2fc0c455aee6f122f64022f",
+      "extraction_receipt": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349"
+    }
+  },
+  "manifest_sha256": "4332e43a6be6b074d4a0231a3db6505ef9838d318591b599cb1035babfea0271",
+  "expected_sha256": "8940471242ca3063724cdf6edad92129b53386a70d33804556297e7559e9303c",
+  "verified_files": 11,
+  "certification_path": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/validation-stage-digests.txt",
+  "certification_sha256": "33994c817fa82deb479eba5b199e26e156da636b717a69b621727c266bc39aaf",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "inventory": {
+    "root": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7",
+    "directories": {
+      "": 448,
+      "train-validation": 448
+    },
+    "files": [
+      {
+        "name": "train-validation/bundle.json",
+        "size_bytes": 2959,
+        "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d"
+      },
+      {
+        "name": "train-validation/calendar.csv.age",
+        "size_bytes": 150323,
+        "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24"
+      },
+      {
+        "name": "train-validation/calendar.sql.age",
+        "size_bytes": 488,
+        "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1"
+      },
+      {
+        "name": "train-validation/delists.csv.age",
+        "size_bytes": 438816,
+        "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2"
+      },
+      {
+        "name": "train-validation/delists.sql.age",
+        "size_bytes": 843,
+        "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395"
+      },
+      {
+        "name": "train-validation/manifest.json.age",
+        "size_bytes": 1481,
+        "sha256": "5b11bee1abbf503f5222a33939037ca44a74d9352919415d171c22ecb6dd4b15"
+      },
+      {
+        "name": "train-validation/membership.csv.age",
+        "size_bytes": 1323763,
+        "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32"
+      },
+      {
+        "name": "train-validation/membership.sql.age",
+        "size_bytes": 740,
+        "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb"
+      },
+      {
+        "name": "train-validation/protocol.json.age",
+        "size_bytes": 1697,
+        "sha256": "d83f682e286986e5195bda1a9c34a9165ad9ef26a70c6eb6dee1e9c71bd3c69f"
+      },
+      {
+        "name": "train-validation/returns.csv.age",
+        "size_bytes": 1788046370,
+        "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66"
+      },
+      {
+        "name": "train-validation/returns.sql.age",
+        "size_bytes": 815,
+        "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f"
+      },
+      {
+        "name": "train-validation/validation-stage-digests.txt",
+        "size_bytes": 1281,
+        "sha256": "33994c817fa82deb479eba5b199e26e156da636b717a69b621727c266bc39aaf"
+      }
+    ]
+  }
+}

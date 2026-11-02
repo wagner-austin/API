@@ -1,0 +1,72 @@
+{
+ "results": [
+  {
+   "kind": "licensed-training-span-qualification-v3",
+   "native_job_id": "58748788",
+   "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+   "bundle_sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+   "selector_sha256": "e22fbbc6184a76f019608653295d188eb776d0f2f7eb3f5a5065485529fba684",
+   "program_sha256": "eb0f0353988f6c95b6b8971a1602c587e0655fc5600dd6a3941236c1318fc8bc",
+   "protocol_version": 3,
+   "training_only": true,
+   "observed_rows": 2,
+   "missing_flag": "MP",
+   "missing_duration": "MR",
+   "closing_duration": "P1",
+   "complete_two_session_span": true,
+   "growth_matches_once": true,
+   "absolute_tolerance": 1e-12,
+   "plaintext_removed": true,
+   "scope": "Previously failed training interval only; no fitting, selection, final access, raw prices, returns or security identifier published. Does not establish coverage of other intervals."
+  }
+ ],
+ "diagnosis_of": "58740674",
+ "fingerprint": {
+  "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "dataset": {
+  "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d"
+ }
+}
