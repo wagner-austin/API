@@ -12,6 +12,33 @@ from platform_core.json_utils import JSONObject, JSONValue, require_int, require
 
 from .validation import require_day
 
+_KEY_FIELDS = {
+    "membership": ("permno", "namedt", "nameendt"),
+    "returns": ("permno", "dlycaldt"),
+    "calendar": ("caldt",),
+    "delists": ("permno", "delistingdt"),
+}
+
+
+def crsp_row_key(row: JSONObject, relation: str) -> tuple[str, ...]:
+    """Identify a decoded row using the reader's canonical natural key.
+
+    Args:
+        row: A previously decoded source row.
+        relation: One of the four protocol relation roles.
+
+    Returns:
+        The exact key fields, preserving date spelling and integer identity.
+
+    Raises:
+        KeyError: Unknown relation or absent key field.
+        TypeError: A key field differs from its decoded type.
+    """
+    return tuple(
+        str(require_int(row, field)) if field == "permno" else require_str(row, field)
+        for field in _KEY_FIELDS[relation]
+    )
+
 
 def encode_crsp_rows(rows: Sequence[JSONObject], columns: tuple[str, ...]) -> bytes:
     """Encode decoded rows in frozen column order, retaining nulls as empty cells.
@@ -77,7 +104,6 @@ def _cell(column: str, text: str) -> JSONValue:
 
 def _key(row: JSONObject, relation: str, extracted_day: str) -> tuple[str, ...]:
     """Require relation chronology and return its unique source key."""
-    key: tuple[str, ...]
     if relation == "calendar":
         day = require_str(row, "caldt")
         if (require_str(row, "exchangegroup"), require_str(row, "tradingflg")) not in {
@@ -85,25 +111,22 @@ def _key(row: JSONObject, relation: str, extracted_day: str) -> tuple[str, ...]:
             ("N/A", "N"),
         }:
             raise ValueError("[CRSP-007] require CIZ/Y sessions or N/A/N closed calendar days")
-        key = (day,)
     elif relation == "membership":
         first, last = require_str(row, "namedt"), require_str(row, "nameendt")
         if first > last:
             raise ValueError("[CRSP-007] membership interval is reversed")
         # End dates may be vendor open-ended bounds after extraction.
         day = first
-        key = (str(require_int(row, "permno")), first, last)
     else:
         field = "dlycaldt" if relation == "returns" else "delistingdt"
         day = require_str(row, field)
-        key = (str(require_int(row, "permno")), day)
         if relation == "returns":
             previous = row["dlyprevdt"]
             if previous is not None and require_str(row, "dlyprevdt") >= day:
                 raise ValueError("[CRSP-007] return predecessor must precede its observation")
     if day >= extracted_day:
         raise ValueError("[CRSP-007] observation must precede extraction day")
-    return key
+    return crsp_row_key(row, relation)
 
 
 def decode_crsp_rows(
@@ -145,4 +168,4 @@ def decode_crsp_rows(
     return tuple(rows)
 
 
-__all__ = ["decode_crsp_rows", "encode_crsp_rows"]
+__all__ = ["crsp_row_key", "decode_crsp_rows", "encode_crsp_rows"]
