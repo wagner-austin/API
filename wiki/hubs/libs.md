@@ -77,3 +77,4 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [CRSP version-3 licensed study freeze](../pages/wrds-baseline-v3-freeze.md) -- unchanged candidate rules, real training-span qualification and new encrypted dataset/runtime identities
 
 [CRSP refused-path source diagnosis](../pages/wrds-v3-refused-path-diagnosis.md) -- all 27 refusals traced to source fields, with vendor missingness and protocol questions kept distinct
+[CRSP outcome qualification](../pages/crsp-outcome-qualification.md) -- separate missing outcomes, order execution, terminal maturity and partition-boundary evidence before a replacement freeze
