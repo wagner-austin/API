@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
@@ -17,6 +18,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json": "a3cb9cfa855ff7e11dd6f66884957fa3630af1a2"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
@@ -31,7 +33,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json": "1100c7de989b5f9fb98273fd26e16477db17637a"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
-fact_checked: 2026-11-01
+fact_checked: 2026-11-02
 confidence: medium
 ---
 
@@ -50,12 +52,13 @@ Verified diagnostics `58741562` and `58741598` found an existing daily row with
 missing price/return (`MP`/`MR`), followed by an available two-session return
 (`P1`) linked to the earlier price date. The frozen one-session rule correctly
 refuses this span. This differs from the version-1 pre-entry delisting. A
-version-3 accounting amendment is now implemented in source, with boundary
-tests. Full source checks and separate candidate runtime installation passed;
-independent review, candidate queue rehearsal and licensed qualification remain
-required before another frozen study. The missing close has no observed value
+version-3 accounting amendment and its separately frozen runtime have passed
+independent review. Its encrypted synthetic queue rehearsal completed as job
+`58747974`, automatically reconciled and verified; the rehearsal's independent
+review and licensed qualification remain before another frozen study.
+The missing close has no observed value
 and must not be silently filled or used to remove the security. See
-[[crsp-monthly-holdings-validation]] for the new source contract.[^v2diagnosis][^current][^candidate]
+[[crsp-monthly-holdings-validation]] for the new source contract.[^v2diagnosis][^current][^v3]
 
 Preparation audit and launch checks passed: the job had 8 CPUs, 128 GiB, no
 GPU and sixteen successful input checksums. Those establish execution
@@ -69,9 +72,9 @@ boundary, and [[wrds-baseline-v2-freeze]] for the new fixed study.[^stop]
 
 | Area | Evidence and current boundary |
 |---|---|
-| Runtime | [[wrds-installed-runtime]] — separate version-3 candidate installed and inspected; the last queue rehearsal used version 2.[^candidate][^v2] |
+| Runtime | [[wrds-installed-runtime]] — version-3 installation independently verified and exercised by its synthetic queue rehearsal.[^v3] |
 | Data | [[wrds-licensed-data-evidence]] — version-2 validation staged and independently reread on HPC3; [[wrds-protocol-revision]] records lineage. |
-| Operations | [[wrds-operational-rehearsals]] — current version-2 queue rehearsal plus historical seed summary, selection and controlled final execution.[^v2] |
+| Operations | [[wrds-operational-rehearsals]] — version-3 queue rehearsal completed; its independent review remains, and earlier selection/final rehearsals remain historical.[^v3] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
 | Cleanup | [[wrds-cleanup-evidence]] — original failed job's configured paths observed absent on its node; historical-path and timing limits remain.[^cleanup] |
 | Scientific rules | [[crsp-monthly-study-design]] and [[crsp-monthly-holdings-validation]] — frozen target, chronology, accounting and uncertainty. |
@@ -85,7 +88,9 @@ or investment performance.[^stop][^diagnostic]
 The source protocol retains rejected-order cash and actual traded-notional
 costs and adds the version-3 held-return rule. The completed preparation below
 concerns the stopped version-2 study. The separate version-3 installation is
-recorded above; its operational rehearsal remains outstanding.[^current][^candidate]
+recorded above; its synthetic rehearsal completed without a licensed study or
+final release. Substantive work is tracked by board task `f61db3a7`; the separate
+Bermudan Asian options study is `5bec93df` and needs its own extraction.[^current][^v3]
 
 - [x] Stage the separately verified version-2 validation bundle described in
    [[wrds-protocol-revision]]. Transfer and complete remote readback passed;
@@ -99,13 +104,15 @@ recorded above; its operational rehearsal remains outstanding.[^current][^candid
    service verification and independent task audit passed.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; queue `3d3aad6e` recorded the first attempt's
-   failure. Investigate it before further submission.[^v2stop]
+   failure. Version 3 requires licensed qualification and a new freeze before
+   submission; neither failed study is silently retried.[^v2stop][^v3]
 
 The original failed journal remains immutable. Its diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
 [^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule`, `cost_rule` and `held_return_rule`; this is the current rule document, not an installed runtime or a completed study.
+[^v3]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `prerequisite_audits`, `queue`, `native_accounting`, `result`, `preflight_incident` and `remaining`; source/runtime reviews passed, while synthetic rehearsal review and licensed execution are separate milestones.
 [^preserved]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json`, `observed_at`, `policy_digest`, `journal_sha256` and `attempts`; service post `6029b64c-80a4-444a-9f73-96a604aad1b5` from the existing preparation reporter. Digest `82450a7994d16019b9f699104b5e8891d943ad426becd93c5fb56402b0854a40` matches the independent audit reading, and was unchanged before and after this report.
 [^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `source_checks`, `controller`, `image`, `remaining` and `scope`; passed source gate and separately inspected candidate runtime, without a new study launch.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.

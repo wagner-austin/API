@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json"
@@ -11,6 +12,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json": "c6de49289a168f4bd12cdcd78419acaa972f3107"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json": "fc1b6b3b20e99d4ea3d594c7cc11b222f9dfcf77"
@@ -19,7 +21,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json": "5d9afac1cd73df5108a17c49127f811dd8ae8a05"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
-fact_checked: 2026-11-01
+fact_checked: 2026-11-02
 confidence: medium
 ---
 
@@ -30,7 +32,31 @@ control paths ran; they do not estimate licensed CRSP performance. Current
 deployment and study status are separate in [[wrds-installed-runtime]] and
 [[wrds-baseline-readiness]].[^summary][^selection][^final][^wrds]
 
-## Current protocol-v2 queue rehearsal
+## Current protocol-v3 queue rehearsal
+
+The independently reviewed `087f67b4c` controller/image executed one encrypted
+synthetic request containing both the entry-date delisting and an explicit
+missing-price row closed by a linked two-session return. Native job `58747974`
+completed in ten seconds with four CPUs and 16 GiB. The existing controller
+automatically reconciled queue `b45ef01a` to passed; replay before and after
+completion returned that same identity, with one completed journal attempt.[^v3]
+
+Service inspection verified sixteen pinned inputs and sixteen compute checksum
+receipts. Readback checked all 240 monthly accounting observations across
+fifteen strategy/cost cases and sixteen months, plus four paired comparisons.
+The stock-7 ending weight divided by the rejected-order cash slot recovered
+the original daily-product growth across the missing-price span within
+`1e-12`; entry rejection preserved the old terminal receivable until its
+next rebalance. No candidate was selected and no final holdout was released.
+Independent review of this rehearsal evidence remains outstanding.[^v3]
+
+Initial preflight reached its 600-second timeout while Apptainer waited on
+`/pub` BeeGFS metadata. The unchanged canonical preflight passed after a bounded
+filesystem probe recovered; no frozen request was edited. The unnecessary
+mount dependency is tracked separately as `0a0e5913`; recovery is not a
+permanent storage fix. The licensed study follows under `f61db3a7`.[^v3]
+
+## Historical protocol-v2 queue rehearsal
 
 One fresh encrypted synthetic attempt used the installed `8ef7e0f17`
 controller and image. The maintained pre-entry fixture delists security 8 on
@@ -100,3 +126,5 @@ Final-data permissions remain governed by [[wrds-proposer-isolation]] and
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
 
 [^measurement]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json`, `measurement`, `program`, `execution` and `interpretation`; service post `93e273e2-6e02-46a1-973f-f169925a3be3` binds regenerated fixture identities and the immutable queue selection, not a new historical process attestation.
+
+[^v3]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `prerequisite_audits`, `queue`, `queue_replay`, `native_accounting`, `native_input_verification`, `result`, `service_reports`, `preflight_incident` and `remaining`; sibling files retain program-authored fixture and result measurements, measurement programs and native evidence.

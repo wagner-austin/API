@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
@@ -13,6 +14,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json": "bb969cf2a9f3f4048e33df6cc1067f6cf21aa16c"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
@@ -31,9 +33,10 @@ confidence: medium
 
 The separately installed version-3 runtime candidate uses source `087f67b4c`,
 including exact missing-price return spans. Controller and native image
-inspections passed. Its queue rehearsal and licensed qualification remain
-outstanding; the last completed queue rehearsal used version 2. Current study
-status is in [[wrds-baseline-readiness]].[^candidate][^v2]
+inspections and independent review passed. Its synthetic queue rehearsal
+completed as job `58747974`; independent rehearsal review and licensed
+qualification remain. Current study status is in
+[[wrds-baseline-readiness]].[^candidate][^v3]
 
 ## Installed identities
 
@@ -85,17 +88,19 @@ and freeze a feasible CPU/memory pair for the next study.[^allocation]
 
 The shared queue uses the installed `wrds-queue-b53b0ea34` adapter.
 Historical synthetic request `eecf34ae` completed as native job `58719001`.
-The current rehearsal used queue `f1961f01` and native job `58740021`,
+The version-2 rehearsal used queue `f1961f01` and native job `58740021`,
 automatically reconciled by `fleet-research-diphtheria`; its immutable
 specification selected the new evaluator interpreter. Adapter identity and
 evaluator-image identity are separate provenance fields.[^controller][^v2]
 
 ## Changing the runtime
 
-The version-3 candidate still needs independent review, its own synthetic queue
-rehearsal and licensed return-span qualification before a newly frozen study.
-Installation is not a rehearsal or substantive result. No licensed decryption,
-study launch or final grant release was requested during installation.[^candidate]
+Independent runtime audit `29717b73` passed on November 2 at 06:23 UTC.
+Queue `b45ef01a` then selected this exact evaluator and completed native job
+`58747974`; [[wrds-operational-rehearsals]] records the result and its limits.
+Licensed return-span qualification remains before a newly frozen study.
+No licensed decryption, study launch or final grant release was requested
+during installation.[^candidate][^v3]
 
 The follow-up scope measurement read 63 native ledger entries and validated
 277 events across all thirteen journals found under the WRDS experiment root.
@@ -107,6 +112,7 @@ and ledger hashes were unchanged across the reading. These are measurements
 of retained records, not a historical filesystem-access audit.[^source-scope]
 
 [^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `controller`, `image`, `construction`, `service_reports`, `source_checks`, `remaining` and `scope`; separate candidate installation, with no version-3 study execution.
+[^v3]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `prerequisite_audits`, `controller_python`, `image_sha256`, `queue`, `native_accounting` and `remaining`; subsequent synthetic execution is separate from installation and licensed qualification.
 
 [^source-scope]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json`, `python_wheels`, `source_members`, `retained_rust`, `submissions_in_window`, `journals`, `release_metadata` and `scope`; service post `0873ab5e-a859-4ae5-bf15-18a9780add22`, measured at 06:11:25 UTC. The adjacent measurement program and member manifests are bound by SHA-256 in this report; the existing archive exporter, native ledger reader and shared event-journal reader performed the reads.
 
