@@ -70,3 +70,40 @@ replay, CLI subprocesses, filesystem failures and report provenance checks.
 Unequal contract counts across dates verify that the study mean gives dates
 equal weight. Mutation tests cover altered plans, collector identity, report
 digests, prediction bindings, future receipts and disagreement with replay.
+
+## Forward plan scoring
+
+The campaign's own protocol scores probabilities only. A forward plan adds what
+a money question needs, fixed before its outcomes exist: the arm under test, the
+market reference, the future event dates, the fee, the hurdle and the decision
+rule. [forward_weather_plan_20261103.json](forward_weather_plan_20261103.json),
+SHA-256 `bfdb77a0694048bc950df34029f6e82f49689acfe0c42a69108a481b8a9bd33c`, was
+recorded on MCPs board task `269fd5c0` at 2026-11-02T09:58:35Z, before the first
+of its 40 event dates (November 3 to December 12, 2026) was captured. It scores
+the continuation campaign `f57a191b` on diphtheria: the 12 UTC
+`market_plus_forecast` logistic arm against `raw_market`, the bid-ask midpoint.
+
+```bash
+poetry run python -m scripts.forward_weather_report \
+  --plan docs/forward_weather_plan_20261103.json \
+  --plan-sha256 bfdb77a0694048bc950df34029f6e82f49689acfe0c42a69108a481b8a9bd33c \
+  --root /home/corvis/PROJECTS/files/market-edge-20261012/campaign-20261019-20261212 \
+  --out /home/corvis/PROJECTS/files/market-edge-20261012/forward-evaluation-<instant>.json
+```
+
+`markets.forward_plan` refuses any plan whose bytes differ from the pinned
+digest (`FORWARD-001`), and any fee, hurdle or stress the quoted taker policy
+does not implement (`FORWARD-003`). `markets.forward_scoring` adds no second
+evaluator. It runs `evaluate_campaign` unchanged and requires the campaign's
+name, collector, protocol and fitted report to be the plan's (`FORWARD-004`).
+For every declared plan whose settlement snapshot is complete, it then
+re-derives the capture from its archived exchange and forecast responses with
+`collect_paper_predictions` in replay mode, and refuses any difference from the
+sealed report (`FORWARD-005`). Scores come only from the declared dates:
+per-date Brier of the model minus the reference, pooled over series; the
+unweighted mean over dates; a Student t interval with one date as one unit;
+`paired_continuous_power`'s minimum detectable effect against the plan's
+smallest effect of interest; and `forecast_policy.quoted_policy`, unchanged,
+over the same contracts. A date with no eligible contract is listed with its
+plans' dispositions and scores nothing. With fewer than three scored dates,
+every criterion fails.
