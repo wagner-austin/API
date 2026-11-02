@@ -563,3 +563,7 @@ Notes: Native 58766611 reproduced 262000 paths and all 27 refusals with seventee
 ## [2026-11-02] Qualification | CRSP outcome requirements
 Page added: crsp-outcome-qualification; linked from readiness and libs, total 72 pages.
 Notes: Re-read captured vendor definitions and existing path/partition owners. Separate execution assumptions, closed suspended spans, incomplete returns, late terminal values and prospective event-visibility checks. No new economic rule, vendor correction, candidate fitting or final release is claimed. Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3.
+
+## [2026-11-02] Diagnostic derivation | Encrypted CRSP cohort
+Page added: wrds-encrypted-diagnostic-cohort; linked from qualification, readiness and libs, total 73 pages.
+Notes: Checked each new claim against the current transformation, envelope, actual-trial rejection test and native reports. Preserve the first preempted attempt separately from its explicit retry; pending execution is not completion, subset derivation is not fresh extraction, and normal cleanup does not establish post-preemption reclamation. Board task 98379d28-9167-4467-ae1e-418eff3d91b5; live citation audit follows publication.
