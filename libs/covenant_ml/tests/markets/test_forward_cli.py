@@ -59,6 +59,8 @@ def test_cli_scores_settled_evidence_under_the_pinned_plan(
         api_server.url,
     ]
     requests = len(api_server.requests)
+    # The fixture's captures print their own report lines; read only the scorer's.
+    capsys.readouterr()
     assert main(args, stand_in_pin) == 0
     assert capsys.readouterr().out == (
         f"Forward evaluation: {output}\nRun record: {output}.runrecord.json\n"
