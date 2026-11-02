@@ -82,6 +82,17 @@ def test_label_path_requires_trade_prices_at_both_ordinary_endpoints(day: str) -
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
+@pytest.mark.parametrize("day", [W1.entry, W1.exit])
+def test_missing_price_at_either_endpoint_refuses_the_actual_label_path(day: str) -> None:
+    rows = [daily(1, W1.entry, 0.0), daily(1, "2020-02-04", 0.1), daily(1, W1.exit, 0.0)]
+    for row in rows:
+        if row["dlycaldt"] == day:
+            row["dlyprc"] = None
+            row["dlyprcflg"] = "NT"
+    with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
+        crsp_window_path(outcomes(rows, []), 1, W1)
+
+
 def test_missing_entry_fails_before_later_ordinary_returns_are_examined() -> None:
     with pytest.raises(ValueError, match="no execution record for 1 on 2020-02-03"):
         crsp_window_path(outcomes([], []), 1, W1)

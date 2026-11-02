@@ -7,7 +7,7 @@ from math import inf, nan
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject, JSONValue, require_list
+from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, require_list
 
 from covenant_ml.markets.crsp_calendar import (
     CrspWindow,
@@ -251,6 +251,28 @@ def test_execution_price_is_a_trade_not_absolute_quote_or_terminal_amount() -> N
     for price, flag in ((-25.0, "BA"), (25.0, "DP"), (nan, "TR"), (0.0, "TR"), (-1.0, "TR")):
         with pytest.raises(ValueError, match="CRSP-004"):
             require_crsp_execution_price({"dlyprc": price, "dlyprcflg": flag}, protocol)
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        {"dlyprcflg": "TR"},
+        {"dlyprc": None, "dlyprcflg": "TR"},
+        {"dlyprc": None, "dlyprcflg": "NT"},
+    ],
+)
+def test_missing_execution_price_is_a_named_protocol_refusal(row: JSONObject) -> None:
+    with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
+        require_crsp_execution_price(row, decode_crsp_protocol(protocol_document()))
+
+
+@pytest.mark.parametrize("price", [True, "25"])
+def test_malformed_execution_price_remains_a_type_error(price: JSONValue) -> None:
+    with pytest.raises(JSONTypeError, match="Field 'dlyprc' must be a number"):
+        require_crsp_execution_price(
+            {"dlyprc": price, "dlyprcflg": "TR"},
+            decode_crsp_protocol(protocol_document()),
+        )
 
 
 def test_terminal_value_uses_dated_amount_and_returns_one_multiplier() -> None:
