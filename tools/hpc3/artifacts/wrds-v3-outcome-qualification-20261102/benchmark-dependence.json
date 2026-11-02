@@ -1,0 +1,72 @@
+{
+  "kind": "derived-full-universe-benchmark-dependence",
+  "task": "f963ee0b-7382-4d7a-a1db-9a7b4d5467a3",
+  "source_result": {
+    "path": "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json",
+    "sha256": "3dd11ddad1ea74724a44f7bcc1b82b4f581ea51462647fbd7592664abf75ec65",
+    "native_job_id": "58766611"
+  },
+  "protocol": {
+    "path": "protocol.json",
+    "sha256": "af5cbced56bc26076db0a3dc769c98c45ba393a507473a18eda839e5ddf61ed9",
+    "max_universe": 1000
+  },
+  "panel": {
+    "decisions": 262,
+    "eligible_paths": 262000,
+    "refused_paths": 27
+  },
+  "derivation": [
+    "crsp_panel._decision caps every decision at protocol.max_universe.",
+    "262000 eligible paths = 262 decisions * 1000 maximum members, so every decision has exactly 1000 members.",
+    "The native audit enumerates all features inside each decision consecutively, incrementing checked before recording path_ordinal.",
+    "Zero-based decision ordinal = (one-based path_ordinal - 1) // 1000.",
+    "Deduplicate these ordinals by period; crsp_study_rows uses every member in each decision mean."
+  ],
+  "zero_based_decision_ordinals": {
+    "training": [
+      9,
+      10,
+      12,
+      18,
+      23,
+      27,
+      34,
+      44,
+      54,
+      59,
+      62,
+      83,
+      84,
+      92,
+      105,
+      106,
+      133,
+      134,
+      135,
+      136,
+      169,
+      173,
+      179
+    ],
+    "validation": [
+      187,
+      191
+    ]
+  },
+  "benchmark_dependent_rows": {
+    "training": 23000,
+    "validation": 2000,
+    "total": 25000
+  },
+  "affected_decisions": {
+    "training": 23,
+    "validation": 2,
+    "total": 25
+  },
+  "limitations": [
+    "Derived from frozen protocol and existing native metadata; no new licensed-data read or native execution.",
+    "25000 benchmark-dependent rows is not a count of incorrect or flipped labels, selected holdings, or realized loss.",
+    "No rows removed, returns imputed, protocol amended, candidate admitted, or final partition opened."
+  ]
+}
