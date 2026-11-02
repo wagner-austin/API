@@ -3,7 +3,13 @@
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import dump_json_str, narrow_json_to_dict, require_dict, require_list
+from platform_core.json_utils import (
+    JSONValue,
+    dump_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_list,
+)
 from platform_core.stage_manifest import encode_staged_file
 
 from covenant_ml.markets.crsp_extract import load_crsp_sources
@@ -136,7 +142,7 @@ def test_original_bundle_must_reconstruct_the_exact_recorded_manifest(
                 if require_dict(value, "plaintext")["name"] != "returns.csv"
             ]
             (path.parent / "returns.csv.age").unlink()
-            bundle["files"] = [value for value in files]
+            bundle["files"] = list[JSONValue](files)
         else:
             for value in files:
                 if require_dict(value, "plaintext")["name"] == name:
@@ -147,7 +153,7 @@ def test_original_bundle_must_reconstruct_the_exact_recorded_manifest(
         path.write_text(dump_json_str(bundle))
         item["bundle"] = encode_staged_file(file_record(path))
     receipt_path.write_text(dump_json_str(receipt))
-    with pytest.raises(ValueError, match="CRSP_REVISION|CRSP-006"):
+    with pytest.raises(ValueError, match=r"CRSP_REVISION|CRSP-006"):
         revise_crsp_protocol(
             case.outputs,
             file_record(receipt_path)["sha256"],

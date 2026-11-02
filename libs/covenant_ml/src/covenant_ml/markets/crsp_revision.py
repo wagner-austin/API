@@ -10,7 +10,11 @@ from platform_core.json_utils import JSONObject, dump_json_str, load_json_str, n
 from platform_core.stage_manifest import StagedFile
 
 from .crsp_extract import crsp_extract_from_records, encode_crsp_extract
-from .crsp_extraction_records import CrspExtractionReceipt, decode_crsp_extraction_receipt
+from .crsp_extraction_records import (
+    CrspExtractionReceipt,
+    CrspPartitionReceipt,
+    decode_crsp_extraction_receipt,
+)
 from .crsp_protocol import decode_crsp_protocol
 from .crsp_revision_records import (
     CrspBundleRevision,
@@ -187,6 +191,49 @@ def revise_crsp_protocol(
     return revision
 
 
+def _verify_partition_revision(
+    path: Path,
+    item: CrspPartitionReceipt,
+    changed: CrspBundleRevision,
+    old: EncryptedBundle,
+    manifest: StagedFile,
+    protocol: StagedFile,
+) -> int:
+    """Verify one partition's lineage and count byte-identical retained ciphertexts."""
+    new = verify_encrypted_bundle(path, changed["current"]["sha256"])
+    with path.open("rb") as source:
+        current = staged_record(source, "bundle.json")
+    expected = CrspBundleRevision(
+        previous=item["bundle"],
+        current=current,
+        previous_manifest=item["manifest"],
+        manifest=manifest,
+    )
+    if (
+        changed != expected
+        or new["manifest"] != manifest
+        or (new["partition"], new["recipient"]) != (old["partition"], old["recipient"])
+    ):
+        raise ValueError(
+            "CRSP_REVISION_LINEAGE: revised partition differs from expected identities"
+        )
+    retained = {file["plaintext"]["name"]: file for file in old["files"]}
+    revised = {file["plaintext"]["name"]: file for file in new["files"]}
+    if set(retained) != set(revised):
+        raise ValueError("CRSP_REVISION_FILES: revision changed the file inventory")
+    count = 0
+    for name, file in revised.items():
+        if name in {"protocol.json", "manifest.json"}:
+            expected_plain = protocol if name == "protocol.json" else manifest
+            if file["plaintext"] != expected_plain:
+                raise ValueError("CRSP_REVISION_FILES: replacement metadata differs")
+        elif file != retained[name]:
+            raise ValueError("CRSP_REVISION_FILES: relation ciphertext must remain unchanged")
+        else:
+            count += 1
+    return count
+
+
 def verify_crsp_revision(
     outputs: Path,
     receipt_digest: str,
@@ -231,6 +278,7 @@ def verify_crsp_revision(
         or revision["protocol"] != prepared.protocol
     ):
         raise ValueError("CRSP_REVISION_LINEAGE: receipt differs from expected transformation")
+    retained = 0
     for item, changed, old, manifest_bytes in zip(
         (prepared.receipt["train_validation"], prepared.receipt["final"]),
         (revision["train_validation"], revision["final"]),
@@ -239,40 +287,15 @@ def verify_crsp_revision(
         strict=True,
     ):
         path = destination / item["partition"] / "bundle.json"
-        new = verify_encrypted_bundle(path, changed["current"]["sha256"])
-        with path.open("rb") as source:
-            current = staged_record(source, "bundle.json")
         manifest = staged_record(BytesIO(manifest_bytes), "manifest.json")
-        expected = CrspBundleRevision(
-            previous=item["bundle"],
-            current=current,
-            previous_manifest=item["manifest"],
-            manifest=manifest,
+        retained += _verify_partition_revision(
+            path, item, changed, old, manifest, prepared.protocol
         )
-        if (
-            changed != expected
-            or new["manifest"] != manifest
-            or (new["partition"], new["recipient"]) != (old["partition"], old["recipient"])
-        ):
-            raise ValueError(
-                "CRSP_REVISION_LINEAGE: revised partition differs from expected identities"
-            )
-        retained = {file["plaintext"]["name"]: file for file in old["files"]}
-        revised = {file["plaintext"]["name"]: file for file in new["files"]}
-        if set(retained) != set(revised):
-            raise ValueError("CRSP_REVISION_FILES: revision changed the file inventory")
-        for name, file in revised.items():
-            if name in {"protocol.json", "manifest.json"}:
-                expected_plain = prepared.protocol if name == "protocol.json" else manifest
-                if file["plaintext"] != expected_plain:
-                    raise ValueError("CRSP_REVISION_FILES: replacement metadata differs")
-            elif file != retained[name]:
-                raise ValueError("CRSP_REVISION_FILES: relation ciphertext must remain unchanged")
     return {
         "kind": "CRSP_PROTOCOL_REVISION_EVIDENCE",
         "revision_sha256": sha256(payload).hexdigest(),
         "revision": encode_crsp_protocol_revision(revision),
-        "retained_relation_ciphertexts": 16,
+        "retained_relation_ciphertexts": retained,
         "opened_observations": False,
     }
 

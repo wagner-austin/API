@@ -110,7 +110,7 @@ def test_revised_bundle_cannot_change_its_original_data_or_metadata(
     lineage = read_document(receipt)
     require_dict(lineage, "train_validation")["current"] = encode_staged_file(file_record(path))
     receipt.write_text(dump_json_str(lineage))
-    with pytest.raises(ValueError, match="CRSP_REVISION_LINEAGE|CRSP_REVISION_FILES"):
+    with pytest.raises(ValueError, match=r"CRSP_REVISION_LINEAGE|CRSP_REVISION_FILES"):
         verify_crsp_revision(*case, destination)
 
 
@@ -126,7 +126,7 @@ def test_revision_codec_refuses_unknown_fields_and_naive_time(tmp_path: Path, fa
         require_dict(document, "final")["extra"] = True
     else:
         document["extracted_at"] = "2026-10-29T00:00:00"
-    with pytest.raises(ValueError, match="CRSP_REVISION_FIELDS|CRSP_REVISION_TIME"):
+    with pytest.raises(ValueError, match=r"CRSP_REVISION_FIELDS|CRSP_REVISION_TIME"):
         decode_crsp_protocol_revision(document)
 
 
