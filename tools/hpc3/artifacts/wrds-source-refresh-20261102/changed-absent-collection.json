@@ -1,0 +1,12 @@
+{
+  "observed_at": "2026-11-02T23:15:05.029321+00:00",
+  "method": "hpc3.core.wrds_results.collect followed by covenant_ml.markets.encrypted_storage.verify_encrypted_bundle; no decryption",
+  "job_id": "40568175",
+  "completion_file_sha256": "32b8eef773cafe45f3e9089a4444f38f0478f5a39b9ed3245716eb4890f8b606",
+  "bundle_sha256": "57ddff31accea36b43ac5eb9823385da0971214514e3db47dcba0a86ec18d921",
+  "verified_ciphertexts": 16,
+  "ciphertext_bytes": 8171080,
+  "partition": "train-validation",
+  "manifest": "comparison.json",
+  "plaintext_created": false
+}

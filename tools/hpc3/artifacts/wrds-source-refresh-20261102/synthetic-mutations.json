@@ -1,0 +1,14 @@
+{
+  "synthetic": true,
+  "source_setup_sha256": "2ee9d8761bd275684536a8962930cb7b38f8eff4981995c658f08e0a9c2b3cf5",
+  "changed_setup_sha256": "4dfa94f05c12c750f7884f5cbba5eee77a22f30ea794ddab9902dbafd937c74e",
+  "mutation": "Set the first synthetic cohort return to null; remove its next synthetic return observation. Other source rows unchanged.",
+  "expected_returns": {
+    "old": 1042,
+    "fresh": 1041,
+    "unchanged": 1040,
+    "changed": 1,
+    "removed": 1,
+    "added": 0
+  }
+}

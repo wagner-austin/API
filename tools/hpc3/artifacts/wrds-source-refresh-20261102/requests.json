@@ -1,0 +1,369 @@
+{
+  "source": "source.json",
+  "controller": "hpc3.cli.wrds submit/preflight/collect/report from the frozen source snapshot",
+  "runtime": "Per-attempt completion records retain interpreter identity and all 61 installed package versions; five first-party Python packages are replaced by the declared immutable source files.",
+  "requests": [
+    {
+      "name": "refresh-synthetic-80ad9ec5",
+      "identity": "78b0868f290a1b9a7e17915d8305c4482754374d42662a3a548e6882055627a6",
+      "job_id": "40568160",
+      "spec_sha256": "ec46dbc7a92ec41de6443b7e31fd10bfc63c8e28e8e5b6dc00269f331f25dcc7",
+      "slots": 2,
+      "memory_gb_per_slot": 6,
+      "seconds": 600,
+      "seed": 0,
+      "entrypoint": "crsp_extraction.py",
+      "arguments": [
+        "refresh",
+        "--cohort",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/cohort/bundle.json",
+        "--cohort-sha256",
+        "b854c31dcfb2ac9813d0cce89779d3af9d4b58b114b1f31180b568511ad241e6",
+        "--plan",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/plan.json",
+        "--access",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/native-access.json",
+        "--setup",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/setup.sql",
+        "--max-rows",
+        "20000",
+        "--max-relation-bytes",
+        "2000000",
+        "--max-partition-bytes",
+        "10000000",
+        "--seconds",
+        "120",
+        "--scratch-env",
+        "TMPDIR",
+        "--output-env",
+        "WRDS_OUTPUT_DIR"
+      ],
+      "code_files": 501,
+      "inputs": [
+        {
+          "name": "cohort/audit.json.age",
+          "sha256": "bbca07bae24378b2b91ffde4048d4b3d6db57ae33d15ed8cde601ad4906bbc56"
+        },
+        {
+          "name": "cohort/bundle.json",
+          "sha256": "b854c31dcfb2ac9813d0cce89779d3af9d4b58b114b1f31180b568511ad241e6"
+        },
+        {
+          "name": "cohort/calendar.csv.age",
+          "sha256": "24d660f6b0fc386fa397c52e16e1a083318c59b675e44c15f27d5a9af2ff1c9d"
+        },
+        {
+          "name": "cohort/calendar.sql.age",
+          "sha256": "c4e84fb9838ae69dae310f149a71c52bbefcbe8660cae248b132e375b100611e"
+        },
+        {
+          "name": "cohort/cohort.json.age",
+          "sha256": "aadb70942a38ba509c2e7ae4a527e92781c64ca96cedd5d223bd260cdab5d74c"
+        },
+        {
+          "name": "cohort/delists.csv.age",
+          "sha256": "affedb0ddc8aa556319c906c55e48f2189ccce8f7dec78fef56ee09deedf240e"
+        },
+        {
+          "name": "cohort/delists.sql.age",
+          "sha256": "160c580dfa4599b36213de847689a8833134ab78dd411a931e27dd30af5d07f6"
+        },
+        {
+          "name": "cohort/membership.csv.age",
+          "sha256": "96766507c3df7a17a126a6e22c1d49d123e8766f49e631bfd5f317270ac07d08"
+        },
+        {
+          "name": "cohort/membership.sql.age",
+          "sha256": "227152612124f3278d9eeb8db68fa9572909daaa1384bf6f8edefbee5c2d1962"
+        },
+        {
+          "name": "cohort/protocol.json.age",
+          "sha256": "af8faa2dacc7ed1b0231fca0fff0d2f323ce51af2fc79c6f7f489ab184270fc8"
+        },
+        {
+          "name": "cohort/returns.csv.age",
+          "sha256": "4a5e997fed13189181803184832598ce64677a53655a56ca6b4c34bb7939e2f8"
+        },
+        {
+          "name": "cohort/returns.sql.age",
+          "sha256": "9da0c37ca8180c101d736c88ef2eda0b7c7bf752d3ecfa9eff06f870c35167b0"
+        },
+        {
+          "name": "plan.json",
+          "sha256": "07ce2970293b457615f5eb5e4e847a7fcfb6630da19ea05b26d33079827f97cf"
+        },
+        {
+          "name": "setup.sql",
+          "sha256": "2ee9d8761bd275684536a8962930cb7b38f8eff4981995c658f08e0a9c2b3cf5"
+        },
+        {
+          "name": "fixture.json",
+          "sha256": "ea31edca32958487fdd74e0fc72b0381365e4191ab374b13945ae21eced3d6bb"
+        },
+        {
+          "name": "native-access.json",
+          "sha256": "0d24445ff6ed51340d26147b3592630622ec722ea09d2ec5b9a01dd78eb303e7"
+        }
+      ],
+      "outputs": [
+        "comparison.json",
+        "metrics.json",
+        "comparison/bundle.json",
+        "comparison/protocol.json.age",
+        "comparison/manifest.json.age",
+        "comparison/comparison.json.age",
+        "comparison/differences.json.age",
+        "comparison/extract.sql.age",
+        "comparison/snapshot-first.csv.age",
+        "comparison/snapshot-last.csv.age",
+        "comparison/setup.sql.age",
+        "comparison/membership.csv.age",
+        "comparison/membership.sql.age",
+        "comparison/returns.csv.age",
+        "comparison/returns.sql.age",
+        "comparison/calendar.csv.age",
+        "comparison/calendar.sql.age",
+        "comparison/delists.csv.age",
+        "comparison/delists.sql.age"
+      ]
+    },
+    {
+      "name": "refresh-changed-absent-80ad9ec5",
+      "identity": "fb3998d57c0102e3f93f278376d85a24199e05321ab470cad5e201138d091fd6",
+      "job_id": "40568175",
+      "spec_sha256": "6fcf299981517bfd4cc322fff68db135aeae4a238fd3018ec15cf6733a080011",
+      "slots": 2,
+      "memory_gb_per_slot": 6,
+      "seconds": 600,
+      "seed": 0,
+      "entrypoint": "crsp_extraction.py",
+      "arguments": [
+        "refresh",
+        "--cohort",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/cohort/bundle.json",
+        "--cohort-sha256",
+        "b854c31dcfb2ac9813d0cce89779d3af9d4b58b114b1f31180b568511ad241e6",
+        "--plan",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/plan.json",
+        "--access",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/native-access.json",
+        "--setup",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/synthetic/changed-absent-setup.sql",
+        "--max-rows",
+        "20000",
+        "--max-relation-bytes",
+        "2000000",
+        "--max-partition-bytes",
+        "10000000",
+        "--seconds",
+        "120",
+        "--scratch-env",
+        "TMPDIR",
+        "--output-env",
+        "WRDS_OUTPUT_DIR"
+      ],
+      "code_files": 501,
+      "inputs": [
+        {
+          "name": "cohort/audit.json.age",
+          "sha256": "bbca07bae24378b2b91ffde4048d4b3d6db57ae33d15ed8cde601ad4906bbc56"
+        },
+        {
+          "name": "cohort/bundle.json",
+          "sha256": "b854c31dcfb2ac9813d0cce89779d3af9d4b58b114b1f31180b568511ad241e6"
+        },
+        {
+          "name": "cohort/calendar.csv.age",
+          "sha256": "24d660f6b0fc386fa397c52e16e1a083318c59b675e44c15f27d5a9af2ff1c9d"
+        },
+        {
+          "name": "cohort/calendar.sql.age",
+          "sha256": "c4e84fb9838ae69dae310f149a71c52bbefcbe8660cae248b132e375b100611e"
+        },
+        {
+          "name": "cohort/cohort.json.age",
+          "sha256": "aadb70942a38ba509c2e7ae4a527e92781c64ca96cedd5d223bd260cdab5d74c"
+        },
+        {
+          "name": "cohort/delists.csv.age",
+          "sha256": "affedb0ddc8aa556319c906c55e48f2189ccce8f7dec78fef56ee09deedf240e"
+        },
+        {
+          "name": "cohort/delists.sql.age",
+          "sha256": "160c580dfa4599b36213de847689a8833134ab78dd411a931e27dd30af5d07f6"
+        },
+        {
+          "name": "cohort/membership.csv.age",
+          "sha256": "96766507c3df7a17a126a6e22c1d49d123e8766f49e631bfd5f317270ac07d08"
+        },
+        {
+          "name": "cohort/membership.sql.age",
+          "sha256": "227152612124f3278d9eeb8db68fa9572909daaa1384bf6f8edefbee5c2d1962"
+        },
+        {
+          "name": "cohort/protocol.json.age",
+          "sha256": "af8faa2dacc7ed1b0231fca0fff0d2f323ce51af2fc79c6f7f489ab184270fc8"
+        },
+        {
+          "name": "cohort/returns.csv.age",
+          "sha256": "4a5e997fed13189181803184832598ce64677a53655a56ca6b4c34bb7939e2f8"
+        },
+        {
+          "name": "cohort/returns.sql.age",
+          "sha256": "9da0c37ca8180c101d736c88ef2eda0b7c7bf752d3ecfa9eff06f870c35167b0"
+        },
+        {
+          "name": "plan.json",
+          "sha256": "07ce2970293b457615f5eb5e4e847a7fcfb6630da19ea05b26d33079827f97cf"
+        },
+        {
+          "name": "setup.sql",
+          "sha256": "4dfa94f05c12c750f7884f5cbba5eee77a22f30ea794ddab9902dbafd937c74e"
+        },
+        {
+          "name": "fixture.json",
+          "sha256": "ea31edca32958487fdd74e0fc72b0381365e4191ab374b13945ae21eced3d6bb"
+        },
+        {
+          "name": "native-access.json",
+          "sha256": "0d24445ff6ed51340d26147b3592630622ec722ea09d2ec5b9a01dd78eb303e7"
+        }
+      ],
+      "outputs": [
+        "comparison.json",
+        "metrics.json",
+        "comparison/bundle.json",
+        "comparison/protocol.json.age",
+        "comparison/manifest.json.age",
+        "comparison/comparison.json.age",
+        "comparison/differences.json.age",
+        "comparison/extract.sql.age",
+        "comparison/snapshot-first.csv.age",
+        "comparison/snapshot-last.csv.age",
+        "comparison/setup.sql.age",
+        "comparison/membership.csv.age",
+        "comparison/membership.sql.age",
+        "comparison/returns.csv.age",
+        "comparison/returns.sql.age",
+        "comparison/calendar.csv.age",
+        "comparison/calendar.sql.age",
+        "comparison/delists.csv.age",
+        "comparison/delists.sql.age"
+      ]
+    },
+    {
+      "name": "refresh-licensed-80ad9ec5",
+      "identity": "2d75df30f2043c5234cf1acab5b57110453eb2d96ae5f2017dba86a2d4220a83",
+      "job_id": "40568218",
+      "spec_sha256": "008b2fa1896980da52eff506174cfeb139fefdace0158e15f1473c3685f258c5",
+      "slots": 2,
+      "memory_gb_per_slot": 12,
+      "seconds": 900,
+      "seed": 0,
+      "entrypoint": "crsp_extraction.py",
+      "arguments": [
+        "refresh",
+        "--cohort",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/bundle.json",
+        "--cohort-sha256",
+        "182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202",
+        "--plan",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-plan.json",
+        "--access",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-access.json",
+        "--max-rows",
+        "200000",
+        "--max-relation-bytes",
+        "60000000",
+        "--max-partition-bytes",
+        "100000000",
+        "--seconds",
+        "600",
+        "--scratch-env",
+        "TMPDIR",
+        "--output-env",
+        "WRDS_OUTPUT_DIR"
+      ],
+      "code_files": 501,
+      "inputs": [
+        {
+          "name": "audit.json.age",
+          "sha256": "ecdcc8f8b20756d39d04ca95a453ff32fc464e1d026cbcd934983e6cdd62518a"
+        },
+        {
+          "name": "bundle.json",
+          "sha256": "182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202"
+        },
+        {
+          "name": "calendar.csv.age",
+          "sha256": "42a36cc0479c84ced8b9c08d430bbfe729fdbbfed92a14352fbc35f25e7173df"
+        },
+        {
+          "name": "calendar.sql.age",
+          "sha256": "947ff7e8ca09eff06aee964fb06ce17cc7b1c681022d8e037892be784c9b4d72"
+        },
+        {
+          "name": "cohort.json.age",
+          "sha256": "e428c51c5652fce98e598e0ffa6c9bad8aa7412f3e2d32c14d4ae2663776f7af"
+        },
+        {
+          "name": "delists.csv.age",
+          "sha256": "d900fe43e2afffb1920119ce6fc2ef2b52c8028b6751c10ba6d8023305c959fb"
+        },
+        {
+          "name": "delists.sql.age",
+          "sha256": "51544bedbe769301fbfbdd6a53037c851e72d5d3248c4103750a2b55acd21985"
+        },
+        {
+          "name": "membership.csv.age",
+          "sha256": "aeeaf4b9917ae2c35b0024281568691b07182986f6f9670d86b6336ed9cc9b6d"
+        },
+        {
+          "name": "membership.sql.age",
+          "sha256": "7f88150a242056e3fa09f2cf75d6f863b9a9480e8487af489bf93d3a30631d39"
+        },
+        {
+          "name": "protocol.json.age",
+          "sha256": "912588f119fcda8daa8c9130bcf6631ebdd1af005ed02d4428c65e3b91560271"
+        },
+        {
+          "name": "returns.csv.age",
+          "sha256": "02843c3a3360b47d0a1d900fc904d901b36d62ba32a9b93410f40d592024fb32"
+        },
+        {
+          "name": "returns.sql.age",
+          "sha256": "565e16f8e61e23dc6662cfeaf0e784d13dbb9f259e8813a04d4bf457262f8a98"
+        },
+        {
+          "name": "licensed-plan.json",
+          "sha256": "54b73d68ad08bfedfbb0e285bed4f8586d4a48e30483781fa591a5cf8e9831bb"
+        },
+        {
+          "name": "licensed-access.json",
+          "sha256": "d38ec7445d2d9208bbdd6d904dba4c6faf79de4e181b978a0ec6f7009fa25b07"
+        }
+      ],
+      "outputs": [
+        "comparison.json",
+        "metrics.json",
+        "comparison/bundle.json",
+        "comparison/protocol.json.age",
+        "comparison/manifest.json.age",
+        "comparison/comparison.json.age",
+        "comparison/differences.json.age",
+        "comparison/extract.sql.age",
+        "comparison/snapshot-first.csv.age",
+        "comparison/snapshot-last.csv.age",
+        "comparison/membership.csv.age",
+        "comparison/membership.sql.age",
+        "comparison/returns.csv.age",
+        "comparison/returns.sql.age",
+        "comparison/calendar.csv.age",
+        "comparison/calendar.sql.age",
+        "comparison/delists.csv.age",
+        "comparison/delists.sql.age"
+      ]
+    }
+  ],
+  "limits": "Diagnostic-only cohort; validation identity only. No candidate fitting, study admission or final-scoring release."
+}

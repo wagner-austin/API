@@ -1,0 +1,15 @@
+{
+  "identity": "91aa25c5458f6d888409b257a37da08322bf35e76aad84c6418941c20b7431b4",
+  "job_id": "40568113",
+  "attempt": "first",
+  "state": "failed",
+  "accounting": {
+    "hostname": "wrds-sas24-w.wharton.private",
+    "failed": "0",
+    "exit_status": "1"
+  },
+  "payload_error": "Traceback (most recent call last):\n  File \"/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/refresh-synthetic-80ad9ec5/91aa25c5458f6d888409b257a37da08322bf35e76aad84c6418941c20b7431b4/first/code/crsp_extraction.py\", line 24, in <module>\n    from covenant_ml.markets import _test_hooks\n  File \"/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/refresh-synthetic-80ad9ec5/91aa25c5458f6d888409b257a37da08322bf35e76aad84c6418941c20b7431b4/first/code/covenant_ml/__init__.py\", line 5, in <module>\n    from covenant_ml.metrics import (\n  File \"/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/refresh-synthetic-80ad9ec5/91aa25c5458f6d888409b257a37da08322bf35e76aad84c6418941c20b7431b4/first/code/covenant_ml/metrics.py\", line 15, in <module>\n    from .types import AMEXMetricResult, EvalMetrics\n  File \"/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/refresh-synthetic-80ad9ec5/91aa25c5458f6d888409b257a37da08322bf35e76aad84c6418941c20b7431b4/first/code/covenant_ml/types.py\", line 14, in <module>\n    from platform_ml import OptimizerName, RequestedDevice, RequestedPrecision, ResolvedDevice\n  File \"/home/uci/awagner14/research-runtime-extract-d758dfc40/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/site-packages/platform_ml/__init__.py\", line 3, in <module>\n    from .artifact_store import ArtifactStore, ArtifactStoreError\n  File \"/home/uci/awagner14/research-runtime-extract-d758dfc40/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/site-packages/platform_ml/artifact_store.py\", line 9, in <module>\n    from platform_core.data_bank_client import DataBankClient\nModuleNotFoundError: No module named 'platform_core.data_bank_client'\n",
+  "payload_error_sha256": "4cbeb8b711c03f2277a7de2f070ff737e6296996993c95ce8ae2ed7b31a82a93",
+  "service_report": "e5150d42-912d-459d-ac67-7613f1352344",
+  "interpretation": "Synthetic attempt failed importing the old installed platform_ml before database access. No comparison or completion artifact. New request freezes all five first-party Python packages at one source commit; removed modules are not restored."
+}

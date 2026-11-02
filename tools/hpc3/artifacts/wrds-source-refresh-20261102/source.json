@@ -1,0 +1,13 @@
+{
+  "source_commit": "88ad03e16960fe84e0b912b73c940245e74770f6",
+  "archive_sha256": "48b9c9e09e162a438d112e14719da43f647d54ea63b14bf288abce103aa53810",
+  "packages": [
+    "platform_core",
+    "platform_ml",
+    "covenant_domain",
+    "cleargbm",
+    "covenant_ml"
+  ],
+  "code_files": 501,
+  "supersedes": "Incomplete platform_core/covenant_ml source snapshot; failed synthetic native job 40568113 before database access."
+}
