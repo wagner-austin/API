@@ -101,6 +101,12 @@ class DispatchCommand(StrEnum):
     NETBOOT_RETIRE = "netboot-retire"
     # Decode before MCPs migration 877 admits live research rows.
     RESEARCH = "research"
+    # MCPs mig 896, board task 62b1bb0a: start and end one model of the
+    # committed catalog on the node the queue placed it on, named as project
+    # models/<catalog id>. Decoded before the queue admits one, since a
+    # command this reader does not know fails every listing.
+    MODEL_LOAD = "model-load"
+    MODEL_UNLOAD = "model-unload"
 
 
 class DispatchLane(StrEnum):
@@ -112,8 +118,10 @@ class DispatchLane(StrEnum):
     sessions duty; ``node`` is the make targets a fleet node runs on a
     checked-out commit, claimed by ``fleet-node-agent``; ``netboot`` is the
     arms and their retirements, run on the machine holding the netboot duty
-    (MCPs board tasks bea0264b and 7b7570c5). The queue partitions its
-    claims by lane, which is what stops a revive queueing behind a check.
+    (MCPs board tasks bea0264b and 7b7570c5); ``models`` is the load and
+    unload of a catalog model, each claimed on the node it names (MCPs mig
+    896, board task 62b1bb0a). The queue partitions its claims by lane,
+    which is what stops a revive queueing behind a check.
     """
 
     HUB = "hub"
@@ -121,6 +129,7 @@ class DispatchLane(StrEnum):
     NODE = "node"
     NETBOOT = "netboot"
     RESEARCH = "research"
+    MODELS = "models"
 
 
 class ClosingStatus(StrEnum):
@@ -511,6 +520,9 @@ def encode_job_line(job: DispatchJob) -> str:
         verb = "retire netboot arm"
     elif job["command"] is DispatchCommand.RESEARCH:
         verb = f"research request {job['project']}"
+    elif job["command"] in (DispatchCommand.MODEL_LOAD, DispatchCommand.MODEL_UNLOAD):
+        # A model job names a catalog model, not a make target or a commit.
+        verb = f"{job['command']} {job['project']}"
     else:
         verb = f"make {job['command']} {job['project']}{at}"
     return f"{job['job_id']} {job['status']} {verb} @{where}{run}"
