@@ -132,7 +132,11 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     # The hub is armable since the netboot duty moved to emerald (MCPs board
     # task ab48f939); the duty's holder never is, since it serves every
     # install, its own included (fleet-mcp's requireMachineBootMac).
-    assert machines["diphtheria"]["role"] == "hub"
+    assert machines["lacrymal"]["role"] == "hub"
+    assert machines["lacrymal"]["duties"] == ["control", "sessions"]
+    assert machines["diphtheria"]["role"] == "worker"
+    assert machines["diphtheria"]["duties"] == ["devices"]
+    assert machines["diphtheria"]["standby"] == ["sessions"]
     for name in declared:
         assert machines[name]["role"] in ("worker", "server", "vpn-jump", "hub")
         assert machines[name]["platform"] == "linux"
