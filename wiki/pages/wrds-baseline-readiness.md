@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json"
@@ -15,6 +16,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json": "83fe5d2f5fa2468079f00334c0c2ddd2548ffddf"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json": "ada422b51719ecf7356cfc273f49015fe77aa783"
@@ -44,10 +46,11 @@ missing price/return (`MP`/`MR`), followed by an available two-session return
 (`P1`) linked to the earlier price date. The frozen one-session rule correctly
 refuses this span. This differs from the version-1 pre-entry delisting. A
 version-3 accounting amendment is now implemented in source, with boundary
-tests; verification, independent review and installation remain required
-before another frozen study. The missing close has no observed value
+tests. Full source checks and separate candidate runtime installation passed;
+independent review, candidate queue rehearsal and licensed qualification remain
+required before another frozen study. The missing close has no observed value
 and must not be silently filled or used to remove the security. See
-[[crsp-monthly-holdings-validation]] for the new source contract.[^v2diagnosis][^current]
+[[crsp-monthly-holdings-validation]] for the new source contract.[^v2diagnosis][^current][^candidate]
 
 Preparation audit and launch checks passed: the job had 8 CPUs, 128 GiB, no
 GPU and sixteen successful input checksums. Those establish execution
@@ -61,7 +64,7 @@ boundary, and [[wrds-baseline-v2-freeze]] for the new fixed study.[^stop]
 
 | Area | Evidence and current boundary |
 |---|---|
-| Runtime | [[wrds-installed-runtime]] — version-2 controller/image installed; current-runtime queue rehearsal passed.[^runtime][^v2] |
+| Runtime | [[wrds-installed-runtime]] — separate version-3 candidate installed and inspected; the last queue rehearsal used version 2.[^candidate][^v2] |
 | Data | [[wrds-licensed-data-evidence]] — version-2 validation staged and independently reread on HPC3; [[wrds-protocol-revision]] records lineage. |
 | Operations | [[wrds-operational-rehearsals]] — current version-2 queue rehearsal plus historical seed summary, selection and controlled final execution.[^v2] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
@@ -76,7 +79,8 @@ or investment performance.[^stop][^diagnostic]
 
 The source protocol retains rejected-order cash and actual traded-notional
 costs and adds the version-3 held-return rule. The completed preparation below
-concerns the stopped version-2 study, not a version-3 installation.[^current]
+concerns the stopped version-2 study. The separate version-3 installation is
+recorded above; its operational rehearsal remains outstanding.[^current][^candidate]
 
 - [x] Stage the separately verified version-2 validation bundle described in
    [[wrds-protocol-revision]]. Transfer and complete remote readback passed;
@@ -97,6 +101,7 @@ limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
 [^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule`, `cost_rule` and `held_return_rule`; this is the current rule document, not an installed runtime or a completed study.
+[^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `source_checks`, `controller`, `image`, `remaining` and `scope`; passed source gate and separately inspected candidate runtime, without a new study launch.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
 [^stage]: `tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json`, `staging`, `readback` and `scope`; encrypted validation staging only, with no evaluator installation or final release.

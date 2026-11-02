@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
@@ -11,6 +12,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
@@ -25,27 +27,34 @@ confidence: medium
 
 # WRDS installed controller and compute runtime
 
-The current separately installed controller and HPC3 image use source
-`8ef7e0f17`, including the audited version-2 CRSP corrections. Installation
-passed its service inspections. A separate current-runtime queue rehearsal
-has now passed; the substantive study remains outstanding. Current study
-status is in [[wrds-baseline-readiness]].[^current][^v2]
+The separately installed version-3 runtime candidate uses source `087f67b4c`,
+including exact missing-price return spans. Controller and native image
+inspections passed. Its queue rehearsal and licensed qualification remain
+outstanding; the last completed queue rehearsal used version 2. Current study
+status is in [[wrds-baseline-readiness]].[^candidate][^v2]
 
 ## Installed identities
 
-Controller inspection and native image inspection recorded these identities.[^current]
+Candidate controller and native image inspection recorded these identities.[^candidate]
 
 | Component | Verified identity |
 |---|---|
-| Controller interpreter | `/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python` |
-| Controller source | `8ef7e0f1769e7127feabb30008d72bc70e908111` |
-| HPC3 image | `/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif` |
-| Image SHA-256 | `e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e` |
+| Controller interpreter | `/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python` |
+| Controller source | `087f67b4c4aae9a731c913330840dcc665b51701` |
+| HPC3 image | `/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/research-crsp-v3.sif` |
+| Image SHA-256 | `369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde` |
 
-Controller inspection verified 623 installed files against seven wheels,
-including both shared libraries. Native image build `58739821` completed in
-88 seconds with exit `0:0`; inspection verified fourteen pinned files and
-two self-check passes. Both dependency checks passed.[^current]
+Candidate controller inspection verified 624 installed files against seven
+wheels, including both shared libraries. Native image build `58742562` completed
+in 95 seconds with exit `0:0`; inspection verified fourteen pinned files and
+two self-check passes. Both dependency checks passed. Capture retained the 53
+exact dependencies; the generated self-check requires 24 symbols. No licensed
+observations or keys were included in the image.[^candidate]
+
+The preserved version-2 controller/image at source `8ef7e0f17` belong to the
+stopped second study and its completed rehearsal. Their inspection verified
+623 installed members and native build `58739821`; they were not replaced or
+relabeled by candidate installation.[^current][^v2]
 
 The historical `b3843a3d3` controller and image remain the runtime of the
 stopped licensed attempt. Its inspections verified 585 installed files,
@@ -74,11 +83,13 @@ evaluator-image identity are separate provenance fields.[^controller][^v2]
 
 ## Changing the runtime
 
-The corrected evaluator is installed separately and its synthetic queue
-rehearsal has passed. Amended rules remain required before a new licensed
-study. Installation is not a queue rehearsal or a substantive study result;
-no final grant release occurred during installation. The original failed
-journal, policy and image remain the record of [[wrds-baseline-20261101]].[^current][^preparation][^v2]
+The version-3 candidate still needs independent review, its own synthetic queue
+rehearsal and licensed return-span qualification before a newly frozen study.
+Installation is not a rehearsal or substantive result. No licensed decryption,
+study launch or final grant release occurred during installation. Historical
+journals, policies and images remain unchanged.[^candidate]
+
+[^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `controller`, `image`, `construction`, `service_reports`, `source_checks`, `remaining` and `scope`; separate candidate installation, with no version-3 study execution.
 
 [^current]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `service_reports`, `construction`, `historical_state`, `remaining` and `scope`.
 [^runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, `controller`, `image`, `construction`, `service_reports` and `scope`.
