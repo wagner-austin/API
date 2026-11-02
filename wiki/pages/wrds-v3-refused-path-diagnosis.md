@@ -16,7 +16,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/completion-preparation-report.json": "032a26faf8678ed0dd56d2d70e7895c036d62210"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "981e281e5f954d447007d4482c08507fc4fd11eb"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "d7fca763bfbbc141e0ea0bda85c53183f19ed10e"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "190254f6e21071cea522ca8cf292e2bb84d588d0"
 provenance:
   - "Vendor definitions use the existing tech-wiki capture crsp-ciz-guide-20260731.txt, SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e, corpus document 0264d5cc-4dec-4715-b17b-45f3c8e5fbec."
 fact_checked: 2026-11-02
