@@ -7,6 +7,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from platform_core.config import config_test_hooks
 
 from hpc3.contracts.image import ImageReference, encode_image_reference
 from hpc3.core.image_exec import run_inside_image
@@ -35,7 +36,7 @@ def test_shell_preserves_paths_removes_ambient_mounts_and_propagates_exit(
         sha256="ab" * 32,
         binds=["/home/data $(touch UNWANTED)"],
     )
-    environment = dict(os.environ)
+    environment = config_test_hooks.get_environment()
     environment["PATH"] = str(tmp_path) + os.pathsep + environment["PATH"]
     for prefix in ("APPTAINER", "SINGULARITY"):
         for suffix in ("BIND", "BINDPATH", "MOUNT"):
