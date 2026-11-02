@@ -38,24 +38,22 @@
     "runrecord_sha256": "d0f91f935d367002227d283e1bbfcf7369d2128ec592a86cc590537ac4b88969"
   },
   "shared": {
-    "state": "STAGING_FAILED",
-    "controller_exit_code": 1,
-    "exception": "subprocess.TimeoutExpired",
-    "command": "mkdir -p '/pub/wagnera3/research/mount-grammar-5d16022f-final-20261102'",
-    "timeout_seconds": 600,
-    "session": "34877",
-    "pid": 2678585,
-    "wait_channel": "FhgfsOps_revalidateIntent",
-    "submitted": false,
-    "termination": {
-      "observed_at": "2026-11-02T19:37:27Z",
-      "signal": "SIGTERM",
-      "request_succeeded": true,
-      "process_state": "Ds",
-      "shared_pending_signals_hex": "0000000000004000",
-      "process_exit_verified": false
-    },
-    "next_step": "Do not duplicate this stage while the owned mkdir remains in I/O wait. Verify its exit and storage response before one explicit retry of the frozen stage."
+    "job_id": "58783480",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 8,
+    "node": "hpc3-l18-01",
+    "verified_inputs": 5,
+    "native_service_post": "fffb62c9-f741-49ca-b729-19a1935e2303",
+    "stage_service_post": "2e154c5f-6128-4bc4-bff8-fd66502a362d",
+    "preflight_service_post": "ac34d781-9961-453b-9f0b-bad8df4d28b0",
+    "result_sha256": "06ef288c4683f3842a8c7709ba8200307ea936a2f01636990efb05850ebc660e",
+    "runrecord_sha256": "25f73059e29413f97b475b026a67339a9d367521a12fc1664ae955adde1da293",
+    "beegfs_mounts": [
+      "/pub/wagnera3/research/mount-grammar-5d16022f-final-20261102"
+    ],
+    "scratch_mode": "0700",
+    "scratch_removed": true
   },
   "prior_shared": {
     "source": "artifacts/wrds-declared-mounts-20261102/evidence.json",
@@ -81,7 +79,6 @@
     "No licensed data, credentials or final keys used.",
     "Normal-exit private scratch cleanup only; not forced termination or hostile-account isolation.",
     "CPU probe only; no new GPU allocation.",
-    "Shared staging is not a passed native shared probe.",
     "No storage-server cause or permanent recovery established.",
     "Stopped baseline and historical frozen requests unchanged."
   ],
@@ -109,12 +106,51 @@
     "refuse-comma-run.json": "4bce63c0a0a063e2249f21ac81352e217c558d7fb3c73e8b16aeb7dfbbcac5a7",
     "refuse-comma.txt": "bfc1791adbd2996a6d23d2874340021a117bdaf1af339e988278fb44315e4243",
     "shared-checksums.txt": "202742ef704bcbf097e7004a3f1adad9e058425a337a9b2523c1ccab4008118a",
+    "shared-native-evidence.json": "24d3e1cea8488dcc43ec4833116cb307285886a7a48cbae264e7fc2b24d8874f",
+    "shared-preflight-report.txt": "e0bcc2812ebba3c59347069f4d94af74b866fc986b3e0a029fb754f44dbd35ae",
+    "shared-preflight-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "shared-request.json": "b1b365b723d640ec7b83b9a9b4237a23709b7280bc81d83e9f55c7e3c0ea5142",
+    "shared-result.json": "06ef288c4683f3842a8c7709ba8200307ea936a2f01636990efb05850ebc660e",
+    "shared-result.json.runrecord.json": "25f73059e29413f97b475b026a67339a9d367521a12fc1664ae955adde1da293",
+    "shared-retry-readiness.txt": "4e754cdaf651d42be4eada04aeb58012ddbb83b1a808fc492a62e677bde34452",
     "shared-run.json": "8e8c4fd884a1c908075c1ea939694cd3dc62089c721e1e5281634c0d1941874c",
     "shared-stage-after-timeout.txt": "8a0e0261df303184c9a4fb8bf115b7555ceac116642c745327b7c435129c4bc4",
     "shared-stage-process.txt": "0946d3218b774c83c8ec49418efd3036196cbea1674a3b50bae2c2592bb195f7",
     "shared-stage-report.txt": "d3837b6499c14fd1c26bad423e515c5bf1146f1da49d11b25bcd1eeefc478e11",
+    "shared-stage-retry-report.txt": "64d68749f8a3883f58c8444f33b91e32e7d2d17ce864cd588798d373f1c8aa29",
+    "shared-stage-retry-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     "shared-stage.json": "6424b74c82cfb19125cc49f83f8f64b68648e0273e16a6d74b6aaee336424563",
+    "shared-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "shared-stdout.txt": "c634082df1ddcc0b4dfde54358282d026adf6790e4aa94892e91159b89d93040",
+    "shared-submit-stderr.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "shared-submit.json": "40e655163896fbed89ca594c17a23463f7859d990eeb1286b1033d505c0909d0",
+    "shared.sbatch": "e764bbac9b9a6ecb731da6d80a6a425f739c7c0877957d2d103220c3fb1f38e6",
     "shared.txt": "f272c6175d745909d8014d978a7143caf5fae589757f02b5bb38dbb814b967c0"
+  },
+  "shared_stage_failure": {
+    "state": "STAGING_FAILED",
+    "controller_exit_code": 1,
+    "exception": "subprocess.TimeoutExpired",
+    "command": "mkdir -p '/pub/wagnera3/research/mount-grammar-5d16022f-final-20261102'",
+    "timeout_seconds": 600,
+    "session": "34877",
+    "pid": 2678585,
+    "wait_channel": "FhgfsOps_revalidateIntent",
+    "submitted": false,
+    "termination": {
+      "observed_at": "2026-11-02T19:37:27Z",
+      "signal": "SIGTERM",
+      "request_succeeded": true,
+      "process_state": "Ds",
+      "shared_pending_signals_hex": "0000000000004000",
+      "process_exit_verified": false
+    },
+    "recovery_observation": {
+      "observed_at": "2026-11-02T19:51:29Z",
+      "prior_pid_absent": true,
+      "parent_stat_exit_code": 0,
+      "parent_stat_output": "directory",
+      "retry_post": "0939ece4-a70a-478f-8e52-6b5e93e14f7b"
+    }
   }
 }

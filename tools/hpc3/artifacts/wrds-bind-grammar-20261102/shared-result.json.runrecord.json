@@ -1,0 +1,51 @@
+{
+ "experiment": "5a3badd338788a9a75d38677d21bf4fb8efa6ec80e46c5744b3382c14e608ae9",
+ "label": "declared-mount-probe",
+ "fingerprint": {
+  "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 64
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "observations": [],
+ "payload_digest": "db3e5e4b7a063bd0565581e4ee78d4784131379b27bf54bef5490c3f2997df16"
+}
