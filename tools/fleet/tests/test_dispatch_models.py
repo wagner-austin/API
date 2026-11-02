@@ -13,12 +13,13 @@ from fleet.contracts.dispatch import (
     decode_listing,
     encode_job_line,
 )
-from fleet.contracts.model_host import CatalogModel, ModelBackend
+from fleet.contracts.model_host import CatalogModel, ModelBackend, ModelServer
 from tests._queue_fakes import queue_job
 
 #: The catalog row the queue hands a model job's runner, as fleet-mcp renders it.
 GLIMMER: JSONObject = {
     "id": "glimmer-30b",
+    "server": "llama-server",
     "file": "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
     "sha256": "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
     "sizeBytes": 16756683904,
@@ -65,6 +66,7 @@ def test_a_listing_with_model_jobs_decodes_every_row_and_names_each_model() -> N
     assert rows[0]["model"] is None
     glimmer = CatalogModel(
         model_id="glimmer-30b",
+        server=ModelServer.LLAMA,
         file="Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
         sha256="4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
         size_bytes=16756683904,

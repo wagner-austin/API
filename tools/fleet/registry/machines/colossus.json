@@ -43,7 +43,10 @@
     "stack": null,
     "elevated": false,
     "models": {
-      "server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+      "servers": {
+        "llama-server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+        "whisper-server": "/home/corvis/build/whisper.cpp-v1.9.5/build/bin/whisper-server"
+      },
       "backend": "vulkan",
       "cache": "/home/corvis/models",
       "first_port": 8091,

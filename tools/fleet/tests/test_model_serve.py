@@ -11,7 +11,7 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.dispatch import ClosingStatus
-from fleet.contracts.model_host import CatalogModel, ModelBackend
+from fleet.contracts.model_host import CatalogModel, ModelBackend, ModelServer
 from fleet.core import _test_hooks, dialect
 from fleet.core.linux_gpu_probe import GPU_PROBE_PART
 from fleet.core.model_scripts import scan_script, unload_script
@@ -34,6 +34,7 @@ COLOSSUS = node(host="colossus", gpu=None, models=COLOSSUS_MODELS)
 JOB = "e33cfb0d-66bf-4ee2-9b7c-5110cc7328ee"
 ORNITH = CatalogModel(
     model_id="ornith-1.5-9b",
+    server=ModelServer.LLAMA,
     file="Ornith-1.5-9B-Q4_K_M.gguf",
     sha256="70c112196e0b7023803c9762752e46d29e612a92c83f995bc3ba1ceb07e8fab6",
     size_bytes=5780090816,
@@ -41,19 +42,31 @@ ORNITH = CatalogModel(
     context_tokens=32768,
     backends=(ModelBackend.VULKAN,),
 )
+WHISPER = CatalogModel(
+    model_id="whisper-large-v3-turbo",
+    server=ModelServer.WHISPER,
+    file="ggml-large-v3-turbo.bin",
+    sha256="1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+    size_bytes=1624555275,
+    gpu_bytes=1932406784,
+    context_tokens=None,
+    backends=(ModelBackend.VULKAN,),
+)
 FILE = "/home/corvis/models/Ornith-1.5-9B-Q4_K_M.gguf"
+LLAMA_BINARY = COLOSSUS_MODELS["servers"][ModelServer.LLAMA]
 
 
-def _read(output: str) -> tuple[ClosingStatus, str | None, str]:
+def _read(output: str, model: CatalogModel = ORNITH) -> tuple[ClosingStatus, str | None, str]:
     """Read a load script's line on colossus.
 
     Args:
         output: What it printed.
+        model: The model it loaded.
 
     Returns:
         The status, the endpoint and the detail.
     """
-    read = read_load(output, host="colossus", models=COLOSSUS_MODELS, model=ORNITH)
+    read = read_load(output, host="colossus", models=COLOSSUS_MODELS, model=model)
     return read["status"], read["endpoint"], read["detail"]
 
 
@@ -121,6 +134,32 @@ class TestReadLoad:
             "its log, not every layer on the GPU; llama-server stopped"
         )
 
+    def test_a_whisper_server_on_its_gpu_passes_with_the_url(self) -> None:
+        assert _read("loaded 100.111.149.33 8092 Vulkan0\n", WHISPER) == (
+            ClosingStatus.PASSED,
+            "http://100.111.149.33:8092",
+            "whisper-server serves whisper-large-v3-turbo (ggml-large-v3-turbo.bin, sha256 "
+            "1fc70f774d38) on colossus at 100.111.149.33:8092 on its GPU Vulkan0, and answered "
+            "/health",
+        )
+
+    def test_a_whisper_server_with_no_gpu_fails_and_names_its_server(self) -> None:
+        assert _read("loaded 100.111.149.33 8092 none", WHISPER) == (
+            ClosingStatus.FAILED,
+            None,
+            "MODEL_NOT_ON_GPU: whisper-large-v3-turbo answered on colossus with no "
+            "whisper_backend_init_gpu device in its log, so it runs on the CPU; whisper-server "
+            "stopped",
+        )
+        assert _read("unhealthy 300", WHISPER)[2] == (
+            "whisper-server of whisper-large-v3-turbo on colossus did not answer /health in "
+            "300 s; stopped"
+        )
+
+    def test_a_whisper_device_that_is_not_one_is_a_fault(self) -> None:
+        with pytest.raises(AppError, match=r"printed 'loaded 100\.111\.149\.33 8092 Vulkan-0'"):
+            _read("loaded 100.111.149.33 8092 Vulkan-0", WHISPER)
+
     @pytest.mark.parametrize(
         "output",
         [
@@ -144,8 +183,9 @@ class TestServeModel:
     def test_a_pass_sends_the_load_under_its_deadline_and_stops_nothing(self) -> None:
         runner = FakeRun([ok(""), ok("loaded 100.111.149.33 8091 34/34\n")])
         _test_hooks.run = runner
-        served = serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB)
+        served = serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB, binary=LLAMA_BINARY)
         assert served["endpoint"] == "http://100.111.149.33:8091"
+        assert LLAMA_BINARY.encode() in (runner.stdin[1] or b"")
         assert runner.calls[1][-2:] == (
             "/bin/sh",
             "/home/corvis/fleet/stage/model-load-ornith-1.5-9b.sh",
@@ -156,25 +196,21 @@ class TestServeModel:
     def test_a_failed_load_stops_its_server_before_it_returns(self) -> None:
         runner = FakeRun([ok(""), ok("unhealthy 300\n"), ok(""), ok(f"stopped {JOB}\n")])
         _test_hooks.run = runner
-        assert (
-            serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB)["status"]
-            is ClosingStatus.FAILED
-        )
+        served = serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB, binary=LLAMA_BINARY)
+        assert served["status"] is ClosingStatus.FAILED
         assert runner.stdin[2] == unload_script("ornith-1.5-9b").encode()
 
     def test_a_refused_load_stops_nothing(self) -> None:
         runner = FakeRun([ok(""), ok(f"absent {FILE}\n")])
         _test_hooks.run = runner
-        assert (
-            serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB)["status"]
-            is ClosingStatus.REFUSED
-        )
+        served = serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB, binary=LLAMA_BINARY)
+        assert served["status"] is ClosingStatus.REFUSED
         assert len(runner.calls) == 2
 
     def test_a_node_that_does_not_answer_raises_its_fault(self) -> None:
         _test_hooks.run = FakeRun([failed(255, "ssh: connect to host colossus: No route to host")])
         with pytest.raises(AppError, match="No route to host") as fault:
-            serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB)
+            serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB, binary=LLAMA_BINARY)
         assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
 
 

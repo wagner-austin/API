@@ -10,9 +10,10 @@ sha256 is refused before anything starts, naming the file and both values
 (A2): the catalog's digest is the only thing that says the bytes on the node
 are the model the job asked for. A server that exits while loading, does
 not answer ``/health`` in :data:`fleet.core.model_scripts.HEALTH_SECONDS`, or
-puts fewer than all of its layers on the GPU fails, and is stopped. Only a
-server that answered with every layer on the GPU passes, with the url it
-answers on, its node's tailnet address and port.
+is not wholly on the GPU fails, and is stopped. Only a server that answered
+on the GPU passes, with the url it answers on, its node's tailnet address
+and port: a llama-server with every layer there, or a whisper-server that
+logged the GPU device it uses (MCPs board task 228aa097).
 
 WHAT AN UNLOAD READS. The node's GPU memory, by the tick's own probe lines
 (:data:`fleet.core.linux_gpu_probe.GPU_PROBE_PART`), before the stop and
@@ -30,7 +31,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
 
 from fleet.contracts.dispatch import ClosingStatus
-from fleet.contracts.model_host import CatalogModel, NodeModels
+from fleet.contracts.model_host import CatalogModel, ModelServer, NodeModels
 from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, remote
 from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
@@ -126,27 +127,68 @@ def _odd(host: str, what: str, output: str) -> AppError[FleetErrorCode]:
     )
 
 
-def _passed(host: str, model: CatalogModel, address: str, port: str, offload: str) -> LoadOutcome:
-    """Judge a server that answered ``/health`` by its offload line.
+def _transcribing(
+    host: str, model: CatalogModel, address: str, port: str, device: str
+) -> LoadOutcome:
+    """Judge a whisper-server that answered ``/health`` by its GPU line.
 
     Args:
         host: The node.
         model: The catalog row.
         address: The node's tailnet address.
         port: The port it answers on.
-        offload: The log's ``N/M``, or ``none``.
+        device: The GPU device its log names, or ``none``.
 
     Returns:
-        ``passed`` with the url when every layer is on the GPU, else
-        ``failed`` naming how many were.
+        ``passed`` with the url when it uses a GPU, else ``failed``.
+    """
+    if device == "none":
+        return LoadOutcome(
+            status=ClosingStatus.FAILED,
+            endpoint=None,
+            detail=(
+                f"MODEL_NOT_ON_GPU: {model['model_id']} answered on {host} with no "
+                "whisper_backend_init_gpu device in its log, so it runs on the CPU; "
+                "whisper-server stopped"
+            ),
+        )
+    return LoadOutcome(
+        status=ClosingStatus.PASSED,
+        endpoint=f"http://{address}:{port}",
+        detail=(
+            f"whisper-server serves {model['model_id']} ({model['file']}, sha256 "
+            f"{model['sha256'][:12]}) on {host} at {address}:{port} on its GPU {device}, "
+            "and answered /health"
+        ),
+    )
+
+
+def _passed(host: str, model: CatalogModel, address: str, port: str, offload: str) -> LoadOutcome:
+    """Judge a server that answered ``/health`` by where its log says it was placed.
+
+    Args:
+        host: The node.
+        model: The catalog row.
+        address: The node's tailnet address.
+        port: The port it answers on.
+        offload: llama-server's ``N/M`` or whisper-server's GPU device, or
+            ``none``.
+
+    Returns:
+        ``passed`` with the url when it is wholly on the GPU, else
+        ``failed`` naming where it was.
 
     Raises:
-        AppError: ``DISPATCH_FAILED`` for an address, port or offload that
-            is not one.
+        AppError: ``DISPATCH_FAILED`` for an address, port or placement
+            that is not one.
     """
     layers = re.fullmatch(r"([0-9]+)/([0-9]+)", offload)
     if _ADDRESS.fullmatch(address) is None or re.fullmatch(r"[0-9]{1,5}", port) is None:
         raise _odd(host, "load", f"loaded {address} {port} {offload}")
+    if model["server"] is ModelServer.WHISPER:
+        if re.fullmatch(r"[A-Za-z0-9_]+", offload) is None:
+            raise _odd(host, "load", f"loaded {address} {port} {offload}")
+        return _transcribing(host, model, address, port, offload)
     if offload != "none" and layers is None:
         raise _odd(host, "load", f"loaded {address} {port} {offload}")
     counts = offload.split("/")
@@ -226,7 +268,7 @@ def read_load(output: str, *, host: str, models: NodeModels, model: CatalogModel
             status=ClosingStatus.FAILED,
             endpoint=None,
             detail=(
-                f"llama-server of {model['model_id']} on {host} exited while loading; "
+                f"{model['server']} of {model['model_id']} on {host} exited while loading; "
                 f"its status and its log's last line: {rest}"
             ),
         )
@@ -235,7 +277,7 @@ def read_load(output: str, *, host: str, models: NodeModels, model: CatalogModel
             status=ClosingStatus.FAILED,
             endpoint=None,
             detail=(
-                f"llama-server of {model['model_id']} on {host} did not answer /health in "
+                f"{model['server']} of {model['model_id']} on {host} did not answer /health in "
                 f"{rest} s; stopped"
             ),
         )
@@ -318,7 +360,7 @@ def gpu_free_bytes(node: NodeConfig) -> int:
 
 
 def serve_model(
-    node: NodeConfig, models: NodeModels, model: CatalogModel, *, job_id: str
+    node: NodeConfig, models: NodeModels, model: CatalogModel, *, job_id: str, binary: str
 ) -> LoadOutcome:
     """Check a model's file on its node and serve it there.
 
@@ -327,6 +369,7 @@ def serve_model(
         models: Its declaration.
         model: The catalog row.
         job_id: The load.
+        binary: The node's binary of the model's server.
 
     Returns:
         The outcome. A server that started and did not pass is stopped
@@ -339,7 +382,7 @@ def serve_model(
     outcome = remote.attempt_script(
         node["host"],
         _script_path(node, "load", model["model_id"]),
-        load_script(models=models, model=model, job_id=job_id),
+        load_script(models=models, model=model, job_id=job_id, binary=binary),
         timeout_seconds=LOAD_DEADLINE_SECONDS,
     )
     failure = outcome["failure"]

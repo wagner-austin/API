@@ -907,7 +907,10 @@ reinstall wrote, since a reinstall leaves no build behind):
 
 ```json
 "models": {
-  "server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+  "servers": {
+    "llama-server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+    "whisper-server": "/home/corvis/build/whisper.cpp-v1.9.5/build/bin/whisper-server"
+  },
   "backend": "vulkan",
   "cache": "/home/corvis/models",
   "first_port": 8091,
@@ -916,29 +919,40 @@ reinstall wrote, since a reinstall leaves no build behind):
 }
 ```
 
+Each catalog row names the server that runs it (MCPs board task 228aa097):
+llama.cpp's `llama-server` for a GGUF chat model, and whisper.cpp's
+`whisper-server` for `whisper-large-v3-turbo`, the speech-to-text model
+chat's voice call posts each spoken sentence to (`POST /inference`).
+`servers` names the binary of each one the node has built.
+
 That node's serve (`fleet.cli.node_models`, MCPs board task b9235198) claims
 the models lane before every fill pass and runs each job to its close there:
 
-- **A load** is refused unless the catalog lists the node's backend, and
-  unless the file under `cache` has the catalog's size and sha256, named with
-  both digests when it does not. Otherwise llama-server starts as the
-  transient user unit `fleet-model-<id>.service`, on the node's tailnet
-  address and the lowest free port of its range, with `-ngl 999 -fit off`, so
-  every layer goes on the GPU or none is served. Once `/health` answers and
-  its log reads `offloaded N/N layers to GPU`, the load passes with
-  `dispatch_report action='loaded'` and `http://<tailnet address>:<port>`.
-  A server that exits, does not answer in 300 s, or leaves a layer off the
-  GPU fails and is stopped.
+- **A load** is refused unless the catalog lists the node's backend, the
+  node has built the model's server, and the file under `cache` has the
+  catalog's size and sha256, named with both digests when it does not.
+  Otherwise the server starts as the transient user unit
+  `fleet-model-<id>.service`, on the node's tailnet address and the lowest
+  free port of its range. llama-server runs with `-ngl 999 -fit off`, so
+  every layer goes on the GPU or none is served, and passes once `/health`
+  answers and its log reads `offloaded N/N layers to GPU`; whisper-server
+  passes once `/health` answers and its log reads `whisper_backend_init_gpu:
+  using <device> backend`. A passed load reports `dispatch_report
+  action='loaded'` with `http://<tailnet address>:<port>`. A server that
+  exits, does not answer in 300 s, or is not wholly on the GPU fails and is
+  stopped.
 - **An unload** stops that unit and passes. Its close names the GPU free
   bytes the tick's own probe read before the stop and after it, because the
   tick keeps only each runner's latest row, which the next stop overwrites
   (audit 7b709022). An unload whose GPU cannot be read is refused, naming
   the fault.
 - **Idle** copies chat's rule (its deleted `src/chat/api/activity.py`): a use
-  is a request somebody made, never a probe. Here that means llama.cpp's
-  prompt and generated token counters moved, or a request is in flight, read
-  from `/metrics`, so the runner's own `/health` and `/metrics` reads never
-  count. Every collect pass reads each served model. One unused for its
+  is a request somebody made, never a probe. For llama-server that means
+  llama.cpp's prompt and generated token counters moved, or a request is in
+  flight, read from `/metrics`, so the runner's own `/health` and `/metrics`
+  reads never count; whisper-server has no counters, so its uses are the
+  `processing '<file>'` lines its log gains as each transcription starts.
+  Every collect pass reads each served model. One unused for its
   `idle_seconds`, kept in `/proc/uptime` seconds on the node, is stopped with
   no unload job. That, and a server found exited, is recorded on its passed
   load with `dispatch_report action='ended'` (MCPs mig 897), so the next load

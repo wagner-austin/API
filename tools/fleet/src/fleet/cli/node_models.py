@@ -137,7 +137,10 @@ def _unload(
     said = (
         f"{model['model_id']} was not being served on {alias}, so there was nothing to stop"
         if stopped is None
-        else f"stopped llama-server of {model['model_id']} on {alias}, which load {stopped} started"
+        else (
+            f"stopped {model['server']} of {model['model_id']} on {alias}, "
+            f"which load {stopped} started"
+        )
     )
     detail = (
         f"{said}; the tick's GPU probe read {before} free bytes before the stop "
@@ -185,8 +188,23 @@ def _load(
             ),
         )
         return
+    binary = models["servers"].get(model["server"])
+    if binary is None:
+        job_close.close(
+            credentials,
+            job,
+            identity,
+            status=ClosingStatus.REFUSED,
+            exit_code=None,
+            detail=(
+                f"MODEL_SERVER_ABSENT: {model['model_id']} runs in {model['server']}, which "
+                f"{alias} has not built; its machine file declares "
+                f"{', '.join(models['servers'])}"
+            ),
+        )
+        return
     try:
-        outcome = serve_model(node, models, model, job_id=job["job_id"])
+        outcome = serve_model(node, models, model, job_id=job["job_id"], binary=binary)
     except AppError as fault:
         job_close.close(
             credentials,

@@ -17,15 +17,28 @@ knows every layer went there (measured on colossus 2026-11-02: at the
 default verbosity the line is not written; one 200-token request and ten
 polls add 3.5 KB to the log at ``-lv 4``).
 
+A SPEECH-TO-TEXT MODEL RUNS IN WHISPER-SERVER (MCPs board task 228aa097),
+whisper.cpp's, in the same kind of unit on the same ports, as ``-m <file>
+--host <address> --port <port>`` with its own defaults: the GPU, flash
+attention, and four threads. It answers ``/health`` only once its model is
+loaded, as llama-server does (whisper.cpp v1.9.5 ``examples/server``), and
+has no layers to count: its GPU proof is the ``whisper_backend_init_gpu:
+using <device> backend`` line it logs, where a build or card without a GPU
+logs ``no GPU found`` instead (measured on colossus 2026-11-02: ``using
+Vulkan0 backend``).
+
 ITS STATE IS ON THE NODE, in ``~/.fleet/models/<id>/``: the job that loaded
-it, its port, its server log, the last use, and ``ended`` once it stopped
-with no unload job. The last use copies chat's idle rule (chat
-``src/chat/api/activity.py``, deleted with the Python app in 71edefa): a
-use is a request a person made, never a probe, which here is llama.cpp's
-prompt and generated token counters moving, or a request in flight, so the
-``/health`` and ``/metrics`` reads the runner itself makes never count. It
-is kept in ``/proc/uptime`` seconds, monotonic as chat's ledger was, and a
-start counts as a use, so a server just loaded is not idle.
+it, the server it runs in, its port, its server log, the last use, and
+``ended`` once it stopped with no unload job. The last use copies chat's
+idle rule (chat ``src/chat/api/activity.py``, deleted with the Python app
+in 71edefa): a use is a request a person made, never a probe, so the
+``/health`` and ``/metrics`` reads the runner itself makes never count. For
+llama-server that is its prompt and generated token counters moving, or a
+request in flight; whisper-server has no counters, so it is the count of
+the ``processing '<file>'`` lines it writes to its log as each
+transcription starts. It is kept in ``/proc/uptime`` seconds, monotonic as
+chat's ledger was, and a start counts as a use, so a server just loaded is
+not idle.
 """
 
 from __future__ import annotations
@@ -33,7 +46,7 @@ from __future__ import annotations
 import shlex
 from typing import Final
 
-from fleet.contracts.model_host import CatalogModel, NodeModels
+from fleet.contracts.model_host import CatalogModel, ModelServer, NodeModels
 from fleet.core.dialect import PROLOGUE
 
 #: How long a started server has to answer ``/health`` before the load
@@ -58,6 +71,12 @@ _COUNT_USE: Final[str] = (
     "awk '/^llamacpp:(prompt_tokens_total|tokens_predicted_total) / {s += $2}\n"
     "  /^llamacpp:requests_processing / {b = $2}\n"
     '  END {printf "%d %d", s, b}\''
+)
+
+#: Count whisper-server's transcriptions from its log, with none in flight,
+#: since it publishes no counter; ``grep -c`` prints 0 and exits 1 for none.
+_COUNT_TRANSCRIPTIONS: Final[str] = (
+    'counted="$({ grep -c ": processing \'" "$dir/server.log" || true; }) 0"'
 )
 
 
@@ -129,13 +148,56 @@ def _check_file(model: CatalogModel) -> str:
     )
 
 
-def _start(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
+def _command(model: CatalogModel, binary: str) -> str:
+    """The server's command line, its flags the model's server's.
+
+    Args:
+        model: The catalog row.
+        binary: The node's binary of the model's server.
+
+    Returns:
+        The command, its last line ending in a newline.
+    """
+    serve = f'    {shlex.quote(binary)} -m "$file" --host "$addr" --port "$port"'
+    if model["server"] is ModelServer.WHISPER:
+        return f"{serve}\n"
+    return (
+        f"{serve} \\\n"
+        f"    -c {model['context_tokens']} -ngl 999 -fit off -fa on --jinja --metrics -lv 4\n"
+    )
+
+
+def _placed(model: CatalogModel) -> str:
+    """The lines that read from the server's log where the model was placed.
+
+    Args:
+        model: The catalog row.
+
+    Returns:
+        The fragment, setting ``offload`` to llama-server's last ``N/M``
+        layers on the GPU, or whisper-server's GPU device, else ``none``.
+    """
+    if model["server"] is ModelServer.WHISPER:
+        found = (
+            "grep -o 'whisper_backend_init_gpu: using [A-Za-z0-9_]* backend' \"$dir/server.log\""
+            " \\\n  | tail -n 1 | cut -d ' ' -f 3"
+        )
+    else:
+        found = (
+            "grep -o 'offloaded [0-9]*/[0-9]* layers to GPU' \"$dir/server.log\""
+            " \\\n  | tail -n 1 | cut -d ' ' -f 2"
+        )
+    return f'offload="$({found})"\nif [ -z "$offload" ]; then\n  offload=none\nfi\n'
+
+
+def _start(*, models: NodeModels, model: CatalogModel, job_id: str, binary: str) -> str:
     """The lines that start the server on the lowest free port, unless one is active.
 
     Args:
         models: The node's declaration.
         model: The catalog row.
         job_id: The load, which names the unit's description.
+        binary: The node's binary of the model's server.
 
     Returns:
         The fragment, setting ``port``, or printing ``ports`` and exiting.
@@ -160,17 +222,17 @@ def _start(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
         "    exit 0\n"
         "  fi\n"
         '  printf \'%s\\n\' "$port" > "$dir/port"\n'
+        f"  printf '%s\\n' {q(model['server'].value)} > \"$dir/server\"\n"
         '  rm -f "$dir/ended"\n'
         '  printf \'%s 0\\n\' "$(cut -d . -f 1 /proc/uptime)" > "$dir/use"\n'
         f'  systemd-run --user --quiet --unit="$unit" --description={description} \\\n'
         '    -p StandardOutput=truncate:"$dir/server.log" -p StandardError=inherit -- \\\n'
-        f'    {q(models["server"])} -m "$file" --host "$addr" --port "$port" \\\n'
-        f"    -c {model['context_tokens']} -ngl 999 -fit off -fa on --jinja --metrics -lv 4\n"
+        f"{_command(model, binary)}"
         "fi\n"
     )
 
 
-def load_script(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
+def load_script(*, models: NodeModels, model: CatalogModel, job_id: str, binary: str) -> str:
     """Check the model's file, serve it, and wait for it to answer.
 
     Prints exactly one line: ``absent <path>``, ``size <bytes>`` or
@@ -178,15 +240,17 @@ def load_script(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
     starts; ``ports <first>-<last>`` when none is free; ``exited <status>
     <last log line>`` when the server stopped while loading; ``unhealthy
     <seconds>`` once it was stopped for not answering; else ``loaded
-    <address> <port> <offloaded>``, the last ``N/M`` of the log's offload
-    line or ``none``. A unit already active for the model is adopted, its
-    port kept, so a load claimed again after its runner restarted serves
-    the same server.
+    <address> <port> <placed>``, where ``placed`` is the last ``N/M`` of
+    llama-server's offload line or the device of whisper-server's GPU line,
+    or ``none`` without one. A unit already active for the model is
+    adopted, its port kept, so a load claimed again after its runner
+    restarted serves the same server.
 
     Args:
         models: The node's declaration.
         model: The catalog row.
         job_id: The load, written as the model's job.
+        binary: The node's binary of the model's server.
 
     Returns:
         The script.
@@ -200,7 +264,7 @@ def load_script(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
         f"{_check_file(model)}"
         'addr="$(tailscale ip -4 | head -n 1)"\n'
         'mkdir -p "$dir"\n'
-        f"{_start(models=models, model=model, job_id=job_id)}"
+        f"{_start(models=models, model=model, job_id=job_id, binary=binary)}"
         f"printf '%s\\n' {q(job_id)} > \"$dir/job\"\n"
         "waited=0\n"
         'until curl -fsS -m 2 "http://$addr:$port/health" > /dev/null 2>&1; do\n'
@@ -217,11 +281,7 @@ def load_script(*, models: NodeModels, model: CatalogModel, job_id: str) -> str:
         "  sleep 1\n"
         "  waited=$((waited + 1))\n"
         "done\n"
-        'offload="$(grep -o \'offloaded [0-9]*/[0-9]* layers to GPU\' "$dir/server.log" \\\n'
-        "  | tail -n 1 | cut -d ' ' -f 2)\"\n"
-        'if [ -z "$offload" ]; then\n'
-        "  offload=none\n"
-        "fi\n"
+        f"{_placed(model)}"
         'printf \'loaded %s %s %s\\n\' "$addr" "$port" "$offload"\n'
     )
 
@@ -262,8 +322,9 @@ def scan_script(models: NodeModels) -> str:
     <port> <idle seconds>``, or ``ended <id> <job> <why>`` for one whose
     server exited or which this scan stopped for idleness. An ended model
     stays ``ended`` until :func:`forget_script` removes it, so an end the
-    queue did not hear is said again at the next scan. A server whose
-    ``/metrics`` does not answer gets no use counted.
+    queue did not hear is said again at the next scan. A llama-server whose
+    ``/metrics`` does not answer gets no use counted; a whisper-server's
+    uses are counted from its log.
 
     Args:
         models: The node's declaration, whose idle span applies.
@@ -272,6 +333,7 @@ def scan_script(models: NodeModels) -> str:
         The script.
     """
     idle = models["idle_seconds"]
+    whisper = shlex.quote(ModelServer.WHISPER.value)
     return (
         f"{PROLOGUE}"
         f"root={STATE_ROOT}\n"
@@ -287,11 +349,12 @@ def scan_script(models: NodeModels) -> str:
         '  id="$(basename "$dir")"\n'
         '  unit="fleet-model-$id.service"\n'
         '  job="$(cat "$dir/job")"\n'
+        '  server="$(cat "$dir/server")"\n'
         '  if [ ! -f "$dir/ended" ] && ! systemctl --user is-active --quiet "$unit"; then\n'
         '    status="$(systemctl --user show "$unit" -p ExecMainStatus --value)"\n'
         '    result="$(systemctl --user show "$unit" -p Result --value)"\n'
-        "    printf 'llama-server exited with status %s, result %s, with no unload job\\n' \\\n"
-        '      "$status" "$result" > "$dir/ended"\n'
+        "    printf '%s exited with status %s, result %s, with no unload job\\n' \\\n"
+        '      "$server" "$status" "$result" > "$dir/ended"\n'
         "  fi\n"
         '  if [ -f "$dir/ended" ]; then\n'
         '    printf \'ended %s %s %s\\n\' "$id" "$job" "$(cat "$dir/ended")"\n'
@@ -299,8 +362,14 @@ def scan_script(models: NodeModels) -> str:
         "  fi\n"
         '  port="$(cat "$dir/port")"\n'
         '  read -r last seen < "$dir/use"\n'
-        '  if metrics="$(curl -fsS -m 5 "http://$addr:$port/metrics")"; then\n'
+        f'  if [ "$server" = {whisper} ]; then\n'
+        f"    {_COUNT_TRANSCRIPTIONS}\n"
+        '  elif metrics="$(curl -fsS -m 5 "http://$addr:$port/metrics")"; then\n'
         f'    counted="$(printf \'%s\\n\' "$metrics" | {_COUNT_USE})"\n'
+        "  else\n"
+        "    counted=''\n"
+        "  fi\n"
+        '  if [ -n "$counted" ]; then\n'
         '    total="${counted% *}"\n'
         '    busy="${counted#* }"\n'
         '    if [ "$total" != "$seen" ] || [ "$busy" != 0 ]; then\n'
@@ -311,8 +380,8 @@ def scan_script(models: NodeModels) -> str:
         "  idle=$((now - last))\n"
         f'  if [ "$idle" -ge {idle} ]; then\n'
         '    systemctl --user stop "$unit"\n'
-        f"    printf 'idle %s s with no request, past its {idle} s; llama-server stopped' \\\n"
-        '      "$idle" > "$dir/ended"\n'
+        f"    printf 'idle %s s with no request, past its {idle} s; %s stopped' \\\n"
+        '      "$idle" "$server" > "$dir/ended"\n'
         '    printf \'ended %s %s %s\\n\' "$id" "$job" "$(cat "$dir/ended")"\n'
         "  else\n"
         '    printf \'serving %s %s %s %s\\n\' "$id" "$job" "$port" "$idle"\n'

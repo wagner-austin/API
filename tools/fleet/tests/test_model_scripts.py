@@ -16,7 +16,7 @@ import subprocess
 
 import pytest
 
-from fleet.contracts.model_host import CatalogModel, ModelBackend, NodeModels
+from fleet.contracts.model_host import CatalogModel, ModelBackend, ModelServer, NodeModels
 from fleet.core.model_scripts import (
     HEALTH_SECONDS,
     forget_script,
@@ -31,6 +31,23 @@ JOB = "e33cfb0d-66bf-4ee2-9b7c-5110cc7328ee"
 OTHER_JOB = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa"
 ADDRESS = "100.111.149.33"
 UNIT = model_unit("ornith-1.5-9b")
+WHISPER = "whisper-large-v3-turbo"
+WHISPER_UNIT = model_unit(WHISPER)
+LLAMA_BINARY = "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server"
+WHISPER_BINARY = "/home/corvis/build/whisper.cpp-v1.9.5/build/bin/whisper-server"
+
+#: whisper-server's log on colossus as v1.9.5 wrote it, 2026-11-02, cut to
+#: the GPU lines and one transcription's.
+WHISPER_LOG = (
+    "whisper_init_with_params_no_state: flash attn = 1\n"
+    "whisper_backend_init_gpu: device 0: Vulkan0 (type: 1)\n"
+    "whisper_backend_init_gpu: found GPU device 0: Vulkan0 (type: 1, cnt: 0)\n"
+    "whisper_backend_init_gpu: using Vulkan0 backend\n"
+)
+TRANSCRIPTION = (
+    "operator(): processing 'utterance.wav' (34560 samples, 2.2 sec), 4 threads, 1 processors, "
+    "lang = en, task = transcribe, timestamps = 1 ...\n"
+)
 
 #: llama-server's ``/metrics`` with 13 prompt and 8 generated tokens counted.
 METRICS = (
@@ -102,7 +119,7 @@ class Node:
             encoding="utf-8",
         )
         self.models = NodeModels(
-            server="/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+            servers={ModelServer.LLAMA: LLAMA_BINARY, ModelServer.WHISPER: WHISPER_BINARY},
             backend=ModelBackend.VULKAN,
             cache=str(self.cache),
             first_port=8091,
@@ -122,6 +139,7 @@ class Node:
         (self.cache / "Ornith-1.5-9B-Q4_K_M.gguf").write_bytes(content)
         return CatalogModel(
             model_id="ornith-1.5-9b",
+            server=ModelServer.LLAMA,
             file="Ornith-1.5-9B-Q4_K_M.gguf",
             sha256=hashlib.sha256(content).hexdigest(),
             size_bytes=len(content),
@@ -130,24 +148,58 @@ class Node:
             backends=(ModelBackend.VULKAN,),
         )
 
+    def whisper(self) -> CatalogModel:
+        """Write the whisper model's file into the cache, with its log, and give its row.
+
+        Returns:
+            The row, whose size and digest are the file's.
+        """
+        content = b"ggml whisper large v3 turbo"
+        (self.cache / "ggml-large-v3-turbo.bin").write_bytes(content)
+        (self.state / "server-log").write_text(WHISPER_LOG, encoding="utf-8")
+        return CatalogModel(
+            model_id=WHISPER,
+            server=ModelServer.WHISPER,
+            file="ggml-large-v3-turbo.bin",
+            sha256=hashlib.sha256(content).hexdigest(),
+            size_bytes=len(content),
+            gpu_bytes=1932406784,
+            context_tokens=None,
+            backends=(ModelBackend.VULKAN,),
+        )
+
     @property
     def served(self) -> pathlib.Path:
-        """The model's state directory on the node."""
+        """The Ornith model's state directory on the node."""
         return self.home / ".fleet" / "models" / "ornith-1.5-9b"
 
-    def serve(self, *, port: int, job: str, use: str) -> None:
+    @property
+    def whisper_served(self) -> pathlib.Path:
+        """The whisper model's state directory on the node."""
+        return self.home / ".fleet" / "models" / WHISPER
+
+    def serve(
+        self, *, port: int, job: str, use: str, server: ModelServer = ModelServer.LLAMA
+    ) -> pathlib.Path:
         """Lay out a model already served, as a load leaves it.
 
         Args:
             port: Its port.
             job: Its load.
             use: Its ``use`` file's line.
+            server: Its server: Ornith's llama-server, or the whisper model's.
+
+        Returns:
+            Its state directory.
         """
-        self.served.mkdir(parents=True)
-        (self.served / "port").write_text(f"{port}\n", encoding="utf-8")
-        (self.served / "job").write_text(f"{job}\n", encoding="utf-8")
-        (self.served / "use").write_text(f"{use}\n", encoding="utf-8")
+        served = self.served if server is ModelServer.LLAMA else self.whisper_served
+        served.mkdir(parents=True)
+        (served / "port").write_text(f"{port}\n", encoding="utf-8")
+        (served / "server").write_text(f"{server}\n", encoding="utf-8")
+        (served / "job").write_text(f"{job}\n", encoding="utf-8")
+        (served / "use").write_text(f"{use}\n", encoding="utf-8")
         (self.state / "active").touch()
+        return served
 
     def flag(self, *names: str) -> None:
         """Set stand-in flags: ``starts``, ``healthy``, ``active`` or ``failed``.
@@ -194,6 +246,18 @@ class Node:
         log = self.state / f"{command}.log"
         return log.read_text(encoding="utf-8").splitlines() if log.exists() else []
 
+    def load(self, model: CatalogModel) -> subprocess.CompletedProcess[str]:
+        """Run a load of a model, with the node's binary of its server.
+
+        Args:
+            model: The catalog row.
+
+        Returns:
+            The finished run.
+        """
+        binary = self.models["servers"][model["server"]]
+        return self.run(load_script(models=self.models, model=model, job_id=JOB, binary=binary))
+
 
 def _uptime() -> int:
     """This host's ``/proc/uptime`` in whole seconds, as the scripts read it."""
@@ -212,7 +276,7 @@ class TestLoad:
     def test_an_absent_file_is_named_and_nothing_starts(self, node: Node) -> None:
         model = node.model()
         (node.cache / model["file"]).unlink()
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert (ran.returncode, ran.stdout) == (0, f"absent {node.cache}/{model['file']}\n")
         assert node.calls("systemd-run") == []
 
@@ -220,7 +284,7 @@ class TestLoad:
         model = node.model()
         expected = model.copy()
         expected["size_bytes"] = 99
-        ran = node.run(load_script(models=node.models, model=expected, job_id=JOB))
+        ran = node.load(expected)
         assert ran.stdout == f"size {model['size_bytes']}\n"
         assert node.calls("systemd-run") == []
 
@@ -228,7 +292,7 @@ class TestLoad:
         model = node.model(content=b"not the catalog's bytes")
         expected = model.copy()
         expected["sha256"] = hashlib.sha256(b"GGUF ornith 9b").hexdigest()
-        ran = node.run(load_script(models=node.models, model=expected, job_id=JOB))
+        ran = node.load(expected)
         assert ran.stdout == f"sha256 {model['sha256']}\n"
         assert node.calls("systemd-run") == []
 
@@ -242,21 +306,43 @@ class TestLoad:
         )
         node.flag("starts", "healthy", "failed")
         before = _uptime()
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert (ran.returncode, ran.stdout) == (0, f"loaded {ADDRESS} 8092 34/34\n"), ran.stderr
         [started] = node.calls("systemd-run")
         assert started.startswith(f"--user --quiet --unit={UNIT} --description=catalog model ")
         assert started.endswith(
-            f"-- {node.models['server']} -m {node.cache}/{model['file']} --host {ADDRESS} "
+            f"-- {LLAMA_BINARY} -m {node.cache}/{model['file']} --host {ADDRESS} "
             "--port 8092 -c 32768 -ngl 999 -fit off -fa on --jinja --metrics -lv 4"
         )
         assert f"StandardOutput=truncate:{node.served}/server.log" in started
         assert f"--user reset-failed {UNIT}" in node.calls("systemctl")
         assert (node.served / "port").read_text(encoding="utf-8") == "8092\n"
+        assert (node.served / "server").read_text(encoding="utf-8") == "llama-server\n"
         assert (node.served / "job").read_text(encoding="utf-8") == f"{JOB}\n"
         last, seen = (node.served / "use").read_text(encoding="utf-8").split()
         assert seen == "0"
         assert before <= int(last) <= _uptime()
+
+    def test_a_whisper_model_runs_in_whisper_server_and_names_its_gpu(self, node: Node) -> None:
+        model = node.whisper()
+        node.flag("starts", "healthy")
+        ran = node.load(model)
+        assert (ran.returncode, ran.stdout) == (0, f"loaded {ADDRESS} 8091 Vulkan0\n"), ran.stderr
+        [started] = node.calls("systemd-run")
+        assert started.startswith(f"--user --quiet --unit={WHISPER_UNIT} --description=catalog ")
+        assert started.endswith(
+            f"-- {WHISPER_BINARY} -m {node.cache}/ggml-large-v3-turbo.bin --host {ADDRESS} "
+            "--port 8091"
+        )
+        assert (node.whisper_served / "server").read_text(encoding="utf-8") == "whisper-server\n"
+
+    def test_a_whisper_server_that_found_no_gpu_reads_none(self, node: Node) -> None:
+        model = node.whisper()
+        (node.state / "server-log").write_text(
+            "whisper_backend_init_gpu: no GPU found\n", encoding="utf-8"
+        )
+        node.flag("starts", "healthy")
+        assert node.load(model).stdout == f"loaded {ADDRESS} 8091 none\n"
 
     def test_an_active_server_is_adopted_on_its_own_port(self, node: Node) -> None:
         model = node.model()
@@ -265,7 +351,7 @@ class TestLoad:
             "load_tensors: offloaded 34/34 layers to GPU\n", encoding="utf-8"
         )
         node.flag("healthy")
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert ran.stdout == f"loaded {ADDRESS} 8093 34/34\n"
         assert node.calls("systemd-run") == []
         assert (node.served / "job").read_text(encoding="utf-8") == f"{JOB}\n"
@@ -277,7 +363,7 @@ class TestLoad:
             "".join(f"LISTEN 0 512 *:{port} *:*\n" for port in range(8091, 8095)),
             encoding="utf-8",
         )
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert ran.stdout == "ports 8091-8094\n"
         assert node.calls("systemd-run") == []
 
@@ -288,13 +374,13 @@ class TestLoad:
         (node.state / "server-log").write_text(
             "load_model: loading\nggml_vulkan: device lost\n", encoding="utf-8"
         )
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert ran.stdout == "exited 1 ggml_vulkan: device lost\n"
 
     def test_a_server_that_never_answers_is_stopped(self, node: Node) -> None:
         model = node.model()
         node.flag("starts")
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert ran.stdout == f"unhealthy {HEALTH_SECONDS}\n"
         assert node.calls("systemctl")[-1] == f"--user stop {UNIT}"
         assert not (node.state / "active").exists()
@@ -303,7 +389,7 @@ class TestLoad:
         model = node.model()
         (node.state / "server-log").write_text("load_model: loading\n", encoding="utf-8")
         node.flag("starts", "healthy")
-        ran = node.run(load_script(models=node.models, model=model, job_id=JOB))
+        ran = node.load(model)
         assert ran.stdout == f"loaded {ADDRESS} 8091 none\n"
 
 
@@ -371,6 +457,35 @@ class TestScan:
         again = self._scan(node, idle_seconds=1)
         assert again.stdout == ran.stdout
         assert node.calls("systemctl").count(f"--user stop {UNIT}") == 1
+
+    def test_a_new_transcription_in_whisper_server_s_log_is_a_use(self, node: Node) -> None:
+        served = node.serve(port=8092, job=JOB, use="0 1", server=ModelServer.WHISPER)
+        (served / "server.log").write_text(WHISPER_LOG + TRANSCRIPTION * 2, encoding="utf-8")
+        ran = self._scan(node, idle_seconds=1800)
+        assert ran.stdout == f"serving {WHISPER} {JOB} 8092 0\n", ran.stderr
+        last, seen = (served / "use").read_text(encoding="utf-8").split()
+        assert seen == "2"
+        assert int(last) <= _uptime()
+
+    def test_whisper_server_with_no_new_transcription_past_the_span_is_stopped(
+        self, node: Node
+    ) -> None:
+        served = node.serve(port=8092, job=JOB, use="0 0", server=ModelServer.WHISPER)
+        (served / "server.log").write_text(WHISPER_LOG, encoding="utf-8")
+        ran = self._scan(node, idle_seconds=1)
+        prefix = f"ended {WHISPER} {JOB} idle "
+        assert ran.stdout.startswith(prefix)
+        assert ran.stdout.endswith(" s with no request, past its 1 s; whisper-server stopped\n")
+        assert node.calls("systemctl")[-1] == f"--user stop {WHISPER_UNIT}"
+        assert (served / "use").read_text(encoding="utf-8") == "0 0\n"
+
+    def test_a_whisper_server_that_exited_is_ended_naming_it(self, node: Node) -> None:
+        node.serve(port=8092, job=JOB, use="0 0", server=ModelServer.WHISPER)
+        (node.state / "active").unlink()
+        assert self._scan(node, idle_seconds=1800).stdout == (
+            f"ended {WHISPER} {JOB} whisper-server exited with status 1, result exit-code, "
+            "with no unload job\n"
+        )
 
     def test_metrics_that_do_not_answer_count_no_use(self, node: Node) -> None:
         node.serve(port=8091, job=JOB, use="0 0")

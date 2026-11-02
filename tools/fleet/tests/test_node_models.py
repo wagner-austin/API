@@ -15,6 +15,8 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli.node_models import MODEL_LEASE_SECONDS, idle_pass, models_pass
+from fleet.contracts.model_host import ModelServer
+from fleet.contracts.node import NodeConfig
 from fleet.core import _test_hooks
 from fleet.core.model_scripts import unload_script
 from fleet.core.queue_transport import answering
@@ -33,11 +35,23 @@ COLOSSUS = node(host="colossus", gpu=None, models=COLOSSUS_MODELS)
 JOB = "e33cfb0d-66bf-4ee2-9b7c-5110cc7328ee"
 ORNITH: JSONObject = {
     "id": "ornith-1.5-9b",
+    "server": "llama-server",
     "file": "Ornith-1.5-9B-Q4_K_M.gguf",
     "sha256": "70c112196e0b7023803c9762752e46d29e612a92c83f995bc3ba1ceb07e8fab6",
     "sizeBytes": 5780090816,
     "gpuBytes": 6499381248,
     "contextTokens": 32768,
+    "backends": ["vulkan"],
+}
+#: The catalog's whisper model, as fleet-mcp renders it (MCPs board task 228aa097).
+WHISPER: JSONObject = {
+    "id": "whisper-large-v3-turbo",
+    "server": "whisper-server",
+    "file": "ggml-large-v3-turbo.bin",
+    "sha256": "1fc70f774d38eb169993ac391eea357ef47c88757ef72ee5943879b7e8e2bc69",
+    "sizeBytes": 1624555275,
+    "gpuBytes": 1932406784,
+    "contextTokens": None,
     "backends": ["vulkan"],
 }
 FILE = "/home/corvis/models/Ornith-1.5-9B-Q4_K_M.gguf"
@@ -112,19 +126,36 @@ def _report(queue: FakeQueue, index: int) -> JSONObject:
     }
 
 
-def _pass(queue: FakeQueue, runner: FakeRun) -> tuple[str, ...]:
+def _pass(queue: FakeQueue, runner: FakeRun, on: NodeConfig = COLOSSUS) -> tuple[str, ...]:
     """Run colossus's models pass against the fakes.
 
     Args:
         queue: The queue.
         runner: The node.
+        on: Its declaration.
 
     Returns:
         The jobs it claimed.
     """
     _test_hooks.http_post = answering(queue)
     _test_hooks.run = runner
-    return models_pass(QUEUE_CREDENTIALS, RUNNER_IDENTITY, alias="colossus", node=COLOSSUS)
+    return models_pass(QUEUE_CREDENTIALS, RUNNER_IDENTITY, alias="colossus", node=on)
+
+
+def _whisper_claimed() -> list[str]:
+    """The queue's answers to a claim of a whisper model's load and its start.
+
+    Returns:
+        The claim's and the start's answers.
+    """
+    whisper: dict[str, str | JSONObject] = {
+        "project": "models/whisper-large-v3-turbo",
+        "model": WHISPER,
+    }
+    return [
+        dump_json_str({"claimed": _model_job("model-load", "claimed", **whisper)}),
+        dump_json_str({"job": _model_job("model-load", "running", node="colossus", **whisper)}),
+    ]
 
 
 class TestModelsPass:
@@ -203,6 +234,36 @@ class TestModelsPass:
             "MODEL_BACKEND: colossus serves models on vulkan, and ornith-1.5-9b is measured on "
             "cuda only"
         )
+        assert runner.calls == []
+
+    def test_a_whisper_model_is_served_by_the_node_s_whisper_server(self) -> None:
+        queue = FakeQueue([*_whisper_claimed(), _closed("model-load", "passed"), EMPTY])
+        runner = FakeRun([ok(""), ok("loaded 100.111.149.33 8092 Vulkan0\n")])
+        assert _pass(queue, runner) == (JOB,)
+        assert _report(queue, 1)["runId"] == "fleet-model-whisper-large-v3-turbo.service"
+        loaded = _report(queue, 2)
+        assert (loaded["action"], loaded["endpoint"]) == ("loaded", "http://100.111.149.33:8092")
+        assert str(loaded["detail"]).startswith(
+            "whisper-server serves whisper-large-v3-turbo (ggml-large-v3-turbo.bin"
+        )
+        whisper_binary = COLOSSUS_MODELS["servers"][ModelServer.WHISPER]
+        assert f"{whisper_binary} -m " in (runner.stdin[1] or b"").decode()
+
+    def test_a_server_the_node_has_not_built_is_refused_before_the_node_is_asked(self) -> None:
+        llama_only = COLOSSUS_MODELS.copy()
+        llama_only["servers"] = {ModelServer.LLAMA: COLOSSUS_MODELS["servers"][ModelServer.LLAMA]}
+        queue = FakeQueue([*_whisper_claimed(), _closed("model-load", "refused"), EMPTY])
+        runner = FakeRun([])
+        _pass(queue, runner, node(host="colossus", gpu=None, models=llama_only))
+        assert _report(queue, 2) == {
+            "action": "close",
+            "jobId": JOB,
+            "status": "refused",
+            "detail": (
+                "MODEL_SERVER_ABSENT: whisper-large-v3-turbo runs in whisper-server, which "
+                "colossus has not built; its machine file declares llama-server"
+            ),
+        }
         assert runner.calls == []
 
     def test_a_node_that_does_not_answer_refuses_the_load_with_its_fault(self) -> None:

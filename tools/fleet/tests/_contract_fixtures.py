@@ -8,7 +8,7 @@ from platform_core.json_utils import JSONValue
 
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.machine import LedgerObserver, Machine, MachineRole
-from fleet.contracts.model_host import ModelBackend, NodeModels
+from fleet.contracts.model_host import ModelBackend, ModelServer, NodeModels
 from fleet.contracts.node import NodeConfig, NodeGpu, decode_node_config
 
 BUDGET: Final = NodeBudget(
@@ -29,9 +29,12 @@ GPU: Final = NodeGpu(
 
 
 #: colossus's model declaration, as its machine file carries it (MCPs board
-#: task b9235198).
+#: tasks b9235198 and 228aa097).
 COLOSSUS_MODELS: Final = NodeModels(
-    server="/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+    servers={
+        ModelServer.LLAMA: "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+        ModelServer.WHISPER: "/home/corvis/build/whisper.cpp-v1.9.5/build/bin/whisper-server",
+    },
     backend=ModelBackend.VULKAN,
     cache="/home/corvis/models",
     first_port=8091,

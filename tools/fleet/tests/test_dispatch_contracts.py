@@ -297,6 +297,7 @@ class TestMalformedAnswers:
             model: JSONValue = (
                 {
                     "id": "ornith-1.5-9b",
+                    "server": "llama-server",
                     "file": "Ornith-1.5-9B-Q4_K_M.gguf",
                     "sha256": "70c112196e0b7023803c9762752e46d29e612a92c83f995bc3ba1ceb07e8fab6",
                     "sizeBytes": 5780090816,
