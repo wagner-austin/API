@@ -4,6 +4,9 @@ tags: [wrds, crsp, qualification, missingness]
 hubs: [libs]
 related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_comparison.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
@@ -19,6 +22,9 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py": "2dc5d21a784e30c843e5e3857a615e03751f1141"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "b10994304c31e020bab370b7eb0f6fe2fd948b39"
+  "libs/covenant_ml/tests/markets/test_crsp_comparison.py": "eb978fb83e99e545de690e98d38f8f3e070bad96"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
@@ -134,6 +140,15 @@ final scope or altering an individual bound is refused before SQL is returned.
 This hardens future query admission; it supplies no missing outcome and does
 not establish that a previous extraction crossed its boundary.[^query-scope]
 
+The comparison algorithm shares natural-key definitions with the source
+decoder. It accounts separately for unchanged, added, removed and changed
+rows; edits to key fields become a removal and an addition. It rejects
+duplicate keys on either side, ignores input ordering and preserves null
+versus zero and exact decoded numeric differences. The function performs no
+I/O and returns licensed row details for private evaluator use. Its regression
+cases cover all four relations. This algorithm does not yet constitute a
+native fresh-source comparison or resolve any of the 27 refusals.[^comparison]
+
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
 [^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
@@ -143,3 +158,4 @@ not establish that a previous extraction crossed its boundary.[^query-scope]
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting valuation predicate; `crsp_partition.py`, `check_crsp_partition`, dated-field checks.
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner" and § "Admission is not permission to fit this subset".
 [^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
+[^comparison]: `libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py`, `compare_crsp_rows` and `_indexed`; `libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py`, `crsp_row_key` and `_key`; `libs/covenant_ml/tests/markets/test_crsp_comparison.py`, mixed accounting, key edits, null/numeric changes, duplicate and empty-input cases.
