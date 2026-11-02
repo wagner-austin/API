@@ -216,7 +216,8 @@ class TestGpuFreeBytes:
     def test_a_node_whose_gpus_hold_no_memory_counter_is_a_fault(self) -> None:
         unbound = "gpu_0=0000:01:00.0\t0x10de\t\t\t\t\tRTX A2000\ngpu_count=1\n"
         _test_hooks.run = FakeRun([ok(""), ok(unbound)])
-        with pytest.raises(AppError, match="colossus read 1 GPU[(]s[)] and no GPU memory counter"):
+        refusal = "colossus read 1 GPU[(]s[)] and no GPU memory counter"
+        with pytest.raises(AppError, match=refusal):
             gpu_free_bytes(COLOSSUS)
 
 

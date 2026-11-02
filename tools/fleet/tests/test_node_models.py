@@ -255,7 +255,8 @@ class TestModelsPass:
         closed = _report(queue, 2)
         assert (closed["status"], closed["detail"]) == (
             "refused",
-            "DISPATCH_FAILED: colossus reported gpu_count='two', which is not a whole number of GPUs",
+            "DISPATCH_FAILED: colossus reported gpu_count='two', "
+            "which is not a whole number of GPUs",
         )
 
     def test_an_unload_the_node_did_not_answer_is_refused(self) -> None:
