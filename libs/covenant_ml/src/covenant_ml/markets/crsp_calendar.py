@@ -192,14 +192,65 @@ def require_crsp_execution_price(row: JSONObject, protocol: CrspProtocol) -> flo
     return price
 
 
-def crsp_terminal_value(row: JSONObject) -> tuple[str, float]:
-    """Return the terminal valuation date and multiplier, never an actual cash date.
+class TerminalResolution(NamedTuple):
+    """A delisting record's valuation, or why the vendor's record cannot value it.
+
+    Attributes:
+        valued: Conservative recorded valuation date.
+        multiplier: One plus the delisting return; meaningless when refused.
+        refusal: None for a valued record, else a short reason: ``delisting
+            <DelRetMissType>`` when the vendor flags the return missing,
+            ``delisting value out of range`` or ``delisting chronology``.
+    """
+
+    valued: str
+    multiplier: float
+    refusal: str | None
+
+
+def crsp_resolve_terminal(row: JSONObject) -> TerminalResolution:
+    """Value a delisting record, reporting rather than raising an unresolved one.
 
     ``dated-value-next-rebalance`` marks the terminal receivable on the latest of
     DelDlyDt, DelAmtDt and a present DelNextDt. It becomes modeled reinvestable
-    value at the next scheduled rebalance strictly after that date. The evaluator
-    must refuse an outcome whose required value is dated after its scoring exit.
-    This is a retrospective settlement assumption, not observed cash receipt.
+    value at the next scheduled rebalance strictly after that date. This is a
+    retrospective settlement assumption, not observed cash receipt. A return
+    the vendor flags missing is never read, so its null DelRet is no error.
+
+    Args:
+        row: Complete stkdelists record. DelAmtDt is required; DelNextDt is nullable.
+
+    Returns:
+        The valuation, or the reason it is unresolved.
+
+    Raises:
+        ValueError: CRSP-005 when DelNextDt is absent rather than null.
+        TypeError: Missing or malformed fields, including missing DelAmtDt.
+    """
+    event = require_day(row, "delistingdt")
+    stored = require_day(row, "deldlydt")
+    amount = require_day(row, "delamtdt")
+    dates = [stored, amount]
+    if "delnextdt" not in row:
+        raise ValueError("[CRSP-005] require an explicit nullable next-price date")
+    if row["delnextdt"] is not None:
+        dates.append(require_day(row, "delnextdt"))
+    flag = require_str(row, "delretmisstype")
+    if flag != "NA":
+        return TerminalResolution(max(dates), 1.0, f"delisting {flag}")
+    value = require_float(row, "delret")
+    if not isfinite(value) or value < -1:
+        return TerminalResolution(max(dates), 1.0, "delisting value out of range")
+    if stored <= event or any(day < event for day in dates):
+        return TerminalResolution(max(dates), 1.0, "delisting chronology")
+    return TerminalResolution(max(dates), 1 + value, None)
+
+
+def crsp_terminal_value(row: JSONObject) -> tuple[str, float]:
+    """Return the terminal valuation date and multiplier, never an actual cash date.
+
+    The valuation is :func:`crsp_resolve_terminal`'s. The evaluator must refuse
+    an outcome whose required value is dated after its scoring exit.
 
     Args:
         row: Complete stkdelists record. DelAmtDt is required; DelNextDt is nullable.
@@ -211,21 +262,10 @@ def crsp_terminal_value(row: JSONObject) -> tuple[str, float]:
         ValueError: CRSP-005 for unresolved value, inconsistent chronology or flags.
         TypeError: Missing or malformed fields, including missing DelAmtDt.
     """
-    event = require_day(row, "delistingdt")
-    stored = require_day(row, "deldlydt")
-    amount = require_day(row, "delamtdt")
-    value = require_float(row, "delret")
-    dates = [stored, amount]
-    if "delnextdt" not in row:
-        raise ValueError("[CRSP-005] require an explicit nullable next-price date")
-    if row["delnextdt"] is not None:
-        dates.append(require_day(row, "delnextdt"))
-    if (
-        require_str(row, "delretmisstype") != "NA"
-        or not isfinite(value)
-        or value < -1
-        or stored <= event
-        or any(day < event for day in dates)
-    ):
-        raise ValueError("[CRSP-005] terminal return or valuation chronology is unresolved")
-    return max(dates), 1 + value
+    resolution = crsp_resolve_terminal(row)
+    if resolution.refusal is not None:
+        raise ValueError(
+            f"[CRSP-005] terminal return or valuation chronology is unresolved: "
+            f"{resolution.refusal}"
+        )
+    return resolution.valued, resolution.multiplier

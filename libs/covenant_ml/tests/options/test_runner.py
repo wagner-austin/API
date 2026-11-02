@@ -110,6 +110,7 @@ def test_a_run_publishes_its_manifest_and_record(tmp_path: Path) -> None:
     assert manifest["code_sha256"] == "c" * 64
     counts = decode_path_counts(manifest["paths"])
     assert (counts["decisions"], counts["terminal_contracts"]) == (36, 1)
+    assert counts["excluded"] == {}
     (encoded,) = require_list(manifest, "results")
     result = decode_study_result(encoded)
     assert result["contracts"] == counts["contracts"]

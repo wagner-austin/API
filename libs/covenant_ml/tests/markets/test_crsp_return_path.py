@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date, timedelta
 from math import prod
 from pathlib import Path
@@ -17,7 +18,11 @@ from covenant_ml.markets.crsp_holdings import (
     index_crsp_outcomes,
 )
 from covenant_ml.markets.crsp_panel import build_crsp_panel
-from covenant_ml.markets.crsp_return_path import crsp_compound_held
+from covenant_ml.markets.crsp_return_path import (
+    crsp_compound_held,
+    crsp_held_spans,
+    crsp_resolve_held,
+)
 from covenant_ml.markets.crsp_study import crsp_study_rows
 
 from ._crsp_fixtures import write_sources
@@ -174,6 +179,47 @@ def test_unsupported_long_gap_is_not_accepted_as_an_arbitrary_vendor_span() -> N
     records[(1, days[-1])] = daily(1, W1.entry, 0.2, dlyretdurflg="P10")
     with pytest.raises(ValueError, match="CRSP-009"):
         crsp_compound_held(records, 1, "2020-06-01", days)
+
+
+FLAGGED_ENTRY = "2020-06-01"
+FLAGGED_DAYS = ("2020-06-02", "2020-06-03")
+
+
+@pytest.mark.parametrize(
+    ("records", "reason", "code"),
+    [
+        (
+            {
+                (1, FLAGGED_DAYS[0]): daily(
+                    1, W1.entry, 0.1, dlyprevdt=FLAGGED_ENTRY, dlyretmissflg="MV"
+                )
+            },
+            "span MV/DU",
+            "CRSP-009",
+        ),
+        (
+            {
+                (1, FLAGGED_DAYS[0]): missing(FLAGGED_DAYS[0]),
+                (1, FLAGGED_DAYS[1]): daily(1, W1.entry, 0.1, dlyprevdt=FLAGGED_ENTRY),
+            },
+            "span NA/DU after a price gap",
+            "CRSP-009",
+        ),
+        ({}, "absent row", "CRSP-009"),
+        ({(1, FLAGGED_DAYS[0]): missing(FLAGGED_DAYS[0])}, "price gap tail", "CRSP-011"),
+    ],
+)
+def test_resolution_names_its_first_refusal_and_keeps_no_partial_span(
+    records: dict[tuple[int, str], JSONObject], reason: str, code: str
+) -> None:
+    days = FLAGGED_DAYS[: max(1, len(records))]
+    resolution = crsp_resolve_held(records, 1, FLAGGED_ENTRY, days)
+    assert resolution.spans == ()
+    assert resolution.refusal is not None
+    assert resolution.refusal.reason == reason
+    assert resolution.refusal.message.startswith(f"[{code}] held return for 1 ")
+    with pytest.raises(ValueError, match=re.escape(resolution.refusal.message)):
+        crsp_held_spans(records, 1, FLAGGED_ENTRY, days)
 
 
 def test_two_separate_gaps_do_not_accumulate_or_double_count_their_returns() -> None:

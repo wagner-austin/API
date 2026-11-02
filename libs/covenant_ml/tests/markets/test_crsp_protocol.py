@@ -12,6 +12,7 @@ from platform_core.json_utils import JSONObject, JSONValue, require_list
 from covenant_ml.markets.crsp_calendar import (
     CrspWindow,
     crsp_member_on,
+    crsp_resolve_terminal,
     crsp_terminal_value,
     crsp_windows,
     require_crsp_execution_price,
@@ -262,20 +263,30 @@ def test_terminal_value_uses_dated_amount_and_returns_one_multiplier() -> None:
 
 
 @pytest.mark.parametrize(
-    ("key", "value"),
+    ("changes", "reason"),
     [
-        ("delretmisstype", "DM"),
-        ("delret", nan),
-        ("delret", -1.1),
-        ("deldlydt", "2024-01-05"),
-        ("delamtdt", "2024-01-04"),
+        ({"delretmisstype": "DM"}, "delisting DM"),
+        ({"delretmisstype": "DM", "delret": None}, "delisting DM"),
+        ({"delret": nan}, "delisting value out of range"),
+        ({"delret": -1.1}, "delisting value out of range"),
+        ({"deldlydt": "2024-01-05"}, "delisting chronology"),
+        ({"delamtdt": "2024-01-04"}, "delisting chronology"),
     ],
 )
-def test_unresolved_terminal_value_fails(key: str, value: JSONValue) -> None:
+def test_unresolved_terminal_value_names_its_reason_and_fails(
+    changes: JSONObject, reason: str
+) -> None:
     row = terminal_document()
-    row[key] = value
-    with pytest.raises(ValueError, match="CRSP-005"):
+    row.update(changes)
+    resolution = crsp_resolve_terminal(row)
+    assert (resolution.multiplier, resolution.refusal) == (1.0, reason)
+    with pytest.raises(ValueError, match=f"CRSP-005.*: {reason}$"):
         crsp_terminal_value(row)
+
+
+def test_a_resolved_terminal_value_has_no_refusal() -> None:
+    resolution = crsp_resolve_terminal(terminal_document())
+    assert resolution == ("2024-01-15", 0.6, None)
 
 
 def test_terminal_dates_are_required_not_imputed() -> None:
