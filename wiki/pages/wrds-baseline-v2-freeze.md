@@ -40,6 +40,8 @@ Intervals remain descriptive and do not choose the winner.[^rank][^freeze]
 
 ## Explicit amendments
 
+The frozen amendment records these changes from the stopped study.[^freeze]
+
 | Item | New frozen value and reason |
 |---|---|
 | Accounting rules | Protocol version 2: rejected entry orders retain cash and costs follow actual traded notional. |
