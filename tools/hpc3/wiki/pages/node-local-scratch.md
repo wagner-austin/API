@@ -13,7 +13,7 @@ source_paths:
   - "src/hpc3/core/image_build.py"
 source_git_blobs:
   "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
-  "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
+  "src/hpc3/core/sbatch.py": "bf884f896e0eaaeafd595a034030368467f04026"
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
   "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
   "src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
@@ -113,8 +113,9 @@ its 600-second controller timeout in `FhgfsOps_revalidateIntent`. An exact-image
 diagnostic without that bind and with `--no-mount bind-paths` printed Python
 3.11.16. After `/pub` responded again, unchanged canonical preflight passed and
 job `58747974` completed. The diagnostic did not replace the job's frozen
-configuration. Task `0a0e5913` tracks explicit mount ownership; these observations
-do not establish a storage-server cause or permanent recovery.[^mounts]
+configuration. [[declared-image-mounts]] records the subsequent explicit mount
+implementation and native home/shared probes. These observations do not
+establish a storage-server cause or permanent recovery.[^mounts]
 
 ## The October 28 recurrence and image-build mitigation
 
