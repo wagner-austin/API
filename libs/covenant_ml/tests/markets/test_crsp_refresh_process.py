@@ -161,7 +161,7 @@ def test_real_refresh_process_captures_and_encrypts_client_output(tmp_path: Path
             "exec sleep 30\n",
             1,
             2_000_000,
-            f"subprocess.TimeoutExpired: Command '{PSQL}' timed out after 1 seconds",
+            f"subprocess.TimeoutExpired: Command '{PSQL}'",
         ),
     ],
 )
@@ -172,7 +172,16 @@ def test_real_client_failures_remove_authenticated_plaintext_without_leaking_sql
     result = _run(case, body, seconds, max_bytes)
     assert result.returncode == 1
     assert result.stdout == ""
-    assert result.stderr.splitlines()[-1] == error
+    failure = result.stderr.splitlines()[-1]
+    if seconds == 1:
+        command, separator, deadline = failure.partition(" timed out after ")
+        assert command == error
+        assert separator == " timed out after "
+        duration, unit = deadline.split()
+        assert unit == "seconds"
+        assert 0 < float(duration) <= seconds
+    else:
+        assert failure == error
     assert "private SQL" not in result.stderr
     assert list(case.cohort.extraction.scratch.iterdir()) == []
     assert list((tmp_path / "native-output").iterdir()) == []
