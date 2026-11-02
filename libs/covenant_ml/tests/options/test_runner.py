@@ -118,14 +118,15 @@ def test_a_run_publishes_its_manifest_and_record(tmp_path: Path) -> None:
     record = decode_run_record(load_json_str(record_path.read_text()))
     assert record["experiment"] == EXPERIMENT
     assert record["label"] == request_digest(request)[:12]
+    # The shared record keeps observations in name order.
     names = [observation["name"] for observation in record["observations"]]
     assert names == [
-        "simulated_value",
-        "realized_policy_mean",
-        "realized_hold_mean",
         "difference",
-        "difference.ci_low",
         "difference.ci_high",
+        "difference.ci_low",
+        "realized_hold_mean",
+        "realized_policy_mean",
+        "simulated_value",
     ]
     assert not [path for path in tmp_path.iterdir() if path.name.startswith("research-plaintext-")]
 
