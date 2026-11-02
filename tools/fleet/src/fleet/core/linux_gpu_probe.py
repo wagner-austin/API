@@ -61,7 +61,7 @@ _SMI_ROW = (
 #: of it. Told apart by name, so an empty first file cannot make the second
 #: read as capacity.
 _DMEM_ROW = (
-    "awk -v r=\"drm/$address/vram\" 'index($1, r) != 1 { next } "
+    'awk -v r="drm/$address/vram" \'index($1, r) != 1 { next } '
     "FILENAME == ARGV[1] { total += $2; seen = 1; next } { used += $2 } "
     'END { if (seen) printf "dmem\\t%.0f\\t%.0f\\n", total, total - used }\' '
     '"$dmem/dmem.capacity" "$dmem/dmem.current"'
@@ -83,7 +83,7 @@ GPU_PROBE_PART: Final = (
     + "  driver=''\n"
     + '  if [ -e "$device/driver" ]; then '
     + 'driver="$(basename "$(readlink -f "$device/driver")")"; fi\n'
-    + f"  row=\"$(printf '%s\\n' \"$smi\" | {_SMI_ROW})\"\n"
+    + f'  row="$(printf \'%s\\n\' "$smi" | {_SMI_ROW})"\n'
     + '  if [ -z "$row" ] && [ -r "$dmem/dmem.capacity" ]; then\n'
     + f'    row="$({_DMEM_ROW})"\n'
     + "  fi\n"
@@ -95,7 +95,7 @@ GPU_PROBE_PART: Final = (
     + "  fi\n"
     + '  if [ -z "$name" ]; then '
     + 'name="$(lspci -mm -s "$address" | awk -F\'"\' \'{ print $6 }\')"; fi\n'
-    + "  printf 'gpu_%s=%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$gpus\" \"$address\" \"$vendor\" "
+    + '  printf \'gpu_%s=%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\' "$gpus" "$address" "$vendor" '
     + '"$driver" "$source" "$total" "$free" "$name"\n'
     + "  gpus=$((gpus + 1))\n"
     + "done\n"

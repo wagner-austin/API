@@ -17,7 +17,6 @@ import pytest
 from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.core import probe
 from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION
-from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
     CHECK_QUOTA_LINE,
@@ -29,6 +28,7 @@ from fleet.core.linux_capacity_probe import (
     RESERVATIONS_LINE,
     RESERVATIONS_PART,
 )
+from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
 from tests.test_dialect_linux import fields_of
 
 #: diphtheria's MemAvailable at 22:1xZ on 2026-09-29, in kB as /proc/meminfo prints it.
