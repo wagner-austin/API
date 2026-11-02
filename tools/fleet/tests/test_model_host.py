@@ -86,9 +86,14 @@ class TestNodeModels:
             decode_node_models({**COLOSSUS_MODELS, "first_port": first, "last_port": last})
 
     def test_sixteen_ports_are_admitted(self) -> None:
-        decoded = decode_node_models({**COLOSSUS_MODELS, "last_port": 8106})
-        assert decoded is not None
-        assert decoded["last_port"] == 8106
+        assert decode_node_models({**COLOSSUS_MODELS, "last_port": 8106}) == NodeModels(
+            server="/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+            backend=ModelBackend.VULKAN,
+            cache="/home/corvis/models",
+            first_port=8091,
+            last_port=8106,
+            idle_seconds=1800,
+        )
 
     def test_an_idle_span_that_is_not_positive_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="idle_seconds must be positive, got 0"):

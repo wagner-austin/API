@@ -13,7 +13,7 @@ from fleet.contracts.dispatch import (
     decode_listing,
     encode_job_line,
 )
-from fleet.contracts.model_host import ModelBackend
+from fleet.contracts.model_host import CatalogModel, ModelBackend
 from tests._queue_fakes import queue_job
 
 #: The catalog row the queue hands a model job's runner, as fleet-mcp renders it.
@@ -63,14 +63,16 @@ def test_a_listing_with_model_jobs_decodes_every_row_and_names_each_model() -> N
         DispatchCommand.MODEL_UNLOAD,
     )
     assert rows[0]["model"] is None
-    assert rows[1]["model"] == rows[2]["model"]
-    loaded = rows[1]["model"]
-    assert loaded is not None
-    assert (loaded["model_id"], loaded["gpu_bytes"], loaded["backends"]) == (
-        "glimmer-30b",
-        17016778752,
-        (ModelBackend.VULKAN,),
+    glimmer = CatalogModel(
+        model_id="glimmer-30b",
+        file="Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+        sha256="4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+        size_bytes=16756683904,
+        gpu_bytes=17016778752,
+        context_tokens=32768,
+        backends=(ModelBackend.VULKAN,),
     )
+    assert (rows[1]["model"], rows[2]["model"]) == (glimmer, glimmer)
     assert encode_job_line(rows[1]) == (
         "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa passed model-load models/glimmer-30b @colossus"
     )

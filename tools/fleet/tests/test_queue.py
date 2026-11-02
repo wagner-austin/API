@@ -157,6 +157,7 @@ class TestClaim:
             "claimed_unix": None,
             "lease_expires_unix": None,
             "research_request": None,
+            "model": None,
         }
         assert endpoint.tools == ["dispatch_claim"]
         assert endpoint.arguments[0] == {
