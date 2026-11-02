@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import pytest
@@ -18,7 +19,8 @@ from covenant_ml.options.crsp_paths import (
     encode_path_counts,
     realized_contracts,
 )
-from covenant_ml.options.types import ERR_MONTHS, ERR_PATH_SHAPE, AsianPutContract
+from covenant_ml.options.rates import RateObservation
+from covenant_ml.options.types import ERR_PATH_SHAPE, ERR_RATE, AsianPutContract
 
 from ..markets._crsp_fixtures import write_sources
 from ..markets._crsp_study_fixtures import (
@@ -52,9 +54,9 @@ def _return(rows: dict[str, list[JSONObject]], permno: int, day: str) -> float:
     return require_float(row, "dlyret")
 
 
-def _rates() -> dict[int, float]:
-    """A carry rate for every month the decisions can fall in."""
-    return {crsp_month(f"2019-{month:02d}-01"): 0.01 * month for month in range(1, 13)}
+def _rates() -> tuple[RateObservation, ...]:
+    """A month-start yield of ``month`` percent through 2019."""
+    return tuple(RateObservation(f"2019-{month:02d}-01", float(month)) for month in range(1, 13))
 
 
 def test_ordinary_sessions_carry_their_own_returns(tmp_path: Path) -> None:
@@ -62,7 +64,8 @@ def test_ordinary_sessions_carry_their_own_returns(tmp_path: Path) -> None:
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-01-02", "2019-01-03", "2019-01-04")
     path = contract_path(outcomes, 1, "2019-01-01", days)
-    assert listed(path.returns) == pytest.approx([_return(rows, 1, day) for day in days])
+    expected: list[float] = [_return(rows, 1, day) for day in days]
+    assert listed(path.returns) == pytest.approx(expected)
     assert (path.gap_sessions, path.terminal) == (0, False)
 
 
@@ -74,7 +77,8 @@ def test_a_missing_price_span_is_carried_flat_and_closed_once(tmp_path: Path) ->
     assert [index for index, _ in spans] == [1, 2]
     path = contract_path(outcomes, 7, "2019-03-08", days)
     closed = _return(rows, 7, "2019-03-12")
-    assert listed(path.returns) == pytest.approx([0.0, closed, _return(rows, 7, "2019-03-13")])
+    expected: list[float] = [0.0, closed, _return(rows, 7, "2019-03-13")]
+    assert listed(path.returns) == pytest.approx(expected)
     assert (path.gap_sessions, path.terminal) == (1, False)
     growth = crsp_compound_held(outcomes.returns, 7, "2019-03-08", days)
     assert growth == pytest.approx((1 + closed) * (1 + _return(rows, 7, "2019-03-13")))
@@ -85,9 +89,10 @@ def test_a_delisting_applies_its_terminal_value_once_and_holds_it(tmp_path: Path
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-03-13", "2019-03-14", "2019-03-15", "2019-03-18", "2019-03-19")
     path = contract_path(outcomes, DELISTED, "2019-03-12", days)
-    expected = [_return(rows, DELISTED, "2019-03-13"), _return(rows, DELISTED, "2019-03-14")]
+    held = [_return(rows, DELISTED, "2019-03-13"), _return(rows, DELISTED, "2019-03-14")]
     # The daily copy on 2019-03-15 carries +30% and is never read.
-    assert listed(path.returns) == pytest.approx([*expected, -0.25, 0.0, 0.0])
+    expected: list[float] = [*held, -0.25, 0.0, 0.0]
+    assert listed(path.returns) == pytest.approx(expected)
     assert (path.gap_sessions, path.terminal) == (0, True)
 
 
@@ -97,7 +102,8 @@ def test_a_delisting_on_the_last_session_ends_nothing_early(tmp_path: Path) -> N
     days = ("2019-03-13", "2019-03-14")
     path = contract_path(outcomes, DELISTED, "2019-03-12", days)
     assert path.terminal is False
-    assert listed(path.returns) == pytest.approx([_return(rows, DELISTED, day) for day in days])
+    expected: list[float] = [_return(rows, DELISTED, day) for day in days]
+    assert listed(path.returns) == pytest.approx(expected)
 
 
 def test_two_delistings_inside_one_life_are_refused(tmp_path: Path) -> None:
@@ -120,7 +126,7 @@ def test_contracts_follow_the_panel_and_count_their_assumptions(tmp_path: Path) 
     assert counts["terminal_contracts"] == 1
     assert (counts["gap_contracts"], counts["gap_sessions"]) == (0, 0)
     assert int(contracts.months.flat[0]) == crsp_month("2019-01-31")
-    assert float(contracts.carry_rates.flat[0]) == pytest.approx(0.01)
+    assert float(contracts.carry_rates.flat[0]) == pytest.approx(math.log(1.01))
     assert DELISTED in {int(value) for value in contracts.securities.flat}
 
 
@@ -131,11 +137,9 @@ def test_a_gap_inside_a_contract_is_counted(tmp_path: Path) -> None:
     assert (counts["gap_contracts"], counts["gap_sessions"]) == (1, 1)
 
 
-def test_a_month_without_a_rate_is_refused(tmp_path: Path) -> None:
-    rates = _rates()
-    del rates[crsp_month("2019-03-01")]
-    with pytest.raises(ValueError, match=ERR_MONTHS):
-        realized_contracts(_sources(tmp_path, study_rows()), FIRST, LAST, MONTHLY, rates)
+def test_a_decision_before_any_rate_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match=ERR_RATE):
+        realized_contracts(_sources(tmp_path, study_rows()), FIRST, LAST, MONTHLY, _rates()[2:])
 
 
 def test_a_contract_that_outlives_the_sources_is_refused(tmp_path: Path) -> None:
