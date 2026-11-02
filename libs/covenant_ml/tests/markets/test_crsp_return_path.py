@@ -126,7 +126,7 @@ def test_gap_closure_rejects_unknown_values_overlaps_and_wrong_spans(
 
 def test_absent_row_is_not_a_vendor_missing_price_observation() -> None:
     rows = bridged_rows()
-    with pytest.raises(ValueError, match="CRSP-009.*absent"):
+    with pytest.raises(ValueError, match=r"CRSP-009.*absent"):
         crsp_window_path(outcomes([rows[0], rows[2]], []), 1, W1)
 
 
