@@ -22,6 +22,7 @@ from __future__ import annotations
 import csv
 import io
 import pathlib
+from typing import NamedTuple
 
 from platform_core.json_utils import dump_json_str
 
@@ -35,15 +36,46 @@ from hpc3.contracts.wrds_sql import psql_argv
 from hpc3.core import _test_hooks, artifacts, wrds_grid
 from hpc3.core.wrds_sql import quote_identifier
 
-#: The readable volatility-surface relations, as ``(library, relation)``.
-VOLATILITY_SURFACES: tuple[tuple[str, str], ...] = (
-    ("optionmsamp_us", "vsurfd2014"),
-    ("omtrial", "vsurfd2014"),
-    ("omtrial", "volatility_surface_2013"),
+
+class Surface(NamedTuple):
+    """One volatility-surface relation and the columns its schema names.
+
+    Attributes:
+        library: Schema.
+        relation: Table or view.
+        security: The security identifier column.
+        put_flag: The call/put flag column, whose put value is ``P``.
+    """
+
+    library: str
+    relation: str
+    security: str
+    put_flag: str
+
+
+#: The readable volatility-surface relations. The 2013 trial view names its
+#: columns differently from the IvyDB ``vsurfd`` layout, as read from
+#: ``information_schema.columns`` on 2026-11-02.
+VOLATILITY_SURFACES: tuple[Surface, ...] = (
+    Surface("optionmsamp_us", "vsurfd2014", "secid", "cp_flag"),
+    Surface("omtrial", "vsurfd2014", "secid", "cp_flag"),
+    Surface("omtrial", "volatility_surface_2013", "securityid", "callput"),
 )
 
 #: The surface point a one-year at-the-money put calibration reads.
-SLICE = "days = 365 AND delta = -50 AND cp_flag = 'P'"
+SLICE = "days = 365 AND delta = -50 AND <put flag> = 'P'"
+
+
+def surface_slice(surface: Surface) -> str:
+    """Write :data:`SLICE` for one relation's put-flag column.
+
+    Args:
+        surface: The relation.
+
+    Returns:
+        The SQL condition.
+    """
+    return f"days = 365 AND delta = -50 AND {quote_identifier(surface.put_flag)} = 'P'"
 
 
 def _literal(text: str) -> str:
@@ -58,11 +90,31 @@ def _literal(text: str) -> str:
     return "'" + text.replace("'", "''") + "'"
 
 
-def coverage_query(surfaces: tuple[tuple[str, str], ...]) -> str:
+def _select(surface: Surface) -> str:
+    """Write one relation's aggregate line.
+
+    Args:
+        surface: The relation and its column names.
+
+    Returns:
+        A SELECT of counts and bounding dates, overall and within the slice.
+    """
+    security = quote_identifier(surface.security)
+    condition = surface_slice(surface)
+    return (
+        f"SELECT {_literal(surface.library)}, {_literal(surface.relation)}, count(*), "
+        f"count(DISTINCT {security}), min(date)::text, max(date)::text, "
+        f"count(*) FILTER (WHERE {condition}), "
+        f"count(DISTINCT {security}) FILTER (WHERE {condition}) "
+        f"FROM {quote_identifier(surface.library)}.{quote_identifier(surface.relation)}"
+    )
+
+
+def coverage_query(surfaces: tuple[Surface, ...]) -> str:
     """Write the aggregates-only coverage query.
 
     Args:
-        surfaces: ``(library, relation)`` pairs, at least one.
+        surfaces: Relations with their column names, at least one.
 
     Returns:
         The psql script: one read-only transaction copying one CSV line per
@@ -73,13 +125,7 @@ def coverage_query(surfaces: tuple[tuple[str, str], ...]) -> str:
     """
     if not surfaces:
         raise ValueError("WRDS_COVERAGE_EMPTY: name at least one relation")
-    selects = [
-        f"SELECT {_literal(library)}, {_literal(relation)}, count(*), count(DISTINCT secid), "
-        "min(date)::text, max(date)::text, "
-        f"count(*) FILTER (WHERE {SLICE}), count(DISTINCT secid) FILTER (WHERE {SLICE}) "
-        f"FROM {quote_identifier(library)}.{quote_identifier(relation)}"
-        for library, relation in surfaces
-    ]
+    selects = [_select(surface) for surface in surfaces]
     return (
         "BEGIN READ ONLY;\n"
         "SET LOCAL statement_timeout = '1800s';\n"
@@ -88,7 +134,7 @@ def coverage_query(surfaces: tuple[tuple[str, str], ...]) -> str:
     )
 
 
-def read_coverage(text: str, surfaces: tuple[tuple[str, str], ...]) -> list[CoverageRow]:
+def read_coverage(text: str, surfaces: tuple[Surface, ...]) -> list[CoverageRow]:
     """Decode the job's CSV and require exactly the relations asked for.
 
     Args:
@@ -104,8 +150,9 @@ def read_coverage(text: str, surfaces: tuple[tuple[str, str], ...]) -> list[Cove
     """
     rows = [decode_coverage_row(fields) for fields in csv.reader(io.StringIO(text, newline=""))]
     named = [(row["library"], row["relation"]) for row in rows]
-    if named != list(surfaces):
-        raise ValueError(f"WRDS_COVERAGE_RELATIONS: expected {list(surfaces)}, got {named}")
+    expected = [(surface.library, surface.relation) for surface in surfaces]
+    if named != expected:
+        raise ValueError(f"WRDS_COVERAGE_RELATIONS: expected {expected}, got {named}")
     return rows
 
 
@@ -166,7 +213,9 @@ def option_coverage(host: str, remote_dir: str, output: pathlib.Path) -> Coverag
 __all__ = [
     "SLICE",
     "VOLATILITY_SURFACES",
+    "Surface",
     "coverage_query",
     "option_coverage",
     "read_coverage",
+    "surface_slice",
 ]
