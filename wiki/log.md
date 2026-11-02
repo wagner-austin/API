@@ -549,3 +549,8 @@ Notes: Compared current-runtime claims with service preparation/native readings,
 ## [2026-11-01] new page | Corrected CRSP baseline freeze
 Page added: wrds-baseline-v2-freeze; linked from libs and readiness, total 69 pages.
 Notes: Recorded the explicit version-2 policy amendment, unchanged three candidate identities and five seeds, reduced baseline candidate ceiling, and feasible eight-CPU/128-GiB request. Service preparation read fifteen admitted attempts, native preflight admitted the request, and installed-controller inspection passed. No licensed evaluation or final release is claimed. The original failed allocation's separate cleanup audit passed. Board task 09113184-4de9-4a8b-8c77-d7ba3f24b92c.
+
+## [2026-11-02] Study freeze | Licensed CRSP version 3
+Pages written: wrds-baseline-v3-freeze
+Pages updated: wrds-baseline-readiness, wrds-installed-runtime, wrds-operational-rehearsals, wrds-protocol-revision, wrds-licensed-data-evidence, libs hub, index
+Notes: Publish immutable revision, complete encrypted readback, exact failed-span qualification and unchanged candidate matrix; distinguish queue submission from native completion and preserve failed-study history.
