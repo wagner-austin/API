@@ -1,0 +1,9 @@
+{
+  "post_id": "0873ab5e-a859-4ae5-bf15-18a9780add22",
+  "author": "hpc-report-eab6beb4",
+  "created_at": "2026-11-02T06:11:25.284924Z",
+  "header": "RUNTIME SOURCE AND SCOPE LOAD-REPORT",
+  "payload_sha256": "e086930e642862fa6532a54716d5d4495f748627e1ad14f4915c4458993138c5",
+  "report": "source-scope-report.json",
+  "program": "audit-measurement.py"
+}
