@@ -85,7 +85,7 @@ def test_real_encrypted_cohort_keeps_lineage_and_cannot_load_as_a_study(tmp_path
         scratch=case.extraction.scratch,
         max_plaintext_bytes=case.plan["max_cohort_bytes"],
     ) as path:
-        with pytest.raises(ValueError, match="CRSP-006.*exact extract fields"):
+        with pytest.raises(ValueError, match=r"CRSP-006.*exact extract fields"):
             load_crsp_sources(path)
         document = load_json_str(path.read_text())
         cohort = decode_crsp_cohort(document)
@@ -117,7 +117,7 @@ def test_changed_input_identity_refuses_and_cleans_up(tmp_path: Path, field: str
     case = cohort_case(tmp_path)
     plan = encode_crsp_cohort_plan(case.plan)
     plan[field] = "f" * 64
-    with pytest.raises(ValueError, match="CRSP_COHORT|WRDS_DATA_DRIFT"):
+    with pytest.raises(ValueError, match=r"CRSP_COHORT|WRDS_DATA_DRIFT"):
         _derive(case, decode_crsp_cohort_plan(plan))
     _assert_refused(case)
 
@@ -127,7 +127,7 @@ def test_evidence_budgets_refuse_before_publication(tmp_path: Path, field: str) 
     case = cohort_case(tmp_path)
     plan = encode_crsp_cohort_plan(case.plan)
     plan[field] = 1
-    with pytest.raises(ValueError, match="CRSP_COHORT_LIMIT|CRSP-012"):
+    with pytest.raises(ValueError, match=r"CRSP_COHORT_LIMIT|CRSP-012"):
         _derive(case, decode_crsp_cohort_plan(plan))
     _assert_refused(case)
 
@@ -208,7 +208,7 @@ def test_actual_trial_refuses_a_cohort_even_when_its_bundle_is_admitted(tmp_path
         evaluation, case.destination / "bundle.json", ["momentum", "liquidity"]
     )
     output = tmp_path / "attempt" / "result.json"
-    with pytest.raises(ValueError, match="CRSP-006.*exact extract fields"):
+    with pytest.raises(ValueError, match=r"CRSP-006.*exact extract fields"):
         execute_trial(
             decode_research_trial(document),
             sample_run_fingerprint(image_digest="d" * 64),
@@ -259,6 +259,6 @@ def test_inconsistent_or_unresolved_audit_refuses_without_plaintext(
     case.audit.write_bytes(payload)
     plan = encode_crsp_cohort_plan(case.plan)
     plan["audit_sha256"] = sha256(payload).hexdigest()
-    with pytest.raises(ValueError, match="CRSP_COHORT_|MARKET-001"):
+    with pytest.raises(ValueError, match=r"CRSP_COHORT_|MARKET-001"):
         _derive(case, decode_crsp_cohort_plan(plan))
     _assert_refused(case)

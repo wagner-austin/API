@@ -51,7 +51,7 @@ def test_plan_roundtrips_without_identifiers_or_observations() -> None:
 def test_plan_refuses_unbounded_or_unpinned_inputs(field: str, value: JSONValue) -> None:
     document = _plan()
     document[field] = value
-    with pytest.raises(ValueError, match="CRSP_COHORT_PLAN|CAMPAIGN-001|MARKET-001"):
+    with pytest.raises(ValueError, match=r"CRSP_COHORT_PLAN|CAMPAIGN-001|MARKET-001"):
         decode_crsp_cohort_plan(document)
 
 
@@ -74,7 +74,7 @@ def _document(tmp_path: Path) -> JSONObject:
 def test_cohort_roundtrips_but_refuses_study_manifest_decoding(tmp_path: Path) -> None:
     document = _document(tmp_path)
     assert encode_crsp_cohort(decode_crsp_cohort(document)) == document
-    with pytest.raises(ValueError, match="CRSP-006.*exact extract fields"):
+    with pytest.raises(ValueError, match=r"CRSP-006.*exact extract fields"):
         decode_crsp_extract(document)
 
 
