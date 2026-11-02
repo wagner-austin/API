@@ -1,0 +1,612 @@
+{
+ "results": [
+  {
+   "kind": "crsp-return-context-diagnostic",
+   "bundle_sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+   "native_job_id": "58741598",
+   "rows": [
+    {
+     "day_offset": -35,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -38,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -34,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -35,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -33,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -34,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -32,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -33,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -31,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -32,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -28,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -31,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -27,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -28,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -26,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -27,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -25,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -26,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -24,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -25,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -21,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -24,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -20,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -21,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -19,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -20,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -18,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -19,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -17,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -18,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -14,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -17,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -13,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -14,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -12,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -13,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -11,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -12,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -10,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -11,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -6,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -10,
+     "missing_flag": "NA",
+     "duration_flag": "D4",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -5,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -6,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -4,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -5,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": -3,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": -4,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 0,
+     "return_present": false,
+     "previous_session_matches": false,
+     "previous_date_offset": null,
+     "missing_flag": "MP",
+     "duration_flag": "MR",
+     "delist_flag": "N",
+     "price_flag": "MP",
+     "price_present": false
+    },
+    {
+     "day_offset": 1,
+     "return_present": true,
+     "previous_session_matches": false,
+     "previous_date_offset": -3,
+     "missing_flag": "NA",
+     "duration_flag": "P1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 2,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 1,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 3,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 2,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 4,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 3,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 7,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 4,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 8,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 7,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 9,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 8,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 10,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 9,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 11,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 10,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 14,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 11,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 15,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 14,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 16,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 15,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 17,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 16,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 18,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 17,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 21,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 18,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 22,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 21,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 23,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 22,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 24,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 23,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 25,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 24,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 28,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 25,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 29,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 28,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 30,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 29,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 31,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 30,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 32,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 31,
+     "missing_flag": "NA",
+     "duration_flag": "D1",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    },
+    {
+     "day_offset": 35,
+     "return_present": true,
+     "previous_session_matches": true,
+     "previous_date_offset": 32,
+     "missing_flag": "NA",
+     "duration_flag": "D3",
+     "delist_flag": "N",
+     "price_flag": "TR",
+     "price_present": true
+    }
+   ],
+   "scope": "Training-era failure context only; no fitting or final data; dates relative to private failure selector; no return or price values",
+   "diagnostic_plaintext_removed": true
+  }
+ ],
+ "diagnosis_of": "58740674",
+ "fingerprint": {
+  "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "dataset": {
+  "sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83"
+ }
+}

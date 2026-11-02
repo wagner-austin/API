@@ -1,0 +1,120 @@
+{
+  "kind": "HPC3_DIAGNOSTIC_EVIDENCE",
+  "native_job_id": "58741562",
+  "accounting": {
+    "job": {
+      "job_id": "58741562",
+      "name": "cleargbm.diagnostic-held-return-v2-1",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 67,
+      "billing_tres": 2,
+      "gpu_count": 0,
+      "cpu_count": 2,
+      "node_list": "hpc3-21-11"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-11-02T02:46:24",
+    "ended_at": "2026-11-02T02:47:31"
+  },
+  "inputs": {
+    "stdout_sha256": "dcaca427c53afb6340a7ee1028e68b4c0c748d13ba26551bd379fc7640ba2f6d",
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/bundle.json": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/calendar.csv.age": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/calendar.sql.age": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/delists.csv.age": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/delists.sql.age": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/manifest.json.age": "ac96be34785472ede6f9ea7dc8398c14388937edf39647502037891be2e6dacf",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/membership.csv.age": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/membership.sql.age": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/protocol.json.age": "c035bbfb00fe3b6d12013f294f8495981b570f923835bfba4f38dc61dd47a649",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/returns.csv.age": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+      "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/returns.sql.age": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+      "/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+      "/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+      "/data/homezvol1/wagnera3/research/licensed-baseline-b3843a3d3-20261101/access.json": "a8f35bd37ac939bbc2f67c4923192a39ee9cbb1cb225b298a3257ef11c5e9631",
+      "/data/homezvol1/wagnera3/research/licensed-v2-09113184/attempts/f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce/1/request.json": "60d57cc5ea51bd318bcb1aaf1162c1af207dfe702c0473327c76e2f617d926a7"
+    },
+    "compute_checksum_lines": 16
+  },
+  "result_sha256": "2147cfd16b9c2fb996650bd93969ee6db29277ea969b83c6a5f75c59c4ebf4aa",
+  "record_sha256": "e03a1d4035f0b03a9e71a97334ff4d6efab59749264841e1cdc54f75480aed8a",
+  "result_mtime": 1793587651,
+  "record_mtime": 1793587651,
+  "result": {
+    "results": [
+      {
+        "kind": "crsp-return-diagnostic",
+        "bundle_sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+        "native_job_id": "58741562",
+        "matched_rows": 1,
+        "previous_session": "2000-09-08",
+        "ordinary": false,
+        "scope": "Training-era failure diagnosis only; no fitting, validation score or final data",
+        "checks": {
+          "return_present": false,
+          "previous_session_matches": false,
+          "missing_flag_is_NA": false,
+          "delist_flag_is_N": true,
+          "duration_allowed": false
+        },
+        "diagnostic_plaintext_removed": true
+      }
+    ],
+    "diagnosis_of": "58740674"
+  },
+  "record": {
+    "experiment": "4d5d0e7e2f1b535bfa6c0c6f628f7717b1cf07540e4fdb4274e68441466c953f",
+    "label": "training-return-diagnosis",
+    "fingerprint": {
+      "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+      "gpu_model": "",
+      "driver_version": "",
+      "determinism": {
+        "stack": "cpu",
+        "settings": {
+          "MKL_NUM_THREADS": "1",
+          "NUMEXPR_NUM_THREADS": "1",
+          "OMP_NUM_THREADS": "1",
+          "OPENBLAS_NUM_THREADS": "1"
+        }
+      },
+      "host": {
+        "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+        "machine": "x86_64",
+        "logical_cores": 48
+      },
+      "packages": [
+        {
+          "name": "covenant-ml",
+          "version": "0.1.0"
+        },
+        {
+          "name": "httpx",
+          "version": "0.28.1"
+        },
+        {
+          "name": "numpy",
+          "version": "2.3.5"
+        },
+        {
+          "name": "platform-core",
+          "version": "0.1.0"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.7.2"
+        },
+        {
+          "name": "scipy",
+          "version": "1.16.3"
+        }
+      ]
+    },
+    "observations": [],
+    "payload_digest": "893fe34890b2af995417ebf1d5ead787e9f802a240a6742475a6d1f2ad92bf7d"
+  },
+  "scope": "Diagnostic evidence only; not a scored research result. Existing accounting, input, artifact-time and shared RunRecord validators used directly."
+}

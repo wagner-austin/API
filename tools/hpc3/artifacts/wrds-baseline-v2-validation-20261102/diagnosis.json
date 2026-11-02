@@ -1,0 +1,78 @@
+{
+  "kind": "CRSP_V2_STOP_DIAGNOSIS",
+  "subject_job": "58740674",
+  "diagnostic_jobs": [
+    "58741562",
+    "58741598"
+  ],
+  "service_posts": [
+    "8e3e42cf-7b57-4a81-96fa-3772229cfa51",
+    "27644263-14a1-4069-86cd-ed5bfbb6afc4"
+  ],
+  "observed_boundary": [
+    {
+      "day_offset": -3,
+      "return_present": true,
+      "previous_session_matches": true,
+      "previous_date_offset": -4,
+      "missing_flag": "NA",
+      "duration_flag": "D1",
+      "delist_flag": "N",
+      "price_flag": "TR",
+      "price_present": true
+    },
+    {
+      "day_offset": 0,
+      "return_present": false,
+      "previous_session_matches": false,
+      "previous_date_offset": null,
+      "missing_flag": "MP",
+      "duration_flag": "MR",
+      "delist_flag": "N",
+      "price_flag": "MP",
+      "price_present": false
+    },
+    {
+      "day_offset": 1,
+      "return_present": true,
+      "previous_session_matches": false,
+      "previous_date_offset": -3,
+      "missing_flag": "NA",
+      "duration_flag": "P1",
+      "delist_flag": "N",
+      "price_flag": "TR",
+      "price_present": true
+    },
+    {
+      "day_offset": 2,
+      "return_present": true,
+      "previous_session_matches": true,
+      "previous_date_offset": 1,
+      "missing_flag": "NA",
+      "duration_flag": "D1",
+      "delist_flag": "N",
+      "price_flag": "TR",
+      "price_present": true
+    }
+  ],
+  "row_count": 50,
+  "interpretation": "Training-era held interval contains an MP/MR missing-price/return row, then an NA/P1 present return whose previous-price date precedes the missing session. The frozen v2 ordinary-day predicate correctly refuses this span. No fitting occurred. This is distinct from the earlier pre-entry delisting.",
+  "vendor_source": {
+    "sha256": "bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e",
+    "url": "https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d",
+    "locator": "pages 18 (DlyPrevDt), 91 (P1, MR), 92 (MP)",
+    "meaning": "P1 is a two-trading-period return; MP is missing price; MR is missing return."
+  },
+  "retained_recipe_sha256": {
+    "diagnostic-run.json": "8ee43cb5160cf2623b42c85c5b0c0730cd80db0f5f204cd62c6f4851fa7e4b2b",
+    "diagnostic-context-run.json": "38c0e788bb7a2eae59f5ceb9b76790798a505442d36ba1eea1f958846bd39a52"
+  },
+  "study_action": "Keep one failed and fourteen unsubmitted admitted attempts. No candidate selection or final access. Define and independently review any interval-aware protocol amendment before a new frozen study.",
+  "cleanup_limit": "Both diagnostics assert their private decrypted directory absent after the context closes. No same-node post-exit observation has yet established configured scratch absence for failed subject 58740674.",
+  "limits": [
+    "No prices, returns or security identifier published.",
+    "A two-session vendor return is not an observed value for its missing intermediate close.",
+    "No automatic zero fill, skipped security, changed universe, or silent conversion of a multi-session return into a daily return.",
+    "Service reports are operational evidence, not hostile-owner attestation."
+  ]
+}
