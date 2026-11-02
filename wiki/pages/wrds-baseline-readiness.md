@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json"
   - "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
@@ -13,6 +14,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json": "83fe5d2f5fa2468079f00334c0c2ddd2548ffddf"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json": "ada422b51719ecf7356cfc273f49015fe77aa783"
   "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json": "7fc3888de5afbfcd89731034f8c401f855de4d28"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
@@ -29,12 +31,17 @@ confidence: medium
 
 # WRDS substantive baseline readiness
 
-**The corrected study has started; no completed licensed result is recorded yet.**
-After preparation audit passed, the shared queue launched version-2 job
-`58740674` on HPC3. Its launch measurement records 8 CPUs, 128 GiB, no GPU
-and sixteen successful input checksums. The other fourteen admitted requests
-remain unsubmitted until this first result is verified. No candidate has been
-selected and the final holdout remains unreleased.[^launch]
+**The corrected study stopped before fitting; no licensed result is complete.**
+Version-2 job `58740674` failed after 2,245 seconds while constructing training
+labels: a held daily observation was absent or failed the ordinary-return
+predicate (`CRSP-009`). The shared queue automatically recorded the failure.
+A targeted diagnostic is pending; no rule change is justified yet. Fourteen
+admitted requests remain unsubmitted, no candidate is selected, and the final
+holdout remains unreleased.[^v2stop]
+
+Preparation audit and launch checks passed: the job had 8 CPUs, 128 GiB, no
+GPU and sixteen successful input checksums. Those establish execution
+identity, not complete real-data coverage.[^launch]
 
 The earlier version-1 attempt failed before fitting. Its journal remains
 historical; see [[wrds-baseline-20261101]] for that failure and correction
@@ -71,8 +78,8 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
 - [x] Observe the failed allocation's configured paths on its original node;
    service verification and independent task audit passed.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
-   validation attempts complete; first attempt running through queue `3d3aad6e`.
-   Final access stays a separate controlled step.[^launch]
+   validation attempts complete; queue `3d3aad6e` recorded the first attempt's
+   failure. Investigate it before further submission.[^v2stop]
 
 The original failed journal remains immutable. Current diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
@@ -90,3 +97,5 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^cleanup]: `tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json`, `subject`, `observer`, `results`, `verified_measurement`, `service_reports` and `limits`; original expanded scratch path was not logged. Independent board audit `b239dc19-84e4-49c1-b429-7002656cf0bd` returned VERIFIED at 2026-11-02T01:31:49Z.
 
 [^launch]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json`, `freeze_audit`, `queue`, `native`, `native_service_post`, `attempts`, `execution_cluster_change` and `submission_rule`; pinned sibling documents retain queue transitions, native service inspection, allocation readout and checksum receipts. This is launch evidence, not a completed evaluation.
+
+[^v2stop]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `actions` and `cleanup_limit`; raw identifiers and return observations remain private. Prior same-node cleanup evidence concerns the earlier allocation, not this new failure.
