@@ -219,6 +219,8 @@ def test_diagnostic_driver_opens_only_train_validation_in_one_snapshot() -> None
 @pytest.mark.parametrize(
     "partitions", [(), ("final",), ("train-validation", "train-validation"), ("../final",)]
 )
-def test_driver_refuses_unknown_repeated_or_final_only_partitions(partitions: tuple[str, ...]) -> None:
+def test_driver_refuses_unknown_repeated_or_final_only_partitions(
+    partitions: tuple[str, ...],
+) -> None:
     with pytest.raises(ValueError, match=r"\[CRSP-010\] invalid extraction partition sequence"):
         crsp_driver_sql(60, partitions=partitions)
