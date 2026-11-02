@@ -73,8 +73,9 @@ Installed-runtime identity is tracked separately in
 
 ## Next study requirements
 
-Version-2 bundle lineage is recorded in [[wrds-protocol-revision]]. The new
-study still needs current runtime identities and a new preregistration.
+Version-2 bundle lineage is recorded in [[wrds-protocol-revision]]. Current
+installation and rehearsal evidence are recorded in [[wrds-installed-runtime]]
+and [[wrds-operational-rehearsals]]; the new study still needs preregistration.
 The originally staged bundle embeds version 1 and cannot be silently
 reinterpreted. Rehearse changed inputs through the existing queue
 and preserve this failed journal. The original allocation's later configured-path

@@ -4,12 +4,14 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json": "c6de49289a168f4bd12cdcd78419acaa972f3107"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json": "fc1b6b3b20e99d4ea3d594c7cc11b222f9dfcf77"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
@@ -36,6 +38,12 @@ controller and image. The maintained pre-entry fixture delists security 8 on
 native job `58740021`, which completed in seven seconds with four CPUs and
 16 GiB; automatic reconciliation marked queue `f1961f01` passed. Replay
 returned the same queue identity and the journal retained one complete job.[^v2]
+
+A subsequent service measurement regenerated all ten plaintext files from
+the frozen source archive and matched their bundle digests, including the
+pre-entry delisting row. It also verified the immutable queue specification's
+selection of the version-2 evaluator and its four pinned input documents.
+The queue adapter and selected evaluator are separate installations.[^measurement]
 
 Service inspection verified sixteen pinned inputs and sixteen compute checksum
 receipts, then bound the result and shared RunRecord to that allocation.
@@ -90,3 +98,5 @@ Final-data permissions remain governed by [[wrds-proposer-isolation]] and
 [^wrds]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json`, `measurements`, `repeatability` and `limits`.
 
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
+
+[^measurement]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/audit-measurement.json`, `measurement`, `program`, `execution` and `interpretation`; service post `93e273e2-6e02-46a1-973f-f169925a3be3` binds regenerated fixture identities and the immutable queue selection, not a new historical process attestation.
