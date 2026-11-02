@@ -39,6 +39,10 @@ directory. Existing frozen requests and installed controllers remain historical:
 the native probes used a pinned source overlay over the existing frozen
 interpreter, not a fleet-wide replacement.[^deployment]
 
+The current path validator does not reject commas or colons, although `--bind`
+uses those characters as separators. These probes used neither character;
+task `5d16022f` tracks validation of that additional path-grammar gap.[^owner]
+
 ## Why the dependency mattered
 
 On November 2, a home-image preflight still depended on BeeGFS through explicit
