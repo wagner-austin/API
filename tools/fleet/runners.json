@@ -65,42 +65,35 @@
           "sha256": null,
           "writable": false,
           "reason": "Model-Trainer's GGUF export tests run the real llama.cpp converter",
-          "manual": false,
-          "provision_command": "git clone --depth 1 https://github.com/ggml-org/llama.cpp /opt/llama.cpp && chown -R gharunner:gharunner /opt/llama.cpp"
+          "manual": false
         },
         {
           "path": "/data",
           "sha256": null,
           "writable": true,
           "reason": "Model-Trainer's APP__DATA_ROOT default; checkpoint tests write under it",
-          "manual": false,
-          "provision_command": null
+          "manual": false
         },
         {
           "path": "/opt/google/chrome/chrome",
           "sha256": null,
           "writable": false,
           "reason": "MCPs web-scraper launches channel 'chrome', the system Google Chrome, never bundled Chromium",
-          "manual": false,
-          "provision_command": "curl -fsSL -o /tmp/google-chrome-stable_current_amd64.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y -qq /tmp/google-chrome-stable_current_amd64.deb && rm -f /tmp/google-chrome-stable_current_amd64.deb"
+          "manual": false
         },
         {
           "path": "/opt/corvis/model-cache/Xenova/gte-small/onnx/model.onnx",
-          "sha256": null,
+          "sha256": "398a29991324e0b383afa13375d681ced3079c83e097fb1ebd9290d7498523b3",
           "writable": false,
-          "reason": "MCPs packages/embed and mcp-proxy load gte-small from this cache; absent, the 133 MB fetch times the embed suite out; /opt/corvis itself must be traversable too, since curl --create-dirs makes it 750 as root and the runner then cannot reach the cache (CI mcp-proxy red at MCPs 657c01563, 2026-10-08)",
-          "manual": false,
-          "provision_command": "for f in config.json tokenizer.json tokenizer_config.json onnx/model.onnx; do curl -fsSL --create-dirs -o /opt/corvis/model-cache/Xenova/gte-small/$f https://huggingface.co/Xenova/gte-small/resolve/main/$f; done && chmod a+rX /opt/corvis && chmod -R a+rX /opt/corvis/model-cache"
+          "reason": "MCPs packages/embed and mcp-proxy load gte-small from this cache; absent, the 133 MB fetch times the embed suite out; /opt/corvis itself must be traversable too, since curl --create-dirs made it 750 as root and the runner then could not reach the cache (CI mcp-proxy red at MCPs 657c01563, 2026-10-08)",
+          "manual": false
         }
       ],
       "base": {
-        "apt_packages": [
-          "python3",
-          "pkg-config",
+        "nix_packages": [
           "ffmpeg",
-          "golang-go",
+          "go",
           "poppler-utils",
-          "unzip",
           "inkscape"
         ],
         "disk": {

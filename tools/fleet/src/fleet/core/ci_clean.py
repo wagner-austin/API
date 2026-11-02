@@ -1,8 +1,9 @@
-"""ci-clean, the daily hygiene a CI runner host's provision installs.
+"""ci-clean, the daily hygiene a CI runner host's generation carries.
 
-:mod:`fleet.core.runner_render` writes these three payloads into the rendered
-``provision.sh``: the script to ``/usr/local/bin/ci-clean``, and its service
-and timer beside it. They live here, apart from the provision's other lines,
+:mod:`fleet.core.runner_host_document` puts these three payloads into the
+host's document, which its NixOS generation installs (MCPs board task
+9aba868d): the script to ``/usr/local/bin/ci-clean``, and its service and
+timer beside it. They live here, apart from the other runner modules,
 because they are a program in their own right that the tests execute.
 
 DOCKER FIRST. The Actions runner removes a job's service containers but never

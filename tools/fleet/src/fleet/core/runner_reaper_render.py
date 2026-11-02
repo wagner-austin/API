@@ -63,7 +63,7 @@ it, and never the listener above it. A Worker already gone is said and is no
 fault, since a job may end between the hub's reading and this, while a
 process that outlives SIGKILL is a refusal naming it.
 
-THE SAME TASK'S LISTENER MOVE FINISHES HERE. The provision writes each
+THE SAME TASK'S LISTENER MOVE FINISHES HERE. Ubuntu's provision wrote each
 unit's ``Slice=`` drop-in for the listener slice
 (:mod:`fleet.core.runner_slice_render`) but restarts only a unit no job runs
 in, and lavender's runners go from one job straight into the next: at
@@ -83,8 +83,8 @@ still owed a move and running a job again five times a second, for up to
 ended. Reaping comes first, so the watch delays no unit's leftovers.
 
 THE JOB HOOKS FINISH HERE THE SAME WAY (MCPs board task 621902c3). A runner
-reads its hooks from its environment when it starts, so a unit the provision
-found busy runs on without the job-completed hook its drop-in now names: at
+reads its hooks from its environment when it starts, so a unit Ubuntu's
+provision found busy ran on without the job-completed hook its drop-in now names: at
 2026-10-30T20:46Z both MCPs units on lavender were. So a unit whose main
 process's environment lacks a hook the drop-in sets
 (:data:`fleet.core.runner_job_scope_render.HOOK_ENVIRONMENT`) is owed a
@@ -94,14 +94,13 @@ restart too, taken between jobs by the same watch.
 from __future__ import annotations
 
 from fleet.contracts.runner_slice import LISTENER_SLICE_NAME
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
+from fleet.contracts.runners import HostRunnerSpec
 from fleet.core.runner_job_scope_render import HOOK_ENVIRONMENT
 from fleet.core.runner_proc_bash import (
     PROCESS_FUNCTIONS,
     UNIT_PROCS_FUNCTION,
     WORKER_CASE_PATTERN,
 )
-from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 
 #: The runner drop-in's file name inside ``<unit>.d``.
 KILL_DROP_IN_NAME = "fleet-kill.conf"
@@ -409,30 +408,6 @@ WantedBy=timers.target
 """
 
 
-def render_kill_mode_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that make a runner unit's stop end its whole cgroup.
-
-    Run after ``svc.sh install`` has written the unit. A running unit takes
-    the new ``KillMode`` at the reload, so its next stop or restart honours it.
-
-    Args:
-        install: The install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines. The drop-in is written, and systemd reloaded, only when
-        the file does not already hold exactly :data:`KILL_DROP_IN`.
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    return render_drop_in_lines(
-        install,
-        name=KILL_DROP_IN_NAME,
-        body=KILL_DROP_IN,
-        announcement=f"kill mode set for {install['service']}: a stop ends its whole cgroup",
-    )
-
-
 def render_reaper_service(spec: HostRunnerSpec) -> str:
     """The reaper's service, which passes the host's job timeout.
 
@@ -454,35 +429,6 @@ def render_reaper_service(spec: HostRunnerSpec) -> str:
     )
 
 
-def render_reaper_lines(spec: HostRunnerSpec) -> list[str]:
-    """Bash lines that install the reaper and start its timer.
-
-    Args:
-        spec: The host, whose job timeout the service passes the reaper.
-
-    Returns:
-        The lines: the script written whole on every run, both units
-        written when they differ, then the timer enabled and started.
-    """
-    return [
-        f"cat > {REAPER_PATH} <<'REAPER_EOF'",
-        REAPER_SCRIPT.rstrip("\n"),
-        "REAPER_EOF",
-        f"chmod +x {REAPER_PATH}",
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{REAPER_SERVICE_NAME}",
-            render_reaper_service(spec),
-            announcement=f"{REAPER_SERVICE_NAME} written",
-        ),
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{REAPER_TIMER_NAME}",
-            REAPER_TIMER,
-            announcement=f"{REAPER_TIMER_NAME} written",
-        ),
-        f"systemctl enable --now {REAPER_TIMER_NAME}",
-    ]
-
-
 __all__ = [
     "DROPPED_KILL_WAIT_SECONDS",
     "HOOK_CASES",
@@ -495,7 +441,5 @@ __all__ = [
     "REAPER_SERVICE_NAME",
     "REAPER_TIMER",
     "REAPER_TIMER_NAME",
-    "render_kill_mode_lines",
-    "render_reaper_lines",
     "render_reaper_service",
 ]

@@ -27,12 +27,12 @@ because which CPUs share a core differs per machine and only the host can
 say. ``systemctl set-property`` writes it into systemd's control drop-in
 and applies it to the live slice at once, so jobs already running move
 onto the set with nothing restarted, and the lines then read the slice's
-``EffectiveCPUs`` back and fail the provision unless it is exactly the set.
+``EffectiveCPUs`` back and fail unless it is exactly the set.
 
-ON A NIXOS HOST THE SAME LINES RUN AT BOOT (MCPs board task 9aba868d). The
-flake that builds a runner host cannot read its topology, so the lines are
-the body of :data:`CPUSET_PATH`, which :data:`CPUSET_SERVICE` runs once each
-boot, before any runner starts (:func:`render_ci_cpuset_script`).
+THEY RUN AT BOOT (MCPs board task 9aba868d). The NixOS flake that builds a
+runner host cannot read its topology, so the lines are the body of
+:data:`CPUSET_PATH`, which :data:`CPUSET_SERVICE` runs once each boot
+(:func:`render_ci_cpuset_script`).
 """
 
 from __future__ import annotations
@@ -47,8 +47,8 @@ CPUSET_PATH: Final = "/usr/local/sbin/fleet-ci-cpuset"
 #: The oneshot that runs it.
 CPUSET_SERVICE_NAME: Final = "fleet-ci-cpuset.service"
 
-#: Its unit: once per boot, and remembered as done, so a runner unit that
-#: orders itself after it starts only with the set in place.
+#: Its unit: once per boot, and remembered as done. No runner waits for it:
+#: ``set-property`` moves the jobs already in the slice onto the set.
 CPUSET_SERVICE: Final = f"""[Unit]
 Description=Hold {CI_SLICE_NAME} to whole cores, as many as the roster reserves
 
@@ -82,7 +82,7 @@ EXPAND_PROGRAM: Final = (
 def render_ci_cpu_select_lines(reserved_cores: int) -> list[str]:
     """Bash lines that choose the CI slice's CPUs from the host's ``lscpu`` and change nothing.
 
-    The provision runs them first (:func:`render_ci_cpuset_lines`), and
+    The boot script runs them first (:func:`render_ci_cpuset_lines`), and
     ``tools/fleet-execution-runners`` runs them alone on the runner host to
     say which set its live slice must hold.
 
@@ -116,8 +116,9 @@ def render_ci_cpu_select_lines(reserved_cores: int) -> list[str]:
 def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
     """Bash lines that hold the CI slice to whole cores, as many as the roster reserves.
 
-    Run after the slice unit is written and started
-    (:func:`fleet.core.runner_slice_render.render_slice_unit_lines`).
+    The slice unit is the generation's
+    (:func:`fleet.core.runner_slice_render.render_slice_unit`), so
+    ``set-property`` finds it loaded.
 
     Args:
         reserved_cores: The host's ``dispatch.budget.reserved_cores``, the

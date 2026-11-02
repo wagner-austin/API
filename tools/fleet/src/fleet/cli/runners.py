@@ -1,22 +1,21 @@
-"""CLI: score the CI hosts against the runner roster, render, sample, report.
+"""CLI: score the CI hosts against the runner roster, register, sample, report.
 
 Usage:
     fleet-runners --spec runners.json
     fleet-runners --spec runners.json --host lavender
-    fleet-runners --spec runners.json --host lavender --render /tmp/provision --config registry
     fleet-runners --spec runners.json --host lavender --sample load.jsonl
     fleet-runners --spec runners.json --report load.jsonl --cores 16
-    fleet-runners --spec runners.json --host lavender --onboard owner/repo --config registry
-    fleet-runners --spec runners.json --host lavender --rebuild yes --config registry
+    fleet-runners --spec runners.json --host lavender --onboard owner/repo
+    fleet-runners --spec runners.json --host lavender --register yes
     fleet-runners --spec runners.json --prune yes
-
-``--config`` names the fleet's registry directory, as it does for every fleet
-command, for the three modes that run the provision: the provision holds the
-host's runners to the cores its roster file reserves for them
-(:func:`load_reserved_cores`, MCPs board task 349e25ee).
 
 This module parses the flags and refuses what it cannot honour; each mode's
 act is :mod:`fleet.cli._runner_acts`.
+
+A runner host is a NixOS machine whose generation declares every runner
+unit, script and asset from the roster (MCPs board task 9aba868d), so no
+mode here installs anything: ``make render-documents`` renders the roster
+for MCPs' ``fleet-mcp/nixos``, and the netboot or a switch lays it.
 
 ``--prune yes`` deletes each registration of the roster's repositories that
 no roster host declares and GitHub reads offline and idle, the remains of a
@@ -24,17 +23,16 @@ machine that was reimaged or retired, and names any online one it leaves
 (:mod:`fleet.core.runner_registrations`). The audit holds the same
 registrations to the roster, one row per repository.
 
-``--rebuild yes`` takes a fleet node a CORVIS stick or a netboot installed
-and enrolled to an audited runner host: the base and the reboot it asks
-for, fresh tokens, the roster's provision, then the audit
-(:mod:`fleet.core.runner_rebuild`). Every stage is idempotent, so a
-cut-short rebuild is finished by running it again. The value is a
-confirmation, because the act lays a whole machine.
+``--register yes`` is GitHub's half of a freshly installed or switched
+runner host: a token per repository minted with gh, each unregistered
+runner restarted to register with it, then the audit
+(:mod:`fleet.core.runner_register`). A registered runner is skipped, so a
+cut-short registration is finished by running it again. The value is a
+confirmation, because the act registers runners with GitHub.
 
 ``--onboard`` is the operator's 2026-09-09 mandate made runnable: ONE
-command registers a repository's CI onto the self-hosted fleet -- token
-minted via gh, the host's provision re-run with the new install in it,
-the roster rewritten in the same act, and the host audited as proof. See
+command adds a repository's CI to the self-hosted fleet's roster, rewritten
+in the same act, and prints the steps that lay and register it. See
 :mod:`fleet.core.runner_onboard` for every refusal it can make.
 
 The ``fleet-nodes`` of GitHub Actions serving: one line per declared check,
@@ -43,11 +41,6 @@ audited check passed. A host that cannot be reached is a LINE, not a crash --
 the audit of three machines must not refuse to describe two because a third
 is off -- and the exit status is non-zero so a script cannot read a partial
 fleet as a whole one.
-
-``--render`` writes the converge scripts for one host into a directory and
-prints the run order plus every step no script can perform (the licensed game
-tree). It touches no network: rendering is a local act, and the audit
-afterwards is the proof the scripts were run.
 
 ``--sample`` appends one load reading per selected host to a JSONL record --
 per install, the count of live processes UNDER its Runner.Worker, descendants
@@ -76,7 +69,6 @@ from platform_core.logging import LogFormat, LogLevel, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _runner_acts
-from fleet.cli._config import CONFIG_FLAG
 from fleet.contracts.machine import decode_machine
 from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, parse_runner_spec
 from fleet.core import _test_hooks
@@ -86,8 +78,6 @@ SPEC_FLAG = "--spec"
 
 HOST_FLAG = "--host"
 
-RENDER_FLAG = "--render"
-
 SAMPLE_FLAG = "--sample"
 
 REPORT_FLAG = "--report"
@@ -96,21 +86,19 @@ CORES_FLAG = "--cores"
 
 ONBOARD_FLAG = "--onboard"
 
-REBUILD_FLAG = "--rebuild"
+REGISTER_FLAG = "--register"
 
 PRUNE_FLAG = "--prune"
 
 _FLAGS = (
     SPEC_FLAG,
     HOST_FLAG,
-    RENDER_FLAG,
     SAMPLE_FLAG,
     REPORT_FLAG,
     CORES_FLAG,
     ONBOARD_FLAG,
-    REBUILD_FLAG,
+    REGISTER_FLAG,
     PRUNE_FLAG,
-    CONFIG_FLAG,
 )
 
 
@@ -120,8 +108,9 @@ def load_reserved_cores(registry: str, host_name: str) -> int:
     The fleet's roster (``registry/machines/<name>.json``) is the one place
     a machine's split between its owner and dispatch is written; dispatch
     takes ``logical_cores - reserved_cores`` and on a runner host the rest
-    is the runners'. The provision holds the CI slice to that many CPUs
-    (:mod:`fleet.core.runner_cpuset_render`, MCPs board task 349e25ee).
+    is the runners'. The host's boot script holds the CI slice to that many
+    CPUs (:mod:`fleet.core.runner_cpuset_render`, MCPs board task 349e25ee),
+    and :mod:`fleet.cli.render_documents` reads it for that script.
 
     Args:
         registry: The registry directory ``--config`` names.
@@ -192,7 +181,7 @@ def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit, render, sample, report, onboard, rebuild or prune, per the flags.
+    """Audit, sample, report, onboard, register or prune, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
@@ -201,7 +190,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         0 when the audit found every check passing on every reachable host
         and every registration declared, the prune left no undeclared
-        registration, or the render, sample or report completed. 1 when any
+        registration, or the onboard, sample or report completed. 1 when any
         audited check drifted, any audited host did not answer, or the prune
         kept a registration GitHub reads online or busy.
 
@@ -209,13 +198,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         ValueError: When a flag is unknown, repeated, missing its value,
             ``--spec`` is absent, more than one mode flag is given (each
             names a different act and a combined invocation would do one
-            silently), ``--render`` or ``--rebuild`` was given without
-            ``--host``, ``--prune`` with it, ``--rebuild`` or ``--prune``
+            silently), ``--onboard`` or ``--register`` was given without
+            ``--host``, ``--prune`` with it, ``--register`` or ``--prune``
             with any value but ``yes``, ``--report`` without ``--cores``,
-            ``--cores`` is not a positive integer, ``--render``,
-            ``--onboard`` or ``--rebuild`` was given without ``--config``,
-            or the host's roster file declares no dispatch budget.
-        JSONTypeError: When the host's roster file does not decode.
+            or ``--cores`` is not a positive integer.
         AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
             ``RUNNER_AUDIT_UNPARSABLE``, ``RUNNER_TOKEN_UNAVAILABLE``,
             ``RUNNER_GITHUB_UNREADABLE``, ``RUNNER_DEREGISTRATION_REFUSED``,
@@ -230,7 +216,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     modes = [
         flag
-        for flag in (RENDER_FLAG, SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REBUILD_FLAG, PRUNE_FLAG)
+        for flag in (SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REGISTER_FLAG, PRUNE_FLAG)
         if flag in parsed
     ]
     if len(modes) > 1:
@@ -239,7 +225,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     spec = load_runner_spec(spec_path)
     hosts = select_hosts(spec, parsed.get(HOST_FLAG))
-    if ONBOARD_FLAG in parsed or REBUILD_FLAG in parsed or PRUNE_FLAG in parsed:
+    if ONBOARD_FLAG in parsed or REGISTER_FLAG in parsed or PRUNE_FLAG in parsed:
         return _change(parsed, spec, spec_path, hosts)
     return _read(parsed, spec, hosts)
 
@@ -247,7 +233,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _change(
     parsed: dict[str, str], spec: RunnerSpec, spec_path: str, hosts: list[HostRunnerSpec]
 ) -> int:
-    """Run the one mode that changes a host or GitHub: onboard, rebuild or prune.
+    """Run the one mode that changes the roster, a host or GitHub: onboard, register or prune.
 
     Args:
         parsed: The parsed flags, naming exactly one of the three.
@@ -263,13 +249,12 @@ def _change(
     """
     onboard_repo = parsed.get(ONBOARD_FLAG)
     if onboard_repo is not None:
-        _require_host(parsed, ONBOARD_FLAG, "onboarding registers a runner on one machine")
-        reserved = _reserved_cores(parsed, ONBOARD_FLAG, hosts[0])
-        return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo, reserved)
-    if REBUILD_FLAG in parsed:
-        _require_confirmation(parsed, REBUILD_FLAG, "it lays a machine's whole runner host")
-        _require_host(parsed, REBUILD_FLAG, "a rebuild lays one machine")
-        return _runner_acts.rebuild(hosts[0], _reserved_cores(parsed, REBUILD_FLAG, hosts[0]))
+        _require_host(parsed, ONBOARD_FLAG, "onboarding adds a runner to one machine")
+        return _runner_acts.onboard(spec, spec_path, hosts[0], onboard_repo)
+    if REGISTER_FLAG in parsed:
+        _require_confirmation(parsed, REGISTER_FLAG, "it registers runners with GitHub")
+        _require_host(parsed, REGISTER_FLAG, "a registration is of one machine's runners")
+        return _runner_acts.register(hosts[0])
     _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
     if HOST_FLAG in parsed:
         raise ValueError(
@@ -280,10 +265,10 @@ def _change(
 
 
 def _read(parsed: dict[str, str], spec: RunnerSpec, hosts: list[HostRunnerSpec]) -> int:
-    """Run the one mode that only reads or writes locally: render, sample, report or the audit.
+    """Run the one mode that only reads or writes locally: sample, report or the audit.
 
     Args:
-        parsed: The parsed flags, naming at most one of the first three.
+        parsed: The parsed flags, naming at most one of the first two.
         spec: The roster.
         hosts: The hosts ``--host`` selected.
 
@@ -293,11 +278,6 @@ def _read(parsed: dict[str, str], spec: RunnerSpec, hosts: list[HostRunnerSpec])
     Raises:
         ValueError: As :func:`main` describes for these modes.
     """
-    render_dir = parsed.get(RENDER_FLAG)
-    if render_dir is not None:
-        _require_host(parsed, RENDER_FLAG, "a render is for one machine")
-        reserved = _reserved_cores(parsed, RENDER_FLAG, hosts[0])
-        return _runner_acts.render(hosts[0], render_dir, reserved)
     sample_path = parsed.get(SAMPLE_FLAG)
     if sample_path is not None:
         return _runner_acts.sample(hosts, sample_path)
@@ -324,38 +304,12 @@ def _require_host(parsed: dict[str, str], flag: str, why: str) -> None:
         raise ValueError(f"{flag} requires {HOST_FLAG}: {why}, and defaulting one would be a guess")
 
 
-def _reserved_cores(parsed: dict[str, str], flag: str, host: HostRunnerSpec) -> int:
-    """The cores a mode that runs the provision holds the host's runners to.
-
-    Args:
-        parsed: The parsed flags.
-        flag: ``--render``, ``--onboard`` or ``--rebuild``.
-        host: The host the mode provisions.
-
-    Returns:
-        Its roster file's ``dispatch.budget.reserved_cores``
-        (:func:`load_reserved_cores`).
-
-    Raises:
-        ValueError: When ``--config`` is absent: the provision's CPU set is
-            the roster's reservation, and the registry's path is passed,
-            never searched for; and as :func:`load_reserved_cores` describes.
-    """
-    registry = parsed.get(CONFIG_FLAG)
-    if registry is None:
-        raise ValueError(
-            f"{flag} requires {CONFIG_FLAG}, the fleet's registry directory: the provision "
-            "holds the host's runners to the cores its roster file reserves for them"
-        )
-    return load_reserved_cores(registry, host["name"])
-
-
 def _require_confirmation(parsed: dict[str, str], flag: str, act: str) -> None:
     """Refuse a confirming mode whose value is not the literal ``yes``.
 
     Args:
         parsed: The parsed flags, ``flag`` among them.
-        flag: ``--rebuild`` or ``--prune``.
+        flag: ``--register`` or ``--prune``.
         act: The clause naming what the mode does that needs confirming.
 
     Raises:
@@ -416,8 +370,7 @@ __all__ = [
     "HOST_FLAG",
     "ONBOARD_FLAG",
     "PRUNE_FLAG",
-    "REBUILD_FLAG",
-    "RENDER_FLAG",
+    "REGISTER_FLAG",
     "REPORT_FLAG",
     "SAMPLE_FLAG",
     "SPEC_FLAG",

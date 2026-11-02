@@ -6,6 +6,13 @@
       "sha256": "70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613"
     },
     "localBin": "/home/gharunner/.local/bin",
+    "tokenDirectory": "/var/lib/fleet-runner-tokens",
+    "packages": [
+      "ffmpeg",
+      "go",
+      "poppler-utils",
+      "inkscape"
+    ],
     "installs": [
       {
         "service": "actions.runner.wagner-austin-API.lavender.service",

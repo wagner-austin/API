@@ -1,11 +1,12 @@
 """What a runner install, its account and its payloads are called on the host.
 
-The runner release, the account every runner runs as, the environment
-variable a repository's registration token arrives in, the directory an
+The runner release, the account every runner runs as, the name a
+repository's registration token is kept under and where, the directory an
 install lives in, and where a payload lands are one fact each, read by the
-provision (:mod:`fleet.core.runner_render`), the audit
-(:mod:`fleet.core.runner_audit`) and the rebuild alike, so none of them can
-name them differently from the others.
+document the host's generation carries (:mod:`fleet.core.runner_host_document`),
+the audit (:mod:`fleet.core.runner_audit`) and the registration
+(:mod:`fleet.core.runner_register`) alike, so none of them can name them
+differently from the others.
 """
 
 from __future__ import annotations
@@ -36,15 +37,21 @@ RUNNER_ACCOUNT = "gharunner"
 #: lavender).
 LOCAL_BIN = f"/home/{RUNNER_ACCOUNT}/.local/bin"
 
+#: Where a NixOS runner host keeps each repository's registration token,
+#: root's alone: ``fleet-runners --register`` writes it, and an install whose
+#: root holds no ``.runner`` reads it as its unit starts (MCPs
+#: ``fleet-mcp/nixos/modules/runner-host.nix``, board task 9aba868d).
+TOKEN_DIRECTORY = "/var/lib/fleet-runner-tokens"
+
 
 def token_variable(repo: str) -> str:
-    """The environment variable a repo's registration token arrives in.
+    """The name a repo's registration token is kept under, its file in :data:`TOKEN_DIRECTORY`.
 
     Args:
         repo: The repository, ``owner/name`` form.
 
     Returns:
-        The variable name, e.g. ``RUNNER_TOKEN_API`` for ``wagner-austin/API``.
+        The name, e.g. ``RUNNER_TOKEN_API`` for ``wagner-austin/API``.
     """
     name = repo.split("/")[1]
     sanitized = "".join(c if c.isalnum() else "_" for c in name.upper())
@@ -81,6 +88,7 @@ __all__ = [
     "RUNNER_ACCOUNT",
     "RUNNER_SHA256",
     "RUNNER_VERSION",
+    "TOKEN_DIRECTORY",
     "install_root_for",
     "payload_path",
     "token_variable",

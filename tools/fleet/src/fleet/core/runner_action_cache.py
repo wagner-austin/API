@@ -49,7 +49,6 @@ wrote 480,054 bytes under one directory.
 from __future__ import annotations
 
 from fleet.contracts.runners import HostRunnerSpec
-from fleet.core.runner_unit_files import render_unit_file_lines
 from fleet.core.script_values import scriptable
 
 #: The variable the runner reads (``Constants.Variables.Agent``).
@@ -254,43 +253,6 @@ def render_fill_service(spec: HostRunnerSpec) -> str:
     )
 
 
-def render_fill_lines(spec: HostRunnerSpec) -> list[str]:
-    """Bash lines that install the fill, make the cache, and start its timer.
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        The lines: the script written whole on every run, as the reaper's
-        is, both units written when they differ, the cache directory made
-        readable by every account, the timer enabled and started, and one
-        pass started without waiting, so a provision run does not wait on
-        the network and a failed pass does not fail the provision.
-
-    Raises:
-        ValueError: When a workdir cannot be embedded verbatim.
-    """
-    return [
-        f"cat > {FILL_PATH} <<'FILL_EOF'",
-        FILL_SCRIPT.rstrip("\n"),
-        "FILL_EOF",
-        f"chmod +x {FILL_PATH}",
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{FILL_SERVICE_NAME}",
-            render_fill_service(spec),
-            announcement=f"{FILL_SERVICE_NAME} written",
-        ),
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{FILL_TIMER_NAME}",
-            FILL_TIMER,
-            announcement=f"{FILL_TIMER_NAME} written",
-        ),
-        f"install -d -m 0755 {CACHE_DIR}",
-        f"systemctl enable --now {FILL_TIMER_NAME}",
-        f"systemctl start --no-block {FILL_SERVICE_NAME}",
-    ]
-
-
 __all__ = [
     "CACHE_DIR",
     "CACHE_DROP_IN",
@@ -302,6 +264,5 @@ __all__ = [
     "FILL_TIMER",
     "FILL_TIMER_NAME",
     "PRUNE_DAYS",
-    "render_fill_lines",
     "render_fill_service",
 ]

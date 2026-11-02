@@ -4,7 +4,10 @@ This document exists because on 2026-09-08 every fact in it was folklore:
 the licensed game tree, the llama.cpp checkout and ``/data`` had each been
 placed on lavender by hand, findable only by reading a workflow's assert step
 or a board post. ``fleet-runners audit`` scores a host against this roster;
-``fleet-runners render`` emits the converge script for a new one.
+``make render-documents`` renders it as the document the host's NixOS
+generation is built from (:mod:`fleet.core.runner_host_document`, MCPs board
+task 9aba868d), and ``fleet-runners --register`` gives a new install its
+registration.
 
 A RUNNER HOST IS A LINUX MACHINE. Until 2026-10-19 lavender was a Windows
 machine whose WSL distro held the Linux runners beside four Windows ones;
@@ -89,16 +92,11 @@ class FileAsset(TypedDict):
         manual: True when the asset can never be fetched by a script -- a
             licensed file, such as the game tree lavender once declared,
             which must not enter the repo, its caches, or any hosted VM.
-            ``render`` emits these as a loud REQUIRED MANUAL STEP instead
-            of a command.
-        provision_command: The exact shell command that creates the asset on
-            a new host, for an asset that is neither manual nor a writable
-            directory -- e.g. the ``git clone`` for the llama.cpp checkout.
-            Null for a manual asset (nothing may fetch it), null for a
-            writable one (the mkdir+chown is implied by ``writable``), and
-            REQUIRED otherwise: a fetchable asset with no fetch command
-            renders a provision that stops at "missing" with no way forward,
-            which is a dead end this contract refuses to describe.
+            Every other asset that is no writable directory is fetched by
+            the runner host's NixOS generation, whose runner-host module
+            names its source and refuses to build an asset it has none for
+            (MCPs ``fleet-mcp/nixos/modules/runner-host.nix``, board task
+            9aba868d).
     """
 
     path: str
@@ -106,7 +104,6 @@ class FileAsset(TypedDict):
     writable: bool
     reason: str
     manual: bool
-    provision_command: str | None
 
 
 class HostRunnerSpec(TypedDict):
@@ -131,8 +128,8 @@ class HostRunnerSpec(TypedDict):
             (Model-Trainer's default hooks do). Audited via ``nvidia-smi``
             on each runner's own PATH.
         systemd_timers: Timers that must be enabled on the host, e.g.
-            ``ci-clean.timer`` -- hygiene is part of the provision, not an
-            afterthought on one box's disk.
+            ``ci-clean.timer`` -- hygiene is part of the host's generation,
+            not an afterthought on one box's disk.
         job_timeout_minutes: The longest ``timeout-minutes`` any job these
             runners take may declare. A runner holding a process older than
             this with no ``Runner.Worker`` alive is holding what a finished
@@ -226,7 +223,6 @@ def encode_file_asset(asset: FileAsset) -> JSONObject:
         "writable": asset["writable"],
         "reason": asset["reason"],
         "manual": asset["manual"],
-        "provision_command": asset["provision_command"],
     }
 
 
@@ -241,10 +237,8 @@ def decode_file_asset(value: JSONValue) -> FileAsset:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, ``sha256`` is absent rather than explicitly null, a
-            declared pin is not 64 hex characters, or ``provision_command``
-            contradicts the asset's kind -- present on a manual or writable
-            asset, or absent on one that is neither. A truncated pin matches
+            mistyped, ``sha256`` is absent rather than explicitly null, or a
+            declared pin is not 64 hex characters. A truncated pin matches
             nothing and would report every audit as drift -- rejecting it at
             decode names the actual fault.
     """
@@ -268,27 +262,12 @@ def decode_file_asset(value: JSONValue) -> FileAsset:
         pin = raw_pin
     else:
         raise JSONTypeError(f"sha256 must be a string or null, got {type(raw_pin).__name__}")
-    writable = require_bool(value, "writable")
-    manual = require_bool(value, "manual")
-    provision_command = _optional_null_str(value, "provision_command")
-    if provision_command is not None and (manual or writable):
-        raise JSONTypeError(
-            "provision_command must be null on a manual or writable asset: a manual "
-            "asset may not be fetched by any script, and a writable one's mkdir+chown "
-            "is implied by 'writable'"
-        )
-    if provision_command is None and not manual and not writable:
-        raise JSONTypeError(
-            "a fetchable asset must carry provision_command: without it the rendered "
-            "provision stops at 'missing' with no way forward"
-        )
     return FileAsset(
         path=require_str(value, "path"),
         sha256=pin,
-        writable=writable,
+        writable=require_bool(value, "writable"),
         reason=require_str(value, "reason"),
-        manual=manual,
-        provision_command=provision_command,
+        manual=require_bool(value, "manual"),
     )
 
 
@@ -315,33 +294,6 @@ def encode_host_runner_spec(spec: HostRunnerSpec) -> JSONObject:
         "base": encode_host_base(spec["base"]),
         "ci_slice": encode_ci_slice(spec["ci_slice"]),
     }
-
-
-def _optional_null_str(obj: JSONObject, key: str) -> str | None:
-    """Read a key that must be present and either a string or null.
-
-    Args:
-        obj: The object holding the key.
-        key: The key to read.
-
-    Returns:
-        The string, or None when the value is null.
-
-    Raises:
-        JSONTypeError: If the key is absent or holds any other type. Absence
-            is rejected for the module-docstring reason: an entry nobody
-            finished describing must not read as one with nothing to hold.
-    """
-    if key not in obj:
-        raise JSONTypeError(
-            f"entry must declare {key!r}, using null when the concept does not apply"
-        )
-    value = obj[key]
-    if value is None:
-        return None
-    if isinstance(value, str):
-        return value
-    raise JSONTypeError(f"{key} must be a string or null, got {type(value).__name__}")
 
 
 def decode_host_runner_spec(value: JSONValue) -> HostRunnerSpec:

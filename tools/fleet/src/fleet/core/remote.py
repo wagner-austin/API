@@ -50,6 +50,7 @@ from typing import TypedDict
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import _test_hooks, dialect
+from fleet.core.script_values import scriptable
 from fleet.core.ssh_options import SSH_OPTIONS
 from fleet.core.stderr_tail import stderr_tail
 
@@ -440,11 +441,10 @@ def attempt_root_script(
 ) -> RemoteOutcome:
     """Send a payload to a node and run it with full rights, reporting failure as a value.
 
-    For a CI runner host's payloads (:mod:`fleet.core.runner_audit`,
-    :mod:`fleet.core.runner_rebuild`): they read and write units, slices,
-    services and the runner account's files, which only root may. The send
-    keeps the short deadline; only the run takes the caller's, because a
-    provision that installs packages was never sized for
+    For a CI runner host's payloads (:mod:`fleet.core.runner_audit`): they
+    read units, slices, services and the runner account's files, which only
+    root may. The send keeps the short deadline; only the run takes the
+    caller's, because an audit that walks the caches was never sized for
     :data:`SSH_TIMEOUT_SECONDS`.
 
     Args:
@@ -462,6 +462,29 @@ def attempt_root_script(
     if failure is not None:
         return RemoteOutcome(output="", failure=failure)
     return _attempt_ssh_within(host, (*ROOT_BASH, remote_path), timeout_seconds=timeout_seconds)
+
+
+def send_root_file(host: str, remote_path: str, body: str) -> None:
+    """Write a file only root may read on a node, its body streamed over stdin.
+
+    For a runner host's registration tokens (:mod:`fleet.core.runner_register`):
+    ``install -D -m 0600`` as root makes the file root's and mode 0600 from
+    its first byte, its directory with it, and the body never appears in an
+    argument another account could read in ``/proc``.
+
+    Args:
+        host: SSH destination.
+        remote_path: Absolute path on the node to write.
+        body: The file's complete text.
+
+    Raises:
+        ValueError: When the path cannot be embedded in the command verbatim.
+        AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as
+            :func:`run_ssh` describes.
+    """
+    path = scriptable(remote_path, label="root file path")
+    command = " ".join((*ROOT_PREFIX, "install", "-D", "-m", "0600", "/dev/stdin", path))
+    _raise_on(_attempt_stream(host, command, body, what=f"writing {path} as root"))
 
 
 def run_root_script(host: str, remote_path: str, body: str, *, timeout_seconds: int) -> str:
@@ -505,5 +528,6 @@ __all__ = [
     "run_script",
     "run_ssh",
     "send_file",
+    "send_root_file",
     "send_script",
 ]

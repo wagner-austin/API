@@ -54,12 +54,7 @@ from fleet.core.runner_proc_bash import (
     WORKER_CASE_PATTERN,
 )
 from fleet.core.runner_tool_caches import HOOK_LINES
-from fleet.core.runner_unit_files import render_drop_in_lines
-from fleet.core.runner_work_clear import (
-    COMPLETED_HOOK_VARIABLE,
-    JOB_COMPLETED_HOOK_PATH,
-    JOB_COMPLETED_SCRIPT,
-)
+from fleet.core.runner_work_clear import COMPLETED_HOOK_VARIABLE, JOB_COMPLETED_HOOK_PATH
 from fleet.core.runner_workspace_unlock import UNLOCK_LINES
 from fleet.core.script_values import scriptable
 
@@ -274,109 +269,6 @@ fi
 )
 
 
-def render_job_scope_lines() -> list[str]:
-    """Bash lines that install the helper, both hooks and the sudoers rule.
-
-    Returns:
-        The lines. The helper and the hooks are written whole on every run, as
-        the reaper is. The rule is written beside its final name, checked with
-        ``visudo -cf`` and only then moved over it, so a rule sudo would
-        refuse never reaches sudoers.d and fails the provision instead.
-    """
-    staged = f"{SUDOERS_PATH}.new"
-    return [
-        f"cat > {JOB_SCOPE_PATH} <<'JOB_SCOPE_EOF'",
-        JOB_SCOPE_SCRIPT.rstrip("\n"),
-        "JOB_SCOPE_EOF",
-        f"chmod 0755 {JOB_SCOPE_PATH}",
-        f"cat > {JOB_HOOK_PATH} <<'JOB_HOOK_EOF'",
-        JOB_HOOK_SCRIPT.rstrip("\n"),
-        "JOB_HOOK_EOF",
-        f"chmod 0755 {JOB_HOOK_PATH}",
-        f"cat > {JOB_COMPLETED_HOOK_PATH} <<'JOB_COMPLETED_EOF'",
-        JOB_COMPLETED_SCRIPT.rstrip("\n"),
-        "JOB_COMPLETED_EOF",
-        f"chmod 0755 {JOB_COMPLETED_HOOK_PATH}",
-        f"cat > {staged} <<'SUDOERS_EOF'",
-        SUDOERS_RULE.rstrip("\n"),
-        "SUDOERS_EOF",
-        f"chmod 0440 {staged}",
-        f"visudo -cf {staged}",
-        f"mv {staged} {SUDOERS_PATH}",
-    ]
-
-
-def render_job_hook_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that give one runner unit the job-started hook.
-
-    Run before the unit starts or is restarted into the listener slice
-    (:func:`fleet.core.runner_slice_render.render_runner_slice_move_lines`), which
-    is when its runner reads its environment.
-
-    Args:
-        install: The install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines. The drop-in is written, and systemd reloaded, only when the
-        file does not already hold exactly :data:`HOOK_DROP_IN`.
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    return render_drop_in_lines(
-        install,
-        name=HOOK_DROP_IN_NAME,
-        body=HOOK_DROP_IN,
-        announcement=(
-            f"job hook set for {install['service']}: each job runs in a scope of {CI_SLICE_NAME}"
-        ),
-    )
-
-
-def render_hooks_live_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that restart an idle unit whose listener predates its hooks.
-
-    A runner reads its hooks from its environment when it starts, so a
-    drop-in a later provision changed (the job-completed hook, MCPs board task
-    621902c3) reaches a running unit only through a restart. Run after the
-    unit has started and been placed
-    (:func:`fleet.core.runner_slice_render.render_runner_slice_move_lines`).
-
-    Args:
-        install: The install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines. They read the unit's main process's environment and do
-        nothing when it already names every hook :data:`HOOK_DROP_IN` sets.
-        Otherwise the unit is restarted when the helper's ``--workers`` mode
-        finds no ``Runner.Worker`` of it, in its cgroup or its job scopes,
-        and else left running its job and named: the reaper's pass restarts
-        it between jobs (:mod:`fleet.core.runner_reaper_render`).
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    unit = scriptable(install["service"], label="service")
-    return [
-        f"pid=$(systemctl show -p MainPID --value {unit})",
-        'environ=$(tr "\\0" "\\n" < "/proc/$pid/environ")',
-        "hooks=live",
-        *(
-            f'case "$environ" in *"{variable}"*) ;; *) hooks=stale ;; esac'
-            for variable in HOOK_ENVIRONMENT
-        ),
-        'if [ "$hooks" = stale ]; then',
-        f'    if [ "$({JOB_SCOPE_PATH} --workers {unit})" = "{unit} -" ]; then',
-        f"        systemctl restart {unit}",
-        f"        echo 'job hooks live: {unit} restarted to read {HOOK_DROP_IN_NAME}'",
-        "    else",
-        f"        echo 'job hooks pending: {unit} is running a job; the reaper restarts it "
-        "between jobs'",
-        "    fi",
-        "fi",
-    ]
-
-
 #: Why the placement row matters, printed beside a drift line.
 PLACEMENT_REASON = (
     f"a listener inside {CI_SLICE_NAME} is throttled with the jobs filling it, and on "
@@ -437,8 +329,5 @@ __all__ = [
     "SUDOERS_PATH",
     "SUDOERS_RULE",
     "placement_check_id",
-    "render_hooks_live_lines",
-    "render_job_hook_lines",
-    "render_job_scope_lines",
     "render_placement_check_lines",
 ]

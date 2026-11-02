@@ -1,14 +1,19 @@
-"""What a runner host needs BELOW its runners: the base a rebuild lays first.
+"""What a runner host needs BELOW its runners: the base its generation carries.
 
 The roster (:mod:`fleet.contracts.runners`) always said which runners a host
 carries and which assets their jobs need. This block says what the machine
 must hold beyond a fleet worker before any runner can register on it: the
 packages only its CI jobs call (ffmpeg, go, poppler, ...) and the disk its
-root may use. A runner host is a fleet machine installed from a CORVIS stick
-or a netboot and provisioned by MCPs scripts/host/fleet-node/provision.sh,
-which is the one source of its docker, GPU driver and toolchain, so none of
-those is listed here (MCPs board task 1e9ab738, which retired the Windows
-host and its WSL guest).
+root may use. A runner host is a fleet worker on NixOS, installed by the
+netboot from MCPs ``fleet-mcp/nixos``, whose worker configuration is the one
+source of its docker, GPU driver and toolchain, its Python among them, so
+none of those is listed here (MCPs board task 1e9ab738, which retired the
+Windows host and its WSL guest).
+
+THE PACKAGES ARE NIXPKGS ATTRIBUTE NAMES (MCPs board task 9aba868d). lavender
+moved from Ubuntu, whose apt installed this list, to the fleet's NixOS,
+whose runner-host module installs ``pkgs.<name>`` for each, read from the
+document :mod:`fleet.core.runner_host_document` renders.
 
 THE DISK CEILING LIVES HERE TOO. A runner host is meant to sit essentially
 empty; the ceiling is the most its root may hold before the audit fails the
@@ -28,6 +33,7 @@ refused where the host decodes (:func:`fleet.contracts.runners.decode_host_runne
 
 from __future__ import annotations
 
+import re
 from typing import Final
 
 from platform_core.json_utils import (
@@ -50,6 +56,10 @@ from typing_extensions import TypedDict
 #: cache, none in use, against the 150 GB the operator asked for ('Get it
 #: under 150', MCPs board task 621902c3).
 BUILD_CACHE_BOUND_GIB: Final = 10
+
+#: A top-level nixpkgs attribute name, which the runner-host module reads as
+#: ``pkgs.<name>``.
+_NIX_ATTRIBUTE: Final = re.compile(r"[A-Za-z_][A-Za-z0-9_'-]*")
 
 
 class DiskCeiling(TypedDict):
@@ -79,12 +89,12 @@ class HostBase(TypedDict):
     """Everything a runner host holds before its first runner registers.
 
     Attributes:
-        apt_packages: Packages installed before any runner that a fleet
-            worker does not already carry.
+        nix_packages: The nixpkgs attributes of the packages its CI jobs
+            call that a fleet worker does not already carry.
         disk: The root's disk ceiling and its idle baseline.
     """
 
-    apt_packages: list[str]
+    nix_packages: list[str]
     disk: DiskCeiling
 
 
@@ -190,7 +200,7 @@ def encode_host_base(base: HostBase) -> JSONObject:
         JSON-serialisable mapping carrying every field.
     """
     return {
-        "apt_packages": list(base["apt_packages"]),
+        "nix_packages": list(base["nix_packages"]),
         "disk": encode_disk_ceiling(base["disk"]),
     }
 
@@ -206,20 +216,24 @@ def decode_host_base(value: JSONValue) -> HostBase:
 
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
-            mistyped, or no package is declared. The capability tags the
-            runner jobs need (ffmpeg, go, pdftotext) are packages a fleet
-            worker does not carry, so a base with none describes a host
-            those jobs would fail on.
+            mistyped, no package is declared, or one is not a plain nixpkgs
+            attribute name. The capability tags the runner jobs need
+            (ffmpeg, go, pdftotext) are packages a fleet worker does not
+            carry, so a base with none describes a host those jobs would
+            fail on.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"host base must be a JSON object, got {type(value).__name__}")
-    packages = require_str_list(value, "apt_packages")
+    packages = require_str_list(value, "nix_packages")
     if not packages:
         raise JSONTypeError(
-            "apt_packages must be non-empty; a fleet worker lacks the tagged tools runner jobs call"
+            "nix_packages must be non-empty; a fleet worker lacks the tagged tools runner jobs call"
         )
+    for package in packages:
+        if not _NIX_ATTRIBUTE.fullmatch(package):
+            raise JSONTypeError(f"nix_packages names {package!r}, which is no nixpkgs attribute")
     return HostBase(
-        apt_packages=packages,
+        nix_packages=packages,
         disk=decode_disk_ceiling(require_dict(value, "disk")),
     )
 

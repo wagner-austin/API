@@ -16,8 +16,10 @@ WHAT IT CARRIES, per host of ``runners.json``:
 - ``runner``: the pinned release, with its tarball's SHA-256, which the
   store fetches it by.
 - ``localBin``: what each runner's ``.path`` ends with.
+- ``tokenDirectory``: where each repository's registration token is kept.
+- ``packages``: the nixpkgs attributes of the base's packages.
 - ``installs``: each install's unit, root, repository, runner name, labels
-  and the variable its registration token is named by.
+  and the name its registration token is kept under.
 - ``files``: every file with its path, mode and text. These are the
   hygiene, reaper, job-scope, action-cache and CPU-set scripts, their units
   and timers, both slices, every runner unit's five drop-ins and the
@@ -91,6 +93,7 @@ from fleet.core.runner_install import (
     RUNNER_ACCOUNT,
     RUNNER_SHA256,
     RUNNER_VERSION,
+    TOKEN_DIRECTORY,
     install_root_for,
     token_variable,
 )
@@ -218,6 +221,8 @@ class RunnerHostDocument(TypedDict):
         account: The account the runners run as.
         runner: The pinned release.
         localBin: What each runner's ``.path`` ends with.
+        tokenDirectory: Where each repository's registration token is kept.
+        packages: The nixpkgs attributes of the base's packages, in roster order.
         installs: Every install, in roster order.
         files: Every file, scripts first, then units, then drop-ins.
         directories: Every directory, the action cache first.
@@ -230,6 +235,8 @@ class RunnerHostDocument(TypedDict):
     account: str
     runner: DocumentRelease
     localBin: str
+    tokenDirectory: str
+    packages: list[str]
     installs: list[DocumentInstall]
     files: list[HostFile]
     directories: list[HostDirectory]
@@ -341,6 +348,8 @@ def host_document(spec: HostRunnerSpec, reserved_cores: int) -> RunnerHostDocume
         account=RUNNER_ACCOUNT,
         runner=DocumentRelease(version=RUNNER_VERSION, sha256=RUNNER_SHA256),
         localBin=LOCAL_BIN,
+        tokenDirectory=TOKEN_DIRECTORY,
+        packages=list(spec["base"]["nix_packages"]),
         installs=[
             DocumentInstall(
                 service=install["service"],

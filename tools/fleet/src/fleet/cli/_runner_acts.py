@@ -22,9 +22,8 @@ from fleet.core import (
     runner_audit,
     runner_load,
     runner_onboard,
-    runner_rebuild,
+    runner_register,
     runner_registrations,
-    runner_render,
 )
 from fleet.core.runner_audit_types import AuditFinding
 
@@ -70,40 +69,6 @@ def audit(spec: RunnerSpec, hosts: Sequence[HostRunnerSpec]) -> int:
     if faults:
         _log.info("%d fault(s); the fleet does not match its roster", faults)
         return 1
-    return 0
-
-
-def render(host: HostRunnerSpec, out_dir: str, reserved_cores: int) -> int:
-    """Write the converge scripts for one host and print the run order.
-
-    Args:
-        host: The host to render for.
-        out_dir: Directory receiving ``base.sh`` and ``provision.sh``.
-        reserved_cores: The logical cores its roster file reserves for its
-            runners, as the provision takes them.
-
-    Returns:
-        0 always: rendering is a local act that either completes or raises.
-
-    Raises:
-        ValueError: As :func:`fleet.core.runner_render.render_provision` describes.
-    """
-    rendered = runner_render.render_provision(host, reserved_cores)
-    base_path = pathlib.Path(out_dir) / "base.sh"
-    provision_path = pathlib.Path(out_dir) / "provision.sh"
-    _test_hooks.write_text(base_path, rendered["base_script"])
-    _test_hooks.write_text(provision_path, rendered["provision_script"])
-    _log.info("wrote %s", base_path)
-    _log.info("wrote %s", provision_path)
-    _log.info("RUN ORDER for %s:", host["name"])
-    _log.info(
-        "  1. base.sh on the host as root, then reboot if it printed %s",
-        runner_render.REBOOT_MARKER,
-    )
-    _log.info("  2. provision.sh on the host as root, with each RUNNER_TOKEN_* exported")
-    for step in rendered["manual_steps"]:
-        _log.info("  %s", step)
-    _log.info("  3. fleet-runners --spec <roster> --host %s", host["name"])
     return 0
 
 
@@ -168,10 +133,8 @@ def report(record_path: str, *, cores: int, host_name: str | None) -> int:
     return 0
 
 
-def onboard(
-    spec: RunnerSpec, spec_path: str, host: HostRunnerSpec, repo: str, reserved_cores: int
-) -> int:
-    """Onboard a repo onto a host, rewrite the roster, print the audit.
+def onboard(spec: RunnerSpec, spec_path: str, host: HostRunnerSpec, repo: str) -> int:
+    """Add a repo's install to a host's roster entry, rewrite the roster, print what follows.
 
     Args:
         spec: The whole roster; the host entry inside it is mutated by the
@@ -179,18 +142,16 @@ def onboard(
         spec_path: Where the roster lives, for the rewrite.
         host: The target host's entry within ``spec``.
         repo: The repository, ``owner/name``.
-        reserved_cores: The logical cores its roster file reserves for its
-            runners, as the provision takes them.
 
     Returns:
-        0 when the post-onboard audit is clean; 1 when it reports drift --
-        the runner exists and the roster records it either way, and the
-        drift lines say exactly what to repair.
+        0 always: the roster is rewritten or the onboarder raised. The host
+        has no runner until its generation is switched and ``--register``
+        has run, which the printed steps say in order.
 
     Raises:
         AppError: As :func:`fleet.core.runner_onboard.onboard` describes.
     """
-    plan, findings = runner_onboard.onboard(host, repo, reserved_cores)
+    plan = runner_onboard.onboard(host, repo)
     _test_hooks.write_text(
         pathlib.Path(spec_path), dump_json_str(encode_runner_spec(spec), indent=2) + "\n"
     )
@@ -202,39 +163,35 @@ def onboard(
         ",".join(install["labels"]),
     )
     _log.info("roster rewritten: %s", spec_path)
-    faults = log_findings(host["name"], findings)
-    if faults:
-        _log.info("%d fault(s) after onboarding; the drift lines name the repairs", faults)
-        return 1
-    _log.info("onboarding verified: every check green, %s covered from birth", repo)
+    _log.info("NEXT, in order, for %s:", host["name"])
+    _log.info("  1. make render-documents, then commit and push the roster and its render")
+    _log.info("  2. in MCPs, fleet-reach render, then commit and push fleet-mcp/nixos/roster.json")
+    _log.info("  3. switch %s to the new generation", host["name"])
+    _log.info("  4. fleet-runners --spec <roster> --host %s --register yes", host["name"])
     return 0
 
 
-def rebuild(host: HostRunnerSpec, reserved_cores: int) -> int:
-    """Rebuild one runner host and print each stage and the audit.
+def register(host: HostRunnerSpec) -> int:
+    """Register one runner host's unregistered runners and print each step and the audit.
 
     Args:
-        host: The host to rebuild.
-        reserved_cores: The logical cores its roster file reserves for its
-            runners, as the provision takes them.
+        host: The host to register.
 
     Returns:
-        0 when the post-rebuild audit is clean; 1 when it reports drift, a
+        0 when the audit afterwards is clean; 1 when it reports drift, a
         manual asset being the usual one, named by its own line.
 
     Raises:
-        AppError: As :func:`fleet.core.runner_rebuild.rebuild` describes.
+        AppError: As :func:`fleet.core.runner_register.register` describes.
     """
-    rebuilt = runner_rebuild.rebuild(host, reserved_cores)
-    for step in rebuilt["steps"]:
-        _log.info("%s rebuild: %s", host["name"], step)
-    for step in rebuilt["manual_steps"]:
-        _log.info("%s %s", host["name"], step)
-    faults = log_findings(host["name"], rebuilt["findings"])
+    registered = runner_register.register(host)
+    for step in registered["steps"]:
+        _log.info("%s register: %s", host["name"], step)
+    faults = log_findings(host["name"], registered["findings"])
     if faults:
-        _log.info("%d fault(s) after the rebuild; the drift lines name the repairs", faults)
+        _log.info("%d fault(s) after registering; the drift lines name the repairs", faults)
         return 1
-    _log.info("rebuild verified: every check green on %s", host["name"])
+    _log.info("registration verified: every check green on %s", host["name"])
     return 0
 
 
@@ -310,8 +267,7 @@ __all__ = [
     "log_findings",
     "onboard",
     "prune",
-    "rebuild",
-    "render",
+    "register",
     "report",
     "sample",
 ]

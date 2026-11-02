@@ -10,27 +10,28 @@ owner/repo --host lavender`` does, in order:
   1. REFUSES if the roster already carries installs for that repo on that
      host -- re-registering is how duplicate runners are born, and the
      roster is the memory that prevents it.
-  2. MINTS the registration token itself (``gh api``, through the command
-     hook) -- tokens expire hourly, so any flow that asks a human to paste
-     one has already lost the idiot-proofing race.
-  3. DERIVES the install entry from the fleet's convention: one runner
+  2. DERIVES the install entry from the fleet's convention: one runner
      named and labelled after the host, in
      ``/home/<runner account>/actions-runner-<repo>-1``, so a workflow
      targets the host's label and the directory says whose runner it is.
-  4. PROVISIONS by re-running the host's whole provision
-     (:func:`fleet.core.runner_render.render_provision_script`) over the
-     roster with the new install in it, sent as a file and run as root.
-     Every step is idempotent, and the host-wide units that list every
-     install pick the new one up in the same run.
-  5. REWRITES the roster in the same act (the caller, from the mutated
+  3. REWRITES the roster in the same act (the caller, from the mutated
      host entry), so the audit and the load sampler cover the new install
      from birth rather than after somebody remembers.
-  6. AUDITS the host as verification and returns the findings -- onboarding
-     is not done when the script exits; it is done when the audit says the
-     service is running.
 
-Nothing here is optional and nothing falls back: a failure at any step
-raises with a typed code and the steps already taken stand.
+The registration token is minted by ``--register`` itself (``gh api``):
+tokens expire hourly, so any flow that asks a human to paste one has
+already lost the idiot-proofing race.
+
+THE HOST GETS THE RUNNER FROM ITS GENERATION (MCPs board task 9aba868d). A
+runner host is a NixOS machine whose every runner unit its generation
+declares from the roster, so the new install's unit exists once the roster
+is rendered (``make render-documents``), rolled, carried into MCPs'
+``fleet-mcp/nixos`` by ``fleet-reach render`` and switched to on the host;
+``fleet-runners --register`` then mints its token and registers it, and
+audits the host, which is when onboarding is done. The command says so.
+
+Nothing here is optional and nothing falls back: a refusal raises with a
+typed code and changes nothing.
 """
 
 from __future__ import annotations
@@ -40,10 +41,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.runner_registration import runner_service_name
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import remote, runner_audit, runner_render
-from fleet.core.runner_audit_types import AuditFinding
-from fleet.core.runner_github import mint_registration_token
-from fleet.core.runner_install import RUNNER_ACCOUNT, payload_path
+from fleet.core.runner_install import RUNNER_ACCOUNT
 
 
 class OnboardPlan(TypedDict):
@@ -51,8 +49,8 @@ class OnboardPlan(TypedDict):
 
     Attributes:
         repo: The repository, ``owner/name``.
-        install: The install that will be provisioned and added to the
-            roster, derived from the fleet's naming convention.
+        install: The install added to the roster, derived from the fleet's
+            naming convention.
     """
 
     repo: str
@@ -113,53 +111,25 @@ def plan_onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
     return OnboardPlan(repo=repo, install=install)
 
 
-def onboard(
-    spec: HostRunnerSpec, repo: str, reserved_cores: int
-) -> tuple[OnboardPlan, list[AuditFinding]]:
-    """Onboard one repository onto one host, end to end.
+def onboard(spec: HostRunnerSpec, repo: str) -> OnboardPlan:
+    """Add one repository's install to one host's roster entry.
 
     Args:
         spec: The target host's roster entry. MUTATED: the plan's install is
-            appended before the provision runs, because the provision is
-            rendered from the roster, and the caller's roster write and the
-            audit then see the new state -- the whole point of onboarding
-            being one act.
+            appended, and the caller writes the roster from it.
         repo: The repository, ``owner/name``.
-        reserved_cores: The logical cores the host's roster file reserves
-            for its runners, as the provision takes them
-            (:func:`fleet.core.runner_render.render_provision_script`).
 
     Returns:
-        The executed plan and the post-onboarding audit findings for the
-        host, the new install included.
+        The plan, its install now in ``spec``.
 
     Raises:
-        AppError: ``RUNNER_ALREADY_ONBOARDED``,
-            ``RUNNER_TOKEN_UNAVAILABLE``, ``NODE_UNREACHABLE``,
-            ``DISPATCH_FAILED`` or ``RUNNER_AUDIT_UNPARSABLE`` as the
-            steps describe; config.sh refusing (an expired token) surfaces
-            as ``DISPATCH_FAILED`` with the script's own stderr.
+        AppError: ``RUNNER_ALREADY_ONBOARDED`` as :func:`plan_onboard`
+            describes.
         ValueError: From the planner's flag validation.
     """
     plan = plan_onboard(spec, repo)
-    token = mint_registration_token(repo)
     spec["installs"].append(plan["install"])
-    remote.run_root_script(
-        spec["host"],
-        payload_path(spec, f"fleet-onboard-{_repo_slug(repo)}"),
-        runner_render.render_provision_script(spec, {repo: token}, reserved_cores),
-        timeout_seconds=runner_render.STAGE_TIMEOUT_SECONDS,
-    )
-    outcome = runner_audit.attempt_audit_host(spec)
-    findings = outcome["findings"]
-    if findings is None:
-        raise AppError(
-            FleetErrorCode.NODE_UNREACHABLE,
-            f"post-onboard audit could not reach {spec['name']}: {outcome['reason']}. "
-            "The runner was provisioned and its roster entry is staged; re-run the "
-            "audit before trusting either.",
-        )
-    return plan, findings
+    return plan
 
 
 __all__ = [

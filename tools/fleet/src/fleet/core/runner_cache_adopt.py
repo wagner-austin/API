@@ -14,11 +14,11 @@ for all four at each), while the API, corvis-stick and tree-bot units, idle,
 took the cache at the first. So the restart is now the job of
 ``fleet-action-cache-adopt``, a root timer firing every minute: a unit whose
 configured environment holds the setting and whose running main process
-lacks it is restarted once it has been idle a while. Provision writes the
-drop-in before a unit's first start, so a new unit reads the cache from its
-first job, and runs the same script once per unit after the start, so an
-idle unit an older provision started without it still takes the cache
-within the provision run.
+lacks it is restarted once it has been idle a while. A runner host's NixOS
+generation declares the drop-in before a unit's first start
+(:mod:`fleet.core.runner_host_document`, MCPs board task 9aba868d), so a new
+unit reads the cache from its first job, and the timer is for a unit that
+started before its drop-in changed.
 
 A unit is restarted only when every one of these holds: it is running (a
 stopped unit takes the drop-in whenever it next starts, and the timer
@@ -44,15 +44,9 @@ so one sample is not enough. No such moment lasts
 from __future__ import annotations
 
 from fleet.contracts.action_cache import STATUS_PATH
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core.runner_action_cache import (
-    CACHE_DIR,
-    CACHE_DROP_IN,
-    CACHE_DROP_IN_NAME,
-    CACHE_VARIABLE,
-)
+from fleet.contracts.runners import HostRunnerSpec
+from fleet.core.runner_action_cache import CACHE_DIR, CACHE_VARIABLE
 from fleet.core.runner_proc_bash import UNIT_PROCS_FUNCTION
-from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
 from fleet.core.script_values import scriptable
 
 #: Where the adopt script is installed.
@@ -276,90 +270,3 @@ def render_adopt_service(spec: HostRunnerSpec) -> str:
         )
         + "\n"
     )
-
-
-def render_adopt_lines(spec: HostRunnerSpec) -> list[str]:
-    """Bash lines that install the adopt and report scripts and their units, and start its timer.
-
-    One timer fires both, through one service.
-
-    Args:
-        spec: The host's roster entry.
-
-    Returns:
-        The lines: both scripts written whole on every run, as the fill's
-        are, and both units written when they differ.
-
-    Raises:
-        ValueError: When a unit name cannot be embedded verbatim.
-    """
-    return [
-        f"cat > {ADOPT_PATH} <<'ADOPT_EOF'",
-        ADOPT_SCRIPT.rstrip("\n"),
-        "ADOPT_EOF",
-        f"chmod +x {ADOPT_PATH}",
-        f"cat > {REPORT_PATH} <<'REPORT_EOF'",
-        REPORT_SCRIPT.rstrip("\n"),
-        "REPORT_EOF",
-        f"chmod +x {REPORT_PATH}",
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{ADOPT_SERVICE_NAME}",
-            render_adopt_service(spec),
-            announcement=f"{ADOPT_SERVICE_NAME} written",
-        ),
-        *render_unit_file_lines(
-            f"/etc/systemd/system/{ADOPT_TIMER_NAME}",
-            ADOPT_TIMER,
-            announcement=f"{ADOPT_TIMER_NAME} written",
-        ),
-        f"systemctl enable --now {ADOPT_TIMER_NAME}",
-    ]
-
-
-def render_cache_drop_in_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that name the action cache in one runner unit's drop-in.
-
-    Run BEFORE ``svc.sh start``, so a new unit's first job already has the
-    cache: a fresh runner takes a queued job within seconds of starting
-    (:func:`fleet.core.runner_slice_render.render_runner_slice_drop_in_lines`
-    has the measurement). The drop-in is written, and systemd reloaded, only
-    when the file does not already hold exactly
-    :data:`~fleet.core.runner_action_cache.CACHE_DROP_IN`.
-
-    Args:
-        install: The install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines.
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    unit = scriptable(install["service"], label="service")
-    return render_drop_in_lines(
-        install,
-        name=CACHE_DROP_IN_NAME,
-        body=CACHE_DROP_IN,
-        announcement=f"action cache named for {unit}",
-    )
-
-
-def render_cache_adopt_now_lines(install: RunnerInstall) -> list[str]:
-    """Bash lines that restart a started unit running without the cache, if idle.
-
-    Run after ``svc.sh start``. The adopt script, which
-    :func:`render_adopt_lines` installed earlier in the same run, leaves a
-    unit that started with the drop-in in place alone, restarts an idle one
-    an older provision started without it, and says so either way.
-
-    Args:
-        install: The install; its ``service`` is the unit's name.
-
-    Returns:
-        The lines.
-
-    Raises:
-        ValueError: When the unit name cannot be embedded verbatim.
-    """
-    unit = scriptable(install["service"], label="service")
-    return [f"{ADOPT_PATH} {ADOPT_SETTLE_SECONDS} {unit}"]

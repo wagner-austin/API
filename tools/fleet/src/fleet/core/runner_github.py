@@ -1,8 +1,7 @@
 """What the fleet asks GitHub about its self-hosted runners, through ``gh`` on this machine.
 
-Two reads and one removal, one auth: a registration token for onboarding and
-rebuilding a host (:mod:`fleet.core.runner_onboard`,
-:mod:`fleet.core.runner_rebuild`); each repository's runner list, for the
+Two reads and one removal, one auth: a registration token for registering a
+host's runners (:mod:`fleet.core.runner_register`); each repository's runner list, for the
 audit's dropped-job row (:mod:`fleet.core.runner_dropped_check`, MCPs board
 task 715b9ec5) and its registrations row (:mod:`fleet.core.runner_registrations`);
 and the deletion of a registration no roster host declares. Each runs

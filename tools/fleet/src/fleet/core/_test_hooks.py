@@ -139,9 +139,9 @@ class NowProtocol(Protocol):
 class SleepProtocol(Protocol):
     """Waits a whole number of seconds.
 
-    A hook for the same reason the clock is one: ``--rebuild`` waits out a
-    host's reboot by polling, and a test that could not control the wait
-    could only run the poll in real time or not at all.
+    A hook for the same reason the clock is one: ``--register`` waits for
+    each runner to register by polling, and a test that could not control
+    the wait could only run the poll in real time or not at all.
     """
 
     def __call__(self, seconds: int) -> None:

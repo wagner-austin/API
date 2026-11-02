@@ -143,9 +143,8 @@ CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
 #: ``runners.json`` asset, passed the same suite). It is not an executable on
 #: a PATH, so the probe asks for it at the path Playwright opens
 #: (:data:`CHROME_LINUX_PATH`) rather than through ``report``'s
-#: ``command -v``. The apt-get install is the asset's own
-#: ``provision_command``: Google ships the .deb from its own host, not from
-#: any apt repository the node already has.
+#: ``command -v``. A NixOS runner host's generation installs it (MCPs
+#: ``fleet-mcp/nixos/modules/runner-host.nix``, board task 9aba868d).
 #:
 #: ``pdftotext`` because MCPs ``packages/wiki-check`` reads PDF sources
 #: through poppler's pdftotext and its audit rules depend on that tool's
