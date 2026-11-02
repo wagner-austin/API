@@ -9,7 +9,7 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONObject, JSONValue, require_float, require_str
 
-from covenant_ml.markets.crsp_calendar import CrspWindow, crsp_ordinary_return
+from covenant_ml.markets.crsp_calendar import CrspWindow, crsp_return_span
 from covenant_ml.markets.crsp_extract import load_crsp_sources
 from covenant_ml.markets.crsp_holdings import (
     crsp_window_path,
@@ -75,7 +75,7 @@ def test_vendor_duration_must_cover_exactly_two_through_ten_sessions(gap: int) -
     records = {(1, day): missing(day) for day in sessions[1 : gap + 1]}
     close = daily(1, W1.entry, -0.2, dlycaldt=end, dlyprevdt=entry, dlyretdurflg=f"P{gap}")
     records[(1, end)] = close
-    assert not crsp_ordinary_return(close, sessions[gap])
+    assert not crsp_return_span(close, sessions[gap], 1)
     assert crsp_compound_held(records, 1, entry, sessions[1 : gap + 2]) == 0.8
 
 
