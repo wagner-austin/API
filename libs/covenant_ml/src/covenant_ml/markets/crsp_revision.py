@@ -47,7 +47,7 @@ def _inputs(
 ) -> _RevisionInputs:
     """Verify the pinned extraction and reconstruct its exact original manifests.
 
-    Only version, entry execution and cost-accounting rules may differ. Every
+    Only version, entry, cost and held-return accounting rules may differ. Every
     extraction setting must remain identical, including dates and columns.
     """
     require_ciphertext_only(outputs)
@@ -62,7 +62,7 @@ def _inputs(
     current_document = narrow_json_to_dict(load_json_str(current.decode()))
     decode_crsp_protocol(current_document)
     old_document = narrow_json_to_dict(load_json_str(previous.decode()))
-    allowed = {"version", "entry_rule", "cost_rule"}
+    allowed = {"version", "entry_rule", "cost_rule", "held_return_rule"}
     if (
         current_document == old_document
         or set(current_document) - allowed != set(old_document) - allowed
