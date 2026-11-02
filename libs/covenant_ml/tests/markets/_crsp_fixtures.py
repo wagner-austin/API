@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import csv
 import hashlib
-import io
 from datetime import date, timedelta
 from itertools import pairwise
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject, JSONValue, dump_json_str, require_list, require_str
+from platform_core.json_utils import JSONObject, dump_json_str, require_list, require_str
+
+from covenant_ml.markets.crsp_rows import encode_crsp_rows
 
 from .test_crsp_protocol import protocol_document
 
@@ -81,19 +81,13 @@ def write_sources(
     manifest: JSONObject = {"extracted_at": "2026-10-29T00:00:00+00:00"}
     manifest["protocol"] = save_file(directory, "protocol.json", dump_json_str(protocol).encode())
     for name, records in rows.items():
-        columns = [
+        columns = tuple(
             require_str({"value": value}, "value")
             for value in require_list(protocol, name + "_columns")
-        ]
-        stream = io.StringIO()
-        writer = csv.writer(stream)
-        writer.writerow(columns)
-        for row in records:
-            values: list[JSONValue] = [row[column] for column in columns]
-            writer.writerow(values)
+        )
         sql = f"select {', '.join(columns)} from crsp_a_stock.{require_str(protocol, name)};"
         manifest[name] = {
-            "csv": save_file(directory, name + ".csv", stream.getvalue().encode()),
+            "csv": save_file(directory, name + ".csv", encode_crsp_rows(records, columns)),
             "query": save_file(directory, name + ".sql", sql.encode()),
         }
     path = directory / "manifest.json"

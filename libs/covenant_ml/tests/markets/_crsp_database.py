@@ -10,14 +10,13 @@ by ``test_crsp_process``.
 
 from __future__ import annotations
 
-import csv
-import io
 from pathlib import Path
 
-from platform_core.json_utils import JSONObject, JSONValue, require_int, require_str
+from platform_core.json_utils import JSONObject, require_int, require_str
 
 from covenant_ml.markets.crsp_protocol import CrspProtocol, decode_crsp_protocol
 from covenant_ml.markets.crsp_queries import CrspScope, crsp_scopes
+from covenant_ml.markets.crsp_rows import encode_crsp_rows
 from covenant_ml.markets.crsp_writer import PSQL
 
 from ._crsp_study_fixtures import FINAL_END, study_protocol, study_rows
@@ -166,17 +165,6 @@ def relation_columns(protocol: CrspProtocol) -> dict[str, tuple[str, ...]]:
     }
 
 
-def copy_csv(rows: list[JSONObject], columns: tuple[str, ...]) -> bytes:
-    """Render rows as ``COPY ... WITH (FORMAT CSV, HEADER)`` would, nulls empty."""
-    stream = io.StringIO()
-    writer = csv.writer(stream, lineterminator="\n")
-    writer.writerow(columns)
-    for row in rows:
-        values: list[JSONValue] = ["" if row[column] is None else row[column] for column in columns]
-        writer.writerow(values)
-    return stream.getvalue().encode()
-
-
 class FakeDatabase:
     """Answer the writer's one client invocation with the partitioned CSV files."""
 
@@ -200,7 +188,7 @@ class FakeDatabase:
         for scope in crsp_scopes(protocol):
             for name, records in partition_rows(self.rows, protocol, scope).items():
                 target = directory / scope.partition / (name + ".csv")
-                target.write_bytes(copy_csv(records, columns[name]))
+                target.write_bytes(encode_crsp_rows(records, columns[name]))
         for name, payload in self.extra.items():
             (directory / name).write_bytes(payload)
         (directory / "snapshot-first.csv").write_text(self.snapshots[0], encoding="utf-8")
@@ -214,7 +202,6 @@ __all__ = [
     "SNAPSHOT",
     "STRADDLE",
     "FakeDatabase",
-    "copy_csv",
     "database_protocol",
     "database_rows",
     "partition_rows",

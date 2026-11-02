@@ -26,6 +26,7 @@ from covenant_ml.markets.crsp_queries import (
     synthetic_source,
     vendor_source,
 )
+from covenant_ml.markets.crsp_rows import encode_crsp_rows
 from covenant_ml.markets.crsp_writer import extract_crsp
 from covenant_ml.markets.encrypted_storage import decrypted_bundle
 
@@ -33,7 +34,6 @@ from ._crsp_database import (
     INELIGIBLE,
     LATE,
     STRADDLE,
-    copy_csv,
     database_protocol,
     partition_rows,
     relation_columns,
@@ -328,7 +328,7 @@ def test_final_period_rows_in_the_validation_partition_are_refused(
     protocol = database_protocol()
     final = partition_rows(database_rows(), protocol, crsp_scopes(protocol)[1])
     database.extra = {
-        "train-validation/returns.csv": copy_csv(
+        "train-validation/returns.csv": encode_crsp_rows(
             final["returns"], relation_columns(protocol)["returns"]
         )
     }
