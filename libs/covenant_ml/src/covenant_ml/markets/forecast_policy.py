@@ -7,17 +7,38 @@ from collections.abc import Sequence
 import numpy as np
 from numpy.typing import NDArray
 from platform_core.json_utils import JSONObject, JSONValue
+from typing_extensions import ReadOnly, TypedDict
 
 from ..evaluation.codec_records import encode_interval
 from ..evaluation.paired import paired_mean_difference
 from ..evaluation.policy import CONTRACT_ACTIONS, choose_actions, payoff_table
 from ..evaluation.resampling import build_resampling
 from ..evaluation.types import ResamplingUnit
-from .forecast_records import ForecastRow
 from .replay import quadratic_fee
+from .types import CENT
+
+#: Quadratic taker fee coefficient in basis points (0.07), rounded up to a cent per order.
+QUOTED_FEE_BPS = 700
+#: Expected value, in ten-thousandths of a dollar, an action must clear after its fee.
+QUOTED_HURDLE = 200
+#: Additional friction per trade in the sensitivity result: one cent.
+QUOTED_STRESS = CENT
 
 
-def cluster_interval(values: Sequence[float], rows: Sequence[ForecastRow]) -> JSONObject:
+class QuotedContract(TypedDict):
+    """The quote and outcome of one binary contract, all the taker policy reads.
+
+    A retrospective ``ForecastRow`` and a prospective campaign contract both carry
+    these fields, so both are scored by the same policy.
+    """
+
+    event_day: ReadOnly[str]
+    bid: ReadOnly[int]
+    ask: ReadOnly[int]
+    yes: ReadOnly[int]
+
+
+def cluster_interval(values: Sequence[float], rows: Sequence[QuotedContract]) -> JSONObject:
     """Estimate a paired mean with event dates as the independent clusters.
 
     Args:
@@ -37,7 +58,7 @@ def cluster_interval(values: Sequence[float], rows: Sequence[ForecastRow]) -> JS
     return encode_interval(paired_mean_difference(array, units, 0.95))
 
 
-def quoted_policy(rows: Sequence[ForecastRow], probabilities: Sequence[float]) -> JSONObject:
+def quoted_policy(rows: Sequence[QuotedContract], probabilities: Sequence[float]) -> JSONObject:
     """Select pass/YES/NO with a two-cent expected-value hurdle and exact fees.
 
     Args:
@@ -56,14 +77,14 @@ def quoted_policy(rows: Sequence[ForecastRow], probabilities: Sequence[float]) -
     fees: list[tuple[int, int]] = []
     for index, row in enumerate(rows):
         yes_price, no_price = row["ask"], 10000 - row["bid"]
-        yes_fee = quadratic_fee(yes_price, 1, 700)
-        no_fee = quadratic_fee(no_price, 1, 700)
+        yes_fee = quadratic_fee(yes_price, 1, QUOTED_FEE_BPS)
+        no_fee = quadratic_fee(no_price, 1, QUOTED_FEE_BPS)
         fees.append((yes_fee, no_fee))
         for action, price, fee in ((1, yes_price, yes_fee), (2, no_price, no_fee)):
             if not 0 < price < 10000:
                 decision[index, action, :] = -1.0
             else:
-                cost = (price + fee + 200) / 10000
+                cost = (price + fee + QUOTED_HURDLE) / 10000
                 decision[index, action, 0] = float(action == 2) - cost
                 decision[index, action, 1] = float(action == 1) - cost
     proba: NDArray[np.float64] = np.asarray(probabilities, dtype=np.float64)
@@ -92,7 +113,7 @@ def quoted_policy(rows: Sequence[ForecastRow], probabilities: Sequence[float]) -
     return {
         "trades": trades,
         "pnl": sum(pnl),
-        "extra_cent_pnl": sum(pnl) - trades * 100,
+        "extra_cent_pnl": sum(pnl) - trades * QUOTED_STRESS,
         "per_opportunity": cluster_interval(values, rows),
         "actions": encoded_actions,
         "pnl_by_row": encoded_pnl,
@@ -101,4 +122,11 @@ def quoted_policy(rows: Sequence[ForecastRow], probabilities: Sequence[float]) -
     }
 
 
-__all__ = ["cluster_interval", "quoted_policy"]
+__all__ = [
+    "QUOTED_FEE_BPS",
+    "QUOTED_HURDLE",
+    "QUOTED_STRESS",
+    "QuotedContract",
+    "cluster_interval",
+    "quoted_policy",
+]
