@@ -4,12 +4,38 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Iterable
 from datetime import datetime
 from math import isfinite
 
 from platform_core.json_utils import JSONObject, JSONValue, require_int, require_str
 
 from .validation import require_day
+
+
+def encode_crsp_rows(rows: Iterable[JSONObject], columns: tuple[str, ...]) -> bytes:
+    """Encode decoded rows in frozen column order, retaining nulls as empty cells.
+
+    This is also the synthetic database's CSV writer. It does not claim a new
+    vendor extraction; a derived cohort must retain its transformation lineage.
+
+    Args:
+        rows: Already decoded source rows, in their original order.
+        columns: The protocol's ordered projection for this relation.
+
+    Returns:
+        UTF-8 CSV with a header and explicit LF record endings.
+
+    Raises:
+        KeyError: A row is missing a required column.
+    """
+    stream = io.StringIO()
+    writer = csv.writer(stream, lineterminator="\n")
+    writer.writerow(columns)
+    for row in rows:
+        values: list[JSONValue] = ["" if row[column] is None else row[column] for column in columns]
+        writer.writerow(values)
+    return stream.getvalue().encode()
 
 
 def _cell(column: str, text: str) -> JSONValue:
@@ -117,3 +143,6 @@ def decode_crsp_rows(
         keys.add(key)
         rows.append(row)
     return tuple(rows)
+
+
+__all__ = ["decode_crsp_rows", "encode_crsp_rows"]

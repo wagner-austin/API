@@ -40,19 +40,13 @@ from .crsp_queries import (
     synthetic_source,
     vendor_source,
 )
-from .encrypted_storage import encrypt_bundle, staged_record
+from .encrypted_storage import encrypt_bundle, staged_file_record
 from .research_keys import ResearchAccess
 
 #: psql without startup files or password prompts, stopping at the first error.
 PSQL = ("psql", "-X", "-w", "-q", "-v", "ON_ERROR_STOP=1", "-f", "extract.sql")
 #: The source name of a session whose relations are inline synthetic definitions.
 SYNTHETIC_SOURCE = "synthetic"
-
-
-def _record(path: Path) -> StagedFile:
-    """Hash one written file by streaming it."""
-    with path.open("rb") as stream:
-        return staged_record(stream, path.name)
 
 
 def _snapshot(root: Path) -> tuple[str, str]:
@@ -81,7 +75,7 @@ def _seal_manifest(directory: Path, extracted_at: str, limits: CrspLimits) -> St
             checked before the whole-file reader loads them.
     """
     records = tuple(
-        _record(directory / (name + suffix))
+        staged_file_record(directory / (name + suffix))
         for name in CRSP_RELATIONS
         for suffix in (".csv", ".sql")
     )
@@ -89,11 +83,11 @@ def _seal_manifest(directory: Path, extracted_at: str, limits: CrspLimits) -> St
     if plaintext > limits["max_partition_bytes"]:
         raise ValueError("[CRSP-012] partition plaintext exceeds its byte budget")
     manifest = crsp_extract_from_records(
-        extracted_at, _record(directory / "protocol.json"), records
+        extracted_at, staged_file_record(directory / "protocol.json"), records
     )
     with (directory / "manifest.json").open("x", encoding="utf-8") as stream:
         stream.write(dump_json_str(encode_crsp_extract(manifest)))
-    return _record(directory / "manifest.json")
+    return staged_file_record(directory / "manifest.json")
 
 
 def _partition(
@@ -107,7 +101,7 @@ def _partition(
     manifest = _seal_manifest(directory, extracted_at, limits)
     sources = load_crsp_sources(directory / "manifest.json")
     check_crsp_partition(sources, scope, limits["max_rows"])
-    files = tuple(_record(path) for path in sorted(directory.iterdir()))
+    files = tuple(staged_file_record(path) for path in sorted(directory.iterdir()))
     counts = (
         len(sources.membership),
         len(sources.returns),
@@ -168,7 +162,7 @@ def _encrypt(
             recipient=recipient,
             partition=scope.partition,
         )
-        bundles.append(_record(pending / "bundle.json"))
+        bundles.append(staged_file_record(pending / "bundle.json"))
     return bundles
 
 
@@ -217,7 +211,7 @@ def extract_crsp(
         setup_sha256 = None
     else:
         relations = synthetic_source(setup.read_text("utf-8"))
-        setup_sha256 = _record(setup)["sha256"]
+        setup_sha256 = staged_file_record(setup)["sha256"]
     started = hooks.clock()
     if protocol["coverage_end"] >= started[:10]:
         raise ValueError("[CRSP-010] coverage must end before the extraction day")
@@ -238,7 +232,7 @@ def extract_crsp(
         snapshot, transaction = _snapshot(root)
         sealed = [_partition(root / scope.partition, scope, started, limits) for scope in scopes]
         bundles = _encrypt(root, output, scopes, access, sealed)
-        driver_sha256 = _record(root / "extract.sql")["sha256"]
+        driver_sha256 = staged_file_record(root / "extract.sql")["sha256"]
     for scope in scopes:
         (output / (".pending-" + scope.partition)).rename(output / scope.partition)
     partitions = [
@@ -259,7 +253,7 @@ def extract_crsp(
     receipt = CrspExtractionReceipt(
         source=source,
         setup_sha256=setup_sha256,
-        protocol=_record(protocol_path),
+        protocol=staged_file_record(protocol_path),
         driver_sha256=driver_sha256,
         started_at=started,
         completed_at=completed,

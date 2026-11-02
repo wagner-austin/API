@@ -38,6 +38,12 @@ def staged_record(stream: BufferedIOBase, name: str) -> StagedFile:
     return StagedFile(name=name, sha256=digest.hexdigest(), size_bytes=size)
 
 
+def staged_file_record(path: Path) -> StagedFile:
+    """Open one written file and hash it by streaming its exact bytes."""
+    with path.open("rb") as stream:
+        return staged_record(stream, path.name)
+
+
 class _BoundedWriter:
     """Stop even authenticated ciphertext exceeding its declared plaintext size."""
 
@@ -336,6 +342,7 @@ __all__ = [
     "encrypted_stage_manifest",
     "read_encrypted_bundle",
     "revise_encrypted_bundle",
+    "staged_file_record",
     "staged_record",
     "verify_encrypted_bundle",
 ]
