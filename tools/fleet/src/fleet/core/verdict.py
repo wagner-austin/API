@@ -13,10 +13,10 @@ THE BANNER IS THE VERDICT; THE COUNTS ARE THE EVIDENCE. ``=== ALL CHECKS
 PASSED ===`` is the last thing every package's ``make check`` prints and the
 only thing that means it passed (the operator's rule; an exit code through a
 pipe has lied before, ``feedback_out_file_pipe_clobbers_lastexitcode``). The
-counts are parsed from the two families of runner output this fleet has,
-vitest's and pytest's, and a count that is not in the tail is written as
-``unread`` rather than guessed: a verdict that invents a number is worse than
-one that says it could not read it.
+counts are parsed from the families of runner output this fleet has,
+vitest's, pytest's and osrs-lab's Gradle summary, and a count that is not in
+the tail is written as ``unread`` rather than guessed: a verdict that invents
+a number is worse than one that says it could not read it.
 """
 
 from __future__ import annotations
@@ -73,6 +73,17 @@ PYTEST_TOTAL: Final[re.Pattern[str]] = re.compile(r"^TOTAL\s.*?(\d+(?:\.\d+)?)%\
 #: absence on a passing run is not a defect but ``unread``.
 VITEST_ALL_FILES: Final[re.Pattern[str]] = re.compile(
     r"^All files\s*\|\s*(\d+(?:\.\d+)?)\s*\|\s*(\d+(?:\.\d+)?)\s*\|", re.MULTILINE
+)
+
+#: osrs-lab's Gradle total row: ``COVERAGE TOTAL: lines 592/592 branches
+#: 378/378``, covered over total summed from each module's JaCoCo XML report
+#: by its check-summary init script (board task fd8e5f9b). Gradle and
+#: JaCoCo print no count of their own (a refused gate prints a rounded
+#: ratio, ``lines covered ratio is 0.7``), so the counts are the summary's.
+#: Its tests are ``TESTS TOTAL: 68 passed, 0 failed, 0 skipped of 68``, which
+#: :data:`PASSED` and :data:`FAILED` already read.
+GRADLE_COVERAGE_TOTAL: Final[re.Pattern[str]] = re.compile(
+    r"^COVERAGE TOTAL: lines (\d+/\d+) branches (\d+/\d+)$", re.MULTILINE
 )
 
 #: vitest's threshold refusal, which names the figure that missed.
@@ -248,8 +259,9 @@ def read_coverage(tail: str) -> str:
 
     Returns:
         ``statements=<n>% branches=<n>%`` from vitest's tree row,
-        ``total=<n>%`` from pytest-cov's, ``<figure>=<n>% below threshold``
-        from vitest's refusal, else ``unread``.
+        ``total=<n>%`` from pytest-cov's, ``lines=<c>/<t> branches=<c>/<t>``
+        from the Gradle summary's, ``<figure>=<n>% below threshold`` from
+        vitest's refusal, else ``unread``.
     """
     vitest = VITEST_ALL_FILES.search(tail)
     if vitest is not None:
@@ -259,6 +271,9 @@ def read_coverage(tail: str) -> str:
         pytest_total = match.group(1)
     if pytest_total is not None:
         return f"total={pytest_total}%"
+    gradle = GRADLE_COVERAGE_TOTAL.search(tail)
+    if gradle is not None:
+        return f"lines={gradle.group(1)} branches={gradle.group(2)}"
     threshold = VITEST_THRESHOLD.search(tail)
     if threshold is not None:
         return f"{threshold.group(1)}={threshold.group(2)}% below threshold"
@@ -400,6 +415,7 @@ __all__ = [
     "BUDGET_WITHIN",
     "CHECK_BANNER",
     "FAILED",
+    "GRADLE_COVERAGE_TOTAL",
     "LOG_TAIL_LINES",
     "PASSED",
     "PYTEST_CALL",

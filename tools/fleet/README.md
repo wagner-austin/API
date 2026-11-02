@@ -1414,6 +1414,23 @@ failed EACCES on `/var/run/docker.sock`. It names no node, so any node
 carrying the tag runs it, and it is no deploy gate: `MCPs/execution-deploy`
 runs the same case.
 
+**`osrs-lab/desktop-input` and `osrs-lab/observer` require `docker`** (board
+task fd8e5f9b, 2026-11-02). They are Java builds, and no node has a JDK,
+Gradle or an X server: colossus, demure and lavender each answered none of
+`java`, `gradle`, `xvfb-run` or `openbox` over ssh that day. So each
+directory's `make check` builds the image osrs-lab's `desktop-input/Dockerfile`
+pins (JDK 17, Gradle 8.10.2, Xvfb, Openbox), tagged by that file's hash, and
+runs Gradle in it under Xvfb with Openbox, so the desktop tests drive the
+container's own screen. The tag sends it to execdocker's rootless daemon,
+which runs that container. Gradle and JaCoCo print no counts of their own,
+so the build's `check-summary.gradle` init script prints `TESTS TOTAL:` and
+`COVERAGE TOTAL: lines <c>/<t> branches <c>/<t>` lines, and the verdict
+reads them (`GRADLE_COVERAGE_TOTAL`). Run that
+way on colossus, desktop-input passed 68 tests at lines 592/592 and branches
+378/378. The observer ran 477 tests and stopped at its own coverage gate,
+lines 725/951 and branches 461/646. Each declares 4 workers of 1.5 GB, the
+4 cores and 6 GB its runs were measured in.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular

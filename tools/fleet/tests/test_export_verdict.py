@@ -361,6 +361,32 @@ class TestReadingTheTail:
         assert verdict.read_tests(PYTEST_TAIL) == "771p/0f"
         assert verdict.read_coverage(PYTEST_TAIL) == "total=100.00%"
 
+    def test_a_gradle_summary_tail_reads_its_total_rows(self) -> None:
+        """The last lines of osrs-lab desktop-input's make check as execdocker
+        on colossus, 2026-11-02 (board task fd8e5f9b), byte for byte: each
+        module's row, then the totals the verdict reads."""
+        tail = (
+            "> Task :check\n"
+            "TESTS :input-policy:test: 5 passed, 0 failed, 0 skipped of 5\n"
+            "TESTS :test: 63 passed, 0 failed, 0 skipped of 63\n"
+            "COVERAGE :input-policy:jacocoTestReport: lines 37/37 branches 26/26\n"
+            "COVERAGE :jacocoTestReport: lines 555/555 branches 352/352\n"
+            "TESTS TOTAL: 68 passed, 0 failed, 0 skipped of 68\n"
+            "COVERAGE TOTAL: lines 592/592 branches 378/378\n"
+            "\n"
+            "BUILD SUCCESSFUL in 41s\n"
+            "12 actionable tasks: 12 executed\n"
+            "=== ALL CHECKS PASSED ===\n"
+        )
+
+        assert verdict.read_tests(tail) == "68p/0f"
+        assert verdict.read_coverage(tail) == "lines=592/592 branches=378/378"
+
+    def test_a_gradle_module_row_alone_is_not_the_total(self) -> None:
+        tail = "COVERAGE :jacocoTestReport: lines 725/951 branches 461/646\n"
+
+        assert verdict.read_coverage(tail) == "unread"
+
     def test_the_last_passed_count_wins_over_per_file_lines(self) -> None:
         tail = "test_a.py 12 passed\ntest_b.py 30 passed\n42 passed in 1.0s\n"
 
