@@ -4,6 +4,12 @@ tags: [wrds, crsp, qualification, missingness]
 hubs: [libs]
 related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py"
+  - "libs/covenant_ml/scripts/crsp_extraction.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_refresh.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_refresh_process.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py"
   - "libs/covenant_ml/tests/markets/test_crsp_comparison.py"
@@ -22,6 +28,12 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py": "11e16545808e5aa1ec05c5ca1bdeb858eceff88c"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py": "8d8e94ed142d6b4badb23faf9b0fdd9ae48e8d68"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py": "1e454f61a3b50a031c92803ebf3c54cc0343c4d1"
+  "libs/covenant_ml/scripts/crsp_extraction.py": "590e709a6a702ce5143fd84d692f9b36a1ad91af"
+  "libs/covenant_ml/tests/markets/test_crsp_refresh.py": "37b284c4cdd68cd694544633f5f20a1527fed899"
+  "libs/covenant_ml/tests/markets/test_crsp_refresh_process.py": "6848bccd0bb01d06b874cb4148bc06efcd7d622d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py": "2dc5d21a784e30c843e5e3857a615e03751f1141"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "b10994304c31e020bab370b7eb0f6fe2fd948b39"
   "libs/covenant_ml/tests/markets/test_crsp_comparison.py": "eb978fb83e99e545de690e98d38f8f3e070bad96"
@@ -149,6 +161,21 @@ I/O and returns licensed row details for private evaluator use. Its regression
 cases cover all four relations. This algorithm does not yet constitute a
 native fresh-source comparison or resolve any of the 27 refusals.[^comparison]
 
+The refresh owner now opens that authenticated cohort in private storage,
+queries its securities within the frozen train-validation bounds and encrypts
+the new rows, exact SQL, transaction readings and detailed differences. It
+shares query preparation, snapshot execution and manifest sealing with the
+partition writer. A separate diagnostic envelope binds the old cohort and new
+source identities and remains inadmissible to the study loader.[^refresh]
+
+The existing extraction CLI exposes `refresh` with explicit allocation paths
+and limits. It writes aggregate observations for the native controller's
+RunRecord. Tests exercise real encryption, changed and absent rows, input
+refusals, actual client exits, file-size limits and timeout cleanup. These
+client-boundary tests use controlled CSV output; they do not establish real
+PostgreSQL query behavior. A native synthetic database rehearsal and licensed
+vintage comparison remain pending, and the study remains stopped.[^refresh-tests]
+
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
 [^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
@@ -159,3 +186,5 @@ native fresh-source comparison or resolve any of the 27 refusals.[^comparison]
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner" and § "Admission is not permission to fit this subset".
 [^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
 [^comparison]: `libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py`, `compare_crsp_rows` and `_indexed`; `libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py`, `crsp_row_key` and `_key`; `libs/covenant_ml/tests/markets/test_crsp_comparison.py`, mixed accounting, key edits, null/numeric changes, duplicate and empty-input cases.
+[^refresh]: `libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py`, `compare_crsp_vintages`, `_cohort_sources` and `_refresh`; `crsp_refresh_records.py`, `decode_crsp_refresh`; `crsp_snapshot.py`, `prepare_crsp_queries`, `execute_crsp_snapshot` and `seal_crsp_manifest`.
+[^refresh-tests]: `libs/covenant_ml/scripts/crsp_extraction.py`, `main` refresh branch; `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, encrypted differences and study rejection; `libs/covenant_ml/tests/markets/test_crsp_refresh_process.py`, native observations and real child-process success/failure tests.
