@@ -48,6 +48,7 @@ from fleet.core.runner_cache_adopt import (
 )
 from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
 from fleet.core.runner_install import (
+    LOCAL_BIN,
     RUNNER_ACCOUNT,
     RUNNER_VERSION,
     install_root_for,
@@ -84,10 +85,6 @@ REBOOT_REQUIRED_PATH: Final = "/var/run/reboot-required"
 #: A Debian package name: lowercase letters, digits and ``+-.``, starting
 #: with a letter or digit, so a name is embedded in the apt line verbatim.
 _APT_PACKAGE: Final = re.compile(r"[a-z0-9][a-z0-9+.-]*")
-
-#: Where ``pipx install`` puts its shims for the runner account, appended to
-#: each runner's ``.path`` (see :func:`render_install_lines`).
-LOCAL_BIN: Final = f"/home/{RUNNER_ACCOUNT}/.local/bin"
 
 #: Every root payload's first lines.
 SCRIPT_HEADER: Final = ("#!/usr/bin/env bash", "set -euo pipefail")
@@ -381,7 +378,6 @@ def render_provision(spec: HostRunnerSpec, reserved_cores: int) -> RenderedProvi
 __all__ = [
     "CI_CLEAN_SERVICE_PATH",
     "CI_CLEAN_TIMER_PATH",
-    "LOCAL_BIN",
     "REBOOT_MARKER",
     "REBOOT_REQUIRED_PATH",
     "SCRIPT_HEADER",

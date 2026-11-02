@@ -19,8 +19,22 @@ from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
 #: a one-line change reviewed like any other.
 RUNNER_VERSION = "2.337.0"
 
+#: The SHA-256 of that release's ``actions-runner-linux-x64`` tarball, which
+#: a NixOS runner host's store fetches it by (MCPs board task 9aba868d).
+#: Measured 2026-11-02: the downloaded bytes' digest, and the one the
+#: release's notes publish between its ``BEGIN SHA linux-x64`` markers.
+RUNNER_SHA256 = "70920811a4f8ad4328818682bca5c6469c1c942fab52448868071d0063816613"
+
 #: The account every runner on a host runs as, and owns its install as.
 RUNNER_ACCOUNT = "gharunner"
+
+#: Where ``pipx install`` puts its shims for the runner account, on each
+#: runner's ``.path``: runsvc.sh reads that file once at start and exports it
+#: as every job step's PATH, and a systemd-started runner has no login shell
+#: to add anything, so without it a job that installs poetry with pipx dies
+#: one step later at ``poetry: command not found``, exit 127 (measured on
+#: lavender).
+LOCAL_BIN = f"/home/{RUNNER_ACCOUNT}/.local/bin"
 
 
 def token_variable(repo: str) -> str:
@@ -63,7 +77,9 @@ def payload_path(spec: HostRunnerSpec, stem: str) -> str:
 
 
 __all__ = [
+    "LOCAL_BIN",
     "RUNNER_ACCOUNT",
+    "RUNNER_SHA256",
     "RUNNER_VERSION",
     "install_root_for",
     "payload_path",

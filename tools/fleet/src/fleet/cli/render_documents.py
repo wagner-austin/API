@@ -1,14 +1,19 @@
 """CLI: write every rendered JSON document to its committed copy.
 
 Usage:
-    python -m fleet.cli.render_documents --out rendered
+    python -m fleet.cli.render_documents --out rendered --spec runners.json --config registry
 
 ``make render-documents`` runs exactly that. It writes the hooks check pins
-(:mod:`fleet.core.hooks_check_document`) and the toolchain's pinned versions
-(:mod:`fleet.core.toolchain_document`); why each exists and its shape are
-those modules'. ``tests/test_hooks_check_document.py`` and
-``tests/test_toolchain_document.py`` fail until each committed copy is its
-render, so a pin moved without running this is never published stale.
+(:mod:`fleet.core.hooks_check_document`), the toolchain's pinned versions
+(:mod:`fleet.core.toolchain_document`) and every runner host as its NixOS
+generation carries it (:mod:`fleet.core.runner_host_document`), which reads
+the runner roster ``--spec`` names and each host's reserved cores from the
+registry ``--config`` names; why each exists and its shape are those
+modules'. ``tests/test_hooks_check_document.py``,
+``tests/test_toolchain_document.py`` and
+``tests/test_runner_host_document.py`` fail until each committed copy is its
+render, so a pin or a runner body moved without running this is never
+published stale.
 """
 
 from __future__ import annotations
@@ -23,15 +28,18 @@ from platform_core.cli_boundary import run_cli
 from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
 
+from fleet.cli._config import CONFIG_FLAG
+from fleet.cli.runners import SPEC_FLAG, load_reserved_cores, load_runner_spec
 from fleet.core import _test_hooks
 from fleet.core.hooks_check_document import HOOKS_CHECK_DOCUMENT, render_hooks_check_document
+from fleet.core.runner_host_document import RUNNER_HOSTS_DOCUMENT, render_runner_hosts_document
 from fleet.core.toolchain_document import TOOLCHAIN_DOCUMENT, render_toolchain_document
 
 _log = get_logger(__name__)
 
 OUT_FLAG = "--out"
 
-_FLAGS = (OUT_FLAG,)
+_FLAGS = (OUT_FLAG, SPEC_FLAG, CONFIG_FLAG)
 
 #: Where the committed copies live, relative to tools/fleet: the directory
 #: ``make render-documents`` passes as ``--out``, and the one MCPs
@@ -55,14 +63,23 @@ def main(argv: Sequence[str] | None = None) -> int:
         0 once every document is written.
 
     Raises:
-        ValueError: When a flag is unknown, repeated or missing its value.
+        ValueError: When a flag is unknown, repeated or missing its value,
+            or a runner host's registry file declares no dispatch budget.
+        AppError: ``RUNNER_SPEC_UNREADABLE`` when the roster does not decode.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
     out = pathlib.Path(cli_args.require_flag(parsed, OUT_FLAG))
+    spec = load_runner_spec(cli_args.require_flag(parsed, SPEC_FLAG))
+    registry = cli_args.require_flag(parsed, CONFIG_FLAG)
     for name, render in DOCUMENTS:
         _test_hooks.write_text(out / name, render())
         _log.info("wrote %s to %s", name, out)
+    reserved = {host["name"]: load_reserved_cores(registry, host["name"]) for host in spec["hosts"]}
+    _test_hooks.write_text(
+        out / RUNNER_HOSTS_DOCUMENT, render_runner_hosts_document(spec, reserved)
+    )
+    _log.info("wrote %s to %s", RUNNER_HOSTS_DOCUMENT, out)
     return 0
 
 

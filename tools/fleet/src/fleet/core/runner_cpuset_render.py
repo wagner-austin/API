@@ -28,6 +28,11 @@ say. ``systemctl set-property`` writes it into systemd's control drop-in
 and applies it to the live slice at once, so jobs already running move
 onto the set with nothing restarted, and the lines then read the slice's
 ``EffectiveCPUs`` back and fail the provision unless it is exactly the set.
+
+ON A NIXOS HOST THE SAME LINES RUN AT BOOT (MCPs board task 9aba868d). The
+flake that builds a runner host cannot read its topology, so the lines are
+the body of :data:`CPUSET_PATH`, which :data:`CPUSET_SERVICE` runs once each
+boot, before any runner starts (:func:`render_ci_cpuset_script`).
 """
 
 from __future__ import annotations
@@ -35,6 +40,23 @@ from __future__ import annotations
 from typing import Final
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME
+
+#: Where a NixOS runner host's set-at-boot script lives.
+CPUSET_PATH: Final = "/usr/local/sbin/fleet-ci-cpuset"
+
+#: The oneshot that runs it.
+CPUSET_SERVICE_NAME: Final = "fleet-ci-cpuset.service"
+
+#: Its unit: once per boot, and remembered as done, so a runner unit that
+#: orders itself after it starts only with the set in place.
+CPUSET_SERVICE: Final = f"""[Unit]
+Description=Hold {CI_SLICE_NAME} to whole cores, as many as the roster reserves
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart={CPUSET_PATH}
+"""
 
 #: The awk program that picks the set from ``lscpu -p=CPU,CORE``: whole
 #: cores from the highest-numbered down until the set holds ``want`` CPUs,
@@ -125,9 +147,30 @@ def render_ci_cpuset_lines(reserved_cores: int) -> list[str]:
     ]
 
 
+def render_ci_cpuset_script(reserved_cores: int) -> str:
+    """:data:`CPUSET_PATH`'s text: :func:`render_ci_cpuset_lines` as a script of its own.
+
+    Args:
+        reserved_cores: The host's ``dispatch.budget.reserved_cores``.
+
+    Returns:
+        The script, newline-terminated.
+
+    Raises:
+        ValueError: When ``reserved_cores`` is below 1, as
+            :func:`render_ci_cpu_select_lines` raises it.
+    """
+    lines = ["#!/usr/bin/env bash", "set -euo pipefail", *render_ci_cpuset_lines(reserved_cores)]
+    return "\n".join(lines) + "\n"
+
+
 __all__ = [
+    "CPUSET_PATH",
+    "CPUSET_SERVICE",
+    "CPUSET_SERVICE_NAME",
     "EXPAND_PROGRAM",
     "SELECT_PROGRAM",
     "render_ci_cpu_select_lines",
     "render_ci_cpuset_lines",
+    "render_ci_cpuset_script",
 ]

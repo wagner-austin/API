@@ -14,7 +14,14 @@ import subprocess
 import pytest
 
 from fleet.contracts.runner_slice import CI_SLICE_NAME
-from fleet.core.runner_cpuset_render import render_ci_cpu_select_lines, render_ci_cpuset_lines
+from fleet.core.runner_cpuset_render import (
+    CPUSET_PATH,
+    CPUSET_SERVICE,
+    CPUSET_SERVICE_NAME,
+    render_ci_cpu_select_lines,
+    render_ci_cpuset_lines,
+    render_ci_cpuset_script,
+)
 from tests._runner_fixtures import RESERVED_CORES
 from tests._stand_ins import run_with_stand_ins
 
@@ -153,3 +160,47 @@ class TestTheMeasurement:
         )
         assert ran.stdout == ""
         assert len(calls) == 2
+
+
+class TestTheBootScript:
+    """A NixOS runner host runs the same lines at boot, as a script of their own (task 9aba868d)."""
+
+    def test_the_script_is_the_lines_under_the_provision_s_options(self) -> None:
+        lines = render_ci_cpuset_script(RESERVED_CORES).splitlines()
+        assert lines[:2] == ["#!/usr/bin/env bash", "set -euo pipefail"]
+        assert lines[2:] == render_ci_cpuset_lines(RESERVED_CORES)
+
+    def test_the_script_run_whole_sets_lavender_s_cores(self, tmp_path: pathlib.Path) -> None:
+        """Run with no options of the caller's, so its own header is what holds it."""
+        log = tmp_path / "systemctl.log"
+        log.write_bytes(b"")
+        ran = run_with_stand_ins(
+            tmp_path,
+            render_ci_cpuset_script(RESERVED_CORES).splitlines(),
+            {
+                "lscpu": f"printf '%s' '{LAVENDER}'",
+                "systemctl": (
+                    'echo "$*" >> "$(dirname "$0")/../systemctl.log"\n'
+                    'if [ "$1" = show ]; then echo "4-7 12-15"; fi'
+                ),
+            },
+            options=[],
+        )
+        assert ran.returncode == 0, ran.stderr
+        assert log.read_text(encoding="utf-8").splitlines() == [
+            f"set-property {CI_SLICE_NAME} AllowedCPUs={LAVENDER_SET}",
+            f"show {CI_SLICE_NAME} -p EffectiveCPUs --value",
+        ]
+
+    def test_the_boot_unit_runs_the_script_once_and_stays_done(self) -> None:
+        assert CPUSET_SERVICE.splitlines()[3:] == [
+            "[Service]",
+            "Type=oneshot",
+            "RemainAfterExit=yes",
+            f"ExecStart={CPUSET_PATH}",
+        ]
+        assert CPUSET_SERVICE_NAME == "fleet-ci-cpuset.service"
+
+    def test_no_reservation_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="reserved_cores is 0"):
+            render_ci_cpuset_script(0)

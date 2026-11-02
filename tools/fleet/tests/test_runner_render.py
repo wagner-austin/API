@@ -400,7 +400,7 @@ class TestTheInstallLines:
         ran = run_with_stand_ins(tmp_path, [append, append], {}, options=("-eu",))
         assert ran.returncode == 0, ran.stderr
         assert (tmp_path / "runner" / ".path").read_bytes() == (
-            f"/usr/local/bin:/usr/bin:/bin:{runner_render.LOCAL_BIN}\n"
+            f"/usr/local/bin:/usr/bin:/bin:{runner_install.LOCAL_BIN}\n"
         ).encode()
 
     def test_every_drop_in_is_written_before_the_unit_starts(self) -> None:

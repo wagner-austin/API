@@ -66,9 +66,11 @@ execution-hub:
 # the hooks check pins (fleet.core.hooks_check_document, MCPs board task
 # 88ca2402), read by MCPs' session-host provision.sh and the fleet audit, and
 # the toolchain's Poetry (fleet.core.toolchain_document, MCPs board task
-# ce698bfb), read by MCPs' host provisioning. Run this after a pin in
-# fleet.contracts.tagged_tools or fleet.contracts.toolchain moves;
-# tests/test_hooks_check_document.py and tests/test_toolchain_document.py
-# fail until the copies match.
+# ce698bfb), read by MCPs' host provisioning, and every runner host as its
+# NixOS generation carries it (fleet.core.runner_host_document, MCPs board
+# task 9aba868d), read by MCPs' fleet-reach render. Run this after a pin in
+# fleet.contracts.tagged_tools or fleet.contracts.toolchain moves, or after
+# runners.json or a runner body changes; their tests under tests/ fail until
+# the copies match.
 render-documents:
-	poetry run python -m fleet.cli.render_documents --out rendered
+	poetry run python -m fleet.cli.render_documents --out rendered --spec runners.json --config registry

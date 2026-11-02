@@ -345,7 +345,12 @@ CI_CLEAN_CACHES: Final = f"""# The orphan rule; a virtualenv recording no source
 {WORK_TREES}
 """
 
-#: The daily hygiene script, installed to /usr/local/bin/ci-clean.
+#: Where the hygiene script lives, and its service and timer.
+CI_CLEAN_PATH: Final = "/usr/local/bin/ci-clean"
+CI_CLEAN_SERVICE_NAME: Final = "ci-clean.service"
+CI_CLEAN_TIMER_NAME: Final = "ci-clean.timer"
+
+#: The daily hygiene script, installed to :data:`CI_CLEAN_PATH`.
 CI_CLEAN_SCRIPT: Final = f"""#!/usr/bin/env bash
 # ci-clean: daily hygiene for a CI runner host. Rendered from
 # fleet.core.ci_clean -- edit THERE, never here.
@@ -388,7 +393,7 @@ Description=CI runner host hygiene (docker leftovers, poetry orphans, unread cac
 Type=oneshot
 User={RUNNER_ACCOUNT}
 StateDirectory={STATE_DIRECTORY_NAME}
-ExecStart=/usr/local/bin/ci-clean
+ExecStart={CI_CLEAN_PATH}
 """
 
 #: systemd timer for the hygiene pass: daily, because a week of a leak
@@ -406,10 +411,13 @@ WantedBy=timers.target
 
 __all__ = [
     "CI_CLEAN_CACHES",
+    "CI_CLEAN_PATH",
     "CI_CLEAN_REPORT",
     "CI_CLEAN_SCRIPT",
     "CI_CLEAN_SERVICE",
+    "CI_CLEAN_SERVICE_NAME",
     "CI_CLEAN_TIMER",
+    "CI_CLEAN_TIMER_NAME",
     "GENERATIONS_SWEEP",
     "GENERATION_READERS",
     "ORPHAN_SWEEP",
