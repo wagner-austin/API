@@ -4,11 +4,13 @@
   "user": "corvis",
   "enabled": true,
   "disabledUntil": null,
-  "duties": [],
+  "duties": [
+    "netboot"
+  ],
   "standby": [],
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.113.38.162",
-  "reachKey": null,
+  "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIPJOXKDSln98+LifubdIhrOyTCN9crZo/ipI0OvjYK8 corvis@emerald duty host",
   "bootMac": null,
   "netbootWifi": false,
   "installDisk": null,
@@ -18,7 +20,7 @@
   "boot": {
     "units": []
   },
-  "notes": "Emerald is the Lenovo H50-55, model 90BG003JUS, with an AMD A10-7800, MAC 00:01:6c:d6:77:6f, and the fleet's storage machine (board task 4b3809c7-28cd-4eb0-854f-2858c26e76f0). On 2026-10-25 its 2 TB Seagate and DVD drive were replaced by two WD Red Plus 4 TB disks, WD-WX32D763CR1E and WD-WX82D56LED4P, and it was installed with NixOS 26.05 on a ZFS mirror of both with a RAID1 ESP, from MCPs fleet-mcp/nixos/hosts/emerald: netboot arm 578f3729 booted the live installer, whose install-disk guard refused before writing, and the install ran from a kexec NixOS installer. Arm 578f3729 checked in and was adopted at 100.113.38.162, retiring the old device. bootMac and installDisk are null because the Ubuntu network install would wipe one disk of the mirror; a NixOS network install is board task 213a1a87. Firmware: Secure Boot enforced in user mode with the Lanzaboote keys enrolled beside Microsoft's, Wake on LAN enabled. It answers ssh and the fleet audit, so it is enabled; its dispatch is held because the block as measured under NixOS has no Docker, compiler or test database.",
+  "notes": "Holds the netboot duty since MCPs board task ab48f939 (the operator, 2026-11-02, choosing \"Netboot on emerald\" so diphtheria can be reinstalled from it): it serves the network install on the LAN from MCPs fleet-mcp/nixos/modules/netboot-server.nix, and its reachKey is its own ~/.ssh/id_ed25519 (SHA256:gu+seIkWFuGvAx9U6jhQ9cphIz8paEK8UTG1iOwY060), which every node admits since MCPs board task f30ea3ac, so it reaches the installers and the systems it makes. Emerald is the Lenovo H50-55, model 90BG003JUS, with an AMD A10-7800, MAC 00:01:6c:d6:77:6f, and the fleet's storage machine (board task 4b3809c7-28cd-4eb0-854f-2858c26e76f0). On 2026-10-25 its 2 TB Seagate and DVD drive were replaced by two WD Red Plus 4 TB disks, WD-WX32D763CR1E and WD-WX82D56LED4P, and it was installed with NixOS 26.05 on a ZFS mirror of both with a RAID1 ESP, from MCPs fleet-mcp/nixos/hosts/emerald: netboot arm 578f3729 booted the live installer, whose install-disk guard refused before writing, and the install ran from a kexec NixOS installer. Arm 578f3729 checked in and was adopted at 100.113.38.162, retiring the old device. bootMac and installDisk are null because the Ubuntu network install would wipe one disk of the mirror; a NixOS network install is board task 213a1a87. Firmware: Secure Boot enforced in user mode with the Lanzaboote keys enrolled beside Microsoft's, Wake on LAN enabled. It answers ssh and the fleet audit, so it is enabled; its dispatch is held because the block as measured under NixOS has no Docker, compiler or test database.",
   "dispatch": {
     "held": "Storage machine under NixOS (board task 4b3809c7): no Docker, compiler or test database, so no check can run here; it serves the fleet's Nix cache (a00648a8) and storage at /srv.",
     "stage_root": "/home/corvis/fleet/stage",
