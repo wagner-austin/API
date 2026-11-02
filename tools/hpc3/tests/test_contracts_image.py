@@ -396,6 +396,23 @@ class TestImageReference:
                 {"path": "/pub/abl.sif", "sha256": _DIGEST, "binds": [bad]}, "image"
             )
 
+    @pytest.mark.parametrize("bad", ["/pub/data:archive", "/pub/data,archive", "/pub/a:b,c"])
+    def test_apptainer_separators_are_refused_before_rendering(self, bad: str) -> None:
+        """Shell quoting cannot protect delimiters parsed inside Apptainer."""
+        with pytest.raises(JSONTypeError, match="bind separators") as error:
+            _ = decode_image_reference(_ref(binds=["/pub/ordinary", bad]), "image")
+        assert str(error.value) == (
+            "Field 'binds[1]' must not contain Apptainer bind separators "
+            f"':' or ',', got {bad!r}"
+        )
+
+    def test_spaces_and_shell_literals_remain_literal_paths(self) -> None:
+        """Only Apptainer separators are disallowed by the added rule."""
+        paths = ["/pub/data archive", "/pub/$(literal)", "/pub/it's-data"]
+        reference = decode_image_reference(_ref(binds=paths), "image")
+        assert reference is not None
+        assert reference["binds"] == paths
+
     def test_a_non_string_bind_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a string"):
             _ = decode_image_reference(
