@@ -528,3 +528,8 @@ index and api-package-use-inventory record the archive.
 Pages written: wrds-installed-runtime, wrds-operational-rehearsals, wrds-licensed-data-evidence, wrds-cleanup-evidence, wrds-baseline-20261101.
 Pages updated: wrds-baseline-readiness, wrds-equity-research-protocol, crsp-monthly-holdings-validation, crsp-monthly-study-design, wrds-evaluation-reuse, wrds-integration-ownership-review, wrds-research-queue-admission, libs hub and index.
 Notes: Replaced the 95,523-byte readiness diary with a short current-status page and focused fact/evidence pages. Underlying run artifacts remain authoritative; superseded narrative remains in git at fbff31147581c22e1a91a13108e89217c41a4380. Preserved the stopped licensed study and its cleanup gap, corrected the distinction between pre-entry and entry-date delisting, and documented the shared endpoint-validation correction. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1.
+
+## [2026-11-01] evidence and audit | Encrypted CRSP protocol revision
+Pages written: wrds-protocol-revision.
+Pages updated: wrds-baseline-readiness, wrds-licensed-data-evidence, wrds-baseline-20261101, crsp-monthly-data-contract, libs hub and index.
+Notes: Compared new revision claims and each identity with both real service reports, checked publication/verification against the shared implementation, and kept original extraction/study evidence historical. Reverified the unchanged source-reader claims before repinning crsp_extract after its manifest constructor was lifted for reuse. No observation decryption, runtime installation or successful baseline is inferred. The added page keeps transformation evidence out of the readiness summary. Board task 9a37c9a5-b981-4bf7-a4aa-5234b4ddcc96.

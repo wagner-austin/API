@@ -22,7 +22,9 @@ confidence: medium
 # WRDS licensed CRSP extraction and encrypted staging
 
 The frozen four-relation dataset has been extracted, encrypted and collected.
-Its train/validation bundle has been staged to HPC3. Extraction completeness
+Its original version-1 train/validation bundle has been staged to HPC3.
+[[wrds-protocol-revision]] records the separately verified version-2 successors.
+Extraction completeness
 and byte identity do not guarantee that every eligible security has an
 executable holding path; [[wrds-baseline-20261101]] records that distinction.[^collection][^staging][^stopped]
 

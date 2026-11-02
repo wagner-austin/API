@@ -73,9 +73,10 @@ Installed-runtime identity is tracked separately in
 
 ## Next study requirements
 
-Version 2 needs new verified protocol/bundle and runtime identities before a
-new preregistration. The staged licensed bundle embeds version 1 and cannot
-be silently reinterpreted. Rehearse changed inputs through the existing queue
+Version-2 bundle lineage is recorded in [[wrds-protocol-revision]]. The new
+study still needs current runtime identities and a new preregistration.
+The originally staged bundle embeds version 1 and cannot be silently
+reinterpreted. Rehearse changed inputs through the existing queue
 and preserve this failed journal. Cleanup of the original failed
 allocation remains an evidence gap in [[wrds-cleanup-evidence]].[^diagnostic]
 

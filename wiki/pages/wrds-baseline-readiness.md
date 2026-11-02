@@ -29,7 +29,7 @@ See [[wrds-baseline-20261101]] for the cause and correction boundary.[^stop]
 | Area | Evidence and current boundary |
 |---|---|
 | Runtime | [[wrds-installed-runtime]] — verified controller/image identities; repository changes require a new installation. |
-| Data | [[wrds-licensed-data-evidence]] — four CRSP relations extracted and encrypted; train/validation staged to HPC3. |
+| Data | [[wrds-licensed-data-evidence]] — original extraction and staging; [[wrds-protocol-revision]] — verified version-2 successors, awaiting HPC3 staging. |
 | Operations | [[wrds-operational-rehearsals]] — synthetic queue, seed summary, selection and controlled final execution. |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
 | Cleanup | [[wrds-cleanup-evidence]] — bounded WRDS/HPC3 probes; failed licensed allocation still needs its own observation. |
@@ -44,9 +44,9 @@ or investment performance.[^stop][^diagnostic]
 The current protocol declares rejected-order cash and actual traded-notional
 costs. These version-2 rules differ from the stopped study's installed inputs.[^current]
 
-1. Prepare a separately verified version-2 bundle: retain the original CSV/SQL
-   identities and extraction vintage, and record changed protocol/manifest
-   identities. The current staged bundle embeds version 1 and remains historical.
+1. Stage the separately verified version-2 validation bundle described in
+   [[wrds-protocol-revision]]. It retains original CSV/SQL identities and
+   extraction vintage; the staged version-1 bundle remains historical.
 2. Freeze and install the version-2 evaluator and amended study rules,
    then rehearse proposal → admission → queue → native job → verified result.
 3. Close the failed allocation's cleanup-evidence gap.

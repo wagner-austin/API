@@ -48,6 +48,8 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 [WRDS licensed data evidence](../pages/wrds-licensed-data-evidence.md) -- extraction vintage, encrypted partitions and verified HPC3 staging
 
+[Encrypted CRSP protocol revision](../pages/wrds-protocol-revision.md) -- verified version-2 metadata lineage with unchanged observation ciphertext
+
 [WRDS cleanup evidence](../pages/wrds-cleanup-evidence.md) -- allocation-specific normal-exit and forced-kill observations and remaining limits
 
 [November 1 CRSP baseline incident](../pages/wrds-baseline-20261101.md) -- stopped study, pre-entry delisting diagnosis and execution-boundary correction
