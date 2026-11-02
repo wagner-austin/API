@@ -206,14 +206,15 @@ class TestCheckEnvPathInsideAnImage:
         fake_run.add("test -d", stdout="PRESENT\n")
         assert check_env_path("hpc3", _image_spec()) == "/opt/env/bin"
         sent = fake_run.calls[0].remote_command
-        assert sent.startswith("module load apptainer/1.4.5 && apptainer exec ")
-        assert '"/pub/wagnera3/images/v3/abl.sif"' in sent
+        assert sent.startswith("module load apptainer/1.4.5 && env ")
+        assert "apptainer exec --no-mount bind-paths,hostfs" in sent
+        assert "/pub/wagnera3/images/v3/abl.sif" in sent
 
     def test_the_probe_carries_the_images_binds(self, fake_run: FakeRun) -> None:
         """Same binds as the payload, or preflight verifies a different world."""
         fake_run.add("test -d", stdout="PRESENT\n")
         check_env_path("hpc3", _image_spec())
-        assert '--bind "/pub/wagnera3:/pub/wagnera3"' in fake_run.calls[0].remote_command
+        assert "--bind /pub/wagnera3:/pub/wagnera3" in fake_run.calls[0].remote_command
 
     def test_an_absent_env_inside_an_image_is_still_refused(self, fake_run: FakeRun) -> None:
         fake_run.add("test -d", stdout="ABSENT\n")

@@ -10,12 +10,15 @@ preflight -- it reports green and the job still fails.
 
 from __future__ import annotations
 
+import shlex
+
 from hpc3.contracts.image import ImageReference
 from hpc3.core.image_exec import (
+    APPTAINER_EXEC,
     APPTAINER_MODULE,
-    bind_arguments,
     describe_location,
     gpu_arguments,
+    mount_arguments,
     run_inside_image,
 )
 
@@ -35,16 +38,20 @@ _TWO_BINDS = ImageReference(
 class TestBindArguments:
     def test_each_bind_is_mounted_at_its_own_path(self) -> None:
         """A payload's absolute paths must mean the same thing on both sides."""
-        assert bind_arguments(_IMAGE) == ['--bind "/pub/wagnera3:/pub/wagnera3"']
-
-    def test_binds_keep_their_declared_order(self) -> None:
-        assert bind_arguments(_TWO_BINDS) == [
-            '--bind "/pub/wagnera3:/pub/wagnera3"',
-            '--bind "/dfs9/scratch:/dfs9/scratch"',
+        assert mount_arguments(_IMAGE) == [
+            "--no-mount bind-paths,hostfs",
+            "--bind /pub/wagnera3:/pub/wagnera3",
         ]
 
-    def test_an_image_declaring_no_binds_renders_no_arguments(self) -> None:
-        assert bind_arguments(_NO_BINDS) == []
+    def test_binds_keep_their_declared_order(self) -> None:
+        assert mount_arguments(_TWO_BINDS) == [
+            "--no-mount bind-paths,hostfs",
+            "--bind /pub/wagnera3:/pub/wagnera3",
+            "--bind /dfs9/scratch:/dfs9/scratch",
+        ]
+
+    def test_no_declared_binds_still_disables_implicit_site_mounts(self) -> None:
+        assert mount_arguments(_NO_BINDS) == ["--no-mount bind-paths,hostfs"]
 
 
 class TestGpuArguments:
@@ -73,7 +80,7 @@ class TestRunInsideImage:
     def test_it_loads_the_module_before_reaching_for_apptainer(self) -> None:
         """`which apptainer` returns nothing on a login node until loaded."""
         assert run_inside_image(_IMAGE, "true").startswith(
-            f"module load {APPTAINER_MODULE} && apptainer exec "
+            f"module load {APPTAINER_MODULE} && {APPTAINER_EXEC} "
         )
 
     def test_the_module_load_is_chained_so_its_failure_is_its_own(self) -> None:
@@ -83,10 +90,10 @@ class TestRunInsideImage:
         ABSENT because apptainer was not found, and the caller would
         diagnose the image instead of the module.
         """
-        assert f"module load {APPTAINER_MODULE} && apptainer" in run_inside_image(_IMAGE, "true")
+        assert f"module load {APPTAINER_MODULE} && env " in run_inside_image(_IMAGE, "true")
 
     def test_the_image_is_named_by_path_because_apptainer_takes_a_file(self) -> None:
-        assert '"/pub/wagnera3/images/v3/abl.sif"' in run_inside_image(_IMAGE, "true")
+        assert "/pub/wagnera3/images/v3/abl.sif" in shlex.split(run_inside_image(_IMAGE, "true"))
 
     def test_the_command_is_handed_to_a_shell_inside_the_container(self) -> None:
         """A host probe keeps its meaning without being rewritten for argv."""
@@ -110,7 +117,8 @@ class TestRunInsideImage:
 
     def test_the_whole_line_is_exactly_what_a_remote_shell_receives(self) -> None:
         assert run_inside_image(_NO_BINDS, "true") == (
-            f'module load {APPTAINER_MODULE} && apptainer exec "/i/x.sif" sh -c true'
+            f"module load {APPTAINER_MODULE} && {APPTAINER_EXEC} "
+            "--no-mount bind-paths,hostfs /i/x.sif sh -c true"
         )
 
 

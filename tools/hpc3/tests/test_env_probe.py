@@ -264,9 +264,10 @@ class TestVerifyEnvironment:
         fake_run.add("importlib.metadata", stdout=IMAGE_PROBE)
         verify_environment("hpc3", "/opt/env", _ABL_PINS, image=_IMAGE)
         sent = fake_run.calls[0].remote_command
-        assert sent.startswith("module load apptainer/1.4.5 && apptainer exec ")
-        assert '--bind "/pub/wagnera3:/pub/wagnera3"' in sent
-        assert '"/pub/wagnera3/images/v3/abl.sif"' in sent
+        assert sent.startswith("module load apptainer/1.4.5 && env ")
+        assert "apptainer exec --no-mount bind-paths,hostfs" in sent
+        assert "--bind /pub/wagnera3:/pub/wagnera3" in sent
+        assert "/pub/wagnera3/images/v3/abl.sif" in sent
         assert "/opt/env/bin/python" in sent
 
     def test_an_images_wrong_environment_is_still_refused(self, fake_run: FakeRun) -> None:

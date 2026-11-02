@@ -18,6 +18,7 @@ import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from hpc3.contracts.job import JobSpec
+from hpc3.core.image_exec import APPTAINER_EXEC
 from hpc3.core.sbatch import job_comment, render_sbatch
 from tests._sbatch_support import IMAGE, LOG_DIR, SIF, spec
 
@@ -54,7 +55,7 @@ def _image(**overrides: JSONValue) -> JSONValue:
 class TestThePayloadRunsThroughApptainer:
     def test_the_image_is_the_argument_apptainer_receives(self) -> None:
         script = _render(spec(image=IMAGE, env_path="/opt/env"))
-        assert f'    "{SIF}" \\' in script.splitlines()
+        assert f"    {SIF} \\" in script.splitlines()
 
     def test_the_apptainer_module_is_loaded(self) -> None:
         """`which apptainer` returns nothing on HPC3 until the module loads."""
@@ -93,18 +94,18 @@ class TestTheDataIsBoundWhereThePayloadExpectsIt:
 
     def test_a_bind_is_mounted_at_its_own_path(self) -> None:
         script = _render(spec(image=IMAGE, env_path="/opt/env"))
-        assert '    --bind "/pub/wagnera3:/pub/wagnera3" \\' in script.splitlines()
+        assert "    --bind /pub/wagnera3:/pub/wagnera3 \\" in script.splitlines()
 
     def test_every_declared_bind_is_emitted(self) -> None:
         image = _image(binds=["/pub/wagnera3", "/dfs7/scratch"])
         script = _render(spec(image=image, env_path="/opt/env"))
-        assert script.count("--bind") == 2
+        assert script.count("--bind") == 4  # Both provenance probe and payload.
 
     def test_the_binds_precede_the_image(self) -> None:
         """apptainer reads options before the image argument."""
         script = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
-        bind = script.index('    --bind "/pub/wagnera3:/pub/wagnera3" \\')
-        assert bind < script.index(f'    "{SIF}" \\')
+        bind = script.index("    --bind /pub/wagnera3:/pub/wagnera3 \\")
+        assert bind < script.index(f"    {SIF} \\")
 
     def test_an_image_with_no_binds_emits_none(self) -> None:
         """A self-contained computation needs nothing mounted."""
@@ -129,7 +130,7 @@ class TestTheGpuIsReachableFromInsideTheImage:
 
     def test_the_driver_flag_precedes_the_image(self) -> None:
         script = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
-        assert script.index("    --nv \\") < script.index(f'    "{SIF}" \\')
+        assert script.index("    --nv \\") < script.index(f"    {SIF} \\")
 
     def test_a_cpu_job_in_an_image_asks_for_no_driver(self) -> None:
         """--nv on a node with no driver is an error, not a no-op."""
@@ -149,8 +150,10 @@ class TestTheRunCanSayWhichEnvironmentProducedIt:
         -- reporting an image that does know its commit as unstamped."""
         script = _render(spec(image=IMAGE, env_path="/opt/env"))
         assert (
-            'export GIT_COMMIT="$(apptainer exec "/pub/wagnera3/images/abl.sif" '
-            "cat /opt/env/GIT_COMMIT 2>/dev/null || echo '')\"" in script.splitlines()
+            f'export GIT_COMMIT="$(module load apptainer/1.4.5 && {APPTAINER_EXEC} '
+            "--no-mount bind-paths,hostfs --bind /pub/wagnera3:/pub/wagnera3 "
+            "/pub/wagnera3/images/abl.sif sh -c 'cat /opt/env/GIT_COMMIT' "
+            "2>/dev/null || echo '')\"" in script.splitlines()
         )
 
     def test_the_module_loads_before_the_stamp_is_read(self) -> None:
@@ -174,7 +177,7 @@ class TestTheRunCanSayWhichEnvironmentProducedIt:
     def test_the_digest_is_exported_before_the_payload(self) -> None:
         lines = _render(spec(image=IMAGE, env_path="/opt/env")).splitlines()
         export = next(i for i, line in enumerate(lines) if line.startswith("export IMAGE_DIGEST="))
-        payload = next(i for i, line in enumerate(lines) if line.startswith("apptainer exec"))
+        payload = next(i for i, line in enumerate(lines) if line.startswith(APPTAINER_EXEC))
         assert export < payload
 
     def test_the_queue_records_the_digest_not_the_path(self) -> None:
