@@ -157,54 +157,55 @@ having none.
 
 The self-hosted GitHub Actions runners live on one roster, `runners.json`:
 which runners each host carries, which assets their jobs need, the CI slice
-their jobs share, and, in each host's `base`, the apt packages a fleet node
-lacks for them. `fleet-runners` holds the hosts to it:
+their jobs share, and, in each host's `base`, the nixpkgs packages a fleet
+node lacks for them. `fleet-runners` holds the hosts to it:
 
 ```bash
 fleet-runners --spec runners.json                                   # audit every host
-fleet-runners --spec runners.json --host lavender --render <dir> --config registry
-fleet-runners --spec runners.json --host lavender --onboard owner/repo --config registry
-fleet-runners --spec runners.json --host lavender --rebuild yes --config registry
+fleet-runners --spec runners.json --host lavender --onboard owner/repo
+fleet-runners --spec runners.json --host lavender --register yes
 ```
-
-The three modes that run the provision take the registry with `--config`,
-because the provision holds the runners to the CPUs the host's roster file
-reserves for them (`dispatch.budget.reserved_cores`): whole physical cores,
-the highest-numbered first, set as the CI slice's `AllowedCPUs` and read back
-from its `EffectiveCPUs` (MCPs board task 349e25ee). A weight alone let CI
-take every core on lavender, and a check sharing a core with it ran past its
-budget.
 
 The operator, on 2026-09-26, while lavender was being recovered by hand from a
 full disk: "it justcis a github runner". A machine whose only job is running
 CI holds nothing that needs saving, so the answer to any fault on it is to
-wipe it and run the recipe again (board task 1aa6a021). `--rebuild yes` is
-that recipe. Every runner host is an Ubuntu fleet node since lavender was
-reimaged on 2026-10-19 (MCPs board task 1e9ab738), so the recipe starts from
-a node a CORVIS stick or a netboot installed and MCPs' `make fleet-provision`
-provisioned (Tailscale, the fleet user's key and passwordless sudo, docker,
-the GPU driver, the toolchain), because nothing can reach a machine before
-that. Each stage is a bash payload sent to the host's `payload_dir` and run
-there as root (`remote.run_root_script`), in order:
+wipe it and install it again (board task 1aa6a021). A runner host is a NixOS
+fleet worker since MCPs board task 9aba868d, so that install is the netboot's:
+`make render-documents` renders the roster into `rendered/runner-hosts.json`
+(`runner_host_document`), every runner unit with its drop-ins, every hygiene
+unit and script, the job scope's sudoers rule, the packages and the assets;
+MCPs' `fleet-reach render` carries it into `fleet-mcp/nixos/roster.json`; and
+the flake's `runner-host.nix` builds the host's generation from it, so a
+netboot install or a switch lays the whole runner host and nothing is
+provisioned by hand. The boot script `fleet-ci-cpuset` holds the runners to
+the CPUs the host's roster file reserves for them
+(`dispatch.budget.reserved_cores`): whole physical cores, the highest-numbered
+first, set as the CI slice's `AllowedCPUs` and read back from its
+`EffectiveCPUs` (MCPs board task 349e25ee). A weight alone let CI take every
+core on lavender, and a check sharing a core with it ran past its budget.
 
-1. the **base**: refuses a host whose docker is not active, installs the
-   roster's apt packages, creates the runner account `gharunner` in the
-   docker group and proves it can reach docker; then the **reboot** a
-   package asked for (`/var/run/reboot-required`), waited out by comparing
-   the kernel's boot id, never by a sleep, and the base again;
-2. **registration tokens**, minted with `gh`, one per repository;
-3. the roster's own **`provision.sh`**, carrying them;
+What no generation can carry is GitHub's half, each runner's registration.
+`--register yes` is that half (`runner_register`):
+
+1. it asks the host, as root, which installs hold no `.runner`;
+2. it mints one **registration token** per repository of those with `gh`,
+   and writes each to `/var/lib/fleet-runner-tokens` on the host, root's
+   alone, streamed over stdin and never an argument;
+3. it restarts each of those units, whose setup step runs GitHub's own
+   `config.sh` with its repository's token, and waits until each holds a
+   `.runner`;
 4. the **audit**, whose findings are the verdict and the exit code.
 
-Every stage is idempotent, so a rebuild cut short by anything is finished by
-running the same command again, and a rebuild over a healthy host changes
-nothing: an install whose `.runner` exists is not configured twice.
+A registered install is skipped, so a registration cut short by anything is
+finished by running the same command again, and one over a healthy host
+mints nothing. `--onboard` adds a repository's install to the roster and
+prints the render, switch and register steps that lay it.
 
 **What a runner host holds, and why none of it needs saving:**
 
-| State | What happens to it on a rebuild |
+| State | What happens to it on a reinstall |
 |---|---|
-| Registration tokens | Minted fresh by every run; they expire within the hour |
+| Registration tokens | Minted fresh by every `--register`; they expire within the hour |
 | Each runner's `.runner`, `.credentials`, service | Written by config.sh; `--replace` takes back the old registration of the same name |
 | `_work` job trees | The job's own state, emptied as it ends: the job-completed hook (`runner_work_clear`) empties the workspace and removes every clone beside it under `_work/<repository>`, which every workflow's checkout and MCPs' sibling clones recreate anyway. On lavender on 2026-10-30 the two API installs each held a torch venv their last job built, 5706 and 6389 MB, until their next job (MCPs board task 621902c3) |
 | `_work/_update` | The runner's unpacked self-update, which it never removes: ci-clean removes one no file of which changed within an hour, 682 MB in each of lavender's seven installs on 2026-10-30 (MCPs board task 621902c3) |
@@ -212,12 +213,12 @@ nothing: an install whose `.runner` exists is not configured twice.
 | npm's, pip's and poetry's download caches | `~/.cache/fleet-tools/<generation>`: the job-started hook (`runner_tool_caches`) reads or starts the generation, writes it into its runner install's marker under `~/.cache/fleet-jobs`, and hands the job its paths through `GITHUB_ENV`, npm's one per runner install because concurrent writers corrupted a shared one; ci-clean removes a generation whole once no marker names it, the fleet nodes' rule (`tool_caches`). Removing single files instead could part a poetry metadata file from its body and fail every later lock (MCPs board task 4b405239) |
 | Docker images and volumes | The pull cache and nothing else: services mount tmpfs (MCPs `check.yml`), and ci-clean prunes daily |
 | Docker build cache | What the jobs' `docker build` steps leave; ci-clean prunes daily what no build used for a week, then the reclaimable cache above 10 GB, `BUILD_CACHE_BOUND_GIB` in `runner_base` (MCPs board task 46c7b11b; 60 GB, then 20, until board task 621902c3) |
-| Chrome, the gte-small model cache, llama.cpp | Roster assets with a `provision_command`, fetched by provision.sh |
-| ci-clean script, service and timer | Written in `ci_clean`, embedded by `runner_render` and installed by provision.sh |
+| Chrome, the gte-small model cache, llama.cpp | Roster assets the generation provides from the store: nixpkgs' Chrome, the model files every worker reads, and the llama.cpp checkout at MCPs' `artifacts.json` revision |
+| ci-clean script, service and timer | Written in `ci_clean`, carried in the document and installed by the generation |
 | ci-clean's report | `/var/lib/ci-clean/last-run`, in the state directory systemd makes for the service (`StateDirectory=ci-clean`), world-readable: each run writes the sha256 of the script that ran, when it started, every pass's closing line, the daemon's build cache records before the prunes and after them, which generation each runner install's last job read and what the current one holds, and each install's job trees: whether a job runs from it, when its last job started and its hook last emptied them, and the files and MB they hold. `test_runner_hygiene_host` reads it, because the runner account's home is closed to the fleet's user (MCPs board tasks 46c7b11b, 4b405239 and 621902c3) |
-| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render` and installed by provision.sh. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5). Once every unit's leftovers are reaped, a pass restarts each unit whose `Slice=` drop-in names `listeners.slice` while its cgroup is still in `runners.slice`, the moment its Listener runs with no Worker: a unit running a job is read again five times a second for up to `PLACE_WAIT_SECONDS`, 20 s, because a single read missed the seconds between two jobs on every pass for 82 minutes. A unit whose main process's environment lacks a job hook its `fleet-job-scope.conf` sets is restarted the same way, since a runner reads its hooks only when it starts: the provision of 2026-10-30 left both MCPs units on lavender without the job-completed hook (MCPs board task 621902c3) |
-| Each unit file the provision writes | Written through `runner_unit_files`, the one writer: a unit or drop-in is rewritten, and systemd reloaded, only when its text differs, so a re-run over a built host reloads nothing |
-| A `manual` asset | One no script may fetch: the rebuild prints it as `PLACE BY HAND`, and the audit fails until it is placed. Lavender declares none since RustedWarfareBot's licensed game jar, which nothing read once its CI left the host (board task 4f228608), was dropped from its roster (MCPs board task faec98a5) |
+| fleet-runner-reaper script, service and timer; each runner unit's `fleet-kill.conf` | Rendered from `runner_reaper_render`, carried in the document and installed by the generation. Every 30 s the reaper kills what a finished job left in a runner unit's cgroup: every process outside the unit's own tree while no Worker runs, the orphan trees rooted before the earliest live Worker while one does, and a Worker older than the host's `job_timeout_minutes` with everything under it, because GitHub has ended its job by then. The audit's `orphans:<repo>:<runner>` rows count the same, older than that timeout (MCPs board task 53528106). `--dropped UNIT PID START` ends one Worker the hub's reap pass names as holding a job GitHub dropped: it writes each pid's argv, then kills the Worker and every process of the unit under it, and never the listener (MCPs board task 715b9ec5). Once every unit's leftovers are reaped, a pass restarts each unit whose `Slice=` drop-in names `listeners.slice` while its cgroup is still in `runners.slice`, the moment its Listener runs with no Worker: a unit running a job is read again five times a second for up to `PLACE_WAIT_SECONDS`, 20 s, because a single read missed the seconds between two jobs on every pass for 82 minutes. A unit whose main process's environment lacks a job hook its `fleet-job-scope.conf` sets is restarted the same way, since a runner reads its hooks only when it starts: the provision of 2026-10-30 left both MCPs units on lavender without the job-completed hook (MCPs board task 621902c3) |
+| Each unit and drop-in | Carried in the document byte for byte, at the path `runner_unit_files` names, and installed by the generation, which a switch replaces whole |
+| A `manual` asset | One no build may fetch: the document names it apart, and MCPs' `runner-host.nix` refuses to build a host that needs one, since a netboot install never places a file by hand. Lavender declares none since RustedWarfareBot's licensed game jar, which nothing read once its CI left the host (board task 4f228608), was dropped from its roster (MCPs board task faec98a5) |
 
 **The disk ceiling.** The audit fails a host whose root uses more than
 `base.disk.ceiling_gb`, and the row's id carries both numbers, so every line,
@@ -745,18 +746,17 @@ It routes MCPs `web-scraper`, whose check launches that channel in three
 real-browser cases: diphtheria, a `cxx` node without Chrome, failed exactly
 those three on 2026-10-04 (fleet job 874c160c) and 2026-10-09 (56d7fbb5)
 and passed the other 490, so the verdict depended on which node claimed the
-suite. A node without it is offered the .deb Google ships, the same command
-`runners.json` provisions the asset with. `pdftotext` routes MCPs
+suite. A node without it is offered the .deb Google ships. `pdftotext` routes MCPs
 `packages/wiki-check`, whose audit rules read PDF sources through poppler's
 pdftotext and depend on its exact page breaks (MCPs board task 6dd73ada). It
 is found on the PATH and asked `-v`. Every live runner had it on 2026-10-11,
 but nothing declared it and the roster's apt packages lacked poppler-utils;
 a node without it is offered `sudo apt-get install -y poppler-utils`.
-lavender, the runner host since its reimage to Ubuntu, gets go, ffmpeg and
-pdftotext from `runners.json`'s base `apt_packages` and Chrome from its
-`assets`, so a `--rebuild` keeps all four tags, and
-`test_runner_contracts.py` fails if a tagged tool apt can supply is missing
-from that list or Chrome's path from those assets. Installing a tool therefore makes a
+lavender, the runner host, gets go, ffmpeg and pdftotext from
+`runners.json`'s base `nix_packages` and Chrome from its `assets`, so a
+reinstall keeps all four tags, and `test_runner_contracts.py` fails if a
+tagged tool a Linux node installs is missing from that list or Chrome's path
+from those assets. Installing a tool therefore makes a
 node eligible on its next tick with no file edited, and a toolchain that
 disappears takes its tag with it. Each difference from the node's machine file is logged
 on every tick, for example `pendragon (pendragon) declares cxx none but its
