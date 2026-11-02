@@ -179,3 +179,10 @@ This pass did not remeasure those historical environments or recover every
 primary incident record; adding citations without that evidence would overstate
 verification. The findings are retained under existing wiki task 52668052,
 post 7c001a6b, and remain deferred rather than marked verified.
+
+## [2026-11-02] Native mount verification | explicit image mounts
+Pages written: declared-image-mounts.
+Pages updated: node-local-scratch, cluster-facts hub, index.
+Notes: one shared mount owner, successful home-only and declared-shared probes,
+preserved import-order probe failures, and bounded scratch/isolation claims.
+Board task 0a0e5913; controller abb117967, native jobs 58776025 and 58776026.
