@@ -45,8 +45,11 @@ CALLED: Final[frozenset[str]] = frozenset(
 
 #: How many call sites the source holds, so a scan that found none cannot pass.
 #: The 17th is :func:`fleet.core.queue_lost.report_lost`'s ``dispatch_report``
-#: with action ``lost``, which fleet-mcp serves since MCPs 60a8dbb05.
-CALL_SITES: Final[int] = 18
+#: with action ``lost``, which fleet-mcp serves since MCPs 60a8dbb05. The
+#: 19th and 20th are :mod:`fleet.core.queue_models`'s, actions ``loaded``
+#: and ``ended`` (MCPs board task b9235198), which fleet-mcp serves since
+#: MCPs d3ea102d2.
+CALL_SITES: Final[int] = 20
 
 
 def constants(tree: ast.Module) -> dict[str, str]:

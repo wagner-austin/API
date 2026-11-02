@@ -14,6 +14,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONObject, JSONValue, dump_json_str
 
 from fleet.contracts.dispatch import (
+    MODEL_COMMANDS,
     DispatchCommand,
     DispatchJob,
     DispatchStatus,
@@ -293,8 +294,27 @@ class TestMalformedAnswers:
                 if command is DispatchCommand.RESEARCH
                 else None
             )
+            model: JSONValue = (
+                {
+                    "id": "ornith-1.5-9b",
+                    "file": "Ornith-1.5-9B-Q4_K_M.gguf",
+                    "sha256": "70c112196e0b7023803c9762752e46d29e612a92c83f995bc3ba1ceb07e8fab6",
+                    "sizeBytes": 5780090816,
+                    "gpuBytes": 6499381248,
+                    "contextTokens": 32768,
+                    "backends": ["vulkan"],
+                }
+                if command in MODEL_COMMANDS
+                else None
+            )
             decoded = claimed_job(
-                answer({"claimed": queue_job(command=command.value, researchRequest=reference)})
+                answer(
+                    {
+                        "claimed": queue_job(
+                            command=command.value, researchRequest=reference, model=model
+                        )
+                    }
+                )
             )
             assert decoded["command"] is command
 
