@@ -25,7 +25,6 @@ TWO FIXING ASSUMPTIONS, both counted in :class:`PathCounts` rather than hidden:
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
-from collections.abc import Mapping
 from typing import NamedTuple
 
 import numpy as np
@@ -40,8 +39,9 @@ from ..markets.crsp_holdings import CrspOutcomes, index_crsp_outcomes
 from ..markets.crsp_panel import build_crsp_panel
 from ..markets.crsp_return_path import crsp_held_spans
 from .paths import total_sessions
+from .rates import RateObservation, carry_rate
 from .study import RealizedContracts
-from .types import ERR_MONTHS, ERR_PATH_SHAPE, AsianPutContract
+from .types import ERR_PATH_SHAPE, AsianPutContract
 
 
 class ContractPath(NamedTuple):
@@ -185,7 +185,7 @@ def realized_contracts(
     first: str,
     last: str,
     contract: AsianPutContract,
-    rates: Mapping[int, float],
+    rates: tuple[RateObservation, ...],
 ) -> tuple[RealizedContracts, PathCounts]:
     """Build every realized contract the panel admits between two decision closes.
 
@@ -194,15 +194,15 @@ def realized_contracts(
         first: Inclusive first decision bound.
         last: Inclusive last decision bound.
         contract: Sets how many sessions each path spans.
-        rates: Continuously compounded carry rate per decision month
-            (``12 * year + month - 1``), known at that decision.
+        rates: The carry-rate series; each contract uses the latest
+            observation on or before its decision close.
 
     Returns:
         The contracts in decision order and what building them assumed.
 
     Raises:
         ValueError: CVML-OPT-002 when a contract would outlive the sources'
-            sessions; CVML-OPT-006 when a decision month has no rate; the
+            sessions; CVML-OPT-003 when no rate is observed by a decision; the
             panel's, span and terminal refusals propagate.
     """
     outcomes = index_crsp_outcomes(sources)
@@ -216,8 +216,7 @@ def realized_contracts(
     for decision in build_crsp_panel(sources, first, last):
         start = decision.window.decision
         month = crsp_month(start)
-        if month not in rates:
-            raise ValueError(f"[{ERR_MONTHS}] no carry rate for the decision on {start}")
+        rate = carry_rate(rates, start)
         offset = bisect_left(sessions, start) + 1
         days = sessions[offset : offset + steps]
         if len(days) < steps:
@@ -228,7 +227,7 @@ def realized_contracts(
             permnos.append(feature.permno)
             months.append(month)
             rows.append(path.returns)
-            carry.append(rates[month])
+            carry.append(rate)
             gaps += path.gap_sessions
             gap_contracts += int(path.gap_sessions > 0)
             terminals += int(path.terminal)
