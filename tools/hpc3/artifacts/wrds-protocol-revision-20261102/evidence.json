@@ -1,0 +1,111 @@
+{
+  "task": "9a37c9a5-b981-4bf7-a4aa-5234b4ddcc96",
+  "source_commit": "b69daf97a0747732787d2036694b2c8d84e48c06",
+  "scope": "Metadata-only revision of the original encrypted extraction; no observation decryption, new extraction, HPC3 staging, runtime installation, study submission or final grant.",
+  "source_root": "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first/outputs",
+  "revision_root": "/home/corvis/research-data/wrds/experiments/crsp-protocol-v2-b69daf97a-20261102",
+  "execution": {
+    "host": "ziggurat",
+    "python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+    "source_overrides": [
+      "libs/covenant_ml/src",
+      "libs/covenant_ml",
+      "libs/platform_core/src",
+      "libs/platform_ml/src"
+    ],
+    "commands": [
+      "python -m scripts.crsp_extraction revise-protocol",
+      "python -m scripts.crsp_extraction verify-revision"
+    ],
+    "private_key_acquisition": false,
+    "installed_runtime_claim": false
+  },
+  "service_author": "load-report-9a37c9a5",
+  "service_reports": {
+    "create": {
+      "id": "b9fbe586-6ed8-4087-8a73-7791d6701309",
+      "created_at": "2026-11-02T00:20:07.810089+00:00"
+    },
+    "readback": {
+      "id": "3c1ed303-2357-4189-8652-0afca2f4f6af",
+      "created_at": "2026-11-02T00:20:45.473369+00:00"
+    }
+  },
+  "identical_report_sha256": "8eb7971d3fc435287180feb46e3f57fd76285df0980886ce0d33c8c8c022fea2",
+  "measurement": {
+    "kind": "CRSP_PROTOCOL_REVISION_EVIDENCE",
+    "revision_sha256": "ddb0ad455e91fccb358b2479c2f6a5ab218a0e2dd056b6bfe429f40c56a537eb",
+    "revision": {
+      "extraction_sha256": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349",
+      "extracted_at": "2026-10-31T18:44:04.122752+00:00",
+      "previous_protocol": {
+        "name": "protocol.json",
+        "sha256": "6063bb531f4d2cfc3072e902dde2dc7df73e5d1a18dcce51d3e2e02038e7ab2b",
+        "size_bytes": 1251
+      },
+      "protocol": {
+        "name": "protocol.json",
+        "sha256": "66547bc7f4d8f942116ae794494257e4dabd01428b5da7a4361b46661a79cf2b",
+        "size_bytes": 1341
+      },
+      "train_validation": {
+        "previous": {
+          "name": "bundle.json",
+          "sha256": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+          "size_bytes": 2959
+        },
+        "current": {
+          "name": "bundle.json",
+          "sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+          "size_bytes": 2959
+        },
+        "previous_manifest": {
+          "name": "manifest.json",
+          "sha256": "3ff5ffc36ecae3089b50763fa5804da522c2702035233f83b663a8a91609c9d0",
+          "size_bytes": 1242
+        },
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "9d9569979efb49f11f53939b9304ae8fbcdd995c8fb356d385b541b382d3dc1a",
+          "size_bytes": 1242
+        }
+      },
+      "final": {
+        "previous": {
+          "name": "bundle.json",
+          "sha256": "377b316ee84d185853412776b63ec8ccb6da7ecd0cbe4d6293bfa703ca0c226e",
+          "size_bytes": 2948
+        },
+        "current": {
+          "name": "bundle.json",
+          "sha256": "8c753ae372b7e640b797375d79118ffb961a5bf27cec82f1766010e9e10ece85",
+          "size_bytes": 2948
+        },
+        "previous_manifest": {
+          "name": "manifest.json",
+          "sha256": "7a330b024227ef47558b68dad413bcdf6f5253441077cb08b8af21737325aa65",
+          "size_bytes": 1242
+        },
+        "manifest": {
+          "name": "manifest.json",
+          "sha256": "228a30b285ce9bef4212ae75990b933d1b16b817fc13131bbb482571aeebcb94",
+          "size_bytes": 1242
+        }
+      }
+    },
+    "retained_relation_ciphertexts": 16,
+    "opened_observations": false
+  },
+  "verification": {
+    "fleet_job": "ca7e37f2-d3c6-4b4c-86cf-7012a7b3e466",
+    "package": "libs/covenant_ml",
+    "tests_passed": 5180,
+    "coverage_percent": 100,
+    "elapsed_seconds": 182
+  },
+  "limits": [
+    "Original protocol, extraction receipt, ciphertext and failed-study journal remain historical.",
+    "Final ciphertext has revised metadata but final observations remain unreleased.",
+    "A replacement validation staging, current controller/image, feasible resource preregistration and synthetic queue rehearsal precede a new licensed study."
+  ]
+}
