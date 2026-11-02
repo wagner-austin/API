@@ -8,7 +8,9 @@ source_paths:
   - tools/fleet/registry/machines/loki.json
 source_git_blobs:
   "tools/fleet/src/fleet/core/ssh_options.py": afa311f94fa24e74a5733b34ffcca1f4b4273885
-  "tools/fleet/registry/machines/loki.json": 9aa8a3bdca64b9a58f0e8fc77975f96e865fc7ca
+  "tools/fleet/registry/machines/loki.json": 3a7465e25d9ad7d9fabe09db5a9112468c99749a
+provenance:
+  - "2026-11-02 loki pin review: the machine file's dispatch gained models null as its last key (board task b9235198-f688-4eb2-8068-71377481e1d9); every line this page cites is unchanged."
 fact_checked: "2026-10-30"
 confidence: high
 hubs: [infrastructure]

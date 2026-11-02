@@ -20,10 +20,11 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/runner_reap_dropped.py": 99720a7f2a335f205c722df15154ecba8f792da0
   "tools/fleet/src/fleet/core/runner_reaper_render.py": 75ddd7944f569bf1a95d5d46d572eddd434489e8
   "tools/fleet/tests/test_runner_placement_host.py": e59308c8c36a312274e53cbd0f298a9dd1ffbe40
-  "tools/fleet/registry/machines/lavender.json": 76d7cacd8a90eaad6c39ea0976fced20e871b699
+  "tools/fleet/registry/machines/lavender.json": 98edfe58d3da5c739440fbebc823a85fcb4e6337
   "tools/fleet/registry/projects/tools/fleet-execution-runners.json": baeefbb12b207d6e5b71acd6fc7f60f8c6f99858
 provenance:
   - "2026-11-01 lavender pin review: the registry now declares Rust 1.98.1 and appends its measurement to the existing notes. The cited reimage/WSL history remains verbatim; board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
+  - "2026-11-02 lavender pin review: the machine file's dispatch gained models null as its last key; the cited lines are unchanged; board task b9235198-f688-4eb2-8068-71377481e1d9."
 fact_checked: "2026-10-30"
 confidence: high
 hubs: [infrastructure]
