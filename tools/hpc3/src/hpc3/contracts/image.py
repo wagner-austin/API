@@ -68,7 +68,9 @@ class ImageReference(TypedDict):
             the same path inside. Required as a field and may be empty, but
             must explicitly include every required data filesystem. Site
             bind-paths and hostfs mounts are disabled by the shared launcher.
-            Standard home and temporary mounts remain available. ``/pub`` is a
+            Commas and colons are refused because Apptainer interprets them
+            as bind separators even in shell-quoted paths. Standard home and
+            temporary mounts remain available. ``/pub`` is a
             SYMLINK to ``/dfs6b/pub``, and while apptainer binds the BeeGFS
             mounts it does not carry the symlink, so ``/pub/...`` does not
             resolve inside the container at all. Measured 2026-08-25 --
@@ -166,7 +168,8 @@ def _require_bind_paths(obj: JSONObject, key: str) -> list[str]:
     Raises:
         JSONTypeError: If the field is missing, not a list, holds a
             non-string, or holds a path that is not absolute POSIX,
-            backslashed, or carries a ``..`` segment. Absent is refused
+            backslashed, carries a ``..`` segment, or contains Apptainer's
+            comma/colon bind separators. Absent is refused
             rather than defaulted to empty: on HPC3 an unbound job finds
             none of its data, and silently choosing that for a caller who
             did not decide it is how a run completes against nothing.
@@ -186,6 +189,11 @@ def _require_bind_paths(obj: JSONObject, key: str) -> list[str]:
             raise JSONTypeError(f"Field '{key}[{index}]' must be forward-slashed, got {item!r}")
         if ".." in item.split("/"):
             raise JSONTypeError(f"Field '{key}[{index}]' must not contain '..', got {item!r}")
+        if ":" in item or "," in item:
+            raise JSONTypeError(
+                f"Field '{key}[{index}]' must not contain Apptainer bind separators "
+                f"':' or ',', got {item!r}"
+            )
         paths.append(item.rstrip("/") or "/")
     return paths
 
