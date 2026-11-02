@@ -12,7 +12,7 @@ source_paths:
   - "artifacts/wrds-bind-grammar-20261102/evidence.json"
   - "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
 source_git_blobs:
-  "src/hpc3/core/image_exec.py": "5d6a6241b29c5974f02e56efb12ca07eafd96463"
+  "src/hpc3/core/image_exec.py": "c0f72eb78ffa1249572704fc924a97ed1a016ba8"
   "src/hpc3/core/sbatch.py": "bf884f896e0eaaeafd595a034030368467f04026"
   "src/hpc3/contracts/image.py": "f17e30ab2167882931acf763a17b94da0011256d"
   "tests/test_image_mount_shell.py": "345bd899563c0f7be1c833e3ecb1cbc24e1aee91"
