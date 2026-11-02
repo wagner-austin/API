@@ -57,7 +57,7 @@ a passed preflight does not establish permanent recovery.[^preparation][^rehears
 
 Stock-selection study task `f61db3a7` owns this sequence. Bermudan Asian
 options task `5bec93df` is a separate study; its experiment and execution
-contract must be frozen separately.
+contract must be frozen separately.[^studies]
 
 ## Preserved failures
 
@@ -75,5 +75,6 @@ allocation-specific observations and their limits.[^preparation]
 
 [^preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `rehearsal_audit`, `staging`, `qualification`, `freeze`, `queue_submission` and `limits`; sibling program reports retain exact identities and recorded observations.
 [^rehearsal]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `preflight_incident`; recovery of the unchanged preflight did not establish a permanent filesystem fix.
+[^studies]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `remaining`; separate stock-selection and options task identities, without making its historical extraction plan a current requirement.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
