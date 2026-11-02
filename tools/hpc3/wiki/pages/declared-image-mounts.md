@@ -17,7 +17,7 @@ source_git_blobs:
   "src/hpc3/contracts/image.py": "f17e30ab2167882931acf763a17b94da0011256d"
   "tests/test_image_mount_shell.py": "345bd899563c0f7be1c833e3ecb1cbc24e1aee91"
   "artifacts/wrds-declared-mounts-20261102/evidence.json": "85aa658a3d949e054048fa129d41a541d16f3281"
-  "artifacts/wrds-bind-grammar-20261102/evidence.json": "c034a98c1f05567c8cdcfc982b59aa08094bc79e"
+  "artifacts/wrds-bind-grammar-20261102/evidence.json": "679ad2362481c412d5a69a03f02ac291bd800231"
   "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
 provenance:
   - "Board task 0a0e5913-7be2-4be5-8225-2833d21981f8; controller source abb117967be4f07194c748c9ad1d3e9eb6d3e676."
@@ -73,15 +73,19 @@ identities, and artifact timestamps within the allocations. This proves neither
 forced-termination cleanup nor hostile-account isolation. No licensed data or
 final keys were used; no new GPU allocation was tested.[^native]
 
-The delimiter-validation controller `29450d1b` subsequently ran home job
-`58780755`: completed `0:0` in 6 seconds, four input/runtime hashes verified,
-no BeeGFS mounts and normal private scratch removal. Its shared repeat has not
-run: staging reached its 600-second deadline in `FhgfsOps_revalidateIntent`
-inside login-node `mkdir`. SIGTERM was requested; the process remained in
-I/O wait at 19:37:27 UTC, so termination is not verified. Retry requires its
-exit and a responsive storage path. The earlier shared success is not
-represented as a repeat under this controller. Its full fleet check passed
-2,205 tests with 100% coverage.[^grammar]
+The delimiter-validation controller `29450d1b` subsequently completed home job
+`58780755` in 6 seconds and shared job `58783480` in 8 seconds, both `0:0`.
+Inspection verified four and five input/runtime hashes respectively, results
+and RunRecords. The home image had no BeeGFS mount; the shared image had exactly
+its declared directory. Both removed private mode-0700 scratch normally. The
+full controller fleet check passed 2,205 tests with 100% coverage.[^grammar]
+
+The first shared staging attempt reached its 600-second deadline inside
+login-node `mkdir` in `FhgfsOps_revalidateIntent`. After SIGTERM, the process
+remained in I/O wait. At 19:51:29 UTC it was absent and the parent directory
+answered a bounded stat. One explicit retry staged and verified the same
+frozen fixture before the successful job. The failed attempt remains in the
+evidence; this recovery does not establish a storage-server repair.[^grammar]
 
 Earlier jobs `58775808` and `58775824` failed because the diagnostic pinned CPU
 determinism after importing NumPy. The guard refused a misleading record. Their
@@ -94,4 +98,4 @@ the shell tests also verify literal paths and propagation of nonzero exits.[^che
 [^incident]: `artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `preflight_incident`; [[node-local-scratch]], § "The login node stalls on /pub too, and nothing on the hub can bound it".
 [^native]: `artifacts/wrds-declared-mounts-20261102/evidence.json`, `resources`, `native_service_posts` and `files`; hash-addressed sibling `home-native-evidence.json`, `shared-native-evidence.json`, `home-result.json`, `shared-result.json` and both `.sbatch` files, accounting, verified inputs, result mounts and scratch observations.
 [^checks]: `artifacts/wrds-declared-mounts-20261102/evidence.json`, `earlier_failure`, `fleet` and `files`; sibling failed native reports and stderr; `tests/test_image_mount_shell.py`, `test_shell_preserves_paths_removes_ambient_mounts_and_propagates_exit`.
-[^grammar]: `artifacts/wrds-bind-grammar-20261102/evidence.json`, `controller`, `refusal`, `home`, `shared`, `prior_shared`, `fleet` and `files`; sibling refusal outputs, native report, result, RunRecord, effective script and shared-stage process observation.
+[^grammar]: `artifacts/wrds-bind-grammar-20261102/evidence.json`, `controller`, `refusal`, `home`, `shared`, `shared_stage_failure`, `prior_shared`, `fleet` and `files`; sibling refusal outputs, native reports, results, RunRecords, effective scripts and shared-stage process/retry observations.
