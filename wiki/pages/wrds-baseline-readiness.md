@@ -21,7 +21,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json": "7fc3888de5afbfcd89731034f8c401f855de4d28"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
-  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
+  "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json": "8e2fb19391d79f19118806c6420625050051c298"
   "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json": "1100c7de989b5f9fb98273fd26e16477db17637a"
@@ -43,9 +43,11 @@ Verified diagnostics `58741562` and `58741598` found an existing daily row with
 missing price/return (`MP`/`MR`), followed by an available two-session return
 (`P1`) linked to the earlier price date. The frozen one-session rule correctly
 refuses this span. This differs from the version-1 pre-entry delisting. A
-multi-session accounting amendment needs explicit boundary rules, tests and
-review before another frozen study; the missing close has no observed value
-and must not be silently filled or used to remove the security.[^v2diagnosis]
+version-3 accounting amendment is now implemented in source, with boundary
+tests; verification, independent review and installation remain required
+before another frozen study. The missing close has no observed value
+and must not be silently filled or used to remove the security. See
+[[crsp-monthly-holdings-validation]] for the new source contract.[^v2diagnosis][^current]
 
 Preparation audit and launch checks passed: the job had 8 CPUs, 128 GiB, no
 GPU and sixteen successful input checksums. Those establish execution
@@ -72,8 +74,9 @@ or investment performance.[^stop][^diagnostic]
 
 ## Baseline preparation sequence
 
-The current protocol declares rejected-order cash and actual traded-notional
-costs. These version-2 rules differ from the stopped study's installed inputs.[^current]
+The source protocol retains rejected-order cash and actual traded-notional
+costs and adds the version-3 held-return rule. The completed preparation below
+concerns the stopped version-2 study, not a version-3 installation.[^current]
 
 - [x] Stage the separately verified version-2 validation bundle described in
    [[wrds-protocol-revision]]. Transfer and complete remote readback passed;
@@ -93,7 +96,7 @@ The original failed journal remains immutable. Its diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
-[^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule` and `cost_rule`; this is the current rule document, not an installed runtime or a completed study.
+[^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule`, `cost_rule` and `held_return_rule`; this is the current rule document, not an installed runtime or a completed study.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
 [^stage]: `tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json`, `staging`, `readback` and `scope`; encrypted validation staging only, with no evaluator installation or final release.

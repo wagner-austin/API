@@ -20,14 +20,14 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "7f848a9ca758b48c41f3dca9c891bc167b654fb0"
-  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "46cdf20ad4459526d15e5ba16b0d231494b4f9a9"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
+  "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "5e809a95dfd22a7c19755b10b69ee5e1e786571d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "aaa7e06eea6ce338fae20a0e2cf64670e1e86886"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "962625468640855e2e0fd3acb73e6ea1abcecfc3"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1b58a731bc46ace7515ba137deb2f854904cada9"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
@@ -45,11 +45,13 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-The current version-2 design is `libs/covenant_ml/docs/crsp-monthly.json`.
-It declares confirmed rejected-order cash and actual traded-notional costs.
-The stopped November 1 study used version 1; its admitted journal and encrypted
-bundle remain unchanged. Version 2 requires new runtime and input identities
-before another study, as recorded in [[wrds-baseline-readiness]]. Its codec,
+The current version-3 source design is `libs/covenant_ml/docs/crsp-monthly.json`.
+It retains confirmed rejected-order cash and actual traded-notional costs,
+and declares exact missing-price spans for held returns, detailed in
+[[crsp-monthly-holdings-validation]]. The stopped version-1 and version-2
+studies retain their original journals and encrypted identities. Version 3
+requires review, a new runtime and input identities before another study,
+as recorded in [[wrds-baseline-readiness]]. Its codec,
 validators, holdings evaluation and validation study share one implementation. The process
 boundary and deployment limits are in [[wrds-proposer-isolation]] and
 [[wrds-baseline-readiness]]. These are study assumptions, not

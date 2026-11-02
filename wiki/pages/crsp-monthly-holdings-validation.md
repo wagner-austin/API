@@ -4,6 +4,8 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_return_path.py"
   - "libs/covenant_ml/src/covenant_ml/markets/research_trial.py"
   - "libs/covenant_ml/tests/markets/test_crsp_unfilled.py"
   - "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py"
@@ -15,11 +17,13 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "9639ab336cd35c4bcd57bda978edbb6bea91a636"
+  "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "e75aae6010e813ab170621c90e010644ace2de5a"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "7f848a9ca758b48c41f3dca9c891bc167b654fb0"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "dab95633b59869e38fffa4e80d18a556f5fba0eb"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "64bfcdcc9053f66511e8b6398de7b8bd44de19d4"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "13031c17a0e67e2f4fc75d2486d2b6689092536a"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1b58a731bc46ace7515ba137deb2f854904cada9"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
@@ -41,16 +45,24 @@ before that close, is split equally across the decision-time selection.
 Version 2 solves `slots × x + rate × turnover(x) = investable` on the linear
 segments between prior position values. This charges actual buys and sells
 against post-cost targets; the earlier pre-fee-target approximation is removed.
-Positions compound their own ordinary daily returns, checked against
-the declared predecessor session. A position delisted inside a window stops at
+Positions compound their own evidenced return intervals. Ordinary returns are
+checked against the declared predecessor session. Version 3 also permits
+explicit MP/MR missing-price rows followed by one available NA/P1-P9 return
+whose previous-price date and duration cover exactly the intervening declared
+sessions. No intermediate close is assigned a value. Missing rows, other
+missingness, inconsistent spans and an unresolved tail still refuse the whole
+evaluation; the same path supplies labels and holdings.[^spans]
+A position delisted inside a window stops at
 its delisting date and becomes a receivable worth its `stkdelists` multiplier,
 applied once and never combined with the daily delisting-flagged row; it is
 reinvested only at a rebalance strictly after its valuation date. The last
-window pays the cost of liquidating its positions. A missing or non-ordinary
-held return, an unverifiable fill, an unresolved owned terminal event or a value
+window pays the cost of liquidating its positions. An unresolved held interval,
+an unverifiable fill, an unresolved owned terminal event or a value
 dated after the scored exit refuses the whole evaluation. Hand-calculated cases
 check two-month drift, turnover and liquidation and a three-month delisting
 whose value waits one month before reinvestment.[^holdings]
+
+[^spans]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_compound_held`, `_missing_price` and `_closes_gap`; `libs/covenant_ml/tests/markets/test_crsp_return_path.py`, independent span, wealth, cost, label and boundary oracles; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, encrypted evaluator integration with a missing-price span. Vendor meanings remain in the tech wiki's `crsp-ciz-daily-return-quality`; this permission is a versioned study assumption, not permission to fill or discard unknown observations.
 
 Label construction uses the same order outcome as holdings. Exactly one event
 at decision close, before entry, plus an entry-day terminal row with `DD`

@@ -26,10 +26,10 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "67792a2f1fd38cf8927a88d68adb04f1e8eb7c98"
   "libs/covenant_ml/tests/markets/test_crsp_extract.py": "4b0707b97313b908c6c5790e92dc03592e1d764f"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
-  "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "46cdf20ad4459526d15e5ba16b0d231494b4f9a9"
+  "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "5e809a95dfd22a7c19755b10b69ee5e1e786571d"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "954dbb37c940a7551cc6f40615f6462232e9d7c9"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "aaa7e06eea6ce338fae20a0e2cf64670e1e86886"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "962625468640855e2e0fd3acb73e6ea1abcecfc3"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
@@ -64,11 +64,11 @@ do not prove field semantics, historical completeness or publication availabilit
 |---|---|
 | Target return | `crsp_a_stock.stkdlysecuritydata`: `permno`, `dlycaldt`, `dlyret`, `dlyretmissflg`, `dlyretdurflg`, `dlydelflg`. Compound the held interval `(entry close, exit close]`; never substitute vendor calendar-month returns. |
 | Feature inputs and price validation | The same relation's `dlyprc`, `dlyprcflg`, `dlyvol`, plus `dlyprevdt` for return-span validation. Ordinary entry/exit requires a finite positive `TR` closing trade. Version 2 permits only a confirmed pre-entry terminal rejection to retain its equal cash slot; missing or contradictory fill evidence makes the run incomplete. Future execution cannot change pre-decision selection. |
-| Ordinary daily completeness | Require finite return, missingness flag `NA`, nonterminal flag `N`, and duration in `D1,D2,D3,D4,DU`, with independent session and previous-date checks. An absent or unknown flag is an explicit validation error. |
+| Return completeness | Decision-time features still require ordinary daily evidence: finite return, `NA`, `N`, duration `D1,D2,D3,D4,DU`, and independent predecessor checks. Version 3's held-return path additionally accepts exactly evidenced multi-session spans described in [[crsp-monthly-holdings-validation]]. Unknown flags or unresolved spans fail. |
 | Terminal reconciliation | `stkdelists`: `permno,delistingdt,delret,delretmisstype,deldlydt,delamtdt,delnextdt`. Require finite return at least -1 and missingness flag `NA`. Value once at the latest stored/amount/present next-price date; retain a receivable until modeled reinvestment at the next rebalance strictly after that date. Missing terminal value makes the held outcome incomplete; a valuation date after the scored exit also fails. |
 | Membership evidence | `dsenames`: `permno,namedt,nameendt,shrcd,exchcd`. Exactly one inclusive effective interval must apply at decision time. Preserve numeric codes 10/11 and 1/2/3 directly; do not infer equivalent mnemonic classifications or extrapolate after December 2024. Entry membership does not filter later held outcomes. |
 | Session evidence | `metaexchangecalendar`: `caldt,exchangegroup,tradingflg`. Retain every date; require `CIZ/Y` sessions or `N/A/N` closed days. Validate contiguous full months and construct windows from declared sessions, including historical Saturday sessions. Never infer the calendar from stock rows. |
-| Incomplete observations | Exclude insufficient pre-decision history with counted reasons. A missing required held return or unresolved terminal event stops publication of a complete evaluation; no zero fill, forward fill or silent security removal. Aggregate flags serve diagnostics only and cannot override missing daily evidence. |
+| Incomplete observations | Exclude insufficient pre-decision history with counted reasons. An absent source row, unresolved held interval or unresolved terminal event stops publication; no zero fill, forward fill or silent security removal. Vendor calendar-period aggregate flags cannot substitute for the required holding interval. |
 | Historical availability | Preserve source capture, query, extraction timestamp, checksums and effective-date joins. The resulting study is a revised-history retrospective backtest. These dates do not establish when a vendor first published a value or what a historical subscriber actually saw. |
 
 The terminal rule is a declared retrospective valuation and settlement proxy.
