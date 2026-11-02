@@ -1,0 +1,298 @@
+{
+  "task": "1fe61b29-b95e-42e6-b389-76a81e274c84",
+  "scope": "Encrypted validation transport and complete private-tree readback only; no private key or final ciphertext transferred, no observation decryption, evaluator installation, research submission or final release.",
+  "repository_comparison_commit": "715e159ac69deff5565a7a7763afd1bf58f5a2e1",
+  "unchanged_staging_source": [
+    "tools/hpc3/src/hpc3/cli/stage.py",
+    "tools/hpc3/src/hpc3/core/stage.py",
+    "tools/hpc3/src/hpc3/core/expected.py",
+    "tools/hpc3/src/hpc3/core/digest.py"
+  ],
+  "source_revision_evidence": "../wrds-protocol-revision-20261102/evidence.json",
+  "source_directory": "/home/corvis/research-data/wrds/experiments/crsp-protocol-v2-b69daf97a-20261102/train-validation",
+  "expected_record": {
+    "sha256": "27615ad35f73949c96b39b0670a89274906f9d95e6199f9f8fc0b6293053007e",
+    "verified_revision_report_sha256": "8eb7971d3fc435287180feb46e3f57fd76285df0980886ce0d33c8c8c022fea2",
+    "pinned_bundle_sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+    "construction": "Existing encrypted_stage_manifest consumes the independently pinned bundle; expected-revision.json retains the frozen revision service report and that exact bundle document."
+  },
+  "service_author": "hpc-report-1fe61b29",
+  "service_reports": {
+    "controller": {
+      "id": "d2dd74c3-e87c-4895-bd0d-bd9c9a74c78e",
+      "created_at": "2026-11-02T00:25:26.738791+00:00"
+    },
+    "staging": {
+      "id": "28f22083-1df6-4ebb-8130-5d686534e590",
+      "created_at": "2026-11-02T00:35:45.565706+00:00"
+    },
+    "readback": {
+      "id": "4fda31d1-d857-42bb-a614-a7c156d1121b",
+      "created_at": "2026-11-02T00:36:07.967189+00:00"
+    }
+  },
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "b3843a3d3b83cbae77dc4f855be2c4fbaa17b492",
+    "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-summary-b3843a3d3/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "5c43c166ebf927888b8e4e61f70f89549604526b1660e20ebbb3435e738d1572",
+        "installed_files": 355
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "760ad4644a21a9011a1a739c8ea660f1fd65170192a7f35fab627b02fab162dd",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "13cd97fdf5a67c6c6882d0029e69fe993fdad0a0fb1c10457c7e64ae47285dea",
+        "installed_files": 96
+      }
+    },
+    "installed_files": 585,
+    "selfcheck_sha256": "b388907a6365e694ec6f2f483d598b84920297d79a511fcfb89057116888cfcb",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "ec1f15f79adbbd3c82518e61a6058c264c2e12041de88def95e93efe2446bb90"
+  },
+  "staging": {
+    "kind": "HPC3_STAGE_EVIDENCE",
+    "host": "hpc3",
+    "manifest": {
+      "destination": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation",
+      "files": [
+        {
+          "name": "bundle.json",
+          "sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+          "size_bytes": 2959
+        },
+        {
+          "name": "calendar.csv.age",
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+          "size_bytes": 150323
+        },
+        {
+          "name": "calendar.sql.age",
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+          "size_bytes": 488
+        },
+        {
+          "name": "delists.csv.age",
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+          "size_bytes": 438816
+        },
+        {
+          "name": "delists.sql.age",
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+          "size_bytes": 843
+        },
+        {
+          "name": "manifest.json.age",
+          "sha256": "ac96be34785472ede6f9ea7dc8398c14388937edf39647502037891be2e6dacf",
+          "size_bytes": 1573
+        },
+        {
+          "name": "membership.csv.age",
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+          "size_bytes": 1323763
+        },
+        {
+          "name": "membership.sql.age",
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+          "size_bytes": 740
+        },
+        {
+          "name": "protocol.json.age",
+          "sha256": "c035bbfb00fe3b6d12013f294f8495981b570f923835bfba4f38dc61dd47a649",
+          "size_bytes": 1658
+        },
+        {
+          "name": "returns.csv.age",
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+          "size_bytes": 1788046370
+        },
+        {
+          "name": "returns.sql.age",
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+          "size_bytes": 815
+        }
+      ],
+      "provenance": {
+        "encrypted_bundle": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+        "plaintext_manifest": "9d9569979efb49f11f53939b9304ae8fbcdd995c8fb356d385b541b382d3dc1a",
+        "partition": "train-validation",
+        "protocol_revision": "ddb0ad455e91fccb358b2479c2f6a5ab218a0e2dd056b6bfe429f40c56a537eb",
+        "extraction_receipt": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349"
+      }
+    },
+    "manifest_sha256": "60689bc8a500c2741648bc3d23b1d6f1762365f2f8cada40621a06dfa758a7fe",
+    "expected_sha256": "27615ad35f73949c96b39b0670a89274906f9d95e6199f9f8fc0b6293053007e",
+    "verified_files": 11,
+    "certification_path": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/validation-stage-digests.txt",
+    "certification_sha256": "02f746059081162a8cd02e59e2ec80efd532f3caf522615c36edb82594e4d313",
+    "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+  },
+  "readback": {
+    "kind": "HPC3_STAGE_INSPECTION",
+    "host": "hpc3",
+    "manifest": {
+      "destination": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation",
+      "files": [
+        {
+          "name": "bundle.json",
+          "sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+          "size_bytes": 2959
+        },
+        {
+          "name": "calendar.csv.age",
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+          "size_bytes": 150323
+        },
+        {
+          "name": "calendar.sql.age",
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+          "size_bytes": 488
+        },
+        {
+          "name": "delists.csv.age",
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+          "size_bytes": 438816
+        },
+        {
+          "name": "delists.sql.age",
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+          "size_bytes": 843
+        },
+        {
+          "name": "manifest.json.age",
+          "sha256": "ac96be34785472ede6f9ea7dc8398c14388937edf39647502037891be2e6dacf",
+          "size_bytes": 1573
+        },
+        {
+          "name": "membership.csv.age",
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+          "size_bytes": 1323763
+        },
+        {
+          "name": "membership.sql.age",
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+          "size_bytes": 740
+        },
+        {
+          "name": "protocol.json.age",
+          "sha256": "c035bbfb00fe3b6d12013f294f8495981b570f923835bfba4f38dc61dd47a649",
+          "size_bytes": 1658
+        },
+        {
+          "name": "returns.csv.age",
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+          "size_bytes": 1788046370
+        },
+        {
+          "name": "returns.sql.age",
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+          "size_bytes": 815
+        }
+      ],
+      "provenance": {
+        "encrypted_bundle": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+        "plaintext_manifest": "9d9569979efb49f11f53939b9304ae8fbcdd995c8fb356d385b541b382d3dc1a",
+        "partition": "train-validation",
+        "protocol_revision": "ddb0ad455e91fccb358b2479c2f6a5ab218a0e2dd056b6bfe429f40c56a537eb",
+        "extraction_receipt": "18bd2028207c56784df784916728b62800b7bc3c6a89ea5b1f5970c7c28f9349"
+      }
+    },
+    "manifest_sha256": "60689bc8a500c2741648bc3d23b1d6f1762365f2f8cada40621a06dfa758a7fe",
+    "expected_sha256": "27615ad35f73949c96b39b0670a89274906f9d95e6199f9f8fc0b6293053007e",
+    "verified_files": 11,
+    "certification_path": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation/validation-stage-digests.txt",
+    "certification_sha256": "02f746059081162a8cd02e59e2ec80efd532f3caf522615c36edb82594e4d313",
+    "controller_python": "/home/corvis/research-control/wrds-summary-b3843a3d3/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "inventory": {
+      "root": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29",
+      "directories": {
+        "": 448,
+        "train-validation": 448
+      },
+      "files": [
+        {
+          "name": "train-validation/bundle.json",
+          "size_bytes": 2959,
+          "sha256": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83"
+        },
+        {
+          "name": "train-validation/calendar.csv.age",
+          "size_bytes": 150323,
+          "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24"
+        },
+        {
+          "name": "train-validation/calendar.sql.age",
+          "size_bytes": 488,
+          "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1"
+        },
+        {
+          "name": "train-validation/delists.csv.age",
+          "size_bytes": 438816,
+          "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2"
+        },
+        {
+          "name": "train-validation/delists.sql.age",
+          "size_bytes": 843,
+          "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395"
+        },
+        {
+          "name": "train-validation/manifest.json.age",
+          "size_bytes": 1573,
+          "sha256": "ac96be34785472ede6f9ea7dc8398c14388937edf39647502037891be2e6dacf"
+        },
+        {
+          "name": "train-validation/membership.csv.age",
+          "size_bytes": 1323763,
+          "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32"
+        },
+        {
+          "name": "train-validation/membership.sql.age",
+          "size_bytes": 740,
+          "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb"
+        },
+        {
+          "name": "train-validation/protocol.json.age",
+          "size_bytes": 1658,
+          "sha256": "c035bbfb00fe3b6d12013f294f8495981b570f923835bfba4f38dc61dd47a649"
+        },
+        {
+          "name": "train-validation/returns.csv.age",
+          "size_bytes": 1788046370,
+          "sha256": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66"
+        },
+        {
+          "name": "train-validation/returns.sql.age",
+          "size_bytes": 815,
+          "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f"
+        },
+        {
+          "name": "train-validation/validation-stage-digests.txt",
+          "size_bytes": 1281,
+          "sha256": "02f746059081162a8cd02e59e2ec80efd532f3caf522615c36edb82594e4d313"
+        }
+      ]
+    }
+  },
+  "stage_bytes": 1789968348,
+  "private_evidence_sha256": {
+    "controller-report.json": "a419e250cdf5f36af3be82a3fd3613b0382640fe264cd3eedbda9c6d88f7e77c",
+    "validation-stage.json": "60689bc8a500c2741648bc3d23b1d6f1762365f2f8cada40621a06dfa758a7fe",
+    "expected-revision.json": "27615ad35f73949c96b39b0670a89274906f9d95e6199f9f8fc0b6293053007e",
+    "staging.log": "6d990e7f2a21ba0dbb41691c4d4db17d39fd3acf68f5160df8dbd469e31777e5",
+    "readback.log": "abf919e0ccb3cc5fe4d8ba5889b31374e8660160ed3ab8716afa2aed3ae3e1b3"
+  },
+  "remaining": [
+    "Install and verify a current version-2 controller and image.",
+    "Freeze amended resource and candidate rules; rehearse the existing complete queue workflow before a new licensed baseline.",
+    "Observe cleanup for original failed job 58733020; preserve its stopped journal."
+  ]
+}
