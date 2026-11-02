@@ -193,7 +193,7 @@ def test_refused_refresh_publishes_nothing_and_removes_private_storage(
     elif failure == "rows":
         bounds = limits(max_rows=1)
     elif failure == "bytes":
-        bounds = limits(max_relation_bytes=100_000, max_partition_bytes=100_000)
+        bounds = limits(max_relation_bytes=1, max_partition_bytes=1)
     else:
         database.securities = None
     with (
