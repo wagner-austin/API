@@ -13,6 +13,10 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json"
+  - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py"
+  - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/protocol.json"
+  - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
@@ -23,6 +27,10 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
+  "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
+  "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/protocol.json": "a095650070b230379e759563df3c20b3c2476ded"
+  "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json": "b2994cf9db46aff4a4714b987bd4f5c0729dd5b2"
+  "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e; corpus 0264d5cc-4dec-4715-b17b-45f3c8e5fbec; reread November 2."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; this is qualification analysis, not an approved version-4 freeze."
@@ -75,6 +83,15 @@ peer's held observation preserves the decision-time universe and causes label
 construction to refuse. This is an evaluator contract check, not a measured
 count of affected months in the licensed dataset.[^labels]
 
+The frozen metadata permits a separate derivation: 262 decisions contain
+262,000 paths, and each decision is capped at 1,000 members. Every decision
+therefore has exactly 1,000 members. The audit records consecutive one-based
+path ordinals, so `(ordinal - 1) // 1000` identifies its zero-based decision.
+The 27 refusals occupy 23 training and two validation decisions. Thus 25,000
+rows depend on an unverified monthly benchmark. This is not a count of wrong
+or flipped labels, selected holdings, or realized losses; no new data was
+decrypted to derive it.[^dependence]
+
 ## Qualification design
 
 A replacement must distinguish selection, order execution, owned exposure and
@@ -109,4 +126,5 @@ the original full-universe baseline.[^cases][^partition]
 [^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
 [^features]: `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision` and `_feature`.
 [^labels]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_study_rows`, the mean of every eligible member's multiplier, and `crsp_arms`, `EQUAL_WEIGHT` selection; `libs/covenant_ml/tests/markets/test_crsp_study.py`, `test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark`.
+[^dependence]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json`, inputs, ordinal derivation and period counts; sibling `protocol.json`, `max_universe`, exact bytes matching `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `revision.revision.protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision`, universe cap; `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, consecutive `checked` increment and `path_ordinal` recording; sibling `result.json`, `results[0].decisions`, `eligible_paths` and `refused_cases`.
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting valuation predicate; `crsp_partition.py`, `check_crsp_partition`, dated-field checks.
