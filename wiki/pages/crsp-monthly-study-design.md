@@ -23,8 +23,8 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
   "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "5e809a95dfd22a7c19755b10b69ee5e1e786571d"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "7b96e5bca7a5ad17c5b9828193e5b822a292fe20"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "962625468640855e2e0fd3acb73e6ea1abcecfc3"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "4a09eb54a38e561ef1100322b80d931efe2774c3"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "7030a8a0e6012a5378791e24e88828b68fab4deb"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1b58a731bc46ace7515ba137deb2f854904cada9"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
@@ -37,7 +37,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
-fact_checked: 2026-11-01
+fact_checked: 2026-11-02
 confidence: medium
 ---
 
@@ -49,9 +49,9 @@ The current version-3 source design is `libs/covenant_ml/docs/crsp-monthly.json`
 It retains confirmed rejected-order cash and actual traded-notional costs,
 and declares exact missing-price spans for held returns, detailed in
 [[crsp-monthly-holdings-validation]]. The stopped version-1 and version-2
-studies retain their original journals and encrypted identities. Version 3
-requires review, a new runtime and input identities before another study,
-as recorded in [[wrds-baseline-readiness]]. Its codec,
+studies retain their original journals and encrypted identities. The version-3
+runtime, input identities and observed study outcomes are tracked in
+[[wrds-baseline-readiness]]. Its codec,
 validators, holdings evaluation and validation study share one implementation. The process
 boundary and deployment limits are in [[wrds-proposer-isolation]] and
 [[wrds-baseline-readiness]]. These are study assumptions, not
