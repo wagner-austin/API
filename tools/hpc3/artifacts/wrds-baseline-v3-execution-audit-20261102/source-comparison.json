@@ -1,0 +1,30 @@
+{
+  "frozen_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+  "files": [
+    {
+      "path": "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py",
+      "frozen_sha256": "b0890d621c534ea92555307da6a168a01fe4cdc500fab711a78df3f7539dc966",
+      "inspected_local_sha256": "b0890d621c534ea92555307da6a168a01fe4cdc500fab711a78df3f7539dc966",
+      "exact_match": true
+    },
+    {
+      "path": "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py",
+      "frozen_sha256": "270612321db7765fd5d4dbeef3c9ee0693f1a2e641ebfcf692b568f35f3b2fe4",
+      "inspected_local_sha256": "270612321db7765fd5d4dbeef3c9ee0693f1a2e641ebfcf692b568f35f3b2fe4",
+      "exact_match": true
+    },
+    {
+      "path": "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py",
+      "frozen_sha256": "d4360fb46cd3742bedaa2b33925eb9799076e0d136e7408794a936f6276ac730",
+      "inspected_local_sha256": "d4360fb46cd3742bedaa2b33925eb9799076e0d136e7408794a936f6276ac730",
+      "exact_match": true
+    },
+    {
+      "path": "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py",
+      "frozen_sha256": "336e780d2f9f8183710837907cad083c3d6fa67aaa767a632eff69bcaebacabc",
+      "inspected_local_sha256": "e17f510f5354ec1d62913de7ee1bdab722e4eae6c623508d5b7678d9e9f72678",
+      "exact_match": false
+    }
+  ],
+  "limit": "The diagnostic uses the pinned frozen image, not this current source checkout. Current crsp_return_path contains the subsequent options span lift."
+}
