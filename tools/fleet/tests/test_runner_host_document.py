@@ -13,7 +13,13 @@ from __future__ import annotations
 import pathlib
 
 import pytest
-from platform_core.json_utils import load_json_str
+from platform_core.json_utils import (
+    load_json_str,
+    narrow_json_to_dict,
+    require_dict,
+    require_list,
+    require_str,
+)
 
 from fleet.cli.render_documents import RENDERED_DIRECTORY
 from fleet.cli.runners import load_reserved_cores, load_runner_spec
@@ -72,13 +78,17 @@ class TestTheCommittedCopy:
         ), "run `make render-documents` in tools/fleet"
 
     def test_the_copy_carries_lavender_s_seven_installs(self) -> None:
-        document = load_json_str(_COMMITTED.read_text(encoding="utf-8"))
-        assert isinstance(document, dict)
-        lavender = document["lavender"]
-        assert isinstance(lavender, dict)
-        installs = lavender["installs"]
-        assert isinstance(installs, list)
-        assert len(installs) == 7
+        document = narrow_json_to_dict(load_json_str(_COMMITTED.read_text(encoding="utf-8")))
+        installs = require_list(require_dict(document, "lavender"), "installs")
+        assert [require_str(narrow_json_to_dict(install), "service") for install in installs] == [
+            "actions.runner.wagner-austin-API.lavender.service",
+            "actions.runner.wagner-austin-API.lavender-2.service",
+            "actions.runner.wagner-austin-MCPs.lavender.service",
+            "actions.runner.wagner-austin-MCPs.lavender-2.service",
+            "actions.runner.wagner-austin-corvis-stick.lavender.service",
+            "actions.runner.wagner-austin-tree-bot.lavender.service",
+            "actions.runner.wagner-austin-chat.lavender.service",
+        ]
 
 
 class TestTheFiles:
@@ -192,8 +202,7 @@ class TestTheDocument:
     def test_it_keys_each_host_by_its_name(self) -> None:
         spec = RunnerSpec(hosts=[a_host()])
         document = load_json_str(render_runner_hosts_document(spec, {"lavender": RESERVED_CORES}))
-        assert isinstance(document, dict)
-        assert list(document) == ["lavender"]
+        assert list(narrow_json_to_dict(document)) == ["lavender"]
 
     def test_a_host_with_no_reserved_figure_is_refused(self) -> None:
         with pytest.raises(KeyError, match="lavender"):
