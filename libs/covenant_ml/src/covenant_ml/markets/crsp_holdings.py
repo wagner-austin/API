@@ -8,34 +8,33 @@ the drifted pre-trade positions and actual post-cost targets. The budget
 equation pays that cost from the portfolio. A confirmed pre-entry delisting
 rejects a new purchase: its equal allocation stays in zero-interest cash,
 without replacement or redistribution. Positions then compound their own
-ordinary daily returns to the next rebalance. A security delisted inside the
+evidenced return intervals to the next rebalance. A security delisted inside the
 window stops compounding at its delisting date and becomes a receivable worth
 its terminal multiplier, applied once and dated by ``crsp_terminal_value``; it
 is not reinvested until a rebalance strictly after that date. The last window
 also pays the cost of liquidating its remaining positions at its exit close.
 
-Every missing or non-ordinary held return, missing fill, unresolved terminal
-event or terminal value dated after the scored exit refuses the whole
-evaluation. A partial result is never returned.
+Only explicit missing-price rows resolved by an exactly dated multi-session
+return are accepted. Missing fills, unresolved held intervals or terminal
+values refuse the whole evaluation. A partial result is never returned.
 """
 
 from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
 from itertools import pairwise
-from math import isfinite
 from typing import NamedTuple
 
-from platform_core.json_utils import JSONObject, require_float, require_int, require_str
+from platform_core.json_utils import JSONObject, require_int, require_str
 
 from .crsp_calendar import (
     CrspWindow,
-    crsp_ordinary_return,
     crsp_terminal_value,
     require_crsp_execution_price,
 )
 from .crsp_extract import CrspSources
 from .crsp_protocol import CrspProtocol
+from .crsp_return_path import crsp_compound_held
 
 
 class CrspOutcomes(NamedTuple):
@@ -53,7 +52,7 @@ class CrspPath(NamedTuple):
     Args:
         filled: Whether the selected purchase executed; a rejected purchase
             retains cash with growth one and no terminal claim.
-        growth: Compounded ordinary daily returns after entry, through the exit
+        growth: Compounded evidenced returns after entry, through the exit
             or, for a delisted security, through its delisting date.
         terminal: Terminal valuation date and multiplier when the security was
             delisted inside the window, else None.
@@ -174,7 +173,7 @@ def _terminal_row(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> JS
 
 
 def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> CrspPath:
-    """Validate execution, compound ordinary returns and resolve a terminal event.
+    """Validate execution, compound complete return spans and resolve a terminal event.
 
     The daily series' own delisting-flagged rows after the delisting date are
     never compounded: the terminal multiplier comes from ``stkdelists`` alone,
@@ -192,26 +191,19 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
 
     Raises:
         ValueError: CRSP-004 for an unexecutable entry or ordinary exit;
-            CRSP-009 for a missing or non-ordinary held return or a
+            CRSP-009 for a missing or inconsistent held return or a
             terminal value dated after the exit; CRSP-005 propagates for an
             unresolved terminal event; CRSP-010 for contradictory terminal-entry
-            evidence.
+            evidence; CRSP-011 for an unresolved price gap at the boundary.
     """
     days = _sessions_after(outcomes.sessions, window.entry, window.exit)
     if not _entry_filled(outcomes, permno, window):
         return CrspPath(False, 1.0, None)
     terminal = _terminal_row(outcomes, permno, window)
     end = window.exit if terminal is None else require_str(terminal, "delistingdt")
-    growth = 1.0
-    previous = window.entry
-    for day in days[: bisect_right(days, end)]:
-        row = outcomes.returns.get((permno, day))
-        if row is None or not crsp_ordinary_return(row, previous):
-            raise ValueError(f"[CRSP-009] held return for {permno} on {day} is not ordinary")
-        growth *= 1 + require_float(row, "dlyret")
-        previous = day
-    if not isfinite(growth):
-        raise ValueError("[CRSP-009] compounded held return is not finite")
+    growth = crsp_compound_held(
+        outcomes.returns, permno, window.entry, days[: bisect_right(days, end)]
+    )
     if terminal is None:
         _require_fill(outcomes, permno, window.exit)
         return CrspPath(True, growth, None)
