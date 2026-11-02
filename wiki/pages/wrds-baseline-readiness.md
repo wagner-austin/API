@@ -99,6 +99,9 @@ diagnosis remains the starting evidence; no new outcome policy is approved.[^sou
 [[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
 derived for that source comparison, including its separate native
 attempts and the enforced prohibition on using it as a study dataset.[^cohort]
+The completed [[wrds-crsp-source-comparison]] found all 81,920 queried rows
+unchanged. It supplied no fresh-vintage correction; economic qualification
+and the study stop remain in force.[^comparison]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
 verified the explicit protocol stop. Source-diagnosis task `a9ad53ae` then passed
@@ -135,3 +138,5 @@ allocation-specific observations and their limits.[^preparation]
 [^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
 
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement` and `record`; sibling `completion-preparation-report.json`, fifteen `attempts` with one failed, fourteen admitted, no selection or final-manifest identity and the unchanged journal digest. Diagnostic completion is not a model fit or a final evaluation.
+
+[^comparison]: [[wrds-crsp-source-comparison]], § "Native evidence", licensed job `40568218` and its primary comparison/collection artifacts.

@@ -83,8 +83,9 @@ Collection independently reread the exact twelve-file inventory against that
 bundle pin: eleven ciphertext files totaling 5,047,538 bytes plus metadata.
 The controller created no plaintext during collection.[^collection]
 
-Fresh vendor comparison and economic qualification remain downstream in
-[[crsp-outcome-qualification]]. No result from this derivation permits removal
+[[wrds-crsp-source-comparison]] records the completed bounded vendor check;
+[[crsp-outcome-qualification]] retains the unresolved economic rules.
+No result from this derivation permits removal
 of the refused paths, a changed benchmark or release of the final holdout.[^owner][^tests]
 
 [^request]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json`, `plan`, `source_commit` and source/program identities.
