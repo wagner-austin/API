@@ -4,12 +4,16 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]", "[[wrds-baseline-v2-freeze]]", "[[wrds-protocol-revision]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json": "6a91f67fc36dc4d3aa6b9bbcc7279ca019a78d62"
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json": "98ee300170fb1608bb4cf3f4b7298c0323d762d1"
   "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json": "8ee14efd7aefaa88ffdaa7ed66c6ca0effe2fd51"
   "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
@@ -69,7 +73,33 @@ Diagnostic job `58759614` built the 262-decision panel but failed on a typed
 missing entry price after its last progress report at 84,000 paths. All sixteen
 inputs were verified; it produced no complete diagnostic result or study
 score. The collector's correction and replacement submission do not amend
-this freeze; their current status is in [[wrds-baseline-readiness]].[^pathaudit]
+this freeze.[^pathaudit]
+
+## Completed path diagnostic
+
+Replacement `58760716` completed with exit `0:0` in 2,126 seconds. Native
+inspection verified all sixteen inputs, the result and shared RunRecord.
+Its unchanged frozen evaluator visited all 262,000 paths from 262 decisions:
+261,973 accepted, 27 refused, and zero empty decisions. Accepted paths include
+153 confirmed rejected-entry cash outcomes and 1,093 terminal paths.[^complete]
+
+| First refusal boundary | Training paths | Validation paths | Total |
+|---|---:|---:|---:|
+| Ordinary exit | 3 | 0 | 3 |
+| Entry | 4 | 0 | 4 |
+| Held returns | 14 | 1 | 15 |
+| Terminal valuation | 4 | 1 | 5 |
+| All refusals | 25 | 2 | 27 |
+
+The first refused path, ordinal 9,165, has a positive `BA` ordinary exit and
+a delisting on that exit date. The frozen interval excludes that event from
+terminal valuation and requires a closing trade for sale. The scan records
+first refusals, not every fault within a path; its boundary examples do not
+identify every problematic held-return row or terminal field. It assigns no
+replacement prices, returns or labels, fits no model and accesses no final
+data. Normal-exit plaintext removal is asserted by this program, not a separate
+same-node forced-kill probe. The version-3 study remains a protocol stop;
+[[wrds-baseline-readiness]] records the remaining work.[^complete]
 
 [^freeze]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json`, `old_policy`, `new_policy`, `policy_fields_changed`, `design_fields_changed`, `selection_unchanged`, `estimator_unchanged` and `matrix`; unchanged selection contract from [[wrds-baseline-v2-freeze]].
 [^design]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json`, `design`, `stopping_months`, `fold_months` and `confidence`.
@@ -78,3 +108,5 @@ this freeze; their current status is in [[wrds-baseline-readiness]].[^pathaudit]
 [^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
 
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json`, `native`, `input_count`, `panel_decisions`, `last_progress_paths`, `failure` and `limits`; sibling native-input report and logs retain the program observations.
+
+[^complete]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure`, `plaintext_removed` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement.verified_files`, result/record digests and `record`. Public observations are flags, counts and row digests, without security identifiers, dates, prices or returns.

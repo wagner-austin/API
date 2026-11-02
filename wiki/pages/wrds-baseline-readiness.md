@@ -4,16 +4,18 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
-  - "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json"
-  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/completion-preparation-report.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
 source_git_blobs:
-  "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json": "8ee14efd7aefaa88ffdaa7ed66c6ca0effe2fd51"
-  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json": "8977f84838fbcd6346de5cffdcf86921e72883b0"
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json": "6a91f67fc36dc4d3aa6b9bbcc7279ca019a78d62"
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json": "98ee300170fb1608bb4cf3f4b7298c0323d762d1"
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/completion-preparation-report.json": "97ff089365009ac9ba4d9284d4c420b1df60a391"
   "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
@@ -31,7 +33,8 @@ confidence: medium
 `58749373` failed after 1,099 seconds with `CRSP-004` at an ordinary exit
 requiring a finite positive closing trade. The queue recorded the failure
 automatically. One attempt failed; fourteen remain admitted and unsubmitted.
-No candidate is selected and the final holdout remains unreleased.**[^v3stop]
+No candidate is selected and the final holdout remains unreleased. The completed
+diagnostic found 27 refused paths out of 262,000; it is not a model result.**[^v3stop][^pathaudit]
 
 ## Current evidence
 
@@ -48,14 +51,18 @@ No candidate is selected and the final holdout remains unreleased.**[^v3stop]
 The earlier exact missing-return-span qualification passed, but it did not
 establish whole-dataset completeness. All sixteen frozen inputs of the failed
 allocation passed native inspection; the error arose in label construction,
-before model fitting. The exact exit-date source flag and price remain to be
-diagnosed. This is distinct from the earlier held-return-span failure.[^v3stop]
+before model fitting. This is distinct from the earlier held-return-span
+failure.[^v3stop]
 
-The first full-panel diagnostic (`58759614`) constructed 262 decisions but
-stopped on an entry's missing price: its collector caught `ValueError`, while
-the validator raised `JSONTypeError`. Its last progress message covered 84
-decisions and 84,000 paths; no complete counts were produced. Replacement
-diagnostic `58760716` is submitted; its completion is not yet verified.[^pathaudit]
+Full-panel diagnostic `58760716` completed in 2,126 seconds with all sixteen
+inputs, its result and RunRecord independently verified. Across 262 decisions,
+261,973 paths were accepted and 27 refused: 3 ordinary exits, 4 entries,
+15 held-return paths and 5 terminal valuations; 25 were in training and 2 in
+validation. The first refusal has a finite positive `BA` price at an ordinary
+exit with a delisting on that exit date. A bid/ask average does not satisfy the
+frozen closing-trade rule. Counts measure the first refusal per path; they do
+not establish every underlying cause. [[wrds-baseline-v3-freeze]] retains the
+failed first diagnostic and the completed scan's limits.[^pathaudit]
 
 The `/pub` BeeGFS stall also recurred during submission and cleared without
 changing the request. Its unnecessary mount dependency remains tracked as
@@ -63,11 +70,11 @@ changing the request. Its unnecessary mount dependency remains tracked as
 
 ## Remaining work
 
-1. Complete and verify the full-panel diagnostic, including typed missing-value
-   refusals; the traceback alone does not justify a new fill rule.
+1. Resolve source evidence for the 27 refused paths, including held-return and
+   terminal-value cases; aggregate boundary flags alone do not diagnose them.
 2. Determine whether data correction or an explicit reviewed protocol amendment
-   is warranted. Preserve failed requests; do not silently retry or exclude
-   securities on future outcome availability.
+   is warranted. Preserve failed requests; do not silently retry, treat quotes
+   as trades, or exclude securities on future outcome availability.
 3. Only after a qualified new freeze, execute validation, select under fixed
    rules, and perform the controlled final evaluation.[^v3stop]
 
@@ -97,4 +104,4 @@ allocation-specific observations and their limits.[^preparation]
 
 [^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
 
-[^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json`, `native`, `panel_decisions`, `last_progress_paths`, `failure` and `limits`; `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json`, `job_id`, `experiment` and `image_digest`. Submission is not completion or a study result.
+[^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement` and `record`; sibling `completion-preparation-report.json`, fifteen `attempts` with one failed, fourteen admitted, no selection or final-manifest identity and the unchanged journal digest. Diagnostic completion is not a model fit or a final evaluation.
