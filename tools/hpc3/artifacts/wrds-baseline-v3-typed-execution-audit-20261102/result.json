@@ -1,0 +1,1221 @@
+{
+ "results": [
+  {
+   "kind": "licensed-v3-execution-path-audit",
+   "native_job_id": "58760716",
+   "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+   "program_sha256": "5fa983a6c713c61addf76af19e0da3384ca7caf5b30ef515f1f40f719a2e1967",
+   "bundle_sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+   "decisions": 262,
+   "eligible_paths": 262000,
+   "accepted_paths": 261973,
+   "confirmed_rejected_entries": 153,
+   "accepted_terminal_paths": 1093,
+   "empty_decisions": 0,
+   "refused_paths": 27,
+   "refusal_counts": {
+    "CRSP-004/ordinary_exit/training/TR/BA": 3,
+    "CRSP-004/entry/training/BA/ABSENT": 3,
+    "CRSP-009/held_path/training/TR/TR": 3,
+    "CRSP-009/held_path/training/TR/DA": 3,
+    "CRSP-009/held_path/training/TR/SU": 1,
+    "CRSP-009/held_path/training/TR/DP": 1,
+    "CRSP-009/held_path/training/TR/NT": 5,
+    "JSON_TYPE_ERROR/entry/training/NT/NT": 1,
+    "JSON_TYPE_ERROR/terminal_value/training/TR/ABSENT": 1,
+    "CRSP-005/terminal_value/training/TR/ABSENT": 3,
+    "CRSP-011/held_path/training/TR/MP": 1,
+    "CRSP-009/held_path/validation/TR/DA": 1,
+    "CRSP-005/terminal_value/validation/TR/ABSENT": 1
+   },
+   "first_failure": {
+    "period": "training",
+    "entry": {
+     "present": true,
+     "row_sha256": "5e837d07cea5bd5a9b44ac6168057620f1da4153ce996062ac03fa100b425269",
+     "price_present": true,
+     "finite_positive_price": true,
+     "price_flag": "TR",
+     "return_missing_flag": "NA",
+     "return_duration_flag": "D1",
+     "delisting_flag": "N"
+    },
+    "exit": {
+     "present": true,
+     "row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+     "price_present": true,
+     "finite_positive_price": true,
+     "price_flag": "BA",
+     "return_missing_flag": "NA",
+     "return_duration_flag": "D1",
+     "delisting_flag": "N"
+    },
+    "exit_neighbors": [
+     {
+      "session_offset": -2,
+      "row": {
+       "present": true,
+       "row_sha256": "799eaa30b5a4504bb079813536f1f0513264e2c29abba78b87fbf24ce69eea17",
+       "price_present": true,
+       "finite_positive_price": true,
+       "price_flag": "TR",
+       "return_missing_flag": "NA",
+       "return_duration_flag": "D1",
+       "delisting_flag": "N"
+      }
+     },
+     {
+      "session_offset": -1,
+      "row": {
+       "present": true,
+       "row_sha256": "bfd712103bb0910186ebe74ac37dec358c58e6dcb71e5a3cb2f429170ab233f6",
+       "price_present": true,
+       "finite_positive_price": true,
+       "price_flag": "TR",
+       "return_missing_flag": "NA",
+       "return_duration_flag": "D1",
+       "delisting_flag": "N"
+      }
+     },
+     {
+      "session_offset": 0,
+      "row": {
+       "present": true,
+       "row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+       "price_present": true,
+       "finite_positive_price": true,
+       "price_flag": "BA",
+       "return_missing_flag": "NA",
+       "return_duration_flag": "D1",
+       "delisting_flag": "N"
+      }
+     },
+     {
+      "session_offset": 1,
+      "row": {
+       "present": true,
+       "row_sha256": "a5af3e1cd53e7b3e990716fef16e25ead3c56fb8bb1add376361c90016f4c35f",
+       "price_present": true,
+       "finite_positive_price": false,
+       "price_flag": "DA",
+       "return_missing_flag": "NA",
+       "return_duration_flag": "DD",
+       "delisting_flag": "Y"
+      }
+     },
+     {
+      "session_offset": 2,
+      "row": {
+       "present": false
+      }
+     }
+    ],
+    "terminal_on_decision": 0,
+    "terminal_inside_window": 0,
+    "terminal_on_exit": 1,
+    "terminal_after_exit": 0,
+    "code": "CRSP-004",
+    "boundary": "ordinary_exit",
+    "path_ordinal": 9165
+   },
+   "first_examples_by_signature": {
+    "CRSP-004/ordinary_exit/training/TR/BA": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "5e837d07cea5bd5a9b44ac6168057620f1da4153ce996062ac03fa100b425269",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "BA",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "799eaa30b5a4504bb079813536f1f0513264e2c29abba78b87fbf24ce69eea17",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "bfd712103bb0910186ebe74ac37dec358c58e6dcb71e5a3cb2f429170ab233f6",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "BA",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "a5af3e1cd53e7b3e990716fef16e25ead3c56fb8bb1add376361c90016f4c35f",
+        "price_present": true,
+        "finite_positive_price": false,
+        "price_flag": "DA",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "DD",
+        "delisting_flag": "Y"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 1,
+     "terminal_after_exit": 0,
+     "code": "CRSP-004",
+     "boundary": "ordinary_exit",
+     "path_ordinal": 9165
+    },
+    "CRSP-004/entry/training/BA/ABSENT": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "BA",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": false
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-004",
+     "boundary": "entry",
+     "path_ordinal": 10141
+    },
+    "CRSP-009/held_path/training/TR/TR": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "68ce143bc155427da7bf86f42a3f584cfef2f23a8b166a6071da33cbfdf30d83",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "69d2d8acbb5d91a849ad2547b1a7161cb8f141e72240cdc797e806cad067d094",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "MV",
+      "return_duration_flag": "D4",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "580354c391edab93a01b92ccea709103109261444ee704e69b6e98ee3d535036",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "6ad1797c681e43905c70727e50d17b54cc959260ba98c98b5547210168c6440f",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "69d2d8acbb5d91a849ad2547b1a7161cb8f141e72240cdc797e806cad067d094",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "MV",
+        "return_duration_flag": "D4",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "3707c82110772b6aea05a8057c5a3264334ce3e29feb11ee1a1bdd2b9116e1ca",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": true,
+        "row_sha256": "f41483f55d0f24fb8e523afe2eaf8e07698ff73356109df29368f0ff10d7372c",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 10402
+    },
+    "CRSP-009/held_path/training/TR/DA": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "421e092db8c97aca808a5ee80b3ffa40c7380e352125f9402e5002958122f00c",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "0319541df3b76d47084ad208a2c78b85b16f5ca6592454fd7b0a37ba7bdfaff7",
+      "price_present": true,
+      "finite_positive_price": false,
+      "price_flag": "DA",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "DD",
+      "delisting_flag": "Y"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "1a7bb0d8cc2e79cb1290ae8da3f9d9dba948d1f8e4bff2a83d10f0c198d7ea15",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "6fc47eb126349c1a179c217e345b2f14c7d4e054ac39ead33cbbe823504f4f50",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "0319541df3b76d47084ad208a2c78b85b16f5ca6592454fd7b0a37ba7bdfaff7",
+        "price_present": true,
+        "finite_positive_price": false,
+        "price_flag": "DA",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "DD",
+        "delisting_flag": "Y"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 18863
+    },
+    "CRSP-009/held_path/training/TR/SU": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "152a3c1ab444cf4a3eab07977f839fd7fa330d3c22826fac2734c7972fb2136d",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D2",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "d3f208a3b62b91162a113ca75260189ab0e37aa6e93511cc532d32cad073f912",
+      "price_present": false,
+      "finite_positive_price": false,
+      "price_flag": "SU",
+      "return_missing_flag": "MP",
+      "return_duration_flag": "MR",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "2d764468ec0f3996cdf86f63df2505bcd6ffa3d4e8c35c6a0b5a6f6d3504bee3",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "SU",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "6dbc895af5484eef57f37051878521bd5f1960f61934eecfe3d343d80d18848b",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "SU",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "d3f208a3b62b91162a113ca75260189ab0e37aa6e93511cc532d32cad073f912",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "SU",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "c6b3ca7023ece90809c95bf501b1131c3aff2b23166b5d42c3a9344a60ba5286",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "SU",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": true,
+        "row_sha256": "31186593935d7da35d3eb500e2fe637940fb93d3eb146f6c23eee67d4da636f2",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "SU",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 23610
+    },
+    "CRSP-009/held_path/training/TR/DP": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "664b09e65bc310e5fabb03670b43b888643f0e686f51fbe39a62ca4e4d11ff08",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "7df89f6206081b849959c5798064b8343720671a6c64af1b2d096fdddb17b2bc",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "DP",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "P2",
+      "delisting_flag": "Y"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "088a9d180e21c69f6a06f437aedcc1678bb0510c55fbafea485145790b06f057",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "10b87445a5a631c8492b230fec5d762f09f6ba07ed2cc9a3a0a59f854132e93a",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "7df89f6206081b849959c5798064b8343720671a6c64af1b2d096fdddb17b2bc",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "DP",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "P2",
+        "delisting_flag": "Y"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 27156
+    },
+    "CRSP-009/held_path/training/TR/NT": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "f09de080dfbdfd2d734b50871fbb34741b56395122d06da4b029858c5af9fa36",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D3",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "756f3fb34abaec33c9292a081d8ae5f83f8a69ecbb4afff57ba544eacc242a5d",
+      "price_present": false,
+      "finite_positive_price": false,
+      "price_flag": "NT",
+      "return_missing_flag": "NT",
+      "return_duration_flag": "MR",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "71cf437a6f38d8e3bd2e23f6e1dd7dcfb15aba4060d11b36d3966a884b074551",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "f81cbc77b0bce31390e7de2c63ab232af2d9d23a9cf868778b362848cddef3a6",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "756f3fb34abaec33c9292a081d8ae5f83f8a69ecbb4afff57ba544eacc242a5d",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "51663555d80bb6fb823a0f41a4db77eee4bad80ac9f4a28e2fbbebb5a4a48988",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": true,
+        "row_sha256": "d895aa9bd3fc842c90c98737d589bb7012d5701596866373b92f6dabf1891cc8",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 54734
+    },
+    "JSON_TYPE_ERROR/entry/training/NT/NT": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "1aa2c9fd895e0b0173cb5a2e46a0fee8e384cf9226a6987ffc150432661d5951",
+      "price_present": false,
+      "finite_positive_price": false,
+      "price_flag": "NT",
+      "return_missing_flag": "NT",
+      "return_duration_flag": "MR",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "d8c39945f612a8594e50b07dc4e51684027ea696ace6bbca7207a2ba7cc91bb9",
+      "price_present": false,
+      "finite_positive_price": false,
+      "price_flag": "NT",
+      "return_missing_flag": "NT",
+      "return_duration_flag": "MR",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "c3a8590c83a2df00b374dd1e6274ad262122bdbea428d7a54d693dd6ffbd63ff",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "c548d42b632ccad2af80ecdc977aaed0de2c8cbf0baa36e0c82f406bea9d5876",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "d8c39945f612a8594e50b07dc4e51684027ea696ace6bbca7207a2ba7cc91bb9",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "c2758affbd699225491d6d527f7ac68666f36743f57dc8963a532fa54ef392be",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": true,
+        "row_sha256": "ac46684edac49486cf0be8e1f1b9292450aa6cfa550c9f47c88b6dd76a0ecfed",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "NT",
+        "return_missing_flag": "NT",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 1,
+     "code": "JSON_TYPE_ERROR",
+     "boundary": "entry",
+     "path_ordinal": 84356
+    },
+    "JSON_TYPE_ERROR/terminal_value/training/TR/ABSENT": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "c08643bf26a5fca13b8f45925d60fa910de7ef36dc2ba4022e02d14626aec8cb",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": false
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "JSON_TYPE_ERROR",
+     "boundary": "terminal_value",
+     "path_ordinal": 133712
+    },
+    "CRSP-005/terminal_value/training/TR/ABSENT": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "c11cbe1d267868e0962c6bb91db27ecfd9151c15d306cf1c32fb1b0d57866fd9",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": false
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-005",
+     "boundary": "terminal_value",
+     "path_ordinal": 134760
+    },
+    "CRSP-011/held_path/training/TR/MP": {
+     "period": "training",
+     "entry": {
+      "present": true,
+      "row_sha256": "51b45012fe0083267d74104cc5d3011bb583ecd9a738f9dfc97c29b528805bc0",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D3",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "7c85eb27533f59abbc27cb43d43c948e6a8b9e498c276856d3657359fdc7d1a3",
+      "price_present": false,
+      "finite_positive_price": false,
+      "price_flag": "MP",
+      "return_missing_flag": "MP",
+      "return_duration_flag": "MR",
+      "delisting_flag": "N"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "ab0524fed8a5b05a55c49c49298c9793f37b2dbdd2c9026453369201d5c7878b",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "a40f20910377813e5d6d6f62c7c39d47ab4e5b41e5dfd49861482eb1efe1f810",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D3",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "7c85eb27533f59abbc27cb43d43c948e6a8b9e498c276856d3657359fdc7d1a3",
+        "price_present": false,
+        "finite_positive_price": false,
+        "price_flag": "MP",
+        "return_missing_flag": "MP",
+        "return_duration_flag": "MR",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": true,
+        "row_sha256": "69c7042834ec8b77df822afd20c7447a157b53a9c42eb22a686f186a65c2651f",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "P1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": true,
+        "row_sha256": "45454da028bdfab4f7d6b033424a7c4bce8356b0e331b5d160a6ba2c0f44dfd6",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 0,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-011",
+     "boundary": "held_path",
+     "path_ordinal": 169697
+    },
+    "CRSP-009/held_path/validation/TR/DA": {
+     "period": "validation",
+     "entry": {
+      "present": true,
+      "row_sha256": "8ea7b149e1386c5cfabac0b478cb3658e503a4c4efca873171e4207b243cb097",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D1",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": true,
+      "row_sha256": "c3a3b3ea9c4b59b5f5b0679a18d0dcf7b91fc6bc1a08eb15148af120a7c75f10",
+      "price_present": true,
+      "finite_positive_price": false,
+      "price_flag": "DA",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "DD",
+      "delisting_flag": "Y"
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": true,
+        "row_sha256": "c051befa727e64cc0383a5fdfde01b6ed8b826a0ab070bb0d81a2607f10b7f11",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": true,
+        "row_sha256": "bf2b9694cbfb1f5af0805de514911e1a803aa8faf3ad0a579db4d68f55c0f610",
+        "price_present": true,
+        "finite_positive_price": true,
+        "price_flag": "TR",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "D1",
+        "delisting_flag": "N"
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": true,
+        "row_sha256": "c3a3b3ea9c4b59b5f5b0679a18d0dcf7b91fc6bc1a08eb15148af120a7c75f10",
+        "price_present": true,
+        "finite_positive_price": false,
+        "price_flag": "DA",
+        "return_missing_flag": "NA",
+        "return_duration_flag": "DD",
+        "delisting_flag": "Y"
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-009",
+     "boundary": "held_path",
+     "path_ordinal": 187445
+    },
+    "CRSP-005/terminal_value/validation/TR/ABSENT": {
+     "period": "validation",
+     "entry": {
+      "present": true,
+      "row_sha256": "a9ecf8b5f8d0331202ee7490b0399af7aeaa151897747832797c34bb43c2f110",
+      "price_present": true,
+      "finite_positive_price": true,
+      "price_flag": "TR",
+      "return_missing_flag": "NA",
+      "return_duration_flag": "D4",
+      "delisting_flag": "N"
+     },
+     "exit": {
+      "present": false
+     },
+     "exit_neighbors": [
+      {
+       "session_offset": -2,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": -1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 0,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 1,
+       "row": {
+        "present": false
+       }
+      },
+      {
+       "session_offset": 2,
+       "row": {
+        "present": false
+       }
+      }
+     ],
+     "terminal_on_decision": 0,
+     "terminal_inside_window": 1,
+     "terminal_on_exit": 0,
+     "terminal_after_exit": 0,
+     "code": "CRSP-005",
+     "boundary": "terminal_value",
+     "path_ordinal": 191467
+    }
+   },
+   "all_paths_accounted": true,
+   "plaintext_removed": true,
+   "scope": "First refusal per eligible path across the frozen train-validation panel. No fitting, scores, candidate selection or final access. Refused paths receive no imputed return or label. Public examples expose flags and row digests only, not identifiers, dates, prices or returns."
+  }
+ ],
+ "diagnosis_of": "58749373",
+ "fingerprint": {
+  "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "dataset": {
+  "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d"
+ }
+}
