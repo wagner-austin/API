@@ -1,0 +1,6 @@
+SIGTERM requested for owned probe mkdir 2678585
+Mon Nov  2 19:37:27 UTC 2026
+    PID                  STARTED     ELAPSED STAT WCHAN                               COMMAND
+2678585 Mon Nov  2 11:27:03 2026       10:23 Ds   FhgfsOps_revalidateIntent           mkdir -p /pub/wagnera3 research/mount-grammar-5d16022f-final-20261102
+SigPnd:	0000000000000100
+ShdPnd:	0000000000004000
