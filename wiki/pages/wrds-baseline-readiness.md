@@ -96,6 +96,10 @@ Follow-up task `f963ee0b` tracks that protocol/source qualification.
 requirements, including partition-boundary event visibility. The reviewed source
 diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
 
+[[wrds-encrypted-diagnostic-cohort]] records the bounded encrypted subset
+being prepared for that source comparison, including its separate native
+attempts and the enforced prohibition on using it as a study dataset.[^cohort]
+
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
 verified the explicit protocol stop. Source-diagnosis task `a9ad53ae` then passed
 independent audit `e9d32bd4` on November 2 at 18:30 UTC. That review verifies the
@@ -124,6 +128,7 @@ allocation-specific observations and their limits.[^preparation]
 [^diagnosis-review]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/diagnosis-audit.json`, captured live `task_get` response, task status `done` and audit-verifier transition at 2026-11-02T18:30:14.804Z.
 [^mounts]: [HPC3 mount ownership](../../tools/hpc3/wiki/pages/declared-image-mounts.md), § "Native verification and limits", jobs `58776025` and `58776026`, with original native reports and controller identity.
 [^sources]: [[wrds-v3-refused-path-diagnosis]], § "Every original refusal", § "Data limitations versus implementation" and § "Next action", with native source-field evidence and the primary CIZ definitions.
+[^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner", § "Admission is not permission to fit this subset" and § "Native evidence and limits".
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 
