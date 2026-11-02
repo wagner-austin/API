@@ -787,10 +787,16 @@ poetry run python -m scripts.research_proposals --policy policy.json --ledger at
 `ResearchTrial` contains the frozen policy, exact admitted proposal, evaluation
 settings, attempt number and absolute compute-side evaluation manifest path.
 `ResearchCluster` is operator-owned: the HPC3 Python executable, workspace,
-project, remote attempt root, entrypoint directory, image path, checksum text,
+project, remote attempt root, entrypoint directory, image path, explicit `binds`, checksum text,
 access-configuration path and digest, and board report task. `python` and
 `workspace` are absolute controller paths; remote paths use POSIX syntax and reject
 parent traversal. Encrypted scoring requires Linux private-storage semantics.
+`binds` is required and may be empty for home-only data. The shared image launcher
+disables site bind-paths and hostfs mounts and clears ambient mount variables;
+declare each required shared-data directory explicitly. Validation and final
+recipes use that same list. Missing `binds` is refused, so existing frozen
+requests require an explicit new configuration rather than an inferred default.
+Standard home and temporary mounts remain; this is not a holdout isolation boundary.
 The checksums must include the image, encrypted bundle metadata, access configuration
 and `scripts/research_trial.py`; include the ciphertext files and entrypoint package
 initializer as well. The policy's dataset digest is the SHA-256 of the encrypted
