@@ -241,7 +241,8 @@ def mean_brier(rows: Sequence[ForwardContract], probabilities: Sequence[float]) 
     Returns:
         Mean Brier score.
     """
-    outcomes: NDArray[np.int64] = np.asarray([row["yes"] for row in rows], dtype=np.int64)
+    labels: list[int] = [row["yes"] for row in rows]
+    outcomes: NDArray[np.int64] = np.asarray(labels, dtype=np.int64)
     predicted: NDArray[np.float64] = np.asarray(probabilities, dtype=np.float64)
     return sum(float_values(brier_per_row(outcomes, predicted))) / len(rows)
 
