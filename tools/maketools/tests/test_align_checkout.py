@@ -103,8 +103,15 @@ def script_local(
     subjects: dict[str, str],
     touched: dict[str, str],
     blobs: dict[tuple[str, str], str | None],
+    on_branch: tuple[str, ...] = (),
 ) -> None:
-    """Script the commits ``git cherry`` reports and what each path reads as."""
+    """Script the commits ``git cherry`` reports and what each path reads as.
+
+    Every reported commit but those in ``on_branch`` is one origin/main lacks.
+    """
+    shas = [line.split(" ", 1)[1] for line in cherry.splitlines()]
+    only_here = "\n".join(sha for sha in shas if sha not in on_branch)
+    world.capturing_answers[("git", "rev-list", HEAD, "^origin/main")] = ok(only_here)
     world.capturing_answers[("git", "cherry", TARGET, HEAD)] = ok(cherry)
     for sha, subject in subjects.items():
         world.capturing_answers[("git", "log", "-1", "--format=%s", sha)] = ok(subject)
@@ -335,10 +342,35 @@ def test_drop_names_the_commits_the_caller_read_and_the_move_proceeds(
 
 def test_read_local_commits_asks_cherry_then_each_commit(world: MovingWorld) -> None:
     script_local(world, f"- {LOCAL_ONE}", subjects={LOCAL_ONE: "equivalent"}, touched={}, blobs={})
-    assert read_local_commits(ROOT, HEAD, TARGET) == [
+    assert read_local_commits(ROOT, HEAD, TARGET, "origin/main") == [
         LocalCommit(sha=LOCAL_ONE, subject="equivalent", patch_equivalent=True, paths=[])
     ]
     assert world.captured == [
+        ("git", "rev-list", HEAD, "^origin/main"),
         ("git", "cherry", TARGET, HEAD),
         ("git", "log", "-1", "--format=%s", LOCAL_ONE),
     ]
+
+
+def test_a_commit_the_default_branch_contains_is_not_local_and_is_never_read(
+    world: MovingWorld,
+) -> None:
+    script_until_head(world)
+    script_local(
+        world,
+        f"+ {LOCAL_ONE}\n+ {LOCAL_TWO}",
+        subjects={LOCAL_TWO: "a change origin lacks"},
+        touched={LOCAL_TWO: "lost.py"},
+        blobs={
+            (TARGET, "lost.py"): "old",
+            (LOCAL_TWO, "lost.py"): "new",
+            (f"{LOCAL_TWO}^", "lost.py"): "old",
+        },
+        on_branch=(LOCAL_ONE,),
+    )
+    with pytest.raises(AppError) as refusal:
+        align_checkout(ROOT, TARGET, [])
+    expected = f"{LOCAL_TWO[:12]} 'a change origin lacks': lost.py absent"
+    assert refusal.value.message.endswith(expected)
+    assert ("git", "log", "-1", "--format=%s", LOCAL_ONE) not in world.captured
+    assert RESET not in world.captured

@@ -41,6 +41,15 @@ ziggurat for that alone. The branch a target must be on is the
 repository's own default, read from ``origin/HEAD``, because slime's is
 ``master``; until that task it was the constant ``origin/main``.
 
+A COMMIT THE DEFAULT BRANCH CONTAINS IS NOT LOCAL (MCPs board task
+ab48f939). A local commit is one on HEAD that neither the target nor the
+default branch contains, since only such a commit is lost by the move. On
+2026-11-02 emerald's API checkout, cloned at origin's head when it was
+provisioned as a duty host, sat three commits past the deployed commit, and
+its release-sync's align refused all three as absent at the target though
+every one was on ``origin/main``: a checkout ahead of a deployed commit on
+origin's own line is moved back to it, dropping nothing.
+
 WHAT IT REFUSES. A dirty tracked path (someone's work: commit, restore or
 preserve it first); an untracked path the target tracks (the move would
 overwrite it); a commit the default branch does not contain (push first); a
@@ -214,21 +223,27 @@ def read_path(repo_root: Path, sha: str, target: str, path: str) -> PathReading:
     return PathReading(path=path, fate="evolved")
 
 
-def read_local_commits(repo_root: Path, head: str, target: str) -> list[LocalCommit]:
-    """Read every commit on HEAD the target does not contain.
+def read_local_commits(repo_root: Path, head: str, target: str, branch: str) -> list[LocalCommit]:
+    """Read every commit on HEAD that neither the target nor the default branch contains.
 
     Args:
         repo_root: The checkout.
         head: The checkout's HEAD.
         target: The commit it is moving to.
+        branch: The remote's default branch, as ``origin/<name>``.
 
     Returns:
         The commits, oldest first, each with its reading.
     """
+    only_here = set(
+        _capture(["git", "rev-list", head, f"^{branch}"], repo_root, "git rev-list").split()
+    )
     cherry = _capture(["git", "cherry", target, head], repo_root, "git cherry")
     commits: list[LocalCommit] = []
     for line in cherry.splitlines():
         mark, sha = line.split(" ", 1)
+        if sha not in only_here:
+            continue
         subject = _capture_word(["git", "log", "-1", "--format=%s", sha], repo_root, "git log")
         equivalent = mark == "-"
         paths: list[PathReading] = []
@@ -406,7 +421,7 @@ def align_checkout(repo_root: Path, commit: str, drop: Sequence[str]) -> AlignRe
         )
     carried_untracked = _refuse_dirty(repo_root, target)
     head = _capture_word(["git", "rev-parse", "HEAD"], repo_root, "git rev-parse HEAD")
-    local = [] if head == target else read_local_commits(repo_root, head, target)
+    local = [] if head == target else read_local_commits(repo_root, head, target, branch)
     _refuse_uncarried(local, drop)
     if head != target:
         _capture(["git", "reset", "--hard", target], repo_root, f"git reset --hard {target[:12]}")

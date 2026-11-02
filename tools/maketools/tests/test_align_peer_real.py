@@ -109,6 +109,22 @@ def test_a_peer_on_main_is_moved_forward_and_its_untracked_files_carried(
     assert second != third
 
 
+def test_a_peer_ahead_of_the_target_on_its_default_branch_moves_back_dropping_nothing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seed, peer, first = origin_and_peer(tmp_path, "main")
+    commit_file(seed, "b.txt", "two\n")
+    git(peer, "pull", "-q", "origin", "main")
+    ahead = git(peer, "rev-parse", "HEAD")
+
+    assert dispatch(["align", "--repo", str(peer), "--commit", first, "--drop"]) == 0
+
+    assert git(peer, "rev-parse", "HEAD") == first
+    assert capsys.readouterr().out.splitlines() == [
+        f"align: {ahead[:12]} -> {first[:12]}, 0 local commit(s) dropped"
+    ]
+
+
 def test_a_commit_the_default_branch_does_not_carry_is_refused_and_nothing_moves(
     tmp_path: Path,
 ) -> None:
