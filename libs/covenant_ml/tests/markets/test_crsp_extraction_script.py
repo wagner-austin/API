@@ -285,11 +285,13 @@ def test_real_process_extracts_from_a_client_on_path(tmp_path: Path) -> None:
 
 def test_real_process_refuses_a_failed_client(tmp_path: Path) -> None:
     case = extraction(tmp_path)
-    result = _run(case, _client(tmp_path, "exit 3\n"), _arguments(case))
+    result = _run(case, _client(tmp_path, "echo 'private SQL' >&2\nexit 3\n"), _arguments(case))
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
         "ValueError: [CRSP-011] psql exited 3; no bundle was published"
     )
+    assert "private SQL" not in result.stderr
+    assert result.stdout == ""
     assert (list(case.output.iterdir()), list(case.scratch.iterdir())) == ([], [])
 
 

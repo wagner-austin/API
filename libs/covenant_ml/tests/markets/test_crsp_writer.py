@@ -148,7 +148,9 @@ def test_manifest_preserves_the_exact_queries_and_protocol_bytes(
     opened = case.root / "opened"
     opened.mkdir(mode=0o700)
     protocol = database_protocol()
-    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], vendor_source(protocol), 15000)
+    queries = crsp_relation_sql(
+        protocol, crsp_scopes(protocol)[1], vendor_source(protocol), 15000, securities=None
+    )
     with decrypted_bundle(
         case.output / "final" / "bundle.json",
         receipt["final"]["bundle"]["sha256"],
@@ -202,7 +204,7 @@ def test_a_synthetic_source_carries_its_definitions_in_every_saved_query(
     opened.mkdir(mode=0o700)
     protocol = database_protocol()
     source = synthetic_source(setup.read_text("utf-8"))
-    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 20000)
+    queries = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 20000, securities=None)
     with decrypted_bundle(
         case.output / "train-validation" / "bundle.json",
         receipt["train_validation"]["bundle"]["sha256"],

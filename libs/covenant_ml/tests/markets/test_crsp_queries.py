@@ -68,7 +68,7 @@ def test_validation_queries_clip_membership_and_date_every_relation() -> None:
     protocol = decode_crsp_protocol(protocol_document())
     source = vendor_source(protocol)
     assert source == CrspSource("crsp_a_stock", "crsp_a_stock.", "")
-    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 5)
+    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[0], source, 5, securities=None)
     assert sql == {
         "membership": (
             "COPY (SELECT permno, namedt, LEAST(nameendt, DATE '2021-12-31') AS nameendt,"
@@ -103,7 +103,7 @@ def test_synthetic_definitions_open_every_final_statement_with_unqualified_names
     protocol = decode_crsp_protocol(protocol_document())
     source = synthetic_source("\n dsenames(permno) AS (SELECT 1)\n")
     assert source == CrspSource("synthetic", "", "WITH dsenames(permno) AS (SELECT 1)\n")
-    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], source, 1)
+    sql = crsp_relation_sql(protocol, crsp_scopes(protocol)[1], source, 1, securities=None)
     opening = "COPY (WITH dsenames(permno) AS (SELECT 1)\nSELECT "
     assert [statement.startswith(opening) for statement in sql.values()] == [True] * 4
     assert "FROM dsenames WHERE shrcd IN (10, 11)" in sql["membership"]
@@ -125,11 +125,13 @@ def test_definitions_that_could_end_the_statement_or_reach_the_client_are_refuse
 def test_row_limit_must_be_positive() -> None:
     protocol = decode_crsp_protocol(protocol_document())
     with pytest.raises(ValueError, match=r"\[CRSP-010\] the row limit"):
-        crsp_relation_sql(protocol, crsp_scopes(protocol)[0], vendor_source(protocol), 0)
+        crsp_relation_sql(
+            protocol, crsp_scopes(protocol)[0], vendor_source(protocol), 0, securities=None
+        )
 
 
 def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
-    driver = crsp_driver_sql(120).splitlines()
+    driver = crsp_driver_sql(120, partitions=("train-validation", "final")).splitlines()
     assert driver[:6] == [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         "SET LOCAL statement_timeout = '120s';",
@@ -157,4 +159,66 @@ def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
 
 def test_statement_timeout_must_be_positive() -> None:
     with pytest.raises(ValueError, match=r"\[CRSP-010\] the statement timeout"):
-        crsp_driver_sql(0)
+        crsp_driver_sql(0, partitions=("train-validation", "final"))
+
+
+def test_cohort_queries_preserve_every_existing_bound_and_the_full_calendar() -> None:
+    protocol = decode_crsp_protocol(protocol_document())
+    scope, _ = crsp_scopes(protocol)
+    source = vendor_source(protocol)
+    complete = crsp_relation_sql(protocol, scope, source, 5, securities=None)
+    bounded = crsp_relation_sql(protocol, scope, source, 5, securities=(12, 34))
+    assert bounded == {
+        name: sql.replace(UNIVERSE, UNIVERSE + " AND permno IN (12, 34)")
+        for name, sql in complete.items()
+    }
+    assert bounded["calendar"] == complete["calendar"]
+
+
+@pytest.mark.parametrize("securities", [(), (0,), (-1,), (True,), (2, 1), (1, 1)])
+def test_malformed_cohorts_are_refused(securities: tuple[int, ...]) -> None:
+    protocol = decode_crsp_protocol(protocol_document())
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] the cohort must contain"):
+        crsp_relation_sql(
+            protocol, crsp_scopes(protocol)[0], vendor_source(protocol), 5, securities=securities
+        )
+
+
+def test_cohort_cannot_request_final_observations() -> None:
+    protocol = decode_crsp_protocol(protocol_document())
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] diagnostic cohorts cannot query final"):
+        crsp_relation_sql(
+            protocol, crsp_scopes(protocol)[1], vendor_source(protocol), 5, securities=(12,)
+        )
+
+
+def test_diagnostic_driver_opens_only_train_validation_in_one_snapshot() -> None:
+    driver = crsp_driver_sql(60, partitions=("train-validation",)).splitlines()
+    assert driver == [
+        "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
+        "SET LOCAL statement_timeout = '60s';",
+        "SET LOCAL DateStyle = 'ISO, YMD';",
+        "SET LOCAL TimeZone = 'UTC';",
+        "\\o snapshot-first.csv",
+        "COPY (SELECT pg_current_snapshot()::text, now()) TO STDOUT WITH (FORMAT CSV);",
+        "\\o train-validation/membership.csv",
+        "\\i train-validation/membership.sql",
+        "\\o train-validation/returns.csv",
+        "\\i train-validation/returns.sql",
+        "\\o train-validation/calendar.csv",
+        "\\i train-validation/calendar.sql",
+        "\\o train-validation/delists.csv",
+        "\\i train-validation/delists.sql",
+        "\\o snapshot-last.csv",
+        "COPY (SELECT pg_current_snapshot()::text, now()) TO STDOUT WITH (FORMAT CSV);",
+        "\\o",
+        "COMMIT;",
+    ]
+
+
+@pytest.mark.parametrize(
+    "partitions", [(), ("final",), ("train-validation", "train-validation"), ("../final",)]
+)
+def test_driver_refuses_unknown_repeated_or_final_only_partitions(partitions: tuple[str, ...]) -> None:
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] invalid extraction partition sequence"):
+        crsp_driver_sql(60, partitions=partitions)
