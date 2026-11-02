@@ -1,0 +1,25 @@
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/research_trial.py", line 78, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts/research_trial.py", line 72, in main
+    record = execute_trial(trial, fingerprint, code_digest, output, keys=keys, scratch=scratch)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/research_trial.py", line 313, in execute_trial
+    validation = run_crsp_validation(
+                 ^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_study.py", line 338, in run_crsp_validation
+    rows = crsp_study_rows(outcomes, panel, features)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_study.py", line 165, in crsp_study_rows
+    path = crsp_window_path(outcomes, feature.permno, decision.window)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_holdings.py", line 208, in crsp_window_path
+    _require_fill(outcomes, permno, window.exit)
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_holdings.py", line 270, in _require_fill
+    require_crsp_execution_price(row, outcomes.protocol)
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_calendar.py", line 191, in require_crsp_execution_price
+    raise ValueError("[CRSP-004] execution requires a finite positive closing trade")
+ValueError: [CRSP-004] execution requires a finite positive closing trade

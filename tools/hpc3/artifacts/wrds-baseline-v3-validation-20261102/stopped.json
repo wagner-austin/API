@@ -1,0 +1,49 @@
+{
+  "kind": "LICENSED_V3_PROTOCOL_STOP",
+  "task": "f61db3a7-a9dd-468c-96d2-d520271a9c3b",
+  "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+  "native": {
+    "job": {
+      "job_id": "58749373",
+      "name": "cleargbm.research-2a3ae2875352-1",
+      "partition": "free",
+      "state": "FAILED",
+      "elapsed_seconds": 1099,
+      "billing_tres": 8,
+      "gpu_count": 0,
+      "cpu_count": 8,
+      "node_list": "hpc3-23-14"
+    },
+    "exit_code": "1:0",
+    "started_at": "2026-11-02T07:16:38",
+    "ended_at": "2026-11-02T07:34:57"
+  },
+  "queue": {
+    "id": "766bc4c8-3849-400a-9879-09a968138b89",
+    "state": "failed",
+    "closed_at": "2026-11-02T07:36:13.494Z",
+    "automatic_reconciliation": true
+  },
+  "failure": {
+    "code": "CRSP-004",
+    "message": "execution requires a finite positive closing trade",
+    "phase": "Label construction before any model fitting",
+    "boundary": "crsp_window_path ordinary exit, frozen crsp_holdings.py line 208 calls _require_fill(window.exit)",
+    "stderr_sha256": "7e077b07773131d145b49d07c90a0c40e1908637c1a2498b64c901e4b220cfee",
+    "unresolved": "Exact security, calendar period, price flag and surrounding source evidence not yet diagnosed."
+  },
+  "attempts": {
+    "failed": 1,
+    "admitted_unsubmitted": 14,
+    "complete": 0
+  },
+  "journal_sha256": "8034ad7fb8498793083b6a489661e359ae9e030a0a373d65993b9603a6df0123",
+  "native_input_service_post": "bed66748-8c24-4e9f-8cf3-3770b3aa7ea9",
+  "study_action": "Preserve stopped journal and immutable requests. Do not submit remaining fourteen, select a candidate, or release final data.",
+  "limits": [
+    "The earlier exact MP/MR-to-P1 span qualification passed; it did not establish complete dataset coverage.",
+    "This refusal is not evidence that an exit price should be imputed or the security excluded.",
+    "No performance estimate or final evaluation exists.",
+    "No same-node post-exit cleanup probe for this allocation is claimed."
+  ]
+}
