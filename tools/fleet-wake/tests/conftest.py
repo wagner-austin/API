@@ -115,6 +115,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
                     checks_at_once=None,
                     pinned_checks_only=False,
                 ),
+                models=None,
             ),
             held=None,
         )
