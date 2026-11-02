@@ -8,7 +8,6 @@ writer and encryption run end to end.
 
 from __future__ import annotations
 
-import os
 import runpy
 import signal
 import subprocess
@@ -23,13 +22,18 @@ from platform_core.errors import AppError
 from platform_core.json_utils import load_json_str
 from platform_core.load_report import report_identity
 from platform_core.mcp_client import EVENT_STREAM_MEDIA_TYPE, McpHttpResponse
-from platform_core.mcp_testing import FakeHttpPost, posted_ok, sent_arguments, stack_endpoint_files
+from platform_core.mcp_testing import (
+    FakeHttpPost,
+    posted_ok,
+    sent_arguments,
+    stack_endpoint_files,
+)
 from platform_core.session_label import API_KEY_NAME, STACK_ENV_PATH, TENANT_ID_NAME
 from scripts import crsp_extraction
 
 from covenant_ml.markets import _test_hooks as markets_hooks
+from covenant_ml.markets.crsp_snapshot import PSQL
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
-from covenant_ml.markets.crsp_writer import PSQL
 
 from ._crsp_extraction_fixtures import (
     Extraction,
@@ -38,6 +42,7 @@ from ._crsp_extraction_fixtures import (
     extraction,
     installed,
 )
+from ._crsp_process_fixtures import client_environment
 from ._encrypted_fixtures import evaluator_keys
 
 TASK = "1f60a20d-d860-43b3-9616-68f192bcedd9"
@@ -241,18 +246,6 @@ def test_the_stack_reader_reads_the_file_as_text(tmp_path: Path) -> None:
     assert markets_hooks.read_stack_text(path) == ENV_TEXT
 
 
-def _client(root: Path, body: str) -> dict[str, str]:
-    """Install an executable ``psql`` first on PATH and return the process environment."""
-    directory = root / "bin"
-    directory.mkdir()
-    client = directory / "psql"
-    client.write_text("#!/bin/sh\n" + body, encoding="utf-8")
-    client.chmod(0o755)
-    environment = dict(config_test_hooks.get_environment())
-    environment["PATH"] = f"{directory}{os.pathsep}{environment['PATH']}"
-    return environment
-
-
 def _run(
     case: Extraction, environment: dict[str, str], arguments: list[str]
 ) -> subprocess.CompletedProcess[str]:
@@ -271,7 +264,7 @@ def test_real_process_extracts_from_a_client_on_path(tmp_path: Path) -> None:
     (source / "extract.sql").write_text("", encoding="utf-8")
     FakeDatabase(database_rows())(PSQL, source, seconds=1, max_file_bytes=1)
     (source / "extract.sql").unlink()
-    environment = _client(tmp_path, f'exec cp -R "{source}/." .\n')
+    environment = client_environment(tmp_path, f'exec cp -R "{source}/." .\n')
     result = _run(case, environment, _arguments(case))
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     assert sorted(path.name for path in case.output.iterdir()) == [
@@ -285,7 +278,9 @@ def test_real_process_extracts_from_a_client_on_path(tmp_path: Path) -> None:
 
 def test_real_process_refuses_a_failed_client(tmp_path: Path) -> None:
     case = extraction(tmp_path)
-    result = _run(case, _client(tmp_path, "echo 'private SQL' >&2\nexit 3\n"), _arguments(case))
+    result = _run(
+        case, client_environment(tmp_path, "echo 'private SQL' >&2\nexit 3\n"), _arguments(case)
+    )
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
         "ValueError: [CRSP-011] psql exited 3; no bundle was published"
@@ -298,7 +293,7 @@ def test_real_process_refuses_a_failed_client(tmp_path: Path) -> None:
 def test_real_process_kills_a_client_writing_past_the_file_limit(tmp_path: Path) -> None:
     case = extraction(tmp_path)
     body = "exec dd if=/dev/zero of=train-validation/returns.csv bs=1000 count=10 status=none\n"
-    result = _run(case, _client(tmp_path, body), _arguments(case, relation_bytes=5000))
+    result = _run(case, client_environment(tmp_path, body), _arguments(case, relation_bytes=5000))
     assert result.returncode == 1
     assert result.stderr.splitlines()[-1] == (
         f"ValueError: [CRSP-011] psql exited {-signal.SIGXFSZ}; no bundle was published"

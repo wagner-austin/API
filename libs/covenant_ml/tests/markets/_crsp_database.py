@@ -17,7 +17,7 @@ from platform_core.json_utils import JSONObject, require_int, require_str
 from covenant_ml.markets.crsp_protocol import CrspProtocol, decode_crsp_protocol
 from covenant_ml.markets.crsp_queries import CrspScope, crsp_scopes
 from covenant_ml.markets.crsp_rows import encode_crsp_rows
-from covenant_ml.markets.crsp_writer import PSQL
+from covenant_ml.markets.crsp_snapshot import PSQL
 
 from ._crsp_study_fixtures import FINAL_END, study_protocol, study_rows
 
@@ -168,9 +168,16 @@ def relation_columns(protocol: CrspProtocol) -> dict[str, tuple[str, ...]]:
 class FakeDatabase:
     """Answer the writer's one client invocation with the partitioned CSV files."""
 
-    def __init__(self, rows: dict[str, list[JSONObject]], *, code: int = 0) -> None:
+    def __init__(
+        self,
+        rows: dict[str, list[JSONObject]],
+        *,
+        code: int = 0,
+        securities: tuple[int, ...] | None = None,
+    ) -> None:
         self.rows = rows
         self.code = code
+        self.securities = securities
         self.snapshots = (SNAPSHOT, SNAPSHOT)
         self.calls: list[tuple[int, int]] = []
         self.driver = ""
@@ -186,9 +193,18 @@ class FakeDatabase:
         protocol = database_protocol()
         columns = relation_columns(protocol)
         for scope in crsp_scopes(protocol):
+            if not (directory / scope.partition).is_dir():
+                continue
             for name, records in partition_rows(self.rows, protocol, scope).items():
                 target = directory / scope.partition / (name + ".csv")
-                target.write_bytes(encode_crsp_rows(records, columns[name]))
+                selected = [
+                    row
+                    for row in records
+                    if name == "calendar"
+                    or self.securities is None
+                    or require_int(row, "permno") in self.securities
+                ]
+                target.write_bytes(encode_crsp_rows(selected, columns[name]))
         for name, payload in self.extra.items():
             (directory / name).write_bytes(payload)
         (directory / "snapshot-first.csv").write_text(self.snapshots[0], encoding="utf-8")
