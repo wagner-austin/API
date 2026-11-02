@@ -4,11 +4,13 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]", "[[wrds-baseline-v2-freeze]]", "[[wrds-protocol-revision]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json": "8ee14efd7aefaa88ffdaa7ed66c6ca0effe2fd51"
   "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json": "66ac30dcc341698ef31b3c144a633303fe10025d"
@@ -63,8 +65,16 @@ remain unsubmitted; no candidate is selected and no final data is released.
 [[wrds-baseline-readiness]] records the diagnosis boundary. This freeze remains
 historical and must not be silently changed for a retry.[^v3stop]
 
+Diagnostic job `58759614` built the 262-decision panel but failed on a typed
+missing entry price after its last progress report at 84,000 paths. All sixteen
+inputs were verified; it produced no complete diagnostic result or study
+score. The collector's correction and replacement submission do not amend
+this freeze; their current status is in [[wrds-baseline-readiness]].[^pathaudit]
+
 [^freeze]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json`, `old_policy`, `new_policy`, `policy_fields_changed`, `design_fields_changed`, `selection_unchanged`, `estimator_unchanged` and `matrix`; unchanged selection contract from [[wrds-baseline-v2-freeze]].
 [^design]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json`, `design`, `stopping_months`, `fold_months` and `confidence`.
 [^preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `qualification`, `freeze`, `queue_submission` and `limits`; qualification is separate from a complete licensed study.
 
 [^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
+
+[^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json`, `native`, `input_count`, `panel_decisions`, `last_progress_paths`, `failure` and `limits`; sibling native-input report and logs retain the program observations.

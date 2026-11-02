@@ -4,12 +4,16 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json"
+  - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json": "8ee14efd7aefaa88ffdaa7ed66c6ca0effe2fd51"
+  "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json": "8977f84838fbcd6346de5cffdcf86921e72883b0"
   "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
@@ -47,14 +51,20 @@ allocation passed native inspection; the error arose in label construction,
 before model fitting. The exact exit-date source flag and price remain to be
 diagnosed. This is distinct from the earlier held-return-span failure.[^v3stop]
 
+The first full-panel diagnostic (`58759614`) constructed 262 decisions but
+stopped on an entry's missing price: its collector caught `ValueError`, while
+the validator raised `JSONTypeError`. Its last progress message covered 84
+decisions and 84,000 paths; no complete counts were produced. Replacement
+diagnostic `58760716` is submitted; its completion is not yet verified.[^pathaudit]
+
 The `/pub` BeeGFS stall also recurred during submission and cleared without
 changing the request. Its unnecessary mount dependency remains tracked as
 `0a0e5913`; it was not the recorded cause of this evaluator failure.[^preparation][^v3stop]
 
 ## Remaining work
 
-1. Diagnose the ordinary exit against its source record and surrounding
-   calendar evidence; the traceback alone does not justify a new fill rule.
+1. Complete and verify the full-panel diagnostic, including typed missing-value
+   refusals; the traceback alone does not justify a new fill rule.
 2. Determine whether data correction or an explicit reviewed protocol amendment
    is warranted. Preserve failed requests; do not silently retry or exclude
    securities on future outcome availability.
@@ -86,3 +96,5 @@ allocation-specific observations and their limits.[^preparation]
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 
 [^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
+
+[^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json`, `native`, `panel_decisions`, `last_progress_paths`, `failure` and `limits`; `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/submit.json`, `job_id`, `experiment` and `image_digest`. Submission is not completion or a study result.
