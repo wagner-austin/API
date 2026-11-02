@@ -115,6 +115,9 @@ class TestAStagingFaultIsReported:
         # hub, whose scratch root is memory now (MCPs board task fb505198).
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         assert not (loaded.archives / f"{DEMO_RUN_ID}.tgz").exists()
+        # Nor is the launch attempt's own bundle directory left behind for
+        # the job's next claim to meet (board task 2e3e69cf).
+        assert sorted(path.name for path in loaded.archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
 
     def test_a_job_given_back_before_is_failed_by_the_queue_and_the_log_says_so(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
@@ -272,3 +275,6 @@ class TestAnotherDispatchesLeaseStands:
         assert [e for e in records.read_feed(loaded.feed) if e["run_id"] == DEMO_RUN_ID] == []
         # It took no lease and staged nothing, so it owes no retire (MCPs board task 3d9eec0d).
         assert not loaded.retires.exists()
+        # The refusal came from the launch, after the attempt's directory was
+        # made, and the directory went with it (board task 2e3e69cf).
+        assert sorted(path.name for path in loaded.archives.glob(f"{DEFAULT_JOB_ID}-*")) == []

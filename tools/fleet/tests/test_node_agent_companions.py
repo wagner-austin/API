@@ -9,6 +9,7 @@ and recorded.
 from __future__ import annotations
 
 import pathlib
+from collections.abc import Sequence
 
 from platform_core.json_utils import dump_json_str
 
@@ -31,7 +32,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests._registry import write_registry
-from tests.conftest import FakeRun, failed, ok, registry_replies, stage_replies
+from tests.conftest import FakeRun, failed, ok, registry_replies, stage_replies, timed_out
 
 __all__ = ["_credentials_in_env"]
 
@@ -56,6 +57,62 @@ def _companion_config(config_path: pathlib.Path) -> pathlib.Path:
             ),
         ),
     )
+
+
+class BundlingRun(FakeRun):
+    """A scripted runner whose ``git bundle create`` writes its bundle, as git does.
+
+    The attempt's directory is the real seam's, a name no test knows
+    beforehand, so the bundle cannot be written ahead of the tick as
+    :func:`prebuilt_companion` writes it into a bound directory.
+
+    Attributes:
+        bundles: Each bundle path written, in order.
+    """
+
+    bundles: list[pathlib.Path]
+
+    def __init__(self, replies: Sequence[_test_hooks.CommandResult]) -> None:
+        """Answer as :class:`FakeRun`, with nothing written yet.
+
+        Args:
+            replies: One result per expected call.
+        """
+        super().__init__(replies)
+        self.bundles = []
+
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        timeout_seconds: int,
+        stdin_bytes: bytes | None = None,
+        unset_env: Sequence[str] = (),
+        set_env: Sequence[tuple[str, str]] = (),
+    ) -> _test_hooks.CommandResult:
+        """Write the bundle a ``git bundle create`` names, then answer as scripted.
+
+        Args:
+            argv: The command.
+            timeout_seconds: The deadline the caller chose.
+            stdin_bytes: Its standard input, or None.
+            unset_env: The variables the caller withheld from the child.
+            set_env: The variables the caller set in the child.
+
+        Returns:
+            The next scripted result.
+        """
+        if tuple(argv[3:5]) == ("bundle", "create"):
+            path = pathlib.Path(argv[-2])
+            path.write_bytes(b"# v2 git bundle\nworkspace-at-" + COMPANION_SHA.encode("ascii"))
+            self.bundles.append(path)
+        return super().__call__(
+            argv,
+            timeout_seconds=timeout_seconds,
+            stdin_bytes=stdin_bytes,
+            unset_env=unset_env,
+            set_env=set_env,
+        )
 
 
 def _companion_commit_script() -> str:
@@ -278,6 +335,77 @@ class TestCompanions:
         closed = queue.arguments[2]
         assert (closed["action"], closed["status"]) == ("close", "refused")
         assert str(closed["detail"]).startswith("EXPORT_FAILED: git fetch")
+
+    def test_a_launch_given_back_on_an_unreachable_node_leaves_no_attempt_directory(
+        self, config_path: pathlib.Path
+    ) -> None:
+        """The reclaim path itself (board task 2e3e69cf, check review
+        d9dbf931): the companion is bundled, the export's payload send ends at
+        its deadline, the job is given back to be claimed again, and the
+        attempt's directory, made by the real seam, goes with the attempt."""
+        sourced = _companion_config(config_path)
+        prebuilt_export(sourced)
+        bundled = BundlingRun(
+            [
+                *PROBED,
+                ok(""),  # the project's mirror: git init --bare
+                ok(""),  # the project's mirror: git cat-file -e, the commit is held
+                ok(""),  # the companion's mirror: git init --bare
+                ok(""),  # the companion: git fetch the ref
+                ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
+                ok(""),  # the companion: git bundle create, which BundlingRun writes
+                ok(""),  # the project: git archive
+                ok(""),  # stage: send the export's mkdir script
+                ok(""),  # stage: run it
+                timed_out(120),  # stage: the payload's send, ended at its deadline
+            ]
+        )
+        _test_hooks.run = bundled
+        queue = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="queued")}),
+            ]
+        )
+        _test_hooks.http_post = queue
+
+        assert node_agent.main(node_argv(sourced)) == 0
+
+        assert queue.arguments[2]["action"] == "lost"
+        assert len(bundled.bundles) == 1
+        assert bundled.bundles[0].parent.name.startswith(f"{DEFAULT_JOB_ID}-")
+        archives = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
+        assert sorted(path.name for path in archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
+
+    def test_a_launch_refused_on_its_companions_digest_leaves_no_attempt_directory(
+        self, config_path: pathlib.Path
+    ) -> None:
+        """Refused inside the launch rather than before it: the node reports a
+        digest for the companion that is not its bundle's, so the job is
+        refused, and the attempt's directory goes with it (board task
+        2e3e69cf, check review d9dbf931)."""
+        sourced = _companion_config(config_path)
+        export_payload = prebuilt_export(sourced)
+        bundled = BundlingRun(_companion_replies(staging.digest(export_payload), "0" * 64, sourced))
+        _test_hooks.run = bundled
+        queue = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="refused")}),
+            ]
+        )
+        _test_hooks.http_post = queue
+
+        assert node_agent.main(node_argv(sourced)) == 0
+
+        closed = queue.arguments[2]
+        assert (closed["action"], closed["status"]) == ("close", "refused")
+        assert str(closed["detail"]).startswith("STAGE_DIGEST_MISMATCH: ")
+        assert bundled.bundles[0].parent.name.startswith(f"{DEFAULT_JOB_ID}-")
+        archives = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
+        assert sorted(path.name for path in archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
 
     def test_the_feed_names_the_commit_the_companion_was_measured_with(
         self, config_path: pathlib.Path
