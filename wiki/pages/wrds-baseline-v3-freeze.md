@@ -4,10 +4,12 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]", "[[wrds-baseline-v2-freeze]]", "[[wrds-protocol-revision]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json": "66ac30dcc341698ef31b3c144a633303fe10025d"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json": "cc3375f54d1b5ced0efc206cc9e42f13d019fd49"
@@ -55,10 +57,14 @@ The check establishes the linked two-session return is applied once, within
 or prove cleanup after a different allocation is killed.[^preparation]
 
 The first request reached native job `58749373` through shared queue
-`766bc4c8`; the other fourteen wait for its verified result. No candidate is selected and no final
-ciphertext is staged or released. [[wrds-baseline-readiness]] carries current
-status; this page records the fixed design.[^preparation]
+`766bc4c8`, then failed after 1,099 seconds while constructing labels at an
+ordinary exit (`CRSP-004`). No model was fitted. The fourteen other requests
+remain unsubmitted; no candidate is selected and no final data is released.
+[[wrds-baseline-readiness]] records the diagnosis boundary. This freeze remains
+historical and must not be silently changed for a retry.[^v3stop]
 
 [^freeze]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json`, `old_policy`, `new_policy`, `policy_fields_changed`, `design_fields_changed`, `selection_unchanged`, `estimator_unchanged` and `matrix`; unchanged selection contract from [[wrds-baseline-v2-freeze]].
 [^design]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json`, `design`, `stopping_months`, `fold_months` and `confidence`.
 [^preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `qualification`, `freeze`, `queue_submission` and `limits`; qualification is separate from a complete licensed study.
+
+[^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.

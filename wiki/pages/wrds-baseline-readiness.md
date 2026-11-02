@@ -4,11 +4,13 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json": "46ea508c6280a6626b7803d9b8cd87f25973d8eb"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
@@ -21,11 +23,11 @@ confidence: medium
 
 # WRDS substantive baseline readiness
 
-**The version-3 runtime and synthetic rehearsal passed independent review;
-the exact previously failed licensed training span now passes. The new
-substantive study has been frozen and its first shared-queue request reached
-native HPC3 job `58749373`. No licensed evaluation result or selected candidate exists
-yet; the final holdout remains unreleased.**[^preparation]
+**The first licensed version-3 run stopped before fitting. Native job
+`58749373` failed after 1,099 seconds with `CRSP-004` at an ordinary exit
+requiring a finite positive closing trade. The queue recorded the failure
+automatically. One attempt failed; fourteen remain admitted and unsubmitted.
+No candidate is selected and the final holdout remains unreleased.**[^v3stop]
 
 ## Current evidence
 
@@ -35,25 +37,29 @@ yet; the final holdout remains unreleased.**[^preparation]
 | Data | [[wrds-licensed-data-evidence]] — eleven encrypted version-3 validation files staged and independently reread on HPC3. |
 | Operations | [[wrds-operational-rehearsals]] — version-3 queue rehearsal independently verified; earlier selection/final rehearsals remain historical. |
 | Qualification | Native job `58748788` passed the exact two-session training interval that stopped version 2, with sixteen verified inputs. |
-| Study | [[wrds-baseline-v3-freeze]] — three candidates, five seeds, fifteen admissions; first native job submitted, fourteen withheld until its verified result. |
+| Study | [[wrds-baseline-v3-freeze]] — three candidates, five seeds, fifteen admissions; one failed attempt, fourteen unsubmitted; study stopped.[^v3stop] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposer boundary and evaluator-owned final release. |
 | Scientific rules | [[crsp-monthly-study-design]] and [[crsp-monthly-holdings-validation]] — target, chronology, accounting and uncertainty. |
 
-The current milestone is qualification and submission, not investment
-performance or whole-dataset completeness. Queue `766bc4c8` recorded the native submission. The `/pub` BeeGFS
-metadata stall recurred during submission, then cleared without changing the
-request. Its unnecessary mount dependency remains tracked as task `0a0e5913`;
-a passed preflight does not establish permanent recovery.[^preparation][^rehearsal]
+The earlier exact missing-return-span qualification passed, but it did not
+establish whole-dataset completeness. All sixteen frozen inputs of the failed
+allocation passed native inspection; the error arose in label construction,
+before model fitting. The exact exit-date source flag and price remain to be
+diagnosed. This is distinct from the earlier held-return-span failure.[^v3stop]
+
+The `/pub` BeeGFS stall also recurred during submission and cleared without
+changing the request. Its unnecessary mount dependency remains tracked as
+`0a0e5913`; it was not the recorded cause of this evaluator failure.[^preparation][^v3stop]
 
 ## Remaining work
 
-1. Complete and verify the first licensed run through the existing queue.
-2. Complete the other fourteen fixed requests, or preserve a protocol stop
-   if the evaluator finds unsupported data; never silently skip securities.
-3. Aggregate the required seeds, select under the frozen tie rules, then
-   perform the single controlled final evaluation.
-4. Record validation and final results separately before allowing broader
-   agent proposals through the same admission controls.[^preparation]
+1. Diagnose the ordinary exit against its source record and surrounding
+   calendar evidence; the traceback alone does not justify a new fill rule.
+2. Determine whether data correction or an explicit reviewed protocol amendment
+   is warranted. Preserve failed requests; do not silently retry or exclude
+   securities on future outcome availability.
+3. Only after a qualified new freeze, execute validation, select under fixed
+   rules, and perform the controlled final evaluation.[^v3stop]
 
 Stock-selection study task `f61db3a7` owns this sequence. Bermudan Asian
 options task `5bec93df` is a separate study; its experiment and execution
@@ -78,3 +84,5 @@ allocation-specific observations and their limits.[^preparation]
 [^studies]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `remaining`; separate stock-selection and options task identities, without making its historical extraction plan a current requirement.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
+
+[^v3stop]: `tools/hpc3/artifacts/wrds-baseline-v3-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `study_action` and `limits`; sibling native-input report, stopped preparation report and retained traceback distinguish observed failure from unresolved data diagnosis.
