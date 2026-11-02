@@ -105,8 +105,8 @@ rows were unchanged: 95 membership rows, 72,981 returns, 8,825 calendar rows
 and 19 delistings, with zero additions, removals or changed observations. The
 15 ciphertext files verified; the receipt reports normal plaintext removal.
 This establishes no fresh-vintage correction within the frozen projection and
-bounds. It does not resolve the 27 economic refusals or establish completeness
-of fields that were not queried.[^licensed]
+bounds. The evidence covers only that projection and those bounds; the 27
+economic refusals remain unresolved.[^licensed]
 
 The existing HPC3 staging CLI verified all 15 ciphertext files and the bundle
 manifest against the WRDS completion record. Its independent readback found
