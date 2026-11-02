@@ -1,0 +1,85 @@
+{
+ "results": [
+  {
+   "kind": "CRSP_DIAGNOSTIC_COHORT",
+   "bundle": {
+    "name": "bundle.json",
+    "sha256": "182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202",
+    "size_bytes": 3204
+   },
+   "plan": {
+    "bundle_sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d",
+    "protocol_sha256": "af5cbced56bc26076db0a3dc769c98c45ba393a507473a18eda839e5ddf61ed9",
+    "audit_sha256": "3dd11ddad1ea74724a44f7bcc1b82b4f581ea51462647fbd7592664abf75ec65",
+    "expected_cases": 27,
+    "max_source_rows": 40000000,
+    "max_cohort_bytes": 100000000
+   },
+   "derived_at": "2026-11-02T21:34:22.035524+00:00",
+   "cases": 27,
+   "securities": 23,
+   "rows": {
+    "membership": 95,
+    "returns": 72981,
+    "calendar": 8825,
+    "delists": 19
+   },
+   "plaintext_removed": true,
+   "fresh_vendor_extraction": false,
+   "ciphertext_verified": true,
+   "native_job_id": "58790450",
+   "source_commit": "d37c6cd39783fd717ece4c5d33cc4376fda4527b",
+   "source_archive_sha256": "826e12819c34c3c0b2fab4a17852ab4ef4229e1dcbcc69bc257870cc30261cd9",
+   "program_sha256": "63f56cc09fd7e52173cbbd25eaa20561ad63f11e942086c71da86e700edb4a92",
+   "loaded_owner_sha256": "bd50de72784f0576e8374be135b29dd31c6cb2689b80373277e80d864b6267b3"
+  }
+ ],
+ "fingerprint": {
+  "image_digest": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 64
+  },
+  "packages": [
+   {
+    "name": "covenant-ml",
+    "version": "0.1.0"
+   },
+   {
+    "name": "httpx",
+    "version": "0.28.1"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "platform-core",
+    "version": "0.1.0"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "scipy",
+    "version": "1.16.3"
+   }
+  ]
+ },
+ "dataset": {
+  "sha256": "d8e66902e452c8f0e8790d3d17e31c648b684fbfa2606bea7de363889f94fa6d"
+ }
+}
