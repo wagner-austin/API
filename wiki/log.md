@@ -567,3 +567,7 @@ Notes: Re-read captured vendor definitions and existing path/partition owners. S
 ## [2026-11-02] Diagnostic derivation | Encrypted CRSP cohort
 Page added: wrds-encrypted-diagnostic-cohort; linked from qualification, readiness and libs, total 73 pages.
 Notes: Checked each new claim against the current transformation, envelope, actual-trial rejection test and native reports. Preserve the first preempted attempt separately from its explicit retry; pending execution is not completion, subset derivation is not fresh extraction, and normal cleanup does not establish post-preemption reclamation. Board task 98379d28-9167-4467-ae1e-418eff3d91b5; live citation audit follows publication.
+
+## [2026-11-02] Source comparison | Native encrypted vintage check
+Page added: wrds-crsp-source-comparison; qualification, readiness and cohort pages updated; libs hub and index now 74 pages.
+Notes: Preserve failed synthetic import attempt separately from two verified database rehearsals. Licensed job 40568218 found all 81920 queried rows unchanged; its diagnostic ciphertext reached HPC3 with a complete private-tree readback. No economic refusal, baseline, candidate fit or final release is declared resolved. Board task 80ad9ec5-9a56-46dd-a87b-0ae652d712ad; live citation audits follow publication.
