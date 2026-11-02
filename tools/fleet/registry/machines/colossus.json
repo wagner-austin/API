@@ -41,6 +41,14 @@
     "cxx": "15.3.0",
     "docker": "29.9.1",
     "stack": null,
-    "elevated": false
+    "elevated": false,
+    "models": {
+      "server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+      "backend": "vulkan",
+      "cache": "/home/corvis/models",
+      "first_port": 8091,
+      "last_port": 8094,
+      "idle_seconds": 1800
+    }
   }
 }

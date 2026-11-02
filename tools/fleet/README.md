@@ -896,6 +896,54 @@ From an MCPs package, `make check-fleet` submits HEAD for the package with
 its tags and prints the job id (`packages/maketools/README.md`); `make check`
 stays local.
 
+### A node that serves catalog models drains the models lane too
+
+The queue's `model-load` and `model-unload` jobs (MCPs mig 896, board task
+62b1bb0a) name a model of the catalog in MCPs corvis-db
+(`fleet-dispatch/model-catalog.ts`) as `models/<id>`, and each names the node
+the queue placed it on. A node serves models when its machine file's
+`dispatch` declares `models` (null on every other node, and on any node a
+reinstall wrote, since a reinstall leaves no build behind):
+
+```json
+"models": {
+  "server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+  "backend": "vulkan",
+  "cache": "/home/corvis/models",
+  "first_port": 8091,
+  "last_port": 8094,
+  "idle_seconds": 1800
+}
+```
+
+That node's serve (`fleet.cli.node_models`, MCPs board task b9235198) claims
+the models lane before every fill pass and runs each job to its close there:
+
+- **A load** is refused unless the catalog lists the node's backend, and
+  unless the file under `cache` has the catalog's size and sha256, named with
+  both digests when it does not. Otherwise llama-server starts as the
+  transient user unit `fleet-model-<id>.service`, on the node's tailnet
+  address and the lowest free port of its range, with `-ngl 999 -fit off`, so
+  every layer goes on the GPU or none is served. Once `/health` answers and
+  its log reads `offloaded N/N layers to GPU`, the load passes with
+  `dispatch_report action='loaded'` and `http://<tailnet address>:<port>`.
+  A server that exits, does not answer in 300 s, or leaves a layer off the
+  GPU fails and is stopped.
+- **An unload** stops that unit and passes. The fill pass after it records
+  the node's tick, so the GPU memory freed is in the next tick.
+- **Idle** copies chat's rule (its deleted `src/chat/api/activity.py`): a use
+  is a request somebody made, never a probe. Here that means llama.cpp's
+  prompt and generated token counters moved, or a request is in flight, read
+  from `/metrics`, so the runner's own `/health` and `/metrics` reads never
+  count. Every collect pass reads each served model. One unused for its
+  `idle_seconds`, kept in `/proc/uptime` seconds on the node, is stopped with
+  no unload job. That, and a server found exited, is recorded on its passed
+  load with `dispatch_report action='ended'` (MCPs mig 897), so the next load
+  of it queues a new job.
+
+The tailnet lets demure, where chat runs, reach a model port only by a grant
+(MCPs `fleet-mcp/tailnet-policy.source.hujson`: colossus 8091 to 8094).
+
 ## Subscribing from a Claude session
 
 `fleet-watch` prints one line per event and exits. That is the whole

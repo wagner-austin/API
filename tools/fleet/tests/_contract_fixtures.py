@@ -8,6 +8,7 @@ from platform_core.json_utils import JSONValue
 
 from fleet.contracts.budget import NodeBudget
 from fleet.contracts.machine import LedgerObserver, Machine, MachineRole
+from fleet.contracts.model_host import ModelBackend, NodeModels
 from fleet.contracts.node import NodeConfig, NodeGpu, decode_node_config
 
 BUDGET: Final = NodeBudget(
@@ -27,13 +28,32 @@ GPU: Final = NodeGpu(
 )
 
 
-def node(*, gpu: NodeGpu | None = GPU, cores: int = 16, host: str = "lavender") -> NodeConfig:
+#: colossus's model declaration, as its machine file carries it (MCPs board
+#: task b9235198).
+COLOSSUS_MODELS: Final = NodeModels(
+    server="/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",
+    backend=ModelBackend.VULKAN,
+    cache="/home/corvis/models",
+    first_port=8091,
+    last_port=8094,
+    idle_seconds=1800,
+)
+
+
+def node(
+    *,
+    gpu: NodeGpu | None = GPU,
+    cores: int = 16,
+    host: str = "lavender",
+    models: NodeModels | None = None,
+) -> NodeConfig:
     """Build a node declaration.
 
     Args:
         gpu: Its CUDA device, or None for a CPU-only machine.
         cores: Logical processors.
         host: The machine's name.
+        models: How it serves catalog models, or None for none.
 
     Returns:
         The node.
@@ -51,6 +71,7 @@ def node(*, gpu: NodeGpu | None = GPU, cores: int = 16, host: str = "lavender") 
         docker=None,
         stack=None,
         budget=BUDGET,
+        models=models,
     )
 
 

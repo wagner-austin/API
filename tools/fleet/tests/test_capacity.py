@@ -81,6 +81,7 @@ def _node(
             checks_at_once=checks_at_once,
             pinned_checks_only=pinned_checks_only,
         ),
+        models=None,
     )
 
 

@@ -62,6 +62,12 @@ its own claims across ticks; a fresh UUID per tick would make every tick a
 stranger to the last. ``--announce`` posts the check-in that registers that
 session on the ledger (MCPs mig 530), once, from the registration script.
 
+A NODE THAT SERVES MODELS DRAINS THE MODELS LANE TOO (MCPs board task
+b9235198). When its machine file declares ``models``, every fill pass first
+claims and runs the model jobs naming it, and every collect pass then stops
+the models idle past their span (:mod:`fleet.cli.node_models`); a node that
+declares none never asks the lane.
+
 ONE RUNNER PER NODE. A Windows node that declared ``elevated`` had a second
 runner, this command with ``--elevated`` (MCPs board task a98d7083); it left
 with the fleet's last Windows node (board task e705f08c).
@@ -88,7 +94,7 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import _config, node_serve, node_serve_claim, node_watch
+from fleet.cli import _config, node_models, node_serve, node_serve_claim, node_watch
 from fleet.cli.job_close import refuse
 from fleet.cli.node_claim import ask_queue
 from fleet.cli.node_collect import collect_pass
@@ -376,8 +382,10 @@ def main(argv: Sequence[str] | None = None) -> int:
             holder=watch,
             launching=launcher.launching()["jobs"],
         )
+        node_models.idle_pass(credentials, identity, alias=alias, node=node)
 
     def fill() -> None:
+        node_models.models_pass(credentials, identity, alias=alias, node=node)
         fill_pass(loaded, credentials, identity, alias=alias, node=node, launcher=launcher)
 
     def queued() -> frozenset[str] | None:

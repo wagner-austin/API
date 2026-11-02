@@ -31,6 +31,7 @@ from fleet.contracts.action_cache import ActionCacheCounts
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
 from fleet.contracts.capability import Capability, decode_capability
 from fleet.contracts.gpu_reading import GpuReading
+from fleet.contracts.model_host import NodeModels, decode_node_models, encode_node_models
 
 
 class NodeGpu(TypedDict):
@@ -129,6 +130,11 @@ class NodeConfig(TypedDict):
             images require; required and re-measured like ``rust`` (MCPs
             board task 554bffc1).
         budget: What share of this machine a dispatch may take.
+        models: How the node serves catalog models
+            (:mod:`fleet.contracts.model_host`, MCPs board task b9235198),
+            or None for a node that serves none. REQUIRED like ``gpu``, null
+            spelled out: a node whose runner would claim a model load must
+            say where its server is.
     """
 
     host: str
@@ -143,6 +149,7 @@ class NodeConfig(TypedDict):
     docker: str | None
     stack: str | None
     budget: NodeBudget
+    models: NodeModels | None
 
 
 class SliceMemory(TypedDict):
@@ -315,6 +322,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "docker": node["docker"],
         "stack": node["stack"],
         "budget": encode_node_budget(node["budget"]),
+        "models": encode_node_models(node["models"]),
     }
 
 
@@ -348,6 +356,12 @@ def decode_node_config(value: JSONValue, *, host: str, enabled: bool) -> NodeCon
             "database (corvis-fleet-testdb), false otherwise. A Postgres-backed package handed "
             "to a node without one fails its global setup, so neither default is safe."
         )
+    if "models" not in value:
+        raise JSONTypeError(
+            "node must declare 'models': null for a node that serves no catalog model, or where "
+            "its llama.cpp server, model cache and model ports are. A runner that claimed a model "
+            "load on a node whose file says nothing would have no server to start."
+        )
     for capability in Capability:
         if capability.value not in value:
             raise JSONTypeError(
@@ -376,6 +390,7 @@ def decode_node_config(value: JSONValue, *, host: str, enabled: bool) -> NodeCon
         docker=decode_capability(Capability.DOCKER, value["docker"]),
         stack=decode_capability(Capability.STACK, value["stack"]),
         budget=decode_node_budget(require_dict(value, "budget")),
+        models=decode_node_models(value["models"]),
     )
 
 

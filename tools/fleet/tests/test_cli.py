@@ -74,6 +74,7 @@ def _workspace_document() -> JSONObject:
         "stack": None,
         "elevated": False,
         "budget": budget,
+        "models": None,
     }
     return {
         "machines": {

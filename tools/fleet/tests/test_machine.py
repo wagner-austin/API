@@ -31,7 +31,7 @@ from fleet.contracts.node import (
     encode_node_config,
     encode_node_gpu,
 )
-from tests._contract_fixtures import GPU, machine, node
+from tests._contract_fixtures import COLOSSUS_MODELS, GPU, machine, node
 
 
 def _decode(value: JSONValue) -> NodeConfig:
@@ -136,6 +136,20 @@ class TestNodeConfig:
 
         with pytest.raises(JSONTypeError, match="must declare 'gpu'"):
             _decode(encoded)
+
+    def test_an_absent_models_key_is_refused(self) -> None:
+        """A node serving no catalog model says so with null (MCPs board task b9235198)."""
+        encoded = encode_node_config(node())
+        assert encoded["models"] is None
+        del encoded["models"]
+
+        with pytest.raises(JSONTypeError, match="must declare 'models'"):
+            _decode(encoded)
+
+    def test_a_node_s_model_declaration_is_carried_both_ways(self) -> None:
+        serving = node(host="colossus", gpu=None, models=COLOSSUS_MODELS)
+        encoded = encode_node_config(serving)
+        assert decode_node_config(encoded, host="colossus", enabled=True) == serving
 
     def test_an_absent_test_database_key_is_refused(self) -> None:
         """Neither default is safe here either (MCPs board task 6bbfd171).

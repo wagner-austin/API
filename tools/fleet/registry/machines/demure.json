@@ -46,6 +46,7 @@
     "cxx": "15.3.0",
     "docker": null,
     "stack": null,
-    "elevated": false
+    "elevated": false,
+    "models": null
   }
 }

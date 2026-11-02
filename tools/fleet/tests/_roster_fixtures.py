@@ -38,6 +38,7 @@ def dispatch_document() -> JSONObject:
             "checks_at_once": None,
             "pinned_checks_only": False,
         },
+        "models": None,
     }
 
 

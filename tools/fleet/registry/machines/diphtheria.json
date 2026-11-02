@@ -84,6 +84,7 @@
     "cxx": "13.3.0",
     "docker": "29.8.1",
     "stack": "29.8.1",
-    "elevated": false
+    "elevated": false,
+    "models": null
   }
 }

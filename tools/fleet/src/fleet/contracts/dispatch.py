@@ -29,6 +29,7 @@ from platform_core.json_utils import JSONValue
 from platform_core.members import find_member
 from typing_extensions import TypedDict
 
+from fleet.contracts.model_host import CatalogModel, decode_catalog_model
 from fleet.contracts.queue_answer import (
     envelope,
     malformed,
@@ -107,6 +108,12 @@ class DispatchCommand(StrEnum):
     # command this reader does not know fails every listing.
     MODEL_LOAD = "model-load"
     MODEL_UNLOAD = "model-unload"
+
+
+#: The commands that name a catalog model rather than a registry project.
+MODEL_COMMANDS: frozenset[DispatchCommand] = frozenset(
+    {DispatchCommand.MODEL_LOAD, DispatchCommand.MODEL_UNLOAD}
+)
 
 
 class DispatchLane(StrEnum):
@@ -196,6 +203,11 @@ class DispatchJob(TypedDict):
             last set long enough ago (MCPs board task c1d48330,
             :func:`fleet.cli.node_collected.lease_age`), so a second pass
             seconds after the first writes nothing to the queue.
+        research_request: The private controller reference a research job
+            carries, and None on every other command.
+        model: The catalog row a model job names (MCPs mig 896,
+            :mod:`fleet.contracts.model_host`), which the node runner serves
+            from, and None on every other command.
     """
 
     job_id: str
@@ -216,6 +228,7 @@ class DispatchJob(TypedDict):
     claimed_unix: int | None
     lease_expires_unix: int | None
     research_request: ResearchRequest | None
+    model: CatalogModel | None
 
 
 def _require_status(row: dict[str, JSONValue], *, answer: str) -> DispatchStatus:
@@ -329,6 +342,11 @@ def decode_job(value: JSONValue, *, answer: str) -> DispatchJob:
         research_request=(
             decode_research_request(value.get("researchRequest"))
             if command is DispatchCommand.RESEARCH
+            else None
+        ),
+        model=(
+            decode_catalog_model(value.get("model"), answer=answer)
+            if command in MODEL_COMMANDS
             else None
         ),
     )
@@ -520,7 +538,7 @@ def encode_job_line(job: DispatchJob) -> str:
         verb = "retire netboot arm"
     elif job["command"] is DispatchCommand.RESEARCH:
         verb = f"research request {job['project']}"
-    elif job["command"] in (DispatchCommand.MODEL_LOAD, DispatchCommand.MODEL_UNLOAD):
+    elif job["command"] in MODEL_COMMANDS:
         # A model job names a catalog model, not a make target or a commit.
         verb = f"{job['command']} {job['project']}"
     else:
@@ -529,6 +547,7 @@ def encode_job_line(job: DispatchJob) -> str:
 
 
 __all__ = [
+    "MODEL_COMMANDS",
     "ClosingStatus",
     "DispatchCommand",
     "DispatchJob",
