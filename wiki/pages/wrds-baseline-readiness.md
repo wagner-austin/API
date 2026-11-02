@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json"
@@ -16,6 +17,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json": "a3cb9cfa855ff7e11dd6f66884957fa3630af1a2"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json": "83fe5d2f5fa2468079f00334c0c2ddd2548ffddf"
@@ -39,7 +41,10 @@ confidence: medium
 Version-2 job `58740674` failed after 2,245 seconds while constructing training
 labels (`CRSP-009`). The shared queue automatically recorded the failure.
 Fourteen admitted requests remain unsubmitted, no candidate is selected, and
-the final holdout remains unreleased.[^v2stop]
+the final holdout remains unreleased. The maintained preparation reporter
+reread the stopped study at 05:58 UTC on November 2: its journal matched the
+independently observed post-failure digest, with one failed and fourteen
+admitted attempts, no selection and no final manifest release.[^v2stop][^preserved]
 
 Verified diagnostics `58741562` and `58741598` found an existing daily row with
 missing price/return (`MP`/`MR`), followed by an available two-session return
@@ -101,6 +106,7 @@ limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
 [^current]: `libs/covenant_ml/docs/crsp-monthly.json`, `version`, `entry_rule`, `cost_rule` and `held_return_rule`; this is the current rule document, not an installed runtime or a completed study.
+[^preserved]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/preserved-study-report.json`, `observed_at`, `policy_digest`, `journal_sha256` and `attempts`; service post `6029b64c-80a4-444a-9f73-96a604aad1b5` from the existing preparation reporter. Digest `82450a7994d16019b9f699104b5e8891d943ad426becd93c5fb56402b0854a40` matches the independent audit reading, and was unchanged before and after this report.
 [^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `source_checks`, `controller`, `image`, `remaining` and `scope`; passed source gate and separately inspected candidate runtime, without a new study launch.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action`, failed queue/native records and `wake`.
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
