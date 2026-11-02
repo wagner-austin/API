@@ -186,10 +186,35 @@ def test_malformed_cohorts_are_refused(securities: tuple[int, ...]) -> None:
 
 def test_cohort_cannot_request_final_observations() -> None:
     protocol = decode_crsp_protocol(protocol_document())
-    with pytest.raises(ValueError, match=r"\[CRSP-010\] diagnostic cohorts cannot query final"):
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] diagnostic cohorts require the frozen"):
         crsp_relation_sql(
             protocol, crsp_scopes(protocol)[1], vendor_source(protocol), 5, securities=(12,)
         )
+
+
+def test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic() -> None:
+    protocol = decode_crsp_protocol(protocol_document())
+    disguised = crsp_scopes(protocol)[1]._replace(partition="train-validation")
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] diagnostic cohorts require the frozen"):
+        crsp_relation_sql(protocol, disguised, vendor_source(protocol), 5, securities=(12,))
+
+
+@pytest.mark.parametrize(
+    "field",
+    [
+        "history_start",
+        "universe_start",
+        "observation_end",
+        "calendar_start",
+        "calendar_end",
+        "last_decision",
+    ],
+)
+def test_diagnostic_refuses_each_altered_protocol_boundary(field: str) -> None:
+    protocol = decode_crsp_protocol(protocol_document())
+    altered = crsp_scopes(protocol)[0]._replace(**{field: "2025-02-28"})
+    with pytest.raises(ValueError, match=r"\[CRSP-010\] diagnostic cohorts require the frozen"):
+        crsp_relation_sql(protocol, altered, vendor_source(protocol), 5, securities=(12,))
 
 
 def test_diagnostic_driver_opens_only_train_validation_in_one_snapshot() -> None:
