@@ -170,7 +170,7 @@ def test_missing_exit_cannot_borrow_a_future_return_or_supply_a_fill() -> None:
 def test_missing_entry_is_not_a_filled_position_even_when_later_span_exists() -> None:
     rows = bridged_rows()
     rows[0] = missing(W1.entry)
-    with pytest.raises((TypeError, ValueError), match="dlyprc"):
+    with pytest.raises(ValueError, match="CRSP-004"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
