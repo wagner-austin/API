@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/parent-audit.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/completion-preparation-report.json"
@@ -13,6 +14,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/parent-audit.json": "78746db728bf7fd34597498d2802519915b81291"
   "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json": "6a91f67fc36dc4d3aa6b9bbcc7279ca019a78d62"
   "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/native-evidence.json": "98ee300170fb1608bb4cf3f4b7298c0323d762d1"
   "tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/completion-preparation-report.json": "97ff089365009ac9ba4d9284d4c420b1df60a391"
@@ -64,23 +66,33 @@ frozen closing-trade rule. Counts measure the first refusal per path; they do
 not establish every underlying cause. [[wrds-baseline-v3-freeze]] retains the
 failed first diagnostic and the completed scan's limits.[^pathaudit]
 
+Follow-up native job `58766611` reproduced all counts and collected source
+fields for every refusal, with seventeen inputs and its result/RunRecord
+verified. [[wrds-v3-refused-path-diagnosis]] distinguishes vendor missingness,
+quote-only execution and valuation timing. Five earlier `held_path` refusals
+are actually terminal valuations dated after exit. No extraction repair or
+complete replacement outcome policy has been established.[^sources]
+
 The `/pub` BeeGFS stall also recurred during submission and cleared without
 changing the request. Its unnecessary mount dependency remains tracked as
 `0a0e5913`; it was not the recorded cause of this evaluator failure.[^preparation][^v3stop]
 
 ## Remaining work
 
-1. Resolve source evidence for the 27 refused paths, including held-return and
-   terminal-value cases; aggregate boundary flags alone do not diagnose them.
-2. Determine whether data correction or an explicit reviewed protocol amendment
-   is warranted. Preserve failed requests; do not silently retry, treat quotes
-   as trades, or exclude securities on future outcome availability.
+1. Independently review the source diagnosis and current-source diagnostic
+   correction; source collection is complete, study qualification is not.
+2. Resolve the execution, late-valuation and incomplete-outcome rules through
+   evidenced data corrections or an explicit reviewed protocol amendment.
+   Preserve failed requests; do not silently retry, treat quotes as trades,
+   accept flagged partial returns or exclude securities on future availability.
 3. Only after a qualified new freeze, execute validation, select under fixed
    rules, and perform the controlled final evaluation.[^v3stop]
 
-Stock-selection study task `f61db3a7` owns this sequence. Bermudan Asian
-options task `5bec93df` is a separate study; its experiment and execution
-contract must be frozen separately.[^studies]
+Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
+verified the explicit protocol stop. Follow-up `a9ad53ae` owns source-level
+diagnosis before a new freeze; completion of the parent is not a successful
+model result. Bermudan Asian options task `5bec93df` is a separate study
+with a separate experiment and execution contract.[^parent][^studies]
 
 ## Preserved failures
 
@@ -99,6 +111,8 @@ allocation-specific observations and their limits.[^preparation]
 [^preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `rehearsal_audit`, `staging`, `qualification`, `freeze`, `queue_submission` and `limits`; sibling program reports retain exact identities and recorded observations.
 [^rehearsal]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `preflight_incident`; recovery of the unchanged preflight did not establish a permanent filesystem fix.
 [^studies]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `remaining`; separate stock-selection and options task identities, without making its historical extraction plan a current requirement.
+[^parent]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/parent-audit.json`, captured live `task_get` response: parent status, audit-verifier transition at 2026-11-02T15:21:09.847Z, closure outcome and follow-up ownership.
+[^sources]: [[wrds-v3-refused-path-diagnosis]], "Every original refusal", "Data limitations versus implementation" and "Next action", with native source-field evidence and the primary CIZ definitions.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 

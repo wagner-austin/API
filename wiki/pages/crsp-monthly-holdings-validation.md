@@ -18,12 +18,12 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "4a09eb54a38e561ef1100322b80d931efe2774c3"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
   "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "8f4a1638e69986178e38b712bba571aa49560541"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "dab95633b59869e38fffa4e80d18a556f5fba0eb"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "114e30d4fbee61b64cb2a257449bdfd5bda7edae"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1b58a731bc46ace7515ba137deb2f854904cada9"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
@@ -83,7 +83,12 @@ Missing rows/events and contradictory trade flags still refuse evaluation.
 The monthly payload retains unfilled selections and cash weights alongside
 held positions; weights describe the end value before final liquidation.[^unfilled]
 
-Executed entry and ordinary exit must be closing trades. The terminal interval is
+Executed entry and ordinary exit must be closing trades. Current source reports
+an absent or null execution price as `CRSP-004`; malformed numeric values still
+raise a type error. The boundary tests exercise missing prices through the real
+label path at both entry and exit. This changes the refusal diagnostic, not
+which prices can execute, and does not update a frozen image.[^execution]
+The terminal interval is
 `[entry, exit)`: a delisting on entry is included, while a last ordinary trade
 on exit can be sold before the subsequent terminal outcome. Tests cover these
 boundaries and the pre-entry delisting found by the licensed baseline, without
@@ -94,7 +99,7 @@ then verifies private plaintext removal.[^execution][^unfilled]
 
 [^unfilled]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry_filled` and `_rebalance_notional`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, hand-calculated mixed/all-rejected portfolios, contradictory evidence, held-loss refusals, encrypted study and old protocol rejection; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `_encode_series`.
 
-[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic and verified-extract cash labels with unchanged selection.
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `require_crsp_execution_price`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic, missing entry/exit prices and verified-extract cash labels with unchanged selection.
 
 The validation study builds decisions only up to the day before the final
 period. Labels are whether a security's window multiplier, terminal value

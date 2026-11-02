@@ -98,8 +98,10 @@ first refusals, not every fault within a path; its boundary examples do not
 identify every problematic held-return row or terminal field. It assigns no
 replacement prices, returns or labels, fits no model and accesses no final
 data. Normal-exit plaintext removal is asserted by this program, not a separate
-same-node forced-kill probe. The version-3 study remains a protocol stop;
-[[wrds-baseline-readiness]] records the remaining work.[^complete]
+same-node forced-kill probe. Follow-up [[wrds-v3-refused-path-diagnosis]] adds
+source fields for every refusal and distinguishes actual held-return failures
+from late terminal valuations. The version-3 study remains a protocol stop;
+[[wrds-baseline-readiness]] records the remaining work.[^complete][^sources]
 
 [^freeze]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/freeze-report.json`, `old_policy`, `new_policy`, `policy_fields_changed`, `design_fields_changed`, `selection_unchanged`, `estimator_unchanged` and `matrix`; unchanged selection contract from [[wrds-baseline-v2-freeze]].
 [^design]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evaluation.json`, `design`, `stopping_months`, `fold_months` and `confidence`.
@@ -110,3 +112,4 @@ same-node forced-kill probe. The version-3 study remains a protocol stop;
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-execution-audit-20261102/incomplete.json`, `native`, `input_count`, `panel_decisions`, `last_progress_paths`, `failure` and `limits`; sibling native-input report and logs retain the program observations.
 
 [^complete]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure`, `plaintext_removed` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement.verified_files`, result/record digests and `record`. Public observations are flags, counts and row digests, without security identifiers, dates, prices or returns.
+[^sources]: [[wrds-v3-refused-path-diagnosis]], "Every original refusal", using the completed source-level native job `58766611`; its interpretation does not amend this frozen evaluator.
