@@ -1431,6 +1431,15 @@ way on colossus, desktop-input passed 68 tests at lines 592/592 and branches
 lines 725/951 and branches 461/646. Each declares 4 workers of 1.5 GB, the
 4 cores and 6 GB its runs were measured in.
 
+**`osrs-lab/observer-input-coverage`** (board task 4a83389f, 2026-11-02) is
+the same observer build with one per-class JaCoCo gate in place of the
+module's: its `make check` runs the observer's tests and then only that
+directory's report and verification over the observer's input classes that
+read no live Client, so the `COVERAGE TOTAL` the verdict records is those
+classes' alone, and `check-summary.gradle` prints a `COVERAGE CLASS` row for
+each. On colossus it passed 479 tests at lines 142/142 and branches 66/66,
+with the same tags and workers as the observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
