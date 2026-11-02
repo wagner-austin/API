@@ -70,10 +70,37 @@ def test_metadata_revision_preserves_originals_and_needs_no_keys(tmp_path: Path)
         ) as manifest:
             sources = load_crsp_sources(manifest)
             assert sources.protocol["version"] == 3
+            assert sources.protocol["held_return_rule"] == "exact-missing-price-spans"
             assert len(sources.membership) == 3
             assert sources.manifest["extracted_at"] == revision["extracted_at"]
     assert not list(tmp_path.glob("crsp-revision-metadata-*"))
     assert not list(tmp_path.glob("research-plaintext-*"))
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("history_start", "2017-01-01"),
+        ("source_sha256", "0" * 64),
+        ("max_universe", 999),
+        ("min_price", 6.0),
+    ],
+)
+def test_accounting_amendment_cannot_change_extraction_settings(
+    tmp_path: Path, field: str, value: JSONValue
+) -> None:
+    case = revision_case(tmp_path)
+    destination = tmp_path / "revision"
+    revise_crsp_protocol(*case, destination)
+    document = read_document(case.protocol)
+    document[field] = value
+    case.protocol.write_text(dump_json_str(document))
+    with pytest.raises(ValueError, match="CRSP_REVISION_RULES"):
+        verify_crsp_revision(*case, destination)
+    refused = tmp_path / "refused"
+    with pytest.raises(ValueError, match="CRSP_REVISION_RULES"):
+        revise_crsp_protocol(*case, refused)
+    assert not refused.exists()
 
 
 @pytest.mark.parametrize(
