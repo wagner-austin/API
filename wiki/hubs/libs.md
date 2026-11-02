@@ -79,3 +79,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [CRSP refused-path source diagnosis](../pages/wrds-v3-refused-path-diagnosis.md) -- all 27 refusals traced to source fields, with vendor missingness and protocol questions kept distinct
 [CRSP outcome qualification](../pages/crsp-outcome-qualification.md) -- separate missing outcomes, order execution, terminal maturity and partition-boundary evidence before a replacement freeze
 [Encrypted CRSP diagnostic cohort](../pages/wrds-encrypted-diagnostic-cohort.md) -- private derivation from frozen observations, diagnostic-only admission and native evidence
+
+[Bounded encrypted CRSP source comparison](../pages/wrds-crsp-source-comparison.md) -- shared vintage comparison, native rehearsals and diagnostic-only evidence
