@@ -1,0 +1,106 @@
+{
+  "old_study": "/home/corvis/research-data/wrds/experiments/licensed-baseline-b3843a3d3-20261101",
+  "old_journal_sha256": "bbdce97e25d585adfd574274ce5bca652240f10e04f25c4a26aa27cc3e4949b6",
+  "old_policy": {
+    "protocol_digest": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a",
+    "dataset_digest": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+    "code_digest": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+    "image_digest": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+    "features": [
+      "momentum",
+      "liquidity"
+    ],
+    "seeds": [
+      11,
+      23,
+      37,
+      53,
+      71
+    ],
+    "max_candidates": 20,
+    "max_seconds": 7200,
+    "cpus": 4,
+    "mem_gb": 128,
+    "max_trees": 200,
+    "max_leaves": 31,
+    "selection": {
+      "primary": "lightgbm",
+      "reference": "momentum",
+      "cost_bps": 10,
+      "first_month": 24180,
+      "last_month": 24261,
+      "final_seed": 11,
+      "required_candidates": [
+        "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9"
+      ]
+    }
+  },
+  "new_policy": {
+    "protocol_digest": "99c1c8604a2d2b0f5efb27b87b1030f0ad2ee2366fd4e723ceccd7e79842010d",
+    "dataset_digest": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83",
+    "code_digest": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+    "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+    "features": [
+      "momentum",
+      "liquidity"
+    ],
+    "seeds": [
+      11,
+      23,
+      37,
+      53,
+      71
+    ],
+    "max_candidates": 3,
+    "max_seconds": 7200,
+    "cpus": 8,
+    "mem_gb": 128,
+    "max_trees": 200,
+    "max_leaves": 31,
+    "selection": {
+      "primary": "lightgbm",
+      "reference": "momentum",
+      "cost_bps": 10,
+      "first_month": 24180,
+      "last_month": 24261,
+      "final_seed": 11,
+      "required_candidates": [
+        "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9"
+      ]
+    }
+  },
+  "policy_digest": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce",
+  "changes": {
+    "protocol_digest": {
+      "before": "27f0e6b8ff38dd9d5c69a994aa44b4dc6dfcfb4a6ff3f72f7e1101efbd92a83a",
+      "after": "99c1c8604a2d2b0f5efb27b87b1030f0ad2ee2366fd4e723ceccd7e79842010d"
+    },
+    "dataset_digest": {
+      "before": "26b46d56c5ab47565813981f0eb4dabad4e0d5260c86dd02cf45becbe6c858f1",
+      "after": "ea669b73b777897345465762e653a91ee33696a5f1bd150b936dc1a27ad22f83"
+    },
+    "image_digest": {
+      "before": "14b1b5c929b3e89f62edae19cb04714e66c1d122273296e6d532559d717f8f4e",
+      "after": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e"
+    },
+    "max_candidates": {
+      "before": 20,
+      "after": 3
+    },
+    "cpus": {
+      "before": 4,
+      "after": 8
+    }
+  },
+  "candidate_count": 3,
+  "request_count": 15,
+  "estimator_changed": false,
+  "selection_changed": false,
+  "original_journal_modified": false,
+  "evaluation_launched": false,
+  "final_released": false
+}

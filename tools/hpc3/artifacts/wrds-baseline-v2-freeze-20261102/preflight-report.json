@@ -1,0 +1,65 @@
+{
+  "kind": "HPC3_PREFLIGHT_EVIDENCE",
+  "observed_at": "2026-11-02T01:36:26.198872+00:00",
+  "host": "hpc3",
+  "workspace": "/home/corvis/research-data/wrds/experiments/licensed-v2-09113184/hpc3.json",
+  "reporter_sha256": "a712064d3841314fc12e193a66672d589b0f5b05fae1438cd7e354eae6b129e4",
+  "queued": false,
+  "admissions": [
+    {
+      "spec": {
+        "project": "cleargbm",
+        "name": "research-f3ce57f6d520-1",
+        "partition": "free",
+        "gpu": null,
+        "gpu_pinned_because": null,
+        "exclude_nodes": [],
+        "cpus": 8,
+        "mem_gb": 128,
+        "minutes": 121,
+        "requeue": false,
+        "resumes_from_checkpoint": false,
+        "depends_on": null,
+        "artifact": "/data/homezvol1/wagnera3/research/licensed-v2-09113184/attempts/f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce/1/result/evaluation.json",
+        "image": {
+          "path": "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif",
+          "sha256": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "binds": [
+            "/pub"
+          ]
+        },
+        "env_path": "/opt/env",
+        "pinned_packages": {
+          "numpy": "2.3.5",
+          "lightgbm": "4.6.0",
+          "xgboost": "3.1.2"
+        },
+        "deterministic": true,
+        "experiment": {
+          "research_attempt": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce:1",
+          "request_sha256": "60d57cc5ea51bd318bcb1aaf1162c1af207dfe702c0473327c76e2f617d926a7"
+        },
+        "command": "bash -c 'sha256sum -c /data/homezvol1/wagnera3/research/licensed-v2-09113184/attempts/f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce/1/checksums.txt && cd /data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint && timeout --signal=TERM --kill-after=5s 7200s python -m scripts.research_trial --request /data/homezvol1/wagnera3/research/licensed-v2-09113184/attempts/f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce/1/request.json --out /data/homezvol1/wagnera3/research/licensed-v2-09113184/attempts/f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce/1/result/evaluation.json --access /data/homezvol1/wagnera3/research/licensed-baseline-b3843a3d3-20261101/access.json --scratch \"${TMPDIR:?RESEARCH_SCRATCH: scheduler must provide private scratch}\"'"
+      },
+      "verdict": {
+        "start_estimate": "2026-11-01T17:43:26",
+        "processors": 8,
+        "node_list": "hpc3-15-27",
+        "partition": "free"
+      },
+      "image_drift": {
+        "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+        "head": "3541d4e60e639b97dffb90da195fa99fdabb9704",
+        "modules": [
+          {
+            "directory": "/data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint",
+            "module": "scripts.research_trial",
+            "compared": [],
+            "changed": [],
+            "not_compared": "resolved from /data/homezvol1/wagnera3/research/final-synthetic-85f1d4d75/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+          }
+        ]
+      }
+    }
+  ]
+}

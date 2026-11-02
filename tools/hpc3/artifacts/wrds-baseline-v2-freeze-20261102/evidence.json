@@ -1,0 +1,235 @@
+{
+  "task": "09113184-4de9-4a8b-8c77-d7ba3f24b92c",
+  "frozen_at": "2026-11-02T01:38:22.580839+00:00",
+  "policy_digest": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce",
+  "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+  "scope": "Preparation only: fifteen admitted requests, no new licensed evaluator jobs or final release.",
+  "amendment": "amendment.json records all changed policy fields; version 2 adds explicit rejected-order cash and actual-notional cost rules. Other design fields and estimator settings were compared unchanged.",
+  "selection_rule": "Maximize the mean monthly LightGBM-minus-momentum net return at 10 bps after averaging paired returns over all five fixed seeds. Exact ties use fewer leaves then lexicographic candidate digest; final seed is 11. Intervals do not select the winner.",
+  "candidate_budget": "Exactly three baseline candidates; subsequent agent experiments require a separately frozen policy through the same controllers and queue.",
+  "prepared_state": {
+    "kind": "RESEARCH_PREPARATION_EVIDENCE",
+    "observed_at": "2026-11-02T01:36:14.204993+00:00",
+    "reporter_sha256": "d11df3022d7f9701bb3e2833b7dccf97b0df20c3c3753c746b1ed45f741dc923",
+    "policy_digest": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce",
+    "seeds": [
+      11,
+      23,
+      37,
+      53,
+      71
+    ],
+    "max_candidates": 3,
+    "cpus": 8,
+    "mem_gb": 128,
+    "max_seconds": 7200,
+    "ledger": "/home/corvis/research-data/wrds/experiments/licensed-v2-09113184/attempts.sqlite",
+    "journal_sha256": "8f0677407e9714011c3cbdeacc045ee9fa4f54710473be65c01b5bc48e6c1690",
+    "attempts": [
+      {
+        "number": 1,
+        "status": "admitted",
+        "seed": 11,
+        "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 2,
+        "status": "admitted",
+        "seed": 23,
+        "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 3,
+        "status": "admitted",
+        "seed": 37,
+        "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 4,
+        "status": "admitted",
+        "seed": 53,
+        "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 5,
+        "status": "admitted",
+        "seed": 71,
+        "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 6,
+        "status": "admitted",
+        "seed": 11,
+        "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 7,
+        "status": "admitted",
+        "seed": 23,
+        "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 8,
+        "status": "admitted",
+        "seed": 37,
+        "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 9,
+        "status": "admitted",
+        "seed": 53,
+        "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 10,
+        "status": "admitted",
+        "seed": 71,
+        "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 11,
+        "status": "admitted",
+        "seed": 11,
+        "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 12,
+        "status": "admitted",
+        "seed": 23,
+        "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 13,
+        "status": "admitted",
+        "seed": 37,
+        "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 14,
+        "status": "admitted",
+        "seed": 53,
+        "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      },
+      {
+        "number": 15,
+        "status": "admitted",
+        "seed": 71,
+        "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+        "job_id": "",
+        "selection": "",
+        "final_manifest_digest": ""
+      }
+    ],
+    "recipe_sha256": "7106b40dd61496b6ce4c7cf0d847e39eded72430b118e5d6047d308a8c58b5db",
+    "recipe": {
+      "name": "research-f3ce57f6d520-1",
+      "research_attempt": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce:1",
+      "request_sha256": "60d57cc5ea51bd318bcb1aaf1162c1af207dfe702c0473327c76e2f617d926a7",
+      "cpus": 8,
+      "mem_gb": 128,
+      "minutes": 121,
+      "partition": "free",
+      "gpu_requested": false,
+      "requeue": false
+    }
+  },
+  "native_preflight": {
+    "start_estimate": "2026-11-01T17:43:26",
+    "processors": 8,
+    "node_list": "hpc3-15-27",
+    "partition": "free"
+  },
+  "request_resources": {
+    "cpus": 8,
+    "mem_gb": 128,
+    "evaluator_seconds": 7200,
+    "scheduler_minutes": 121,
+    "partition": "free",
+    "gpu": null,
+    "requeue": false
+  },
+  "old_journal_sha256": "bbdce97e25d585adfd574274ce5bca652240f10e04f25c4a26aa27cc3e4949b6",
+  "old_journal_unchanged": true,
+  "validation_staging_task": "1fe61b29-b95e-42e6-b389-76a81e274c84",
+  "runtime_installation_task": "1ec0dbcb-4c25-455f-9c16-b2b8e3177a68",
+  "service_reports": [
+    {
+      "id": "6309f346-3ff0-4a6c-bf0f-355ac0cde83e",
+      "author": "hpc-report-09113184",
+      "created_at": "2026-11-02T01:36:09.855731+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT"
+    },
+    {
+      "id": "e0cd8139-98bc-4b49-81dc-335fc396610b",
+      "author": "hpc-report-09113184",
+      "created_at": "2026-11-02T01:36:14.279667+00:00",
+      "header": "RESEARCH PREPARATION LOAD-REPORT"
+    },
+    {
+      "id": "b5c89311-979d-425b-811d-b3c233ed2f35",
+      "author": "hpc-report-09113184",
+      "created_at": "2026-11-02T01:36:26.285871+00:00",
+      "header": "HPC3 PREFLIGHT LOAD-REPORT"
+    },
+    {
+      "id": "5db505d3-74ea-4676-8849-fed62a6bdf6e",
+      "author": "hpc-report-09113184",
+      "created_at": "2026-11-02T01:37:03.562054+00:00",
+      "header": "HPC3 CONTROLLER LOAD-REPORT"
+    }
+  ],
+  "files": {
+    "hpc3.json": "1cbca33313a679af9febdce6eea93415f34522380164fc00344e483fe54d3f0a",
+    "amendment.json": "73457878fd51ec9c540c9d2f16be73244270d4e17c2912e95ec09344a92b7abf",
+    "service-reports.json": "85312bbccf9b7bafcf37ceb19ad1d8b7147444cb096c0e08ab8cefb7206190a4",
+    "cluster.json": "dde80d3db4283f7371d2c0f48fa5a3208e509f34eeabf552c7194467a73ae19c",
+    "preflight-report.json": "f935766f86b17e4872cc7b3eb318e7b8b204b7401ab2a568652e340fa0b4543f",
+    "controller-report.json": "d7c4f690079b717f14ac705583aa9e988e942a47862470bd378ac1965c95f690",
+    "evaluation.json": "ede2d959d52b279f4a99c3c19e925592a4815d288e29c17f987cf1242398f002",
+    "policy.json": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce",
+    "preparation-report.json": "c6fa2f0f22a9978913d40fe99c97e5a4258400a351274d6ebcd3b7dff192248d",
+    "requests.json": "f468a67a0d1b0c09ae96708a1a4ce1db5bf8b376cd99526f12b35838ac0e8996"
+  }
+}
