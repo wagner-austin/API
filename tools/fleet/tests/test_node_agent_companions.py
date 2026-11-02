@@ -170,7 +170,9 @@ class TestCompanions:
         # export of the same tip and no earlier attempt of the same job can
         # meet it, and gone with its directory once the launch ends.
         bundles = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
-        bundle = bundles / ATTEMPT_DIRECTORY / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+        bundle = (
+            bundles / ATTEMPT_DIRECTORY / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+        )
         assert runner.calls[base + 3][-2] == str(bundle)
         assert not bundle.parent.exists()
         sent = [body or b"" for body in runner.stdin]
