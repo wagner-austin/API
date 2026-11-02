@@ -14,8 +14,9 @@ from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion
-from fleet.core import _test_hooks, dialect, records, stage_repository, staging
+from fleet.core import _test_hooks, dialect, mirror_fetch, records, stage_repository, staging
 from tests._node_agent_fixtures import (
+    ATTEMPT_DIRECTORY,
     COMPANION_DIRECTORY,
     COMPANION_REF,
     COMPANION_REMOTE,
@@ -30,7 +31,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests._registry import write_registry
-from tests.conftest import FakeRun, ok, registry_replies, stage_replies
+from tests.conftest import FakeRun, failed, ok, registry_replies, stage_replies
 
 __all__ = ["_credentials_in_env"]
 
@@ -165,10 +166,11 @@ class TestCompanions:
         assert runner.calls[base + 2][3] == "rev-parse"
         assert runner.calls[base + 3][3:5] == ("bundle", "create")
         assert runner.calls[base + 3][-1] == "refs/fleet/companion"
-        # Written in the claimed job's own directory, so no other runner's
-        # export of the same tip can replace it, and gone once staged.
+        # Written in the launch attempt's own directory, so no other runner's
+        # export of the same tip and no earlier attempt of the same job can
+        # meet it, and gone with its directory once the launch ends.
         bundles = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
-        bundle = bundles / DEFAULT_JOB_ID / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
+        bundle = bundles / ATTEMPT_DIRECTORY / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
         assert runner.calls[base + 3][-2] == str(bundle)
         assert not bundle.parent.exists()
         sent = [body or b"" for body in runner.stdin]
@@ -238,6 +240,42 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         assert earlier.read_bytes() == b"left by the attempt a tick's end cut off"
+        assert not (loaded.archives / ATTEMPT_DIRECTORY).exists()
+
+    def test_a_companion_the_remote_refuses_leaves_no_attempt_directory(
+        self, config_path: pathlib.Path
+    ) -> None:
+        """The export refused after this attempt's directory was made: the job
+        is refused to the queue and the directory goes with the refusal, made
+        by the real seam, so no two attempts ever share one (board task
+        2e3e69cf)."""
+        sourced = _companion_config(config_path)
+        _test_hooks.run = FakeRun(
+            [
+                *PROBED,
+                ok(""),  # the project's mirror: git init --bare
+                ok(""),  # the project's mirror: git cat-file -e, the commit is held
+                ok(""),  # the companion's mirror: git init --bare
+                *[failed(128, "fatal: unable to access: could not resolve host")]
+                * mirror_fetch.FETCH_ATTEMPTS,
+            ]
+        )
+        queue = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="refused")}),
+            ]
+        )
+        _test_hooks.http_post = queue
+
+        assert node_agent.main(node_argv(sourced)) == 0
+
+        archives = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
+        assert sorted(path.name for path in archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
+        closed = queue.arguments[2]
+        assert (closed["action"], closed["status"]) == ("close", "refused")
+        assert str(closed["detail"]).startswith("EXPORT_FAILED: git fetch")
 
     def test_the_feed_names_the_commit_the_companion_was_measured_with(
         self, config_path: pathlib.Path

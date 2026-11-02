@@ -33,6 +33,7 @@ back to the queue, since nothing ran (MCPs board task ee3d6cdc).
 
 from __future__ import annotations
 
+import shutil
 import threading
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -454,9 +455,14 @@ class Launcher:
             data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
             return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
 
-        launched = launch_claimed(
-            self._loaded, job, alias=self._alias, node=self._node, prepared=prepared, build=build
-        )
+        # The attempt's own bundle directory goes however the launch ends,
+        # content and all (MCPs board task 2e3e69cf).
+        try:
+            launched = launch_claimed(
+                self._loaded, job, alias=self._alias, node=self._node, prepared=prepared, build=build
+            )
+        finally:
+            shutil.rmtree(prepared["bundles"])
         if launched["row"] is not None:
             return launched["row"]
         if launched["unreachable"]:

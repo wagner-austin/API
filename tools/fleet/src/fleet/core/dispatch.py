@@ -393,10 +393,10 @@ def launch(
         )
         # Verified on the node, so like the archive above it has no reader
         # left; kept, the hub held 169 bundles in 14 GB on 2026-10-15 (MCPs
-        # board task f9ee56aa). Its directory is the claimed job's alone.
+        # board task f9ee56aa). Its directory is the launch attempt's own,
+        # which the node runner removes however the attempt ends (board
+        # task 2e3e69cf), so the memory a bundle holds is freed here.
         companion["path"].unlink()
-    for bundles in {companion["path"].parent for companion in companions}:
-        bundles.rmdir()
 
     remote.send_script(
         node["host"],

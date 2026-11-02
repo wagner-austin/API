@@ -10,8 +10,10 @@ claim pass calls it.
 from __future__ import annotations
 
 import pathlib
+import shutil
 
 from platform_core.error_codes_fleet import FleetErrorCode
+from platform_core.errors import AppError
 from typing_extensions import TypedDict
 
 from fleet.cli import _config
@@ -22,7 +24,7 @@ from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
 from fleet.contracts.workspace import require_project
-from fleet.core import archive_scope, capacity, export
+from fleet.core import _test_hooks_attempts, archive_scope, capacity, export
 
 
 def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
@@ -114,6 +116,8 @@ class Prepared(TypedDict):
         plan: The project's declaration.
         source: Its source, present by construction here.
         mirror: The mirror on the hub, holding the commit.
+        bundles: This attempt's own directory the companions are bundled
+            in, which the launch removes however it ends.
         companions: The bundles of the repositories staged beside the
             export, each at the commit its declared ref names now.
         scope: The pathspec the export's archive is built with, leaving out
@@ -126,6 +130,7 @@ class Prepared(TypedDict):
     plan: ProjectConfig
     source: ProjectSource
     mirror: pathlib.Path
+    bundles: pathlib.Path
     companions: tuple[export.CompanionExport, ...]
     scope: tuple[str, ...]
     workers: int
@@ -170,18 +175,28 @@ def prepare(
     source = export.require_source(job["project"], plan["source"])
     mirror = export.prepare_mirror(loaded.mirrors, remote=source["remote"], sha=sha)
     export.require_install_paths(mirror, sha, source["install"])
-    # One directory per claimed job (MCPs board task f9ee56aa): every runner
-    # on the hub writes here, git bundle create never writes one ref's bytes
-    # twice alike, and two runners bundling one companion tip into one file
-    # swapped each other's bytes, which the node's digest then refused.
-    bundles = loaded.archives / job["job_id"]
-    companions = export.export_companions(loaded.mirrors, bundles, source["companions"])
-    run_cli.require_resources_free(loaded, plan)
+    # One directory per launch attempt. Every runner on the hub writes here,
+    # git bundle create never writes one ref's bytes twice alike, and two
+    # runners bundling one companion tip into one file swapped each other's
+    # bytes, which the node's digest then refused (MCPs board task
+    # f9ee56aa). A directory per job was not enough: a job is claimed again
+    # after an attempt that ended mid-launch, whose bundles stayed there, and
+    # removing the next attempt's directory raised ENOTEMPTY and ended
+    # pendragon's serving loop (fleet job e9009971, board task 2e3e69cf).
+    # The launch removes it however the attempt ends; a refusal here does.
+    bundles = _test_hooks_attempts.fresh_directory(loaded.archives, f"{job['job_id']}-")
+    try:
+        companions = export.export_companions(loaded.mirrors, bundles, source["companions"])
+        run_cli.require_resources_free(loaded, plan)
+    except AppError:
+        shutil.rmtree(bundles)
+        raise
     workers = admitted["workers"]
     return Prepared(
         plan=plan,
         source=source,
         mirror=mirror,
+        bundles=bundles,
         companions=companions,
         scope=archive_scope.archive_pathspec(
             loaded.workspace["data_paths"], remote=source["remote"], project_path=source["path"]

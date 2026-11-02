@@ -26,7 +26,7 @@ from fleet.contracts.source import (
     ProjectSource,
     encode_project_source,
 )
-from fleet.core import _test_hooks, staging
+from fleet.core import _test_hooks, _test_hooks_attempts, staging
 from tests._queue_fakes import (
     DEFAULT_JOB_ID,
     DEFAULT_SHA,
@@ -59,6 +59,10 @@ COMPANION_REMOTE = "https://github.com/wagner-austin/MCPs.git"
 COMPANION_REF = "main"
 COMPANION_DIRECTORY = "MCPs"
 COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
+
+#: The launch attempt's own bundle directory under the archives, which
+#: :func:`prebuilt_companion` binds the attempt seam to.
+ATTEMPT_DIRECTORY = f"{DEFAULT_JOB_ID}-attempt"
 
 #: The pre-claim probes every claiming tick pays, each script sent and then
 #: run: lavender answering room for a dispatch, then its toolchain as it
@@ -196,9 +200,11 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     """Write the bundle a companion's ``git bundle create`` would have, where
     the tick reads it.
 
-    Named by the companion's own commit, in the claimed job's own directory,
-    which is where :func:`fleet.cli.node_prepare.prepare` has
-    :func:`fleet.core.export.export_companions` write it.
+    Named by the companion's own commit, in the launch attempt's own
+    directory, which is where :func:`fleet.cli.node_prepare.prepare` has
+    :func:`fleet.core.export.export_companions` write it: this binds the
+    attempt's directory to :data:`ATTEMPT_DIRECTORY` under the archives, so
+    the bundle can be written before the faked ``git bundle create``.
 
     Args:
         config_path: The workspace document.
@@ -207,10 +213,15 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
         The bundle bytes.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    destination = (
-        loaded.archives / DEFAULT_JOB_ID / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
-    )
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    attempt = loaded.archives / ATTEMPT_DIRECTORY
+    attempt.mkdir(parents=True)
+
+    def fresh(parent: pathlib.Path, prefix: str) -> pathlib.Path:
+        assert (parent, prefix) == (loaded.archives, f"{DEFAULT_JOB_ID}-")
+        return attempt
+
+    _test_hooks_attempts.fresh_directory = fresh
+    destination = attempt / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
     payload = b"# v2 git bundle\n" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)
     return payload
@@ -314,6 +325,7 @@ def held_answer(**overrides: str | None) -> str:
 
 
 __all__ = [
+    "ATTEMPT_DIRECTORY",
     "COMPANION_DIRECTORY",
     "COMPANION_REF",
     "COMPANION_REMOTE",
