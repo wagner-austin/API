@@ -109,7 +109,7 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_measured_boot_macs_stay_pinned_and_only_linux_machines_off_the_netboot_duty_declare_one() -> None:
+def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
     # Automatic admission adds a disabled worker before its first install.
