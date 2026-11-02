@@ -56,6 +56,13 @@
         "port": 8042,
         "purpose": "print-mcp's listener on the compose bridge gateway, which mcp-forward-print-mcp dials for the proxy",
         "remedy": "the hub runner's print-mcp row runs it: read that job's record in the runner's state directory"
+      },
+      {
+        "kind": "listener",
+        "address": "172.18.0.1",
+        "port": 8044,
+        "purpose": "participant-mcp's listener on the compose bridge gateway, which mcp-forward-participant-mcp dials for the proxy (MCPs board task 42512a6b)",
+        "remedy": "the hub runner's participant-mcp row runs it: read that job's record in the runner's state directory"
       }
     ]
   },

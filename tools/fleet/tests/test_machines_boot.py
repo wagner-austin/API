@@ -181,6 +181,7 @@ def test_diphtheria_declares_docker_its_tailnet_ingress_and_the_device_listeners
         "listener:127.0.0.1:5037",
         "listener:172.18.0.1:8040",
         "listener:172.18.0.1:8042",
+        "listener:172.18.0.1:8044",
     ]
 
 
