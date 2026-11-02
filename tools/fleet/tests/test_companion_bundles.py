@@ -154,6 +154,13 @@ class TestTwoJobsBundlingOneCompanionTipAtOnce:
         assert sorted(git.written) == sorted(
             [(first["path"], first["data"]), (second["path"], second["data"])]
         )
+        # Each in its launch attempt's own directory, named for its job
+        # (board task 2e3e69cf), so neither job nor a later attempt of one
+        # can write where the other did.
         name = f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
-        assert first["path"] == loaded.archives / FIRST_JOB / name
-        assert second["path"] == loaded.archives / SECOND_JOB / name
+        for companion, job_id in ((first, FIRST_JOB), (second, SECOND_JOB)):
+            assert (companion["path"].name, companion["path"].parent.parent) == (
+                name,
+                loaded.archives,
+            )
+            assert companion["path"].parent.name.startswith(f"{job_id}-")
