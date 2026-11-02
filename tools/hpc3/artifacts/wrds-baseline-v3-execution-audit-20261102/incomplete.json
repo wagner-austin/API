@@ -1,0 +1,38 @@
+{
+  "kind": "incomplete-execution-path-diagnostic",
+  "native": {
+    "job": {
+      "job_id": "58759614",
+      "name": "cleargbm.licensed-v3-execution-audit",
+      "partition": "free",
+      "state": "FAILED",
+      "elapsed_seconds": 1820,
+      "billing_tres": 8,
+      "gpu_count": 0,
+      "cpu_count": 8,
+      "node_list": "hpc3-l18-04"
+    },
+    "exit_code": "1:0",
+    "started_at": "2026-11-02T13:41:09",
+    "ended_at": "2026-11-02T14:11:29"
+  },
+  "input_report": "native-inputs.json",
+  "input_count": 16,
+  "panel_decisions": 262,
+  "last_progress_decisions": 84,
+  "last_progress_paths": 84000,
+  "full_audit_completed": false,
+  "result_absent": true,
+  "failure": {
+    "exception": "platform_core.json_utils.JSONTypeError",
+    "field": "dlyprc",
+    "boundary": "entry",
+    "reason": "The frozen validator requires a numeric execution price. The collector measured ValueError only; JSONTypeError inherits TypeError and propagated."
+  },
+  "correction": "Measure exactly ValueError and JSONTypeError at the diagnostic boundary. Preserve every refused path without inventing a price, return or label; keep the frozen evaluator unchanged. Emit metadata-only first examples before completion.",
+  "limits": [
+    "84000 is the last emitted progress count, not the total number visited before failure.",
+    "No complete refusal counts, original failure source flags, model fit, score, candidate selection or final access were produced.",
+    "No independent plaintext-removal observation is claimed for this failed allocation."
+  ]
+}

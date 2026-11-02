@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "/data/homezvol1/wagnera3/research/licensed-v3-f61db3a7/exit-audit-20261102/audit-execution.py", line 129, in <module>
+    path = crsp_window_path(outcomes, feature.permno, decision.window)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_holdings.py", line 200, in crsp_window_path
+    if not _entry_filled(outcomes, permno, window):
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_holdings.py", line 251, in _entry_filled
+    _require_fill(outcomes, permno, window.entry)
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_holdings.py", line 270, in _require_fill
+    require_crsp_execution_price(row, outcomes.protocol)
+  File "/opt/env/lib/python3.11/site-packages/covenant_ml/markets/crsp_calendar.py", line 185, in require_crsp_execution_price
+    price = require_float(row, "dlyprc")
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/env/lib/python3.11/site-packages/platform_core/json_utils.py", line 187, in require_float
+    raise JSONTypeError(f"Missing required field '{key}'")
+platform_core.json_utils.JSONTypeError: Missing required field 'dlyprc'

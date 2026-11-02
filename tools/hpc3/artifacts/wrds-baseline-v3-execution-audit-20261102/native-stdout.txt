@@ -1,0 +1,33 @@
+host      hpc3-l18-04
+job       58759614
+restart   0
+commit    087f67b4c4aae9a731c913330840dcc665b51701
+gpu       cpu-only
+2026-11-02T05:41:09-08:00
+/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/research-crsp-v3.sif: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/bundle.json: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/calendar.csv.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/calendar.sql.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/delists.csv.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/delists.sql.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/manifest.json.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/membership.csv.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/membership.sql.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/protocol.json.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/returns.csv.age: OK
+/data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/returns.sql.age: OK
+/data/homezvol1/wagnera3/research/licensed-baseline-b3843a3d3-20261101/access.json: OK
+/data/homezvol1/wagnera3/research/licensed-v3-f61db3a7/exit-audit-20261102/audit-execution.py: OK
+/data/homezvol1/wagnera3/research/licensed-v3-f61db3a7/exit-audit-20261102/trial.json: OK
+/data/homezvol1/wagnera3/research/licensed-v3-f61db3a7/exit-audit-20261102/request.json: OK
+Verified frozen sources loaded.
+Frozen panel has 262 decisions; auditing every eligible path.
+Audited 12 decisions and 12000 paths.
+Audited 24 decisions and 24000 paths.
+Audited 36 decisions and 36000 paths.
+Audited 48 decisions and 48000 paths.
+Audited 60 decisions and 60000 paths.
+Audited 72 decisions and 72000 paths.
+Audited 84 decisions and 84000 paths.
+2026-11-02T06:11:29-08:00
+exit      1
