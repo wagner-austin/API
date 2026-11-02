@@ -203,7 +203,7 @@ def test_changed_evidence_refused(
         else:
             report["pending"] = 8
         rewrite_report(path, report)
-        record_attempt(root, campaign, operation, observed)
+        record_attempt(root, name, operation, observed)
         if change == "plan":
             (root / "attempts" / (name + "-settlement.json")).unlink()
     with pytest.raises(ValueError, match="CAMPAIGN-" + code):
@@ -255,7 +255,7 @@ def test_receipts_after_observation_are_refused(
     campaign, root, digest, _ = completed_campaign(api_server, tmp_path)
     plan = campaign["plans"][0]
     observed = plan["window_start"] if operation == "capture" else _test_hooks.clock()
-    record_attempt(root, campaign, operation, observed)
+    record_attempt(root, plan["name"], operation, observed)
     if operation == "capture":
         (root / "attempts" / (plan["name"] + "-settlement.json")).unlink()
     with pytest.raises(ValueError, match=r"CAMPAIGN-011.*later than analysis"):

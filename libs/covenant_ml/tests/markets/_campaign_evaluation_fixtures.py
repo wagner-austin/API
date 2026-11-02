@@ -14,6 +14,7 @@ from scripts.paper_research import main as capture_main
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.archive import ResponseArchive
 from covenant_ml.markets.campaign_records import Attempt, AttemptState, Campaign, encode_attempt
+from covenant_ml.markets.paper_records import PaperPlan
 from covenant_ml.markets.paper_scoring import load_verified_predictions, reconcile_predictions
 from covenant_ml.markets.provenance import implementation_digest, market_fingerprint
 from covenant_ml.markets.reporting import write_market_report
@@ -25,9 +26,8 @@ from ._paper_fixtures import serve_paper
 from ._server import ApiServer
 
 
-def record_attempt(root: Path, campaign: Campaign, operation: str, observed: str) -> None:
+def record_attempt(root: Path, name: str, operation: str, observed: str) -> None:
     (root / "attempts").mkdir(exist_ok=True)
-    name = campaign["plans"][0]["name"]
     report = root / "reports" / f"{name}-{operation}.json"
     attempt = Attempt(
         name=name,
@@ -42,26 +42,23 @@ def record_attempt(root: Path, campaign: Campaign, operation: str, observed: str
     )
 
 
-def completed_campaign(
-    server: ApiServer, destination: Path, kind: str = "binary"
-) -> tuple[Campaign, Path, str, str]:
-    campaign, root, digest = single_campaign(destination)
-    plan = campaign["plans"][0]
+def capture_plan(server: ApiServer, root: Path, campaign: Campaign, plan: PaperPlan) -> str:
+    """Capture one plan through the real collector CLI, record it, return its ticker."""
     ticker = serve_paper(server, plan)
-    prediction_path = root / "reports" / (plan["name"] + "-capture.json")
+    model = next(model for model in campaign["models"] if model["hour"] == plan["forecast_hour"])
     assert (
         capture_main(
             [
                 "--plan",
                 str(root / "plans" / (plan["name"] + ".json")),
                 "--models",
-                campaign["models"][0]["path"],
+                model["path"],
                 "--protocol",
                 campaign["protocol_path"],
                 "--archive",
                 str(root / "archives" / (plan["name"] + "-capture")),
                 "--out",
-                str(prediction_path),
+                str(root / "reports" / (plan["name"] + "-capture.json")),
                 "--mode",
                 "capture",
                 "--market-url",
@@ -73,11 +70,29 @@ def completed_campaign(
         )
         == 0
     )
-    record_attempt(root, campaign, "capture", _test_hooks.clock())
+    record_attempt(root, plan["name"], "capture", _test_hooks.clock())
+    return ticker
+
+
+def settle_plan(
+    server: ApiServer,
+    root: Path,
+    plan: PaperPlan,
+    ticker: str,
+    digest: str,
+    kind: str = "binary",
+    yes: int = 1,
+) -> str:
+    """Archive a native settlement two days after the event and return that instant."""
     day = date.fromisoformat(plan["event_day"])
     observed = (day + timedelta(days=2)).isoformat() + "T15:00:00Z"
     market = native_market(day)
-    market["status"] = "finalized"
+    market.update(
+        ticker=ticker,
+        status="finalized",
+        result="yes" if yes else "no",
+        settlement_value_dollars="1.0000" if yes else "0.0000",
+    )
     if kind == "pending":
         market["status"] = "active"
     elif kind == "scalar":
@@ -85,6 +100,7 @@ def completed_campaign(
     elif kind == "changed":
         market["rules_primary"] = "Revised rules"
     server.documents["/markets/" + ticker] = [{"market": market}]
+    prediction_path = root / "reports" / (plan["name"] + "-capture.json")
     predictions, sources = load_verified_predictions(prediction_path)
     archive_path = root / "archives" / (plan["name"] + "-settlement")
     with closing(_test_hooks.client_factory(5.0, None)) as client:
@@ -103,7 +119,17 @@ def completed_campaign(
         digest,
         (),
     )
-    record_attempt(root, campaign, "settlement", observed)
+    record_attempt(root, plan["name"], "settlement", observed)
+    return observed
+
+
+def completed_campaign(
+    server: ApiServer, destination: Path, kind: str = "binary"
+) -> tuple[Campaign, Path, str, str]:
+    campaign, root, digest = single_campaign(destination)
+    plan = campaign["plans"][0]
+    ticker = capture_plan(server, root, campaign, plan)
+    observed = settle_plan(server, root, plan, ticker, digest, kind)
     return campaign, root, digest, observed
 
 
@@ -120,4 +146,4 @@ def evaluate(root: Path, digest: str, observed: str, url: str) -> JSONObject:
     return report
 
 
-__all__ = ["completed_campaign", "evaluate", "record_attempt"]
+__all__ = ["capture_plan", "completed_campaign", "evaluate", "record_attempt", "settle_plan"]
