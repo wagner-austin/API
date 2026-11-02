@@ -49,12 +49,12 @@ source_git_blobs:
   "tools/fleet/tests/test_research_control.py": "bc44f22ae59cb3c33e60e25ea75411107abfa37e"
   "tools/fleet/tests/test_research_hpc.py": "b8bff1bc8cbd62078fa7bc9d8fd72b0494382504"
   "tools/fleet/tests/test_research_hpc_final.py": "f996d9db04d4cc9ad9f5afca643471fedca7e673"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "1b58a731bc46ace7515ba137deb2f854904cada9"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8e6b7f132dfb8696ef8f88c794243b68e1ec9f23"
   "libs/platform_core/src/platform_core/event_journal.py": "b0660ebf4ebe52161aed9b5e7c425064eac6782e"
   "libs/covenant_ml/src/covenant_ml/markets/research_journal.py": "18c05453efb28a9ab7504e9dd1436bc9a135cfcc"
   "libs/covenant_ml/src/covenant_ml/markets/research_records.py": "4504084dce81b5cddbf86e861fef069108e753a5"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
-  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "b39678f6d1546459a16d4df77bec6b6a91b29a9f"
+  "libs/covenant_ml/src/covenant_ml/markets/research_cluster.py": "7b3f088839100bbfb58c4085bcd71bbfb4c140db"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
   "tools/fleet/src/fleet/cli/research_queue.py": "bc0f30e740470be34280d42eb0ccb266b5130dbd"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
@@ -220,6 +220,14 @@ the frozen staging manifest and compute recipe consume the remote paths. The
 access configuration has its own required digest in the native checksum set;
 it names private evaluator keys without embedding their contents.[^paths]
 
+`ResearchCluster.binds` is now required operator configuration, copied unchanged
+into both validation and final image recipes. An empty list removes the former
+implicit `/pub` dependency for home-only data; shared-data paths must be declared.
+The shared launcher suppresses site bind-paths, hostfs and ambient mount variables.
+Older frozen configurations are not rewritten or given a compatibility default.
+Standard home and temporary mounts remain, so this is mount ownership, not the
+holdout access boundary.[^mounts]
+
 The implemented typed proposal/admission boundary accepts a proposal that
 names its hypothesis, parent, protocol digest, allowed features, model parameters
 and resource budget. Admission records the attempt **before** extraction or job
@@ -265,3 +273,4 @@ in a proposal.[^admission]
 [^holdings]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `evaluate_crsp_holdings` and `crsp_window_path`; `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `run_crsp_validation` and `crsp_study_rows`; `libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py`, `decode_research_evaluation`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_crsp_study.py` and `test_research_trial.py`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Monthly holdings and validation study". Initial integration evidence: fleet job 48a2d9c8-b9f6-4c6b-8a65-917bd3828f37 passed make check for libs/covenant_ml at API fd3f7723bd6eb7f5fbc5caa3157efed306bf3949: 4743 tests, 100% coverage. Board task 8f7247a1-aa1a-41d7-be0e-f2b8e97c1d2d. This was synthetic integration evidence; the later licensed attempt stopped before fitting, as recorded in [[wrds-baseline-20261101]].
 
 [^paths]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py`, `decode_research_cluster` and `prepare_bundle`; `libs/covenant_ml/src/covenant_ml/markets/research_execution.py`, `_command`; `libs/covenant_ml/docs/MARKET_RESEARCH.md` § "Frozen research proposal admission", encrypted access configuration. Board task 3261e090-1354-43ae-8703-a8cf5671f5f9 corrects the former use of POSIX validation for local controller paths.
+[^mounts]: `libs/covenant_ml/src/covenant_ml/markets/research_cluster.py`, `decode_research_cluster` and `prepare_bundle`; `libs/covenant_ml/docs/MARKET_RESEARCH.md`, § "Frozen research proposal admission"; HPC3 wiki `declared-image-mounts`, native probe identities and limits, board task `0a0e5913`.
