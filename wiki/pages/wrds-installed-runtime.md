@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json"
   - "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
@@ -12,6 +13,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json": "bb969cf2a9f3f4048e33df6cc1067f6cf21aa16c"
   "tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json": "4dc9f9b11c5077f59a7122497a019faa1be8cc0b"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
@@ -21,7 +23,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json": "3b52554a69ce12c549fc47b3cc60d2c332299fa7"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
-fact_checked: 2026-11-01
+fact_checked: 2026-11-02
 confidence: medium
 ---
 
@@ -50,6 +52,13 @@ in 95 seconds with exit `0:0`; inspection verified fourteen pinned files and
 two self-check passes. Both dependency checks passed. Capture retained the 53
 exact dependencies; the generated self-check requires 24 symbols. No licensed
 observations or keys were included in the image.[^candidate]
+
+The follow-up source measurement compared all **622 application members** in
+the six Python wheels with their paths in the exact published source archive.
+All matched. The retained Rust wheel matched the previous binary, and all
+224 files in its source tree matched the previous frozen commit. This verifies
+source equality and binary identity; it is not a reproducible Rust rebuild or
+a retroactive build-time attestation.[^source-scope]
 
 The preserved version-2 controller/image at source `8ef7e0f17` belong to the
 stopped second study and its completed rehearsal. Their inspection verified
@@ -86,10 +95,20 @@ evaluator-image identity are separate provenance fields.[^controller][^v2]
 The version-3 candidate still needs independent review, its own synthetic queue
 rehearsal and licensed return-span qualification before a newly frozen study.
 Installation is not a rehearsal or substantive result. No licensed decryption,
-study launch or final grant release occurred during installation. Historical
-journals, policies and images remain unchanged.[^candidate]
+study launch or final grant release was requested during installation.[^candidate]
+
+The follow-up scope measurement read 63 native ledger entries and validated
+277 events across all thirteen journals found under the WRDS experiment root.
+During the installation window, 03:36:25–03:45:36 UTC on November 2, the only
+submission by this session was image build `58742562`, and no journal event
+occurred. Both retained release metadata files predate that window. The
+candidate runtime directory contained no journal or grant metadata. Journal
+and ledger hashes were unchanged across the reading. These are measurements
+of retained records, not a historical filesystem-access audit.[^source-scope]
 
 [^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `controller`, `image`, `construction`, `service_reports`, `source_checks`, `remaining` and `scope`; separate candidate installation, with no version-3 study execution.
+
+[^source-scope]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/source-scope-report.json`, `python_wheels`, `source_members`, `retained_rust`, `submissions_in_window`, `journals`, `release_metadata` and `scope`; service post `0873ab5e-a859-4ae5-bf15-18a9780add22`, measured at 06:11:25 UTC. The adjacent measurement program and member manifests are bound by SHA-256 in this report; the existing archive exporter, native ledger reader and shared event-journal reader performed the reads.
 
 [^current]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `service_reports`, `construction`, `historical_state`, `remaining` and `scope`.
 [^runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, `controller`, `image`, `construction`, `service_reports` and `scope`.
