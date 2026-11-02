@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json"
   - "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json"
@@ -14,6 +15,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json": "83fe5d2f5fa2468079f00334c0c2ddd2548ffddf"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json": "ada422b51719ecf7356cfc273f49015fe77aa783"
   "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json": "7fc3888de5afbfcd89731034f8c401f855de4d28"
@@ -33,11 +35,17 @@ confidence: medium
 
 **The corrected study stopped before fitting; no licensed result is complete.**
 Version-2 job `58740674` failed after 2,245 seconds while constructing training
-labels: a held daily observation was absent or failed the ordinary-return
-predicate (`CRSP-009`). The shared queue automatically recorded the failure.
-A targeted diagnostic is pending; no rule change is justified yet. Fourteen
-admitted requests remain unsubmitted, no candidate is selected, and the final
-holdout remains unreleased.[^v2stop]
+labels (`CRSP-009`). The shared queue automatically recorded the failure.
+Fourteen admitted requests remain unsubmitted, no candidate is selected, and
+the final holdout remains unreleased.[^v2stop]
+
+Verified diagnostics `58741562` and `58741598` found an existing daily row with
+missing price/return (`MP`/`MR`), followed by an available two-session return
+(`P1`) linked to the earlier price date. The frozen one-session rule correctly
+refuses this span. This differs from the version-1 pre-entry delisting. A
+multi-session accounting amendment needs explicit boundary rules, tests and
+review before another frozen study; the missing close has no observed value
+and must not be silently filled or used to remove the security.[^v2diagnosis]
 
 Preparation audit and launch checks passed: the job had 8 CPUs, 128 GiB, no
 GPU and sixteen successful input checksums. Those establish execution
@@ -75,13 +83,13 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
    with the installed version-2 runtime and pre-entry delisting fixture.[^v2]
 - [x] Freeze amended resource and candidate rules in [[wrds-baseline-v2-freeze]];
    fifteen requests admitted, native preflight and independent task audit passed.[^launch]
-- [x] Observe the failed allocation's configured paths on its original node;
+- [x] Observe the original version-1 allocation's configured paths on its node;
    service verification and independent task audit passed.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; queue `3d3aad6e` recorded the first attempt's
    failure. Investigate it before further submission.[^v2stop]
 
-The original failed journal remains immutable. Current diagnosis and its
+The original failed journal remains immutable. Its diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
 evidence that an idle AI session will be resumed by a queue event.[^stop][^diagnostic]
 
@@ -99,3 +107,5 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^launch]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json`, `freeze_audit`, `queue`, `native`, `native_service_post`, `attempts`, `execution_cluster_change` and `submission_rule`; pinned sibling documents retain queue transitions, native service inspection, allocation readout and checksum receipts. This is launch evidence, not a completed evaluation.
 
 [^v2stop]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/stopped.json`, `native`, `queue`, `failure`, `attempts`, `actions` and `cleanup_limit`; raw identifiers and return observations remain private. Prior same-node cleanup evidence concerns the earlier allocation, not this new failure.
+
+[^v2diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `vendor_source`, `service_posts`, `study_action` and `limits`; sibling diagnostic evidence retains native accounting, all sixteen input identities, shared records and artifact digests. Diagnostic plaintext removal does not establish the failed study allocation's post-exit cleanup.
