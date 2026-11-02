@@ -1,0 +1,138 @@
+{
+  "task": "be59eebf-5cfe-4116-986c-c84962f7cb18",
+  "repairs_audit": "b24b2bec-0257-4df7-b12d-7f0e8dcda674",
+  "measurement": {
+    "id": "93e273e2-6e02-46a1-973f-f169925a3be3",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T01:28:52.81982+00:00",
+    "header": "REHEARSAL FIXTURE AND QUEUE LOAD-REPORT",
+    "report": {
+      "kind": "REHEARSAL_FIXTURE_AND_QUEUE_EVIDENCE",
+      "scope": "Synthetic regeneration and immutable specification readback; no licensed inputs, keys, new jobs or journal mutations. Selection names the evaluator; it is not a new historical process attestation.",
+      "row_counts": {
+        "delists": 1,
+        "returns": 8420,
+        "calendar": 1521,
+        "membership": 8
+      },
+      "observed_at": "2026-11-02T01:28:52.636056+00:00",
+      "source_files": {
+        "libs/covenant_ml/tests/__init__.py": "0dacf22d47cf976db0c7a32c19a9c5c13f3f95c464f28c6cf1c5590e564917e6",
+        "libs/covenant_ml/docs/crsp-monthly.json": "66547bc7f4d8f942116ae794494257e4dabd01428b5da7a4361b46661a79cf2b",
+        "libs/covenant_ml/tests/markets/__init__.py": "98c0220d18afb4905ac38b68920f1bb3ec94bbfbcc810fc1dd7b11c4a9f385e4",
+        "libs/covenant_ml/tests/markets/_crsp_fixtures.py": "08a035b2ff97bd2cfbb01aa6ffc25717dd791d9ef882beffaf57fdb60b08a06a",
+        "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "9ac103fa97f8e0fa8245629e413a58d5511fa50eeac87d12a384a2aae3289e66",
+        "libs/covenant_ml/tests/markets/_crsp_study_fixtures.py": "78c158500d52285b7c57d14779523842b4a2c85e8ce52068b4b32f87b1e52707"
+      },
+      "bundle_sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+      "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+      "delisting_rows": [
+        {
+          "delret": -0.25,
+          "permno": 8,
+          "delamtdt": "2019-03-01",
+          "deldlydt": "2019-03-01",
+          "delnextdt": null,
+          "delistingdt": "2019-02-28",
+          "delretmisstype": "NA"
+        }
+      ],
+      "native_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1",
+      "manifest_sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+      "plaintext_files": [
+        {
+          "name": "calendar.csv",
+          "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+          "size_bytes": 27410
+        },
+        {
+          "name": "calendar.sql",
+          "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+          "size_bytes": 79
+        },
+        {
+          "name": "delists.csv",
+          "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+          "size_bytes": 116
+        },
+        {
+          "name": "delists.sql",
+          "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+          "size_bytes": 111
+        },
+        {
+          "name": "manifest.json",
+          "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+          "size_bytes": 1221
+        },
+        {
+          "name": "membership.csv",
+          "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+          "size_bytes": 277
+        },
+        {
+          "name": "membership.sql",
+          "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+          "size_bytes": 74
+        },
+        {
+          "name": "protocol.json",
+          "sha256": "bdb9ddef52648542ee61395760a1f267885a95647f4a2eb9750d4d9280e82598",
+          "size_bytes": 1175
+        },
+        {
+          "name": "returns.csv",
+          "sha256": "2bc996def472dfa965d8a83e4ee4c30eefabd58490bbbd472ac1a4667b47db66",
+          "size_bytes": 483184
+        },
+        {
+          "name": "returns.sql",
+          "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+          "size_bytes": 147
+        }
+      ],
+      "queue_reference": {
+        "attempt": "protocol-v2-be59eebf-1",
+        "backend": "hpc3",
+        "specSha256": "0ac9237726fb993986c43a61d415c2d2333eac5fc359e1e611324b5a0d1b4402"
+      },
+      "reporter_sha256": "7225607c13c43d7469b4cf11591236d02ae052c9b80812eddce3df7bef249d7a",
+      "fixture_function": "tests.markets._crsp_study_fixtures.pre_entry_rows",
+      "source_archive_sha256": "45c8bbbd18136cdff1236b0a6315cfa65da0daae8c108f5372c0ffc81e780ec7",
+      "verified_queue_inputs": {
+        "trial": {
+          "path": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/trial.json",
+          "sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f"
+        },
+        "policy": {
+          "path": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/policy.json",
+          "sha256": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b"
+        },
+        "script": {
+          "path": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/controller/research_proposals.py",
+          "sha256": "13c2a739e2425399b4964dc1fe84830572caf7ae06ee8cfce758340108bfe644"
+        },
+        "cluster": {
+          "path": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/cluster.json",
+          "sha256": "bc0c2ff309e07fc2bbb7316db135816047da1814b1a265729e2732add2f60686"
+        }
+      },
+      "selected_evaluator_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python"
+    }
+  },
+  "program": {
+    "sha256": "7225607c13c43d7469b4cf11591236d02ae052c9b80812eddce3df7bef249d7a",
+    "text": "\"\"\"Regenerate retained synthetic inputs and read the immutable queue selection.\"\"\"\n\nfrom pathlib import Path\nfrom hashlib import sha256\nfrom datetime import UTC, datetime\n\nfrom platform_core.json_utils import JSONObject, JSONValue, dump_json_str, require_str\nfrom platform_core.load_report import post_load_report\nfrom covenant_ml.markets import _test_hooks\nfrom covenant_ml.markets.encrypted_records import decode_encrypted_bundle\nfrom covenant_ml.markets.validation import read_document\nfrom fleet.contracts.research import decode_research_request\nfrom fleet.core.research_control import read_specification, verified_input\nfrom tests.markets._crsp_study_fixtures import pre_entry_rows, study_protocol\nfrom tests.markets._crsp_fixtures import write_sources\n\nroot = Path(__file__).parent\nsource = root / \"source\"\ngenerated = root / \"regenerated\"\ngenerated.mkdir(mode=0o700)\nrows = pre_entry_rows()\nmanifest_path, manifest = write_sources(generated, rows, study_protocol())\nfixture_files: JSONObject = {\n    str(path.relative_to(source)): sha256(path.read_bytes()).hexdigest()\n    for path in source.rglob(\"*\") if path.is_file() and \"__pycache__\" not in path.parts\n}\nbundle_path = root.parent / \"validation\" / \"bundle.json\"\nbundle_digest = sha256(bundle_path.read_bytes()).hexdigest()\nassert bundle_digest == \"f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f\"\nbundle = decode_encrypted_bundle(read_document(bundle_path))\nplain_files: list[JSONValue] = []\nfor file in bundle[\"files\"]:\n    expected = file[\"plaintext\"]\n    actual = generated / expected[\"name\"]\n    digest = sha256(actual.read_bytes()).hexdigest()\n    assert digest == expected[\"sha256\"], \"REHEARSAL_REGEN_DIGEST\"\n    assert actual.stat().st_size == expected[\"size_bytes\"], \"REHEARSAL_REGEN_SIZE\"\n    plain_files.append({\"name\": actual.name, \"sha256\": digest, \"size_bytes\": actual.stat().st_size})\nassert sha256(manifest_path.read_bytes()).hexdigest() == bundle[\"manifest\"][\"sha256\"]\nreference: JSONObject = {\"backend\": \"hpc3\",\n    \"specSha256\": \"0ac9237726fb993986c43a61d415c2d2333eac5fc359e1e611324b5a0d1b4402\",\n    \"attempt\": \"protocol-v2-be59eebf-1\"}\nspec = read_specification(Path(\"/home/corvis/research-data/wrds/queue\"),\n    decode_research_request(reference), \"2e137b5f-f77f-4b42-9c33-ce818d0451ea\")\ninputs: JSONObject = {}\nfor key in (\"script\", \"policy\", \"trial\", \"cluster\"):\n    path = verified_input(spec, key)\n    inputs[key] = {\"path\": str(path), \"sha256\": sha256(path.read_bytes()).hexdigest()}\nselected = require_str(spec, \"python\")\ncluster = read_document(verified_input(spec, \"cluster\"))\nassert selected == require_str(cluster, \"python\"), \"REHEARSAL_CONTROLLER_SELECTION\"\nreport: JSONObject = {\n    \"kind\": \"REHEARSAL_FIXTURE_AND_QUEUE_EVIDENCE\",\n    \"observed_at\": datetime.now(UTC).isoformat(),\n    \"reporter_sha256\": sha256(Path(__file__).read_bytes()).hexdigest(),\n    \"source_commit\": \"8ef7e0f1769e7127feabb30008d72bc70e908111\",\n    \"source_archive_sha256\": sha256(Path(\"/home/corvis/research-data/wrds/runtime/protocol-v2-8ef7e0f17/source.tgz\").read_bytes()).hexdigest(),\n    \"fixture_function\": \"tests.markets._crsp_study_fixtures.pre_entry_rows\",\n    \"source_files\": fixture_files,\n    \"plaintext_files\": plain_files,\n    \"manifest_sha256\": sha256(manifest_path.read_bytes()).hexdigest(),\n    \"delisting_rows\": list(rows[\"delists\"]),\n    \"row_counts\": {name: len(records) for name, records in rows.items()},\n    \"bundle_sha256\": bundle_digest,\n    \"queue_reference\": reference,\n    \"selected_evaluator_python\": selected,\n    \"verified_queue_inputs\": inputs,\n    \"native_attempt\": require_str(spec, \"native_attempt\"),\n    \"scope\": \"Synthetic regeneration and immutable specification readback; no licensed inputs, keys, new jobs or journal mutations. Selection names the evaluator; it is not a new historical process attestation.\"\n}\npayload = dump_json_str(report)\n(root / \"report.json\").write_text(payload)\npost_load_report(post=_test_hooks.http_post, read_text=_test_hooks.stack_text,\n    task_id=\"be59eebf-5cfe-4116-986c-c84962f7cb18\", family=\"hpc\",\n    body=\"REHEARSAL FIXTURE AND QUEUE LOAD-REPORT\\n\" + payload)\n"
+  },
+  "execution": {
+    "python": "/home/corvis/research-control/wrds-fixture-preparation-be59eebf/bin/python",
+    "pythonpath": [
+      "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/audit-measurement/source/libs/covenant_ml",
+      "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/lib/python3.11/site-packages",
+      "/home/corvis/research-control/wrds-queue-b53b0ea34/lib/python3.11/site-packages"
+    ],
+    "exit_code": 0,
+    "scope": "Metadata preparation, no test suite or evaluator run on session host."
+  },
+  "interpretation": "Regenerated source bytes match every plaintext identity pinned by completed native job 58740021. The immutable queue specification selects the installed version-2 evaluator; the queue adapter remains separately installed. Historical execution follows from the existing queue/native receipts and maintained adapter path, not a new process attestation."
+}
