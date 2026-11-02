@@ -206,6 +206,39 @@ class TestCompanions:
         )
         assert committed < built
 
+    def test_an_earlier_attempts_bundles_left_behind_never_meet_this_attempt(
+        self, config_path: pathlib.Path
+    ) -> None:
+        """MCPs board task 2e3e69cf, fleet job e9009971 on pendragon: a tick
+        that ended mid-launch left its attempt's bundle behind, the job was
+        claimed again, and removing the job's bundle directory raised
+        ENOTEMPTY, which ended the node's serving loop before its start
+        report. The second attempt launches, and the earlier one's file is
+        left for the scratch reaper, whose file it is."""
+        sourced = _companion_config(config_path)
+        export_payload = prebuilt_export(sourced)
+        companion_payload = prebuilt_companion(sourced)
+        loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)})
+        earlier = loaded.archives / DEFAULT_JOB_ID / "companion-wagner-austin-API-earlier.bundle"
+        earlier.parent.mkdir(parents=True, exist_ok=True)
+        earlier.write_bytes(b"left by the attempt a tick's end cut off")
+        _test_hooks.run = FakeRun(
+            _companion_replies(
+                staging.digest(export_payload), staging.digest(companion_payload), sourced
+            )
+        )
+        _test_hooks.http_post = FakeQueue(
+            [
+                dump_json_str({"jobs": []}),
+                dump_json_str({"claimed": queue_job(status="claimed")}),
+                dump_json_str({"job": queue_job(status="running", node="lavender")}),
+            ]
+        )
+
+        assert node_agent.main(node_argv(sourced)) == 0
+
+        assert earlier.read_bytes() == b"left by the attempt a tick's end cut off"
+
     def test_the_feed_names_the_commit_the_companion_was_measured_with(
         self, config_path: pathlib.Path
     ) -> None:
