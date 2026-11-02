@@ -163,11 +163,11 @@ def describe_location(image: ImageReference | None, host: str) -> str:
 
 
 __all__ = [
-    "APPTAINER_MODULE",
     "APPTAINER_EXEC",
+    "APPTAINER_MODULE",
     "NVIDIA_FLAG",
-    "mount_arguments",
     "describe_location",
     "gpu_arguments",
+    "mount_arguments",
     "run_inside_image",
 ]
