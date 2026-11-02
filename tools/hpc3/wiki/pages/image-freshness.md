@@ -24,7 +24,7 @@ source_git_blobs:
   "src/hpc3/cli/trace.py": "58c782e75faac84ca2ef4f146543882b50c75366"
   "tests/test_entrypoint.py": "05b02dcc8b56ba5ab9f8b5418da36a423403f699"
   "tests/test_drift.py": "df99de375093bcc2970a59b784f5c53619150684"
-  "README.md": "b506737230f2028e798d732e2ae914a2c102c3a1"
+  "README.md": "6d14fcebcfb6a6eb102b927d5855953bcbb192b2"
 provenance:
   - "board task 2c8161a3 (MCPs board), filed 2026-09-04: the registered mi image predates cartridge_benchmark and cartridge_composition_sweep"
   - "board task 7aab32ef (MCPs board), 2026-10-16: a module the image carries but whose source moved was admitted with no word"

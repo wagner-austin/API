@@ -10,7 +10,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/contracts/job.py": "9defe2ae9f5f195b2f7d466765669df7ff1977c5"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
-  "README.md": "b506737230f2028e798d732e2ae914a2c102c3a1"
+  "README.md": "6d14fcebcfb6a6eb102b927d5855953bcbb192b2"
 fact_checked: 2026-10-16
 confidence: high
 ---

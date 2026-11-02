@@ -25,7 +25,7 @@ source_git_blobs:
   "src/hpc3/cli/image_capture.py": "a1156a46c02c71fc42a56c885a1709eb28b9acc7"
   "src/hpc3/core/env_probe.py": "19d41901aac9ea756003760b58338d1b163a9c47"
   "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
-  "README.md": "b506737230f2028e798d732e2ae914a2c102c3a1"
+  "README.md": "6d14fcebcfb6a6eb102b927d5855953bcbb192b2"
   "src/hpc3/core/register.py": "f99301f3312238f4721ddfc81a316fb5cbd6dd8b"
 provenance:
   - "runs/hpc3*.json -- the six committed workspace documents; every project declares an image as of 2026-09-03"
