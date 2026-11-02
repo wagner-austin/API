@@ -112,7 +112,7 @@ allocation-specific observations and their limits.[^preparation]
 [^rehearsal]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `preflight_incident`; recovery of the unchanged preflight did not establish a permanent filesystem fix.
 [^studies]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `remaining`; separate stock-selection and options task identities, without making its historical extraction plan a current requirement.
 [^parent]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/parent-audit.json`, captured live `task_get` response: parent status, audit-verifier transition at 2026-11-02T15:21:09.847Z, closure outcome and follow-up ownership.
-[^sources]: [[wrds-v3-refused-path-diagnosis]], "Every original refusal", "Data limitations versus implementation" and "Next action", with native source-field evidence and the primary CIZ definitions.
+[^sources]: [[wrds-v3-refused-path-diagnosis]], § "Every original refusal", § "Data limitations versus implementation" and § "Next action", with native source-field evidence and the primary CIZ definitions.
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 
