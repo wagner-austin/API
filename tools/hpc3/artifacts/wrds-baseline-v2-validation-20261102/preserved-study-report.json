@@ -1,0 +1,168 @@
+{
+  "kind": "RESEARCH_PREPARATION_EVIDENCE",
+  "observed_at": "2026-11-02T05:58:58.628798+00:00",
+  "reporter_sha256": "d11df3022d7f9701bb3e2833b7dccf97b0df20c3c3753c746b1ed45f741dc923",
+  "policy_digest": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce",
+  "seeds": [
+    11,
+    23,
+    37,
+    53,
+    71
+  ],
+  "max_candidates": 3,
+  "cpus": 8,
+  "mem_gb": 128,
+  "max_seconds": 7200,
+  "ledger": "/home/corvis/research-data/wrds/experiments/licensed-v2-09113184/attempts.sqlite",
+  "journal_sha256": "82450a7994d16019b9f699104b5e8891d943ad426becd93c5fb56402b0854a40",
+  "attempts": [
+    {
+      "number": 1,
+      "status": "failed",
+      "seed": 11,
+      "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "job_id": "58740674",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 2,
+      "status": "admitted",
+      "seed": 23,
+      "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 3,
+      "status": "admitted",
+      "seed": 37,
+      "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 4,
+      "status": "admitted",
+      "seed": 53,
+      "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 5,
+      "status": "admitted",
+      "seed": 71,
+      "candidate": "3ee999073126f4f09249522c2ee7d06889d8df3ff08e97a744f55cf66c97b0af",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 6,
+      "status": "admitted",
+      "seed": 11,
+      "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 7,
+      "status": "admitted",
+      "seed": 23,
+      "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 8,
+      "status": "admitted",
+      "seed": 37,
+      "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 9,
+      "status": "admitted",
+      "seed": 53,
+      "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 10,
+      "status": "admitted",
+      "seed": 71,
+      "candidate": "4303f97e6e648e3d82dcc11a5390985dd5e9c9fed356075a58651f61b4f8bee3",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 11,
+      "status": "admitted",
+      "seed": 11,
+      "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 12,
+      "status": "admitted",
+      "seed": 23,
+      "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 13,
+      "status": "admitted",
+      "seed": 37,
+      "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 14,
+      "status": "admitted",
+      "seed": 53,
+      "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    },
+    {
+      "number": 15,
+      "status": "admitted",
+      "seed": 71,
+      "candidate": "3e1c6eca496f33c9a74695b684b0256ed4f676d1554247431f82ceb5584ef3b9",
+      "job_id": "",
+      "selection": "",
+      "final_manifest_digest": ""
+    }
+  ],
+  "recipe_sha256": "7106b40dd61496b6ce4c7cf0d847e39eded72430b118e5d6047d308a8c58b5db",
+  "recipe": {
+    "name": "research-f3ce57f6d520-1",
+    "research_attempt": "f3ce57f6d520a09f537452c6b878b4a0fc00253d280ee4193a8a64dffef58dce:1",
+    "request_sha256": "60d57cc5ea51bd318bcb1aaf1162c1af207dfe702c0473327c76e2f617d926a7",
+    "cpus": 8,
+    "mem_gb": 128,
+    "minutes": 121,
+    "partition": "free",
+    "gpu_requested": false,
+    "requeue": false
+  }
+}
