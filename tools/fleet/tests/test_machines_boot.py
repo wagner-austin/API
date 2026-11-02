@@ -7,8 +7,8 @@ one commit, so on 2026-10-19 API ee52f9b22 (pendragon's MAC) failed MCPs'
 fleet-mcp at 58bbf5887 and 25c1f2881 with no MCPs change, and no MCPs head
 could deploy (MCPs board task 9cd8a32e). A pin on the roster's own data
 belongs beside the roster, where the edit that moves it moves the pin in the
-same commit; the rules on its shape (a hub never carries a MAC, no two boot
-units share a key) are fleet-mcp's decoder's, which refuses a roster that
+same commit; the rules on its shape (the netboot duty's holder never carries
+a MAC, no two boot units share a key) are fleet-mcp's decoder's, which refuses a roster that
 breaks them on every audit pass.
 """
 
@@ -37,12 +37,19 @@ LOKI_MAC = "d8:5e:d3:84:53:d4"
 #: when it was austinpc, renamed demure for MCPs board task e0c286f5.
 DEMURE_MAC = "d8:43:ae:24:7c:04"
 
+#: diphtheria's onboard Intel I219-LM (enp0s31f6), whose UEFI PXE request
+#: emerald's proxy DHCP answered at 2026-11-02T14:04:11Z (MCPs board task
+#: ab48f939), declared once the netboot duty left the hub for emerald.
+DIPHTHERIA_MAC = "f4:8e:38:a4:cd:82"
+
 #: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
 #: SSD. demure's one NVMe, whose netboot install accepted it on 2026-10-22
 #: (arm b54008dd). pendragon's NVMe went with its boot MAC (MCPs board task
 #: 7d7ea0e9). loki's one NVMe, read with udevadm on its NixOS install on
-#: 2026-10-26 (arm 2ec3a579).
+#: 2026-10-26 (arm 2ec3a579). diphtheria's internal SATA SSD, read with
+#: udevadm on 2026-11-02 (MCPs board task ab48f939), never its two USB drives.
+DIPHTHERIA_INSTALL_DISK = "Samsung_SSD_860_EVO_1TB_S3Z6NB0K305596H"
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
 LOKI_INSTALL_DISK = "SAMSUNG_MZVL81T0HELB-00BTW_S7HZNX0XC49177_1"
 DEMURE_INSTALL_DISK = "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
@@ -102,13 +109,14 @@ def _key(unit: JSONObject) -> str:
     return f"task:{unit['path']}{unit['name']}"
 
 
-def test_measured_boot_macs_stay_pinned_and_only_workers_servers_and_jumps_declare_one() -> None:
+def test_measured_boot_macs_stay_pinned_and_only_linux_machines_off_the_netboot_duty_declare_one() -> None:
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
     # Automatic admission adds a disabled worker before its first install.
     # Pin measured identities without making each admission a test-code edit.
-    assert {name: declared[name] for name in ("demure", "lavender", "loki")} == {
+    assert {name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki")} == {
         "demure": DEMURE_MAC,
+        "diphtheria": DIPHTHERIA_MAC,
         "lavender": LAVENDER_MAC,
         "loki": LOKI_MAC,
     }
@@ -121,10 +129,14 @@ def test_measured_boot_macs_stay_pinned_and_only_workers_servers_and_jumps_decla
     # the vpn-jump the netboot installs (MCPs board task 7d7ea0e9).
     assert machines["demure"]["role"] == "server"
     assert machines["loki"]["role"] == "vpn-jump"
+    # The hub is armable since the netboot duty moved to emerald (MCPs board
+    # task ab48f939); the duty's holder never is, since it serves every
+    # install, its own included (fleet-mcp's requireMachineBootMac).
+    assert machines["diphtheria"]["role"] == "hub"
     for name in declared:
-        assert machines[name]["role"] in ("worker", "server", "vpn-jump")
+        assert machines[name]["role"] in ("worker", "server", "vpn-jump", "hub")
         assert machines[name]["platform"] == "linux"
-    assert machines["diphtheria"]["bootMac"] is None
+        assert "netboot" not in narrow_json_to_list(machines[name]["duties"])
     assert machines["pendragon"]["bootMac"] is None
 
 
@@ -149,8 +161,9 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     # a disk. Every other machine still carries null.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
-    assert {name: named[name] for name in ("demure", "lavender", "loki")} == {
+    assert {name: named[name] for name in ("demure", "diphtheria", "lavender", "loki")} == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
+        "diphtheria": {"rule": "serial", "serial": DIPHTHERIA_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
         "loki": {"rule": "serial", "serial": LOKI_INSTALL_DISK},
     }
