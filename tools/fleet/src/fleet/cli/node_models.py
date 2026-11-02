@@ -12,9 +12,12 @@ already runs one:
     pass: a load is checked against its catalog row and served
     (:func:`fleet.core.model_serve.serve_model`), then passed with the url
     it answers on (``dispatch_report action='loaded'``); an unload stops the
-    model's server and passes. The fill pass after it records the node's
-    tick (:mod:`fleet.cli.node_ready`), so an unload's freed GPU memory is
-    in the tick that follows it.
+    model's server and passes, its close naming the GPU free bytes the
+    tick's own probe read before the stop and after it
+    (:func:`fleet.core.model_serve.gpu_free_bytes`). That record is the
+    unload's: the tick the fill pass after it records
+    (:mod:`fleet.cli.node_ready`) keeps only the runner's latest row, which
+    the next stop overwrites (audit 7b709022).
 
     THE IDLE PASS, after every collect pass, so at every fire boundary. It
     reads every model the node serves (:func:`fleet.core.model_serve.scan_models`),
@@ -58,6 +61,7 @@ from fleet.core.model_serve import (
     LOAD_DEADLINE_SECONDS,
     EndedModel,
     forget_models,
+    gpu_free_bytes,
     scan_models,
     serve_model,
     stop_model,
@@ -117,7 +121,9 @@ def _unload(
         AppError: Only from the queue calls.
     """
     try:
+        before = gpu_free_bytes(node)
         stopped = stop_model(node, model["model_id"])
+        after = gpu_free_bytes(node)
     except AppError as fault:
         job_close.close(
             credentials,
@@ -128,10 +134,14 @@ def _unload(
             detail=f"{fault.code}: {fault.message}",
         )
         return
-    detail = (
+    said = (
         f"{model['model_id']} was not being served on {alias}, so there was nothing to stop"
         if stopped is None
         else f"stopped llama-server of {model['model_id']} on {alias}, which load {stopped} started"
+    )
+    detail = (
+        f"{said}; the tick's GPU probe read {before} free bytes before the stop "
+        f"and {after} after it"
     )
     job_close.close(
         credentials, job, identity, status=ClosingStatus.PASSED, exit_code=0, detail=detail

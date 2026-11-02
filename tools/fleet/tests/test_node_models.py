@@ -16,8 +16,9 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli.node_models import MODEL_LEASE_SECONDS, idle_pass, models_pass
 from fleet.core import _test_hooks
+from fleet.core.model_scripts import unload_script
 from fleet.core.queue_transport import answering
-from tests._contract_fixtures import COLOSSUS_MODELS, node
+from tests._contract_fixtures import COLOSSUS_MODELS, colossus_gpu_lines, node
 from tests._queue_fakes import (
     QUEUE_CREDENTIALS,
     RUNNER_IDENTITY,
@@ -212,9 +213,18 @@ class TestModelsPass:
         assert closed["status"] == "refused"
         assert str(closed["detail"]).startswith("NODE_UNREACHABLE: ssh to colossus failed")
 
-    def test_an_unload_stops_the_server_and_passes(self) -> None:
+    def test_an_unload_stops_the_server_and_passes_with_the_memory_it_freed(self) -> None:
         queue = FakeQueue([*_claimed("model-unload"), _closed("model-unload", "passed"), EMPTY])
-        runner = FakeRun([ok(""), ok(f"stopped {JOB}\n")])
+        runner = FakeRun(
+            [
+                ok(""),
+                ok(colossus_gpu_lines(2053775360)),
+                ok(""),
+                ok(f"stopped {JOB}\n"),
+                ok(""),
+                ok(colossus_gpu_lines(8595890176)),
+            ]
+        )
         _pass(queue, runner)
         assert _report(queue, 2) == {
             "action": "close",
@@ -222,15 +232,30 @@ class TestModelsPass:
             "status": "passed",
             "exitCode": 0,
             "detail": (
-                f"stopped llama-server of ornith-1.5-9b on colossus, which load {JOB} started"
+                f"stopped llama-server of ornith-1.5-9b on colossus, which load {JOB} started; "
+                "the tick's GPU probe read 2053775360 free bytes before the stop "
+                "and 8595890176 after it"
             ),
         }
+        assert runner.stdin[2] == unload_script("ornith-1.5-9b").encode()
 
     def test_an_unload_of_nothing_served_passes_saying_so(self) -> None:
         queue = FakeQueue([*_claimed("model-unload"), _closed("model-unload", "passed"), EMPTY])
-        _pass(queue, FakeRun([ok(""), ok("absent\n")]))
+        gpus = ok(colossus_gpu_lines(8595890176))
+        _pass(queue, FakeRun([ok(""), gpus, ok(""), ok("absent\n"), ok(""), gpus]))
         assert _report(queue, 2)["detail"] == (
-            "ornith-1.5-9b was not being served on colossus, so there was nothing to stop"
+            "ornith-1.5-9b was not being served on colossus, so there was nothing to stop; "
+            "the tick's GPU probe read 8595890176 free bytes before the stop "
+            "and 8595890176 after it"
+        )
+
+    def test_an_unload_whose_gpu_cannot_be_read_is_refused_by_that_fault(self) -> None:
+        queue = FakeQueue([*_claimed("model-unload"), _closed("model-unload", "refused"), EMPTY])
+        _pass(queue, FakeRun([ok(""), ok("gpu_count=two\n")]))
+        closed = _report(queue, 2)
+        assert (closed["status"], closed["detail"]) == (
+            "refused",
+            "DISPATCH_FAILED: colossus reported gpu_count='two', which is not a whole number of GPUs",
         )
 
     def test_an_unload_the_node_did_not_answer_is_refused(self) -> None:

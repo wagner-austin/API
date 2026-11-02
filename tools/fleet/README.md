@@ -929,8 +929,11 @@ the models lane before every fill pass and runs each job to its close there:
   `dispatch_report action='loaded'` and `http://<tailnet address>:<port>`.
   A server that exits, does not answer in 300 s, or leaves a layer off the
   GPU fails and is stopped.
-- **An unload** stops that unit and passes. The fill pass after it records
-  the node's tick, so the GPU memory freed is in the next tick.
+- **An unload** stops that unit and passes. Its close names the GPU free
+  bytes the tick's own probe read before the stop and after it, because the
+  tick keeps only each runner's latest row, which the next stop overwrites
+  (audit 7b709022). An unload whose GPU cannot be read is refused, naming
+  the fault.
 - **Idle** copies chat's rule (its deleted `src/chat/api/activity.py`): a use
   is a request somebody made, never a probe. Here that means llama.cpp's
   prompt and generated token counters moved, or a request is in flight, read

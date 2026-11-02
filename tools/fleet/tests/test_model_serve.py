@@ -12,7 +12,8 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.dispatch import ClosingStatus
 from fleet.contracts.model_host import CatalogModel, ModelBackend
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, dialect
+from fleet.core.linux_gpu_probe import GPU_PROBE_PART
 from fleet.core.model_scripts import scan_script, unload_script
 from fleet.core.model_serve import (
     LOAD_DEADLINE_SECONDS,
@@ -20,12 +21,13 @@ from fleet.core.model_serve import (
     ModelScan,
     ServedModel,
     forget_models,
+    gpu_free_bytes,
     read_load,
     scan_models,
     serve_model,
     stop_model,
 )
-from tests._contract_fixtures import COLOSSUS_MODELS, node
+from tests._contract_fixtures import COLOSSUS_MODELS, colossus_gpu_lines, node
 from tests.conftest import FakeRun, failed, ok
 
 COLOSSUS = node(host="colossus", gpu=None, models=COLOSSUS_MODELS)
@@ -191,6 +193,31 @@ class TestStopModel:
         _test_hooks.run = FakeRun([ok(""), ok("stopped\n")])
         with pytest.raises(AppError, match="the model unload script on colossus printed 'stopped'"):
             stop_model(COLOSSUS, "ornith-1.5-9b")
+
+
+class TestGpuFreeBytes:
+    """The free GPU memory an unload reads before and after its stop, by the tick's probe."""
+
+    def test_every_gpu_with_a_memory_counter_is_summed(self) -> None:
+        unbound = "gpu_1=0000:01:00.0\t0x10de\t\t\t\t\tRTX A2000\n"
+        second = "gpu_2=0000:03:00.0\t0x1002\tamdgpu\tdmem\t8000\t3000\tRadeon\n"
+        lines = colossus_gpu_lines(8595890176).replace("gpu_count=1", "gpu_count=3")
+        runner = FakeRun([ok(""), ok(f"{lines}{unbound}{second}")])
+        _test_hooks.run = runner
+        assert gpu_free_bytes(COLOSSUS) == 8595890176 + 3000
+        assert runner.stdin[0] == f"{dialect.PROLOGUE}{GPU_PROBE_PART}".encode()
+
+    def test_lines_the_probe_reader_refuses_are_a_fault(self) -> None:
+        _test_hooks.run = FakeRun([ok(""), ok("gpu_count=two\n")])
+        with pytest.raises(AppError, match="colossus reported gpu_count='two'") as fault:
+            gpu_free_bytes(COLOSSUS)
+        assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
+
+    def test_a_node_whose_gpus_hold_no_memory_counter_is_a_fault(self) -> None:
+        unbound = "gpu_0=0000:01:00.0\t0x10de\t\t\t\t\tRTX A2000\ngpu_count=1\n"
+        _test_hooks.run = FakeRun([ok(""), ok(unbound)])
+        with pytest.raises(AppError, match="colossus read 1 GPU[(]s[)] and no GPU memory counter"):
+            gpu_free_bytes(COLOSSUS)
 
 
 class TestScanAndForget:

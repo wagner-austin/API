@@ -40,6 +40,25 @@ COLOSSUS_MODELS: Final = NodeModels(
 )
 
 
+def colossus_gpu_lines(free_bytes: int) -> str:
+    """What the GPU probe prints on colossus with ``free_bytes`` of its B60 free.
+
+    The line's other fields are the card's as the probe read it at 00:16Z on
+    2026-11-02 (tests/test_linux_gpu_probe.py): its address, Intel's id, xe,
+    the dmem counter and 25669140480 bytes in all.
+
+    Args:
+        free_bytes: The card's free bytes.
+
+    Returns:
+        The probe's two lines.
+    """
+    return (
+        f"gpu_0=0000:08:00.0\t0x8086\txe\tdmem\t25669140480\t{free_bytes}\t"
+        "Battlemage G21 [Arc Pro B60]\ngpu_count=1\n"
+    )
+
+
 def node(
     *,
     gpu: NodeGpu | None = GPU,

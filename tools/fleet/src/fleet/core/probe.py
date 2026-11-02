@@ -106,7 +106,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
     Returns:
         What the node reported, or the reason its answer could not be read.
     """
-    fields = _read_fields(output)
+    fields = read_fields(output)
     unreadable_file = fields.get(reservations.UNREADABLE_FIELD)
     if unreadable_file is not None:
         return ProbeOutcome(
@@ -247,13 +247,14 @@ def parse_probe(host: str, output: str, *, live: LiveLoad) -> NodeState:
     return state
 
 
-def _read_fields(output: str) -> dict[str, str]:
+def read_fields(output: str) -> dict[str, str]:
     """Split key=value lines into a mapping.
 
     A line without an ``=`` is skipped rather than refused: a login banner or
     a warning can reach the same stream, and one that does not displace a
     field has not broken anything. A line whose key is absent IS refused, by
-    :func:`read_state`, which is where the failure belongs.
+    :func:`read_state`, which is where the failure belongs. A model unload
+    reads its GPU probe's lines with it too (:mod:`fleet.core.model_serve`).
 
     Args:
         output: The probe's standard output.
@@ -395,5 +396,6 @@ __all__ = [
     "attempt_probe",
     "parse_probe",
     "probe_node",
+    "read_fields",
     "read_state",
 ]

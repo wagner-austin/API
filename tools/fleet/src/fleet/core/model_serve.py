@@ -13,6 +13,12 @@ not answer ``/health`` in :data:`fleet.core.model_scripts.HEALTH_SECONDS`, or
 puts fewer than all of its layers on the GPU fails, and is stopped. Only a
 server that answered with every layer on the GPU passes, with the url it
 answers on, its node's tailnet address and port.
+
+WHAT AN UNLOAD READS. The node's GPU memory, by the tick's own probe lines
+(:data:`fleet.core.linux_gpu_probe.GPU_PROBE_PART`), before the stop and
+after it (:func:`gpu_free_bytes`), so the unload's own record says what the
+stop freed: the tick keeps only each runner's latest row, which a later
+stop overwrites (audit 7b709022 of board task b9235198).
 """
 
 from __future__ import annotations
@@ -27,6 +33,7 @@ from fleet.contracts.dispatch import ClosingStatus
 from fleet.contracts.model_host import CatalogModel, NodeModels
 from fleet.contracts.node import NodeConfig
 from fleet.core import dialect, remote
+from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
 from fleet.core.model_scripts import (
     HEALTH_SECONDS,
     forget_script,
@@ -34,6 +41,7 @@ from fleet.core.model_scripts import (
     scan_script,
     unload_script,
 )
+from fleet.core.probe import read_fields
 
 #: The deadline for a whole load: hashing the largest catalog file, 21.7 GB,
 #: well inside five minutes on an NVMe node, then the health wait.
@@ -242,8 +250,9 @@ def _script_path(node: NodeConfig, action: str, model_id: str) -> str:
 
     Args:
         node: The node.
-        action: ``load``, ``unload``, ``scan`` or ``forget``.
-        model_id: The catalog id, or ``all`` for a scan or a forget.
+        action: ``load``, ``unload``, ``scan``, ``forget`` or ``gpus``.
+        model_id: The catalog id, or ``all`` for a scan, a forget or a GPU
+            reading.
 
     Returns:
         A path under its stage root, named so two actions never share one.
@@ -275,6 +284,37 @@ def stop_model(node: NodeConfig, model_id: str) -> str | None:
     if stopped is None:
         raise _odd(node["host"], "unload", output)
     return stopped.group(1)
+
+
+def gpu_free_bytes(node: NodeConfig) -> int:
+    """The free GPU memory the tick's probe reads on a node, summed over its GPUs.
+
+    Args:
+        node: The node.
+
+    Returns:
+        The free bytes of every GPU whose memory a counter holds.
+
+    Raises:
+        AppError: ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the node,
+            and ``DISPATCH_FAILED`` when the probe's lines cannot be read or
+            no GPU's memory can, since a stop that cannot be measured has
+            not been shown to free anything.
+    """
+    output = remote.run_script(
+        node["host"], _script_path(node, "gpus", "all"), f"{dialect.PROLOGUE}{GPU_PROBE_PART}"
+    )
+    gpus, problem = read_gpus(node["host"], read_fields(output))
+    if gpus is None:
+        raise AppError(FleetErrorCode.DISPATCH_FAILED, problem)
+    memories = [gpu["memory"] for gpu in gpus]
+    free = [memory["free_bytes"] for memory in memories if memory is not None]
+    if not free:
+        raise AppError(
+            FleetErrorCode.DISPATCH_FAILED,
+            f"{node['host']} read {len(gpus)} GPU(s) and no GPU memory counter",
+        )
+    return sum(free)
 
 
 def serve_model(
