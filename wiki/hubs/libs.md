@@ -75,3 +75,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [Evaluation numerical contracts](../pages/evaluation-numerical-contracts.md) -- paired comparisons, tie-aware scores, uncertainty, ablation, learning curves, chronology and provenance limits
 
 [CRSP version-3 licensed study freeze](../pages/wrds-baseline-v3-freeze.md) -- unchanged candidate rules, real training-span qualification and new encrypted dataset/runtime identities
+
+[CRSP refused-path source diagnosis](../pages/wrds-v3-refused-path-diagnosis.md) -- all 27 refusals traced to source fields, with vendor missingness and protocol questions kept distinct
