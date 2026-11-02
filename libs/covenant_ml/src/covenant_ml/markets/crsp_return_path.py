@@ -7,7 +7,7 @@ from math import isfinite
 
 from platform_core.json_utils import JSONObject, require_float
 
-from .crsp_calendar import crsp_ordinary_return
+from .crsp_calendar import crsp_return_span
 
 
 def _missing_price(row: JSONObject) -> bool:
@@ -20,18 +20,6 @@ def _missing_price(row: JSONObject) -> bool:
         and row["dlydelflg"] == "N"
         and row["dlyprc"] is None
         and row["dlyprcflg"] == "MP"
-    )
-
-
-def _closes_gap(row: JSONObject, previous: str, missing: int) -> bool:
-    """Require a present return spanning exactly the accumulated missing sessions."""
-    return (
-        missing <= 9
-        and row["dlyret"] is not None
-        and row["dlyprevdt"] == previous
-        and row["dlyretmissflg"] == "NA"
-        and row["dlydelflg"] == "N"
-        and row["dlyretdurflg"] == f"P{missing}"
     )
 
 
@@ -69,12 +57,7 @@ def crsp_compound_held(
         if _missing_price(row):
             missing += 1
             continue
-        valid = (
-            crsp_ordinary_return(row, previous)
-            if missing == 0
-            else _closes_gap(row, previous, missing)
-        )
-        if not valid:
+        if not crsp_return_span(row, previous, missing + 1):
             raise ValueError(f"[CRSP-009] held return for {permno} on {day} has an invalid span")
         growth *= 1 + require_float(row, "dlyret")
         previous, missing = day, 0

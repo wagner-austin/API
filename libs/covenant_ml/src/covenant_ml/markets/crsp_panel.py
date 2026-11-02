@@ -12,7 +12,7 @@ from .crsp_calendar import (
     CrspWindow,
     crsp_member_on,
     crsp_month,
-    crsp_ordinary_return,
+    crsp_return_span,
     crsp_windows,
 )
 from .crsp_extract import CrspSources
@@ -45,7 +45,7 @@ def _history_failure(
         observed = history.get(day)
         if observed is None:
             return "daily_history_missing"
-        if not crsp_ordinary_return(observed, sessions[index - 1]):
+        if not crsp_return_span(observed, sessions[index - 1], 1):
             return "daily_history_invalid"
     return None
 

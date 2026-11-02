@@ -68,23 +68,31 @@ def crsp_month(day: str) -> int:
     return int(day[:4]) * 12 + int(day[5:7]) - 1
 
 
-def crsp_ordinary_return(row: JSONObject, previous: str) -> bool:
-    """Accept a one-session ordinary return only with independent predecessor evidence.
+def crsp_return_span(row: JSONObject, previous: str, periods: int) -> bool:
+    """Validate present nonterminal returns against independent interval evidence.
 
     Args:
         row: Daily security record for one declared session.
-        previous: The independently declared preceding session.
+        previous: The independently established previous priced session.
+        periods: Exact number of declared trading sessions in the return span.
+            Feature construction requires one; holdings may supply two to ten.
 
     Returns:
-        Whether the row carries a present, nonterminal, one-session return whose
-        recorded predecessor is exactly that preceding session.
+        Whether availability, predecessor, terminal and duration flags all
+        agree with the independently supplied interval.
     """
+    duration = row["dlyretdurflg"]
+    supported = (
+        duration in ("D1", "D2", "D3", "D4", "DU")
+        if periods == 1
+        else 2 <= periods <= 10 and duration == f"P{periods - 1}"
+    )
     return (
         row["dlyret"] is not None
         and row["dlyprevdt"] == previous
         and row["dlyretmissflg"] == "NA"
         and row["dlydelflg"] == "N"
-        and row["dlyretdurflg"] in ("D1", "D2", "D3", "D4", "DU")
+        and supported
     )
 
 
