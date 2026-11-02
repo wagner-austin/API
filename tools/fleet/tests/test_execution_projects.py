@@ -234,9 +234,9 @@ def test_the_testdb_lane_reads_the_pushed_commits_from_an_mcps_companion() -> No
     )
 
 
-@pytest.mark.parametrize("host", ["colossus", "demure"])
-def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
-    """MCPs/execution-served-<host> reads what that host's search container serves.
+@pytest.mark.parametrize("host", ["colossus", "demure", "lacrymal"])
+def test_each_served_lane_runs_on_its_declared_host_alone(host: str) -> None:
+    """MCPs/execution-served-<host> reads that host's live services and duties.
 
     Its last install step writes the marker that makes the execution
     workspace collect tests/served alone (MCPs board tasks b456a3cb and
@@ -245,8 +245,9 @@ def test_each_served_lane_runs_on_its_search_host_alone(host: str) -> None:
     through the public tunnel reads whichever origin its node's route
     reaches. demure's lane reads the host's own provisioning as the stack
     host, its boot target, daemon, GPU runtime and load sampler (MCPs board
-    task c036582e), which no other node holds either. So each project names
-    its host, and every other node refuses it.
+    task c036582e), which no other node holds either. Lacrymal's lane reads
+    the control runner and primary sessions after the cutover (MCPs board
+    task 927bbd25). So each project names its host, and every other node refuses it.
     It holds no test database and no companion, so it takes the npm workspace
     build's tags and nothing more.
     """

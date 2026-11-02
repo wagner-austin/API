@@ -316,6 +316,19 @@ def test_no_server_is_offered_a_check_not_pinned_to_it() -> None:
     assert offered == set()
 
 
+def test_the_control_served_lane_is_admitted_only_on_lacrymal() -> None:
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/execution-served-lacrymal"]
+    codes = {
+        name: assess(node, _idle(node), project, node_tags(node))["code"]
+        for name, node in workspace["nodes"].items()
+    }
+    assert codes == {
+        **dict.fromkeys(workspace["nodes"], FleetErrorCode.NODE_NOT_PINNED),
+        "lacrymal": None,
+    }
+
+
 def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
     workspace = _shipped()
     node = workspace["nodes"]["diphtheria"]

@@ -82,7 +82,8 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # 70 since execution-deploy and execution-linux share cached multi-root
     # preparation (MCPs board task 007bfc7e). 71 since MCPs/participant-mcp,
     # the chat app's subscription participants (MCPs board task 42512a6b).
-    assert len(prepared) == 71
+    # 72 since the served lane follows control onto Lacrymal (MCPs board task 927bbd25).
+    assert len(prepared) == 72
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
@@ -172,12 +173,14 @@ def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None
         "MCPs/execution-served-colossus",
         "MCPs/execution-served-demure",
         "MCPs/execution-served-diphtheria",
+        "MCPs/execution-served-lacrymal",
     ]
     # The gateway host's lane migrates corvis_test first, for its usage-limit
     # case (MCPs board task ea46a7a4); the marker still comes last.
     assert {name: [step["phase"] for step in steps] for name, steps in marking.items()} == {
         "MCPs/execution-served-colossus": ["install", "workspace-build", "served-lane"],
         "MCPs/execution-served-demure": ["install", "workspace-build", "served-lane"],
+        "MCPs/execution-served-lacrymal": ["install", "workspace-build", "served-lane"],
         "MCPs/execution-served-diphtheria": [
             "install",
             "workspace-build",
