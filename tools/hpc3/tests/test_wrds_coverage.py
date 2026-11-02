@@ -21,9 +21,11 @@ from hpc3.contracts.wrds_coverage import (
 from hpc3.core.wrds_coverage import (
     SLICE,
     VOLATILITY_SURFACES,
+    Surface,
     coverage_query,
     option_coverage,
     read_coverage,
+    surface_slice,
 )
 from tests.conftest import FakeRun
 from tests.wrds_board import TASK, accepting_board
@@ -67,9 +69,14 @@ def test_the_query_is_read_only_aggregates_over_each_surface() -> None:
     assert QUERY.count("\nUNION ALL\n") == len(VOLATILITY_SURFACES) - 1
     assert 'FROM "optionmsamp_us"."vsurfd2014"' in QUERY
     assert 'FROM "omtrial"."volatility_surface_2013"' in QUERY
-    assert QUERY.count(f"FILTER (WHERE {SLICE})") == 2 * len(VOLATILITY_SURFACES)
+    for surface in VOLATILITY_SURFACES:
+        sharing = sum(other.put_flag == surface.put_flag for other in VOLATILITY_SURFACES)
+        assert QUERY.count(f"FILTER (WHERE {surface_slice(surface)})") == 2 * sharing
+    assert 'count(DISTINCT "securityid")' in QUERY
+    assert "\"callput\" = 'P'" in QUERY
     assert "SELECT *" not in QUERY
-    assert coverage_query((("o'k", 'we"ird'),)).count("SELECT 'o''k', 'we\"ird', ") == 1
+    odd = Surface("o'k", 'we"ird', "secid", "cp_flag")
+    assert coverage_query((odd,)).count("SELECT 'o''k', 'we\"ird', ") == 1
 
 
 def test_an_empty_relation_list_is_refused() -> None:
