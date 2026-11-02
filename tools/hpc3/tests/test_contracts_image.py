@@ -402,8 +402,7 @@ class TestImageReference:
         with pytest.raises(JSONTypeError, match="bind separators") as error:
             _ = decode_image_reference(_ref(binds=["/pub/ordinary", bad]), "image")
         assert str(error.value) == (
-            "Field 'binds[1]' must not contain Apptainer bind separators "
-            f"':' or ',', got {bad!r}"
+            f"Field 'binds[1]' must not contain Apptainer bind separators ':' or ',', got {bad!r}"
         )
 
     def test_spaces_and_shell_literals_remain_literal_paths(self) -> None:
