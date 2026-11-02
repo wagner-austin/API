@@ -1,8 +1,11 @@
-"""Extract and seal both CRSP partitions in a native allocation, or verify them afterwards.
+"""Extract CRSP partitions, refresh a diagnostic cohort, or verify collected evidence.
 
 ``extract`` runs inside the scheduler allocation: plaintext stays in its
 private scratch and only ciphertext, the receipt and metrics reach the output
-directory named by an environment variable. ``verify`` runs on the evaluator
+directory named by an environment variable. ``refresh`` uses those same
+allocation paths and bounds for a pinned validation cohort, writing encrypted
+differences and aggregate metrics for the native controller's RunRecord.
+``verify`` runs on the evaluator
 host against the collected directory, posts its metadata on the named board
 task under the task's WRDS load-report identity, then writes the same metadata
 to standard output; it never prints or posts a source row or key.
@@ -15,11 +18,13 @@ import sys
 from pathlib import Path
 
 from platform_core.config import config_test_hooks
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_int
 from platform_core.load_report import post_load_report, report_identity
 
 from covenant_ml.markets import _test_hooks
+from covenant_ml.markets.crsp_cohort_records import decode_crsp_cohort_plan
 from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
+from covenant_ml.markets.crsp_refresh import compare_crsp_vintages
 from covenant_ml.markets.crsp_revision import revise_crsp_protocol, verify_crsp_revision
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import extract_crsp
@@ -28,20 +33,25 @@ from covenant_ml.markets.validation import read_document
 
 
 def _parser() -> argparse.ArgumentParser:
-    """Declare both commands with every bound and path explicit."""
+    """Declare capture and verification commands with every bound and path explicit."""
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest="command", required=True)
     extract = commands.add_parser("extract")
     extract.add_argument("--protocol", required=True, type=Path)
-    extract.add_argument("--access", required=True, type=Path)
     extract.add_argument("--source", required=True)
-    extract.add_argument("--setup", type=Path)
-    extract.add_argument("--max-rows", required=True, type=int)
-    extract.add_argument("--max-relation-bytes", required=True, type=int)
-    extract.add_argument("--max-partition-bytes", required=True, type=int)
-    extract.add_argument("--seconds", required=True, type=int)
-    extract.add_argument("--scratch-env", required=True)
-    extract.add_argument("--output-env", required=True)
+    refresh = commands.add_parser("refresh")
+    refresh.add_argument("--cohort", required=True, type=Path)
+    refresh.add_argument("--cohort-sha256", required=True)
+    refresh.add_argument("--plan", required=True, type=Path)
+    for capture in (extract, refresh):
+        capture.add_argument("--access", required=True, type=Path)
+        capture.add_argument("--setup", type=Path)
+        capture.add_argument("--max-rows", required=True, type=int)
+        capture.add_argument("--max-relation-bytes", required=True, type=int)
+        capture.add_argument("--max-partition-bytes", required=True, type=int)
+        capture.add_argument("--seconds", required=True, type=int)
+        capture.add_argument("--scratch-env", required=True)
+        capture.add_argument("--output-env", required=True)
     verify = commands.add_parser("verify")
     verify.add_argument("--collected", required=True, type=Path)
     verify.add_argument("--access", required=True, type=Path)
@@ -83,32 +93,62 @@ def main(argv: list[str] | None = None) -> int:
     command: str = args.command
     access: Path = args.access
     settings = decode_research_access(read_document(access))
-    if command == "extract":
+    if command in {"extract", "refresh"}:
         environment = config_test_hooks.get_environment()
         scratch_variable: str = args.scratch_env
         output_variable: str = args.output_env
-        protocol: Path = args.protocol
-        source: str = args.source
         setup: Path | None = args.setup
         rows: int = args.max_rows
         relation_bytes: int = args.max_relation_bytes
         partition_bytes: int = args.max_partition_bytes
         seconds: int = args.seconds
+        bounds = decode_crsp_limits(
+            {
+                "max_rows": rows,
+                "max_relation_bytes": relation_bytes,
+                "max_partition_bytes": partition_bytes,
+                "seconds": seconds,
+            }
+        )
+        output = Path(environment[output_variable])
+        if command == "refresh":
+            cohort: Path = args.cohort
+            cohort_digest: str = args.cohort_sha256
+            plan: Path = args.plan
+            result = compare_crsp_vintages(
+                cohort,
+                cohort_digest,
+                decode_crsp_cohort_plan(read_document(plan)),
+                EvaluatorKeys(settings),
+                scratch=Path(environment[scratch_variable]),
+                destination=output / "comparison",
+                limits=bounds,
+                setup=setup,
+            )
+            with (output / "comparison.json").open("x", encoding="utf-8") as stream:
+                stream.write(dump_json_str(result))
+            counts = require_dict(result, "rows")
+            metrics: list[JSONObject] = [
+                {
+                    "name": role + "." + name,
+                    "value": float(require_int(require_dict(counts, role), name)),
+                }
+                for role in counts
+                for name in ("old", "fresh", "unchanged", "added", "removed", "changed")
+            ]
+            with (output / "metrics.json").open("x", encoding="utf-8") as stream:
+                stream.write(dump_json_str(metrics))
+            return 0
+        protocol: Path = args.protocol
+        source: str = args.source
         extract_crsp(
             protocol,
             settings,
             source=source,
             setup=setup,
             scratch=Path(environment[scratch_variable]),
-            output=Path(environment[output_variable]),
-            limits=decode_crsp_limits(
-                {
-                    "max_rows": rows,
-                    "max_relation_bytes": relation_bytes,
-                    "max_partition_bytes": partition_bytes,
-                    "seconds": seconds,
-                }
-            ),
+            output=output,
+            limits=bounds,
         )
         return 0
     task: str = args.report_task
