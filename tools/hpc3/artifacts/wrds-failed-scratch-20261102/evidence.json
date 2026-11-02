@@ -1,0 +1,245 @@
+{
+  "kind": "failed-allocation-configured-scratch-observation",
+  "task": "c9a929a6-d4cc-4922-a833-392a219b15e4",
+  "runtime_source": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+  "controller": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+  "observed_at": "2026-11-02T01:21:44.284925+00:00",
+  "subject": {
+    "job": {
+      "job_id": "58733020",
+      "name": "cleargbm.research-47d4ee174b2a-1",
+      "partition": "free",
+      "state": "FAILED",
+      "elapsed_seconds": 2131,
+      "billing_tres": 8,
+      "gpu_count": 0,
+      "cpu_count": 8,
+      "node_list": "hpc3-14-24"
+    },
+    "exit_code": "1:0",
+    "started_at": "2026-11-01T20:39:14",
+    "ended_at": "2026-11-01T21:14:45"
+  },
+  "observer": {
+    "job": {
+      "job_id": "58740123",
+      "name": "cleargbm.failed-scratch-c9a929a6",
+      "partition": "free",
+      "state": "COMPLETED",
+      "elapsed_seconds": 5,
+      "billing_tres": 1,
+      "gpu_count": 0,
+      "cpu_count": 1,
+      "node_list": "hpc3-14-24"
+    },
+    "exit_code": "0:0",
+    "started_at": "2026-11-02T01:21:39",
+    "ended_at": "2026-11-02T01:21:44"
+  },
+  "path_derivation": {
+    "user": "wagnera3",
+    "task_prolog": "prolog_task.sh",
+    "job_prolog": "prolog_job.sh",
+    "job_epilog": "epilog_job.sh",
+    "configuration": "slurm.conf",
+    "original_expanded_tmpdir_logged": false,
+    "current_source_bytes_verified_on_observer_node": true,
+    "host_binds": [
+      "/tmp",
+      "/dev/shm",
+      "/etc/slurm"
+    ],
+    "positive_controls": [
+      "parent owned by current uid",
+      "parent is not a symlink",
+      "current observer job directory exists in both parents"
+    ]
+  },
+  "results": [
+    {
+      "path": "/tmp/wagnera3/58733020",
+      "absent": true,
+      "observed_at": "2026-11-02T01:21:44.284925+00:00",
+      "node": "hpc3-14-24",
+      "subject_job": "58733020",
+      "observer_job": "58740123"
+    },
+    {
+      "path": "/dev/shm/wagnera3/58733020",
+      "absent": true,
+      "observed_at": "2026-11-02T01:21:44.284998+00:00",
+      "node": "hpc3-14-24",
+      "subject_job": "58733020",
+      "observer_job": "58740123"
+    }
+  ],
+  "verified_measurement": {
+    "ledger": {
+      "job_id": "58740123",
+      "project": "cleargbm",
+      "name": "cleargbm.failed-scratch-c9a929a6",
+      "host": "hpc3",
+      "partition": "free",
+      "submitted_at": "2026-11-02T01:19:30.770683+00:00",
+      "log_dir": "/data/homezvol1/wagnera3/research/failed-scratch-c9a929a6/cleargbm/logs",
+      "deterministic": true,
+      "experiment": {
+        "purpose": "failed-scratch-absence",
+        "research_attempt": "failed-scratch-c9a929a6",
+        "subject_job": "58733020",
+        "subject_node": "hpc3-14-24"
+      },
+      "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+      "submitter": "",
+      "artifact": "/data/homezvol1/wagnera3/research/failed-scratch-c9a929a6/result.json",
+      "image_drift": {
+        "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+        "head": "3d74e6f4cbdd59c4e45fc5b399bb4dc966fa0d33",
+        "modules": []
+      }
+    },
+    "accounting": {
+      "job": {
+        "job_id": "58740123",
+        "name": "cleargbm.failed-scratch-c9a929a6",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 5,
+        "billing_tres": 1,
+        "gpu_count": 0,
+        "cpu_count": 1,
+        "node_list": "hpc3-14-24"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-02T01:21:39",
+      "ended_at": "2026-11-02T01:21:44"
+    },
+    "result_sha256": "316c120fb9d3739bb6cef02fbc90dedde44f2889e8b0f6689b2165e3c4e8d08d",
+    "record_sha256": "9db4f2ead80139df6b3c660088a7e928e02dae0b4e0c280d9fcdd07db639d908",
+    "stdout_sha256": "f619f3694bbf7549391e797d7df83c5910d8c106f4b0a544418e3dd903be3960",
+    "verified_files": {
+      "/data/homezvol1/wagnera3/research/failed-scratch-c9a929a6/observer.py": "fc1823c45c8204da58cd4b471488e038efd3ad63cab7706cf88b6ccab6922819",
+      "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+      "/etc/slurm/prolog_task.sh": "666ee94897c44d65494133405a45454cbfa247ad64fa80bb3cdfe87751bc43a4",
+      "/etc/slurm/prolog_job.sh": "e6f1d9b0fe5a1fd01ff8e14d33ec889e2737c84089bd46806b31cfb8cd951afb",
+      "/etc/slurm/epilog_job.sh": "6caf76444642f9312a609c9fe7469ad3b2420099ff856312254c9fa14dee43fb",
+      "/etc/slurm/slurm.conf": "33fe1e5ee79ab22bad8a192551dac387313a1086b738d75fa3baab9d2abed778"
+    },
+    "compute_checksum_lines": 6,
+    "result_mtime": 1793582504,
+    "record_mtime": 1793582504,
+    "dataset": {
+      "subject_job": "58733020",
+      "subject_node": "hpc3-14-24",
+      "historical_tmpdir_recorded": false,
+      "claim": "eventual-configured-path-absence"
+    }
+  },
+  "record": {
+    "experiment": "failed-allocation-configured-scratch",
+    "label": "58740123",
+    "fingerprint": {
+      "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+      "gpu_model": "",
+      "driver_version": "",
+      "determinism": {
+        "stack": "cpu",
+        "settings": {
+          "MKL_NUM_THREADS": "1",
+          "NUMEXPR_NUM_THREADS": "1",
+          "OMP_NUM_THREADS": "1",
+          "OPENBLAS_NUM_THREADS": "1"
+        }
+      },
+      "host": {
+        "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+        "machine": "x86_64",
+        "logical_cores": 40
+      },
+      "packages": [
+        {
+          "name": "cleargbm",
+          "version": "0.1.0"
+        },
+        {
+          "name": "cleargbm_rs",
+          "version": "0.1.0"
+        },
+        {
+          "name": "lightgbm",
+          "version": "4.6.0"
+        },
+        {
+          "name": "numpy",
+          "version": "2.3.5"
+        },
+        {
+          "name": "scikit-learn",
+          "version": "1.7.2"
+        },
+        {
+          "name": "xgboost",
+          "version": "3.1.2"
+        }
+      ]
+    },
+    "observations": [
+      {
+        "name": "/dev/shm/wagnera3/58733020",
+        "value": 1.0
+      },
+      {
+        "name": "/tmp/wagnera3/58733020",
+        "value": 1.0
+      }
+    ],
+    "payload_digest": "d593160abbc5f7214813065db45717d921aad2013605e361ec3db79d1a189ff0"
+  },
+  "elapsed_after_subject_end_seconds": 14819.284925,
+  "service_reports": [
+    {
+      "id": "64295a24-577e-4ba1-9978-481de6c6b298",
+      "author": "hpc-report-c9a929a6",
+      "created_at": "2026-11-02T01:19:16.145808+00:00",
+      "header": "HPC3 PREFLIGHT LOAD-REPORT"
+    },
+    {
+      "id": "2b101c0e-90c8-4744-993f-54f552de5c0c",
+      "author": "hpc-report-c9a929a6",
+      "created_at": "2026-11-02T01:20:08.27954+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT"
+    },
+    {
+      "id": "8ffa0d43-a150-4d23-aab0-bb790b472d2a",
+      "author": "hpc-report-c9a929a6",
+      "created_at": "2026-11-02T01:22:02.26025+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT"
+    }
+  ],
+  "scope": {
+    "licensed_bytes_opened": false,
+    "keys_read": false,
+    "files_deleted": false,
+    "final_grant_released": false,
+    "original_journal_modified": false
+  },
+  "limits": [
+    "Current configured-path absence on the original node; the original expanded TMPDIR was not logged.",
+    "Current prolog bytes and metadata do not prove the exact historical configuration.",
+    "Eventual absence observed about four hours after completion, not an immediate cleanup deadline.",
+    "No physical secure-erasure, node-failure or every-allocation guarantee.",
+    "Service verification binds runtime, accounting and artifact evidence; the account owner remains privileged."
+  ],
+  "files": {
+    "hpc3.json": "0c9a49770ffe77edf7bab3d3e99793f0fc225b6ecd7ba9d5d928ca8505b65662",
+    "result.json": "316c120fb9d3739bb6cef02fbc90dedde44f2889e8b0f6689b2165e3c4e8d08d",
+    "run.json": "ce2442d364756ce994a6b02f1b9e9f8f527ec2a8379ce241a7a7cdd5c9d786c9",
+    "subject-report.json": "a5dd315686fdd2132764d32d24b820ebac1592b4ddb4135c56ecafb66dde8f49",
+    "service-reports.json": "e7a2119ab1d17465c7ddc2c59d102312c26c5ba6dfd83b9388745fb1b2d1f1ac",
+    "submission.json": "775372eb4461409c943f0bdbebac4870936dbb036061954ee5710152dc90ae1b",
+    "captured-text.json": "a6592f2b52729d58bf6c591298bfdfb02dbe318e467afc42fc852de43f6d8447",
+    "result.json.runrecord.json": "9db4f2ead80139df6b3c660088a7e928e02dae0b4e0c280d9fcdd07db639d908",
+    "observer-report.json": "20b8f5d54067bbebfe07140c8b4b8c7238d0545f78020d2eda89f0ca16ba48ee"
+  },
+  "captured_text": "captured-text.json: exact UTF-8 source, checksum manifest, native readouts and refused preflight, indexed by original filename"
+}

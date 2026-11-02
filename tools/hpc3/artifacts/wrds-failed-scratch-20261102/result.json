@@ -1,0 +1,72 @@
+{
+ "kind": "configured-scratch-absence",
+ "results": [
+  {
+   "path": "/tmp/wagnera3/58733020",
+   "absent": true,
+   "observed_at": "2026-11-02T01:21:44.284925+00:00",
+   "node": "hpc3-14-24",
+   "subject_job": "58733020",
+   "observer_job": "58740123"
+  },
+  {
+   "path": "/dev/shm/wagnera3/58733020",
+   "absent": true,
+   "observed_at": "2026-11-02T01:21:44.284998+00:00",
+   "node": "hpc3-14-24",
+   "subject_job": "58733020",
+   "observer_job": "58740123"
+  }
+ ],
+ "fingerprint": {
+  "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ },
+ "dataset": {
+  "subject_job": "58733020",
+  "subject_node": "hpc3-14-24",
+  "historical_tmpdir_recorded": false,
+  "claim": "eventual-configured-path-absence"
+ }
+}

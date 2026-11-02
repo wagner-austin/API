@@ -1,0 +1,60 @@
+{
+ "experiment": "failed-allocation-configured-scratch",
+ "label": "58740123",
+ "fingerprint": {
+  "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 40
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ },
+ "observations": [
+  {
+   "name": "/dev/shm/wagnera3/58733020",
+   "value": 1.0
+  },
+  {
+   "name": "/tmp/wagnera3/58733020",
+   "value": 1.0
+  }
+ ],
+ "payload_digest": "d593160abbc5f7214813065db45717d921aad2013605e361ec3db79d1a189ff0"
+}

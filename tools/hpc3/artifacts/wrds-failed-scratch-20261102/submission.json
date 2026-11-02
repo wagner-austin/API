@@ -1,0 +1,24 @@
+{
+  "job_id": "58740123",
+  "project": "cleargbm",
+  "name": "cleargbm.failed-scratch-c9a929a6",
+  "host": "hpc3",
+  "partition": "free",
+  "submitted_at": "2026-11-02T01:19:30.770683+00:00",
+  "log_dir": "/data/homezvol1/wagnera3/research/failed-scratch-c9a929a6/cleargbm/logs",
+  "deterministic": true,
+  "experiment": {
+    "purpose": "failed-scratch-absence",
+    "research_attempt": "failed-scratch-c9a929a6",
+    "subject_job": "58733020",
+    "subject_node": "hpc3-14-24"
+  },
+  "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "submitter": "",
+  "artifact": "/data/homezvol1/wagnera3/research/failed-scratch-c9a929a6/result.json",
+  "image_drift": {
+    "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+    "head": "3d74e6f4cbdd59c4e45fc5b399bb4dc966fa0d33",
+    "modules": []
+  }
+}
