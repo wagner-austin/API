@@ -13,7 +13,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "libs/covenant_ml/tests/markets/test_crsp_revision.py": "5280b2f699404f291abe0923eb6b91cfd1f0255b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "1a855414b25c2eda01dc2d6c34c9e42012cd836c"
-  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "0fa13bb7ae218f95730b91b3968ae2be8d9d9388"
+  "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "7e9ebdafddf540613819fc1310f9aaf0dd05602d"
   "tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json": "bd6ac340e20ce528c5a4ad2571714d69cd2fad34"
 fact_checked: 2026-11-02
 confidence: high
