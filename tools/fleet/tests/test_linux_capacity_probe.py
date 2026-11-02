@@ -98,9 +98,8 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
 
     # Every display device on this host, then their count (MCPs board task
     # b4d5ca0f); each line reads as a GPU, so none is a zero.
-    gpus, problem = read_gpus("this host", fields)
-    assert gpus is not None, problem
-    devices = {f"gpu_{index}" for index in range(len(gpus))}
+    assert read_gpus("this host", fields)[1] == ""
+    devices = {f"gpu_{index}" for index in range(int(fields["gpu_count"]))}
     reported = {*probe.REQUIRED_FIELDS, "logical_cores", probe.CHECK_QUOTA_FIELD, "gpu_count"}
     assert set(fields) == reported | counted | devices | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()

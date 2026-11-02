@@ -139,7 +139,7 @@ def _gpus(
     smi: tuple[str, int],
     lspci: dict[str, str],
     dmem: tuple[str, str] | None,
-) -> tuple[GpuReading, ...]:
+) -> tuple[tuple[GpuReading, ...] | None, str]:
     """Run the GPU lines and read them as the probe does.
 
     Args:
@@ -149,13 +149,11 @@ def _gpus(
         dmem: As :func:`_run` takes it.
 
     Returns:
-        The GPUs read.
+        What :func:`read_gpus` answers for the lines.
     """
     completed = _run(tmp_path, smi, lspci, dmem)
     assert completed.returncode == 0, completed.stderr
-    gpus, problem = read_gpus("node", fields_of(completed.stdout))
-    assert gpus is not None, problem
-    return gpus
+    return read_gpus("node", fields_of(completed.stdout))
 
 
 def test_the_part_names_its_roots_on_their_own_lines() -> None:
@@ -193,24 +191,27 @@ class TestTheGpuLinesUnderSh:
         }
 
         assert _gpus(tmp_path, smi, lspci, ("", "")) == (
-            GpuReading(
-                address="0000:00:02.0",
-                vendor="intel",
-                name="Raptor Lake-S GT1 [UHD Graphics 770]",
-                driver="i915",
-                memory=None,
-            ),
-            GpuReading(
-                address="0000:01:00.0",
-                vendor="nvidia",
-                name="NVIDIA GeForce RTX 3090 Ti",
-                driver="nvidia",
-                memory=GpuMemory(
-                    source=GpuSource.NVIDIA_SMI,
-                    total_bytes=24564 * 1048576,
-                    free_bytes=21784 * 1048576,
+            (
+                GpuReading(
+                    address="0000:00:02.0",
+                    vendor="intel",
+                    name="Raptor Lake-S GT1 [UHD Graphics 770]",
+                    driver="i915",
+                    memory=None,
+                ),
+                GpuReading(
+                    address="0000:01:00.0",
+                    vendor="nvidia",
+                    name="NVIDIA GeForce RTX 3090 Ti",
+                    driver="nvidia",
+                    memory=GpuMemory(
+                        source=GpuSource.NVIDIA_SMI,
+                        total_bytes=24564 * 1048576,
+                        free_bytes=21784 * 1048576,
+                    ),
                 ),
             ),
+            "",
         )
 
     def test_diphtheria_s_unbound_card_is_listed_with_no_memory(self, tmp_path: pathlib.Path) -> None:
@@ -221,13 +222,16 @@ class TestTheGpuLinesUnderSh:
         }
 
         assert _gpus(tmp_path, SMI_FAILED, lspci, None) == (
-            GpuReading(
-                address="0000:01:00.0",
-                vendor="nvidia",
-                name="GA106 [RTX A2000 12GB]",
-                driver=None,
-                memory=None,
+            (
+                GpuReading(
+                    address="0000:01:00.0",
+                    vendor="nvidia",
+                    name="GA106 [RTX A2000 12GB]",
+                    driver=None,
+                    memory=None,
+                ),
             ),
+            "",
         )
 
     def test_pendragon_s_amdgpu_region_and_two_regions_of_one_card_are_summed(
@@ -245,20 +249,27 @@ class TestTheGpuLinesUnderSh:
             "drm/0000:09:00.0/vram 80592896\ndrm/0000:0a:00.0/vram0 30\ndrm/0000:0a:00.0/vram1 20\n",
         )
 
-        gpus = _gpus(tmp_path, NOT_INSTALLED, lspci, dmem)
-
-        assert [(gpu["vendor"], gpu["name"], gpu["memory"]) for gpu in gpus] == [
+        assert _gpus(tmp_path, NOT_INSTALLED, lspci, dmem) == (
             (
-                "amd",
-                "Phoenix1",
-                GpuMemory(source=GpuSource.DMEM, total_bytes=4294967296, free_bytes=4214374400),
+                GpuReading(
+                    address="0000:09:00.0",
+                    vendor="amd",
+                    name="Phoenix1",
+                    driver="amdgpu",
+                    memory=GpuMemory(
+                        source=GpuSource.DMEM, total_bytes=4294967296, free_bytes=4214374400
+                    ),
+                ),
+                GpuReading(
+                    address="0000:0a:00.0",
+                    vendor="intel",
+                    name="Battlemage G21 [Arc Pro B60]",
+                    driver="xe",
+                    memory=GpuMemory(source=GpuSource.DMEM, total_bytes=150, free_bytes=100),
+                ),
             ),
-            (
-                "intel",
-                "Battlemage G21 [Arc Pro B60]",
-                GpuMemory(source=GpuSource.DMEM, total_bytes=150, free_bytes=100),
-            ),
-        ]
+            "",
+        )
 
     def test_an_nvidia_smi_bus_id_in_capitals_and_a_name_with_a_comma_still_match(
         self, tmp_path: pathlib.Path
@@ -266,11 +277,21 @@ class TestTheGpuLinesUnderSh:
         _device(tmp_path, "0000:0a:00.0", "0x030000", "0x10de", "nvidia")
         smi = ("00000000:0A:00.0, 4096, 3715, NVIDIA GeForce GTX 1630, OEM", 0)
 
-        (gpu,) = _gpus(tmp_path, smi, {}, None)
-
-        assert gpu["name"] == "NVIDIA GeForce GTX 1630, OEM"
-        assert gpu["memory"] == GpuMemory(
-            source=GpuSource.NVIDIA_SMI, total_bytes=4096 * 1048576, free_bytes=3715 * 1048576
+        assert _gpus(tmp_path, smi, {}, None) == (
+            (
+                GpuReading(
+                    address="0000:0a:00.0",
+                    vendor="nvidia",
+                    name="NVIDIA GeForce GTX 1630, OEM",
+                    driver="nvidia",
+                    memory=GpuMemory(
+                        source=GpuSource.NVIDIA_SMI,
+                        total_bytes=4096 * 1048576,
+                        free_bytes=3715 * 1048576,
+                    ),
+                ),
+            ),
+            "",
         )
 
     def test_a_node_with_no_display_device_counts_none(self, tmp_path: pathlib.Path) -> None:
@@ -318,12 +339,16 @@ class TestReadingTheLines:
         assert message in problem
 
     def test_a_vendor_outside_the_named_three_is_named_by_its_id(self) -> None:
-        gpus, _problem = read_gpus(
-            "emerald", {"gpu_count": "1", "gpu_0": "0000:00:01.0\t0x102b\tmgag200\t\t\t\tG200eR2"}
-        )
+        line = "0000:00:01.0\t0x102b\tmgag200\t\t\t\tG200eR2"
 
-        assert gpus is not None
-        assert gpus[0]["vendor"] == "pci-102b"
+        assert read_gpus("emerald", {"gpu_count": "1", "gpu_0": line}) == (
+            (
+                GpuReading(
+                    address="0000:00:01.0", vendor="pci-102b", name="G200eR2", driver="mgag200", memory=None
+                ),
+            ),
+            "",
+        )
 
     def test_the_probe_carries_the_gpus_into_the_node_s_state(self) -> None:
         output = PROBE_OK.replace(

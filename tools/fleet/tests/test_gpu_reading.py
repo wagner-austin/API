@@ -25,6 +25,9 @@ B60 = GpuReading(
     memory=GpuMemory(source=GpuSource.DMEM, total_bytes=25669140480, free_bytes=8546701312),
 )
 
+#: How a memory outside the shape is named, before its numbers.
+MEMORY_SHAPE = "0000:08:00.0's memory must have a total above 0 and a free from 0 to the total, "
+
 #: diphtheria's card: no driver bound, so no counter holds it.
 UNBOUND = GpuReading(
     address="0000:01:00.0", vendor="nvidia", name="GA106 [RTX A2000 12GB]", driver=None, memory=None
@@ -64,25 +67,23 @@ class TestTheShape:
             ({**B60, "driver": "x e"}, "0000:08:00.0's driver is not a driver's name: 'x e'"),
             (
                 {**B60, "memory": GpuMemory(source=GpuSource.DMEM, total_bytes=0, free_bytes=0)},
-                "got 0 free of 0",
+                f"{MEMORY_SHAPE}got 0 free of 0",
             ),
             (
                 {**B60, "memory": GpuMemory(source=GpuSource.DMEM, total_bytes=10, free_bytes=11)},
-                "got 11 free of 10",
+                f"{MEMORY_SHAPE}got 11 free of 10",
             ),
             (
                 {**B60, "memory": GpuMemory(source=GpuSource.DMEM, total_bytes=10, free_bytes=-1)},
-                "got -1 free of 10",
+                f"{MEMORY_SHAPE}got -1 free of 10",
             ),
         ],
     )
     def test_a_gpu_outside_it_is_named(self, gpu: GpuReading, message: str) -> None:
-        problem = gpu_problem(gpu)
-
-        assert problem is not None
-        assert message in problem
-        with pytest.raises(JSONTypeError, match=message.replace("[", r"\[")):
+        assert gpu_problem(gpu) == message
+        with pytest.raises(JSONTypeError) as refused:
             require_gpu(gpu)
+        assert str(refused.value) == message
 
 
 class TestTheWire:
