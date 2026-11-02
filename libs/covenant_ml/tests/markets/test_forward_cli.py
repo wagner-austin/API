@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 from platform_core.determinism_cpu import NativeLibrariesAlreadyLoadedError
-from platform_core.json_utils import narrow_json_to_dict, require_dict, require_list
+from platform_core.json_utils import narrow_json_to_dict, require_list
 from scripts.forward_weather_report import main
 
 from covenant_ml.markets import _test_hooks
@@ -29,7 +29,10 @@ __all__ = ["api_server", "restore_clock"]
 
 
 def test_cli_scores_settled_evidence_under_the_pinned_plan(
-    api_server: ApiServer, tmp_path: Path, restore_clock: None
+    api_server: ApiServer,
+    tmp_path: Path,
+    restore_clock: None,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     campaign, root, digest, observed = forward_campaign(
         api_server, tmp_path, [("binary", 1), ("binary", 0), ("binary", 1)]
@@ -57,6 +60,9 @@ def test_cli_scores_settled_evidence_under_the_pinned_plan(
     ]
     requests = len(api_server.requests)
     assert main(args, stand_in_pin) == 0
+    assert capsys.readouterr().out == (
+        f"Forward evaluation: {output}\nRun record: {output}.runrecord.json\n"
+    )
     assert len(api_server.requests) == requests
     report = read_document(output)
     assert (report["scored_dates"], report["plan_sha256"], report["observed_at"]) == (
@@ -75,11 +81,11 @@ def test_cli_scores_settled_evidence_under_the_pinned_plan(
         main([*args[:3], "e" * 64, *args[4:]], stand_in_pin)
 
 
-def test_cli_real_subprocess_reports_an_unsettled_date(
+def test_cli_real_subprocess_refuses_while_a_settlement_is_outstanding(
     api_server: ApiServer, tmp_path: Path, restore_clock: None
 ) -> None:
     # One plan: its window opens when the fixture runs, so the subprocess's real
-    # clock reads after its capture; a later plan's capture would lie days ahead.
+    # clock reads after its capture and before its settlement window, two days on.
     campaign, root, digest, _ = forward_campaign(api_server, tmp_path, [("unsettled", 1)])
     plan_path = tmp_path / "forward-plan.json"
     plan_sha = write_plan(
@@ -105,16 +111,15 @@ def test_cli_real_subprocess_reports_an_unsettled_date(
             "--forecast-url",
             api_server.url,
         ],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
         timeout=60,
     )
-    assert (
-        completed.stdout == f"Forward evaluation: {output}\nRun record: {output}.runrecord.json\n"
+    assert (completed.returncode, completed.stdout) == (1, "")
+    assert completed.stderr.splitlines()[-1] == (
+        "ValueError: [FORWARD-007] 1 declared acquisitions are still outstanding, first paper-test"
     )
-    report = read_document(output)
-    assert (report["declared_dates"], report["scored_dates"]) == (1, 0)
-    assert require_dict(report, "criteria")["reason"] == "fewer than 3 scored dates"
+    assert (output.exists(), Path(str(output) + ".runrecord.json").exists()) == (False, False)
     with pytest.raises(NativeLibrariesAlreadyLoadedError):
         runpy.run_module("scripts.forward_weather_report", run_name="__main__")

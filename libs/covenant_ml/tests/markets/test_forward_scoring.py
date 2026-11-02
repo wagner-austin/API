@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from contextlib import closing
+from datetime import date, timedelta
 from pathlib import Path
 from statistics import stdev
 
@@ -53,6 +54,25 @@ def days(campaign: Campaign) -> list[str]:
     return [plan["event_day"] for plan in campaign["plans"]]
 
 
+def after_last_settlement_window(campaign: Campaign) -> str:
+    last = date.fromisoformat(campaign["plans"][-1]["event_day"]) + timedelta(days=2)
+    return last.isoformat() + "T17:00:00Z"
+
+
+def test_an_outstanding_declared_settlement_refuses_the_run(
+    api_server: ApiServer, tmp_path: Path, restore_clock: None
+) -> None:
+    campaign, root, digest, observed = forward_campaign(
+        api_server, tmp_path, [("binary", 1), ("unsettled", 1), ("unsettled", 1)]
+    )
+    plan = decode_forward_plan(plan_document(campaign, digest, days(campaign)))
+    with pytest.raises(
+        ValueError,
+        match=r"FORWARD-007\] 2 declared acquisitions are still outstanding, first paper-test-1$",
+    ):
+        score(plan, root, observed, api_server.url)
+
+
 def saved_model_probability(root: Path, name: str) -> float:
     capture = read_document(root / "reports" / (name + "-capture.json"))
     prediction = narrow_json_to_dict(require_list(capture, "predictions")[0])
@@ -70,10 +90,12 @@ def test_declared_dates_score_from_archives_without_requests(
         ("scalar", 1),
         ("unsettled", 1),
     ]
-    campaign, root, digest, observed = forward_campaign(api_server, tmp_path, outcomes)
+    campaign, root, digest, _ = forward_campaign(api_server, tmp_path, outcomes)
     requests = len(api_server.requests)
     plan = decode_forward_plan(plan_document(campaign, digest, days(campaign)))
-    report = score(plan, root, observed, api_server.url)
+    # After the last plan's settlement window closed with no attempt recorded.
+    late = after_last_settlement_window(campaign)
+    report = score(plan, root, late, api_server.url)
     assert len(api_server.requests) == requests
     assert (report["declared_dates"], report["scored_dates"], report["eligible_contracts"]) == (
         6,
@@ -81,18 +103,18 @@ def test_declared_dates_score_from_archives_without_requests(
         3,
     )
     dates = [narrow_json_to_dict(value) for value in require_list(report, "dates")]
-    assert [date["event_day"] for date in dates] == days(campaign)
+    assert [entry["event_day"] for entry in dates] == days(campaign)
     dispositions = [
-        narrow_json_to_dict(require_list(date, "plans")[0])["settlement"] for date in dates
+        narrow_json_to_dict(require_list(entry, "plans")[0])["settlement"] for entry in dates
     ]
-    assert dispositions == ["complete"] * 5 + ["future"]
-    assert [date["contracts"] for date in dates] == [1, 1, 1, 0, 0, 0]
-    assert [date["paired_brier_difference"] for date in dates[3:]] == [None, None, None]
+    assert dispositions == ["complete"] * 5 + ["unrecorded_overdue"]
+    assert [entry["contracts"] for entry in dates] == [1, 1, 1, 0, 0, 0]
+    assert [entry["paired_brier_difference"] for entry in dates[3:]] == [None, None, None]
     differences: list[float] = []
-    for frozen, date, (_, yes) in zip(campaign["plans"][:3], dates[:3], outcomes[:3], strict=True):
+    for frozen, entry, (_, yes) in zip(campaign["plans"][:3], dates[:3], outcomes[:3], strict=True):
         probability = saved_model_probability(root, frozen["name"])
         model, reference = (probability - yes) ** 2, (0.5 - yes) ** 2
-        assert (date["model_brier"], date["reference_brier"]) == pytest.approx((model, reference))
+        assert (entry["model_brier"], entry["reference_brier"]) == pytest.approx((model, reference))
         differences.append(model - reference)
     mean = sum(differences) / 3
     assert report["mean_paired_brier_difference"] == pytest.approx(mean)
