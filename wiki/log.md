@@ -541,3 +541,7 @@ Notes: Compared new staging claims with the controller, transfer and separate co
 ## [2026-11-01] evidence audit | Corrected CRSP runtime installation
 Pages updated: wrds-installed-runtime, wrds-baseline-readiness.
 Notes: Bound the current controller and image identities to service inspections of 623 installed members, seven wheels and native build 58739821. Checked fourteen image files, two self-check passes and successful dependency checks. Retained the old queue adapter and stopped study as historical evidence; installation does not complete a current-runtime queue rehearsal, amended resource rules or a substantive baseline. Encrypted validation staging independently passed audit ac4a9dc7. Board task 1ec0dbcb-4c25-455f-9c16-b2b8e3177a68.
+
+## [2026-11-01] evidence audit | Protocol-v2 automatic queue rehearsal
+Pages updated: wrds-installed-runtime, wrds-operational-rehearsals, wrds-baseline-readiness.
+Notes: Compared current-runtime claims with service preparation/native readings, shared queue completion and verified synthetic result bytes. Job 58740021 completed in seven seconds with four CPUs/16 GiB and sixteen verified inputs; the existing fleet worker reconciled it without a manual submit/reconcile call. The maintained pre-entry fixture is visible as an unfilled new purchase and separate prior-holding receivable. Kept licensed baseline execution, amended study rules and original failed-allocation cleanup outstanding. Board task be59eebf-5cfe-4116-986c-c84962f7cb18.

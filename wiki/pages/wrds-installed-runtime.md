@@ -4,12 +4,14 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
   "tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json": "d54e268ee85ba1691c10cead64e501f1814f1f94"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
@@ -25,9 +27,9 @@ confidence: medium
 
 The current separately installed controller and HPC3 image use source
 `8ef7e0f17`, including the audited version-2 CRSP corrections. Installation
-passed its service inspections. A complete queue rehearsal with this runtime
-and a successful substantive study remain outstanding. Current study status
-is in [[wrds-baseline-readiness]].[^current]
+passed its service inspections. A separate current-runtime queue rehearsal
+has now passed; the substantive study remains outstanding. Current study
+status is in [[wrds-baseline-readiness]].[^current][^v2]
 
 ## Installed identities
 
@@ -64,20 +66,24 @@ Four CPUs was not an enforced allocation ceiling. Preserve that discrepancy
 and freeze a feasible CPU/memory pair for the next study.[^allocation]
 
 The shared queue uses the installed `wrds-queue-b53b0ea34` adapter.
-A fresh synthetic request `eecf34ae` completed as native job `58719001`
-and was reconciled by `fleet-research-diphtheria`. Adapter identity and
-evaluator-image identity are separate provenance fields.[^controller]
+Historical synthetic request `eecf34ae` completed as native job `58719001`.
+The current rehearsal used queue `f1961f01` and native job `58740021`,
+automatically reconciled by `fleet-research-diphtheria`; its immutable
+specification selected the new evaluator interpreter. Adapter identity and
+evaluator-image identity are separate provenance fields.[^controller][^v2]
 
 ## Changing the runtime
 
-The corrected evaluator is installed separately. Amended study resources and
-a complete synthetic queue rehearsal remain required before a new licensed
+The corrected evaluator is installed separately and its synthetic queue
+rehearsal has passed. Amended rules remain required before a new licensed
 study. Installation is not a queue rehearsal or a substantive study result;
 no final grant release occurred during installation. The original failed
-journal, policy and image remain the record of [[wrds-baseline-20261101]].[^current][^preparation]
+journal, policy and image remain the record of [[wrds-baseline-20261101]].[^current][^preparation][^v2]
 
 [^current]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `service_reports`, `construction`, `historical_state`, `remaining` and `scope`.
 [^runtime]: `tools/hpc3/artifacts/wrds-summary-runtime-20261101/evidence.json`, `controller`, `image`, `construction`, `service_reports` and `scope`.
 [^preparation]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json`, frozen runtime, policy and first-attempt preparation.
 [^controller]: `tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json`, `queue.observation` and `scope`.
 [^allocation]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json`, `allocation`, exact `sacct_row`, partition limit and bounded interpretation.
+
+[^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.

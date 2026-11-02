@@ -4,12 +4,14 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
   - "libs/covenant_ml/docs/crsp-monthly.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
   "libs/covenant_ml/docs/crsp-monthly.json": "5f1ba7b27191aff1ace131976c28a8c3fd596e14"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
@@ -32,9 +34,9 @@ See [[wrds-baseline-20261101]] for the cause and correction boundary.[^stop]
 
 | Area | Evidence and current boundary |
 |---|---|
-| Runtime | [[wrds-installed-runtime]] — version-2 controller/image installed; current-runtime queue rehearsal pending.[^runtime] |
+| Runtime | [[wrds-installed-runtime]] — version-2 controller/image installed; current-runtime queue rehearsal passed.[^runtime][^v2] |
 | Data | [[wrds-licensed-data-evidence]] — version-2 validation staged and independently reread on HPC3; [[wrds-protocol-revision]] records lineage. |
-| Operations | [[wrds-operational-rehearsals]] — synthetic queue, seed summary, selection and controlled final execution. |
+| Operations | [[wrds-operational-rehearsals]] — current version-2 queue rehearsal plus historical seed summary, selection and controlled final execution.[^v2] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposal boundary and evaluator-owned final release. |
 | Cleanup | [[wrds-cleanup-evidence]] — bounded WRDS/HPC3 probes; failed licensed allocation still needs its own observation. |
 | Scientific rules | [[crsp-monthly-study-design]] and [[crsp-monthly-holdings-validation]] — frozen target, chronology, accounting and uncertainty. |
@@ -52,8 +54,9 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
    [[wrds-protocol-revision]]. Transfer and complete remote readback passed;
    the staged version-1 bundle remains historical.[^stage]
 - [x] Install the separately frozen version-2 controller and HPC3 image.[^runtime]
-- [ ] Freeze amended study rules and rehearse proposal → admission → queue
-   → native job → verified result with the installed version-2 runtime.
+- [x] Rehearse proposal → admission → queue → native job → verified result
+   with the installed version-2 runtime and pre-entry delisting fixture.[^v2]
+- [ ] Freeze amended licensed-study resource and candidate rules.
 - [ ] Close the failed allocation's cleanup-evidence gap.
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; final access stays a separate controlled step.
@@ -67,4 +70,6 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^diagnostic]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json`, `interpretation`, `cleanup_limit` and `study_action`; subsequent code correction is described in the linked incident page.
 [^stage]: `tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json`, `staging`, `readback` and `scope`; encrypted validation staging only, with no evaluator installation or final release.
 
-[^runtime]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `remaining` and `scope`; installation passed, with current-runtime queue rehearsal and substantive study still outstanding.
+[^runtime]: `tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json`, `controller`, `image`, `remaining` and `scope`; installation observation only; subsequent rehearsal is recorded separately and the substantive study remains outstanding.
+
+[^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.

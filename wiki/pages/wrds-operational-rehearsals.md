@@ -4,11 +4,13 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-baseline-readiness]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json"
   - "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json"
   - "tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-seed-summary-rehearsal-20261101/evidence.json": "fc1b6b3b20e99d4ea3d594c7cc11b222f9dfcf77"
   "tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json": "0fe368911bbfdd7de3d68047e27f13463e86593e"
   "tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json": "2ef67b9d8ea85e09cf92c99d7ec56b96b07cb609"
@@ -25,6 +27,24 @@ These are synthetic workflow measurements. They show which execution and
 control paths ran; they do not estimate licensed CRSP performance. Current
 deployment and study status are separate in [[wrds-installed-runtime]] and
 [[wrds-baseline-readiness]].[^summary][^selection][^final][^wrds]
+
+## Current protocol-v2 queue rehearsal
+
+One fresh encrypted synthetic attempt used the installed `8ef7e0f17`
+controller and image. The maintained pre-entry fixture delists security 8 on
+2019-02-28 before entry on 2019-03-01. The existing shared queue submitted
+native job `58740021`, which completed in seven seconds with four CPUs and
+16 GiB; automatic reconciliation marked queue `f1961f01` passed. Replay
+returned the same queue identity and the journal retained one complete job.[^v2]
+
+Service inspection verified sixteen pinned inputs and sixteen compute checksum
+receipts, then bound the result and shared RunRecord to that allocation.
+The result has fifteen strategy/cost cases over sixteen validation months and
+four paired comparisons. Selected new purchases of security 8 are unfilled;
+the old holding's terminal receivable is separate. Readback checks confirm
+ending weights sum to one and costs equal actual turnover times the cost rate.
+This synthetic rehearsal does not establish licensed baseline performance or
+cleanup of the earlier failed allocation. No final grant was released.[^v2]
 
 ## Queue through seed summary
 
@@ -68,3 +88,5 @@ Final-data permissions remain governed by [[wrds-proposer-isolation]] and
 [^selection]: `tools/hpc3/artifacts/wrds-selection-recovery-20261101/selection.json`, `scope`, `required_seeds`, `queue` and `reports`.
 [^final]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/rehearsal.json`, `validation`, `final`, `grant`, `recorded_failures` and `limitations`.
 [^wrds]: `tools/hpc3/artifacts/wrds-final-runtime-20261030/wrds-native.json`, `measurements`, `repeatability` and `limits`.
+
+[^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
