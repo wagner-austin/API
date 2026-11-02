@@ -65,14 +65,30 @@ class ContractPath(NamedTuple):
     """One contract's session returns and the fixing assumptions it needed.
 
     Attributes:
-        returns: One simple return per session after the start.
+        returns: One simple return per session after the start; empty for an
+            excluded contract.
         gap_sessions: Sessions carried flat inside a missing-price span.
         terminal: Whether the security was delisted inside the contract's life.
+        exclusion: None for a built contract, else why the vendor's records
+            cannot value its life.
     """
 
     returns: NDArray[np.float64]
     gap_sessions: int
     terminal: bool
+    exclusion: str | None
+
+
+def _excluded(reason: str) -> ContractPath:
+    """Record a contract that is not built.
+
+    Args:
+        reason: Why the vendor's records cannot value its life.
+
+    Returns:
+        A path with no returns and no fixing assumptions.
+    """
+    return ContractPath(np.empty(0, dtype=np.float64), 0, False, reason)
 
 
 class PathCounts(TypedDict, total=True):
@@ -144,7 +160,7 @@ def decode_path_counts(value: JSONValue) -> PathCounts:
 
 def contract_path(
     outcomes: CrspOutcomes, permno: int, start: str, days: tuple[str, ...]
-) -> ContractPath | str:
+) -> ContractPath:
     """Build one contract's session returns from verified spans.
 
     Args:
@@ -154,8 +170,9 @@ def contract_path(
         days: The contract's sessions after the start, maturity last.
 
     Returns:
-        The returns and the fixing assumptions they needed, or the reason the
-        vendor's records cannot value the life: a held-return refusal of
+        The returns and the fixing assumptions they needed, or an excluded
+        path naming why the vendor's records cannot value the life: a
+        held-return refusal of
         :func:`~covenant_ml.markets.crsp_return_path.crsp_resolve_held`, a
         terminal refusal of
         :func:`~covenant_ml.markets.crsp_calendar.crsp_resolve_terminal`, or
@@ -167,23 +184,23 @@ def contract_path(
         if start <= json_str(row, "delistingdt") < days[-1]
     ]
     if len(events) > 1:
-        return "two delistings"
+        return _excluded("two delistings")
     event = events[0] if events else None
     end = days[-1] if event is None else json_str(event, "delistingdt")
     held = days[: bisect_right(days, end)]
     resolution = crsp_resolve_held(outcomes.returns, permno, start, held)
     if resolution.refusal is not None:
-        return resolution.refusal.reason
+        return _excluded(resolution.refusal.reason)
     growth: NDArray[np.float64] = np.ones(len(days), dtype=np.float64)
     for index, value in resolution.spans:
         growth[index] = value
     if event is not None:
         terminal = crsp_resolve_terminal(event)
         if terminal.refusal is not None:
-            return terminal.refusal
+            return _excluded(terminal.refusal)
         growth[len(held)] = terminal.multiplier
     returns: NDArray[np.float64] = growth - 1.0
-    return ContractPath(returns, len(held) - len(resolution.spans), event is not None)
+    return ContractPath(returns, len(held) - len(resolution.spans), event is not None, None)
 
 
 def realized_contracts(
@@ -232,8 +249,8 @@ def realized_contracts(
         decisions += 1
         for feature in decision.features:
             path = contract_path(outcomes, feature.permno, start, days)
-            if isinstance(path, str):
-                excluded[path] = excluded.get(path, 0) + 1
+            if path.exclusion is not None:
+                excluded[path.exclusion] = excluded.get(path.exclusion, 0) + 1
                 continue
             permnos.append(feature.permno)
             months.append(month)

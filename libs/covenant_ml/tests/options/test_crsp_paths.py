@@ -65,10 +65,9 @@ def test_ordinary_sessions_carry_their_own_returns(tmp_path: Path) -> None:
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-01-02", "2019-01-03", "2019-01-04")
     path = contract_path(outcomes, 1, "2019-01-01", days)
-    assert isinstance(path, ContractPath)
     expected: list[float] = [_return(rows, 1, day) for day in days]
     assert listed(path.returns) == pytest.approx(expected)
-    assert (path.gap_sessions, path.terminal) == (0, False)
+    assert (path.gap_sessions, path.terminal, path.exclusion) == (0, False, None)
 
 
 def test_a_missing_price_span_is_carried_flat_and_closed_once(tmp_path: Path) -> None:
@@ -78,11 +77,10 @@ def test_a_missing_price_span_is_carried_flat_and_closed_once(tmp_path: Path) ->
     spans = crsp_held_spans(outcomes.returns, 7, "2019-03-08", days)
     assert [index for index, _ in spans] == [1, 2]
     path = contract_path(outcomes, 7, "2019-03-08", days)
-    assert isinstance(path, ContractPath)
     closed = _return(rows, 7, "2019-03-12")
     expected: list[float] = [0.0, closed, _return(rows, 7, "2019-03-13")]
     assert listed(path.returns) == pytest.approx(expected)
-    assert (path.gap_sessions, path.terminal) == (1, False)
+    assert (path.gap_sessions, path.terminal, path.exclusion) == (1, False, None)
     growth = crsp_compound_held(outcomes.returns, 7, "2019-03-08", days)
     assert growth == pytest.approx((1 + closed) * (1 + _return(rows, 7, "2019-03-13")))
 
@@ -92,12 +90,11 @@ def test_a_delisting_applies_its_terminal_value_once_and_holds_it(tmp_path: Path
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-03-13", "2019-03-14", "2019-03-15", "2019-03-18", "2019-03-19")
     path = contract_path(outcomes, DELISTED, "2019-03-12", days)
-    assert isinstance(path, ContractPath)
     held = [_return(rows, DELISTED, "2019-03-13"), _return(rows, DELISTED, "2019-03-14")]
     # The daily copy on 2019-03-15 carries +30% and is never read.
     expected: list[float] = [*held, -0.25, 0.0, 0.0]
     assert listed(path.returns) == pytest.approx(expected)
-    assert (path.gap_sessions, path.terminal) == (0, True)
+    assert (path.gap_sessions, path.terminal, path.exclusion) == (0, True, None)
 
 
 def test_a_delisting_on_the_last_session_ends_nothing_early(tmp_path: Path) -> None:
@@ -105,13 +102,17 @@ def test_a_delisting_on_the_last_session_ends_nothing_early(tmp_path: Path) -> N
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-03-13", "2019-03-14")
     path = contract_path(outcomes, DELISTED, "2019-03-12", days)
-    assert isinstance(path, ContractPath)
-    assert path.terminal is False
+    assert (path.terminal, path.exclusion) == (False, None)
     expected: list[float] = [_return(rows, DELISTED, day) for day in days]
     assert listed(path.returns) == pytest.approx(expected)
 
 
 LIFE = ("2019-03-13", "2019-03-14", "2019-03-15")
+
+
+def _exclusion(path: ContractPath) -> tuple[str | None, int, int, bool]:
+    """The fields an excluded path must carry: its reason and nothing measured."""
+    return path.exclusion, int(path.returns.size), path.gap_sessions, path.terminal
 
 
 def test_two_delistings_inside_one_life_exclude_the_contract(tmp_path: Path) -> None:
@@ -120,14 +121,16 @@ def test_two_delistings_inside_one_life_exclude_the_contract(tmp_path: Path) -> 
     second.update({"delistingdt": "2019-03-13", "deldlydt": "2019-03-14", "delamtdt": "2019-03-14"})
     rows["delists"].append(second)
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
-    assert contract_path(outcomes, DELISTED, "2019-03-12", LIFE) == "two delistings"
+    path = contract_path(outcomes, DELISTED, "2019-03-12", LIFE)
+    assert _exclusion(path) == ("two delistings", 0, 0, False)
 
 
 def test_a_delisting_the_vendor_cannot_value_excludes_the_contract(tmp_path: Path) -> None:
     rows = study_rows()
     rows["delists"][0].update({"delretmisstype": "DM", "delret": None})
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
-    assert contract_path(outcomes, DELISTED, "2019-03-12", LIFE) == "delisting DM"
+    path = contract_path(outcomes, DELISTED, "2019-03-12", LIFE)
+    assert _exclusion(path) == ("delisting DM", 0, 0, False)
 
 
 def _flag(rows: dict[str, list[JSONObject]], permno: int, day: str) -> None:
@@ -145,7 +148,8 @@ def test_a_return_the_vendor_flags_missing_excludes_the_contract(tmp_path: Path)
     _flag(rows, 1, "2019-01-03")
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-01-02", "2019-01-03", "2019-01-04")
-    assert contract_path(outcomes, 1, "2019-01-01", days) == "span MV/DU"
+    path = contract_path(outcomes, 1, "2019-01-01", days)
+    assert _exclusion(path) == ("span MV/DU", 0, 0, False)
 
 
 def test_contracts_follow_the_panel_and_count_their_assumptions(tmp_path: Path) -> None:

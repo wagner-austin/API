@@ -19,6 +19,7 @@ from covenant_ml.markets.crsp_holdings import (
 )
 from covenant_ml.markets.crsp_panel import build_crsp_panel
 from covenant_ml.markets.crsp_return_path import (
+    HeldRefusal,
     crsp_compound_held,
     crsp_held_spans,
     crsp_resolve_held,
@@ -186,7 +187,7 @@ FLAGGED_DAYS = ("2020-06-02", "2020-06-03")
 
 
 @pytest.mark.parametrize(
-    ("records", "reason", "code"),
+    ("records", "refusal"),
     [
         (
             {
@@ -194,31 +195,38 @@ FLAGGED_DAYS = ("2020-06-02", "2020-06-03")
                     1, W1.entry, 0.1, dlyprevdt=FLAGGED_ENTRY, dlyretmissflg="MV"
                 )
             },
-            "span MV/DU",
-            "CRSP-009",
+            HeldRefusal(
+                "span MV/DU", "[CRSP-009] held return for 1 on 2020-06-02 has an invalid span"
+            ),
         ),
         (
             {
                 (1, FLAGGED_DAYS[0]): missing(FLAGGED_DAYS[0]),
                 (1, FLAGGED_DAYS[1]): daily(1, W1.entry, 0.1, dlyprevdt=FLAGGED_ENTRY),
             },
-            "span NA/DU after a price gap",
-            "CRSP-009",
+            HeldRefusal(
+                "span NA/DU after a price gap",
+                "[CRSP-009] held return for 1 on 2020-06-03 has an invalid span",
+            ),
         ),
-        ({}, "absent row", "CRSP-009"),
-        ({(1, FLAGGED_DAYS[0]): missing(FLAGGED_DAYS[0])}, "price gap tail", "CRSP-011"),
+        (
+            {},
+            HeldRefusal("absent row", "[CRSP-009] held return for 1 on 2020-06-02 is absent"),
+        ),
+        (
+            {(1, FLAGGED_DAYS[0]): missing(FLAGGED_DAYS[0])},
+            HeldRefusal(
+                "price gap tail", "[CRSP-011] held return for 1 ends with an unresolved price gap"
+            ),
+        ),
     ],
 )
 def test_resolution_names_its_first_refusal_and_keeps_no_partial_span(
-    records: dict[tuple[int, str], JSONObject], reason: str, code: str
+    records: dict[tuple[int, str], JSONObject], refusal: HeldRefusal
 ) -> None:
     days = FLAGGED_DAYS[: max(1, len(records))]
-    resolution = crsp_resolve_held(records, 1, FLAGGED_ENTRY, days)
-    assert resolution.spans == ()
-    assert resolution.refusal is not None
-    assert resolution.refusal.reason == reason
-    assert resolution.refusal.message.startswith(f"[{code}] held return for 1 ")
-    with pytest.raises(ValueError, match=re.escape(resolution.refusal.message)):
+    assert crsp_resolve_held(records, 1, FLAGGED_ENTRY, days) == ((), refusal)
+    with pytest.raises(ValueError, match=re.escape(refusal.message)):
         crsp_held_spans(records, 1, FLAGGED_ENTRY, days)
 
 
