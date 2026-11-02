@@ -6,7 +6,13 @@ from datetime import date, timedelta
 from math import isfinite
 from typing import NamedTuple
 
-from platform_core.json_utils import JSONObject, require_float, require_int, require_str
+from platform_core.json_utils import (
+    JSONObject,
+    optional_float,
+    require_float,
+    require_int,
+    require_str,
+)
 
 from .crsp_protocol import CrspProtocol
 from .validation import require_day
@@ -182,9 +188,10 @@ def require_crsp_execution_price(row: JSONObject, protocol: CrspProtocol) -> flo
     Raises:
         ValueError: CRSP-004 for an unexecutable or missing price.
     """
-    price = require_float(row, "dlyprc")
+    price = optional_float(row, "dlyprc")
     if (
-        require_str(row, "dlyprcflg") != protocol["execution_flag"]
+        price is None
+        or require_str(row, "dlyprcflg") != protocol["execution_flag"]
         or not isfinite(price)
         or price <= 0
     ):
