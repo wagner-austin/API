@@ -91,8 +91,10 @@ frozen study controller or its requests.[^preparation][^v3stop][^mounts]
 2. Only after a qualified new freeze, execute validation, select under fixed
    rules, and perform the controlled final evaluation.[^v3stop]
 
-Follow-up task `f963ee0b` tracks that protocol/source qualification. The reviewed
-source diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
+Follow-up task `f963ee0b` tracks that protocol/source qualification.
+[[crsp-outcome-qualification]] maps every diagnosed class to its evidence
+requirements, including partition-boundary event visibility. The reviewed source
+diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
 verified the explicit protocol stop. Source-diagnosis task `a9ad53ae` then passed
