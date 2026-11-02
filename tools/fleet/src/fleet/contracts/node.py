@@ -30,6 +30,7 @@ from typing_extensions import TypedDict
 from fleet.contracts.action_cache import ActionCacheCounts
 from fleet.contracts.budget import NodeBudget, decode_node_budget, encode_node_budget
 from fleet.contracts.capability import Capability, decode_capability
+from fleet.contracts.gpu_reading import GpuReading
 
 
 class NodeGpu(TypedDict):
@@ -221,6 +222,10 @@ class NodeState(TypedDict):
             d77b8c73), or None where neither has one. A runtime cap set by
             whoever is using the machine lands here: loki's check slice was
             held to one CPU while its probe reported 16 cores.
+        gpus: Every display device on the node with its memory, when a
+            driver counter reads it (:mod:`fleet.core.linux_gpu_probe`, MCPs
+            board task b4d5ca0f); empty for a node with none. Carried to the
+            tick, never weighed.
     """
 
     host: str
@@ -233,6 +238,7 @@ class NodeState(TypedDict):
     cpu_pressure_pct: float
     io_pressure_pct: float
     check_cpu_quota: float | None
+    gpus: tuple[GpuReading, ...]
 
 
 def encode_node_gpu(gpu: NodeGpu) -> JSONObject:

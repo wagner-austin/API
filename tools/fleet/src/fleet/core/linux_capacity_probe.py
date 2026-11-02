@@ -78,6 +78,7 @@ than read as holding nothing.
 from __future__ import annotations
 
 from fleet.core import reservations
+from fleet.core.linux_gpu_probe import GPU_PROBE_PART
 
 #: Where the probe reads memory from; the test replaces it.
 MEMINFO_LINE = "meminfo=/proc/meminfo\n"
@@ -167,7 +168,10 @@ RESERVATIONS_PART = (
     + f"printf '{reservations.RESERVED_CORES_FIELD}=%s\\n' \"$reserved\"\n"
 )
 
-#: The probe after the dialect's prologue, verbatim.
+#: The probe after the dialect's prologue, verbatim. The GPU lines come last
+#: (:mod:`fleet.core.linux_gpu_probe`, MCPs board task b4d5ca0f): a node
+#: whose reservations cannot be read has already ended the probe, and its
+#: reading is refused whatever its GPUs are.
 CAPACITY_PROBE_BODY = (
     MEMINFO_LINE
     + 'awk \'/^MemAvailable:/ { printf "free_ram_gb=%.3f\\n", $2 / 1048576 }\' "$meminfo"\n'
@@ -176,6 +180,7 @@ CAPACITY_PROBE_BODY = (
     + PRESSURE_PART
     + CHECK_QUOTA_PART
     + RESERVATIONS_PART
+    + GPU_PROBE_PART
 )
 
 __all__ = [

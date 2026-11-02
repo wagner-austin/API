@@ -74,6 +74,7 @@ class TestProbe:
             "cpu_pressure_pct": 0.0,
             "io_pressure_pct": 0.0,
             "check_cpu_quota": None,
+            "gpus": (),
         }
 
     def test_a_node_reports_its_cpu_and_io_pressure(self) -> None:
@@ -81,6 +82,7 @@ class TestProbe:
         output = (
             "free_ram_gb=4.073\nfree_disk_gb=206.206\nlogical_cores=8\n"
             "cpu_pressure_pct=14.06\nio_pressure_pct=68.81\ncheck_cpu_quota=max\nreserved_cores=0\n"
+            "gpu_count=0\n"
         )
 
         state = probe.parse_probe("diphtheria", output, live=IDLE)
@@ -92,6 +94,7 @@ class TestProbe:
         output = (
             "free_ram_gb=25.0\nfree_disk_gb=663.0\nlogical_cores=16\n"
             "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=1.000\nreserved_cores=0\n"
+            "gpu_count=0\n"
         )
 
         state = probe.parse_probe("loki", output, live=IDLE)
@@ -341,6 +344,7 @@ class TestDescribeNode:
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
         check_cpu_quota=None,
+        gpus=(),
     )
 
     def test_it_names_the_architecture_and_what_live_runs_hold(self) -> None:

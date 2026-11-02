@@ -17,6 +17,7 @@ import pytest
 from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.core import probe
 from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION
+from fleet.core.linux_gpu_probe import GPU_PROBE_PART, read_gpus
 from fleet.core.linux_capacity_probe import (
     CAPACITY_PROBE_BODY,
     CHECK_QUOTA_LINE,
@@ -55,7 +56,9 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_SCRIPT.startswith(PROLOGUE + CAPACITY_PROBE_BODY)
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
-    assert CAPACITY_PROBE_BODY.endswith(PRESSURE_PART + CHECK_QUOTA_PART + RESERVATIONS_PART)
+    assert CAPACITY_PROBE_BODY.endswith(
+        PRESSURE_PART + CHECK_QUOTA_PART + RESERVATIONS_PART + GPU_PROBE_PART
+    )
     assert CHECK_QUOTA_PART.startswith(CHECK_QUOTA_LINE)
     assert CHECK_QUOTA_LINE == (
         "check_quota=$(systemctl show system-dispatch-checks.slice system-dispatch.slice"
@@ -93,8 +96,13 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     counted = set(PROBE_FIELDS) & set(fields)
     assert counted in (set(), set(PROBE_FIELDS))
 
-    reported = {*probe.REQUIRED_FIELDS, "logical_cores", probe.CHECK_QUOTA_FIELD}
-    assert set(fields) == reported | counted | (
+    # Every display device on this host, then their count (MCPs board task
+    # b4d5ca0f); each line reads as a GPU, so none is a zero.
+    gpus, problem = read_gpus("this host", fields)
+    assert gpus is not None, problem
+    devices = {f"gpu_{index}" for index in range(len(gpus))}
+    reported = {*probe.REQUIRED_FIELDS, "logical_cores", probe.CHECK_QUOTA_FIELD, "gpu_count"}
+    assert set(fields) == reported | counted | devices | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
     # MemAvailable, which the kernel never reports below zero.

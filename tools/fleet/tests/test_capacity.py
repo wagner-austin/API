@@ -123,6 +123,7 @@ def _state(
         cpu_pressure_pct=cpu_pressure_pct,
         io_pressure_pct=io_pressure_pct,
         check_cpu_quota=check_cpu_quota,
+        gpus=(),
     )
 
 

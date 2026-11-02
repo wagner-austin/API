@@ -13,6 +13,7 @@ from platform_core.json_utils import (
 )
 
 from fleet.contracts.action_cache import ActionCacheCounts
+from fleet.contracts.gpu_reading import GpuMemory, GpuReading, GpuSource
 from fleet.contracts.runner_tick import (
     RunnerTick,
     TickLoad,
@@ -30,12 +31,39 @@ from tests._queue_fakes import (
     FakeRefusingQueue,
 )
 
+#: sedona's card as nvidia-smi read it over ssh on 2026-11-02: 8192 MiB, 7828 free.
+SEDONA_GPU = GpuReading(
+    address="0000:01:00.0",
+    vendor="nvidia",
+    name="NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+    driver="nvidia",
+    memory=GpuMemory(
+        source=GpuSource.NVIDIA_SMI, total_bytes=8192 * 1048576, free_bytes=7828 * 1048576
+    ),
+)
+
+#: The same card encoded as dispatch_tick's load carries it.
+SEDONA_GPU_WIRE: JSONObject = {
+    "address": "0000:01:00.0",
+    "vendor": "nvidia",
+    "name": "NVIDIA GeForce RTX 3070 Ti Laptop GPU",
+    "driver": "nvidia",
+    "memory": {"source": "nvidia-smi", "totalBytes": 8589934592, "freeBytes": 8208252928},
+}
+
 #: sedona's tick when its runner could claim two projects.
 SEDONA = RunnerTick(
     node="sedona",
     tags=(NodeTag.CXX, NodeTag.GPU, NodeTag.LINUX),
     fits=("libs/platform_core", "tools/fleet"),
-    load=TickLoad(runs=1, workers=8, free_ram_gb=9.5, free_disk_gb=412.5, action_cache=None),
+    load=TickLoad(
+        runs=1,
+        workers=8,
+        free_ram_gb=9.5,
+        free_disk_gb=412.5,
+        action_cache=None,
+        gpus=(SEDONA_GPU,),
+    ),
     claiming=True,
     verdict="sedona asked for 2 fitting project(s); nothing in the node lane matched",
 )
@@ -51,6 +79,7 @@ LAVENDER = RunnerTick(
         free_ram_gb=11.0,
         free_disk_gb=150.0,
         action_cache=ActionCacheCounts(runners=8, reading=8, served=8, missed=0),
+        gpus=(),
     ),
     claiming=True,
     verdict="lavender-wsl asked for 1 fitting project(s)",
@@ -60,11 +89,12 @@ LAVENDER = RunnerTick(
 OVERCOUNTED: JSONObject = {"runners": 8, "reading": 9, "served": 0, "missed": 0}
 
 
-def _sedona_load(action_cache: JSONValue) -> JSONObject:
-    """sedona's encoded load carrying the given ``actionCache`` value.
+def _sedona_load(action_cache: JSONValue, gpus: JSONValue) -> JSONObject:
+    """sedona's encoded load carrying the given ``actionCache`` and ``gpus``.
 
     Args:
         action_cache: What the load's ``actionCache`` holds.
+        gpus: What the load's ``gpus`` holds.
 
     Returns:
         The load as the wire carries it.
@@ -75,6 +105,7 @@ def _sedona_load(action_cache: JSONValue) -> JSONObject:
         "freeRamGb": 9.5,
         "freeDiskGb": 412.5,
         "actionCache": action_cache,
+        "gpus": gpus,
     }
 
 
@@ -107,6 +138,7 @@ class TestTheWireShape:
                 "freeRamGb": 9.5,
                 "freeDiskGb": 412.5,
                 "actionCache": None,
+                "gpus": [SEDONA_GPU_WIRE],
             },
         }
 
@@ -117,6 +149,7 @@ class TestTheWireShape:
             "freeRamGb": 11.0,
             "freeDiskGb": 150.0,
             "actionCache": {"runners": 8, "reading": 8, "served": 8, "missed": 0},
+            "gpus": [],
         }
 
     def test_a_silent_node_omits_its_load(self) -> None:
@@ -144,12 +177,30 @@ class TestTheWireShape:
                 "load.actionCache is missing",
             ),
             (
-                {**encode_runner_tick(SEDONA), "load": _sedona_load(8)},
+                {**encode_runner_tick(SEDONA), "load": _sedona_load(8, [])},
                 "actionCache must be a JSON object or null, got int",
             ),
             (
-                {**encode_runner_tick(SEDONA), "load": _sedona_load(OVERCOUNTED)},
+                {**encode_runner_tick(SEDONA), "load": _sedona_load(OVERCOUNTED, [])},
                 "do not describe one set of runners: 8 runner.s., 9 reading, 0 served, 0 missed",
+            ),
+            (
+                {
+                    **encode_runner_tick(SEDONA),
+                    "load": {k: v for k, v in _sedona_load(None, []).items() if k != "gpus"},
+                },
+                "load.gpus is missing",
+            ),
+            (
+                {**encode_runner_tick(SEDONA), "load": _sedona_load(None, {"gpu": 1})},
+                "gpus must be a JSON list, got dict",
+            ),
+            (
+                {
+                    **encode_runner_tick(SEDONA),
+                    "load": _sedona_load(None, [{**SEDONA_GPU_WIRE, "vendor": "NVIDIA"}]),
+                },
+                "0000:01:00.0's vendor is outside the vocabulary: 'NVIDIA'",
             ),
         ],
         ids=[
@@ -161,6 +212,9 @@ class TestTheWireShape:
             "no action cache key",
             "action cache not an object",
             "action cache over-counted",
+            "no gpus key",
+            "gpus not a list",
+            "a gpu outside its shape",
         ],
     )
     def test_a_malformed_tick_is_refused_by_name(self, value: JSONValue, message: str) -> None:

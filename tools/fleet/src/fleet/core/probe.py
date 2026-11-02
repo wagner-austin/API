@@ -6,8 +6,9 @@ rule. The body is a CONSTANT (:data:`fleet.core.dialect.CAPACITY_PROBE_SCRIPT`):
 nothing is substituted into it by this package, so there is no value that
 could carry a quote into a shell.
 
-WHAT IT REPORTS AND WHAT IT DOES NOT. Free memory and free disk, and nothing
-about processes. It would be easy to count the node's ``python`` instances
+WHAT IT REPORTS AND WHAT IT DOES NOT. Free memory, free disk and every GPU
+with its memory (:mod:`fleet.core.linux_gpu_probe`), and nothing about
+processes. It would be easy to count the node's ``python`` instances
 and call that its load; that number is unattributable -- some are the owner's
 editor, some are another tool's -- and acting on it would make the fleet's
 behaviour depend on software it does not manage. Live fleet runs come from the
@@ -37,6 +38,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from fleet.contracts.action_cache import PROBE_FIELDS, ActionCacheCounts, inconsistency
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState, SliceMemory
 from fleet.core import dialect, names, remote, reservations
+from fleet.core.linux_gpu_probe import read_gpus
 
 #: The share of the last minute a runnable task waited for a CPU (MCPs board
 #: task 2ce5dc13).
@@ -158,6 +160,9 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
     action_cache, cache_problem = _read_action_cache(host, fields, output)
     if cache_problem:
         return ProbeOutcome(state=None, reason=cache_problem)
+    gpus, gpu_problem = read_gpus(host, fields)
+    if gpus is None:
+        return ProbeOutcome(state=None, reason=gpu_problem)
     return ProbeOutcome(
         state=NodeState(
             host=host,
@@ -170,6 +175,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             cpu_pressure_pct=readings[PRESSURE_FIELD],
             io_pressure_pct=readings[IO_PRESSURE_FIELD],
             check_cpu_quota=check_cpu_quota,
+            gpus=gpus,
         ),
         reason="",
     )

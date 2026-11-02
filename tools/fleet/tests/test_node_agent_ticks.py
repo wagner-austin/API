@@ -31,8 +31,16 @@ from tests.conftest import CALM, DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
 #: lavender's load with 27.0 GB of memory and 860.0 GB of disk free and no
-#: live run, PROBE_OK's answer, which publishes no action cache counts.
-ROOMY = {"runs": 0, "workers": 0, "freeRamGb": 27.0, "freeDiskGb": 860.0, "actionCache": None}
+#: live run, PROBE_OK's answer, which publishes no action cache counts and
+#: no GPU.
+ROOMY = {
+    "runs": 0,
+    "workers": 0,
+    "freeRamGb": 27.0,
+    "freeDiskGb": 860.0,
+    "actionCache": None,
+    "gpus": [],
+}
 
 
 def _ticked(
@@ -141,6 +149,7 @@ class TestATickThatClaimsNothing:
             "freeRamGb": float(free),
             "freeDiskGb": 860.0,
             "actionCache": None,
+            "gpus": [],
         }
         assert narrow_json_to_str(tick["verdict"]).startswith(verdict)
 

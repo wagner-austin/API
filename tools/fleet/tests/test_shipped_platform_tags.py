@@ -103,6 +103,7 @@ def _idle(node: NodeConfig) -> NodeState:
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
         check_cpu_quota=None,
+        gpus=(),
     )
 
 
