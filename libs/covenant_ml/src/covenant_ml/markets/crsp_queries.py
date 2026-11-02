@@ -144,20 +144,21 @@ def crsp_relation_sql(
         max_rows: Positive per-relation row limit.
         securities: Explicit sorted, unique positive identifiers for a diagnostic
             cohort, or None for the complete eligible universe. A cohort is
-            permitted only in the train-validation partition.
+            permitted only for the exact train-validation scope derived from
+            this protocol, including every observation and calendar bound.
 
     Returns:
         Exact SQL bytes to save and execute, keyed by relation role.
 
     Raises:
         ValueError: CRSP-010 for a nonpositive row limit, malformed cohort or a
-            cohort requesting final observations.
+            cohort scope differing from the frozen train-validation bounds.
     """
     if max_rows < 1:
         raise ValueError("[CRSP-010] the row limit must be positive")
     if securities is not None:
-        if scope.partition != "train-validation":
-            raise ValueError("[CRSP-010] diagnostic cohorts cannot query final observations")
+        if scope != crsp_scopes(protocol)[0]:
+            raise ValueError("[CRSP-010] diagnostic cohorts require the frozen validation scope")
         if (
             not securities
             or any(type(value) is not int or value < 1 for value in securities)
