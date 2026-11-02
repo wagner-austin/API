@@ -1,0 +1,1875 @@
+[
+  {
+    "id": "58a97839-5bf7-40d1-9686-0c681f089b81",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T00:59:25.132022+00:00",
+    "header": "HPC3 STAGE LOAD-REPORT",
+    "payload": {
+      "host": "hpc3",
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "manifest": {
+        "files": [
+          {
+            "name": "bundle.json",
+            "sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+            "size_bytes": 2933
+          },
+          {
+            "name": "calendar.csv.age",
+            "sha256": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+            "size_bytes": 27667
+          },
+          {
+            "name": "calendar.sql.age",
+            "sha256": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+            "size_bytes": 427
+          },
+          {
+            "name": "delists.csv.age",
+            "sha256": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+            "size_bytes": 359
+          },
+          {
+            "name": "delists.sql.age",
+            "sha256": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+            "size_bytes": 352
+          },
+          {
+            "name": "manifest.json.age",
+            "sha256": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+            "size_bytes": 1529
+          },
+          {
+            "name": "membership.csv.age",
+            "sha256": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+            "size_bytes": 533
+          },
+          {
+            "name": "membership.sql.age",
+            "sha256": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+            "size_bytes": 324
+          },
+          {
+            "name": "protocol.json.age",
+            "sha256": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+            "size_bytes": 1449
+          },
+          {
+            "name": "returns.csv.age",
+            "sha256": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+            "size_bytes": 483640
+          },
+          {
+            "name": "returns.sql.age",
+            "sha256": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+            "size_bytes": 459
+          }
+        ],
+        "provenance": {
+          "partition": "train-validation",
+          "encrypted_bundle": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+          "plaintext_manifest": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c"
+        },
+        "destination": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation"
+      },
+      "verified_files": 11,
+      "expected_sha256": "f2f8dacc18951a70d1ecdfd9b92b8f5ba855e8006804a35659349b01373ac1c0",
+      "manifest_sha256": "5be57de6e7158852d270088b246b4ce47e1a0b8eca2c32a9f1b3b1525876b025",
+      "controller_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+      "certification_path": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/validation-stage-digests.txt",
+      "certification_sha256": "c7dbd79eb8051420176ef6ded10110fefc4819398ed520389f8ac06438c97ec1",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    }
+  },
+  {
+    "id": "36885015-fd26-4ebc-ba29-2fb8cb3363da",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T00:59:45.297908+00:00",
+    "header": "HPC3 STAGE LOAD-REPORT",
+    "payload": {
+      "host": "hpc3",
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "manifest": {
+        "files": [
+          {
+            "name": "access.json",
+            "sha256": "2549731a66f04bb070da4e24c5af366bd14a1eee89cdf3f4087e5d917ab86b7b",
+            "size_bytes": 287
+          }
+        ],
+        "provenance": {
+          "board_task": "be59eebf-5cfe-4116-986c-c84962f7cb18",
+          "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+        },
+        "destination": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint"
+      },
+      "verified_files": 1,
+      "expected_sha256": "fdb8bd649e6165c07b5d4519a14fe357ebc108cf23a6940b28c2254daef3a8d0",
+      "manifest_sha256": "505eca74af43175ea99bd35aafbe2c4e6442c3c6a62b33e4771de684290e78c2",
+      "controller_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+      "certification_path": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/access-stage-digests.txt",
+      "certification_sha256": "2cbcfffee09e019f9b6c3eb86bd3c57adeb8b93451b0cb338d5cd35c9d162434",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    }
+  },
+  {
+    "id": "a7e02e6d-73af-47c0-ad24-e055980cde4c",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T00:59:46.200391+00:00",
+    "header": "HPC3 STAGE LOAD-REPORT",
+    "payload": {
+      "host": "hpc3",
+      "kind": "HPC3_STAGE_EVIDENCE",
+      "manifest": {
+        "files": [
+          {
+            "name": "__init__.py",
+            "sha256": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+            "size_bytes": 37
+          },
+          {
+            "name": "research_trial.py",
+            "sha256": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+            "size_bytes": 3100
+          }
+        ],
+        "provenance": {
+          "board_task": "be59eebf-5cfe-4116-986c-c84962f7cb18",
+          "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+        },
+        "destination": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts"
+      },
+      "verified_files": 2,
+      "expected_sha256": "fdb8bd649e6165c07b5d4519a14fe357ebc108cf23a6940b28c2254daef3a8d0",
+      "manifest_sha256": "f9e5b5ec574922e3f535c632905564924ce4fcdaa68fceacefb75efd1f1606b3",
+      "controller_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+      "certification_path": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts/scripts-stage-digests.txt",
+      "certification_sha256": "782576760244cb7aeba75ae51b3ae6a849b0f9cad9463f4df93866b7fdc7e053",
+      "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+    }
+  },
+  {
+    "id": "53f51ec6-c7cd-49c6-8eb3-bf799345dfdb",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T01:00:05.310179+00:00",
+    "header": "RESEARCH PREPARATION LOAD-REPORT",
+    "payload": {
+      "cpus": 4,
+      "kind": "RESEARCH_PREPARATION_EVIDENCE",
+      "seeds": [
+        11
+      ],
+      "ledger": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/attempts.sqlite",
+      "mem_gb": 16,
+      "recipe": {
+        "cpus": 4,
+        "name": "research-bdc9887f5d50-1",
+        "mem_gb": 16,
+        "minutes": 11,
+        "requeue": false,
+        "partition": "free",
+        "gpu_requested": false,
+        "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+        "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+      },
+      "attempts": [
+        {
+          "seed": 11,
+          "job_id": "",
+          "number": 1,
+          "status": "admitted",
+          "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+          "selection": "",
+          "final_manifest_digest": ""
+        }
+      ],
+      "max_seconds": 600,
+      "observed_at": "2026-11-02T01:00:05.266433+00:00",
+      "policy_digest": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b",
+      "recipe_sha256": "1d2b3b0c809bc7218e7aeda04bba730547b3d3163c6e485dbd49d3810f0a541a",
+      "journal_sha256": "bb7779be59c626f8241cb2ce961ff86e5fb2bace17c0a72fadf90aab872d31e0",
+      "max_candidates": 1,
+      "reporter_sha256": "d11df3022d7f9701bb3e2833b7dccf97b0df20c3c3753c746b1ed45f741dc923"
+    }
+  },
+  {
+    "id": "77a697b7-01f0-45f0-ab17-f0f5373ff24f",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T01:06:19.883081+00:00",
+    "header": "HPC3 ATTEMPT LOAD-REPORT",
+    "payload": {
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "ledger": {
+        "host": "hpc3",
+        "name": "cleargbm.research-bdc9887f5d50-1",
+        "job_id": "58740021",
+        "log_dir": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/cleargbm/logs",
+        "project": "cleargbm",
+        "artifact": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/result/evaluation.json",
+        "partition": "free",
+        "submitter": "fleet-research-diphtheria",
+        "experiment": {
+          "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+          "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+        },
+        "image_drift": {
+          "head": "71867bcf5411c616bbb98ec77176857ae2faaf8b",
+          "modules": [
+            {
+              "module": "scripts.research_trial",
+              "changed": [],
+              "compared": [],
+              "directory": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint",
+              "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+            }
+          ],
+          "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+        },
+        "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+        "submitted_at": "2026-11-02T01:03:11.610743+00:00",
+        "deterministic": true
+      },
+      "record": {
+        "label": "1",
+        "experiment": "b80f141ba57c63e00e3109a81974be00d7641fe99e8480280cca408b21e64ade",
+        "fingerprint": {
+          "host": {
+            "machine": "x86_64",
+            "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+            "logical_cores": 48
+          },
+          "packages": [
+            {
+              "name": "cleargbm",
+              "version": "0.1.0"
+            },
+            {
+              "name": "cleargbm_rs",
+              "version": "0.1.0"
+            },
+            {
+              "name": "lightgbm",
+              "version": "4.6.0"
+            },
+            {
+              "name": "numpy",
+              "version": "2.3.5"
+            },
+            {
+              "name": "scikit-learn",
+              "version": "1.7.2"
+            },
+            {
+              "name": "xgboost",
+              "version": "3.1.2"
+            }
+          ],
+          "gpu_model": "",
+          "determinism": {
+            "stack": "cpu",
+            "settings": {
+              "MKL_NUM_THREADS": "1",
+              "OMP_NUM_THREADS": "1",
+              "NUMEXPR_NUM_THREADS": "1",
+              "OPENBLAS_NUM_THREADS": "1"
+            }
+          },
+          "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "driver_version": ""
+        },
+        "observations": [
+          {
+            "name": "cleargbm_vs_momentum.net_return.ci_high",
+            "value": 0.01334237631073669
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.ci_low",
+            "value": -0.015766586261006323
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.difference",
+            "value": -0.0012140926921026807
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.p_value",
+            "value": 0.7263681592039801
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.ci_high",
+            "value": 0.00689325268008045
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.ci_low",
+            "value": -0.018237272421219246
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.difference",
+            "value": -0.005768004531568609
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.p_value",
+            "value": 0.47761194029850745
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.ci_high",
+            "value": 0.02164598253100805
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.ci_low",
+            "value": -0.011851203099742812
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.difference",
+            "value": 0.003356820531972983
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.p_value",
+            "value": 0.8557213930348259
+          },
+          {
+            "name": "mean_net_return.cleargbm.10bps",
+            "value": 0.016480433676468863
+          },
+          {
+            "name": "mean_net_return.cleargbm.25bps",
+            "value": 0.015394414266157341
+          },
+          {
+            "name": "mean_net_return.cleargbm.5bps",
+            "value": 0.016842841897416666
+          },
+          {
+            "name": "mean_net_return.equal_weight.10bps",
+            "value": 0.011926521837002935
+          },
+          {
+            "name": "mean_net_return.equal_weight.25bps",
+            "value": 0.011621984862087965
+          },
+          {
+            "name": "mean_net_return.equal_weight.5bps",
+            "value": 0.012028111856343629
+          },
+          {
+            "name": "mean_net_return.lightgbm.10bps",
+            "value": 0.021051346900544526
+          },
+          {
+            "name": "mean_net_return.lightgbm.25bps",
+            "value": 0.02002672901076976
+          },
+          {
+            "name": "mean_net_return.lightgbm.5bps",
+            "value": 0.02139322150704253
+          },
+          {
+            "name": "mean_net_return.momentum.10bps",
+            "value": 0.017694526368571543
+          },
+          {
+            "name": "mean_net_return.momentum.25bps",
+            "value": 0.017121512582314098
+          },
+          {
+            "name": "mean_net_return.momentum.5bps",
+            "value": 0.017885680309149166
+          },
+          {
+            "name": "mean_net_return.xgboost.10bps",
+            "value": 0.018291882721249215
+          },
+          {
+            "name": "mean_net_return.xgboost.25bps",
+            "value": 0.017945348896820104
+          },
+          {
+            "name": "mean_net_return.xgboost.5bps",
+            "value": 0.018407518435431328
+          },
+          {
+            "name": "mean_turnover.cleargbm.10bps",
+            "value": 0.7100520291833693
+          },
+          {
+            "name": "mean_turnover.cleargbm.25bps",
+            "value": 0.7094703359691297
+          },
+          {
+            "name": "mean_turnover.cleargbm.5bps",
+            "value": 0.7102461891816159
+          },
+          {
+            "name": "mean_turnover.equal_weight.10bps",
+            "value": 0.20186693016624216
+          },
+          {
+            "name": "mean_turnover.equal_weight.25bps",
+            "value": 0.2017520915290611
+          },
+          {
+            "name": "mean_turnover.equal_weight.5bps",
+            "value": 0.20190530094906056
+          },
+          {
+            "name": "mean_turnover.lightgbm.10bps",
+            "value": 0.6661850651543479
+          },
+          {
+            "name": "mean_turnover.lightgbm.25bps",
+            "value": 0.6657056534370275
+          },
+          {
+            "name": "mean_turnover.lightgbm.5bps",
+            "value": 0.66634512646891
+          },
+          {
+            "name": "mean_turnover.momentum.10bps",
+            "value": 0.38578268933061266
+          },
+          {
+            "name": "mean_turnover.momentum.25bps",
+            "value": 0.3855600026339148
+          },
+          {
+            "name": "mean_turnover.momentum.5bps",
+            "value": 0.3858570107682946
+          },
+          {
+            "name": "mean_turnover.xgboost.10bps",
+            "value": 0.22814573100054006
+          },
+          {
+            "name": "mean_turnover.xgboost.25bps",
+            "value": 0.2279620765374474
+          },
+          {
+            "name": "mean_turnover.xgboost.5bps",
+            "value": 0.22820706225166848
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.033783629784751135
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.051862099614124135
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.06762504170476769
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.03959200549686259
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.011313463544125324
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07736224929700897
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.02223882908218322
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.05206730144635563
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.02576540279701056
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.02553688084967065
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.022438039135522114
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": -0.00939409757266263
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.10086081401634162
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.02227883860052371
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.016377529517106137
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010577725982714004
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.016515090187992465
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.03236912559817706
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.09589009565831619
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.07227805205820714
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.0497484331558965
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.04084885128195914
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.0900805730012042
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.022650379637812246
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.012806810073757502
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.01183778952671577
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.009053683804723711
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.034861405268555634
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.07111857078604555
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.032421463975225384
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.037839920931531545
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010431917099762433
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.033783629784751135
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.051862099614124135
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.06762504170476769
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.03959200549686259
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.011313463544125324
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07736224929700897
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.02223882908218322
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.018947930204017083
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.025126581649636326
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.02553688084967065
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.02243803913552167
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": -0.00939409757266263
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.10086081401634162
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.06099929082671074
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.015721562547794665
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010577725982713782
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.05598876740941616
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.012114402128963642
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.12414761509274697
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.10499299525960382
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.005880559306886357
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.03705883659797338
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.03939278283443781
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.053459072437388455
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.012903572650136752
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.0036866977866218953
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": -0.005672581224672846
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.07912541919677119
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.04979426169897061
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.0042899508718505786
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.08355531571383568
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.02015075559482815
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.029616488022665255
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.020011498431669716
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.10798351276011098
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.08922384856774257
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.004224712334670477
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07801190619757992
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.03466889846800936
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.052867894466383736
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": 5.50914209251907e-06
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.015898345651281454
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": -0.00500200286809771
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.07912541919677096
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.04979426169897061
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.0042899508718505786
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.06396986853004039
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.011239450969017462
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.ci_high",
+            "value": 0.00777403526193172
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.ci_low",
+            "value": -0.0037454769266350016
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.difference",
+            "value": 0.0005973563526776721
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.p_value",
+            "value": 0.5771144278606966
+          }
+        ],
+        "payload_digest": "acd01dfbd72aa6e80679511a269bc9bd6cf5ee9dedd44ec41c06bcdb3314891a"
+      },
+      "accounting": {
+        "job": {
+          "name": "cleargbm.research-bdc9887f5d50-1",
+          "state": "COMPLETED",
+          "job_id": "58740021",
+          "cpu_count": 4,
+          "gpu_count": 0,
+          "node_list": "hpc3-22-14",
+          "partition": "free",
+          "billing_tres": 4,
+          "elapsed_seconds": 7
+        },
+        "ended_at": "2026-11-02T01:03:25",
+        "exit_code": "0:0",
+        "started_at": "2026-11-02T01:03:18"
+      },
+      "measurement": {
+        "ledger": {
+          "host": "hpc3",
+          "name": "cleargbm.research-bdc9887f5d50-1",
+          "job_id": "58740021",
+          "log_dir": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/cleargbm/logs",
+          "project": "cleargbm",
+          "artifact": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/result/evaluation.json",
+          "partition": "free",
+          "submitter": "fleet-research-diphtheria",
+          "experiment": {
+            "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+            "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+          },
+          "image_drift": {
+            "head": "71867bcf5411c616bbb98ec77176857ae2faaf8b",
+            "modules": [
+              {
+                "module": "scripts.research_trial",
+                "changed": [],
+                "compared": [],
+                "directory": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint",
+                "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+              }
+            ],
+            "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+          },
+          "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "submitted_at": "2026-11-02T01:03:11.610743+00:00",
+          "deterministic": true
+        },
+        "dataset": {
+          "bundle": {
+            "files": [
+              {
+                "plaintext": {
+                  "name": "calendar.csv",
+                  "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+                  "size_bytes": 27410
+                },
+                "ciphertext": {
+                  "name": "calendar.csv.age",
+                  "sha256": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+                  "size_bytes": 27667
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "calendar.sql",
+                  "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+                  "size_bytes": 79
+                },
+                "ciphertext": {
+                  "name": "calendar.sql.age",
+                  "sha256": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+                  "size_bytes": 427
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "delists.csv",
+                  "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+                  "size_bytes": 116
+                },
+                "ciphertext": {
+                  "name": "delists.csv.age",
+                  "sha256": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+                  "size_bytes": 359
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "delists.sql",
+                  "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+                  "size_bytes": 111
+                },
+                "ciphertext": {
+                  "name": "delists.sql.age",
+                  "sha256": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+                  "size_bytes": 352
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "manifest.json",
+                  "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+                  "size_bytes": 1221
+                },
+                "ciphertext": {
+                  "name": "manifest.json.age",
+                  "sha256": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+                  "size_bytes": 1529
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "membership.csv",
+                  "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+                  "size_bytes": 277
+                },
+                "ciphertext": {
+                  "name": "membership.csv.age",
+                  "sha256": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+                  "size_bytes": 533
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "membership.sql",
+                  "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+                  "size_bytes": 74
+                },
+                "ciphertext": {
+                  "name": "membership.sql.age",
+                  "sha256": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+                  "size_bytes": 324
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "protocol.json",
+                  "sha256": "bdb9ddef52648542ee61395760a1f267885a95647f4a2eb9750d4d9280e82598",
+                  "size_bytes": 1175
+                },
+                "ciphertext": {
+                  "name": "protocol.json.age",
+                  "sha256": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+                  "size_bytes": 1449
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "returns.csv",
+                  "sha256": "2bc996def472dfa965d8a83e4ee4c30eefabd58490bbbd472ac1a4667b47db66",
+                  "size_bytes": 483184
+                },
+                "ciphertext": {
+                  "name": "returns.csv.age",
+                  "sha256": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+                  "size_bytes": 483640
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "returns.sql",
+                  "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+                  "size_bytes": 147
+                },
+                "ciphertext": {
+                  "name": "returns.sql.age",
+                  "sha256": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+                  "size_bytes": 459
+                }
+              }
+            ],
+            "format": "age-v1",
+            "manifest": {
+              "name": "manifest.json",
+              "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+              "size_bytes": 1221
+            },
+            "partition": "train-validation",
+            "recipient": "age1grghg7ar3k4jh47wtpl6p3jy3w84vgmptyn98cw8ft43zcawwaasacpps6"
+          },
+          "bundle_sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f"
+        },
+        "accounting": {
+          "job": {
+            "name": "cleargbm.research-bdc9887f5d50-1",
+            "state": "COMPLETED",
+            "job_id": "58740021",
+            "cpu_count": 4,
+            "gpu_count": 0,
+            "node_list": "hpc3-22-14",
+            "partition": "free",
+            "billing_tres": 4,
+            "elapsed_seconds": 7
+          },
+          "ended_at": "2026-11-02T01:03:25",
+          "exit_code": "0:0",
+          "started_at": "2026-11-02T01:03:18"
+        },
+        "record_mtime": 1793581405,
+        "result_mtime": 1793581405,
+        "record_sha256": "1262ff9e7c3a9c4b1fa1da563fd5279d0543009c748d654b4d888ab4adb9c58e",
+        "result_sha256": "10d8252b3934a2c632b80e9cfe74a12acfc5ab6dc63b52ddd74d1da4da446a40",
+        "stdout_sha256": "5b56696d6aa4f77ee174c8953beefd6d32669541712e728b4b0ce4d48ab57236",
+        "verified_files": {
+          "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/access.json": "2549731a66f04bb070da4e24c5af366bd14a1eee89cdf3f4087e5d917ab86b7b",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/bundle.json": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/delists.csv.age": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/delists.sql.age": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/returns.csv.age": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/returns.sql.age": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/calendar.csv.age": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/calendar.sql.age": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/manifest.json.age": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/protocol.json.age": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/membership.csv.age": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/membership.sql.age": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts/research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/request.json": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f"
+        },
+        "compute_checksum_lines": 16
+      }
+    }
+  },
+  {
+    "id": "80ae9739-52fb-48db-8fd2-1fa93518619a",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T01:06:32.642841+00:00",
+    "header": "HPC3 ATTEMPT LOAD-REPORT",
+    "payload": {
+      "kind": "HPC3_ATTEMPT_EVIDENCE",
+      "ledger": {
+        "host": "hpc3",
+        "name": "cleargbm.research-bdc9887f5d50-1",
+        "job_id": "58740021",
+        "log_dir": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/cleargbm/logs",
+        "project": "cleargbm",
+        "artifact": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/result/evaluation.json",
+        "partition": "free",
+        "submitter": "fleet-research-diphtheria",
+        "experiment": {
+          "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+          "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+        },
+        "image_drift": {
+          "head": "71867bcf5411c616bbb98ec77176857ae2faaf8b",
+          "modules": [
+            {
+              "module": "scripts.research_trial",
+              "changed": [],
+              "compared": [],
+              "directory": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint",
+              "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+            }
+          ],
+          "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+        },
+        "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+        "submitted_at": "2026-11-02T01:03:11.610743+00:00",
+        "deterministic": true
+      },
+      "record": {
+        "label": "1",
+        "experiment": "b80f141ba57c63e00e3109a81974be00d7641fe99e8480280cca408b21e64ade",
+        "fingerprint": {
+          "host": {
+            "machine": "x86_64",
+            "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+            "logical_cores": 48
+          },
+          "packages": [
+            {
+              "name": "cleargbm",
+              "version": "0.1.0"
+            },
+            {
+              "name": "cleargbm_rs",
+              "version": "0.1.0"
+            },
+            {
+              "name": "lightgbm",
+              "version": "4.6.0"
+            },
+            {
+              "name": "numpy",
+              "version": "2.3.5"
+            },
+            {
+              "name": "scikit-learn",
+              "version": "1.7.2"
+            },
+            {
+              "name": "xgboost",
+              "version": "3.1.2"
+            }
+          ],
+          "gpu_model": "",
+          "determinism": {
+            "stack": "cpu",
+            "settings": {
+              "MKL_NUM_THREADS": "1",
+              "OMP_NUM_THREADS": "1",
+              "NUMEXPR_NUM_THREADS": "1",
+              "OPENBLAS_NUM_THREADS": "1"
+            }
+          },
+          "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "driver_version": ""
+        },
+        "observations": [
+          {
+            "name": "cleargbm_vs_momentum.net_return.ci_high",
+            "value": 0.01334237631073669
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.ci_low",
+            "value": -0.015766586261006323
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.difference",
+            "value": -0.0012140926921026807
+          },
+          {
+            "name": "cleargbm_vs_momentum.net_return.p_value",
+            "value": 0.7263681592039801
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.ci_high",
+            "value": 0.00689325268008045
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.ci_low",
+            "value": -0.018237272421219246
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.difference",
+            "value": -0.005768004531568609
+          },
+          {
+            "name": "equal_weight_vs_momentum.net_return.p_value",
+            "value": 0.47761194029850745
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.ci_high",
+            "value": 0.02164598253100805
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.ci_low",
+            "value": -0.011851203099742812
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.difference",
+            "value": 0.003356820531972983
+          },
+          {
+            "name": "lightgbm_vs_momentum.net_return.p_value",
+            "value": 0.8557213930348259
+          },
+          {
+            "name": "mean_net_return.cleargbm.10bps",
+            "value": 0.016480433676468863
+          },
+          {
+            "name": "mean_net_return.cleargbm.25bps",
+            "value": 0.015394414266157341
+          },
+          {
+            "name": "mean_net_return.cleargbm.5bps",
+            "value": 0.016842841897416666
+          },
+          {
+            "name": "mean_net_return.equal_weight.10bps",
+            "value": 0.011926521837002935
+          },
+          {
+            "name": "mean_net_return.equal_weight.25bps",
+            "value": 0.011621984862087965
+          },
+          {
+            "name": "mean_net_return.equal_weight.5bps",
+            "value": 0.012028111856343629
+          },
+          {
+            "name": "mean_net_return.lightgbm.10bps",
+            "value": 0.021051346900544526
+          },
+          {
+            "name": "mean_net_return.lightgbm.25bps",
+            "value": 0.02002672901076976
+          },
+          {
+            "name": "mean_net_return.lightgbm.5bps",
+            "value": 0.02139322150704253
+          },
+          {
+            "name": "mean_net_return.momentum.10bps",
+            "value": 0.017694526368571543
+          },
+          {
+            "name": "mean_net_return.momentum.25bps",
+            "value": 0.017121512582314098
+          },
+          {
+            "name": "mean_net_return.momentum.5bps",
+            "value": 0.017885680309149166
+          },
+          {
+            "name": "mean_net_return.xgboost.10bps",
+            "value": 0.018291882721249215
+          },
+          {
+            "name": "mean_net_return.xgboost.25bps",
+            "value": 0.017945348896820104
+          },
+          {
+            "name": "mean_net_return.xgboost.5bps",
+            "value": 0.018407518435431328
+          },
+          {
+            "name": "mean_turnover.cleargbm.10bps",
+            "value": 0.7100520291833693
+          },
+          {
+            "name": "mean_turnover.cleargbm.25bps",
+            "value": 0.7094703359691297
+          },
+          {
+            "name": "mean_turnover.cleargbm.5bps",
+            "value": 0.7102461891816159
+          },
+          {
+            "name": "mean_turnover.equal_weight.10bps",
+            "value": 0.20186693016624216
+          },
+          {
+            "name": "mean_turnover.equal_weight.25bps",
+            "value": 0.2017520915290611
+          },
+          {
+            "name": "mean_turnover.equal_weight.5bps",
+            "value": 0.20190530094906056
+          },
+          {
+            "name": "mean_turnover.lightgbm.10bps",
+            "value": 0.6661850651543479
+          },
+          {
+            "name": "mean_turnover.lightgbm.25bps",
+            "value": 0.6657056534370275
+          },
+          {
+            "name": "mean_turnover.lightgbm.5bps",
+            "value": 0.66634512646891
+          },
+          {
+            "name": "mean_turnover.momentum.10bps",
+            "value": 0.38578268933061266
+          },
+          {
+            "name": "mean_turnover.momentum.25bps",
+            "value": 0.3855600026339148
+          },
+          {
+            "name": "mean_turnover.momentum.5bps",
+            "value": 0.3858570107682946
+          },
+          {
+            "name": "mean_turnover.xgboost.10bps",
+            "value": 0.22814573100054006
+          },
+          {
+            "name": "mean_turnover.xgboost.25bps",
+            "value": 0.2279620765374474
+          },
+          {
+            "name": "mean_turnover.xgboost.5bps",
+            "value": 0.22820706225166848
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.033783629784751135
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.051862099614124135
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.06762504170476769
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.03959200549686259
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.011313463544125324
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07736224929700897
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.02223882908218322
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.05206730144635563
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.02576540279701056
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.02553688084967065
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.022438039135522114
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": -0.00939409757266263
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.10086081401634162
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.02227883860052371
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.016377529517106137
+          },
+          {
+            "name": "monthly_net_return.cleargbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010577725982714004
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.016515090187992465
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.03236912559817706
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.09589009565831619
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.07227805205820714
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.0497484331558965
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.04084885128195914
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.0900805730012042
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.022650379637812246
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.012806810073757502
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.01183778952671577
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.009053683804723711
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.034861405268555634
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.07111857078604555
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.032421463975225384
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.037839920931531545
+          },
+          {
+            "name": "monthly_net_return.equal_weight.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010431917099762433
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.033783629784751135
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.051862099614124135
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.06762504170476769
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.03959200549686259
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.011313463544125324
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07736224929700897
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.02223882908218322
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.018947930204017083
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.025126581649636326
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.02553688084967065
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": 0.02243803913552167
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": -0.00939409757266263
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.10086081401634162
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.06099929082671074
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.015721562547794665
+          },
+          {
+            "name": "monthly_net_return.lightgbm.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.010577725982713782
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.05598876740941616
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.012114402128963642
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.12414761509274697
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.10499299525960382
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.005880559306886357
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.03705883659797338
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.03939278283443781
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.053459072437388455
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": -0.012903572650136752
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.0036866977866218953
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": -0.005672581224672846
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.07912541919677119
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.04979426169897061
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.0042899508718505786
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.08355531571383568
+          },
+          {
+            "name": "monthly_net_return.momentum.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.02015075559482815
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-07-31.2018-08-01.2018-09-03",
+            "value": 0.029616488022665255
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-08-31.2018-09-03.2018-10-01",
+            "value": 0.020011498431669716
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-09-28.2018-10-01.2018-11-01",
+            "value": 0.10798351276011098
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-10-31.2018-11-01.2018-12-03",
+            "value": 0.08922384856774257
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-11-30.2018-12-03.2019-01-01",
+            "value": -0.004224712334670477
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2018-12-31.2019-01-01.2019-02-01",
+            "value": 0.07801190619757992
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-01-31.2019-02-01.2019-03-01",
+            "value": -0.03466889846800936
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-02-28.2019-03-01.2019-04-01",
+            "value": -0.052867894466383736
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-03-29.2019-04-01.2019-05-01",
+            "value": 5.50914209251907e-06
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-04-30.2019-05-01.2019-06-03",
+            "value": -0.015898345651281454
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-05-31.2019-06-03.2019-07-01",
+            "value": -0.00500200286809771
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-06-28.2019-07-01.2019-08-01",
+            "value": 0.07912541919677096
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-07-31.2019-08-01.2019-09-02",
+            "value": 0.04979426169897061
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-08-30.2019-09-02.2019-10-01",
+            "value": 0.0042899508718505786
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-09-30.2019-10-01.2019-11-01",
+            "value": -0.06396986853004039
+          },
+          {
+            "name": "monthly_net_return.xgboost.10bps.2019-10-31.2019-11-01.2019-12-02",
+            "value": 0.011239450969017462
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.ci_high",
+            "value": 0.00777403526193172
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.ci_low",
+            "value": -0.0037454769266350016
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.difference",
+            "value": 0.0005973563526776721
+          },
+          {
+            "name": "xgboost_vs_momentum.net_return.p_value",
+            "value": 0.5771144278606966
+          }
+        ],
+        "payload_digest": "acd01dfbd72aa6e80679511a269bc9bd6cf5ee9dedd44ec41c06bcdb3314891a"
+      },
+      "accounting": {
+        "job": {
+          "name": "cleargbm.research-bdc9887f5d50-1",
+          "state": "COMPLETED",
+          "job_id": "58740021",
+          "cpu_count": 4,
+          "gpu_count": 0,
+          "node_list": "hpc3-22-14",
+          "partition": "free",
+          "billing_tres": 4,
+          "elapsed_seconds": 7
+        },
+        "ended_at": "2026-11-02T01:03:25",
+        "exit_code": "0:0",
+        "started_at": "2026-11-02T01:03:18"
+      },
+      "measurement": {
+        "ledger": {
+          "host": "hpc3",
+          "name": "cleargbm.research-bdc9887f5d50-1",
+          "job_id": "58740021",
+          "log_dir": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/cleargbm/logs",
+          "project": "cleargbm",
+          "artifact": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/result/evaluation.json",
+          "partition": "free",
+          "submitter": "fleet-research-diphtheria",
+          "experiment": {
+            "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+            "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+          },
+          "image_drift": {
+            "head": "71867bcf5411c616bbb98ec77176857ae2faaf8b",
+            "modules": [
+              {
+                "module": "scripts.research_trial",
+                "changed": [],
+                "compared": [],
+                "directory": "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint",
+                "not_compared": "resolved from /data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+              }
+            ],
+            "image_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111"
+          },
+          "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "submitted_at": "2026-11-02T01:03:11.610743+00:00",
+          "deterministic": true
+        },
+        "dataset": {
+          "bundle": {
+            "files": [
+              {
+                "plaintext": {
+                  "name": "calendar.csv",
+                  "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+                  "size_bytes": 27410
+                },
+                "ciphertext": {
+                  "name": "calendar.csv.age",
+                  "sha256": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+                  "size_bytes": 27667
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "calendar.sql",
+                  "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+                  "size_bytes": 79
+                },
+                "ciphertext": {
+                  "name": "calendar.sql.age",
+                  "sha256": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+                  "size_bytes": 427
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "delists.csv",
+                  "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+                  "size_bytes": 116
+                },
+                "ciphertext": {
+                  "name": "delists.csv.age",
+                  "sha256": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+                  "size_bytes": 359
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "delists.sql",
+                  "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+                  "size_bytes": 111
+                },
+                "ciphertext": {
+                  "name": "delists.sql.age",
+                  "sha256": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+                  "size_bytes": 352
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "manifest.json",
+                  "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+                  "size_bytes": 1221
+                },
+                "ciphertext": {
+                  "name": "manifest.json.age",
+                  "sha256": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+                  "size_bytes": 1529
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "membership.csv",
+                  "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+                  "size_bytes": 277
+                },
+                "ciphertext": {
+                  "name": "membership.csv.age",
+                  "sha256": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+                  "size_bytes": 533
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "membership.sql",
+                  "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+                  "size_bytes": 74
+                },
+                "ciphertext": {
+                  "name": "membership.sql.age",
+                  "sha256": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+                  "size_bytes": 324
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "protocol.json",
+                  "sha256": "bdb9ddef52648542ee61395760a1f267885a95647f4a2eb9750d4d9280e82598",
+                  "size_bytes": 1175
+                },
+                "ciphertext": {
+                  "name": "protocol.json.age",
+                  "sha256": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+                  "size_bytes": 1449
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "returns.csv",
+                  "sha256": "2bc996def472dfa965d8a83e4ee4c30eefabd58490bbbd472ac1a4667b47db66",
+                  "size_bytes": 483184
+                },
+                "ciphertext": {
+                  "name": "returns.csv.age",
+                  "sha256": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+                  "size_bytes": 483640
+                }
+              },
+              {
+                "plaintext": {
+                  "name": "returns.sql",
+                  "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+                  "size_bytes": 147
+                },
+                "ciphertext": {
+                  "name": "returns.sql.age",
+                  "sha256": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+                  "size_bytes": 459
+                }
+              }
+            ],
+            "format": "age-v1",
+            "manifest": {
+              "name": "manifest.json",
+              "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+              "size_bytes": 1221
+            },
+            "partition": "train-validation",
+            "recipient": "age1grghg7ar3k4jh47wtpl6p3jy3w84vgmptyn98cw8ft43zcawwaasacpps6"
+          },
+          "bundle_sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f"
+        },
+        "accounting": {
+          "job": {
+            "name": "cleargbm.research-bdc9887f5d50-1",
+            "state": "COMPLETED",
+            "job_id": "58740021",
+            "cpu_count": 4,
+            "gpu_count": 0,
+            "node_list": "hpc3-22-14",
+            "partition": "free",
+            "billing_tres": 4,
+            "elapsed_seconds": 7
+          },
+          "ended_at": "2026-11-02T01:03:25",
+          "exit_code": "0:0",
+          "started_at": "2026-11-02T01:03:18"
+        },
+        "record_mtime": 1793581405,
+        "result_mtime": 1793581405,
+        "record_sha256": "1262ff9e7c3a9c4b1fa1da563fd5279d0543009c748d654b4d888ab4adb9c58e",
+        "result_sha256": "10d8252b3934a2c632b80e9cfe74a12acfc5ab6dc63b52ddd74d1da4da446a40",
+        "stdout_sha256": "5b56696d6aa4f77ee174c8953beefd6d32669541712e728b4b0ce4d48ab57236",
+        "verified_files": {
+          "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/access.json": "2549731a66f04bb070da4e24c5af366bd14a1eee89cdf3f4087e5d917ab86b7b",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/bundle.json": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/delists.csv.age": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/delists.sql.age": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/returns.csv.age": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/returns.sql.age": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/calendar.csv.age": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/calendar.sql.age": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/manifest.json.age": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/protocol.json.age": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/membership.csv.age": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/validation/membership.sql.age": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/entrypoint/scripts/research_trial.py": "aae868b6c53e0cb835ac2b0c959a879269858686f8e7a2d0a28dcf217032b765",
+          "/data/homezvol1/wagnera3/research/protocol-v2-rehearsal-be59eebf/attempts/bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b/1/request.json": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f"
+        },
+        "compute_checksum_lines": 16
+      }
+    }
+  },
+  {
+    "id": "7eb0f6a0-bf16-4e41-b9f0-725f8259fada",
+    "author": "hpc-report-be59eebf",
+    "created_at": "2026-11-02T01:07:19.111384+00:00",
+    "header": "RESEARCH PREPARATION LOAD-REPORT",
+    "payload": {
+      "cpus": 4,
+      "kind": "RESEARCH_PREPARATION_EVIDENCE",
+      "seeds": [
+        11
+      ],
+      "ledger": "/home/corvis/research-data/wrds/experiments/protocol-v2-rehearsal-be59eebf/attempts.sqlite",
+      "mem_gb": 16,
+      "recipe": {
+        "cpus": 4,
+        "name": "research-bdc9887f5d50-1",
+        "mem_gb": 16,
+        "minutes": 11,
+        "requeue": false,
+        "partition": "free",
+        "gpu_requested": false,
+        "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+        "research_attempt": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b:1"
+      },
+      "attempts": [
+        {
+          "seed": 11,
+          "job_id": "58740021",
+          "number": 1,
+          "status": "complete",
+          "candidate": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+          "selection": "",
+          "final_manifest_digest": ""
+        }
+      ],
+      "max_seconds": 600,
+      "observed_at": "2026-11-02T01:07:19.071162+00:00",
+      "policy_digest": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b",
+      "recipe_sha256": "1d2b3b0c809bc7218e7aeda04bba730547b3d3163c6e485dbd49d3810f0a541a",
+      "journal_sha256": "1f9df543c4f40d6f699dfe808beb6ec759b5625040535269132027ea4f80dcd2",
+      "max_candidates": 1,
+      "reporter_sha256": "d11df3022d7f9701bb3e2833b7dccf97b0df20c3c3753c746b1ed45f741dc923"
+    }
+  }
+]

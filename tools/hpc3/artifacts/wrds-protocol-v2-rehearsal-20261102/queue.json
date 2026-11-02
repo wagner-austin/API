@@ -1,0 +1,16 @@
+{
+  "id": "f1961f01-b17b-4b29-abc5-3f78e0d7f256",
+  "status": "passed",
+  "node": "ziggurat",
+  "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58740021\",\"record_sha256\":\"2de84368416f13a8f4deefcc47dd4bb6967ede4ab85909dfffcd2ea94b2821ff\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+  "claimed_by": "fleet-research-diphtheria",
+  "created_at": "2026-11-02T01:00:38.009266+00:00",
+  "claimed_at": "2026-11-02T01:03:06.47656+00:00",
+  "closed_at": "2026-11-02T01:06:32.720811+00:00",
+  "exit_code": 0,
+  "research_request": {
+    "attempt": "protocol-v2-be59eebf-1",
+    "backend": "hpc3",
+    "specSha256": "0ac9237726fb993986c43a61d415c2d2333eac5fc359e1e611324b5a0d1b4402"
+  }
+}

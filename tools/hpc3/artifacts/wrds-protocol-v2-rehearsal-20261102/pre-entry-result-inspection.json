@@ -1,0 +1,200 @@
+{
+  "scope": "Readback of synthetic result only; no evaluator execution on the session host.",
+  "checks": {
+    "arm_cost_cases": 15,
+    "ending_weight_tolerance": 1e-12,
+    "cost_tolerance": 1e-12,
+    "selected_pre_entry_security_unfilled": true
+  },
+  "at_10bps": [
+    {
+      "arm": "momentum",
+      "month": {
+        "decision": "2019-02-28",
+        "entry": "2019-03-01",
+        "exit": "2019-04-01",
+        "selected": [
+          3,
+          4,
+          5
+        ],
+        "unfilled": [],
+        "cash": 0.0,
+        "turnover": 0.678036560497187,
+        "cost": 0.000678036560497187,
+        "net_return": -0.053459072437388455,
+        "held": [
+          [
+            3,
+            0.3311799211170287
+          ],
+          [
+            4,
+            0.3301912206934091
+          ],
+          [
+            5,
+            0.3386288581895623
+          ]
+        ],
+        "receivables": []
+      },
+      "ending_weights_sum": 1.0
+    },
+    {
+      "arm": "equal_weight",
+      "month": {
+        "decision": "2019-02-28",
+        "entry": "2019-03-01",
+        "exit": "2019-04-01",
+        "selected": [
+          3,
+          4,
+          5,
+          6,
+          7,
+          8
+        ],
+        "unfilled": [
+          8
+        ],
+        "cash": 0.14913768669389632,
+        "turnover": 0.14590556703901358,
+        "cost": 0.00014590556703901358,
+        "net_return": -0.022650379637812246,
+        "held": [
+          [
+            3,
+            0.14034812664135318
+          ],
+          [
+            4,
+            0.1399291330870444
+          ],
+          [
+            5,
+            0.1435048529310185
+          ],
+          [
+            6,
+            0.14386053367789253
+          ],
+          [
+            7,
+            0.15501976491667002
+          ]
+        ],
+        "receivables": [
+          {
+            "permno": 8,
+            "valued": "2019-03-01",
+            "amount": 0.12819990205212498
+          }
+        ]
+      },
+      "ending_weights_sum": 0.9999999999999998
+    },
+    {
+      "arm": "cleargbm",
+      "month": {
+        "decision": "2019-02-28",
+        "entry": "2019-03-01",
+        "exit": "2019-04-01",
+        "selected": [
+          3,
+          4,
+          6
+        ],
+        "unfilled": [],
+        "cash": 0.0,
+        "turnover": 0.04791837753402727,
+        "cost": 4.791837753402728e-05,
+        "net_return": -0.05206730144635563,
+        "held": [
+          [
+            3,
+            0.3309021945773903
+          ],
+          [
+            4,
+            0.3299143232751331
+          ],
+          [
+            6,
+            0.3391834821474766
+          ]
+        ],
+        "receivables": []
+      },
+      "ending_weights_sum": 1.0
+    },
+    {
+      "arm": "lightgbm",
+      "month": {
+        "decision": "2019-02-28",
+        "entry": "2019-03-01",
+        "exit": "2019-04-01",
+        "selected": [
+          3,
+          6,
+          7
+        ],
+        "unfilled": [],
+        "cash": 0.0,
+        "turnover": 0.6668889629876626,
+        "cost": 0.0006668889629876626,
+        "net_return": -0.018947930204017083,
+        "held": [
+          [
+            3,
+            0.3195333420553787
+          ],
+          [
+            6,
+            0.32753010828163737
+          ],
+          [
+            7,
+            0.35293654966298404
+          ]
+        ],
+        "receivables": []
+      },
+      "ending_weights_sum": 1.0
+    },
+    {
+      "arm": "xgboost",
+      "month": {
+        "decision": "2019-02-28",
+        "entry": "2019-03-01",
+        "exit": "2019-04-01",
+        "selected": [
+          3,
+          4,
+          5
+        ],
+        "unfilled": [],
+        "cash": 0.0,
+        "turnover": 0.05389331056082705,
+        "cost": 5.3893310560827055e-05,
+        "net_return": -0.052867894466383736,
+        "held": [
+          [
+            3,
+            0.33117992111702865
+          ],
+          [
+            4,
+            0.33019122069340906
+          ],
+          [
+            5,
+            0.33862885818956223
+          ]
+        ],
+        "receivables": []
+      },
+      "ending_weights_sum": 1.0
+    }
+  ]
+}

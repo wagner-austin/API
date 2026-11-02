@@ -1,0 +1,350 @@
+{
+  "task": "be59eebf-5cfe-4116-986c-c84962f7cb18",
+  "scope": "One synthetic protocol-v2 validation rehearsal through existing admission, shared queue, native allocation and automatic reconciliation. No licensed study, candidate selection or final grant release.",
+  "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+  "queue_adapter_python": "/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python",
+  "image_sha256": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "fixture": {
+    "scope": "Synthetic fixture preparation only; no test or evaluator execution on the session host.",
+    "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+    "fixture": "tests.markets._crsp_study_fixtures.pre_entry_rows",
+    "protocol_version": 2,
+    "rows": {
+      "membership": 8,
+      "returns": 8420,
+      "calendar": 1521,
+      "delists": 1
+    },
+    "pre_entry_case": {
+      "permno": 8,
+      "delistingdt": "2019-02-28",
+      "deldlydt": "2019-03-01",
+      "delamtdt": "2019-03-01",
+      "delnextdt": null,
+      "delret": -0.25,
+      "delretmisstype": "NA"
+    },
+    "source_files": {
+      "libs/covenant_ml/tests/markets/_crsp_study_fixtures.py": "78c158500d52285b7c57d14779523842b4a2c85e8ce52068b4b32f87b1e52707",
+      "libs/covenant_ml/tests/markets/_crsp_fixtures.py": "08a035b2ff97bd2cfbb01aa6ffc25717dd791d9ef882beffaf57fdb60b08a06a",
+      "libs/covenant_ml/tests/markets/_encrypted_fixtures.py": "8ab5f2b5e0b74295310dddc31553d4dd01cc77b6d2b85072e472f4060d9ee7dc",
+      "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "9ac103fa97f8e0fa8245629e413a58d5511fa50eeac87d12a384a2aae3289e66",
+      "libs/covenant_ml/docs/crsp-monthly.json": "66547bc7f4d8f942116ae794494257e4dabd01428b5da7a4361b46661a79cf2b"
+    },
+    "bundle_sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+    "manifest_sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c"
+  },
+  "policy_sha256": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b",
+  "trial_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+  "queue": {
+    "id": "f1961f01-b17b-4b29-abc5-3f78e0d7f256",
+    "status": "passed",
+    "node": "ziggurat",
+    "detail": "Native controller outcome (adapter exit status): {\"state\":\"complete\",\"native_job_id\":\"58740021\",\"record_sha256\":\"2de84368416f13a8f4deefcc47dd4bb6967ede4ab85909dfffcd2ea94b2821ff\",\"controller_python\":\"/home/corvis/research-control/wrds-queue-b53b0ea34/bin/python\",\"controller_python_sha256\":\"ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4\",\"handover_sha256\":null}",
+    "claimed_by": "fleet-research-diphtheria",
+    "created_at": "2026-11-02T01:00:38.009266+00:00",
+    "claimed_at": "2026-11-02T01:03:06.47656+00:00",
+    "closed_at": "2026-11-02T01:06:32.720811+00:00",
+    "exit_code": 0,
+    "research_request": {
+      "attempt": "protocol-v2-be59eebf-1",
+      "backend": "hpc3",
+      "specSha256": "0ac9237726fb993986c43a61d415c2d2333eac5fc359e1e611324b5a0d1b4402"
+    }
+  },
+  "queue_replay": "Repeating the exact reference before submission and after successful reconciliation returned f1961f01-b17b-4b29-abc5-3f78e0d7f256; the admission journal retains exactly one complete native job.",
+  "native_accounting": {
+    "job": {
+      "name": "cleargbm.research-bdc9887f5d50-1",
+      "state": "COMPLETED",
+      "job_id": "58740021",
+      "cpu_count": 4,
+      "gpu_count": 0,
+      "node_list": "hpc3-22-14",
+      "partition": "free",
+      "billing_tres": 4,
+      "elapsed_seconds": 7
+    },
+    "ended_at": "2026-11-02T01:03:25",
+    "exit_code": "0:0",
+    "started_at": "2026-11-02T01:03:18"
+  },
+  "native_input_verification": {
+    "verified_files": 16,
+    "compute_checksum_lines": 16,
+    "request_sha256": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f"
+  },
+  "result": {
+    "payload_sha256": "10d8252b3934a2c632b80e9cfe74a12acfc5ab6dc63b52ddd74d1da4da446a40",
+    "sidecar_file_sha256": "1262ff9e7c3a9c4b1fa1da563fd5279d0543009c748d654b4d888ab4adb9c58e",
+    "canonical_record_sha256": "2de84368416f13a8f4deefcc47dd4bb6967ede4ab85909dfffcd2ea94b2821ff",
+    "arm_cost_cases": 15,
+    "paired_comparisons": 4,
+    "months_per_case": 16
+  },
+  "pre_entry_case": {
+    "scope": "Readback of synthetic result only; no evaluator execution on the session host.",
+    "checks": {
+      "arm_cost_cases": 15,
+      "ending_weight_tolerance": 1e-12,
+      "cost_tolerance": 1e-12,
+      "selected_pre_entry_security_unfilled": true
+    },
+    "at_10bps": [
+      {
+        "arm": "momentum",
+        "month": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            4,
+            5
+          ],
+          "unfilled": [],
+          "cash": 0.0,
+          "turnover": 0.678036560497187,
+          "cost": 0.000678036560497187,
+          "net_return": -0.053459072437388455,
+          "held": [
+            [
+              3,
+              0.3311799211170287
+            ],
+            [
+              4,
+              0.3301912206934091
+            ],
+            [
+              5,
+              0.3386288581895623
+            ]
+          ],
+          "receivables": []
+        },
+        "ending_weights_sum": 1.0
+      },
+      {
+        "arm": "equal_weight",
+        "month": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            4,
+            5,
+            6,
+            7,
+            8
+          ],
+          "unfilled": [
+            8
+          ],
+          "cash": 0.14913768669389632,
+          "turnover": 0.14590556703901358,
+          "cost": 0.00014590556703901358,
+          "net_return": -0.022650379637812246,
+          "held": [
+            [
+              3,
+              0.14034812664135318
+            ],
+            [
+              4,
+              0.1399291330870444
+            ],
+            [
+              5,
+              0.1435048529310185
+            ],
+            [
+              6,
+              0.14386053367789253
+            ],
+            [
+              7,
+              0.15501976491667002
+            ]
+          ],
+          "receivables": [
+            {
+              "permno": 8,
+              "valued": "2019-03-01",
+              "amount": 0.12819990205212498
+            }
+          ]
+        },
+        "ending_weights_sum": 0.9999999999999998
+      },
+      {
+        "arm": "cleargbm",
+        "month": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            4,
+            6
+          ],
+          "unfilled": [],
+          "cash": 0.0,
+          "turnover": 0.04791837753402727,
+          "cost": 4.791837753402728e-05,
+          "net_return": -0.05206730144635563,
+          "held": [
+            [
+              3,
+              0.3309021945773903
+            ],
+            [
+              4,
+              0.3299143232751331
+            ],
+            [
+              6,
+              0.3391834821474766
+            ]
+          ],
+          "receivables": []
+        },
+        "ending_weights_sum": 1.0
+      },
+      {
+        "arm": "lightgbm",
+        "month": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            6,
+            7
+          ],
+          "unfilled": [],
+          "cash": 0.0,
+          "turnover": 0.6668889629876626,
+          "cost": 0.0006668889629876626,
+          "net_return": -0.018947930204017083,
+          "held": [
+            [
+              3,
+              0.3195333420553787
+            ],
+            [
+              6,
+              0.32753010828163737
+            ],
+            [
+              7,
+              0.35293654966298404
+            ]
+          ],
+          "receivables": []
+        },
+        "ending_weights_sum": 1.0
+      },
+      {
+        "arm": "xgboost",
+        "month": {
+          "decision": "2019-02-28",
+          "entry": "2019-03-01",
+          "exit": "2019-04-01",
+          "selected": [
+            3,
+            4,
+            5
+          ],
+          "unfilled": [],
+          "cash": 0.0,
+          "turnover": 0.05389331056082705,
+          "cost": 5.3893310560827055e-05,
+          "net_return": -0.052867894466383736,
+          "held": [
+            [
+              3,
+              0.33117992111702865
+            ],
+            [
+              4,
+              0.33019122069340906
+            ],
+            [
+              5,
+              0.33862885818956223
+            ]
+          ],
+          "receivables": []
+        },
+        "ending_weights_sum": 1.0
+      }
+    ]
+  },
+  "service_author": "hpc-report-be59eebf",
+  "service_reports": [
+    {
+      "id": "58a97839-5bf7-40d1-9686-0c681f089b81",
+      "created_at": "2026-11-02T00:59:25.132022+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT"
+    },
+    {
+      "id": "36885015-fd26-4ebc-ba29-2fb8cb3363da",
+      "created_at": "2026-11-02T00:59:45.297908+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT"
+    },
+    {
+      "id": "a7e02e6d-73af-47c0-ad24-e055980cde4c",
+      "created_at": "2026-11-02T00:59:46.200391+00:00",
+      "header": "HPC3 STAGE LOAD-REPORT"
+    },
+    {
+      "id": "53f51ec6-c7cd-49c6-8eb3-bf799345dfdb",
+      "created_at": "2026-11-02T01:00:05.310179+00:00",
+      "header": "RESEARCH PREPARATION LOAD-REPORT"
+    },
+    {
+      "id": "77a697b7-01f0-45f0-ab17-f0f5373ff24f",
+      "created_at": "2026-11-02T01:06:19.883081+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT"
+    },
+    {
+      "id": "80ae9739-52fb-48db-8fd2-1fa93518619a",
+      "created_at": "2026-11-02T01:06:32.642841+00:00",
+      "header": "HPC3 ATTEMPT LOAD-REPORT"
+    },
+    {
+      "id": "7eb0f6a0-bf16-4e41-b9f0-725f8259fada",
+      "created_at": "2026-11-02T01:07:19.111384+00:00",
+      "header": "RESEARCH PREPARATION LOAD-REPORT"
+    }
+  ],
+  "preserved_refusals": [
+    "Initial entry staging manifest contained scripts/ names; canonical decoder refused before transfer. Replaced with separate flat-directory script and access manifests, retaining the rejected input and log.",
+    "Initial dispatch omitted the required project and was refused before queue creation; the explicit research/hpc3 reference was accepted."
+  ],
+  "remaining": [
+    "Amend and freeze licensed-study resource/candidate rules after the stopped version-1 attempt.",
+    "Independently observe original failed allocation 58733020 cleanup.",
+    "Run the licensed baseline/validation before selection and controlled final scoring."
+  ],
+  "files": {
+    "access-stage-report.json": "bdc18b9af373fc26dae3e90a71b2bc48aa83ffa900c5fd2e91a3ef8928d8a3c5",
+    "completed-report.json": "fd918a3696163b1a8ecc1231fc7af91a61d0ca422409f402819858521c617aef",
+    "evaluation.json": "10d8252b3934a2c632b80e9cfe74a12acfc5ab6dc63b52ddd74d1da4da446a40",
+    "evaluation.json.runrecord.json": "1262ff9e7c3a9c4b1fa1da563fd5279d0543009c748d654b4d888ab4adb9c58e",
+    "fixture-provenance.json": "785d73f2d5f92a68f63c2a8aa9afd0968d61849a10a123f992fc67e3424d75c9",
+    "policy.json": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b",
+    "pre-entry-result-inspection.json": "3034f6b505ad9e93a1613400ab913e8ef7fd6902d0ce46df4c6e207eb3dc932f",
+    "preparation-report.json": "0e96681277a05fc5c303496159729bd88818f99efe416ba9709a6c8cd8af7973",
+    "proposal.json": "f3ef79ecdb1cb2c2f2c9132c74d2e0ca8a57bb95b727c091279f56bd7720e4b9",
+    "queue-reference.json": "619b83214c1da11baee7f9221a864b81dfd54ea758ee14b76b9c040b8def7519",
+    "queue.json": "4c72e81b11b0c8f60057235d8dbfb02cd00375f421db85920d59d6471d4585a9",
+    "scripts-stage-report.json": "69d1b4e27894bc4376cf7de8a8f9dac27c66b90453f26814c932c82e2186b322",
+    "service-reports.json": "c335216f9009932d9790d36b4e501337d31fff660814b5a940fc4f694293c55b",
+    "trial.json": "95cce0fe54cc43f3e2eb94744e1ebd73cbdd796d07e39356297ed5514dfd8b9f",
+    "validation-stage-report.json": "96e5d2d2cdd664c713091ac79ce38fb1c97b38f04d1ce84e8666615312e4a799"
+  }
+}

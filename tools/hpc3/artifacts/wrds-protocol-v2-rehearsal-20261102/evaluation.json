@@ -1,0 +1,8613 @@
+{
+ "kind": "research-monthly-validation-v2",
+ "attempt": 1,
+ "policy_digest": "bdc9887f5d507656ea18730233266ccb86385a8727e3030386bc8e79d7fbe31b",
+ "candidate_digest": "88f5b90aa93f70e0f026f7dbc5778c4c2f5984f401e4f74165c0864da5cbf345",
+ "partition": "validation",
+ "dataset": {
+  "bundle_sha256": "f793bf9c611c3a8c0c5c38e0b51f78709a77c58f36fa7dc96b65c6620fb51b1f",
+  "bundle": {
+   "format": "age-v1",
+   "partition": "train-validation",
+   "recipient": "age1grghg7ar3k4jh47wtpl6p3jy3w84vgmptyn98cw8ft43zcawwaasacpps6",
+   "manifest": {
+    "name": "manifest.json",
+    "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+    "size_bytes": 1221
+   },
+   "files": [
+    {
+     "plaintext": {
+      "name": "calendar.csv",
+      "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+      "size_bytes": 27410
+     },
+     "ciphertext": {
+      "name": "calendar.csv.age",
+      "sha256": "c22d9b0a0481c91d76099399a451a39bcec4fb437cd238402c305790ece7e891",
+      "size_bytes": 27667
+     }
+    },
+    {
+     "plaintext": {
+      "name": "calendar.sql",
+      "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+      "size_bytes": 79
+     },
+     "ciphertext": {
+      "name": "calendar.sql.age",
+      "sha256": "03a743a86c141f8eebadb6b885733dcd9679994cba5aac66d67b64bfda89dff7",
+      "size_bytes": 427
+     }
+    },
+    {
+     "plaintext": {
+      "name": "delists.csv",
+      "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+      "size_bytes": 116
+     },
+     "ciphertext": {
+      "name": "delists.csv.age",
+      "sha256": "6184aa8dda7ac3027d5fe9caed7ffc9976ec67576c994a131ecda61bac6dfde2",
+      "size_bytes": 359
+     }
+    },
+    {
+     "plaintext": {
+      "name": "delists.sql",
+      "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+      "size_bytes": 111
+     },
+     "ciphertext": {
+      "name": "delists.sql.age",
+      "sha256": "7fec6afd6a05f908bf2927986471157caa189b8bf7a0a054c1a2e8685ecbd22b",
+      "size_bytes": 352
+     }
+    },
+    {
+     "plaintext": {
+      "name": "manifest.json",
+      "sha256": "2aca175a591a19c214ebfa6214cda8991040de8415957ac8c36b471aaa3cf68c",
+      "size_bytes": 1221
+     },
+     "ciphertext": {
+      "name": "manifest.json.age",
+      "sha256": "45505125651c36b946523edc2f8fc9f37056405027cce5cc17ef21a24e31aed0",
+      "size_bytes": 1529
+     }
+    },
+    {
+     "plaintext": {
+      "name": "membership.csv",
+      "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+      "size_bytes": 277
+     },
+     "ciphertext": {
+      "name": "membership.csv.age",
+      "sha256": "34130ec4dd7b69cc9ada1b976653f4bfa494fbc8b2fc9dc3eeaddcceec3ed712",
+      "size_bytes": 533
+     }
+    },
+    {
+     "plaintext": {
+      "name": "membership.sql",
+      "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+      "size_bytes": 74
+     },
+     "ciphertext": {
+      "name": "membership.sql.age",
+      "sha256": "f8b191cb04cc5fac702eb48a0f8df6977221fef243e5ee2e781391a42398c961",
+      "size_bytes": 324
+     }
+    },
+    {
+     "plaintext": {
+      "name": "protocol.json",
+      "sha256": "bdb9ddef52648542ee61395760a1f267885a95647f4a2eb9750d4d9280e82598",
+      "size_bytes": 1175
+     },
+     "ciphertext": {
+      "name": "protocol.json.age",
+      "sha256": "68c6973e1c2ac12ea1021cac438a5d291ce0980c56aaa5a0eb7b5c4fd571ea6d",
+      "size_bytes": 1449
+     }
+    },
+    {
+     "plaintext": {
+      "name": "returns.csv",
+      "sha256": "2bc996def472dfa965d8a83e4ee4c30eefabd58490bbbd472ac1a4667b47db66",
+      "size_bytes": 483184
+     },
+     "ciphertext": {
+      "name": "returns.csv.age",
+      "sha256": "04bc0ecc164ad4939793cc6f95b3346a64d72b940117611a9943778ff9129d34",
+      "size_bytes": 483640
+     }
+    },
+    {
+     "plaintext": {
+      "name": "returns.sql",
+      "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+      "size_bytes": 147
+     },
+     "ciphertext": {
+      "name": "returns.sql.age",
+      "sha256": "8aba0603e58394de3213ce64f174ce2f79f3ffcb9c9315fc520d423b0ff51639",
+      "size_bytes": 459
+     }
+    }
+   ]
+  }
+ },
+ "source": {
+  "extracted_at": "2026-10-29T00:00:00+00:00",
+  "protocol": {
+   "name": "protocol.json",
+   "sha256": "bdb9ddef52648542ee61395760a1f267885a95647f4a2eb9750d4d9280e82598",
+   "size_bytes": 1175
+  },
+  "membership": {
+   "csv": {
+    "name": "membership.csv",
+    "sha256": "00a56cb87ee04af9398e324ab927f426ce519946e6953266ad0a947e765f1d39",
+    "size_bytes": 277
+   },
+   "query": {
+    "name": "membership.sql",
+    "sha256": "82e4182a8a90bc7623b67d1c0798e7ca7082cb11f74153ab96b9aa1fbf49f914",
+    "size_bytes": 74
+   }
+  },
+  "returns": {
+   "csv": {
+    "name": "returns.csv",
+    "sha256": "2bc996def472dfa965d8a83e4ee4c30eefabd58490bbbd472ac1a4667b47db66",
+    "size_bytes": 483184
+   },
+   "query": {
+    "name": "returns.sql",
+    "sha256": "7cfa137c15e40fd6a02ee6f4ca9ad3f22d6b63d489dba95706e33bb957cb4d46",
+    "size_bytes": 147
+   }
+  },
+  "calendar": {
+   "csv": {
+    "name": "calendar.csv",
+    "sha256": "f0a073a3466acb64819c6e819cd4a1c1011cd42cd60523fa9b7eae308a39fec1",
+    "size_bytes": 27410
+   },
+   "query": {
+    "name": "calendar.sql",
+    "sha256": "3a14cd5b02f0a83f630dbe00637f5ce403cdc8ff5b5ac767374eac8c2c91d92d",
+    "size_bytes": 79
+   }
+  },
+  "delists": {
+   "csv": {
+    "name": "delists.csv",
+    "sha256": "8b174c5ce9050ba6e7235508b5f5777e415234ae59413890b77edb68353bdf17",
+    "size_bytes": 116
+   },
+   "query": {
+    "name": "delists.sql",
+    "sha256": "55bdbb5629f4516893f68131a6db83acf7a246ae5072049712ec054a6623f35e",
+    "size_bytes": 111
+   }
+  }
+ },
+ "config": {
+  "n_estimators": 3,
+  "max_depth": 2,
+  "learning_rate": 0.05,
+  "max_bins": 16,
+  "min_data_in_leaf": 20,
+  "num_leaves": 4,
+  "reg_alpha": 0.0,
+  "reg_lambda": 0.0,
+  "n_jobs": 1,
+  "repeats": 1,
+  "warmups": 0
+ },
+ "evaluation": {
+  "design": {
+   "version": 2,
+   "library": "crsp_a_stock",
+   "membership": "dsenames",
+   "returns": "stkdlysecuritydata",
+   "calendar": "metaexchangecalendar",
+   "delists": "stkdelists",
+   "membership_columns": [
+    "permno",
+    "namedt",
+    "nameendt",
+    "shrcd",
+    "exchcd"
+   ],
+   "returns_columns": [
+    "permno",
+    "dlycaldt",
+    "dlyprevdt",
+    "dlyret",
+    "dlyretmissflg",
+    "dlyretdurflg",
+    "dlydelflg",
+    "dlyprc",
+    "dlyprcflg",
+    "dlyvol"
+   ],
+   "calendar_columns": [
+    "caldt",
+    "exchangegroup",
+    "tradingflg"
+   ],
+   "delists_columns": [
+    "permno",
+    "delistingdt",
+    "deldlydt",
+    "delamtdt",
+    "delnextdt",
+    "delret",
+    "delretmisstype"
+   ],
+   "source_sha256": "bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e",
+   "history_start": "2016-01-01",
+   "train_start": "2017-01-01",
+   "validation_start": "2018-07-01",
+   "holdout_start": "2020-01-01",
+   "holdout_end": "2020-06-30",
+   "coverage_end": "2020-08-31",
+   "share_codes": [
+    10,
+    11
+   ],
+   "exchange_codes": [
+    1,
+    2,
+    3
+   ],
+   "calendar_group": "CIZ",
+   "execution_flag": "TR",
+   "entry_rule": "confirmed-terminal-entry-cash",
+   "cost_rule": "actual-traded-notional",
+   "terminal_rule": "dated-value-next-rebalance",
+   "min_price": 5.0,
+   "min_history": 252,
+   "liquidity_window": 60,
+   "max_universe": 6,
+   "selection_fraction": 0.5,
+   "cost_bps": [
+    10,
+    5,
+    25
+   ],
+   "bootstrap_block_months": 3,
+   "bootstrap_draws": 200,
+   "bootstrap_seed": 7
+  },
+  "stopping_months": 6,
+  "fold_months": 12,
+  "confidence": 0.9
+ },
+ "features": [
+  "momentum",
+  "liquidity"
+ ],
+ "folds": [
+  {
+   "first_stopping": "2018-01-31",
+   "first_scored": "2018-07-31",
+   "n_train": 66,
+   "n_stopping": 30,
+   "n_purged": 12,
+   "n_scored": 72
+  },
+  {
+   "first_stopping": "2019-01-31",
+   "first_scored": "2019-07-31",
+   "n_train": 138,
+   "n_stopping": 30,
+   "n_purged": 12,
+   "n_scored": 24
+  }
+ ],
+ "exclusions": [
+  {
+   "decision": "2018-07-31",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2018-08-31",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2018-09-28",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2018-10-31",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2018-11-30",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2018-12-31",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2019-01-31",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2019-02-28",
+   "counts": {
+    "liquidity_rank_limit": 2
+   }
+  },
+  {
+   "decision": "2019-03-29",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-04-30",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-05-31",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-06-28",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-07-31",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-08-30",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-09-30",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  },
+  {
+   "decision": "2019-10-31",
+   "counts": {
+    "decision_price_missing": 1,
+    "liquidity_rank_limit": 1
+   }
+  }
+ ],
+ "results": [
+  {
+   "arm": "momentum",
+   "seed": 11,
+   "cost_bps": 10,
+   "mean_net_return": 0.017694526368571543,
+   "mean_turnover": 0.38578268933061266,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9990009990009989,
+     "cost": 0.000999000999000999,
+     "net_return": 0.05598876740941616,
+     "held": [
+      [
+       3,
+       0.387849153466001
+      ],
+      [
+       5,
+       0.28671780281389275
+      ],
+      [
+       8,
+       0.3254330437201063
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.10899530849583675,
+     "cost": 0.00010899530849583674,
+     "net_return": 0.012114402128963642,
+     "held": [
+      [
+       3,
+       0.345517162738772
+      ],
+      [
+       5,
+       0.30365908565424016
+      ],
+      [
+       8,
+       0.3508237516069879
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.059368284786448636,
+     "cost": 5.9368284786448646e-05,
+     "net_return": 0.12414761509274697,
+     "held": [
+      [
+       3,
+       0.3310649305760556
+      ],
+      [
+       5,
+       0.3332762396340503
+      ],
+      [
+       8,
+       0.33565882978989403
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.004649443098755201,
+     "cost": 4.649443098755201e-06,
+     "net_return": 0.10499299525960382,
+     "held": [
+      [
+       3,
+       0.37147377475053767
+      ],
+      [
+       5,
+       0.3111460386828367
+      ],
+      [
+       8,
+       0.31738018656662564
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07625546434629328,
+     "cost": 7.625546434629328e-05,
+     "net_return": -0.005880559306886357,
+     "held": [
+      [
+       3,
+       0.4013801282387867
+      ],
+      [
+       5,
+       0.30383275672823223
+      ],
+      [
+       8,
+       0.29478711503298105
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13604824039744096,
+     "cost": 0.00013604824039744096,
+     "net_return": 0.03705883659797338,
+     "held": [
+      [
+       3,
+       0.316325076561688
+      ],
+      [
+       5,
+       0.34165772651637344
+      ],
+      [
+       8,
+       0.34201719692193855
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      5,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7004496969776314,
+     "cost": 0.0007004496969776314,
+     "net_return": -0.03939278283443781,
+     "held": [
+      [
+       3,
+       0.36183148783792685
+      ],
+      [
+       5,
+       0.327535380324657
+      ],
+      [
+       7,
+       0.3106331318374161
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.678036560497187,
+     "cost": 0.000678036560497187,
+     "net_return": -0.053459072437388455,
+     "held": [
+      [
+       3,
+       0.3311799211170287
+      ],
+      [
+       4,
+       0.3301912206934091
+      ],
+      [
+       5,
+       0.3386288581895623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6707499077966772,
+     "cost": 0.0006707499077966772,
+     "net_return": -0.012903572650136752,
+     "held": [
+      [
+       2,
+       0.34732861912465374
+      ],
+      [
+       3,
+       0.3066425454849799
+      ],
+      [
+       5,
+       0.34602883539036633
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.053399375488536335,
+     "cost": 5.339937548853633e-05,
+     "net_return": -0.0036866977866218953,
+     "held": [
+      [
+       2,
+       0.3397472529967476
+      ],
+      [
+       3,
+       0.3026807841642785
+      ],
+      [
+       5,
+       0.3575719628389738
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7277291886085734,
+     "cost": 0.0007277291886085733,
+     "net_return": -0.005672581224672846,
+     "held": [
+      [
+       2,
+       0.35421994912699745
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.32447190743876186
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04175931181672271,
+     "cost": 4.175931181672271e-05,
+     "net_return": 0.07912541919677119,
+     "held": [
+      [
+       2,
+       0.32512893331168696
+      ],
+      [
+       3,
+       0.36403230871230235
+      ],
+      [
+       4,
+       0.3108387579760106
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.061377491594073415,
+     "cost": 6.137749159407341e-05,
+     "net_return": 0.04979426169897061,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.3633040403539983
+      ],
+      [
+       4,
+       0.3150647436681008
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.059921440227920696,
+     "cost": 5.99214402279207e-05,
+     "net_return": 0.0042899508718505786,
+     "held": [
+      [
+       2,
+       0.35257717216985707
+      ],
+      [
+       3,
+       0.3145490245856355
+      ],
+      [
+       4,
+       0.33287380324450744
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7040006172896326,
+     "cost": 0.0007040006172896326,
+     "net_return": -0.08355531571383568,
+     "held": [
+      [
+       2,
+       0.3133636982651927
+      ],
+      [
+       3,
+       0.3184864811005548
+      ],
+      [
+       5,
+       0.36814982063425244
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.090781698867074,
+     "cost": 0.0010907816988670739,
+     "net_return": 0.02015075559482815,
+     "held": [
+      [
+       2,
+       0.32340595288996365
+      ],
+      [
+       3,
+       0.3365329726887028
+      ],
+      [
+       5,
+       0.3400610744213335
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "momentum",
+   "seed": 11,
+   "cost_bps": 5,
+   "mean_net_return": 0.017885680309149166,
+   "mean_turnover": 0.3858570107682946,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9995002498750625,
+     "cost": 0.0004997501249375312,
+     "net_return": 0.05651649792786162,
+     "held": [
+      [
+       3,
+       0.387849153466001
+      ],
+      [
+       5,
+       0.28671780281389275
+      ],
+      [
+       8,
+       0.3254330437201063
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.10901347135344301,
+     "cost": 5.450673567672151e-05,
+     "net_return": 0.012169556809866755,
+     "held": [
+      [
+       3,
+       0.3455171627387719
+      ],
+      [
+       5,
+       0.3036590856542401
+      ],
+      [
+       8,
+       0.3508237516069879
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.059358388422923514,
+     "cost": 2.9679194211461757e-05,
+     "net_return": 0.12418099199464061,
+     "held": [
+      [
+       3,
+       0.3310649305760557
+      ],
+      [
+       5,
+       0.33327623963405034
+      ],
+      [
+       8,
+       0.33565882978989403
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.004650217876808503,
+     "cost": 2.3251089384042516e-06,
+     "net_return": 0.10499556364451079,
+     "held": [
+      [
+       3,
+       0.3714737747505377
+      ],
+      [
+       5,
+       0.31114603868283675
+      ],
+      [
+       8,
+       0.31738018656662564
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07626817147249652,
+     "cost": 3.8134085736248265e-05,
+     "net_return": -0.005842659213215029,
+     "held": [
+      [
+       3,
+       0.4013801282387867
+      ],
+      [
+       5,
+       0.30383275672823223
+      ],
+      [
+       8,
+       0.29478711503298105
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13607091132568577,
+     "cost": 6.803545566284289e-05,
+     "net_return": 0.03712937945461525,
+     "held": [
+      [
+       3,
+       0.31632507656168796
+      ],
+      [
+       5,
+       0.3416577265163735
+      ],
+      [
+       8,
+       0.3420171969219385
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      5,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7005664191401005,
+     "cost": 0.0003502832095700503,
+     "net_return": -0.039056174602290605,
+     "held": [
+      [
+       3,
+       0.36183148783792685
+      ],
+      [
+       5,
+       0.327535380324657
+      ],
+      [
+       7,
+       0.3106331318374161
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6781495477593926,
+     "cost": 0.00033907477387969635,
+     "net_return": -0.05313801354380754,
+     "held": [
+      [
+       3,
+       0.33117992111702865
+      ],
+      [
+       4,
+       0.33019122069340906
+      ],
+      [
+       5,
+       0.33862885818956223
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6708616808191394,
+     "cost": 0.00033543084040956974,
+     "net_return": -0.012572358234658076,
+     "held": [
+      [
+       2,
+       0.34732861912465374
+      ],
+      [
+       3,
+       0.3066425454849799
+      ],
+      [
+       5,
+       0.34602883539036633
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05339047410905832,
+     "cost": 2.669523705452916e-05,
+     "net_return": -0.0036600906774728603,
+     "held": [
+      [
+       2,
+       0.3397472529967476
+      ],
+      [
+       3,
+       0.3026807841642785
+      ],
+      [
+       5,
+       0.3575719628389738
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7278504565953435,
+     "cost": 0.0003639252282976718,
+     "net_return": -0.005310577531222771,
+     "held": [
+      [
+       2,
+       0.3542199491269975
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.3244719074387618
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0417662705422379,
+     "cost": 2.0883135271118952e-05,
+     "net_return": 0.07914794815033055,
+     "held": [
+      [
+       2,
+       0.32512893331168696
+      ],
+      [
+       3,
+       0.36403230871230235
+      ],
+      [
+       4,
+       0.31083875797601057
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.061387719471359584,
+     "cost": 3.069385973567979e-05,
+     "net_return": 0.04982647517680627,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.3633040403539983
+      ],
+      [
+       4,
+       0.3150647436681007
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0599314254704183,
+     "cost": 2.9965712735209148e-05,
+     "net_return": 0.004320036910741232,
+     "held": [
+      [
+       2,
+       0.35257717216985707
+      ],
+      [
+       3,
+       0.31454902458563544
+      ],
+      [
+       4,
+       0.3328738032445075
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7041179311735335,
+     "cost": 0.0003520589655867667,
+     "net_return": -0.08323255343310898,
+     "held": [
+      [
+       2,
+       0.3133636982651928
+      ],
+      [
+       3,
+       0.31848648110055483
+      ],
+      [
+       5,
+       0.3681498206342525
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.0908288368857106,
+     "cost": 0.0005454144184428554,
+     "net_return": 0.020696862112789427,
+     "held": [
+      [
+       2,
+       0.32340595288996365
+      ],
+      [
+       3,
+       0.33653297268870286
+      ],
+      [
+       5,
+       0.34006107442133354
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "momentum",
+   "seed": 11,
+   "cost_bps": 25,
+   "mean_net_return": 0.017121512582314098,
+   "mean_turnover": 0.3855600026339148,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9975062344139651,
+     "cost": 0.002493765586034913,
+     "net_return": 0.054408734340973375,
+     "held": [
+      [
+       3,
+       0.3878491534660009
+      ],
+      [
+       5,
+       0.2867178028138927
+      ],
+      [
+       8,
+       0.32543304372010623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.10894085621848662,
+     "cost": 0.0002723521405462166,
+     "net_return": 0.011949048303768084,
+     "held": [
+      [
+       3,
+       0.345517162738772
+      ],
+      [
+       5,
+       0.30365908565424016
+      ],
+      [
+       8,
+       0.350823751606988
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05939799368625839,
+     "cost": 0.00014849498421564599,
+     "net_return": 0.12404741757758764,
+     "held": [
+      [
+       3,
+       0.3310649305760557
+      ],
+      [
+       5,
+       0.3332762396340504
+      ],
+      [
+       8,
+       0.3356588297898941
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.004647120312860629,
+     "cost": 1.1617800782151574e-05,
+     "net_return": 0.10498529523737421,
+     "held": [
+      [
+       3,
+       0.37147377475053767
+      ],
+      [
+       5,
+       0.31114603868283675
+      ],
+      [
+       8,
+       0.31738018656662564
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07621736836077467,
+     "cost": 0.00019054342090193667,
+     "net_return": -0.005994183850827839,
+     "held": [
+      [
+       3,
+       0.4013801282387867
+      ],
+      [
+       5,
+       0.3038327567282322
+      ],
+      [
+       8,
+       0.29478711503298105
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      5,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13598027291680947,
+     "cost": 0.0003399506822920237,
+     "net_return": 0.03684734899628661,
+     "held": [
+      [
+       3,
+       0.31632507656168796
+      ],
+      [
+       5,
+       0.34165772651637344
+      ],
+      [
+       8,
+       0.3420171969219385
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      5,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7000997637401738,
+     "cost": 0.0017502494093504344,
+     "net_return": -0.040401934874962686,
+     "held": [
+      [
+       3,
+       0.36183148783792685
+      ],
+      [
+       5,
+       0.32753538032465707
+      ],
+      [
+       7,
+       0.31063313183741614
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6776978244969385,
+     "cost": 0.0016942445612423463,
+     "net_return": -0.05442160753499736,
+     "held": [
+      [
+       3,
+       0.3311799211170287
+      ],
+      [
+       4,
+       0.3301912206934091
+      ],
+      [
+       5,
+       0.3386288581895623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6704148120892016,
+     "cost": 0.001676037030223004,
+     "net_return": -0.013896554019306562,
+     "held": [
+      [
+       2,
+       0.34732861912465374
+      ],
+      [
+       3,
+       0.3066425454849799
+      ],
+      [
+       5,
+       0.3460288353903664
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.053426097444577346,
+     "cost": 0.00013356524361144337,
+     "net_return": -0.003766572372669308,
+     "held": [
+      [
+       2,
+       0.33974725299674763
+      ],
+      [
+       3,
+       0.30268078416427857
+      ],
+      [
+       5,
+       0.35757196283897386
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.727365626982291,
+     "cost": 0.0018184140674557276,
+     "net_return": -0.00675786890047414,
+     "held": [
+      [
+       2,
+       0.35421994912699745
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.3244719074387618
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.041738449546039974,
+     "cost": 0.00010434612386509993,
+     "net_return": 0.07905787735648273,
+     "held": [
+      [
+       2,
+       0.32512893331168696
+      ],
+      [
+       3,
+       0.36403230871230235
+      ],
+      [
+       4,
+       0.31083875797601057
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.061346828400937393,
+     "cost": 0.0001533670710023435,
+     "net_return": 0.049697685638775635,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.36330404035399827
+      ],
+      [
+       4,
+       0.3150647436681008
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05989150445428475,
+     "cost": 0.00014972876113571187,
+     "net_return": 0.004199752877154239,
+     "held": [
+      [
+       2,
+       0.35257717216985707
+      ],
+      [
+       3,
+       0.3145490245856355
+      ],
+      [
+       4,
+       0.3328738032445075
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.703648910070337,
+     "cost": 0.0017591222751758427,
+     "net_return": -0.0845229575689439,
+     "held": [
+      [
+       2,
+       0.3133636982651927
+      ],
+      [
+       3,
+       0.3184864811005548
+      ],
+      [
+       5,
+       0.36814982063425244
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.0906403790087016,
+     "cost": 0.002726600947521754,
+     "net_return": 0.018512720110804848,
+     "held": [
+      [
+       2,
+       0.32340595288996365
+      ],
+      [
+       3,
+       0.33653297268870286
+      ],
+      [
+       5,
+       0.34006107442133354
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "equal_weight",
+   "seed": 11,
+   "cost_bps": 10,
+   "mean_net_return": 0.011926521837002935,
+   "mean_turnover": 0.20186693016624216,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.999000999000999,
+     "cost": 0.000999000999000999,
+     "net_return": 0.016515090187992465,
+     "held": [
+      [
+       3,
+       0.20145512519327372
+      ],
+      [
+       4,
+       0.15606328051011087
+      ],
+      [
+       5,
+       0.1489258654939322
+      ],
+      [
+       6,
+       0.15097558507129494
+      ],
+      [
+       7,
+       0.17354495574970513
+      ],
+      [
+       8,
+       0.16903518798168307
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08807053784932393,
+     "cost": 8.807053784932393e-05,
+     "net_return": 0.03236912559817706,
+     "held": [
+      [
+       3,
+       0.16937266243727453
+      ],
+      [
+       4,
+       0.17580859268256951
+      ],
+      [
+       5,
+       0.1488538149678308
+      ],
+      [
+       6,
+       0.16536765901245973
+      ],
+      [
+       7,
+       0.1686233163069557
+      ],
+      [
+       8,
+       0.17197395459290984
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03823646419415052,
+     "cost": 3.823646419415052e-05,
+     "net_return": 0.09589009565831619,
+     "held": [
+      [
+       3,
+       0.1698043073075221
+      ],
+      [
+       4,
+       0.16478788784548962
+      ],
+      [
+       5,
+       0.1709384951001774
+      ],
+      [
+       6,
+       0.15737472518797385
+      ],
+      [
+       7,
+       0.16493405101953304
+      ],
+      [
+       8,
+       0.17216053353930413
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.025806671894007125,
+     "cost": 2.5806671894007127e-05,
+     "net_return": 0.07227805205820714,
+     "held": [
+      [
+       3,
+       0.19139962515356704
+      ],
+      [
+       4,
+       0.15618040058412078
+      ],
+      [
+       5,
+       0.16031612248241495
+      ],
+      [
+       6,
+       0.16650986380721935
+      ],
+      [
+       7,
+       0.16206575833973696
+      ],
+      [
+       8,
+       0.16352822963294097
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.049432961666023394,
+     "cost": 4.9432961666023395e-05,
+     "net_return": -0.0497484331558965,
+     "held": [
+      [
+       3,
+       0.209960449442273
+      ],
+      [
+       4,
+       0.1550789628916898
+      ],
+      [
+       5,
+       0.15893378289020116
+      ],
+      [
+       6,
+       0.15551697379748408
+      ],
+      [
+       7,
+       0.16630778955268813
+      ],
+      [
+       8,
+       0.154202041425664
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0865298789652357,
+     "cost": 8.65298789652357e-05,
+     "net_return": 0.04084885128195914,
+     "held": [
+      [
+       3,
+       0.1575944298144023
+      ],
+      [
+       4,
+       0.19006754521334152
+      ],
+      [
+       5,
+       0.17021525826306927
+      ],
+      [
+       6,
+       0.17019045172647357
+      ],
+      [
+       7,
+       0.14153796711278796
+      ],
+      [
+       8,
+       0.1703943478699254
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06842468103929927,
+     "cost": 6.842468103929928e-05,
+     "net_return": -0.0900805730012042,
+     "held": [
+      [
+       3,
+       0.19111459774818618
+      ],
+      [
+       4,
+       0.16633364775174111
+      ],
+      [
+       5,
+       0.17299984816988795
+      ],
+      [
+       6,
+       0.1801834762618631
+      ],
+      [
+       7,
+       0.16407230446720764
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.12529612560111403
+      }
+     ]
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [
+      8
+     ],
+     "cash": 0.14913768669389632,
+     "turnover": 0.14590556703901358,
+     "cost": 0.00014590556703901358,
+     "net_return": -0.022650379637812246,
+     "held": [
+      [
+       3,
+       0.14034812664135318
+      ],
+      [
+       4,
+       0.1399291330870444
+      ],
+      [
+       5,
+       0.1435048529310185
+      ],
+      [
+       6,
+       0.14386053367789253
+      ],
+      [
+       7,
+       0.15501976491667002
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.12819990205212498
+      }
+     ]
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.2770605282178034,
+     "cost": 0.0002770605282178034,
+     "net_return": -0.012806810073757502,
+     "held": [
+      [
+       2,
+       0.17371569633428746
+      ],
+      [
+       3,
+       0.1533666400681021
+      ],
+      [
+       4,
+       0.17960941990798582
+      ],
+      [
+       5,
+       0.17306561216600105
+      ],
+      [
+       6,
+       0.15155403966068914
+      ],
+      [
+       7,
+       0.1686885918629343
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05684425529418213,
+     "cost": 5.684425529418213e-05,
+     "net_return": -0.01183778952671577,
+     "held": [
+      [
+       2,
+       0.1712742795806457
+      ],
+      [
+       3,
+       0.15258823373367494
+      ],
+      [
+       4,
+       0.1740851167357733
+      ],
+      [
+       5,
+       0.18026011923065918
+      ],
+      [
+       6,
+       0.1759436412040071
+      ],
+      [
+       7,
+       0.14584860951523979
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06981625225292154,
+     "cost": 6.981625225292154e-05,
+     "net_return": 0.009053683804723711,
+     "held": [
+      [
+       2,
+       0.17464011381210595
+      ],
+      [
+       3,
+       0.15841369430605984
+      ],
+      [
+       4,
+       0.15997351640864313
+      ],
+      [
+       5,
+       0.17168262414058275
+      ],
+      [
+       6,
+       0.16322866105858355
+      ],
+      [
+       7,
+       0.1720613902740248
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03676825645342695,
+     "cost": 3.6768256453426946e-05,
+     "net_return": 0.034861405268555634,
+     "held": [
+      [
+       2,
+       0.16951866495169218
+      ],
+      [
+       3,
+       0.18980245880803479
+      ],
+      [
+       4,
+       0.16206792404052525
+      ],
+      [
+       5,
+       0.15194851538697063
+      ],
+      [
+       6,
+       0.17942061222108094
+      ],
+      [
+       7,
+       0.14724182459169613
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07748347196161591,
+     "cost": 7.748347196161591e-05,
+     "net_return": 0.07111857078604555,
+     "held": [
+      [
+       2,
+       0.15761148002769376
+      ],
+      [
+       3,
+       0.17803274264326702
+      ],
+      [
+       4,
+       0.15439365984142311
+      ],
+      [
+       5,
+       0.17890136592298972
+      ],
+      [
+       6,
+       0.15212541150498515
+      ],
+      [
+       7,
+       0.17893534005964126
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07173889725179598,
+     "cost": 7.173889725179597e-05,
+     "net_return": 0.032421463975225384,
+     "held": [
+      [
+       2,
+       0.17148303216350244
+      ],
+      [
+       3,
+       0.15298727415633953
+      ],
+      [
+       4,
+       0.16189990054337786
+      ],
+      [
+       5,
+       0.15937644724676958
+      ],
+      [
+       6,
+       0.18331429870838128
+      ],
+      [
+       7,
+       0.17093904718162925
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05147275610702604,
+     "cost": 5.147275610702604e-05,
+     "net_return": -0.037839920931531545,
+     "held": [
+      [
+       2,
+       0.14933482851109792
+      ],
+      [
+       3,
+       0.15177611287317797
+      ],
+      [
+       4,
+       0.1853039416146361
+      ],
+      [
+       5,
+       0.17544339256642688
+      ],
+      [
+       6,
+       0.17717033732535106
+      ],
+      [
+       7,
+       0.16097138710931008
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.0872787034730504,
+     "cost": 0.0010872787034730505,
+     "net_return": 0.010431917099762433,
+     "held": [
+      [
+       2,
+       0.1632572999328547
+      ],
+      [
+       3,
+       0.1698838996888476
+      ],
+      [
+       4,
+       0.16726809914863763
+      ],
+      [
+       5,
+       0.17166490698822062
+      ],
+      [
+       6,
+       0.16686988727374202
+      ],
+      [
+       7,
+       0.16105590696769753
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "equal_weight",
+   "seed": 11,
+   "cost_bps": 5,
+   "mean_net_return": 0.012028111856343629,
+   "mean_turnover": 0.20190530094906056,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9995002498750625,
+     "cost": 0.0004997501249375312,
+     "net_return": 0.01702309373131472,
+     "held": [
+      [
+       3,
+       0.20145512519327372
+      ],
+      [
+       4,
+       0.1560632805101109
+      ],
+      [
+       5,
+       0.1489258654939322
+      ],
+      [
+       6,
+       0.15097558507129497
+      ],
+      [
+       7,
+       0.17354495574970513
+      ],
+      [
+       8,
+       0.1690351879816831
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0880705378493239,
+     "cost": 4.4035268924661946e-05,
+     "net_return": 0.03241459025434912,
+     "held": [
+      [
+       3,
+       0.16937266243727453
+      ],
+      [
+       4,
+       0.17580859268256954
+      ],
+      [
+       5,
+       0.14885381496783082
+      ],
+      [
+       6,
+       0.16536765901245973
+      ],
+      [
+       7,
+       0.1686233163069557
+      ],
+      [
+       8,
+       0.17197395459290984
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.038230090387817,
+     "cost": 1.91150451939085e-05,
+     "net_return": 0.09591105143328882,
+     "held": [
+      [
+       3,
+       0.16980430730752208
+      ],
+      [
+       4,
+       0.1647878878454896
+      ],
+      [
+       5,
+       0.17093849510017736
+      ],
+      [
+       6,
+       0.1573747251879738
+      ],
+      [
+       7,
+       0.164934051019533
+      ],
+      [
+       8,
+       0.1721605335393041
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.025806671894007118,
+     "cost": 1.290333594700356e-05,
+     "net_return": 0.07229188837921074,
+     "held": [
+      [
+       3,
+       0.19139962515356707
+      ],
+      [
+       4,
+       0.15618040058412078
+      ],
+      [
+       5,
+       0.16031612248241497
+      ],
+      [
+       6,
+       0.16650986380721935
+      ],
+      [
+       7,
+       0.16206575833973696
+      ],
+      [
+       8,
+       0.163528229632941
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04944943382919094,
+     "cost": 2.472471691459547e-05,
+     "net_return": -0.04972495294691104,
+     "held": [
+      [
+       3,
+       0.20996044944227293
+      ],
+      [
+       4,
+       0.15507896289168976
+      ],
+      [
+       5,
+       0.15893378289020113
+      ],
+      [
+       6,
+       0.15551697379748405
+      ],
+      [
+       7,
+       0.1663077895526881
+      ],
+      [
+       8,
+       0.15420204142566396
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08655871264699695,
+     "cost": 4.3279356323498475e-05,
+     "net_return": 0.04089387243444276,
+     "held": [
+      [
+       3,
+       0.15759442981440233
+      ],
+      [
+       4,
+       0.19006754521334152
+      ],
+      [
+       5,
+       0.1702152582630693
+      ],
+      [
+       6,
+       0.17019045172647357
+      ],
+      [
+       7,
+       0.141537967112788
+      ],
+      [
+       8,
+       0.17039434786992544
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06841327502479033,
+     "cost": 3.420663751239517e-05,
+     "net_return": -0.09004943520805164,
+     "held": [
+      [
+       3,
+       0.19111459774818618
+      ],
+      [
+       4,
+       0.16633364775174111
+      ],
+      [
+       5,
+       0.17299984816988795
+      ],
+      [
+       6,
+       0.1801834762618631
+      ],
+      [
+       7,
+       0.16407230446720764
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.125296125601114
+      }
+     ]
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [
+      8
+     ],
+     "cash": 0.1491392821239183,
+     "turnover": 0.1458447477113606,
+     "cost": 7.29223738556803e-05,
+     "net_return": -0.022579274477231515,
+     "held": [
+      [
+       3,
+       0.1403496280433109
+      ],
+      [
+       4,
+       0.13993063000673536
+      ],
+      [
+       5,
+       0.14350638810268262
+      ],
+      [
+       6,
+       0.14386207265452208
+      ],
+      [
+       7,
+       0.15502142327139196
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.12819057579743873
+      }
+     ]
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.27719126229021185,
+     "cost": 0.00013859563114510594,
+     "net_return": -0.012670080587980026,
+     "held": [
+      [
+       2,
+       0.17371569633428746
+      ],
+      [
+       3,
+       0.15336664006810213
+      ],
+      [
+       4,
+       0.17960941990798585
+      ],
+      [
+       5,
+       0.17306561216600108
+      ],
+      [
+       6,
+       0.15155403966068917
+      ],
+      [
+       7,
+       0.16868859186293436
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05683477967236278,
+     "cost": 2.841738983618139e-05,
+     "net_return": -0.011809697575641764,
+     "held": [
+      [
+       2,
+       0.1712742795806457
+      ],
+      [
+       3,
+       0.15258823373367497
+      ],
+      [
+       4,
+       0.17408511673577326
+      ],
+      [
+       5,
+       0.18026011923065918
+      ],
+      [
+       6,
+       0.17594364120400707
+      ],
+      [
+       7,
+       0.14584860951523979
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06980461427121568,
+     "cost": 3.490230713560783e-05,
+     "net_return": 0.00908891630946207,
+     "held": [
+      [
+       2,
+       0.17464011381210595
+      ],
+      [
+       3,
+       0.15841369430605987
+      ],
+      [
+       4,
+       0.15997351640864316
+      ],
+      [
+       5,
+       0.17168262414058275
+      ],
+      [
+       6,
+       0.16322866105858355
+      ],
+      [
+       7,
+       0.1720613902740248
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03676825645342695,
+     "cost": 1.8384128226713473e-05,
+     "net_return": 0.034880430992869416,
+     "held": [
+      [
+       2,
+       0.16951866495169218
+      ],
+      [
+       3,
+       0.1898024588080348
+      ],
+      [
+       4,
+       0.16206792404052525
+      ],
+      [
+       5,
+       0.15194851538697063
+      ],
+      [
+       6,
+       0.17942061222108094
+      ],
+      [
+       7,
+       0.14724182459169616
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07748347196161594,
+     "cost": 3.874173598080797e-05,
+     "net_return": 0.07116007099449928,
+     "held": [
+      [
+       2,
+       0.15761148002769376
+      ],
+      [
+       3,
+       0.17803274264326702
+      ],
+      [
+       4,
+       0.15439365984142311
+      ],
+      [
+       5,
+       0.17890136592298972
+      ],
+      [
+       6,
+       0.15212541150498515
+      ],
+      [
+       7,
+       0.17893534005964126
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07173889725179594,
+     "cost": 3.5869448625897965e-05,
+     "net_return": 0.03245849902074083,
+     "held": [
+      [
+       2,
+       0.17148303216350244
+      ],
+      [
+       3,
+       0.15298727415633956
+      ],
+      [
+       4,
+       0.16189990054337783
+      ],
+      [
+       5,
+       0.15937644724676958
+      ],
+      [
+       6,
+       0.18331429870838128
+      ],
+      [
+       7,
+       0.17093904718162928
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05147275610702604,
+     "cost": 2.5736378053513024e-05,
+     "net_return": -0.037815157141328215,
+     "held": [
+      [
+       2,
+       0.1493348285110979
+      ],
+      [
+       3,
+       0.15177611287317797
+      ],
+      [
+       4,
+       0.1853039416146361
+      ],
+      [
+       5,
+       0.17544339256642685
+      ],
+      [
+       6,
+       0.17717033732535106
+      ],
+      [
+       7,
+       0.16097138710931008
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.0873170579587657,
+     "cost": 0.0005436585289793828,
+     "net_return": 0.010975974088464513,
+     "held": [
+      [
+       2,
+       0.16325729993285468
+      ],
+      [
+       3,
+       0.1698838996888476
+      ],
+      [
+       4,
+       0.16726809914863763
+      ],
+      [
+       5,
+       0.1716649069882206
+      ],
+      [
+       6,
+       0.166869887273742
+      ],
+      [
+       7,
+       0.1610559069676975
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "equal_weight",
+   "seed": 11,
+   "cost_bps": 25,
+   "mean_net_return": 0.011621984862087965,
+   "mean_turnover": 0.2017520915290611,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9975062344139651,
+     "cost": 0.002493765586034913,
+     "net_return": 0.014994119978234854,
+     "held": [
+      [
+       3,
+       0.20145512519327372
+      ],
+      [
+       4,
+       0.1560632805101109
+      ],
+      [
+       5,
+       0.1489258654939322
+      ],
+      [
+       6,
+       0.15097558507129497
+      ],
+      [
+       7,
+       0.17354495574970516
+      ],
+      [
+       8,
+       0.16903518798168307
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08807053784932391,
+     "cost": 0.0002201763446233098,
+     "net_return": 0.03223273162966134,
+     "held": [
+      [
+       3,
+       0.1693726624372745
+      ],
+      [
+       4,
+       0.17580859268256951
+      ],
+      [
+       5,
+       0.1488538149678308
+      ],
+      [
+       6,
+       0.16536765901245973
+      ],
+      [
+       7,
+       0.16862331630695568
+      ],
+      [
+       8,
+       0.17197395459290984
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.038255598371395194,
+     "cost": 9.563899592848799e-05,
+     "net_return": 0.09582718638689491,
+     "held": [
+      [
+       3,
+       0.16980430730752208
+      ],
+      [
+       4,
+       0.1647878878454896
+      ],
+      [
+       5,
+       0.1709384951001774
+      ],
+      [
+       6,
+       0.15737472518797382
+      ],
+      [
+       7,
+       0.16493405101953304
+      ],
+      [
+       8,
+       0.1721605335393041
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.025806671894007108,
+     "cost": 6.451667973501777e-05,
+     "net_return": 0.07223654309519634,
+     "held": [
+      [
+       3,
+       0.191399625153567
+      ],
+      [
+       4,
+       0.15618040058412075
+      ],
+      [
+       5,
+       0.16031612248241492
+      ],
+      [
+       6,
+       0.16650986380721933
+      ],
+      [
+       7,
+       0.1620657583397369
+      ],
+      [
+       8,
+       0.16352822963294095
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04938361095554158,
+     "cost": 0.00012345902738885396,
+     "net_return": -0.04981878001829054,
+     "held": [
+      [
+       3,
+       0.20996044944227293
+      ],
+      [
+       4,
+       0.15507896289168976
+      ],
+      [
+       5,
+       0.15893378289020113
+      ],
+      [
+       6,
+       0.15551697379748405
+      ],
+      [
+       7,
+       0.1663077895526881
+      ],
+      [
+       8,
+       0.154202041425664
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0864434930627747,
+     "cost": 0.00021610873265693676,
+     "net_return": 0.0407139676094761,
+     "held": [
+      [
+       3,
+       0.1575944298144023
+      ],
+      [
+       4,
+       0.1900675452133415
+      ],
+      [
+       5,
+       0.17021525826306924
+      ],
+      [
+       6,
+       0.17019045172647354
+      ],
+      [
+       7,
+       0.14153796711278793
+      ],
+      [
+       8,
+       0.1703943478699254
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06845892191388103,
+     "cost": 0.00017114730478470257,
+     "net_return": -0.09017404870818801,
+     "held": [
+      [
+       3,
+       0.19111459774818618
+      ],
+      [
+       4,
+       0.16633364775174111
+      ],
+      [
+       5,
+       0.17299984816988795
+      ],
+      [
+       6,
+       0.18018347626186312
+      ],
+      [
+       7,
+       0.16407230446720764
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.12529612560111403
+      }
+     ]
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+     ],
+     "unfilled": [
+      8
+     ],
+     "cash": 0.14913289101277846,
+     "turnover": 0.14608832975346736,
+     "cost": 0.00036522082438366846,
+     "net_return": -0.022864051387581408,
+     "held": [
+      [
+       3,
+       0.14034361359789793
+      ],
+      [
+       4,
+       0.13992463351677306
+      ],
+      [
+       5,
+       0.14350023837966816
+      ],
+      [
+       6,
+       0.14385590768924902
+      ],
+      [
+       7,
+       0.15501478009106368
+      ]
+     ],
+     "receivables": [
+      {
+       "permno": 8,
+       "valued": "2019-03-01",
+       "amount": 0.1282279357125697
+      }
+     ]
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.2766691538407463,
+     "cost": 0.0006916728846018658,
+     "net_return": -0.01321622600143213,
+     "held": [
+      [
+       2,
+       0.17371569633428743
+      ],
+      [
+       3,
+       0.1533666400681021
+      ],
+      [
+       4,
+       0.17960941990798582
+      ],
+      [
+       5,
+       0.17306561216600105
+      ],
+      [
+       6,
+       0.15155403966068914
+      ],
+      [
+       7,
+       0.16868859186293433
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.056872701126689615,
+     "cost": 0.00014218175281672404,
+     "net_return": -0.0119221216106985,
+     "held": [
+      [
+       2,
+       0.1712742795806457
+      ],
+      [
+       3,
+       0.15258823373367497
+      ],
+      [
+       4,
+       0.1740851167357733
+      ],
+      [
+       5,
+       0.1802601192306592
+      ],
+      [
+       6,
+       0.1759436412040071
+      ],
+      [
+       7,
+       0.14584860951523979
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06985118949341505,
+     "cost": 0.00017462797373353766,
+     "net_return": 0.008947915766730041,
+     "held": [
+      [
+       2,
+       0.1746401138121059
+      ],
+      [
+       3,
+       0.15841369430605984
+      ],
+      [
+       4,
+       0.15997351640864313
+      ],
+      [
+       5,
+       0.17168262414058272
+      ],
+      [
+       6,
+       0.16322866105858355
+      ],
+      [
+       7,
+       0.17206139027402478
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03676825645342689,
+     "cost": 9.192064113356724e-05,
+     "net_return": 0.0348043280956134,
+     "held": [
+      [
+       2,
+       0.16951866495169218
+      ],
+      [
+       3,
+       0.18980245880803484
+      ],
+      [
+       4,
+       0.16206792404052528
+      ],
+      [
+       5,
+       0.15194851538697066
+      ],
+      [
+       6,
+       0.17942061222108094
+      ],
+      [
+       7,
+       0.14724182459169616
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0774834719616159,
+     "cost": 0.00019370867990403976,
+     "net_return": 0.07099407016068437,
+     "held": [
+      [
+       2,
+       0.15761148002769376
+      ],
+      [
+       3,
+       0.178032742643267
+      ],
+      [
+       4,
+       0.1543936598414231
+      ],
+      [
+       5,
+       0.1789013659229897
+      ],
+      [
+       6,
+       0.15212541150498513
+      ],
+      [
+       7,
+       0.17893534005964123
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.07173889725179596,
+     "cost": 0.00017934724312948988,
+     "net_return": 0.03231035883867839,
+     "held": [
+      [
+       2,
+       0.17148303216350244
+      ],
+      [
+       3,
+       0.15298727415633953
+      ],
+      [
+       4,
+       0.16189990054337786
+      ],
+      [
+       5,
+       0.15937644724676958
+      ],
+      [
+       6,
+       0.18331429870838128
+      ],
+      [
+       7,
+       0.17093904718162928
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05147275610702605,
+     "cost": 0.00012868189026756514,
+     "net_return": -0.03791421230214209,
+     "held": [
+      [
+       2,
+       0.14933482851109792
+      ],
+      [
+       3,
+       0.151776112873178
+      ],
+      [
+       4,
+       0.18530394161463612
+      ],
+      [
+       5,
+       0.17544339256642688
+      ],
+      [
+       6,
+       0.17717033732535106
+      ],
+      [
+       7,
+       0.1609713871093101
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.0871636400159062,
+     "cost": 0.0027179091000397652,
+     "net_return": 0.008799976260570386,
+     "held": [
+      [
+       2,
+       0.1632572999328547
+      ],
+      [
+       3,
+       0.1698838996888476
+      ],
+      [
+       4,
+       0.16726809914863763
+      ],
+      [
+       5,
+       0.1716649069882206
+      ],
+      [
+       6,
+       0.166869887273742
+      ],
+      [
+       7,
+       0.1610559069676975
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "cleargbm",
+   "seed": 11,
+   "cost_bps": 10,
+   "mean_net_return": 0.016480433676468863,
+   "mean_turnover": 0.7100520291833693,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9990009990009989,
+     "cost": 0.000999000999000999,
+     "net_return": 0.033783629784751135,
+     "held": [
+      [
+       3,
+       0.3961799526605245
+      ],
+      [
+       4,
+       0.30691273317183526
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7915683369840648,
+     "cost": 0.0007915683369840648,
+     "net_return": 0.051862099614124135,
+     "held": [
+      [
+       4,
+       0.34485826139790887
+      ],
+      [
+       6,
+       0.3243777935328024
+      ],
+      [
+       7,
+       0.33076394506928886
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0230421754040163,
+     "cost": 2.30421754040163e-05,
+     "net_return": 0.06762504170476769,
+     "held": [
+      [
+       4,
+       0.33830633631184254
+      ],
+      [
+       6,
+       0.3230872572160572
+      ],
+      [
+       7,
+       0.3386064064721004
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.020498985229629025,
+     "cost": 2.0498985229629026e-05,
+     "net_return": 0.03959200549686259,
+     "held": [
+      [
+       4,
+       0.32218351760585207
+      ],
+      [
+       6,
+       0.3434920991164091
+      ],
+      [
+       7,
+       0.334324383277739
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6887367192152243,
+     "cost": 0.0006887367192152243,
+     "net_return": -0.011313463544125324,
+     "held": [
+      [
+       3,
+       0.4033385336074916
+      ],
+      [
+       4,
+       0.29791001901671116
+      ],
+      [
+       6,
+       0.29875144737579706
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7372675394534264,
+     "cost": 0.0007372675394534264,
+     "net_return": 0.07736224929700897,
+     "held": [
+      [
+       3,
+       0.304308472517666
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7244748966657794,
+     "cost": 0.0007244748966657794,
+     "net_return": -0.02223882908218322,
+     "held": [
+      [
+       3,
+       0.35547492830578126
+      ],
+      [
+       4,
+       0.30938213096257533
+      ],
+      [
+       6,
+       0.33514294073164336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04791837753402727,
+     "cost": 4.791837753402728e-05,
+     "net_return": -0.05206730144635563,
+     "held": [
+      [
+       3,
+       0.3309021945773903
+      ],
+      [
+       4,
+       0.3299143232751331
+      ],
+      [
+       6,
+       0.3391834821474766
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3328890369876707,
+     "cost": 0.0013328890369876708,
+     "net_return": -0.02576540279701056,
+     "held": [
+      [
+       2,
+       0.3516808737441865
+      ],
+      [
+       6,
+       0.30681543586463084
+      ],
+      [
+       7,
+       0.34150369039118267
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05305347943054849,
+     "cost": 5.30534794305485e-05,
+     "net_return": -0.02553688084967065,
+     "held": [
+      [
+       2,
+       0.3473654548737538
+      ],
+      [
+       6,
+       0.35683549864354974
+      ],
+      [
+       7,
+       0.29579904648269645
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.741488077675382,
+     "cost": 0.0007414880776753821,
+     "net_return": 0.022438039135522114,
+     "held": [
+      [
+       5,
+       0.3386427562004994
+      ],
+      [
+       6,
+       0.3219673740921667
+      ],
+      [
+       7,
+       0.3393898697073339
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.022739498315105022,
+     "cost": 2.273949831510502e-05,
+     "net_return": -0.00939409757266263,
+     "held": [
+      [
+       5,
+       0.3174781410425291
+      ],
+      [
+       6,
+       0.37487778204080874
+      ],
+      [
+       7,
+       0.3076440769166623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3636800378770648,
+     "cost": 0.001363680037877065,
+     "net_return": 0.10086081401634162,
+     "held": [
+      [
+       2,
+       0.3063119838581914
+      ],
+      [
+       3,
+       0.34599993973276505
+      ],
+      [
+       5,
+       0.3476880764090435
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7204692092138791,
+     "cost": 0.0007204692092138791,
+     "net_return": 0.02227883860052371,
+     "held": [
+      [
+       2,
+       0.3461441148647856
+      ],
+      [
+       3,
+       0.30880982176668814
+      ],
+      [
+       7,
+       0.3450460633685262
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3328890369876707,
+     "cost": 0.0013328890369876706,
+     "net_return": -0.016377529517106137,
+     "held": [
+      [
+       2,
+       0.2917783727116857
+      ],
+      [
+       4,
+       0.362056749121734
+      ],
+      [
+       6,
+       0.34616487816658026
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.7611160609594199,
+     "cost": 0.00176111606095942,
+     "net_return": 0.010577725982714004,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.33948989378555666
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "cleargbm",
+   "seed": 11,
+   "cost_bps": 5,
+   "mean_net_return": 0.016842841897416666,
+   "mean_turnover": 0.7102461891816159,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9995002498750625,
+     "cost": 0.0004997501249375312,
+     "net_return": 0.034300263282894594,
+     "held": [
+      [
+       3,
+       0.3961799526605244
+      ],
+      [
+       4,
+       0.3069127331718352
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7919639233593694,
+     "cost": 0.0003959819616796847,
+     "net_return": 0.05227853156377682,
+     "held": [
+      [
+       4,
+       0.3448582613979088
+      ],
+      [
+       6,
+       0.3243777935328023
+      ],
+      [
+       7,
+       0.33076394506928875
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.023046015126629914,
+     "cost": 1.1523007563314957e-05,
+     "net_return": 0.06763734014019684,
+     "held": [
+      [
+       4,
+       0.3383063363118425
+      ],
+      [
+       6,
+       0.3230872572160571
+      ],
+      [
+       7,
+       0.3386064064721003
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02049556816257943,
+     "cost": 1.0247784081289716e-05,
+     "net_return": 0.039602662782086906,
+     "held": [
+      [
+       4,
+       0.322183517605852
+      ],
+      [
+       6,
+       0.34349209911640904
+      ],
+      [
+       7,
+       0.33432438327773895
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6888514895400393,
+     "cost": 0.0003444257447700197,
+     "net_return": -0.010972813301006523,
+     "held": [
+      [
+       3,
+       0.4033385336074916
+      ],
+      [
+       4,
+       0.29791001901671116
+      ],
+      [
+       6,
+       0.2987514473757971
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7373903969004274,
+     "cost": 0.00036869519845021367,
+     "net_return": 0.07775962819790538,
+     "held": [
+      [
+       3,
+       0.304308472517666
+      ],
+      [
+       4,
+       0.3670127454832705
+      ],
+      [
+       5,
+       0.32867878199906336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7245956223609411,
+     "cost": 0.0003622978111804706,
+     "net_return": -0.021884449651998428,
+     "held": [
+      [
+       3,
+       0.35547492830578126
+      ],
+      [
+       4,
+       0.30938213096257533
+      ],
+      [
+       6,
+       0.33514294073164336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04791038980648367,
+     "cost": 2.3955194903241834e-05,
+     "net_return": -0.05204458487343733,
+     "held": [
+      [
+       3,
+       0.3309021945773903
+      ],
+      [
+       4,
+       0.3299143232751331
+      ],
+      [
+       6,
+       0.3391834821474766
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3331111481419764,
+     "cost": 0.0006665555740709882,
+     "net_return": -0.025115371264259667,
+     "held": [
+      [
+       2,
+       0.35168087374418644
+      ],
+      [
+       6,
+       0.30681543586463084
+      ],
+      [
+       7,
+       0.3415036903911827
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05304463571002332,
+     "cost": 2.652231785501166e-05,
+     "net_return": -0.025511025839508816,
+     "held": [
+      [
+       2,
+       0.34736545487375375
+      ],
+      [
+       6,
+       0.3568354986435497
+      ],
+      [
+       7,
+       0.29579904648269645
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7416116384282023,
+     "cost": 0.00037080581921410116,
+     "net_return": 0.022817320009251185,
+     "held": [
+      [
+       5,
+       0.33864275620049944
+      ],
+      [
+       6,
+       0.32196737409216675
+      ],
+      [
+       7,
+       0.3393898697073339
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02273570776696105,
+     "cost": 1.1367853883480527e-05,
+     "net_return": -0.00938283249840599,
+     "held": [
+      [
+       5,
+       0.317478141042529
+      ],
+      [
+       6,
+       0.37487778204080874
+      ],
+      [
+       7,
+       0.3076440769166623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3643615371463689,
+     "cost": 0.0006821807685731844,
+     "net_return": 0.1016120743353992,
+     "held": [
+      [
+       2,
+       0.3063119838581914
+      ],
+      [
+       3,
+       0.3459999397327651
+      ],
+      [
+       5,
+       0.3476880764090435
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7205892674057162,
+     "cost": 0.0003602946337028581,
+     "net_return": 0.022647302914463152,
+     "held": [
+      [
+       2,
+       0.34614411486478563
+      ],
+      [
+       3,
+       0.30880982176668814
+      ],
+      [
+       7,
+       0.3450460633685263
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3331111481419764,
+     "cost": 0.0006665555740709882,
+     "net_return": -0.01572123418128879,
+     "held": [
+      [
+       2,
+       0.2917783727116857
+      ],
+      [
+       4,
+       0.36205674912173397
+      ],
+      [
+       6,
+       0.3461648781665803
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.7616202890330972,
+     "cost": 0.0008808101445165486,
+     "net_return": 0.011462658742598109,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.3394898937855567
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "cleargbm",
+   "seed": 11,
+   "cost_bps": 25,
+   "mean_net_return": 0.015394414266157341,
+   "mean_turnover": 0.7094703359691297,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9975062344139651,
+     "cost": 0.002493765586034913,
+     "net_return": 0.03223682136113304,
+     "held": [
+      [
+       3,
+       0.3961799526605245
+      ],
+      [
+       4,
+       0.3069127331718353
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7903839454574055,
+     "cost": 0.001975959863643514,
+     "net_return": 0.050615296125963605,
+     "held": [
+      [
+       4,
+       0.3448582613979088
+      ],
+      [
+       6,
+       0.3243777935328024
+      ],
+      [
+       7,
+       0.3307639450692888
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02303066390922667,
+     "cost": 5.757665977306667e-05,
+     "net_return": 0.06758817097487135,
+     "held": [
+      [
+       4,
+       0.3383063363118425
+      ],
+      [
+       6,
+       0.3230872572160571
+      ],
+      [
+       7,
+       0.33860640647210033
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.020509243270611276,
+     "cost": 5.1273108176528196e-05,
+     "net_return": 0.039560012308843095,
+     "held": [
+      [
+       4,
+       0.322183517605852
+      ],
+      [
+       6,
+       0.34349209911640904
+      ],
+      [
+       7,
+       0.33432438327773895
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.688392637590304,
+     "cost": 0.00172098159397576,
+     "net_return": -0.012334733540273368,
+     "held": [
+      [
+       3,
+       0.40333853360749167
+      ],
+      [
+       4,
+       0.2979100190167112
+      ],
+      [
+       6,
+       0.2987514473757971
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7368992126227253,
+     "cost": 0.0018422480315568133,
+     "net_return": 0.07617090669037485,
+     "held": [
+      [
+       3,
+       0.3043084725176661
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7241129608306424,
+     "cost": 0.001810282402076606,
+     "net_return": -0.023301259204017932,
+     "held": [
+      [
+       3,
+       0.3554749283057813
+      ],
+      [
+       4,
+       0.3093821309625754
+      ],
+      [
+       6,
+       0.3351429407316434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.047942356705437214,
+     "cost": 0.00011985589176359305,
+     "net_return": -0.05213549663614947,
+     "held": [
+      [
+       3,
+       0.3309021945773903
+      ],
+      [
+       4,
+       0.3299143232751331
+      ],
+      [
+       6,
+       0.3391834821474766
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3322231473771857,
+     "cost": 0.003330557868442964,
+     "net_return": -0.0277141984146827,
+     "held": [
+      [
+       2,
+       0.3516808737441865
+      ],
+      [
+       6,
+       0.30681543586463084
+      ],
+      [
+       7,
+       0.34150369039118267
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.053080028294316975,
+     "cost": 0.0001327000707357924,
+     "net_return": -0.025614497633304145,
+     "held": [
+      [
+       2,
+       0.3473654548737538
+      ],
+      [
+       6,
+       0.35683549864354974
+      ],
+      [
+       7,
+       0.2957990464826965
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7411176423326632,
+     "cost": 0.001852794105831658,
+     "net_return": 0.021300954444472442,
+     "held": [
+      [
+       5,
+       0.3386427562004994
+      ],
+      [
+       6,
+       0.32196737409216675
+      ],
+      [
+       7,
+       0.3393898697073339
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02275087754695566,
+     "cost": 5.687719386738915e-05,
+     "net_return": -0.009427915344370708,
+     "held": [
+      [
+       5,
+       0.31747814104252897
+      ],
+      [
+       6,
+       0.3748777820408087
+      ],
+      [
+       7,
+       0.3076440769166622
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3616396188677724,
+     "cost": 0.0034040990471694314,
+     "net_return": 0.09861152938027984,
+     "held": [
+      [
+       2,
+       0.30631198385819147
+      ],
+      [
+       3,
+       0.3459999397327651
+      ],
+      [
+       5,
+       0.3476880764090435
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7201092745548214,
+     "cost": 0.0018002731863870536,
+     "net_return": 0.021174181973736328,
+     "held": [
+      [
+       2,
+       0.34614411486478563
+      ],
+      [
+       3,
+       0.3088098217666882
+      ],
+      [
+       7,
+       0.3450460633685263
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.332223147377186,
+     "cost": 0.0033305578684429647,
+     "net_return": -0.01834510402680256,
+     "held": [
+      [
+       2,
+       0.2917783727116858
+      ],
+      [
+       4,
+       0.362056749121734
+      ],
+      [
+       6,
+       0.3461648781665803
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.7596043843548546,
+     "cost": 0.004399010960887136,
+     "net_return": 0.007925959798443794,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.3394898937855567
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "lightgbm",
+   "seed": 11,
+   "cost_bps": 10,
+   "mean_net_return": 0.021051346900544526,
+   "mean_turnover": 0.6661850651543479,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9990009990009989,
+     "cost": 0.000999000999000999,
+     "net_return": 0.033783629784751135,
+     "held": [
+      [
+       3,
+       0.3961799526605245
+      ],
+      [
+       4,
+       0.30691273317183526
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7915683369840648,
+     "cost": 0.0007915683369840648,
+     "net_return": 0.051862099614124135,
+     "held": [
+      [
+       4,
+       0.34485826139790887
+      ],
+      [
+       6,
+       0.3243777935328024
+      ],
+      [
+       7,
+       0.33076394506928886
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0230421754040163,
+     "cost": 2.30421754040163e-05,
+     "net_return": 0.06762504170476769,
+     "held": [
+      [
+       4,
+       0.33830633631184254
+      ],
+      [
+       6,
+       0.3230872572160572
+      ],
+      [
+       7,
+       0.3386064064721004
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.020498985229629025,
+     "cost": 2.0498985229629026e-05,
+     "net_return": 0.03959200549686259,
+     "held": [
+      [
+       4,
+       0.32218351760585207
+      ],
+      [
+       6,
+       0.3434920991164091
+      ],
+      [
+       7,
+       0.334324383277739
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6887367192152243,
+     "cost": 0.0006887367192152243,
+     "net_return": -0.011313463544125324,
+     "held": [
+      [
+       3,
+       0.4033385336074916
+      ],
+      [
+       4,
+       0.29791001901671116
+      ],
+      [
+       6,
+       0.29875144737579706
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7372675394534264,
+     "cost": 0.0007372675394534264,
+     "net_return": 0.07736224929700897,
+     "held": [
+      [
+       3,
+       0.304308472517666
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7244748966657794,
+     "cost": 0.0007244748966657794,
+     "net_return": -0.02223882908218322,
+     "held": [
+      [
+       3,
+       0.35547492830578126
+      ],
+      [
+       4,
+       0.30938213096257533
+      ],
+      [
+       6,
+       0.33514294073164336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6668889629876626,
+     "cost": 0.0006668889629876626,
+     "net_return": -0.018947930204017083,
+     "held": [
+      [
+       3,
+       0.3195333420553787
+      ],
+      [
+       6,
+       0.32753010828163737
+      ],
+      [
+       7,
+       0.35293654966298404
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6780471010697021,
+     "cost": 0.0006780471010697021,
+     "net_return": -0.025126581649636326,
+     "held": [
+      [
+       2,
+       0.3516808737441865
+      ],
+      [
+       6,
+       0.3068154358646309
+      ],
+      [
+       7,
+       0.3415036903911827
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05305347943054851,
+     "cost": 5.305347943054851e-05,
+     "net_return": -0.02553688084967065,
+     "held": [
+      [
+       2,
+       0.3473654548737538
+      ],
+      [
+       6,
+       0.35683549864354974
+      ],
+      [
+       7,
+       0.29579904648269645
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7414880776753819,
+     "cost": 0.000741488077675382,
+     "net_return": 0.02243803913552167,
+     "held": [
+      [
+       5,
+       0.33864275620049944
+      ],
+      [
+       6,
+       0.32196737409216675
+      ],
+      [
+       7,
+       0.3393898697073339
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.022739498315105022,
+     "cost": 2.2739498315105024e-05,
+     "net_return": -0.00939409757266263,
+     "held": [
+      [
+       5,
+       0.317478141042529
+      ],
+      [
+       6,
+       0.37487778204080874
+      ],
+      [
+       7,
+       0.3076440769166623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3636800378770648,
+     "cost": 0.0013636800378770647,
+     "net_return": 0.10086081401634162,
+     "held": [
+      [
+       2,
+       0.3063119838581914
+      ],
+      [
+       3,
+       0.3459999397327651
+      ],
+      [
+       5,
+       0.3476880764090435
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      5,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7204692092138791,
+     "cost": 0.0007204692092138792,
+     "net_return": 0.06099929082671074,
+     "held": [
+      [
+       2,
+       0.33351181927431967
+      ],
+      [
+       5,
+       0.30996611268260954
+      ],
+      [
+       6,
+       0.35652206804307074
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6668889629876625,
+     "cost": 0.0006668889629876625,
+     "net_return": -0.015721562547794665,
+     "held": [
+      [
+       2,
+       0.2917783727116857
+      ],
+      [
+       4,
+       0.36205674912173397
+      ],
+      [
+       6,
+       0.34616487816658026
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.7611160609594199,
+     "cost": 0.00176111606095942,
+     "net_return": 0.010577725982713782,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.33948989378555666
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "lightgbm",
+   "seed": 11,
+   "cost_bps": 5,
+   "mean_net_return": 0.02139322150704253,
+   "mean_turnover": 0.66634512646891,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9995002498750625,
+     "cost": 0.0004997501249375312,
+     "net_return": 0.034300263282894594,
+     "held": [
+      [
+       3,
+       0.3961799526605244
+      ],
+      [
+       4,
+       0.3069127331718352
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7919639233593694,
+     "cost": 0.0003959819616796847,
+     "net_return": 0.05227853156377682,
+     "held": [
+      [
+       4,
+       0.3448582613979088
+      ],
+      [
+       6,
+       0.3243777935328023
+      ],
+      [
+       7,
+       0.33076394506928875
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.023046015126629914,
+     "cost": 1.1523007563314957e-05,
+     "net_return": 0.06763734014019684,
+     "held": [
+      [
+       4,
+       0.3383063363118425
+      ],
+      [
+       6,
+       0.3230872572160571
+      ],
+      [
+       7,
+       0.3386064064721003
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02049556816257943,
+     "cost": 1.0247784081289716e-05,
+     "net_return": 0.039602662782086906,
+     "held": [
+      [
+       4,
+       0.322183517605852
+      ],
+      [
+       6,
+       0.34349209911640904
+      ],
+      [
+       7,
+       0.33432438327773895
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6888514895400393,
+     "cost": 0.0003444257447700197,
+     "net_return": -0.010972813301006523,
+     "held": [
+      [
+       3,
+       0.4033385336074916
+      ],
+      [
+       4,
+       0.29791001901671116
+      ],
+      [
+       6,
+       0.2987514473757971
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7373903969004274,
+     "cost": 0.00036869519845021367,
+     "net_return": 0.07775962819790538,
+     "held": [
+      [
+       3,
+       0.304308472517666
+      ],
+      [
+       4,
+       0.3670127454832705
+      ],
+      [
+       5,
+       0.32867878199906336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7245956223609411,
+     "cost": 0.0003622978111804706,
+     "net_return": -0.021884449651998428,
+     "held": [
+      [
+       3,
+       0.35547492830578126
+      ],
+      [
+       4,
+       0.30938213096257533
+      ],
+      [
+       6,
+       0.33514294073164336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.666777796299383,
+     "cost": 0.00033338889814969156,
+     "net_return": -0.01862053093617233,
+     "held": [
+      [
+       3,
+       0.31953334205537864
+      ],
+      [
+       6,
+       0.3275301082816373
+      ],
+      [
+       7,
+       0.352936549662984
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6781600900883772,
+     "cost": 0.0003390800450441886,
+     "net_return": -0.024795907464347677,
+     "held": [
+      [
+       2,
+       0.3516808737441865
+      ],
+      [
+       6,
+       0.3068154358646308
+      ],
+      [
+       7,
+       0.34150369039118267
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.053044635710023304,
+     "cost": 2.6522317855011654e-05,
+     "net_return": -0.025511025839508594,
+     "held": [
+      [
+       2,
+       0.34736545487375375
+      ],
+      [
+       6,
+       0.35683549864354974
+      ],
+      [
+       7,
+       0.2957990464826964
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7416116384282024,
+     "cost": 0.0003708058192141012,
+     "net_return": 0.022817320009251407,
+     "held": [
+      [
+       5,
+       0.3386427562004994
+      ],
+      [
+       6,
+       0.32196737409216675
+      ],
+      [
+       7,
+       0.3393898697073339
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.022735707766960985,
+     "cost": 1.1367853883480492e-05,
+     "net_return": -0.00938283249840599,
+     "held": [
+      [
+       5,
+       0.3174781410425291
+      ],
+      [
+       6,
+       0.3748777820408088
+      ],
+      [
+       7,
+       0.3076440769166623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3643615371463687,
+     "cost": 0.0006821807685731844,
+     "net_return": 0.10161207433539965,
+     "held": [
+      [
+       2,
+       0.3063119838581914
+      ],
+      [
+       3,
+       0.34599993973276505
+      ],
+      [
+       5,
+       0.3476880764090434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      5,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7205892674057162,
+     "cost": 0.0003602946337028581,
+     "net_return": 0.06138171131809056,
+     "held": [
+      [
+       2,
+       0.33351181927431967
+      ],
+      [
+       5,
+       0.30996611268260954
+      ],
+      [
+       6,
+       0.35652206804307074
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6667777962993832,
+     "cost": 0.0003333888981496916,
+     "net_return": -0.015393086568080028,
+     "held": [
+      [
+       2,
+       0.2917783727116857
+      ],
+      [
+       4,
+       0.36205674912173397
+      ],
+      [
+       6,
+       0.3461648781665802
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.761620289033097,
+     "cost": 0.0008808101445165485,
+     "net_return": 0.011462658742597887,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.3394898937855567
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "lightgbm",
+   "seed": 11,
+   "cost_bps": 25,
+   "mean_net_return": 0.02002672901076976,
+   "mean_turnover": 0.6657056534370275,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9975062344139651,
+     "cost": 0.002493765586034913,
+     "net_return": 0.03223682136113304,
+     "held": [
+      [
+       3,
+       0.3961799526605245
+      ],
+      [
+       4,
+       0.3069127331718353
+      ],
+      [
+       6,
+       0.29690731416764027
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7903839454574055,
+     "cost": 0.001975959863643514,
+     "net_return": 0.050615296125963605,
+     "held": [
+      [
+       4,
+       0.3448582613979088
+      ],
+      [
+       6,
+       0.3243777935328024
+      ],
+      [
+       7,
+       0.3307639450692888
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02303066390922667,
+     "cost": 5.757665977306667e-05,
+     "net_return": 0.06758817097487135,
+     "held": [
+      [
+       4,
+       0.3383063363118425
+      ],
+      [
+       6,
+       0.3230872572160571
+      ],
+      [
+       7,
+       0.33860640647210033
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      4,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.020509243270611276,
+     "cost": 5.1273108176528196e-05,
+     "net_return": 0.039560012308843095,
+     "held": [
+      [
+       4,
+       0.322183517605852
+      ],
+      [
+       6,
+       0.34349209911640904
+      ],
+      [
+       7,
+       0.33432438327773895
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.688392637590304,
+     "cost": 0.00172098159397576,
+     "net_return": -0.012334733540273368,
+     "held": [
+      [
+       3,
+       0.40333853360749167
+      ],
+      [
+       4,
+       0.2979100190167112
+      ],
+      [
+       6,
+       0.2987514473757971
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7368992126227253,
+     "cost": 0.0018422480315568133,
+     "net_return": 0.07617090669037485,
+     "held": [
+      [
+       3,
+       0.3043084725176661
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7241129608306424,
+     "cost": 0.001810282402076606,
+     "net_return": -0.023301259204017932,
+     "held": [
+      [
+       3,
+       0.3554749283057813
+      ],
+      [
+       4,
+       0.3093821309625754
+      ],
+      [
+       6,
+       0.3351429407316434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6672226855713095,
+     "cost": 0.0016680567139282737,
+     "net_return": -0.019930783352206993,
+     "held": [
+      [
+       3,
+       0.31953334205537864
+      ],
+      [
+       6,
+       0.3275301082816373
+      ],
+      [
+       7,
+       0.352936549662984
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6777083598035557,
+     "cost": 0.0016942708995088891,
+     "net_return": -0.02611794340779572,
+     "held": [
+      [
+       2,
+       0.35168087374418644
+      ],
+      [
+       6,
+       0.30681543586463084
+      ],
+      [
+       7,
+       0.34150369039118267
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05308002829431687,
+     "cost": 0.00013270007073579217,
+     "net_return": -0.025614497633304145,
+     "held": [
+      [
+       2,
+       0.3473654548737538
+      ],
+      [
+       6,
+       0.35683549864354974
+      ],
+      [
+       7,
+       0.29579904648269645
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7411176423326632,
+     "cost": 0.0018527941058316582,
+     "net_return": 0.021300954444472886,
+     "held": [
+      [
+       5,
+       0.33864275620049933
+      ],
+      [
+       6,
+       0.3219673740921667
+      ],
+      [
+       7,
+       0.3393898697073338
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      5,
+      6,
+      7
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.02275087754695557,
+     "cost": 5.687719386738892e-05,
+     "net_return": -0.009427915344370819,
+     "held": [
+      [
+       5,
+       0.317478141042529
+      ],
+      [
+       6,
+       0.3748777820408087
+      ],
+      [
+       7,
+       0.30764407691666223
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.3616396188677726,
+     "cost": 0.003404099047169431,
+     "net_return": 0.09861152938028006,
+     "held": [
+      [
+       2,
+       0.3063119838581914
+      ],
+      [
+       3,
+       0.3459999397327651
+      ],
+      [
+       5,
+       0.3476880764090435
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      5,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.7201092745548214,
+     "cost": 0.0018002731863870538,
+     "net_return": 0.05985279355671658,
+     "held": [
+      [
+       2,
+       0.33351181927431967
+      ],
+      [
+       5,
+       0.30996611268260954
+      ],
+      [
+       6,
+       0.35652206804307074
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      4,
+      6
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6672226855713094,
+     "cost": 0.0016680567139282735,
+     "net_return": -0.0167076479868139,
+     "held": [
+      [
+       2,
+       0.2917783727116858
+      ],
+      [
+       4,
+       0.362056749121734
+      ],
+      [
+       6,
+       0.34616487816658026
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.759604384354855,
+     "cost": 0.004399010960887137,
+     "net_return": 0.007925959798443571,
+     "held": [
+      [
+       2,
+       0.3262475344363669
+      ],
+      [
+       3,
+       0.33948989378555666
+      ],
+      [
+       4,
+       0.3342625717780764
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "xgboost",
+   "seed": 11,
+   "cost_bps": 10,
+   "mean_net_return": 0.018291882721249215,
+   "mean_turnover": 0.22814573100054006,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9990009990009989,
+     "cost": 0.000999000999000999,
+     "net_return": 0.029616488022665255,
+     "held": [
+      [
+       3,
+       0.3977834021441312
+      ],
+      [
+       4,
+       0.3081548936098178
+      ],
+      [
+       5,
+       0.29406170424605094
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.12885718522652032,
+     "cost": 0.00012885718522652034,
+     "net_return": 0.020011498431669716,
+     "held": [
+      [
+       3,
+       0.3428353019699927
+      ],
+      [
+       4,
+       0.35586257601382293
+      ],
+      [
+       5,
+       0.30130212201618434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06408378389559649,
+     "cost": 6.40837838955965e-05,
+     "net_return": 0.10798351276011098,
+     "held": [
+      [
+       3,
+       0.3358931724253529
+      ],
+      [
+       4,
+       0.32597009642076835
+      ],
+      [
+       5,
+       0.3381367311538788
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.014731384286558848,
+     "cost": 1.4731384286558848e-05,
+     "net_return": 0.08922384856774257,
+     "held": [
+      [
+       3,
+       0.3768479556781789
+      ],
+      [
+       4,
+       0.307504597409229
+      ],
+      [
+       5,
+       0.3156474469125922
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08700024460815504,
+     "cost": 8.700024460815503e-05,
+     "net_return": -0.004224712334670477,
+     "held": [
+      [
+       3,
+       0.4007083785124707
+      ],
+      [
+       4,
+       0.2959673592183367
+      ],
+      [
+       5,
+       0.30332426226919257
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13470518862873182,
+     "cost": 0.00013470518862873182,
+     "net_return": 0.07801190619757992,
+     "held": [
+      [
+       3,
+       0.304308472517666
+      ],
+      [
+       4,
+       0.3670127454832705
+      ],
+      [
+       5,
+       0.32867878199906336
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06733637884026099,
+     "cost": 6.733637884026098e-05,
+     "net_return": -0.03466889846800936,
+     "held": [
+      [
+       3,
+       0.3602889708321737
+      ],
+      [
+       4,
+       0.31357195875847144
+      ],
+      [
+       5,
+       0.3261390704093549
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05389331056082705,
+     "cost": 5.3893310560827055e-05,
+     "net_return": -0.052867894466383736,
+     "held": [
+      [
+       3,
+       0.33117992111702865
+      ],
+      [
+       4,
+       0.33019122069340906
+      ],
+      [
+       5,
+       0.33862885818956223
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6765811352438806,
+     "cost": 0.0006765811352438806,
+     "net_return": 5.50914209251907e-06,
+     "held": [
+      [
+       2,
+       0.34284294972400825
+      ],
+      [
+       3,
+       0.3026823273875349
+      ],
+      [
+       4,
+       0.3544747228884569
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06132245270916661,
+     "cost": 6.13224527091666e-05,
+     "net_return": -0.015898345651281454,
+     "held": [
+      [
+       2,
+       0.3439604272509849
+      ],
+      [
+       3,
+       0.3064343005675606
+      ],
+      [
+       4,
+       0.34960527218145443
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05381600419961202,
+     "cost": 5.381600419961203e-05,
+     "net_return": -0.00500200286809771,
+     "held": [
+      [
+       2,
+       0.3542199491269975
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.32447190743876186
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.041759311816722725,
+     "cost": 4.175931181672272e-05,
+     "net_return": 0.07912541919677096,
+     "held": [
+      [
+       2,
+       0.32512893331168696
+      ],
+      [
+       3,
+       0.3640323087123024
+      ],
+      [
+       4,
+       0.3108387579760106
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06137749159407343,
+     "cost": 6.137749159407344e-05,
+     "net_return": 0.04979426169897061,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.3633040403539983
+      ],
+      [
+       4,
+       0.3150647436681007
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.059921440227920675,
+     "cost": 5.992144022792067e-05,
+     "net_return": 0.0042899508718505786,
+     "held": [
+      [
+       2,
+       0.35257717216985707
+      ],
+      [
+       3,
+       0.3145490245856355
+      ],
+      [
+       4,
+       0.3328738032445075
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03847485272214004,
+     "cost": 3.847485272214004e-05,
+     "net_return": -0.06396986853004039,
+     "held": [
+      [
+       2,
+       0.30701122381453105
+      ],
+      [
+       3,
+       0.3120301581592796
+      ],
+      [
+       4,
+       0.38095861802618936
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.107470532447476,
+     "cost": 0.001107470532447476,
+     "net_return": 0.011239450969017462,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.33948989378555666
+      ],
+      [
+       4,
+       0.3342625717780764
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "xgboost",
+   "seed": 11,
+   "cost_bps": 5,
+   "mean_net_return": 0.018407518435431328,
+   "mean_turnover": 0.22820706225166848,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9995002498750625,
+     "cost": 0.0004997501249375312,
+     "net_return": 0.030131038991192405,
+     "held": [
+      [
+       3,
+       0.39778340214413116
+      ],
+      [
+       4,
+       0.3081548936098178
+      ],
+      [
+       5,
+       0.29406170424605094
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.12887865784528818,
+     "cost": 6.44393289226441e-05,
+     "net_return": 0.020077213853708198,
+     "held": [
+      [
+       3,
+       0.34283530196999273
+      ],
+      [
+       4,
+       0.35586257601382293
+      ],
+      [
+       5,
+       0.30130212201618434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06407310148454538,
+     "cost": 3.203655074227269e-05,
+     "net_return": 0.10801902284169507,
+     "held": [
+      [
+       3,
+       0.3358931724253529
+      ],
+      [
+       4,
+       0.3259700964207683
+      ],
+      [
+       5,
+       0.3381367311538788
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.014728928646571124,
+     "cost": 7.364464323285562e-06,
+     "net_return": 0.08923187291086676,
+     "held": [
+      [
+       3,
+       0.37684795567817886
+      ],
+      [
+       4,
+       0.307504597409229
+      ],
+      [
+       5,
+       0.31564744691259217
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08701474223265229,
+     "cost": 4.350737111632615e-05,
+     "net_return": -0.004181399437825251,
+     "held": [
+      [
+       3,
+       0.40070837851247076
+      ],
+      [
+       4,
+       0.2959673592183367
+      ],
+      [
+       5,
+       0.3033242622691926
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13472763575231597,
+     "cost": 6.736381787615798e-05,
+     "net_return": 0.07808451077724432,
+     "held": [
+      [
+       3,
+       0.3043084725176661
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.0673475996999244,
+     "cost": 3.3673799849962204e-05,
+     "net_return": -0.0346364007452733,
+     "held": [
+      [
+       3,
+       0.36028897083217365
+      ],
+      [
+       4,
+       0.31357195875847144
+      ],
+      [
+       5,
+       0.3261390704093549
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.053902291282466895,
+     "cost": 2.695114564123345e-05,
+     "net_return": -0.052842375301683675,
+     "held": [
+      [
+       3,
+       0.33117992111702865
+      ],
+      [
+       4,
+       0.3301912206934091
+      ],
+      [
+       5,
+       0.3386288581895623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6769192567507492,
+     "cost": 0.00033845962837537457,
+     "net_return": 0.0003438614344986046,
+     "held": [
+      [
+       2,
+       0.34284294972400825
+      ],
+      [
+       3,
+       0.3026823273875349
+      ],
+      [
+       4,
+       0.3544747228884569
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06131223059669626,
+     "cost": 3.065611529834813e-05,
+     "net_return": -0.01586816500715127,
+     "held": [
+      [
+       2,
+       0.3439604272509849
+      ],
+      [
+       3,
+       0.30643430056756055
+      ],
+      [
+       4,
+       0.34960527218145443
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05380703337044049,
+     "cost": 2.6903516685220243e-05,
+     "net_return": -0.004975223555767405,
+     "held": [
+      [
+       2,
+       0.3542199491269975
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.32447190743876186
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.041766270542237936,
+     "cost": 2.088313527111897e-05,
+     "net_return": 0.07914794815033055,
+     "held": [
+      [
+       2,
+       0.325128933311687
+      ],
+      [
+       3,
+       0.3640323087123024
+      ],
+      [
+       4,
+       0.3108387579760106
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.061387719471359535,
+     "cost": 3.069385973567977e-05,
+     "net_return": 0.04982647517680605,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.3633040403539983
+      ],
+      [
+       4,
+       0.3150647436681008
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.059931425470418194,
+     "cost": 2.9965712735209097e-05,
+     "net_return": 0.004320036910741232,
+     "held": [
+      [
+       2,
+       0.35257717216985707
+      ],
+      [
+       3,
+       0.31454902458563544
+      ],
+      [
+       4,
+       0.3328738032445075
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03848126412902591,
+     "cost": 1.9240632064512954e-05,
+     "net_return": -0.06395186402722908,
+     "held": [
+      [
+       2,
+       0.30701122381453105
+      ],
+      [
+       3,
+       0.3120301581592796
+      ],
+      [
+       4,
+       0.3809586180261894
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.107534588876941,
+     "cost": 0.0005537672944384705,
+     "net_return": 0.01179374199474803,
+     "held": [
+      [
+       2,
+       0.32624753443636695
+      ],
+      [
+       3,
+       0.3394898937855567
+      ],
+      [
+       4,
+       0.33426257177807644
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  },
+  {
+   "arm": "xgboost",
+   "seed": 11,
+   "cost_bps": 25,
+   "mean_net_return": 0.017945348896820104,
+   "mean_turnover": 0.2279620765374474,
+   "months": [
+    {
+     "decision": "2018-07-31",
+     "entry": "2018-08-01",
+     "exit": "2018-09-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.9975062344139651,
+     "cost": 0.002493765586034913,
+     "net_return": 0.02807591472387827,
+     "held": [
+      [
+       3,
+       0.39778340214413116
+      ],
+      [
+       4,
+       0.30815489360981785
+      ],
+      [
+       5,
+       0.29406170424605094
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-08-31",
+     "entry": "2018-09-03",
+     "exit": "2018-10-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.128792810279696,
+     "cost": 0.00032198202569924,
+     "net_return": 0.019814483486963796,
+     "held": [
+      [
+       3,
+       0.3428353019699927
+      ],
+      [
+       4,
+       0.3558625760138229
+      ],
+      [
+       5,
+       0.30130212201618434
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-09-28",
+     "entry": "2018-10-01",
+     "exit": "2018-11-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06411585251139067,
+     "cost": 0.0001602896312784767,
+     "net_return": 0.10787691143596367,
+     "held": [
+      [
+       3,
+       0.33589317242535294
+      ],
+      [
+       4,
+       0.32597009642076835
+      ],
+      [
+       5,
+       0.3381367311538788
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-10-31",
+     "entry": "2018-11-01",
+     "exit": "2018-12-03",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.014738756121898304,
+     "cost": 3.684689030474576e-05,
+     "net_return": 0.08919975947629877,
+     "held": [
+      [
+       3,
+       0.37684795567817886
+      ],
+      [
+       4,
+       0.3075045974092289
+      ],
+      [
+       5,
+       0.31564744691259217
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-11-30",
+     "entry": "2018-12-03",
+     "exit": "2019-01-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.08695678070576963,
+     "cost": 0.0002173919517644241,
+     "net_return": -0.004354564471540812,
+     "held": [
+      [
+       3,
+       0.4007083785124707
+      ],
+      [
+       4,
+       0.2959673592183367
+      ],
+      [
+       5,
+       0.3033242622691926
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2018-12-31",
+     "entry": "2019-01-01",
+     "exit": "2019-02-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.13463789211484561,
+     "cost": 0.00033659473028711405,
+     "net_return": 0.07779423754683856,
+     "held": [
+      [
+       3,
+       0.3043084725176661
+      ],
+      [
+       4,
+       0.36701274548327056
+      ],
+      [
+       5,
+       0.3286787819990634
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-01-31",
+     "entry": "2019-02-01",
+     "exit": "2019-03-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06730273868430416,
+     "cost": 0.00016825684671076038,
+     "net_return": -0.03476632669488977,
+     "held": [
+      [
+       3,
+       0.36028897083217365
+      ],
+      [
+       4,
+       0.31357195875847144
+      ],
+      [
+       5,
+       0.32613907040935486
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-02-28",
+     "entry": "2019-03-01",
+     "exit": "2019-04-01",
+     "selected": [
+      3,
+      4,
+      5
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05386638634239535,
+     "cost": 0.00013466596585598838,
+     "net_return": -0.05294440096465158,
+     "held": [
+      [
+       3,
+       0.33117992111702865
+      ],
+      [
+       4,
+       0.3301912206934091
+      ],
+      [
+       5,
+       0.3386288581895623
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-03-29",
+     "entry": "2019-04-01",
+     "exit": "2019-05-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.6755687943931417,
+     "cost": 0.001688921985982854,
+     "net_return": -0.0010075226839989515,
+     "held": [
+      [
+       2,
+       0.34284294972400825
+      ],
+      [
+       3,
+       0.3026823273875349
+      ],
+      [
+       4,
+       0.35447472288845683
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-04-30",
+     "entry": "2019-05-01",
+     "exit": "2019-06-03",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06135313950785343,
+     "cost": 0.00015338284876963357,
+     "net_return": -0.01598894799530237,
+     "held": [
+      [
+       2,
+       0.3439604272509849
+      ],
+      [
+       3,
+       0.3064343005675606
+      ],
+      [
+       4,
+       0.34960527218145443
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-05-31",
+     "entry": "2019-06-03",
+     "exit": "2019-07-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05384293464374857,
+     "cost": 0.00013460733660937145,
+     "net_return": -0.00508239440838254,
+     "held": [
+      [
+       2,
+       0.3542199491269975
+      ],
+      [
+       3,
+       0.3213081434342407
+      ],
+      [
+       4,
+       0.3244719074387618
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-06-28",
+     "entry": "2019-07-01",
+     "exit": "2019-08-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.04173844954603998,
+     "cost": 0.00010434612386509995,
+     "net_return": 0.07905787735648251,
+     "held": [
+      [
+       2,
+       0.32512893331168696
+      ],
+      [
+       3,
+       0.3640323087123024
+      ],
+      [
+       4,
+       0.3108387579760106
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-07-31",
+     "entry": "2019-08-01",
+     "exit": "2019-09-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.06134682840093737,
+     "cost": 0.00015336707100234345,
+     "net_return": 0.04969768563877541,
+     "held": [
+      [
+       2,
+       0.3216312159779009
+      ],
+      [
+       3,
+       0.3633040403539983
+      ],
+      [
+       4,
+       0.3150647436681007
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-08-30",
+     "entry": "2019-09-02",
+     "exit": "2019-10-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.05989150445428479,
+     "cost": 0.00014972876113571198,
+     "net_return": 0.004199752877154461,
+     "held": [
+      [
+       2,
+       0.352577172169857
+      ],
+      [
+       3,
+       0.31454902458563544
+      ],
+      [
+       4,
+       0.3328738032445075
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-09-30",
+     "entry": "2019-10-01",
+     "exit": "2019-11-01",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 0.03845563131361942,
+     "cost": 9.613907828404855e-05,
+     "net_return": -0.06402384605945177,
+     "held": [
+      [
+       2,
+       0.3070112238145311
+      ],
+      [
+       3,
+       0.3120301581592796
+      ],
+      [
+       4,
+       0.38095861802618936
+      ]
+     ],
+     "receivables": []
+    },
+    {
+     "decision": "2019-10-31",
+     "entry": "2019-11-01",
+     "exit": "2019-12-02",
+     "selected": [
+      2,
+      3,
+      4
+     ],
+     "unfilled": [],
+     "cash": 0.0,
+     "turnover": 1.107278491165268,
+     "cost": 0.00276819622791317,
+     "net_return": 0.009576963084984014,
+     "held": [
+      [
+       2,
+       0.3262475344363669
+      ],
+      [
+       3,
+       0.33948989378555666
+      ],
+      [
+       4,
+       0.3342625717780764
+      ]
+     ],
+     "receivables": []
+    }
+   ]
+  }
+ ],
+ "comparisons": [
+  {
+   "metric": "utility",
+   "arm": "equal_weight",
+   "reference": "momentum",
+   "value_arm": 0.011926521837002935,
+   "value_reference": 0.017694526368571543,
+   "difference": {
+    "method": "moving_block_bootstrap",
+    "estimate": -0.005768004531568609,
+    "std_error": 0.008034504887718716,
+    "ci_low": -0.018237272421219246,
+    "ci_high": 0.00689325268008045,
+    "confidence": 0.9,
+    "p_value": 0.47761194029850745,
+    "n_units": 5
+   },
+   "n_rows": 16
+  },
+  {
+   "metric": "utility",
+   "arm": "cleargbm",
+   "reference": "momentum",
+   "value_arm": 0.016480433676468863,
+   "value_reference": 0.017694526368571543,
+   "difference": {
+    "method": "moving_block_bootstrap",
+    "estimate": -0.0012140926921026807,
+    "std_error": 0.009420457456940763,
+    "ci_low": -0.015766586261006323,
+    "ci_high": 0.01334237631073669,
+    "confidence": 0.9,
+    "p_value": 0.7263681592039801,
+    "n_units": 5
+   },
+   "n_rows": 16
+  },
+  {
+   "metric": "utility",
+   "arm": "lightgbm",
+   "reference": "momentum",
+   "value_arm": 0.021051346900544526,
+   "value_reference": 0.017694526368571543,
+   "difference": {
+    "method": "moving_block_bootstrap",
+    "estimate": 0.003356820531972983,
+    "std_error": 0.010970901226304484,
+    "ci_low": -0.011851203099742812,
+    "ci_high": 0.02164598253100805,
+    "confidence": 0.9,
+    "p_value": 0.8557213930348259,
+    "n_units": 5
+   },
+   "n_rows": 16
+  },
+  {
+   "metric": "utility",
+   "arm": "xgboost",
+   "reference": "momentum",
+   "value_arm": 0.018291882721249215,
+   "value_reference": 0.017694526368571543,
+   "difference": {
+    "method": "moving_block_bootstrap",
+    "estimate": 0.0005973563526776721,
+    "std_error": 0.0034148903982386433,
+    "ci_low": -0.0037454769266350016,
+    "ci_high": 0.00777403526193172,
+    "confidence": 0.9,
+    "p_value": 0.5771144278606966,
+    "n_units": 5
+   },
+   "n_rows": 16
+  }
+ ],
+ "fingerprint": {
+  "image_digest": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 48
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ }
+}
