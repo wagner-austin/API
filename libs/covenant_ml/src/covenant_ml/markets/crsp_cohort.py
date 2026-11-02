@@ -238,7 +238,7 @@ def derive_crsp_cohort(
         "derived_at": cohort["derived_at"],
         "cases": len(anchors),
         "securities": len(securities),
-        "rows": {name: count for name, count in counts.items()},
+        "rows": dict(counts),
         "plaintext_removed": not private.exists() and not manifest.parent.exists(),
         "fresh_vendor_extraction": False,
     }
