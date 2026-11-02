@@ -58,9 +58,10 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
 - [x] Install the separately frozen version-2 controller and HPC3 image.[^runtime]
 - [x] Rehearse proposal → admission → queue → native job → verified result
    with the installed version-2 runtime and pre-entry delisting fixture.[^v2]
-- [ ] Freeze amended licensed-study resource and candidate rules.
+- [x] Freeze amended resource and candidate rules in [[wrds-baseline-v2-freeze]];
+   fifteen requests admitted and native preflight passed; task audit pending.
 - [x] Observe the failed allocation's configured paths on its original node;
-   service verification passed, with independent task audit pending.[^cleanup]
+   service verification and independent task audit passed.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
    validation attempts complete; final access stays a separate controlled step.
 
@@ -77,4 +78,4 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
 
-[^cleanup]: `tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json`, `subject`, `observer`, `results`, `verified_measurement`, `service_reports` and `limits`; original expanded scratch path was not logged.
+[^cleanup]: `tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json`, `subject`, `observer`, `results`, `verified_measurement`, `service_reports` and `limits`; original expanded scratch path was not logged. Independent board audit `b239dc19-84e4-49c1-b429-7002656cf0bd` returned VERIFIED at 2026-11-02T01:31:49Z.

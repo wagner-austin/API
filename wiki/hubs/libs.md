@@ -42,6 +42,8 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 [WRDS baseline readiness](../pages/wrds-baseline-readiness.md) -- short current status and requirements for a new licensed study
 
+[Corrected CRSP baseline freeze](../pages/wrds-baseline-v2-freeze.md) -- explicit version-2 policy amendment, fixed three-candidate/five-seed matrix and measured preparation
+
 [WRDS installed runtime](../pages/wrds-installed-runtime.md) -- verified controller and HPC3 image identities, separate from repository changes
 
 [WRDS operational rehearsals](../pages/wrds-operational-rehearsals.md) -- synthetic queue, seed summary, selection and final-grant measurements
