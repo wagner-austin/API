@@ -285,3 +285,63 @@ def test_requested_feature_order_is_the_column_order(tmp_path: Path) -> None:
     leader = panel[0].features[0]
     assert float(rows.features.flat[0]) == leader.liquidity
     assert float(rows.features.flat[1]) == leader.momentum
+
+
+def test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark(
+    tmp_path: Path,
+) -> None:
+    """Another member changes a known stock's label; dropping it is not a repair.
+
+    Real CSV evidence holds six eligible stocks with multipliers 1.25, 1.125,
+    1, 1, 1, 1. Changing only the first to 4 flips the second stock's label
+    despite its unchanged path and decision-time features. Removing the first
+    stock's held observation preserves membership and refuses label creation.
+    """
+    documents = study_rows()
+    for row in documents["returns"]:
+        if "2017-02-01" < require_str(row, "dlycaldt") <= "2017-03-01":
+            row["dlyret"] = 0.0
+            if row["dlycaldt"] == "2017-02-02":
+                if row["permno"] == 7:
+                    row["dlyret"] = 0.125
+                elif row["permno"] == 8:
+                    row["dlyret"] = 0.25
+    before = tmp_path / "before"
+    before.mkdir()
+    original, _ = write_sources(before, documents, study_protocol())
+    sources = load_crsp_sources(original)
+    panel = build_crsp_panel(sources, "2017-01-01", "2017-01-31")
+    assert tuple(feature.permno for feature in panel[0].features) == (8, 7, 6, 5, 4, 3)
+    outcomes = index_crsp_outcomes(sources)
+    target = crsp_window_path(outcomes, 7, panel[0].window)
+    assert target.growth == 1.125
+    labels = crsp_study_rows(outcomes, panel, FEATURES).labels
+    assert tuple(int(labels.flat[index]) for index in range(6)) == (1, 1, 0, 0, 0, 0)
+
+    for row in documents["returns"]:
+        if (row["permno"], row["dlycaldt"]) == (8, "2017-02-02"):
+            row["dlyret"] = 3.0
+    changed = tmp_path / "changed"
+    changed.mkdir()
+    revised, _ = write_sources(changed, documents, study_protocol())
+    revised_sources = load_crsp_sources(revised)
+    assert build_crsp_panel(revised_sources, "2017-01-01", "2017-01-31") == panel
+    revised_outcomes = index_crsp_outcomes(revised_sources)
+    assert crsp_window_path(revised_outcomes, 7, panel[0].window) == target
+    revised_labels = crsp_study_rows(revised_outcomes, panel, FEATURES).labels
+    assert tuple(int(revised_labels.flat[index]) for index in range(6)) == (1, 0, 0, 0, 0, 0)
+
+    documents["returns"] = [
+        row
+        for row in documents["returns"]
+        if (row["permno"], row["dlycaldt"]) != (8, "2017-02-02")
+    ]
+    missing = tmp_path / "missing"
+    missing.mkdir()
+    incomplete, _ = write_sources(missing, documents, study_protocol())
+    incomplete_sources = load_crsp_sources(incomplete)
+    assert build_crsp_panel(incomplete_sources, "2017-01-01", "2017-01-31") == panel
+    incomplete_outcomes = index_crsp_outcomes(incomplete_sources)
+    assert crsp_window_path(incomplete_outcomes, 7, panel[0].window) == target
+    with pytest.raises(ValueError, match="held return for 8 on 2017-02-02"):
+        crsp_study_rows(incomplete_outcomes, panel, FEATURES)
