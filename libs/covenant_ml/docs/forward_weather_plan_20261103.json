@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "name": "kalshi-weather-logistic-forward-20261103",
+  "frozen_at": "2026-11-02",
+  "board_task": "269fd5c0-6343-49bd-a9c4-0fd068b750e7",
+  "purpose": "Untouched forward test of the forecast-augmented logistic weather model against the Kalshi market price on event dates whose outcomes did not exist when this plan was recorded. Paper only: no orders, no funds.",
+  "campaign": {
+    "name": "frozen-autumn-probability-study-diphtheria",
+    "manifest_sha256": "f57a191b3a7a1f289d01e5b9826a9f9d49e6222133a06382e2a92330a122cc85",
+    "collector_implementation_sha256": "332f0975d3ef78766c5f1f863ea9034fa37c79c7ebe6d46cd85c9cd5a080fcb7",
+    "protocol_sha256": "bb3e6826545afc2959cc58b3cc838449210435f5e235a870258c3165bcc098c8"
+  },
+  "model": {
+    "arm": "market_plus_forecast",
+    "forecast_hour": 12,
+    "report_sha256": "07962971debfbb7e6696cd003aabd62d604c0378bdb8ed193a5c14f9b275ff27",
+    "features": ["market_logit", "boston", "philadelphia", "forecast_logit"],
+    "description": "The existing L2 logistic model (C=1) with forecast augmentation, fitted once on the report's training rows and never refitted."
+  },
+  "reference_arm": "raw_market",
+  "inputs": "Each contract's archived order-book top (best bid and best ask) received in the campaign's frozen capture window, 16:00-16:15 America/New_York (21:00-21:15 UTC for every declared date) on the day before the event date, and the Open-Meteo gfs_global run initialized 12:00 UTC on the day before the event date, whose event-day maximum becomes a bracket probability with a 3.0 F spread. raw_market is the bid-ask midpoint.",
+  "series": ["KXHIGHTBOS", "KXHIGHPHIL", "KXHIGHTDC"],
+  "contract_set": "Every contract the campaign's 12 UTC capture priced for a declared event date and series (an active unresolved contract with a supported strike and both book sides visible), whose settlement snapshot resolves it binary with unchanged rules. A series snapshot holding any pending contract contributes no contract, as in the campaign evaluator.",
+  "event_dates": [
+    "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07",
+    "2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12",
+    "2026-11-13", "2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17",
+    "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22",
+    "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27",
+    "2026-11-28", "2026-11-29", "2026-11-30", "2026-12-01", "2026-12-02",
+    "2026-12-03", "2026-12-04", "2026-12-05", "2026-12-06", "2026-12-07",
+    "2026-12-08", "2026-12-09", "2026-12-10", "2026-12-11", "2026-12-12"
+  ],
+  "event_date_count": 40,
+  "fee_coefficient_bps": 700,
+  "edge_hurdle": 200,
+  "stress_per_trade": 100,
+  "confidence": 0.95,
+  "alpha": 0.05,
+  "smallest_effect_of_interest": 0.005,
+  "scoring_rule": "For each scored event date, the date's paired Brier difference is the model's mean squared error minus raw_market's mean squared error over that date's eligible contracts, pooled across series. The primary estimate is the unweighted mean of the per-date differences; negative favors the model. Its interval is a Student t interval at the declared confidence with one event date as one unit, and its minimum detectable effect is t_crit(n - 1, alpha) * sd / sqrt(n) over the n scored dates. Trades use the existing quoted taker policy unchanged: one contract per eligible contract, YES at the ask or NO at one minus the bid, quadratic taker fee at the declared coefficient rounded up to a whole cent, taken only when the model's expected value clears the declared hurdle after the fee. Report the trade count, total P&L, P&L with the declared extra cost per trade, and the per-opportunity mean with an event-date-clustered interval.",
+  "decision_rule": "A forward lead requires all three: the mean per-date paired Brier difference below zero, its interval's upper bound below zero, and positive P&L after the extra cost per trade. Each criterion is reported pass or fail. A lead does not establish an executable edge and does not authorize funded orders.",
+  "missing_policy": "Every declared date is reported. A date with no eligible contract, or whose captures or settlements are missing, failed, interrupted, pending or not yet due, is listed with each plan's dispositions and contributes nothing; no date outside the declared list is scored, and nothing is substituted or retried.",
+  "scope": "Hypothetical fills at the archived quote: depth, queue position, latency and the exchange's actual fees are not verified, and no collateral budget is shared across trades."
+}
