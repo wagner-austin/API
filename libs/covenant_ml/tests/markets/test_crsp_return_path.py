@@ -203,6 +203,8 @@ def test_real_extract_labels_use_the_same_span_without_future_universe_filtering
         for permno in (7, 6, 5, 4, 3)
     ]
     average = sum(values) / 6
-    assert labels.labels.tolist() == [int(value > average) for value in values]
+    assert [int(labels.labels.flat[index]) for index in range(len(values))] == [
+        int(value > average) for value in values
+    ]
     path = crsp_window_path(index_crsp_outcomes(sources), 7, panel[0].window)
     assert path.growth == pytest.approx(values[1])
