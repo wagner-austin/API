@@ -409,9 +409,8 @@ class TestImageReference:
     def test_spaces_and_shell_literals_remain_literal_paths(self) -> None:
         """Only Apptainer separators are disallowed by the added rule."""
         paths = ["/pub/data archive", "/pub/$(literal)", "/pub/it's-data"]
-        reference = decode_image_reference(_ref(binds=paths), "image")
-        assert reference is not None
-        assert reference["binds"] == paths
+        payload = _ref(binds=paths)
+        assert encode_image_reference(decode_image_reference(payload, "image")) == payload
 
     def test_a_non_string_bind_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="must be a string"):
