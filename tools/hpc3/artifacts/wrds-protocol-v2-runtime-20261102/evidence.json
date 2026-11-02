@@ -1,0 +1,120 @@
+{
+  "task": "1ec0dbcb-4c25-455f-9c16-b2b8e3177a68",
+  "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+  "scope": "Separate controller and native HPC3 image installation only; no research admission, queue rehearsal, licensed observation decryption, candidate selection or final grant release.",
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "8ef7e0f1769e7127feabb30008d72bc70e908111",
+    "controller_python": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-protocol-v2-8ef7e0f17/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "cleargbm-0.1.0-py3-none-any.whl": {
+        "sha256": "a3ceb11e1f969ebdda61259ff58db6f306c19babccd38abf19ab150e48c9dfc3",
+        "installed_files": 15
+      },
+      "covenant_domain-0.1.0-py3-none-any.whl": {
+        "sha256": "3393416b27351c665d2025ba5bc192c97849718d21bd37b66af035ad9e271859",
+        "installed_files": 8
+      },
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "979a59e3189ac19266b78e07f6507f6140e60915cba6f38e6628f07531228388",
+        "installed_files": 359
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "82a5b67aaa2b94cdd3df2527be9fa59f19e99eb383b269d3cdae850a23d6b4a1",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "abb6a2318b763c63410282ebba6ab5a8e820a5e4e3b70e016d0d25b195ed38d2",
+        "installed_files": 84
+      },
+      "platform_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "b8bba877e3d530b40fc8112d75cafe525960833ec56d56d579e22075e886d86e",
+        "installed_files": 21
+      },
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": {
+        "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+        "installed_files": 2
+      }
+    },
+    "installed_files": 623,
+    "selfcheck_sha256": "feb305d7b7bde9a2e88665e096539fe640fa48397460ba6fb83831567ee5e06d",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "03c06fd9d79f6c786a7779048e2f98b17b61bd78f64170958636f2579b255f9a"
+  },
+  "image": {
+    "path": "/data/homezvol1/wagnera3/research-images/protocol-v2-8ef7e0f17/research-crsp-v2.sif",
+    "sha256": "e1560c685864bf2ccc012c49f475f90141e0804435019286ca08c1ffbb2acc1e",
+    "accounting": {
+      "job": {
+        "job_id": "58739821",
+        "name": "cleargbm.image-protocol-v2-8ef7e0f17",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 88,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-15-06"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-02T00:45:20",
+      "ended_at": "2026-11-02T00:46:48"
+    },
+    "verified_files": 14,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "service_author": "hpc-report-1ec0dbcb",
+  "service_reports": {
+    "controller": {
+      "id": "d4c5de2d-a1bb-4fcd-b557-d298fe7d17c4",
+      "created_at": "2026-11-02T00:44:29.719264+00:00"
+    },
+    "build_stage": {
+      "id": "9357d128-4537-41ff-8a79-654b14795390",
+      "created_at": "2026-11-02T00:44:45.876497+00:00"
+    },
+    "wheels_stage": {
+      "id": "40f88b2e-89db-4cd7-93af-32405ea10213",
+      "created_at": "2026-11-02T00:44:45.988368+00:00"
+    },
+    "image": {
+      "id": "9c24442c-9656-40c7-bba3-44a60cad6940",
+      "created_at": "2026-11-02T00:48:20.370445+00:00"
+    }
+  },
+  "construction": {
+    "archive_sha256": "45c8bbbd18136cdff1236b0a6315cfa65da0daae8c108f5372c0ffc81e780ec7",
+    "source_export_owner": "fleet.core.export.archive_commit",
+    "wheel_build_host": "loki",
+    "new_pure_python_wheels": 6,
+    "preserved_compiled_wheel": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+    "compiled_wheel_sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "compiled_source_comparison": "No libs/cleargbm_rs changes between b3843a3d3b83cbae77dc4f855be2c4fbaa17b492 and 8ef7e0f1769e7127feabb30008d72bc70e908111; bytes match the previous frozen checksum.",
+    "captured_environment": "Verified summary-b3843a3d3 HPC3 image; exact same 53 requirements and six image wheel names.",
+    "selfcheck_symbols": 22,
+    "controller_install": "Fresh Python 3.11 venv, binary-only no-dependency-resolution install of 53 exact requirements and all seven frozen first-party wheels.",
+    "preserved_configuration": "Pinned base image, OS package and dependency smoke command retained from the captured runtime specification."
+  },
+  "historical_state": "Old controllers, images, journals, staged ciphertext, keys and final permissions preserved.",
+  "remaining": [
+    "Amended resource/candidate preregistration and current-runtime synthetic shared-queue rehearsal.",
+    "Independent cleanup observation for original failed allocation 58733020.",
+    "New licensed baseline/validation before candidate selection and controlled final scoring."
+  ],
+  "files": {
+    "build-stage-report.json": "870a04cd1ac23dcf9e8c43f541ac7a968da8335d2fc4539a2fa751be704fb20b",
+    "capture-config.json": "a6593684b25f16fd45d210b95a0b5a103336b70006e28f28d7fcd406b1fc213a",
+    "controller-provenance.json": "03c06fd9d79f6c786a7779048e2f98b17b61bd78f64170958636f2579b255f9a",
+    "controller-report.json": "d7c4f690079b717f14ac705583aa9e988e942a47862470bd378ac1965c95f690",
+    "frozen-inputs.sha256": "3cdc2e3e9ddb914f0f428bbd8f1383bed1fdc32facffbd2867752941a136e172",
+    "image-captured.json": "a4fd8a36980f1c331105dac41c04cfac944749a068e2129e620eccbdd1a93f2c",
+    "image-expected.sha256": "a4548bae13bf44f7fa62f9cbc1f6f167ed92119d2fd5d4ab29eae85e372243b7",
+    "image-report.json": "18439c117b1c2195a66a48e844493c559e6c0fe6fd5816e5b09de0fc7b73dbbe",
+    "image-spec.json": "054846213dbac22ad5f28c67ea93ead773960f22a1f755ffe6ae68ccce2e6fe1",
+    "wheels-stage-report.json": "c803320bb7399899d503f74189d29f90111bc408eb99f7c4125103576c1e6ce3"
+  }
+}
