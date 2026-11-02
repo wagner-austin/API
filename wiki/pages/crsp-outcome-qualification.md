@@ -8,6 +8,7 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_queries.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py"
@@ -21,7 +22,8 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "190254f6e21071cea522ca8cf292e2bb84d588d0"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "13da81586926004b2f0ea07534af2dd295c5a1ea"
+  "libs/covenant_ml/tests/markets/test_crsp_queries.py": "254aa595426041e71931fbe0b724d60844a8597b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
@@ -126,6 +128,12 @@ derivation used to prepare this comparison. That diagnostic preserves source
 lineage and cannot pass the study loader; fresh vendor evidence is a separate
 step.[^cohort]
 
+The diagnostic query builder requires the exact train-validation scope
+derived from the supplied protocol, including all date bounds. Renaming a
+final scope or altering an individual bound is refused before SQL is returned.
+This hardens future query admission; it supplies no missing outcome and does
+not establish that a previous extraction crossed its boundary.[^query-scope]
+
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
 [^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
@@ -134,3 +142,4 @@ step.[^cohort]
 [^dependence]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json`, inputs, ordinal derivation and period counts; sibling `protocol.json`, `max_universe`, exact bytes matching `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `revision.revision.protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision`, universe cap; `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, consecutive `checked` increment and `path_ordinal` recording; sibling `result.json`, `results[0].decisions`, `eligible_paths` and `refused_cases`.
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting valuation predicate; `crsp_partition.py`, `check_crsp_partition`, dated-field checks.
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner" and § "Admission is not permission to fit this subset".
+[^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
