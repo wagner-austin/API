@@ -20,7 +20,7 @@ source_paths:
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
-  "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "8f4a1638e69986178e38b712bba571aa49560541"
+  "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "3f1f03965474eef8643cea85651ff1d71427dfe2"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "114e30d4fbee61b64cb2a257449bdfd5bda7edae"
