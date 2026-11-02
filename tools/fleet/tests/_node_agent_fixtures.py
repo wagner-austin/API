@@ -26,7 +26,8 @@ from fleet.contracts.source import (
     ProjectSource,
     encode_project_source,
 )
-from fleet.core import _test_hooks, _test_hooks_attempts, staging
+from fleet.core import _test_hooks, staging
+from fleet.core import _test_hooks_attempts as attempt_hooks
 from tests._queue_fakes import (
     DEFAULT_JOB_ID,
     DEFAULT_SHA,
@@ -220,7 +221,7 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
         assert (parent, prefix) == (loaded.archives, f"{DEFAULT_JOB_ID}-")
         return attempt
 
-    _test_hooks_attempts.fresh_directory = fresh
+    attempt_hooks.fresh_directory = fresh
     destination = attempt / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
     payload = b"# v2 git bundle\n" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)

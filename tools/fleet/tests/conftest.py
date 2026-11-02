@@ -30,7 +30,8 @@ from platform_core.json_utils import JSONObject
 
 from fleet.cli import _config
 from fleet.contracts.node import LiveLoad
-from fleet.core import _test_hooks, _test_hooks_attempts, manifest, staging
+from fleet.core import _test_hooks, manifest, staging
+from fleet.core import _test_hooks_attempts as attempt_hooks
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document
 
@@ -568,7 +569,7 @@ def _restore() -> None:
     _test_hooks.write_text = _test_hooks._default_write_text
     _test_hooks.hostname = _test_hooks._default_hostname
     _test_hooks.executor = _test_hooks._default_executor
-    _test_hooks_attempts.fresh_directory = _test_hooks_attempts._default_fresh_directory
+    attempt_hooks.fresh_directory = attempt_hooks._default_fresh_directory
     # The queue seams. The poster's transport lives in platform_core, shared
     # with board-watch; the SEAM and its unanswered-call code are this package's.
     _test_hooks.http_post = _test_hooks._default_http_post
