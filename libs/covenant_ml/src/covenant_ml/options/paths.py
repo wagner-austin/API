@@ -12,11 +12,22 @@ policy's decision goes through.
 from __future__ import annotations
 
 import math
+from typing import Protocol
 
 import numpy as np
 from numpy.typing import NDArray
 
 from .types import ERR_PATH_SHAPE, ERR_RATE, AsianPutContract, require_contract
+
+
+class _ExpProtocol(Protocol):
+    """``numpy.exp`` on a float64 array, whose stubs leave the result dtype untyped."""
+
+    def __call__(self, x: NDArray[np.float64]) -> NDArray[np.float64]: ...
+
+
+#: Elementwise exponential of a float64 array.
+exp_array: _ExpProtocol = __import__("numpy").exp
 
 
 def total_sessions(contract: AsianPutContract) -> int:
@@ -198,7 +209,7 @@ def gbm_paths(
     logs: NDArray[np.float64] = np.cumsum(increments, axis=1)
     paths: NDArray[np.float64] = np.empty((n_paths, steps + 1), dtype=np.float64)
     paths[:, 0] = contract["spot"]
-    paths[:, 1:] = contract["spot"] * np.exp(logs)
+    paths[:, 1:] = contract["spot"] * exp_array(logs)
     return paths
 
 
@@ -241,6 +252,7 @@ def paths_from_returns(
 __all__ = [
     "decision_inputs",
     "exercise_sessions",
+    "exp_array",
     "gbm_paths",
     "paths_from_returns",
     "put_payoffs",

@@ -21,7 +21,7 @@ from typing import Protocol
 import numpy as np
 from numpy.typing import NDArray
 
-from .paths import decision_inputs, gbm_paths, put_payoffs
+from .paths import decision_inputs, exp_array, gbm_paths, put_payoffs
 from .types import BASIS_TERMS, ERR_TOO_FEW_IN_THE_MONEY, AsianPutContract, LsmPolicy
 
 
@@ -182,7 +182,7 @@ def simulated_value(policy: LsmPolicy, n_paths: int, seed: int) -> float:
     realized: NDArray[np.float64] = put_payoffs(contract, averages)[rows, chosen]
     dates: NDArray[np.float64] = (chosen + 1).astype(np.float64)
     years: NDArray[np.float64] = dates * (contract["years"] / contract["exercise_dates"])
-    discounted: NDArray[np.float64] = realized * np.exp(-rate * years)
+    discounted: NDArray[np.float64] = realized * exp_array(-rate * years)
     return float(np.sum(discounted)) / n_paths
 
 

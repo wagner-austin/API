@@ -16,7 +16,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from .lsm import exercise_choices
-from .paths import decision_inputs, put_payoffs, require_rates
+from .paths import decision_inputs, exp_array, put_payoffs, require_rates
 from .types import ERR_PATH_SHAPE, LsmPolicy
 
 
@@ -67,7 +67,7 @@ def realized_outcomes(
     interval = contract["years"] / contract["exercise_dates"]
     dates_left: NDArray[np.float64] = (contract["exercise_dates"] - 1 - chosen).astype(np.float64)
     remaining: NDArray[np.float64] = dates_left * interval
-    carried: NDArray[np.float64] = exercised * np.exp(carry_rates * remaining)
+    carried: NDArray[np.float64] = exercised * exp_array(carry_rates * remaining)
     held: NDArray[np.float64] = payoffs[:, -1].copy()
     return RealizedOutcomes(chosen=chosen, policy_payoffs=carried, hold_payoffs=held)
 
