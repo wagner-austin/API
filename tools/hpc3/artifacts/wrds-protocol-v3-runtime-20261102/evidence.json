@@ -1,0 +1,132 @@
+{
+  "task": "eab6beb4-3c2c-44b2-92b1-9c8f6c853099",
+  "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+  "scope": "Separate version-three runtime candidate installation only. No queue rehearsal, licensed decryption, study launch, candidate selection or final release.",
+  "controller": {
+    "kind": "HPC3_CONTROLLER_EVIDENCE",
+    "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+    "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+    "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+    "site_packages": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/lib/python3.11/site-packages",
+    "verified_wheels": {
+      "cleargbm-0.1.0-py3-none-any.whl": {
+        "sha256": "c08aaff5a4873e66c60bc273a7f4cc65660529a0d9af54e9e0464350d6e5169f",
+        "installed_files": 15
+      },
+      "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": {
+        "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+        "installed_files": 2
+      },
+      "covenant_domain-0.1.0-py3-none-any.whl": {
+        "sha256": "3c38580b3aead280cb833faf5f23eb1403b3af2d49cc34235ba48857d84d91f6",
+        "installed_files": 8
+      },
+      "covenant_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "af59354b32b0a058fe3a4830877e46a37aced9794152ee9b16b385d7bf6a4155",
+        "installed_files": 360
+      },
+      "hpc3-0.1.0-py3-none-any.whl": {
+        "sha256": "770a7dd200716c5d77f9c7f2bef5ff8f4873624b65384aa7095d392a858f9f47",
+        "installed_files": 134
+      },
+      "platform_core-0.1.0-py3-none-any.whl": {
+        "sha256": "abb6a2318b763c63410282ebba6ab5a8e820a5e4e3b70e016d0d25b195ed38d2",
+        "installed_files": 84
+      },
+      "platform_ml-0.1.0-py3-none-any.whl": {
+        "sha256": "9e6e6c90e70cbb4dcc059cf13f15f868a6c8c48c6be40f44e2b10642c819af38",
+        "installed_files": 21
+      }
+    },
+    "installed_files": 624,
+    "selfcheck_sha256": "ffc464c6c9c6d33357b35034d677879a34c22c471e70cad4414c961b3edb20ef",
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found.",
+    "provenance_sha256": "c9fdb6b78493da44b4af4e5bd875d2a1cb743b1184df731c0fc0ea09990f054e"
+  },
+  "image": {
+    "path": "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/research-crsp-v3.sif",
+    "sha256": "369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde",
+    "accounting": {
+      "job": {
+        "job_id": "58742562",
+        "name": "cleargbm.image-protocol-v3-087f67b4c",
+        "partition": "free",
+        "state": "COMPLETED",
+        "elapsed_seconds": 95,
+        "billing_tres": 8,
+        "gpu_count": 0,
+        "cpu_count": 8,
+        "node_list": "hpc3-14-00"
+      },
+      "exit_code": "0:0",
+      "started_at": "2026-11-02T03:37:28",
+      "ended_at": "2026-11-02T03:39:03"
+    },
+    "verified_files": 14,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "service_author": "hpc-report-eab6beb4",
+  "service_reports": {
+    "controller": {
+      "id": "76f5baf6-003e-49dc-97d6-3b2c159a7464",
+      "created_at": "2026-11-02T03:36:48.511355+00:00"
+    },
+    "build_stage": {
+      "id": "9ea9fe6f-a592-4baf-9dc3-d50ced0ef4d8",
+      "created_at": "2026-11-02T03:36:55.463865+00:00"
+    },
+    "wheels_stage": {
+      "id": "ce8b75e1-28bc-4f94-9082-ea99172faf6a",
+      "created_at": "2026-11-02T03:37:17.923681+00:00"
+    },
+    "image": {
+      "id": "02e4b26b-c1a6-4f0e-9341-327a63dbd61f",
+      "created_at": "2026-11-02T03:40:02.754305+00:00"
+    }
+  },
+  "construction": {
+    "archive_sha256": "00c32ee4627537bf8e0c2b2664501039636b50c9e01e30943e0ac9f8fac6188a",
+    "source_export_owner": "fleet.core.export.archive_commit",
+    "archive_scope": [
+      "libs",
+      "tools/hpc3"
+    ],
+    "wheel_build_host": "loki",
+    "new_pure_python_wheels": 6,
+    "preserved_compiled_wheel": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+    "compiled_wheel_sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "compiled_source_comparison": "No libs/cleargbm_rs changes between 8ef7e0f1769e7127feabb30008d72bc70e908111 and 087f67b4c4aae9a731c913330840dcc665b51701; prior wheel hash verified before reuse.",
+    "captured_environment": "Verified protocol-v2-8ef7e0f17 HPC3 image; identical 53 requirements and six image wheel names.",
+    "selfcheck_symbols": 24,
+    "controller_install": "Separate Python 3.11 environment, binary-only no-dependency-resolution installation of 53 exact requirements and seven frozen first-party wheels.",
+    "preserved_configuration": "Captured pinned base image and dependency versions; original exact OS package and smoke command retained."
+  },
+  "source_checks": {
+    "fleet_job": "df515f29-426a-4b8f-9181-fca6809d01cd",
+    "tests_passed": 5220,
+    "statement_branch_coverage_percent": 100,
+    "strict_typing": "passed",
+    "guards": "passed"
+  },
+  "historical_state": "Old runtimes, images, study journals, ciphertext, keys and final permissions preserved.",
+  "remaining": [
+    "Independent source and runtime audit completion.",
+    "Version-three synthetic shared-queue rehearsal and licensed return-span qualification.",
+    "Separately verified encrypted metadata revision/staging, amended study freeze, baseline/validation and candidate selection before controlled final scoring."
+  ],
+  "files": {
+    "build-stage-report.json": "246705d8ef398b45366fc1139f05eb5cb84282f10b3a7f22ba1a74e8dd81abd6",
+    "capture-config.json": "2fb916be090116610fea5d0a1cefb9f65859cf695ba66bcf004cdc1c4bc3242c",
+    "controller-provenance.json": "c9fdb6b78493da44b4af4e5bd875d2a1cb743b1184df731c0fc0ea09990f054e",
+    "controller-report.json": "79bc55c063d69adcf0ee65a9f7309392e428448fccf450f975ae59faba3a77b5",
+    "frozen-inputs.sha256": "2f4f78cb239d20b2b996ec8a0452fe370dafa6022570d8d8f7e47933045260fc",
+    "image-captured.json": "9d8fcf690b0cdfe06c00c4137abc17272dddc0a259f8ab5bf4a4d7fb592ded1c",
+    "image-expected.sha256": "a03cd8902fda193efc680a8029fc55f6d95740162ba2716d8bdc22f0eb2a6232",
+    "image-report.json": "455117c306b7e239f9ad82766377300f8ca619b647a9d6cb13d03abb11dfc966",
+    "image-spec.json": "a6eaf53a3ffea96dd960fdee27ee7e5c023e7b9734b3c6005ec20738ddf9b261",
+    "wheels-stage-report.json": "81b88ebf6d498f83602c2243c22d7fb32f0cc94a410ad02392b65a10e91c4b0d",
+    "wheel-identities.json": "35d9e5b4aa97cd0ca98d680920173098e8d1a69bff2872b2337c745cb69d2573"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "kind": "HPC3_STAGE_EVIDENCE",
+  "host": "hpc3",
+  "manifest": {
+    "destination": "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c",
+    "files": [
+      {
+        "name": "GIT_COMMIT",
+        "sha256": "534685fece4d973bb75978e440938ac35668406a24438e8757069753de8a437e",
+        "size_bytes": 41
+      },
+      {
+        "name": "build.sbatch",
+        "sha256": "73a27aa0b162992e6d8f76df7bdd53a8c7786795d9659f3df5adbf10861d6307",
+        "size_bytes": 2150
+      },
+      {
+        "name": "build.sh",
+        "sha256": "7cc1879a8a224e596ab948d0eb2f80703f30a94cc2ee78f2f628ef14e369c3b2",
+        "size_bytes": 745
+      },
+      {
+        "name": "image.def",
+        "sha256": "f37575d20f32f65fd114ffe295a10fb3ce8ebfa3756a462da546c82b391889bc",
+        "size_bytes": 3124
+      },
+      {
+        "name": "requirements.txt",
+        "sha256": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+        "size_bytes": 900
+      },
+      {
+        "name": "selfcheck.py",
+        "sha256": "ffc464c6c9c6d33357b35034d677879a34c22c471e70cad4414c961b3edb20ef",
+        "size_bytes": 7854
+      }
+    ],
+    "provenance": {
+      "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+      "runtime": "protocol-v3-087f67b4c",
+      "board_task": "eab6beb4-3c2c-44b2-92b1-9c8f6c853099"
+    }
+  },
+  "manifest_sha256": "518aa12f0f1bb0aadba6e328fda9ea2af748515551108f48aa48c2bfc01697ac",
+  "expected_sha256": "2f4f78cb239d20b2b996ec8a0452fe370dafa6022570d8d8f7e47933045260fc",
+  "verified_files": 6,
+  "certification_path": "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/build-stage-digests.txt",
+  "certification_sha256": "ad0c35a664d7d182940d08d8316873a13f9710304286fcaf57ccbb509fa54da0",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+}

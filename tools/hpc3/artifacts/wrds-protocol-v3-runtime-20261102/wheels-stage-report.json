@@ -1,0 +1,51 @@
+{
+  "kind": "HPC3_STAGE_EVIDENCE",
+  "host": "hpc3",
+  "manifest": {
+    "destination": "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/wheels",
+    "files": [
+      {
+        "name": "cleargbm-0.1.0-py3-none-any.whl",
+        "sha256": "c08aaff5a4873e66c60bc273a7f4cc65660529a0d9af54e9e0464350d6e5169f",
+        "size_bytes": 34976
+      },
+      {
+        "name": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl",
+        "sha256": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+        "size_bytes": 618460
+      },
+      {
+        "name": "covenant_domain-0.1.0-py3-none-any.whl",
+        "sha256": "3c38580b3aead280cb833faf5f23eb1403b3af2d49cc34235ba48857d84d91f6",
+        "size_bytes": 11760
+      },
+      {
+        "name": "covenant_ml-0.1.0-py3-none-any.whl",
+        "sha256": "af59354b32b0a058fe3a4830877e46a37aced9794152ee9b16b385d7bf6a4155",
+        "size_bytes": 814414
+      },
+      {
+        "name": "platform_core-0.1.0-py3-none-any.whl",
+        "sha256": "abb6a2318b763c63410282ebba6ab5a8e820a5e4e3b70e016d0d25b195ed38d2",
+        "size_bytes": 265348
+      },
+      {
+        "name": "platform_ml-0.1.0-py3-none-any.whl",
+        "sha256": "9e6e6c90e70cbb4dcc059cf13f15f868a6c8c48c6be40f44e2b10642c819af38",
+        "size_bytes": 50193
+      }
+    ],
+    "provenance": {
+      "source_commit": "087f67b4c4aae9a731c913330840dcc665b51701",
+      "runtime": "protocol-v3-087f67b4c",
+      "board_task": "eab6beb4-3c2c-44b2-92b1-9c8f6c853099"
+    }
+  },
+  "manifest_sha256": "ab5bac78f86a273af7bd745ce77d3f8307bf54001cf9932516f8e1d980b5fca4",
+  "expected_sha256": "2f4f78cb239d20b2b996ec8a0452fe370dafa6022570d8d8f7e47933045260fc",
+  "verified_files": 6,
+  "certification_path": "/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/wheels/wheels-stage-digests.txt",
+  "certification_sha256": "a79e5f5a963eec3062af42d4ce98df094533fd379df4b5d8b8541a58458c6346",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+}
