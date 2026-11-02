@@ -1,8 +1,9 @@
 """The realized-path study: one policy, many contracts, intervalled over months.
 
-Contracts start on the first session of consecutive months, one per eligible
-security per month. Contracts starting within a year of each other share most
-of their path, and contracts in one month share the market, so neither a
+Contracts start at the decision close that ends each of consecutive months
+(the month's last session), one per eligible security per month. Contracts
+starting within a year of each other share most of their path, and contracts
+in one month share the market, so neither a
 contract nor a month is an independent unit. The estimand is the mean over
 months of each month's average policy-minus-hold difference, and its interval
 is the shared paired moving-block bootstrap over consecutive months
