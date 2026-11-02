@@ -1,0 +1,1 @@
+{"destination":"/pub/wagnera3/research/mount-probe-0a0e5913-v2-20261102","files":[{"name":"shared.txt","sha256":"f272c6175d745909d8014d978a7143caf5fae589757f02b5bb38dbb814b967c0","size_bytes":51}],"provenance":{"task":"0a0e5913-7be2-4be5-8225-2833d21981f8","controller_source":"abb117967be4f07194c748c9ad1d3e9eb6d3e676","scope":"artificial-mount-fixtures-v2-pin-before-imports"}}

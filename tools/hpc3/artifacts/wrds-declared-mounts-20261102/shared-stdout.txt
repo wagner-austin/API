@@ -1,0 +1,14 @@
+host      hpc3-l18-04
+job       58776026
+restart   0
+commit    087f67b4c4aae9a731c913330840dcc665b51701
+gpu       cpu-only
+2026-11-02T10:44:27-08:00
+/data/homezvol1/wagnera3/research-images/protocol-v3-087f67b4c/research-crsp-v3.sif: OK
+/data/homezvol1/wagnera3/research/mount-probe-0a0e5913-v2-20261102/probe.py: OK
+/data/homezvol1/wagnera3/research/mount-probe-0a0e5913-v2-20261102/home.txt: OK
+/data/homezvol1/wagnera3/research/mount-probe-0a0e5913-v2-20261102/shared-request.json: OK
+/pub/wagnera3/research/mount-probe-0a0e5913-v2-20261102/shared.txt: OK
+Declared inputs verified; private scratch removed.
+2026-11-02T10:44:31-08:00
+exit      0
