@@ -71,7 +71,6 @@ def manual_asset(reason: str) -> dict[str, JSONValue]:
         "writable": False,
         "reason": reason,
         "manual": True,
-        "provision_command": None,
     }
 
 

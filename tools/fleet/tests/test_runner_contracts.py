@@ -69,7 +69,6 @@ def _asset(**overrides: JSONValue) -> dict[str, JSONValue]:
         "writable": True,
         "reason": "checkpoint tests write under it",
         "manual": False,
-        "provision_command": None,
     }
     raw.update(overrides)
     return raw
@@ -153,9 +152,7 @@ class TestFileAsset:
 
     def test_a_valid_pinned_asset_keeps_its_pin(self) -> None:
         pin = "8a550a37e2d8a5430866090d4e7d5892f9010b47f52a5a09350fc66c620deec9"
-        decoded = decode_file_asset(
-            _asset(sha256=pin, writable=False, manual=True, provision_command=None)
-        )
+        decoded = decode_file_asset(_asset(sha256=pin, writable=False, manual=True))
         assert decoded["sha256"] == pin
 
     def test_a_non_object_is_refused(self) -> None:
@@ -177,33 +174,24 @@ class TestFileAsset:
         with pytest.raises(JSONTypeError, match="string or null"):
             decode_file_asset(_asset(sha256=64))
 
-    def test_a_provision_command_on_a_manual_asset_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be null on a manual or writable"):
-            decode_file_asset(
-                _asset(manual=True, writable=False, provision_command="curl something")
-            )
+    def test_a_fetched_asset_decodes_with_no_command_since_the_generation_provides_it(
+        self,
+    ) -> None:
+        decoded = decode_file_asset(_asset(path="/opt/google/chrome/chrome", writable=False))
+        assert decoded == FileAsset(
+            path="/opt/google/chrome/chrome",
+            sha256=None,
+            writable=False,
+            reason="checkpoint tests write under it",
+            manual=False,
+        )
 
-    def test_a_provision_command_on_a_writable_asset_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must be null on a manual or writable"):
-            decode_file_asset(_asset(provision_command="mkdir -p /data"))
-
-    def test_a_fetchable_asset_without_a_command_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="must carry provision_command"):
-            decode_file_asset(_asset(writable=False, provision_command=None))
-
-    def test_a_fetchable_asset_with_a_command_is_accepted(self) -> None:
-        decoded = decode_file_asset(_asset(writable=False, provision_command="git clone x /opt/x"))
-        assert decoded["provision_command"] == "git clone x /opt/x"
-
-    def test_an_absent_provision_command_key_is_refused(self) -> None:
+    @pytest.mark.parametrize("field", ["path", "writable", "reason", "manual"])
+    def test_a_missing_field_is_refused(self, field: str) -> None:
         raw = _asset()
-        del raw["provision_command"]
-        with pytest.raises(JSONTypeError, match="must declare 'provision_command'"):
+        del raw[field]
+        with pytest.raises(JSONTypeError, match=field):
             decode_file_asset(raw)
-
-    def test_a_mistyped_provision_command_is_refused(self) -> None:
-        with pytest.raises(JSONTypeError, match="string or null"):
-            decode_file_asset(_asset(provision_command=3))
 
 
 class TestHostRunnerSpec:
@@ -275,7 +263,7 @@ class TestHostRunnerSpec:
 
     def test_the_base_decodes_with_the_host(self) -> None:
         decoded = decode_host_runner_spec(_host())
-        assert decoded["base"]["apt_packages"] == ["ffmpeg", "golang-go"]
+        assert decoded["base"]["nix_packages"] == ["ffmpeg", "go"]
         assert decoded["base"]["disk"]["ceiling_gb"] == 150
 
     def test_a_ceiling_under_the_host_s_own_bounds_is_accepted(self) -> None:
@@ -356,40 +344,29 @@ class TestRunnerSpec:
         assert [asset["path"] for asset in lavender["assets"] if asset["manual"]] == []
         assert lavender["base"]["disk"]["baseline_gb"] < lavender["base"]["disk"]["ceiling_gb"]
 
-    def test_a_runner_host_installs_every_tagged_tool_apt_supplies(self) -> None:
-        """A rebuild never takes a capability tag away from a fleet node.
+    def test_a_runner_host_carries_every_tagged_tool_a_linux_node_installs(self) -> None:
+        """A reinstall never takes a capability tag away from a fleet node.
 
         A CI runner host here is a fleet machine of registry/machines too,
-        whose runner claims with the tags its probe finds each tick: lavender
-        was through its WSL guest lavender-wsl, and is itself since its
-        reimage to Ubuntu on 2026-10-19 (MCPs board task 1e9ab738). A tagged
-        tool installed by hand there would be lost on the next ``--rebuild``,
-        and every job needing its tag would silently wait for another node:
-        on 2026-10-05 no node had go, and MCPs rcs-bridge's check had nowhere
-        to run (MCPs board task 1da15750). So the roster's base installs each
-        tagged tool's apt-get package, and carries as an asset the one tagged
-        tool no apt repository supplies: Chrome, the .deb Google ships, whose
-        asset path is the file the probe's chrome line asks for (MCPs board
-        task 2f596185). poppler-utils joined the base when pdftotext became a
-        tag (MCPs board task 6dd73ada): lavender-wsl had it on 2026-10-11,
-        but from no line here.
+        whose runner claims with the tags its probe finds each tick. A tagged
+        tool installed by hand there would be lost on the next reinstall, and
+        every job needing its tag would silently wait for another node: on
+        2026-10-05 no node had go, and MCPs rcs-bridge's check had nowhere to
+        run (MCPs board task 1da15750). A runner host is NixOS (MCPs board
+        task 9aba868d), so the roster's base names each tagged tool's nixpkgs
+        package, and carries as an asset the one nixpkgs keeps outside every
+        PATH: Google's Chrome, whose asset path is the file the probe's
+        chrome line asks for (MCPs board task 2f596185). poppler-utils is
+        pdftotext's (MCPs board task 6dd73ada). A tag a Linux node installs
+        that this map does not name fails here, so the tag cannot be added
+        without the runner host carrying it.
         """
+        nix_package = {"ffmpeg": "ffmpeg", "go": "go", "pdftotext": "poppler-utils"}
         spec = decode_runner_spec(load_json_str(SHIPPED_ROSTER.read_text(encoding="utf-8")))
         machines = set(decode_fleet_workspace(shipped_document())["machines"])
-        apt_installs = {
-            tool["name"]: tool["install"]["apt-get"]
-            for tool in TAGGED_TOOLS
-            if "apt-get" in tool["install"]
-        }
-        apt_supplied = {
-            install.split()[-1]
-            for install in apt_installs.values()
-            if install.startswith("sudo apt-get install -y ")
-        }
-        assert apt_supplied == {"ffmpeg", "golang-go", "poppler-utils"}
-        assert set(apt_installs) - {"ffmpeg", "go", "pdftotext"} == {"chrome"}
-        assert apt_installs["chrome"].startswith("curl -fsSL -o ")
+        linux_installed = {tool["name"] for tool in TAGGED_TOOLS if "apt-get" in tool["install"]}
+        assert linux_installed == {*nix_package, "chrome"}
         assert [host["name"] for host in spec["hosts"] if host["name"] in machines] == ["lavender"]
         for host in spec["hosts"]:
-            assert apt_supplied <= set(host["base"]["apt_packages"]), host["name"]
+            assert set(nix_package.values()) <= set(host["base"]["nix_packages"]), host["name"]
             assert CHROME_LINUX_PATH in {asset["path"] for asset in host["assets"]}, host["name"]

@@ -66,12 +66,23 @@ class TestHostBase:
 
     def test_no_packages_is_refused(self) -> None:
         with pytest.raises(JSONTypeError) as refused:
-            decode_host_base(_base(apt_packages=[]))
+            decode_host_base(_base(nix_packages=[]))
         assert str(refused.value) == (
-            "apt_packages must be non-empty; a fleet worker lacks the tagged tools runner jobs call"
+            "nix_packages must be non-empty; a fleet worker lacks the tagged tools runner jobs call"
         )
 
-    @pytest.mark.parametrize("field", ["apt_packages", "disk"])
+    @pytest.mark.parametrize("name", ["golang go", "pkgs.go", "9go", "go;rm", ""])
+    def test_a_name_that_is_no_nixpkgs_attribute_is_refused(self, name: str) -> None:
+        packages: list[JSONValue] = ["ffmpeg", name]
+        with pytest.raises(JSONTypeError) as refused:
+            decode_host_base(_base(nix_packages=packages))
+        assert str(refused.value) == f"nix_packages names {name!r}, which is no nixpkgs attribute"
+
+    def test_the_rosters_package_names_decode(self) -> None:
+        names: list[JSONValue] = ["ffmpeg", "go", "poppler-utils", "inkscape", "python3_12", "x'"]
+        assert decode_host_base(_base(nix_packages=names))["nix_packages"] == names
+
+    @pytest.mark.parametrize("field", ["nix_packages", "disk"])
     def test_a_missing_field_is_refused(self, field: str) -> None:
         raw = _base()
         del raw[field]

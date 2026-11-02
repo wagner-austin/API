@@ -1,64 +1,21 @@
-"""The runners' share of a CI host: the budget's contract and its bash (MCPs board task 45a4f22b).
-
-The move is executed by a real bash against a ``systemctl`` stand-in on
-``PATH`` that answers the unit's control group and records every call, so
-what is asserted is the decision the rendered lines make, not their text.
-"""
+"""The runners' share of a CI host: the budget's contract and its units (board task 45a4f22b)."""
 
 from __future__ import annotations
 
 import pathlib
-import subprocess
-from collections.abc import Callable
 
 import pytest
 from platform_core.json_utils import JSONTypeError, JSONValue
 
 from fleet.cli.runners import load_runner_spec
 from fleet.contracts.runner_slice import (
-    CI_SLICE_NAME,
     LISTENER_SLICE_NAME,
     CiSlice,
     decode_ci_slice,
     encode_ci_slice,
 )
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import runner_render, runner_slice_render
-from fleet.core.runner_cpuset_render import render_ci_cpuset_lines
-from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
-from tests._host_bash import host_bash
-from tests._runner_fixtures import RESERVED_CORES, a_ci_slice, a_host, an_install, ci_slice_json
-
-#: The unit every case places.
-UNIT = "actions.runner.wagner-austin-MCPs.lavender.service"
-
-
-def _systemctl_stand_in(cgroup: str) -> str:
-    """A systemctl that answers ``show -p ControlGroup`` with ``cgroup``
-    and appends every invocation to ``systemctl.log`` beside it.
-
-    Args:
-        cgroup: The control group it reports.
-
-    Returns:
-        The script text.
-    """
-    return (
-        "#!/usr/bin/env bash\n"
-        'echo "$*" >> "$(dirname "$0")/../systemctl.log"\n'
-        f'if [ "$1" = show ]; then echo "{cgroup}"; fi\n'
-    )
-
-
-def _install() -> RunnerInstall:
-    """The install every render case places.
-
-    Returns:
-        MCPs' first install, whose unit is :data:`UNIT`.
-    """
-    install = an_install("wagner-austin/MCPs")
-    assert install["service"] == UNIT
-    return install
+from fleet.core import runner_slice_render
+from tests._runner_fixtures import a_ci_slice, ci_slice_json
 
 
 def _budget(**overrides: JSONValue) -> dict[str, JSONValue]:
@@ -73,35 +30,6 @@ def _budget(**overrides: JSONValue) -> dict[str, JSONValue]:
     raw = ci_slice_json()
     raw.update(overrides)
     return raw
-
-
-def _move(tmp_path: pathlib.Path, cgroup: str) -> tuple[str, list[str]]:
-    """Run the rendered move for one unit whose live control group is ``cgroup``.
-
-    Args:
-        tmp_path: The case's directory.
-        cgroup: What the stand-in reports as the unit's ControlGroup.
-
-    Returns:
-        The move's standard output, and the systemctl calls it made.
-    """
-    lines = runner_slice_render.render_runner_slice_move_lines(_install())
-    (tmp_path / "move.sh").write_bytes(("\n".join(lines) + "\n").encode())
-    stand_ins = tmp_path / "bin"
-    stand_ins.mkdir()
-    (stand_ins / "systemctl").write_bytes(_systemctl_stand_in(cgroup).encode())
-    log = tmp_path / "systemctl.log"
-    log.write_bytes(b"")
-    ran = subprocess.run(
-        [host_bash(), "-c", 'chmod +x bin/systemctl && PATH="$PWD/bin:$PATH" bash move.sh'],
-        cwd=tmp_path,
-        capture_output=True,
-        text=True,
-        check=False,
-        stdin=subprocess.DEVNULL,
-    )
-    assert ran.returncode == 0, ran.stderr
-    return ran.stdout, log.read_text(encoding="utf-8").splitlines()
 
 
 class TestContract:
@@ -168,8 +96,8 @@ class TestContract:
         )
 
 
-class TestSliceUnit:
-    """The slice unit and the lines that keep it current."""
+class TestSliceUnits:
+    """The slice units and the drop-in that places each runner."""
 
     def test_the_unit_carries_the_budget(self) -> None:
         assert runner_slice_render.render_slice_unit(a_ci_slice()) == (
@@ -203,25 +131,6 @@ class TestSliceUnit:
         budget["swap_max_gb"] = 0
         assert "\nMemorySwapMax=0G\n" in runner_slice_render.render_slice_unit(budget)
 
-    def test_both_units_are_written_through_the_one_unit_writer_and_always_started(self) -> None:
-        """Written only when they differ, which the writer's own suite runs
-        under bash (tests/test_runner_unit_files.py)."""
-        assert runner_slice_render.render_slice_unit_lines(a_ci_slice()) == [
-            *render_unit_file_lines(
-                runner_slice_render.SLICE_UNIT_PATH,
-                runner_slice_render.render_slice_unit(a_ci_slice()),
-                announcement="ci budget set: runners.slice MemoryHigh=16G MemoryMax=18G "
-                "MemorySwapMax=2G CPUWeight=20 IOReadBandwidthMax=/ 200M IOReadIOPSMax=/ 5000",
-            ),
-            "systemctl start runners.slice",
-            *render_unit_file_lines(
-                runner_slice_render.LISTENER_SLICE_UNIT_PATH,
-                runner_slice_render.LISTENER_SLICE_UNIT,
-                announcement="listener slice set: listeners.slice, bounded by nothing",
-            ),
-            "systemctl start listeners.slice",
-        ]
-
     def test_the_listener_slice_is_accounted_and_bounded_by_nothing(self) -> None:
         """No Memory*, CPUWeight or IO*Max: a bound here would throttle the
         listeners as the CI slice's did (MCPs board task 715b9ec5)."""
@@ -231,96 +140,6 @@ class TestSliceUnit:
         assert LISTENER_SLICE_NAME == "listeners.slice"
         assert "-" not in LISTENER_SLICE_NAME
 
-    def test_the_slice_is_laid_before_any_runner_is_placed_in_it(self) -> None:
-        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
-        assert script.index(f"systemctl start {CI_SLICE_NAME}") < script.index(
-            runner_slice_render.SLICE_DROP_IN_NAME
-        )
-
-    def test_the_slice_s_cpus_are_set_once_it_is_started_and_before_any_runner(self) -> None:
-        """set-property needs the slice loaded, and a runner placed first
-        would run a job on every CPU (MCPs board task 349e25ee)."""
-        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
-        cpus = "\n".join(render_ci_cpuset_lines(RESERVED_CORES))
-        assert cpus in script
-        assert script.index(f"systemctl start {CI_SLICE_NAME}") < script.index(cpus)
-        assert script.index(cpus) < script.index(runner_slice_render.SLICE_DROP_IN_NAME)
-
-    def test_the_whole_provision_parses_as_bash(self, tmp_path: pathlib.Path) -> None:
-        script = runner_render.render_provision(_roster_host(), RESERVED_CORES)["provision_script"]
-        (tmp_path / "provision.sh").write_bytes(script.encode())
-        parsed = subprocess.run(
-            [host_bash(), "-n", "provision.sh"],
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        assert parsed.returncode == 0, parsed.stderr
-
-
-class TestRunnerPlacement:
-    """Each runner's drop-in and the move into the slice."""
-
-    def test_the_drop_in_names_the_listener_slice_through_the_one_unit_writer(self) -> None:
-        drop_in = render_drop_in_lines(
-            _install(),
-            name="fleet-slice.conf",
-            body="[Service]\nSlice=listeners.slice\n",
-            announcement=f"listener slice named for {UNIT}",
-        )
+    def test_each_runner_is_placed_in_the_listener_slice_by_its_drop_in(self) -> None:
         assert runner_slice_render.SLICE_DROP_IN == "[Service]\nSlice=listeners.slice\n"
-        assert runner_slice_render.render_runner_slice_drop_in_lines(_install()) == drop_in
-
-    def test_a_runner_already_in_the_listener_slice_is_left_running(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        out, calls = _move(tmp_path, f"/{LISTENER_SLICE_NAME}/{UNIT}")
-        assert out == ""
-        assert calls == [f"show -p ControlGroup --value {UNIT}"]
-
-    def test_an_idle_runner_in_the_ci_slice_is_restarted_into_the_listener_slice(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """The shape every lavender runner had until board task 715b9ec5: the
-        unit itself in the CI slice. No process is listed for it, an idle
-        runner's shape between jobs; the /dev/null guard keeps grep off stdin."""
-        out, calls = _move(tmp_path, f"/{CI_SLICE_NAME}/{UNIT}")
-        assert out == (
-            f"listener placed: {UNIT} moved into {LISTENER_SLICE_NAME}, its jobs into "
-            f"{CI_SLICE_NAME}\n"
-        )
-        assert calls == [f"show -p ControlGroup --value {UNIT}", f"restart {UNIT}"]
-
-    def test_a_runner_running_a_job_is_named_and_never_restarted(self) -> None:
-        lines = runner_slice_render.render_runner_slice_move_lines(_install())
-        busy = next(index for index, line in enumerate(lines) if "Runner.Worker" in line)
-        assert lines[busy + 1] == (
-            f"            echo 'listener placement pending: {UNIT} is running a job; "
-            "the reaper restarts it into the listener slice between jobs'"
-        )
-        assert lines[busy + 2] == "        else"
-
-    @pytest.mark.parametrize(
-        "render",
-        [
-            runner_slice_render.render_runner_slice_drop_in_lines,
-            runner_slice_render.render_runner_slice_move_lines,
-        ],
-    )
-    def test_an_unscriptable_unit_name_is_refused(
-        self, render: Callable[[RunnerInstall], list[str]]
-    ) -> None:
-        install = _install()
-        install["service"] = "bad'unit.service"
-        with pytest.raises(ValueError, match="service"):
-            render(install)
-
-
-def _roster_host() -> HostRunnerSpec:
-    """A one-install host carrying lavender's budget.
-
-    Returns:
-        The spec.
-    """
-    return a_host([_install()], systemd_timers=["ci-clean.timer"])
+        assert runner_slice_render.SLICE_DROP_IN_NAME == "fleet-slice.conf"

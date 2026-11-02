@@ -37,7 +37,7 @@ from fleet.core.runner_host_document import (
     host_files,
     render_runner_hosts_document,
 )
-from fleet.core.runner_install import LOCAL_BIN, RUNNER_SHA256, RUNNER_VERSION
+from fleet.core.runner_install import LOCAL_BIN, RUNNER_SHA256, RUNNER_VERSION, TOKEN_DIRECTORY
 from fleet.core.runner_job_scope_render import HOOK_DROP_IN, SUDOERS_RULE
 from fleet.core.runner_reaper_render import KILL_DROP_IN, REAPER_SCRIPT, render_reaper_service
 from fleet.core.runner_recovery import SYSTEMD_DROP_IN
@@ -62,7 +62,6 @@ def _asset(path: str, *, writable: bool = False, manual: bool = False) -> FileAs
         writable=writable,
         reason=f"the job class that needs {path}",
         manual=manual,
-        provision_command=None if writable or manual else f"fetch {path}",
     )
 
 
@@ -151,6 +150,8 @@ class TestTheEntry:
         assert entry["account"] == "gharunner"
         assert entry["runner"] == {"version": RUNNER_VERSION, "sha256": RUNNER_SHA256}
         assert entry["localBin"] == LOCAL_BIN
+        assert entry["tokenDirectory"] == TOKEN_DIRECTORY == "/var/lib/fleet-runner-tokens"
+        assert entry["packages"] == ["ffmpeg", "go"]
         assert entry["installs"] == [
             DocumentInstall(
                 service="actions.runner.wagner-austin-corvis-stick.lavender.service",

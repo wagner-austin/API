@@ -16,13 +16,12 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import runners
-from fleet.core import _test_hooks, runner_render
+from fleet.core import _test_hooks
 from fleet.core.runner_registrations import REGISTRATIONS_REASON
 from tests._runner_fixtures import RESERVED_CORES, all_declared, no_dropped_jobs
 from tests._runner_roster_files import (
     REGISTRY,
     clean_transcript,
-    manual_asset,
     raw_host,
     roster_host,
     write_roster,
@@ -37,23 +36,15 @@ class TestFlags:
         with pytest.raises(ValueError, match="--spec is required"):
             runners.main([])
 
-    def test_render_without_host_is_refused(self, tmp_path: pathlib.Path) -> None:
+    @pytest.mark.parametrize("flag", ["--render", "--rebuild", "--config"])
+    def test_the_ubuntu_recipe_s_flags_are_unknown(self, tmp_path: pathlib.Path, flag: str) -> None:
+        """A runner host is NixOS (MCPs board task 9aba868d): its generation
+        lays what ``--render`` wrote and ``--rebuild`` ran, so neither, nor
+        the registry their CPU set was read from, is a flag any more."""
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
-        with pytest.raises(ValueError, match="--render requires --host"):
-            runners.main(["--spec", spec_path, "--render", str(tmp_path / "out")])
-
-    def test_render_without_the_registry_is_refused_writing_nothing(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        spec_path = write_roster(tmp_path, [raw_host("lavender")])
-        out = tmp_path / "out"
         with pytest.raises(ValueError) as refused:
-            runners.main(["--spec", spec_path, "--host", "lavender", "--render", str(out)])
-        assert str(refused.value) == (
-            "--render requires --config, the fleet's registry directory: the provision holds "
-            "the host's runners to the cores its roster file reserves for them"
-        )
-        assert not out.exists()
+            runners.main(["--spec", spec_path, "--host", "lavender", flag, "x"])
+        assert str(refused.value).startswith(f"unknown argument {flag!r}; expected one of ")
 
     def test_an_unknown_host_is_a_typed_error_naming_the_declared_ones(
         self, tmp_path: pathlib.Path
@@ -79,7 +70,7 @@ class TestFlags:
 
     def test_two_mode_flags_are_refused(self, tmp_path: pathlib.Path) -> None:
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
-        with pytest.raises(ValueError, match="--render and --sample are different acts"):
+        with pytest.raises(ValueError, match="--sample and --register are different acts"):
             runners.main(
                 [
                     "--spec",
@@ -88,8 +79,8 @@ class TestFlags:
                     "lavender",
                     "--sample",
                     str(tmp_path / "l.jsonl"),
-                    "--render",
-                    str(tmp_path / "out"),
+                    "--register",
+                    "yes",
                 ]
             )
 
@@ -215,54 +206,8 @@ class TestAudit:
         assert fault.value.code is FleetErrorCode.RUNNER_AUDIT_UNPARSABLE
 
 
-class TestRender:
-    """The render mode's artifacts and run order."""
-
-    def test_render_writes_both_scripts_and_prints_the_run_order(
-        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        host = raw_host("lavender")
-        host["assets"] = [manual_asset("the provenance jar")]
-        spec_path = write_roster(tmp_path, [host])
-        out_dir = tmp_path / "out"
-        runner = FakeRun([])
-        _test_hooks.run = runner
-        with caplog.at_level("INFO"):
-            code = runners.main(
-                [
-                    "--spec",
-                    spec_path,
-                    "--host",
-                    "lavender",
-                    "--render",
-                    str(out_dir),
-                    "--config",
-                    REGISTRY,
-                ]
-            )
-        assert code == 0
-        assert runner.calls == []
-        rendered = runner_render.render_provision(
-            roster_host(spec_path, "lavender"), RESERVED_CORES
-        )
-        assert (out_dir / "base.sh").read_text(encoding="utf-8") == rendered["base_script"]
-        assert (out_dir / "provision.sh").read_text(encoding="utf-8") == (
-            rendered["provision_script"]
-        )
-        assert [record.getMessage() for record in caplog.records] == [
-            f"wrote {out_dir / 'base.sh'}",
-            f"wrote {out_dir / 'provision.sh'}",
-            "RUN ORDER for lavender:",
-            f"  1. base.sh on the host as root, then reboot if it printed "
-            f"{runner_render.REBOOT_MARKER}",
-            "  2. provision.sh on the host as root, with each RUNNER_TOKEN_* exported",
-            f"  {rendered['manual_steps'][0]}",
-            "  3. fleet-runners --spec <roster> --host lavender",
-        ]
-
-
 class TestReservation:
-    """The cores a provision holds the runners to, read from the fleet's roster."""
+    """The cores the boot script holds the runners to, read from the fleet's roster."""
 
     def test_lavender_s_roster_file_reserves_its_runners_eight_cores(self) -> None:
         """Read from the real registry, so the fixture every render case
@@ -285,22 +230,21 @@ class TestReservation:
 class TestEntrypoint:
     """The console script boundary."""
 
-    def _render_argv(self, tmp_path: pathlib.Path) -> list[str]:
-        """A render invocation, which needs no faked network.
+    def _onboard_argv(self, tmp_path: pathlib.Path) -> list[str]:
+        """An onboard invocation, which needs no faked network.
 
         Args:
-            tmp_path: The case's directory, holding the roster and the output.
+            tmp_path: The case's directory, holding the roster it rewrites.
 
         Returns:
             The arguments after the program name.
         """
         spec_path = write_roster(tmp_path, [raw_host("lavender")])
-        out = str(tmp_path / "out")
-        return ["--spec", spec_path, "--host", "lavender", "--render", out, "--config", REGISTRY]
+        return ["--spec", spec_path, "--host", "lavender", "--onboard", "wagner-austin/x"]
 
     def test_entrypoint_exits_with_mains_code(self, tmp_path: pathlib.Path) -> None:
         saved = sys.argv
-        sys.argv = ["fleet-runners", *self._render_argv(tmp_path)]
+        sys.argv = ["fleet-runners", *self._onboard_argv(tmp_path)]
         try:
             with pytest.raises(SystemExit) as caught:
                 runners.entrypoint()
@@ -322,9 +266,8 @@ class TestEntrypoint:
             sys.argv = saved
         assert caught.value.code == 0
         assert capsys.readouterr().out == (
-            "usage: --spec <value> --host <value> --render <value> --sample <value> "
-            "--report <value> --cores <value> --onboard <value> --rebuild <value> "
-            "--prune <value> --config <value>\n"
+            "usage: --spec <value> --host <value> --sample <value> --report <value> "
+            "--cores <value> --onboard <value> --register <value> --prune <value>\n"
         )
 
     def test_a_refusal_is_one_line_on_stderr_and_exit_two(
@@ -346,7 +289,7 @@ class TestEntrypoint:
         """The half that silently goes missing without an `if __name__` block."""
         saved_argv = sys.argv
         saved_module = sys.modules.pop("fleet.cli.runners", None)
-        sys.argv = ["x", *self._render_argv(tmp_path)]
+        sys.argv = ["x", *self._onboard_argv(tmp_path)]
         try:
             with pytest.raises(SystemExit) as raised:
                 runpy.run_module("fleet.cli.runners", run_name="__main__", alter_sys=False)
@@ -355,4 +298,4 @@ class TestEntrypoint:
             if saved_module is not None:
                 sys.modules["fleet.cli.runners"] = saved_module
         assert raised.value.code == 0
-        assert (tmp_path / "out" / "provision.sh").is_file()
+        assert "wagner-austin/x" in (tmp_path / "runners.json").read_text(encoding="utf-8")

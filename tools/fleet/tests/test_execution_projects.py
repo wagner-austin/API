@@ -105,8 +105,7 @@ def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
     user's own systemd manager (MCPs board task 715b9ec5). It ran pinned to
     lavender-wsl, the WSL guest that held the runners, until lavender's
     reimage to Ubuntu on 2026-10-19, and returned pinned to lavender once
-    ``fleet-runners --rebuild yes`` laid its eight runners there (MCPs board
-    task 1e9ab738).
+    the runners were laid there (MCPs board task 1e9ab738).
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "tools/fleet-execution-runners")

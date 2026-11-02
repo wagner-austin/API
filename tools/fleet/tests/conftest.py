@@ -146,9 +146,9 @@ class FakeClock:
 class FakeSleep:
     """A sleep that moves a :class:`FakeClock` instead of waiting.
 
-    Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`. Lifted from
-    ``test_runner_rebuild.py`` when the node runner's watch needed the same
-    clock (MCPs board task c1d48330).
+    Satisfies :class:`~fleet.core._test_hooks.SleepProtocol`. Shared by the
+    node runner's watch (MCPs board task c1d48330) and ``--register``'s wait
+    for each runner to register (MCPs board task 9aba868d).
 
     Attributes:
         clock: The clock each sleep advances.

@@ -24,14 +24,12 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import RunnerInstall
 from fleet.core import (
     runner_job_scope_render,
-    runner_render,
     runner_tool_caches,
     runner_workspace_unlock,
 )
-from fleet.core.runner_unit_files import render_drop_in_lines
 from tests._audit_rows import run_rows
 from tests._host_bash import host_bash
-from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
+from tests._runner_fixtures import an_install
 
 #: The unit every case runs.
 UNIT = "actions.runner.wagner-austin-API.lavender.service"
@@ -520,35 +518,14 @@ class TestTheRenderedPieces:
         )
         assert "." not in runner_job_scope_render.SUDOERS_PATH.rsplit("/", 1)[1]
 
-    def test_the_rule_reaches_sudoers_d_only_once_visudo_accepts_it(self) -> None:
-        lines = runner_job_scope_render.render_job_scope_lines()
-        staged = "/etc/sudoers.d/fleet-runner-job-scope.new"
-        check = lines.index(f"visudo -cf {staged}")
-        assert lines[check - 1] == f"chmod 0440 {staged}"
-        assert lines[check + 1] == f"mv {staged} /etc/sudoers.d/fleet-runner-job-scope"
-        assert lines[check - 3 : check - 1] == [
-            'gharunner ALL=(root) NOPASSWD: /usr/local/sbin/fleet-runner-job-scope ""',
-            "SUDOERS_EOF",
-        ]
-
-    def test_each_unit_s_drop_in_names_the_hook_through_the_one_unit_writer(self) -> None:
+    def test_each_unit_s_drop_in_names_both_hooks(self) -> None:
         assert runner_job_scope_render.HOOK_DROP_IN == (
             "[Service]\nEnvironment=ACTIONS_RUNNER_HOOK_JOB_STARTED="
             "/usr/local/bin/fleet-runner-job-started.sh\n"
             "Environment=ACTIONS_RUNNER_HOOK_JOB_COMPLETED="
             "/usr/local/bin/fleet-runner-job-completed.sh\n"
         )
-        assert runner_job_scope_render.render_job_hook_lines(_install()) == render_drop_in_lines(
-            _install(),
-            name="fleet-job-scope.conf",
-            body=runner_job_scope_render.HOOK_DROP_IN,
-            announcement=f"job hook set for {UNIT}: each job runs in a scope of {CI_SLICE_NAME}",
-        )
-
-    def test_the_provision_installs_the_helper_before_any_runner(self) -> None:
-        rendered = runner_render.render_provision(a_host([_install()]), RESERVED_CORES)
-        script = rendered["provision_script"]
-        assert script.index("visudo -cf") < script.index("./svc.sh start")
+        assert runner_job_scope_render.HOOK_DROP_IN_NAME == "fleet-job-scope.conf"
 
     def test_the_placement_row_is_named_for_the_install(self) -> None:
         assert runner_job_scope_render.placement_check_id(_install()) == (

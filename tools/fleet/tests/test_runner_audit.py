@@ -90,7 +90,6 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
                 writable=False,
                 reason="the provenance jar",
                 manual=True,
-                provision_command=None,
             ),
             FileAsset(
                 path=f"{base}/data",
@@ -98,7 +97,6 @@ def _host(tmp_path: pathlib.Path) -> HostRunnerSpec:
                 writable=True,
                 reason="checkpoint writes",
                 manual=False,
-                provision_command="mkdir -p /data",
             ),
         ],
     )

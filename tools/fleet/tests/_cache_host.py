@@ -1,15 +1,14 @@
 """A runner host laid out as files, for the action cache's adopt and report scripts (MCPs ce2b92e0).
 
 Support module, not a test module: test_runner_action_cache_units runs the
-adopt script and each install's drop-in lines over it, and
-test_runner_cache_report the report script. Each script runs under a real
-bash with the absolute roots it reads, ``/etc/systemd/system``, ``/proc``,
-``/sys/fs/cgroup`` and the status file's directory, rewritten to the test's
-own directories, and with ``systemctl``, ``sleep`` and ``ps`` stand-ins.
-The ``systemctl`` stand-in keeps each unit's state the way systemd does:
-``daemon-reload`` loads a unit's environment from the drop-in file the lines
-wrote, and ``restart`` gives the running process whatever environment is
-loaded. ``find`` is the host's own, reading the Worker logs' real mtimes.
+adopt script over it, and test_runner_cache_report the report script. Each
+script runs under a real bash with the absolute roots it reads,
+``/etc/systemd/system``, ``/proc``, ``/sys/fs/cgroup`` and the status file's
+directory, rewritten to the test's own directories, and with ``systemctl``,
+``sleep`` and ``ps`` stand-ins. The ``systemctl`` stand-in keeps each unit's
+state the way systemd does: ``daemon-reload`` loads a unit's environment
+from its drop-in file, and ``restart`` gives the running process whatever
+environment is loaded. ``find`` is the host's own, reading the Worker logs' real mtimes.
 """
 
 from __future__ import annotations
@@ -279,27 +278,6 @@ class Host:
             text=True,
             check=False,
         )
-
-    def provision(self, install: RunnerInstall) -> subprocess.CompletedProcess[str]:
-        """Run one install's cache lines, the drop-in then the adopt, as provision does.
-
-        Provision starts the unit between the two; the host :meth:`unit`
-        laid out is already running, the shape of a unit an older provision
-        started without the cache.
-
-        Args:
-            install: The install, laid out with :meth:`unit` under its unit's name.
-
-        Returns:
-            The finished process.
-        """
-        lines = [
-            *runner_cache_adopt.render_cache_drop_in_lines(install),
-            *runner_cache_adopt.render_cache_adopt_now_lines(install),
-        ]
-        body = "set -euo pipefail\n" + laid_out("\n".join(lines)) + "\n"
-        (self.root / "provision.sh").write_bytes((STAND_INS + body).encode())
-        return self.run("provision.sh")
 
     def adopt(self, *arguments: str) -> subprocess.CompletedProcess[str]:
         """Run the adopt script with exactly these arguments.

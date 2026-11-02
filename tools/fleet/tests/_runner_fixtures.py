@@ -16,10 +16,11 @@ from fleet.contracts.runner_base import DiskCeiling, HostBase
 from fleet.contracts.runner_slice import CiSlice
 from fleet.contracts.runners import FileAsset, HostRunnerSpec, RunnerInstall
 from fleet.core import _test_hooks
+from fleet.core.runner_install import install_root_for
 from tests.conftest import ok
 
 #: lavender's ``dispatch.budget.reserved_cores``: the logical cores its roster
-#: file reserves for its runners, which the provision holds the CI slice to
+#: file reserves for its runners, which the boot script holds the CI slice to
 #: (:mod:`fleet.core.runner_cpuset_render`, MCPs board task 349e25ee).
 RESERVED_CORES = 8
 
@@ -88,12 +89,12 @@ def a_base() -> HostBase:
     """A lavender-shaped host base.
 
     Returns:
-        The base: ffmpeg and golang-go as the packages a fleet worker lacks,
-        and a 150 GB ceiling over an 18 GB baseline, lavender's, which board
-        task 621902c3 holds its root under.
+        The base: ffmpeg and go as the packages a fleet worker lacks, and a
+        150 GB ceiling over an 18 GB baseline, lavender's, which board task
+        621902c3 holds its root under.
     """
     return HostBase(
-        apt_packages=["ffmpeg", "golang-go"],
+        nix_packages=["ffmpeg", "go"],
         disk=DiskCeiling(
             ceiling_gb=150,
             baseline_gb=18,
@@ -113,7 +114,7 @@ def base_json() -> dict[str, JSONValue]:
         decoder test is not a round trip through the code it is testing.
     """
     return {
-        "apt_packages": ["ffmpeg", "golang-go"],
+        "nix_packages": ["ffmpeg", "go"],
         "disk": {
             "ceiling_gb": 150,
             "baseline_gb": 18,
@@ -168,29 +169,31 @@ def all_declared(hosts: Sequence[HostRunnerSpec]) -> list[_test_hooks.CommandRes
     ]
 
 
-def quiet_rebuild_answers(
-    transcript: str, spec: HostRunnerSpec, *, repos: int
-) -> list[_test_hooks.CommandResult]:
-    """Every command a rebuild of an already-built host runs, in order.
+def register_answers(transcript: str, spec: HostRunnerSpec) -> list[_test_hooks.CommandResult]:
+    """Every command registering a freshly installed host runs, in order.
 
     Written out rather than generated from the code, because the sequence is
-    the claim: each stage sends its payload and runs it.
+    the claim: the probe names every install, each repository's token is
+    minted and written, each unit is restarted, the probe then names none,
+    and the audit closes.
 
     Args:
         transcript: What the closing audit prints.
-        spec: The rebuilt host, whose installs the audit's dropped-job row
-            reads.
-        repos: How many repositories the roster names, one token each.
+        spec: The host, none of whose installs holds a registration yet.
 
     Returns:
-        The replies: the base (send, run), one ``gh`` mint per repository,
-        the provision (send, run), the audit (send, run) and its dropped-job
-        reads (:func:`no_dropped_jobs`).
+        The replies: the probe (send, run), a ``gh`` mint and a root write
+        per repository, a restart per install, the probe again (send, run),
+        the audit (send, run) and its dropped-job reads
+        (:func:`no_dropped_jobs`).
     """
+    roots = "".join(f"{install_root_for(install)}\n" for install in spec["installs"])
+    repos = sorted({install["repo"] for install in spec["installs"]})
     return [
         ok(""),
-        ok("base ready: packages installed, docker reachable as gharunner\n"),
-        *(ok(f"TOKEN{index}\n") for index in range(repos)),
+        ok(roots),
+        *(answer for index in range(len(repos)) for answer in (ok(f"TOKEN{index}\n"), ok(""))),
+        *(ok("") for _ in spec["installs"]),
         ok(""),
         ok(""),
         ok(""),
@@ -242,5 +245,5 @@ __all__ = [
     "base_json",
     "ci_slice_json",
     "no_dropped_jobs",
-    "quiet_rebuild_answers",
+    "register_answers",
 ]

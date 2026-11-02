@@ -35,7 +35,6 @@ DROPPED_ASSET: Final = FileAsset(
     writable=False,
     reason="RustedWarfareBot provenance fingerprints digest the real licensed engine jar",
     manual=True,
-    provision_command=None,
 )
 
 

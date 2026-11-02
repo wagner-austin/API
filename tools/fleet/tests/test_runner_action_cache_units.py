@@ -1,24 +1,20 @@
 """The action archive cache's units, and how a runner unit comes to read it (board task ce2b92e0).
 
 The fill's service is held to the work trees it hands the script, every
-install's. The adopt script and each install's drop-in lines run under a
-real bash over a host laid out as files (tests/_cache_host.py says how). The
-fill itself runs in test_runner_action_cache, the report in
-test_runner_cache_report.
+install's. The adopt script runs under a real bash over a host laid out as
+files (tests/_cache_host.py says how). The fill itself runs in
+test_runner_action_cache, the report in test_runner_cache_report.
 """
 
 from __future__ import annotations
 
 import pathlib
-from collections.abc import Callable
 
 import pytest
 
-from fleet.contracts.runners import RunnerInstall
-from fleet.core import runner_action_cache, runner_cache_adopt, runner_render
-from fleet.core.runner_unit_files import render_unit_file_lines
+from fleet.core import runner_action_cache, runner_cache_adopt
 from tests._cache_host import FOURTH, OTHER, SECOND, SETTING, SETTLE, UNIT, Host
-from tests._runner_fixtures import RESERVED_CORES, a_host, an_install
+from tests._runner_fixtures import a_host, an_install
 
 
 def _restarted(unit: str) -> str:
@@ -67,49 +63,15 @@ class TestTheFillUnits:
         with pytest.raises(ValueError, match="workdir"):
             runner_action_cache.render_fill_service(a_host([install]))
 
-    def test_the_lines_install_the_script_both_units_and_the_cache_then_start_a_pass(
-        self,
-    ) -> None:
-        host = a_host([FOURTH])
-        lines = runner_action_cache.render_fill_lines(host)
-        assert lines == [
-            "cat > /usr/local/sbin/fleet-action-cache-fill <<'FILL_EOF'",
-            runner_action_cache.FILL_SCRIPT.rstrip("\n"),
-            "FILL_EOF",
-            "chmod +x /usr/local/sbin/fleet-action-cache-fill",
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-action-cache-fill.service",
-                runner_action_cache.render_fill_service(host),
-                announcement="fleet-action-cache-fill.service written",
-            ),
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-action-cache-fill.timer",
-                runner_action_cache.FILL_TIMER,
-                announcement="fleet-action-cache-fill.timer written",
-            ),
-            "install -d -m 0755 /var/cache/fleet-actions",
-            "systemctl enable --now fleet-action-cache-fill.timer",
-            "systemctl start --no-block fleet-action-cache-fill.service",
-        ]
+    def test_the_timer_fires_a_pass_every_quarter_hour(self) -> None:
         assert "OnUnitActiveSec=15min" in runner_action_cache.FILL_TIMER
 
 
 class TestTheAdoptUnits:
-    """The timer passes every unit, every minute, and is installed before any unit starts."""
+    """The timer passes every unit, every minute."""
 
     def test_the_service_names_every_unit_and_the_timer_fires_every_minute(self) -> None:
         host = a_host([FOURTH, SECOND])
-        lines = runner_cache_adopt.render_adopt_lines(host)
-        assert lines[:8] == [
-            "cat > /usr/local/sbin/fleet-action-cache-adopt <<'ADOPT_EOF'",
-            runner_cache_adopt.ADOPT_SCRIPT.rstrip("\n"),
-            "ADOPT_EOF",
-            "chmod +x /usr/local/sbin/fleet-action-cache-adopt",
-            "cat > /usr/local/sbin/fleet-action-cache-report <<'REPORT_EOF'",
-            runner_cache_adopt.REPORT_SCRIPT.rstrip("\n"),
-            "REPORT_EOF",
-            "chmod +x /usr/local/sbin/fleet-action-cache-report",
-        ]
         # The report runs after the adopt, over the same units, so the counts
         # it publishes follow any restart the adopt made.
         service = runner_cache_adopt.render_adopt_service(host)
@@ -117,76 +79,34 @@ class TestTheAdoptUnits:
             f"ExecStart=/usr/local/sbin/fleet-action-cache-adopt {SETTLE} {UNIT} {OTHER}",
             f"ExecStart=/usr/local/sbin/fleet-action-cache-report {UNIT} {OTHER}",
         ]
-        assert lines[8:] == [
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-action-cache-adopt.service",
-                service,
-                announcement="fleet-action-cache-adopt.service written",
-            ),
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-action-cache-adopt.timer",
-                runner_cache_adopt.ADOPT_TIMER,
-                announcement="fleet-action-cache-adopt.timer written",
-            ),
-            "systemctl enable --now fleet-action-cache-adopt.timer",
-        ]
         assert "OnUnitActiveSec=1min" in runner_cache_adopt.ADOPT_TIMER
 
-    def test_provision_installs_the_script_before_the_installs_that_call_it(self) -> None:
-        script = runner_render.render_provision(a_host([FOURTH]), RESERVED_CORES)[
-            "provision_script"
-        ]
-        installed = script.index(f"cat > {runner_cache_adopt.ADOPT_PATH} <<'ADOPT_EOF'")
-        called = script.index(f"\n{runner_cache_adopt.ADOPT_PATH} {SETTLE} {UNIT}\n")
-        assert installed < script.index("# --- runner installs ---") < called
+    def test_an_unscriptable_unit_is_refused(self) -> None:
+        with pytest.raises(ValueError, match="cannot be embedded in a rendered script verbatim"):
+            runner_cache_adopt.render_adopt_service(
+                a_host([{**an_install(), "service": "bad'unit.service"}])
+            )
 
 
-class TestProvisionGivesAUnitTheCache:
-    """The drop-in lands once, and the unit reads it after one restart while idle."""
+class TestTheTimerGivesAUnitTheCache:
+    """A unit whose drop-in names the cache reads it after one restart while idle."""
 
-    def test_an_idle_unit_is_given_the_drop_in_and_restarted_once(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        host = Host(tmp_path)
-        host.unit(UNIT, 100, loaded=False)
-        first = host.provision(FOURTH)
-        assert first.returncode == 0, first.stderr
-        assert first.stdout == f"action cache named for {UNIT}\n" + _restarted(UNIT)
-        # Idle at every one of SETTLE + 1 samples, a second apart.
-        assert host.sleeps() == SETTLE
-        drop_in = tmp_path / "units" / f"{UNIT}.d" / runner_action_cache.CACHE_DROP_IN_NAME
-        assert drop_in.read_bytes() == runner_action_cache.CACHE_DROP_IN.encode()
-        assert SETTING.encode() in host.environ(100)
-        second = host.provision(FOURTH)
-        assert second.returncode == 0, second.stderr
-        assert second.stdout == ""
-        assert host.calls() == [
-            "daemon-reload",
-            f"show -p MainPID --value {UNIT}",
-            f"show -p Environment --value {UNIT}",
-            f"show -p ControlGroup --value {UNIT}",
-            f"restart {UNIT}",
-            f"show -p MainPID --value {UNIT}",
-            f"show -p Environment --value {UNIT}",
-        ]
-
-    def test_a_unit_running_a_job_is_left_then_adopted_by_the_timer_once_idle(
+    def test_a_unit_running_a_job_is_left_then_adopted_once_idle(
         self, tmp_path: pathlib.Path
     ) -> None:
         # lavender, 2026-10-15: four provision runs found the four MCPs
         # WSL runners busy; the timer is what restarts each once idle.
         host = Host(tmp_path)
-        host.unit(UNIT, 100, loaded=False, busy=True)
-        provisioned = host.provision(FOURTH)
-        assert provisioned.returncode == 0, provisioned.stderr
-        assert provisioned.stdout == f"action cache named for {UNIT}\n" + _left_busy(UNIT)
-        assert f"restart {UNIT}" not in host.calls()
+        host.unit(UNIT, 100, busy=True)
         still_busy = host.timer(UNIT)
         assert still_busy.stdout == _left_busy(UNIT)
+        assert f"restart {UNIT}" not in host.calls()
         host.idle(UNIT, 100)
         adopted = host.timer(UNIT)
         assert adopted.returncode == 0, adopted.stderr
         assert adopted.stdout == _restarted(UNIT)
+        # Idle at every one of SETTLE + 1 samples, a second apart.
+        assert host.sleeps() == SETTLE
         assert SETTING.encode() in host.environ(100)
         assert host.timer(UNIT).stdout == ""
 
@@ -220,19 +140,6 @@ class TestProvisionGivesAUnitTheCache:
         assert ran.stdout == _left_busy(UNIT)
         assert f"restart {UNIT}" not in host.calls()
         assert host.sleeps() == 1
-
-    @pytest.mark.parametrize(
-        "render",
-        [
-            runner_cache_adopt.render_cache_drop_in_lines,
-            runner_cache_adopt.render_cache_adopt_now_lines,
-        ],
-    )
-    def test_an_unscriptable_unit_is_refused(
-        self, render: Callable[[RunnerInstall], list[str]]
-    ) -> None:
-        with pytest.raises(ValueError, match="cannot be embedded in a rendered script verbatim"):
-            render({**an_install(), "service": "bad'unit.service"})
 
 
 class TestTheAdoptScriptRestartsOnlyAnIdleConfiguredUnit:

@@ -17,15 +17,12 @@ from __future__ import annotations
 import pathlib
 import subprocess
 
-import pytest
 from typing_extensions import TypedDict
 
 from fleet.cli.runners import load_runner_spec
-from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import runner_reaper_render, runner_render
-from fleet.core.runner_unit_files import render_drop_in_lines, render_unit_file_lines
+from fleet.contracts.runners import HostRunnerSpec
+from fleet.core import runner_reaper_render
 from tests._host_bash import host_bash
-from tests._runner_fixtures import RESERVED_CORES, an_install
 
 #: The unit every case runs.
 UNIT = "actions.runner.wagner-austin-API.lavender.service"
@@ -432,17 +429,6 @@ class TestJobScopes:
         assert _killed(tmp_path) == []
 
 
-def _install() -> RunnerInstall:
-    """The install the render cases place.
-
-    Returns:
-        API's first install, whose unit is :data:`UNIT`.
-    """
-    install = an_install("wagner-austin/API")
-    assert install["service"] == UNIT
-    return install
-
-
 def _lavender() -> HostRunnerSpec:
     """The committed roster's lavender, the host the reaper runs on.
 
@@ -453,43 +439,10 @@ def _lavender() -> HostRunnerSpec:
     return roster["hosts"][0]
 
 
-class TestTheRender:
-    def test_the_drop_in_ends_the_whole_group_through_the_one_unit_writer(self) -> None:
+class TestTheUnits:
+    def test_the_drop_in_ends_the_whole_group(self) -> None:
         assert runner_reaper_render.KILL_DROP_IN == "[Service]\nKillMode=control-group\n"
-        assert runner_reaper_render.render_kill_mode_lines(_install()) == render_drop_in_lines(
-            _install(),
-            name="fleet-kill.conf",
-            body=runner_reaper_render.KILL_DROP_IN,
-            announcement=f"kill mode set for {UNIT}: a stop ends its whole cgroup",
-        )
-
-    def test_an_unscriptable_unit_name_is_refused(self) -> None:
-        install = _install()
-        install["service"] = "bad'unit.service"
-        with pytest.raises(ValueError, match="service"):
-            runner_reaper_render.render_kill_mode_lines(install)
-
-    def test_the_reaper_is_written_whole_its_units_when_they_differ_and_the_timer_started(
-        self,
-    ) -> None:
-        spec = _lavender()
-        assert runner_reaper_render.render_reaper_lines(spec) == [
-            "cat > /usr/local/sbin/fleet-runner-reaper <<'REAPER_EOF'",
-            runner_reaper_render.REAPER_SCRIPT.rstrip("\n"),
-            "REAPER_EOF",
-            "chmod +x /usr/local/sbin/fleet-runner-reaper",
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-runner-reaper.service",
-                runner_reaper_render.render_reaper_service(spec),
-                announcement="fleet-runner-reaper.service written",
-            ),
-            *render_unit_file_lines(
-                "/etc/systemd/system/fleet-runner-reaper.timer",
-                runner_reaper_render.REAPER_TIMER,
-                announcement="fleet-runner-reaper.timer written",
-            ),
-            "systemctl enable --now fleet-runner-reaper.timer",
-        ]
+        assert runner_reaper_render.KILL_DROP_IN_NAME == "fleet-kill.conf"
 
     def test_the_timer_runs_the_service_every_thirty_seconds(self) -> None:
         assert "OnUnitActiveSec=30s\n" in runner_reaper_render.REAPER_TIMER
@@ -507,16 +460,11 @@ class TestTheRender:
             "ExecStart=/usr/local/sbin/fleet-runner-reaper 2700\n"
         )
 
-    def test_the_provision_installs_the_reaper_before_any_runner(self) -> None:
-        spec = _lavender()
-        script = runner_render.render_provision(spec, RESERVED_CORES)["provision_script"]
-        assert script.index("enable --now fleet-runner-reaper.timer") < script.index(
-            "# --- runner installs ---"
+    def test_lavender_s_service_passes_its_roster_bound(self) -> None:
+        """360 minutes, the roster's job timeout for lavender."""
+        assert "ExecStart=/usr/local/sbin/fleet-runner-reaper 21600\n" in (
+            runner_reaper_render.render_reaper_service(_lavender())
         )
-        # lavender's roster bound, 360 minutes.
-        assert "ExecStart=/usr/local/sbin/fleet-runner-reaper 21600\n" in script
-        # Twice per runner: the comparison and the write.
-        assert script.count("fleet-kill.conf") == 2 * len(spec["installs"])
 
 
 class TestTheAuditMode:

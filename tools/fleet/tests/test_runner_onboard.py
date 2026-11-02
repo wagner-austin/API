@@ -1,9 +1,9 @@
-"""Onboarding, end to end against fakes at the command seam.
+"""Onboarding: the plan the fleet convention derives, and the roster entry it grows.
 
-Every provisioning byte the onboarder would ship is captured through the
-same ``_test_hooks.run`` seam production uses, so these tests assert the
-actual payload -- the whole host's provision with the new install in it and
-the new repository's token at its head -- not a summary of it.
+Onboarding touches no network (MCPs board task 9aba868d): the host's NixOS
+generation lays the new runner once the roster is rendered and switched to,
+and ``fleet-runners --register`` registers it, so these hold the plan and
+the mutation alone.
 """
 
 from __future__ import annotations
@@ -12,9 +12,8 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import HostRunnerSpec, RunnerInstall
-from fleet.core import _test_hooks, remote, runner_audit, runner_onboard, runner_render
-from tests._runner_fixtures import RESERVED_CORES, a_host, an_install, no_dropped_jobs
-from tests.conftest import FakeRun, failed, ok
+from fleet.core import runner_onboard
+from tests._runner_fixtures import a_host, an_install
 
 #: The install onboarding tree-bot onto lavender creates.
 _TREE_BOT = RunnerInstall(
@@ -33,21 +32,6 @@ def _host() -> HostRunnerSpec:
         The spec.
     """
     return a_host([an_install("wagner-austin/API")])
-
-
-def _clean_transcript(spec: HostRunnerSpec) -> str:
-    """One OK line per expected check for the given spec state.
-
-    Args:
-        spec: The host, in whatever install state the test has built.
-
-    Returns:
-        The transcript.
-    """
-    return (
-        "\n".join(f"CHECK {check['check_id']} OK" for check in runner_audit.expected_checks(spec))
-        + "\n"
-    )
 
 
 class TestPlan:
@@ -84,55 +68,17 @@ class TestPlan:
 
 
 class TestOnboard:
-    """The whole act, the payload captured byte for byte."""
+    """The act: the install appended to the host's entry, or nothing changed."""
 
-    def test_the_host_s_provision_runs_with_the_new_install_and_the_audit_covers_it(
-        self,
-    ) -> None:
+    def test_the_install_is_appended_to_the_host_s_entry(self) -> None:
         spec = _host()
-        grown = a_host([an_install("wagner-austin/API"), _TREE_BOT])
-        runner = FakeRun(
-            [
-                ok("TOKENABC123\n"),  # gh mint
-                ok(""),  # send the provision
-                ok("done\n"),  # run it
-                ok(""),  # audit: send
-                ok(_clean_transcript(grown)),  # audit: run
-                *no_dropped_jobs(grown),  # audit: the dropped-job row's reads
-            ]
-        )
-        _test_hooks.run = runner
-        plan, findings = runner_onboard.onboard(spec, "wagner-austin/tree-bot", RESERVED_CORES)
+        plan = runner_onboard.onboard(spec, "wagner-austin/tree-bot")
         assert plan["install"] == _TREE_BOT
-        assert spec == grown
-        assert [finding["ok"] for finding in findings] == [True] * (
-            len(runner_audit.expected_checks(grown)) + 1
-        )
-        assert runner.calls[0][4] == (
-            "repos/wagner-austin/tree-bot/actions/runners/registration-token"
-        )
-        path = "/home/corvis/fleet/runner-payloads/fleet-onboard-tree-bot.sh"
-        assert runner.stdin[1] == runner_render.render_provision_script(
-            grown, {"wagner-austin/tree-bot": "TOKENABC123"}, RESERVED_CORES
-        ).encode("utf-8")
-        assert tuple(runner.calls[2][-4:]) == (*remote.ROOT_BASH, path)
-        assert runner.timeouts[2] == runner_render.STAGE_TIMEOUT_SECONDS
+        assert spec == a_host([an_install("wagner-austin/API"), _TREE_BOT])
 
-    def test_a_provision_that_fails_raises_with_its_words(self) -> None:
-        _test_hooks.run = FakeRun(
-            [ok("TOK1\n"), ok(""), failed(1, "Http response code: NotFound from 'POST'")]
-        )
+    def test_a_refused_onboard_leaves_the_entry_as_it_was(self) -> None:
+        spec = _host()
         with pytest.raises(AppError) as fault:
-            runner_onboard.onboard(_host(), "wagner-austin/x", RESERVED_CORES)
-        assert fault.value.code is FleetErrorCode.DISPATCH_FAILED
-        assert "Http response code: NotFound" in fault.value.message
-
-    def test_an_unreachable_audit_names_the_staged_state(self) -> None:
-        _test_hooks.run = FakeRun(
-            [ok("TOK1\n"), ok(""), ok("done\n"), failed(255, "No route to host")]
-        )
-        with pytest.raises(AppError) as fault:
-            runner_onboard.onboard(_host(), "wagner-austin/x", RESERVED_CORES)
-        assert fault.value.code is FleetErrorCode.NODE_UNREACHABLE
-        assert fault.value.message.startswith("post-onboard audit could not reach lavender: ")
-        assert "its roster entry is staged" in fault.value.message
+            runner_onboard.onboard(spec, "wagner-austin/API")
+        assert fault.value.code is FleetErrorCode.RUNNER_ALREADY_ONBOARDED
+        assert spec == _host()

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import pathlib
 import sys
+import time
 
 import pytest
 from platform_core.config import config_test_hooks
@@ -251,6 +252,13 @@ class TestDefaultHooks:
         assert seconds == int(seconds)
         assert seconds > 1_756_000_000
         assert _test_hooks._default_now() >= seconds
+
+    def test_sleep_waits_on_the_real_clock(self) -> None:
+        """One real second, measured on the monotonic clock rather than the
+        wall clock a host may step."""
+        started = time.monotonic()
+        _test_hooks._default_sleep(1)
+        assert time.monotonic() - started >= 1
 
     def test_the_real_environment_reader_normalises_blank_to_unset(self) -> None:
         """It delegates to the monorepo's one permitted environment reader.
@@ -511,6 +519,38 @@ class TestRemote:
             remote.send_script("pendragon", "/s/probe.sh", "x")
 
         assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
+
+    def test_a_root_file_is_streamed_into_install_as_root_s_alone(self) -> None:
+        """A registration token, so never an argument and never readable by
+        anyone but root: install writes it at 0600, its parents made."""
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+
+        remote.send_root_file("lavender", "/var/lib/tokens/RUNNER_TOKEN_API", "TOK\n")
+
+        assert runner.stdin[0] == b"TOK\n"
+        assert runner.calls[0][-1] == (
+            "sudo -n install -D -m 0600 /dev/stdin /var/lib/tokens/RUNNER_TOKEN_API"
+        )
+
+    def test_a_root_file_whose_write_fails_says_which_path(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "sudo: a password is required")])
+
+        with pytest.raises(AppError) as excinfo:
+            remote.send_root_file("lavender", "/var/lib/tokens/T", "x")
+
+        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
+        assert "writing /var/lib/tokens/T as root" in excinfo.value.message
+        assert "a password is required" in excinfo.value.message
+
+    def test_a_root_file_path_a_shell_would_reinterpret_is_refused_before_any_call(self) -> None:
+        runner = FakeRun([])
+        _test_hooks.run = runner
+
+        with pytest.raises(ValueError, match="root file path '/var/lib/\\$x' contains '\\$'"):
+            remote.send_root_file("lavender", "/var/lib/$x", "x")
+
+        assert runner.calls == []
 
     def test_a_write_that_fails_is_a_dispatch_failure(self) -> None:
         _test_hooks.run = FakeRun([failed(1, "cat: /s/probe.sh: Permission denied")])
