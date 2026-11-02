@@ -22,8 +22,10 @@ def run_bounded(
 ) -> int:
     """Execute with a wall deadline and a kernel limit on every file the child writes.
 
-    Standard input and output are closed; diagnostics stay on this process's
-    standard error, which the native launcher keeps private to the attempt.
+    Standard input and output are closed. Diagnostics go to an exclusive
+    mode-0600 file inside the caller's private working directory: database
+    errors can quote SQL containing licensed identifiers. They never reach
+    the scheduler's standard error stream. The caller owns scratch cleanup.
 
     Args:
         command: Exact argument vector, including the executable.
@@ -37,20 +39,25 @@ def run_bounded(
 
     Raises:
         OSError: The process cannot be started.
+        FileExistsError: A diagnostic file already exists; it is not replaced.
         TimeoutExpired: The deadline passed; the child has been killed.
     """
 
-    completed = subprocess.run(
-        command,
-        cwd=directory,
-        stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        timeout=seconds,
-        preexec_fn=partial(
-            resource.setrlimit, resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes)
-        ),
-        check=False,
-    )
+    diagnostics = directory / "client-stderr.txt"
+    with diagnostics.open("xb") as stream:
+        diagnostics.chmod(0o600)
+        completed = subprocess.run(
+            command,
+            cwd=directory,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=stream,
+            timeout=seconds,
+            preexec_fn=partial(
+                resource.setrlimit, resource.RLIMIT_FSIZE, (max_file_bytes, max_file_bytes)
+            ),
+            check=False,
+        )
     return completed.returncode
 
 

@@ -130,7 +130,7 @@ def _prepare(
         directory = root / scope.partition
         directory.mkdir(mode=0o700)
         (directory / "protocol.json").write_bytes(protocol_bytes)
-        for name, sql in crsp_relation_sql(protocol, scope, source, rows).items():
+        for name, sql in crsp_relation_sql(protocol, scope, source, rows, securities=None).items():
             (directory / (name + ".sql")).write_text(sql, encoding="utf-8")
 
 
@@ -226,7 +226,8 @@ def extract_crsp(
     with TemporaryDirectory(prefix="research-plaintext-", dir=scratch) as temporary:
         root = Path(temporary)
         require_private_directory(root)
-        (root / "extract.sql").write_text(crsp_driver_sql(limits["seconds"]), encoding="utf-8")
+        driver = crsp_driver_sql(limits["seconds"], partitions=tuple(s.partition for s in scopes))
+        (root / "extract.sql").write_text(driver, encoding="utf-8")
         _prepare(root, protocol_bytes, protocol, scopes, relations, limits["max_rows"])
         code = hooks.bounded_runner(
             PSQL, root, seconds=limits["seconds"], max_file_bytes=limits["max_relation_bytes"]

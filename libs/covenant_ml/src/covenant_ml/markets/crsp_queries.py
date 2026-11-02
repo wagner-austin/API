@@ -121,7 +121,12 @@ def _codes(values: tuple[int, ...]) -> str:
 
 
 def crsp_relation_sql(
-    protocol: CrspProtocol, scope: CrspScope, source: CrspSource, max_rows: int
+    protocol: CrspProtocol,
+    scope: CrspScope,
+    source: CrspSource,
+    max_rows: int,
+    *,
+    securities: tuple[int, ...] | None,
 ) -> dict[str, str]:
     """Render one partition's four COPY statements in protocol column order.
 
@@ -137,15 +142,28 @@ def crsp_relation_sql(
         scope: Partition bounds from ``crsp_scopes``.
         source: Vendor library or synthetic definitions.
         max_rows: Positive per-relation row limit.
+        securities: Explicit sorted, unique positive identifiers for a diagnostic
+            cohort, or None for the complete eligible universe. A cohort is
+            permitted only in the train-validation partition.
 
     Returns:
         Exact SQL bytes to save and execute, keyed by relation role.
 
     Raises:
-        ValueError: CRSP-010 for a nonpositive row limit.
+        ValueError: CRSP-010 for a nonpositive row limit, malformed cohort or a
+            cohort requesting final observations.
     """
     if max_rows < 1:
         raise ValueError("[CRSP-010] the row limit must be positive")
+    if securities is not None:
+        if scope.partition != "train-validation":
+            raise ValueError("[CRSP-010] diagnostic cohorts cannot query final observations")
+        if (
+            not securities
+            or any(type(value) is not int or value < 1 for value in securities)
+            or tuple(sorted(set(securities))) != securities
+        ):
+            raise ValueError("[CRSP-010] the cohort must contain sorted unique positive integers")
 
     def copy(select: str) -> str:
         """Wrap one bounded query as CSV with its header on standard output."""
@@ -160,6 +178,8 @@ def crsp_relation_sql(
         f" AND exchcd IN ({_codes(protocol['exchange_codes'])})"
         f" AND namedt <= {end} AND nameendt >= DATE '{scope.universe_start}'"
     )
+    if securities is not None:
+        universe += f" AND permno IN ({_codes(securities)})"
     limit = f" LIMIT {max_rows + 1}"
     membership = ", ".join(
         f"LEAST(nameendt, {end}) AS nameendt" if column == "nameendt" else column
@@ -192,23 +212,28 @@ def crsp_relation_sql(
     }
 
 
-def crsp_driver_sql(statement_seconds: int) -> str:
+def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> str:
     """Render the one-session script running every partition in one snapshot.
 
-    All eight COPY files and two snapshot readings share one
+    All requested COPY files and two snapshot readings share one
     ``REPEATABLE READ READ ONLY`` transaction.
 
     Args:
         statement_seconds: Positive per-statement server timeout.
+        partitions: Train-validation alone for a diagnostic, or train-validation
+            followed by final for the complete study extraction.
 
     Returns:
         Exact psql script bytes, using only paths relative to its directory.
 
     Raises:
-        ValueError: CRSP-010 for a nonpositive statement timeout.
+        ValueError: CRSP-010 for a nonpositive statement timeout or an invalid
+            partition sequence; final-only and repeated partitions are refused.
     """
     if statement_seconds < 1:
         raise ValueError("[CRSP-010] the statement timeout must be positive")
+    if partitions not in (("train-validation",), ("train-validation", "final")):
+        raise ValueError("[CRSP-010] invalid extraction partition sequence")
     lines = [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         f"SET LOCAL statement_timeout = '{statement_seconds}s';",
@@ -217,7 +242,7 @@ def crsp_driver_sql(statement_seconds: int) -> str:
         "\\o snapshot-first.csv",
         "COPY (SELECT pg_current_snapshot()::text, now()) TO STDOUT WITH (FORMAT CSV);",
     ]
-    for partition in ("train-validation", "final"):
+    for partition in partitions:
         for relation in ("membership", "returns", "calendar", "delists"):
             lines += [f"\\o {partition}/{relation}.csv", f"\\i {partition}/{relation}.sql"]
     lines += [
