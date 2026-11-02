@@ -346,13 +346,32 @@ shortlist (`<output>.accessible.csv`) and a receipt with both job ids, the
 query, validation and catalog digests and every status count are saved
 locally. No dataset rows are read.
 
-Both commands post their counts, job ids and catalog digest on the board task
+What the readable OptionMetrics volatility surfaces cover is measured by a
+third command, as aggregates only:
+
+```bash
+python -m hpc3.cli.wrds_coverage --host wrds \
+  --remote-dir /home/uci/awagner14/wrds-setup/coverage-UNIQUE \
+  --output /existing/local/directory/option-coverage.csv \
+  --report-task <full board task id>
+```
+
+It runs one Grid Engine job under the same `psql` flags and login
+environment. In one read-only transaction it writes one CSV line per surface
+the 2026-10-28 inventory found readable (`optionmsamp_us.vsurfd2014`,
+`omtrial.vsurfd2014`, `omtrial.volatility_surface_2013`): row count, distinct
+securities and first and last date, overall and within the one-year
+at-the-money put point (`days = 365 AND delta = -50 AND cp_flag = 'P'`). The
+CSV and a receipt with the job id, query and output digests and every row are
+saved locally. Only counts and the two bounding dates leave WRDS.
+
+All three commands post their counts, job ids and output digest on the board task
 named by `--report-task`, under the service identity
 `load-report-<first eight characters of the task id>`, and fail if the board
 refuses the post. A malformed task id is refused before any job is submitted.
 
 A readable path or an accessible relation is not permission to redistribute
-it. Data extracts are chosen after inventory; neither command downloads data or registers
+it. Data extracts are chosen after inventory; none of these commands downloads data or registers
 training datasets automatically. Existing `hpc3-stage` handles manifest-backed
 HPC3 transfers, while `libs/covenant_ml` owns Covenant Radar's dataset loaders.
 `libs/platform_kaggle` discovers competitions; it is not a WRDS connector.
