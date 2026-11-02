@@ -61,9 +61,10 @@ Original bundles, receipt and failed-study journal remain historical.[^measured]
 This is a metadata transformation, not a fresh extraction, installed study
 runtime or successful baseline. Invocation used the existing interpreter with
 explicit checked-source imports; it did not replace that installed controller.
-The revised validation bundle still needs HPC3 staging and the current
-controller/image needs installation and queue rehearsal. Final ciphertext
-remains separate and unreleased. See [[wrds-baseline-readiness]].[^measured]
+At that measurement, validation staging and installation and queue rehearsal
+of the current controller/image were pending.
+Subsequent staging evidence is recorded in [[wrds-licensed-data-evidence]].
+Final ciphertext remains separate and unreleased. See [[wrds-baseline-readiness]].[^measured]
 
 [^revision]: `libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py`, `_inputs`, `revise_crsp_protocol` and `verify_crsp_revision`; current protocol validation, original manifest reconstruction, receipt publication and ciphertext comparison.
 [^storage]: `libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py`, `revise_encrypted_bundle`; exclusive destination, shared encryption, copied-byte verification and final manifest publication.

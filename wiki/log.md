@@ -533,3 +533,7 @@ Notes: Replaced the 95,523-byte readiness diary with a short current-status page
 Pages written: wrds-protocol-revision.
 Pages updated: wrds-baseline-readiness, wrds-licensed-data-evidence, wrds-baseline-20261101, crsp-monthly-data-contract, libs hub and index.
 Notes: Compared new revision claims and each identity with both real service reports, checked publication/verification against the shared implementation, and kept original extraction/study evidence historical. Reverified the unchanged source-reader claims before repinning crsp_extract after its manifest constructor was lifted for reuse. No observation decryption, runtime installation or successful baseline is inferred. The added page keeps transformation evidence out of the readiness summary. Board task 9a37c9a5-b981-4bf7-a4aa-5234b4ddcc96.
+
+## [2026-11-01] evidence audit | Version-2 validation staging
+Pages updated: wrds-licensed-data-evidence, wrds-baseline-readiness, wrds-protocol-revision.
+Notes: Compared new staging claims with the controller, transfer and separate complete-tree service reports. Recorded eleven files plus certificate, unchanged pinned identities, 1,789,968,348 bundle bytes and both mode-0700 directories; marked staging complete while retaining pending runtime, cleanup and study work. Historical metadata-revision evidence remains scoped to its observation time. Board task 1fe61b29-b95e-42e6-b389-76a81e274c84.

@@ -8,11 +8,13 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json"
   - "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
+  - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/provenance.json": "f69fefdc21501823201906b30f64122f04c4a931"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json": "e65e100b5be0f5575f096653d0e4de61c6f9fcc4"
   "tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json": "cb08d7053e4363b23ce2740d54bb1823bc4801fb"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
+  "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json": "1100c7de989b5f9fb98273fd26e16477db17637a"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
 fact_checked: 2026-11-01
@@ -22,10 +24,9 @@ confidence: medium
 # WRDS licensed CRSP extraction and encrypted staging
 
 The frozen four-relation dataset has been extracted, encrypted and collected.
-Its original version-1 train/validation bundle has been staged to HPC3.
-[[wrds-protocol-revision]] records the separately verified version-2 successors.
-Extraction completeness
-and byte identity do not guarantee that every eligible security has an
+Its original and revised version-2 validation bundles have separate verified
+HPC3 destinations; [[wrds-protocol-revision]] records their metadata lineage.[^v2]
+Extraction completeness and byte identity do not guarantee that every eligible security has an
 executable holding path; [[wrds-baseline-20261101]] records that distinction.[^collection][^staging][^stopped]
 
 ## Extraction identity
@@ -58,6 +59,14 @@ The staging receipt binds each filename, byte count and SHA-256 to the
 extraction identities. SQL, manifests and data travel encrypted; keys are
 separate from image and bundle.[^staging]
 
+The revised validation bundle is staged separately at
+`/data/homezvol1/wagnera3/research-data/crsp-protocol-v2-1fe61b29/train-validation`.
+The existing controller was re-inspected before transfer. A separate complete
+readback verified all eleven files plus certificate, no extra entries, and
+mode-0700 root and partition directories. The 1,789,968,348 bundle bytes contain
+no private keys or final ciphertext; this is staging, not evaluator installation
+or a study result.[^v2]
+
 ## Limits and related contracts
 
 The extraction receipt reports plaintext removal, and a later same-node
@@ -70,3 +79,4 @@ availability assumptions remain in [[crsp-monthly-study-design]].[^collection]
 [^staging]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/staging.json`, staging manifest, completion receipt, file identities and `audit_query`.
 [^reconciliation]: `tools/hpc3/artifacts/wrds-licensed-collection-20261031/reconciliation.json`, controller measurement, live audit query and negative probes.
 [^stopped]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `diagnostic` and `study_action`.
+[^v2]: `tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json`, `controller`, `staging`, `readback.inventory`, `stage_bytes` and `service_reports`; three program-written readings distinguish installed-controller verification, transport and complete remote inspection.
