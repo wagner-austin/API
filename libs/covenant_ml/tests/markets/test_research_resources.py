@@ -6,7 +6,12 @@ from pathlib import Path
 import pytest
 from platform_core.json_utils import JSONValue, require_dict
 
-from covenant_ml.markets.research_cluster import FinalExecution, prepare_bundle
+from covenant_ml.markets.research_cluster import (
+    FinalExecution,
+    decode_research_cluster,
+    encode_research_cluster,
+    prepare_bundle,
+)
 from covenant_ml.markets.research_execution import submit_attempt
 from covenant_ml.markets.research_journal import research_policy_digest
 from covenant_ml.markets.research_records import (
@@ -19,6 +24,46 @@ from covenant_ml.markets.validation import read_document
 
 from ._research_execution_fixtures import setup
 from ._research_fixtures import policy, proposal
+
+
+@pytest.mark.parametrize("binds", [[], ["/pub"], ["/home/evaluator", "/project/data"]])
+@pytest.mark.parametrize("final", [False, True])
+def test_recipe_preserves_only_operator_declared_mounts(
+    tmp_path: Path, binds: list[str], final: bool
+) -> None:
+    _path, trial, cluster, directory = setup(tmp_path)
+    document = encode_research_cluster(cluster)
+    document["binds"] = list(binds)
+    configured = decode_research_cluster(document)
+    execution = FinalExecution(
+        manifest=trial["manifest"],
+        manifest_digest=trial["policy"]["dataset_digest"],
+        grant_directory="/private/final-grant",
+    )
+    prepare_bundle(directory, configured, trial, final=execution if final else None)
+    assert require_dict(read_document(directory / "run.json"), "image") == {
+        "path": cluster["image"],
+        "sha256": trial["policy"]["image_digest"],
+        "binds": binds,
+    }
+    assert decode_research_cluster(encode_research_cluster(configured)) == configured
+
+
+@pytest.mark.parametrize("binds", [["relative"], ["/pub/../escape"]])
+def test_mount_paths_cannot_be_relative_or_traversing(tmp_path: Path, binds: list[str]) -> None:
+    _path, _trial, cluster, _directory = setup(tmp_path)
+    document = encode_research_cluster(cluster)
+    document["binds"] = list(binds)
+    with pytest.raises(ValueError, match="RESEARCH_CLUSTER_CONFIG"):
+        decode_research_cluster(document)
+
+
+def test_omitted_mount_configuration_is_not_defaulted(tmp_path: Path) -> None:
+    _path, _trial, cluster, _directory = setup(tmp_path)
+    document = encode_research_cluster(cluster)
+    del document["binds"]
+    with pytest.raises(ValueError, match="RESEARCH_CLUSTER_CONFIG"):
+        decode_research_cluster(document)
 
 
 @pytest.mark.parametrize("field", ["cpus", "mem_gb"])

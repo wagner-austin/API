@@ -29,6 +29,7 @@ def setup(root: Path) -> tuple[Path, ResearchTrial, ResearchCluster, Path]:
             "root": "/pub/research",
             "entrypoint": "/pub/entrypoint",
             "image": "/pub/runtime.sif",
+            "binds": ["/pub"],
             "access": "/home/evaluator/access.json",
             "access_digest": "f" * 64,
             "report_task": "6d2d086c-5242-482b-ac81-8a61dd8e354d",
