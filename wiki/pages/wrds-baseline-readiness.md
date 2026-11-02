@@ -4,6 +4,7 @@ tags: [wrds, research, evaluation, provenance]
 hubs: [libs]
 related: ["[[wrds-equity-research-protocol]]"]
 source_paths:
+  - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json"
   - "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json"
@@ -12,6 +13,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/return-diagnostic.json"
   - "tools/hpc3/artifacts/wrds-v2-staging-20261102/evidence.json"
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json": "ada422b51719ecf7356cfc273f49015fe77aa783"
   "tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json": "7fc3888de5afbfcd89731034f8c401f855de4d28"
   "tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json": "a80e656edb6325abd242bf2f77ddbfca17938434"
   "tools/hpc3/artifacts/wrds-protocol-v2-runtime-20261102/evidence.json": "3ad95ee9f98aa38ccd89f44a24a1e0c8a893a9d9"
@@ -27,10 +29,16 @@ confidence: medium
 
 # WRDS substantive baseline readiness
 
-**The substantive study is stopped, not complete.** Its first licensed attempt
-failed before fitting; the remaining fourteen attempts were not submitted,
-no candidate was selected and the final holdout remains unreleased.
-See [[wrds-baseline-20261101]] for the cause and correction boundary.[^stop]
+**The corrected study has started; no completed licensed result is recorded yet.**
+After preparation audit passed, the shared queue launched version-2 job
+`58740674` on HPC3. Its launch measurement records 8 CPUs, 128 GiB, no GPU
+and sixteen successful input checksums. The other fourteen admitted requests
+remain unsubmitted until this first result is verified. No candidate has been
+selected and the final holdout remains unreleased.[^launch]
+
+The earlier version-1 attempt failed before fitting. Its journal remains
+historical; see [[wrds-baseline-20261101]] for that failure and correction
+boundary, and [[wrds-baseline-v2-freeze]] for the new fixed study.[^stop]
 
 ## Readiness by responsibility
 
@@ -59,11 +67,12 @@ costs. These version-2 rules differ from the stopped study's installed inputs.[^
 - [x] Rehearse proposal → admission → queue → native job → verified result
    with the installed version-2 runtime and pre-entry delisting fixture.[^v2]
 - [x] Freeze amended resource and candidate rules in [[wrds-baseline-v2-freeze]];
-   fifteen requests admitted and native preflight passed; task audit pending.
+   fifteen requests admitted, native preflight and independent task audit passed.[^launch]
 - [x] Observe the failed allocation's configured paths on its original node;
    service verification and independent task audit passed.[^cleanup]
 - [ ] Run the new fixed candidate/seed study. Select only after all required
-   validation attempts complete; final access stays a separate controlled step.
+   validation attempts complete; first attempt running through queue `3d3aad6e`.
+   Final access stays a separate controlled step.[^launch]
 
 The original failed journal remains immutable. Current diagnosis and its
 limits are recorded in [[wrds-baseline-20261101]]; machine registration is not
@@ -79,3 +88,5 @@ evidence that an idle AI session will be resumed by a queue event.[^stop][^diagn
 [^v2]: `tools/hpc3/artifacts/wrds-protocol-v2-rehearsal-20261102/evidence.json`, `scope`, `fixture`, `queue`, `native_accounting`, `native_input_verification`, `result`, `pre_entry_case`, `service_reports` and `remaining`.
 
 [^cleanup]: `tools/hpc3/artifacts/wrds-failed-scratch-20261102/evidence.json`, `subject`, `observer`, `results`, `verified_measurement`, `service_reports` and `limits`; original expanded scratch path was not logged. Independent board audit `b239dc19-84e4-49c1-b429-7002656cf0bd` returned VERIFIED at 2026-11-02T01:31:49Z.
+
+[^launch]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/launch.json`, `freeze_audit`, `queue`, `native`, `native_service_post`, `attempts`, `execution_cluster_change` and `submission_rule`; pinned sibling documents retain queue transitions, native service inspection, allocation readout and checksum receipts. This is launch evidence, not a completed evaluation.
