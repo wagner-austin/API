@@ -13,7 +13,7 @@ source_paths:
 source_git_blobs:
   "src/hpc3/core/image_exec.py": "5d6a6241b29c5974f02e56efb12ca07eafd96463"
   "src/hpc3/core/sbatch.py": "bf884f896e0eaaeafd595a034030368467f04026"
-  "src/hpc3/contracts/image.py": "382e3133643bb10c191337c0e9eb507d170002d6"
+  "src/hpc3/contracts/image.py": "f17e30ab2167882931acf763a17b94da0011256d"
   "tests/test_image_mount_shell.py": "345bd899563c0f7be1c833e3ecb1cbc24e1aee91"
   "artifacts/wrds-declared-mounts-20261102/evidence.json": "85aa658a3d949e054048fa129d41a541d16f3281"
   "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
@@ -39,9 +39,11 @@ directory. Existing frozen requests and installed controllers remain historical:
 the native probes used a pinned source overlay over the existing frozen
 interpreter, not a fleet-wide replacement.[^deployment]
 
-The current path validator does not reject commas or colons, although `--bind`
-uses those characters as separators. These probes used neither character;
-task `5d16022f` tracks validation of that additional path-grammar gap.[^owner]
+The image codec rejects commas and colons in bind directory names before
+remote execution: `--bind` interprets them as separators even inside a
+shell-quoted argument. Spaces and shell literals remain supported. The native
+probes below used ordinary paths; task `5d16022f` tracks verification of the
+additional refusal rule.[^owner]
 
 ## Why the dependency mattered
 
