@@ -332,9 +332,7 @@ def test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark(
     assert tuple(int(revised_labels.flat[index]) for index in range(6)) == (1, 0, 0, 0, 0, 0)
 
     documents["returns"] = [
-        row
-        for row in documents["returns"]
-        if (row["permno"], row["dlycaldt"]) != (8, "2017-02-02")
+        row for row in documents["returns"] if (row["permno"], row["dlycaldt"]) != (8, "2017-02-02")
     ]
     missing = tmp_path / "missing"
     missing.mkdir()
