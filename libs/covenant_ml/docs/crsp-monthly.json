@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "library": "crsp_a_stock",
   "membership": "dsenames",
   "returns": "stkdlysecuritydata",
@@ -22,6 +22,7 @@
   "execution_flag": "TR",
   "entry_rule": "confirmed-terminal-entry-cash",
   "cost_rule": "actual-traded-notional",
+  "held_return_rule": "exact-missing-price-spans",
   "terminal_rule": "dated-value-next-rebalance",
   "min_price": 5.0,
   "min_history": 252,

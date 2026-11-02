@@ -836,12 +836,13 @@ database.
 
 ## Frozen monthly CRSP contract
 
-`docs/crsp-monthly.json` is the version-2 machine-readable design. Decode it through
+`docs/crsp-monthly.json` is the version-3 machine-readable design. Decode it through
 `markets.crsp_protocol.decode_crsp_protocol`, then bind its exact digest in the
 existing research policy. The codec rejects unknown fields and unsupported
 source/valuation conventions; proposals cannot replace the evaluator's policy.
 
-Version 2 declares `confirmed-terminal-entry-cash` and `actual-traded-notional`.
+Version 3 retains `confirmed-terminal-entry-cash` and `actual-traded-notional`,
+and declares `exact-missing-price-spans` for held returns.
 The stopped November 1 study used version 1, preserved as historical evidence at
 `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json` from the repo root.
 Old admitted requests and encrypted manifests cannot run under the new codec.
@@ -960,15 +961,17 @@ selection. Confirmed rejected purchases keep their slots in cash. Solve
 `slots * x + rate * actual_turnover(x) = investable` for the post-cost
 allocation `x`; turnover uses actual buys and sells, not pre-fee targets.
 The piecewise-linear solver uses prior position values as breakpoints.
-Positions compound their own ordinary daily returns
-over `(entry, exit]`. A position delisted inside the window stops at its
+Positions compound evidenced returns over `(entry, exit]`. Explicit MP/MR gaps
+must close with one NA/P1-P9 return spanning the exact independent-calendar
+sessions from the previous priced date; intermediate closes receive no value.
+A position delisted inside the window stops at its
 delisting date and becomes a receivable worth its `stkdelists` multiplier,
 applied once; the daily delisting-flagged copy is never compounded. The last
 window also pays the cost of liquidating its positions at its exit close. Each
 period retains its selection, rejected purchases, cash weight, drifted end
 weights, receivables, turnover, cost and net return. Cash and held weights use
-the pre-liquidation end value; terminal receivables remain separate. A missing
-or non-ordinary held return, an unverifiable fill, an unresolved owned terminal
+the pre-liquidation end value; terminal receivables remain separate. An absent
+row, unresolved return span, unverifiable fill, unresolved owned terminal
 event or a terminal value dated after the exit
 refuses the whole evaluation; no partial result is returned.
 
