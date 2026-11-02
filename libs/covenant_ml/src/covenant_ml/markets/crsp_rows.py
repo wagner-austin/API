@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import Iterable
+from collections.abc import Sequence
 from datetime import datetime
 from math import isfinite
 
@@ -13,7 +13,7 @@ from platform_core.json_utils import JSONObject, JSONValue, require_int, require
 from .validation import require_day
 
 
-def encode_crsp_rows(rows: Iterable[JSONObject], columns: tuple[str, ...]) -> bytes:
+def encode_crsp_rows(rows: Sequence[JSONObject], columns: tuple[str, ...]) -> bytes:
     """Encode decoded rows in frozen column order, retaining nulls as empty cells.
 
     This is also the synthetic database's CSV writer. It does not claim a new
