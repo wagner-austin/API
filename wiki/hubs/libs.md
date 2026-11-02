@@ -50,7 +50,7 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 
 [WRDS licensed data evidence](../pages/wrds-licensed-data-evidence.md) -- extraction vintage, encrypted partitions and verified HPC3 staging
 
-[Encrypted CRSP protocol revision](../pages/wrds-protocol-revision.md) -- verified version-2 metadata lineage with unchanged observation ciphertext
+[Encrypted CRSP protocol revision](../pages/wrds-protocol-revision.md) -- verified version-3 metadata lineage with unchanged observation ciphertext
 
 [WRDS cleanup evidence](../pages/wrds-cleanup-evidence.md) -- allocation-specific normal-exit and forced-kill observations and remaining limits
 
@@ -73,3 +73,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [WRDS final scoring](../pages/wrds-final-scoring.md) -- evaluator selection, sealed admissions and consumed one-shot final release
 
 [Evaluation numerical contracts](../pages/evaluation-numerical-contracts.md) -- paired comparisons, tie-aware scores, uncertainty, ablation, learning curves, chronology and provenance limits
+
+[CRSP version-3 licensed study freeze](../pages/wrds-baseline-v3-freeze.md) -- unchanged candidate rules, real training-span qualification and new encrypted dataset/runtime identities
