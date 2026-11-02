@@ -185,7 +185,7 @@ class TestServeModel:
         _test_hooks.run = runner
         served = serve_model(COLOSSUS, COLOSSUS_MODELS, ORNITH, job_id=JOB, binary=LLAMA_BINARY)
         assert served["endpoint"] == "http://100.111.149.33:8091"
-        assert LLAMA_BINARY.encode() in (runner.stdin[1] or b"")
+        assert LLAMA_BINARY.encode() in (runner.stdin[0] or b"")
         assert runner.calls[1][-2:] == (
             "/bin/sh",
             "/home/corvis/fleet/stage/model-load-ornith-1.5-9b.sh",

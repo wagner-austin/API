@@ -247,7 +247,7 @@ class TestModelsPass:
             "whisper-server serves whisper-large-v3-turbo (ggml-large-v3-turbo.bin"
         )
         whisper_binary = COLOSSUS_MODELS["servers"][ModelServer.WHISPER]
-        assert f"{whisper_binary} -m " in (runner.stdin[1] or b"").decode()
+        assert f"{whisper_binary} -m " in (runner.stdin[0] or b"").decode()
 
     def test_a_server_the_node_has_not_built_is_refused_before_the_node_is_asked(self) -> None:
         llama_only = COLOSSUS_MODELS.copy()
