@@ -61,9 +61,15 @@ class TestTheShape:
         ("gpu", "message"),
         [
             ({**B60, "address": "08:00.0"}, "a GPU's address must be a PCI address, got '08:00.0'"),
-            ({**B60, "vendor": "Intel"}, "0000:08:00.0's vendor is outside the vocabulary: 'Intel'"),
+            (
+                {**B60, "vendor": "Intel"},
+                "0000:08:00.0's vendor is outside the vocabulary: 'Intel'",
+            ),
             ({**B60, "name": ""}, "0000:08:00.0's name must be 1 to 200 characters, got 0"),
-            ({**B60, "name": "n" * 201}, "0000:08:00.0's name must be 1 to 200 characters, got 201"),
+            (
+                {**B60, "name": "n" * 201},
+                "0000:08:00.0's name must be 1 to 200 characters, got 201",
+            ),
             ({**B60, "driver": "x e"}, "0000:08:00.0's driver is not a driver's name: 'x e'"),
             (
                 {**B60, "memory": GpuMemory(source=GpuSource.DMEM, total_bytes=0, free_bytes=0)},
@@ -119,7 +125,15 @@ class TestTheWire:
                 "a GPU's memory is missing; a tick carries it or null",
             ),
             (
-                [{"address": "0000:01:00.0", "vendor": "nvidia", "name": "x", "driver": None, "memory": 1}],
+                [
+                    {
+                        "address": "0000:01:00.0",
+                        "vendor": "nvidia",
+                        "name": "x",
+                        "driver": None,
+                        "memory": 1,
+                    }
+                ],
                 "a GPU's memory must be a JSON object or null, got int",
             ),
             (
@@ -151,11 +165,27 @@ class TestTheWire:
                 "Missing required field 'address'",
             ),
             (
-                [{"address": "0000:01:00.0", "vendor": "nvidia", "name": "x", "driver": 3, "memory": None}],
+                [
+                    {
+                        "address": "0000:01:00.0",
+                        "vendor": "nvidia",
+                        "name": "x",
+                        "driver": 3,
+                        "memory": None,
+                    }
+                ],
                 "Field 'driver' must be a string, got int",
             ),
             (
-                [{"address": "0000:01:00.0", "vendor": "NVIDIA", "name": "x", "driver": None, "memory": None}],
+                [
+                    {
+                        "address": "0000:01:00.0",
+                        "vendor": "NVIDIA",
+                        "name": "x",
+                        "driver": None,
+                        "memory": None,
+                    }
+                ],
                 "0000:01:00.0's vendor is outside the vocabulary: 'NVIDIA'",
             ),
         ],

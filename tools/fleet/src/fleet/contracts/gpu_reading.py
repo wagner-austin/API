@@ -207,7 +207,9 @@ def _decode_memory(value: JSONValue) -> GpuMemory | None:
     if value is None:
         return None
     if not isinstance(value, dict):
-        raise JSONTypeError(f"a GPU's memory must be a JSON object or null, got {type(value).__name__}")
+        raise JSONTypeError(
+            f"a GPU's memory must be a JSON object or null, got {type(value).__name__}"
+        )
     source = require_str(value, "source")
     if source not in {member.value for member in GpuSource}:
         raise JSONTypeError(f"a GPU's memory source must be nvidia-smi or dmem, got {source!r}")

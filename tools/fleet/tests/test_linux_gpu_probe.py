@@ -56,7 +56,9 @@ SMI_FAILED = (
 NOT_INSTALLED = ("", 127)
 
 
-def _device(tmp_path: pathlib.Path, address: str, pci_class: str, vendor: str, driver: str | None) -> None:
+def _device(
+    tmp_path: pathlib.Path, address: str, pci_class: str, vendor: str, driver: str | None
+) -> None:
     """Write one fake PCI device under ``tmp_path / "pci"``.
 
     Args:
@@ -112,7 +114,9 @@ def _run(
     tools = tmp_path / "tools"
     answer, status = smi
     _tool(tools, "nvidia-smi", f"#!/bin/sh\ncat <<'EOF'\n{answer}\nEOF\nexit {status}\n")
-    cases = "".join(f"  {address}) cat <<'EOF'\n{line}\nEOF\n  ;;\n" for address, line in lspci.items())
+    cases = "".join(
+        f"  {address}) cat <<'EOF'\n{line}\nEOF\n  ;;\n" for address, line in lspci.items()
+    )
     _tool(tools, "lspci", f'#!/bin/sh\ncase "$3" in\n{cases}esac\n')
     cgroup = tmp_path / "cgroup"
     cgroup.mkdir()
@@ -186,8 +190,8 @@ class TestTheGpuLinesUnderSh:
         smi = ("00000000:01:00.0, 24564, 21784, NVIDIA GeForce RTX 3090 Ti", 0)
         lspci = {
             "0000:00:02.0": '00:02.0 "Display controller" "Intel Corporation" '
-            '"Raptor Lake-S GT1 [UHD Graphics 770]" -r04 -p00 "Micro-Star International Co., Ltd. [MSI]" '
-            '"Device 7e06"'
+            '"Raptor Lake-S GT1 [UHD Graphics 770]" -r04 -p00 '
+            '"Micro-Star International Co., Ltd. [MSI]" "Device 7e06"'
         }
 
         assert _gpus(tmp_path, smi, lspci, ("", "")) == (
@@ -214,7 +218,9 @@ class TestTheGpuLinesUnderSh:
             "",
         )
 
-    def test_diphtheria_s_unbound_card_is_listed_with_no_memory(self, tmp_path: pathlib.Path) -> None:
+    def test_diphtheria_s_unbound_card_is_listed_with_no_memory(
+        self, tmp_path: pathlib.Path
+    ) -> None:
         _device(tmp_path, "0000:01:00.0", "0x030000", "0x10de", None)
         lspci = {
             "0000:01:00.0": '01:00.0 "VGA compatible controller" "NVIDIA Corporation" '
@@ -240,13 +246,16 @@ class TestTheGpuLinesUnderSh:
         _device(tmp_path, "0000:09:00.0", "0x030000", "0x1002", "amdgpu")
         _device(tmp_path, "0000:0a:00.0", "0x030000", "0x8086", "xe")
         lspci = {
-            "0000:09:00.0": '09:00.0 "VGA compatible controller" "Advanced Micro Devices, Inc. [AMD/ATI]" '
+            "0000:09:00.0": '09:00.0 "VGA compatible controller" '
+            '"Advanced Micro Devices, Inc. [AMD/ATI]" '
             '"Phoenix1" -r04 -p00 "ASUSTeK Computer Inc." "Phoenix1"',
             "0000:0a:00.0": B60_LSPCI,
         }
         dmem = (
-            "drm/0000:09:00.0/vram 4294967296\ndrm/0000:0a:00.0/vram0 100\ndrm/0000:0a:00.0/vram1 50\n",
-            "drm/0000:09:00.0/vram 80592896\ndrm/0000:0a:00.0/vram0 30\ndrm/0000:0a:00.0/vram1 20\n",
+            "drm/0000:09:00.0/vram 4294967296\n"
+            "drm/0000:0a:00.0/vram0 100\ndrm/0000:0a:00.0/vram1 50\n",
+            "drm/0000:09:00.0/vram 80592896\n"
+            "drm/0000:0a:00.0/vram0 30\ndrm/0000:0a:00.0/vram1 20\n",
         )
 
         assert _gpus(tmp_path, NOT_INSTALLED, lspci, dmem) == (
@@ -311,7 +320,10 @@ class TestReadingTheLines:
             ({}, "node reported gpu_count=None, which is not a whole number of GPUs"),
             ({"gpu_count": "one"}, "node reported gpu_count='one', which is not a whole number"),
             ({"gpu_count": "1"}, "node counted 1 GPU(s) and printed no gpu_0 line"),
-            ({"gpu_count": "1", "gpu_0": "0000:08:00.0\t0x8086"}, "holds 7 tab-separated fields, got 2"),
+            (
+                {"gpu_count": "1", "gpu_0": "0000:08:00.0\t0x8086"},
+                "holds 7 tab-separated fields, got 2",
+            ),
             (
                 {"gpu_count": "1", "gpu_0": "0000:08:00.0\t8086\txe\t\t\t\tB60"},
                 "0000:08:00.0's PCI vendor id must be 0x and four hex digits, got '8086'",
@@ -344,7 +356,11 @@ class TestReadingTheLines:
         assert read_gpus("emerald", {"gpu_count": "1", "gpu_0": line}) == (
             (
                 GpuReading(
-                    address="0000:00:01.0", vendor="pci-102b", name="G200eR2", driver="mgag200", memory=None
+                    address="0000:00:01.0",
+                    vendor="pci-102b",
+                    name="G200eR2",
+                    driver="mgag200",
+                    memory=None,
                 ),
             ),
             "",
@@ -353,7 +369,8 @@ class TestReadingTheLines:
     def test_the_probe_carries_the_gpus_into_the_node_s_state(self) -> None:
         output = PROBE_OK.replace(
             "gpu_count=0\n",
-            "gpu_0=0000:08:00.0\t0x8086\txe\tdmem\t25669140480\t8546701312\tBattlemage G21 [Arc Pro B60]\n"
+            "gpu_0=0000:08:00.0\t0x8086\txe\tdmem\t25669140480\t8546701312\t"
+            "Battlemage G21 [Arc Pro B60]\n"
             "gpu_count=1\n",
         )
 
@@ -363,4 +380,6 @@ class TestReadingTheLines:
         outcome = probe.read_state("colossus", PROBE_OK.replace("gpu_count=0\n", ""), live=IDLE)
 
         assert outcome["state"] is None
-        assert outcome["reason"] == "colossus reported gpu_count=None, which is not a whole number of GPUs"
+        assert outcome["reason"] == (
+            "colossus reported gpu_count=None, which is not a whole number of GPUs"
+        )

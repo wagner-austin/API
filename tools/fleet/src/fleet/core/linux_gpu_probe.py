@@ -1,4 +1,4 @@
-"""The capacity probe's GPU lines: every display device on the node and its memory (MCPs board task b4d5ca0f).
+"""The capacity probe's GPU lines: each display device and its memory (MCPs board task b4d5ca0f).
 
 WHAT IS A GPU HERE. Every PCI device whose class is display (``0x03....``),
 which is what the kernel itself calls one: discrete cards, integrated GPUs
@@ -81,7 +81,8 @@ GPU_PROBE_PART: Final = (
     + '  address="${device##*/}"\n'
     + '  vendor="$(cat "$device/vendor")"\n'
     + "  driver=''\n"
-    + '  if [ -e "$device/driver" ]; then driver="$(basename "$(readlink -f "$device/driver")")"; fi\n'
+    + '  if [ -e "$device/driver" ]; then '
+    + 'driver="$(basename "$(readlink -f "$device/driver")")"; fi\n'
     + f"  row=\"$(printf '%s\\n' \"$smi\" | {_SMI_ROW})\"\n"
     + '  if [ -z "$row" ] && [ -r "$dmem/dmem.capacity" ]; then\n'
     + f'    row="$({_DMEM_ROW})"\n'
@@ -92,7 +93,8 @@ GPU_PROBE_PART: Final = (
     + "$row\n"
     + "EOF\n"
     + "  fi\n"
-    + '  if [ -z "$name" ]; then name="$(lspci -mm -s "$address" | awk -F\'"\' \'{ print $6 }\')"; fi\n'
+    + '  if [ -z "$name" ]; then '
+    + 'name="$(lspci -mm -s "$address" | awk -F\'"\' \'{ print $6 }\')"; fi\n'
     + "  printf 'gpu_%s=%s\\t%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n' \"$gpus\" \"$address\" \"$vendor\" "
     + '"$driver" "$source" "$total" "$free" "$name"\n'
     + "  gpus=$((gpus + 1))\n"
@@ -122,7 +124,10 @@ def _memory(address: str, source: str, total: str, free: str) -> tuple[GpuMemory
     if source not in {member.value for member in GpuSource}:
         return None, f"{address}'s memory source must be nvidia-smi or dmem, got {source!r}"
     if _WHOLE.fullmatch(total) is None or _WHOLE.fullmatch(free) is None:
-        return None, f"{address}'s memory must be two whole numbers of bytes, got {total!r} and {free!r}"
+        return (
+            None,
+            f"{address}'s memory must be two whole numbers of bytes, got {total!r} and {free!r}",
+        )
     return GpuMemory(source=GpuSource(source), total_bytes=int(total), free_bytes=int(free)), ""
 
 
@@ -184,7 +189,10 @@ def read_gpus(host: str, fields: dict[str, str]) -> tuple[tuple[GpuReading, ...]
     for index in range(int(count)):
         line = fields.get(f"{GPU_FIELD_PREFIX}{index}")
         if line is None:
-            return None, f"{host} counted {count} GPU(s) and printed no {GPU_FIELD_PREFIX}{index} line"
+            return (
+                None,
+                f"{host} counted {count} GPU(s) and printed no {GPU_FIELD_PREFIX}{index} line",
+            )
         gpu, problem = _gpu(line)
         if gpu is None:
             return None, f"{host} printed a GPU line that cannot be read: {problem}"
