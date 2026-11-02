@@ -4,6 +4,7 @@ tags: [cluster-facts, storage, performance]
 hubs: [cluster-facts]
 related: ["[[partitions-and-billing]]", "[[preemption-and-campaigns]]", "[[facts-are-code]]"]
 source_paths:
+  - "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "src/hpc3/core/sbatch.py"
   - "src/hpc3/core/array_sbatch.py"
   - "src/hpc3/core/preflight.py"
@@ -11,6 +12,7 @@ source_paths:
   - "src/hpc3/core/image_sbatch.py"
   - "src/hpc3/core/image_build.py"
 source_git_blobs:
+  "artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "src/hpc3/core/sbatch.py": "0a247eba2978d1fc73886bf5153003ed127fc5e7"
   "src/hpc3/core/array_sbatch.py": "ed32f686a73e2ea8cc48d556d306a9d3d3fdb40a"
   "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
@@ -25,7 +27,7 @@ provenance:
   - "login-i15, 2026-10-28T06:07Z: PID 2581254 stat of /pub/wagnera3/envs/cleargbm/bin/python waited in D state, IBVSocket_waitForRecvCompletionEvent, syscall 332 (statx); board task eadd19d5"
   - "login-i15, 2026-10-28: PID 2810355 writing the synthetic benchmark entrypoint waited in D state, FhgfsOps_revalidateIntent; dfsquotas reported 342.16 GiB of 1.00 TiB and 564.45k of 8.00M chunk files"
   - "HPC3 job 58566045, hpc3-20-20, COMPLETED 0:0 in 85 seconds, 2026-10-28: paired image build with node-local Apptainer cache and temporary directory"
-fact_checked: 2026-10-28
+fact_checked: 2026-11-02
 confidence: high
 ---
 
@@ -105,6 +107,15 @@ state before attributing a new hang to storage. A remote `timeout` cannot
 complete termination while a process remains in uninterruptible I/O, for
 the same reason the orphan outlived its session.
 
+A home-directory image can still depend on BeeGFS through its mounts. On
+November 2, the version-3 research preflight explicitly bound `/pub` and reached
+its 600-second controller timeout in `FhgfsOps_revalidateIntent`. An exact-image
+diagnostic without that bind and with `--no-mount bind-paths` printed Python
+3.11.16. After `/pub` responded again, unchanged canonical preflight passed and
+job `58747974` completed. The diagnostic did not replace the job's frozen
+configuration. Task `0a0e5913` tracks explicit mount ownership; these observations
+do not establish a storage-server cause or permanent recovery.[^mounts]
+
 ## The October 28 recurrence and image-build mitigation
 
 On `login-i15`, `/pub` resolved to `/dfs6b/pub`. A `stat` of the existing
@@ -132,3 +143,4 @@ proof that BeeGFS recovered everywhere.[^build]
 [^october]: Live probes on `login-i15`, 2026-10-28, PIDs 2581254 and 2810355 and `dfsquotas` readings recorded in `provenance`; board task eadd19d5.
 [^builder]: `src/hpc3/core/image_sbatch.py:73` `_preamble`, including the required scratch check and quoted cache/temp exports; `src/hpc3/core/image_build.py` failure guidance.
 [^build]: `sacct` for job 58566045 and `/pub/wagnera3/images/cleargbm-paired-2a50e93ca/build-58566045.out` and `.err`, 2026-10-28; image SHA256 `f5d16ad3732cb1ba196b2c56aa56fa3465dcc183c75fc73924a5aecf455fb16b`.
+[^mounts]: `artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `preflight_incident` and `native_accounting`; board task `284bc096`, observed November 2 at 06:23–06:36 UTC.
