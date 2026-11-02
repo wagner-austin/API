@@ -96,8 +96,8 @@ Follow-up task `f963ee0b` tracks that protocol/source qualification.
 requirements, including partition-boundary event visibility. The reviewed source
 diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
 
-[[wrds-encrypted-diagnostic-cohort]] records the bounded encrypted subset
-being prepared for that source comparison, including its separate native
+[[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
+derived for that source comparison, including its separate native
 attempts and the enforced prohibition on using it as a study dataset.[^cohort]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`

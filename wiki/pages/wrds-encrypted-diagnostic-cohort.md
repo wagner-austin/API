@@ -11,6 +11,9 @@ source_paths:
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-submit.json
+  - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/result.json
+  - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json
+  - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json
 source_git_blobs:
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 660628f90d5027b3c57af7ce06bca2700ec2f166
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py: 9b342cd7bd1a30524af932d900ddb5bc04111f51
@@ -19,6 +22,9 @@ source_git_blobs:
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json: 869b28d0615c22f5d5436317bf41f0c3fb3bac09
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json: 92e625e80fbb93d22f4e81ace4e9dde26b560c4d
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-submit.json: def23228908a289bd9c600fecf514bdf118723b8
+  tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/result.json: bf4b5280854c31a97d4b6fea1ac68d711c1eb782
+  tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json: bcd67522677a3c7cccdda8835f091c8669e77ace
+  tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json: b9c632847496d1b6523645a5eb4411c910445b71
 fact_checked: 2026-11-02
 confidence: medium
 ---
@@ -66,7 +72,16 @@ establishes neither cohort completion nor forced-termination cleanup.[^preempted
 Explicit retry `58790450` uses the same pinned source `d37c6cd397`, image
 `369ae415a20a`, command and free-partition request: 8 CPUs, 128 GB and 121
 minutes. Its distinct attempt name preserves the failed attempt. Submission
-and preflight are recorded; successful derivation remains to be verified.[^retry]
+and preflight are recorded.[^retry] It completed `0:0` in 573 seconds on
+`hpc3-l18-01`; the existing inspector verified 17 inputs, result and RunRecord.
+The result resolves 27 anchors to 23 securities: 95 membership rows, 72,981
+return rows, 8,825 calendar rows and 19 terminal rows. It verifies all output
+ciphertext and normal-exit plaintext removal. Bundle SHA-256 is
+`182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202`.[^completed]
+
+Collection independently reread the exact twelve-file inventory against that
+bundle pin: eleven ciphertext files totaling 5,047,538 bytes plus metadata.
+The controller created no plaintext during collection.[^collection]
 
 Fresh vendor comparison and economic qualification remain downstream in
 [[crsp-outcome-qualification]]. No result from this derivation permits removal
@@ -78,3 +93,5 @@ of the refused paths, a changed benchmark or release of the final holdout.[^owne
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_cohort.py`, `test_actual_trial_refuses_a_cohort_even_when_its_bundle_is_admitted`, `test_real_encrypted_cohort_keeps_lineage_and_cannot_load_as_a_study`, and refusal regressions.
 [^preempted]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json`, `accounting`, `inputs.compute_checksum_lines` and `inputs.verified_files`.
 [^retry]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json`, `admissions[0].spec`; sibling `retry1-submit.json`, `job_id`, `experiment` and `image_digest`.
+[^completed]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json`, `accounting`, `measurement` and `record`; sibling `result.json`, `results[0]`, input/code identities, derived counts, output bundle and cleanup assertions.
+[^collection]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json`, `bundle_sha256`, `files_verified`, `ciphertext_bytes`, `plaintext_created` and `method`.
