@@ -129,17 +129,35 @@ def test_a_vendor_flagged_delisting_return_is_counted_by_its_flag(tmp_path: Path
     )
 
 
+#: The message a closing-trade check gives for a record it cannot execute at.
+UNEXECUTABLE = "[CRSP-004] execution requires a finite positive closing trade"
+
+
 @pytest.mark.parametrize(
-    ("rows", "delists", "reason"),
+    ("rows", "delists", "refusal"),
     [
-        ([], [], "entry absent"),
+        (
+            [],
+            [],
+            CrspPathRefusal("entry absent", "[CRSP-009] no execution record for 1 on 2020-02-03"),
+        ),
         (
             [daily(1, W1.entry, 0.5, dlydelflg="Y", dlyretdurflg="DD", dlyprcflg="TR")],
             [event(W1.decision)],
-            "entry terminal inconsistent",
+            CrspPathRefusal(
+                "entry terminal inconsistent", "[CRSP-010] inconsistent terminal entry for 1"
+            ),
         ),
-        ([daily(1, W1.entry, 0.0, dlyprc=None)], [], "entry not a closing trade"),
-        ([daily(1, W1.entry, 0.0)], [], "absent row"),
+        (
+            [daily(1, W1.entry, 0.0, dlyprc=None)],
+            [],
+            CrspPathRefusal("entry not a closing trade", UNEXECUTABLE),
+        ),
+        (
+            [daily(1, W1.entry, 0.0)],
+            [],
+            CrspPathRefusal("absent row", "[CRSP-009] held return for 1 on 2020-02-04 is absent"),
+        ),
         (
             [
                 daily(1, W1.entry, 0.0),
@@ -147,21 +165,21 @@ def test_a_vendor_flagged_delisting_return_is_counted_by_its_flag(tmp_path: Path
                 daily(1, W1.exit, 0.0, dlyprcflg="BA"),
             ],
             [],
-            "exit not a closing trade",
+            CrspPathRefusal("exit not a closing trade", UNEXECUTABLE),
         ),
         (
             [daily(1, W1.entry, 0.0), daily(1, "2020-02-04", 0.1), daily(1, W1.exit, 0.0)],
             [event("2020-02-04"), event("2020-02-03")],
-            "two terminal events",
+            CrspPathRefusal(
+                "two terminal events", "[CRSP-009] one window cannot hold two terminal events"
+            ),
         ),
     ],
 )
-def test_each_refusal_has_its_counting_key(
-    rows: list[JSONObject], delists: list[JSONObject], reason: str
+def test_each_refusal_has_its_counting_key_and_message(
+    rows: list[JSONObject], delists: list[JSONObject], refusal: CrspPathRefusal
 ) -> None:
-    path = crsp_resolve_window_path(outcomes(rows, delists), 1, W1)
-    assert isinstance(path, CrspPathRefusal)
-    assert path.reason == reason
+    assert crsp_resolve_window_path(outcomes(rows, delists), 1, W1) == refusal
 
 
 def _refusals() -> CrspQualification:
