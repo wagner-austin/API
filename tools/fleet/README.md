@@ -760,7 +760,11 @@ version, when `/dev/kvm` is readable and writable there and nix's
 was pinned to loki by name, and on 2026-11-03 loki ran those checks back to
 back on battery while serendipity, lacrymal and lavender could have taken
 them; colossus runs NixOS without `/dev/kvm` and answers absent. No package
-manager here installs it: a node gets it from its NixOS generation.
+manager here installs it: a node gets it from its NixOS generation. The
+project declares `worker_ram_gb` 16.0: the first job routed by the tag,
+d7e8bd84, went to serendipity under the old 8.0, which had 13 GB free, and
+was OOM-killed after 6 min 50 s; loki's passing run of the same commit
+peaked at 15.3 GB, so a node short of that refuses the check instead.
 lavender, the runner host, gets go, ffmpeg and pdftotext from
 `runners.json`'s base `nix_packages` and Chrome from its `assets`, so a
 reinstall keeps all four tags, and `test_runner_contracts.py` fails if a

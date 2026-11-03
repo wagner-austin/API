@@ -141,19 +141,21 @@ def _shipped() -> FleetWorkspace:
     )
 
 
-def _idle(node: NodeConfig) -> NodeState:
-    """A node with nothing of the fleet's on it and memory to spare.
+def _idle(node: NodeConfig, *, free_ram_gb: float = 24.0) -> NodeState:
+    """A node with nothing of the fleet's on it.
 
     Args:
         node: The node's declaration.
+        free_ram_gb: Its free memory; 24 GB, memory to spare, unless a case
+            measures a node that has less.
 
     Returns:
-        Its state with 24 GB free, no live run, no reservation and no
+        Its state with that memory free, no live run, no reservation and no
         pressure.
     """
     return NodeState(
         host=node["host"],
-        free_ram_gb=24.0,
+        free_ram_gb=free_ram_gb,
         free_disk_gb=100.0,
         live=LiveLoad(runs=0, workers=0, ram_gb=0.0),
         ci_slice=None,
@@ -376,3 +378,19 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
         pool, FleetErrorCode.NODE_LACKS_TAG
     )
     assert {"lacrymal", "lavender", "loki", "serendipity"} <= pool
+
+
+def test_a_node_without_the_flake_check_s_memory_refuses_it_before_it_starts() -> None:
+    """Fleet job d7e8bd84 (MCPs board task 3268afdf): serendipity, 13 GB free,
+    took the flake check under an 8 GB declaration and was OOM-killed after
+    6 min 50 s; loki's passing run peaked at 15.3 GB."""
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/fleet-nixos"]
+    node = workspace["nodes"]["serendipity"]
+    carried = node_tags(node) | {NodeTag.NIXOS_TEST}
+
+    assert project["worker_ram_gb"] == 16.0
+    refused = assess(node, _idle(node, free_ram_gb=13.0), project, carried)
+    assert (refused["workers"], refused["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
+    assert refused["reason"].startswith("serendipity has 13.0 GB free against a reservation")
+    assert assess(node, _idle(node), project, carried) == {"workers": 1, "code": None, "reason": ""}
