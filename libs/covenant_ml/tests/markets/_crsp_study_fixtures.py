@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 from itertools import pairwise
+from math import prod
 from pathlib import Path
 
 import numpy as np
@@ -151,32 +152,33 @@ def final_manifest(directory: Path) -> Path:
     return path
 
 
-def missing_price_rows() -> dict[str, list[JSONObject]]:
-    """Replace two synthetic daily observations with one known two-session return.
+def missing_price_rows(*, price_flag: str = "MP", gap: int = 1) -> dict[str, list[JSONObject]]:
+    """Replace synthetic daily observations with one exact multi-session return.
 
     The total held multiplier stays equal to the independent original path.
-    An MP/MR row and its NA/P1 successor reproduce the licensed diagnostic's
+    MP/MR rows and their NA/P1-P9 successor reproduce the licensed diagnostic's
     metadata pattern, without copying a licensed value or identifier.
     """
     rows = pre_entry_rows()
-    (gap,) = [
-        row for row in rows["returns"] if row["permno"] == 7 and row["dlycaldt"] == "2019-03-11"
-    ]
-    (close,) = [
-        row for row in rows["returns"] if row["permno"] == 7 and row["dlycaldt"] == "2019-03-12"
-    ]
-    close["dlyret"] = (1 + require_float(gap, "dlyret")) * (1 + require_float(close, "dlyret")) - 1
-    close.update({"dlyprevdt": "2019-03-08", "dlyretdurflg": "P1"})
-    gap.update(
-        {
-            "dlyret": None,
-            "dlyprevdt": None,
-            "dlyretmissflg": "MP",
-            "dlyretdurflg": "MR",
-            "dlyprc": None,
-            "dlyprcflg": "MP",
-        }
-    )
+    interval = [
+        row
+        for row in rows["returns"]
+        if row["permno"] == 7 and require_str(row, "dlycaldt") >= "2019-03-11"
+    ][: gap + 1]
+    close = interval[-1]
+    close["dlyret"] = prod(1 + require_float(row, "dlyret") for row in interval) - 1
+    close.update({"dlyprevdt": "2019-03-08", "dlyretdurflg": f"P{gap}"})
+    for unpriced in interval[:-1]:
+        unpriced.update(
+            {
+                "dlyret": None,
+                "dlyprevdt": None,
+                "dlyretmissflg": "MP",
+                "dlyretdurflg": "MR",
+                "dlyprc": None,
+                "dlyprcflg": price_flag,
+            }
+        )
     return rows
 
 

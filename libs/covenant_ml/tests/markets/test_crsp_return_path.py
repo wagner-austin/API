@@ -59,8 +59,13 @@ def bridged_rows() -> list[JSONObject]:
     ]
 
 
-def test_complete_span_is_counted_once_in_monthly_wealth_and_actual_costs() -> None:
-    evidence = outcomes(bridged_rows(), [])
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_complete_span_is_counted_once_in_monthly_wealth_and_actual_costs(
+    price_flag: str,
+) -> None:
+    rows = bridged_rows()
+    rows[1]["dlyprcflg"] = price_flag
+    evidence = outcomes(rows, [])
     path = crsp_window_path(evidence, 1, W1)
     assert (path.filled, path.growth, path.terminal) == (True, 1.1, None)
     (period,) = evaluate_crsp_holdings(evidence, (W1,), ((1,),), 10)
@@ -74,11 +79,14 @@ def test_complete_span_is_counted_once_in_monthly_wealth_and_actual_costs() -> N
 
 
 @pytest.mark.parametrize("gap", range(1, 10))
-def test_vendor_duration_must_cover_exactly_two_through_ten_sessions(gap: int) -> None:
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_vendor_duration_must_cover_exactly_two_through_ten_sessions(
+    gap: int, price_flag: str
+) -> None:
     dates = [date(2020, 6, 1) + timedelta(days=n) for n in range(20)]
     sessions = tuple(day.isoformat() for day in dates if day.weekday() < 5)
     entry, end = sessions[0], sessions[gap + 1]
-    records = {(1, day): missing(day) for day in sessions[1 : gap + 1]}
+    records = {(1, day): missing(day, dlyprcflg=price_flag) for day in sessions[1 : gap + 1]}
     close = daily(1, W1.entry, -0.2, dlycaldt=end, dlyprevdt=entry, dlyretdurflg=f"P{gap}")
     records[(1, end)] = close
     assert not crsp_return_span(close, sessions[gap], 1)
@@ -95,13 +103,19 @@ def test_vendor_duration_must_cover_exactly_two_through_ten_sessions(gap: int) -
         ("dlydelflg", "Y"),
         ("dlyprc", 10.0),
         ("dlyprcflg", "NT"),
+        ("dlyprcflg", "HA"),
+        ("dlyretmissflg", "NT"),
+        ("dlyretmissflg", "DG"),
     ],
 )
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
 def test_only_consistent_missing_price_evidence_can_defer_measurement(
     key: str,
     value: JSONValue,
+    price_flag: str,
 ) -> None:
     rows = bridged_rows()
+    rows[1]["dlyprcflg"] = price_flag
     rows[1][key] = value
     with pytest.raises(ValueError, match="CRSP-009"):
         crsp_window_path(outcomes(rows, []), 1, W1)
@@ -120,11 +134,14 @@ def test_only_consistent_missing_price_evidence_can_defer_measurement(
         ("dlyretdurflg", "DD"),
     ],
 )
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
 def test_gap_closure_rejects_unknown_values_overlaps_and_wrong_spans(
     key: str,
     value: JSONValue,
+    price_flag: str,
 ) -> None:
     rows = bridged_rows()
+    rows[1]["dlyprcflg"] = price_flag
     rows[2][key] = value
     with pytest.raises(ValueError, match="CRSP-009"):
         crsp_window_path(outcomes(rows, []), 1, W1)
@@ -136,8 +153,10 @@ def test_absent_row_is_not_a_vendor_missing_price_observation() -> None:
         crsp_window_path(outcomes([rows[0], rows[2]], []), 1, W1)
 
 
-def test_gap_cannot_consume_a_return_beyond_a_terminal_boundary() -> None:
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_gap_cannot_consume_a_return_beyond_a_terminal_boundary(price_flag: str) -> None:
     rows = bridged_rows()
+    rows[1]["dlyprcflg"] = price_flag
     terminal = event("2020-02-04")
     terminal.update({"deldlydt": "2020-02-05", "delamtdt": "2020-02-05"})
     with pytest.raises(ValueError, match="CRSP-011"):
@@ -156,27 +175,32 @@ def test_span_closed_on_terminal_date_precedes_one_terminal_multiplier() -> None
     assert len(period.receivables) == 1
 
 
-def test_missing_exit_cannot_borrow_a_future_return_or_supply_a_fill() -> None:
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_missing_exit_cannot_borrow_a_future_return_or_supply_a_fill(price_flag: str) -> None:
     rows = [
         daily(1, W1.entry, 0.0),
         daily(1, "2020-02-04", 0.1),
-        missing(W1.exit),
+        missing(W1.exit, dlyprcflg=price_flag),
         daily(1, "2020-03-03", 0.2, dlyprevdt="2020-02-04", dlyretdurflg="P1"),
     ]
     with pytest.raises(ValueError, match="CRSP-011"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
-def test_missing_entry_is_not_a_filled_position_even_when_later_span_exists() -> None:
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_missing_entry_is_not_a_filled_position_even_when_later_span_exists(
+    price_flag: str,
+) -> None:
     rows = bridged_rows()
-    rows[0] = missing(W1.entry)
+    rows[0] = missing(W1.entry, dlyprcflg=price_flag)
     with pytest.raises(ValueError, match="CRSP-004"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
-def test_unsupported_long_gap_is_not_accepted_as_an_arbitrary_vendor_span() -> None:
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_unsupported_long_gap_is_not_accepted_as_an_arbitrary_vendor_span(price_flag: str) -> None:
     days = tuple(f"2020-06-{day:02}" for day in range(2, 13))
-    records = {(1, day): missing(day) for day in days[:-1]}
+    records = {(1, day): missing(day, dlyprcflg=price_flag) for day in days[:-1]}
     records[(1, days[-1])] = daily(1, W1.entry, 0.2, dlyretdurflg="P10")
     with pytest.raises(ValueError, match="CRSP-009"):
         crsp_compound_held(records, 1, "2020-06-01", days)
@@ -238,10 +262,31 @@ def test_two_separate_gaps_do_not_accumulate_or_double_count_their_returns() -> 
     assert crsp_compound_held(records, 1, "2020-06-01", days) == pytest.approx(0.88)
 
 
+def test_mixed_suspension_and_missing_price_span_has_only_one_observed_value() -> None:
+    days = ("2020-06-02", "2020-06-03", "2020-06-04")
+    records = {
+        (1, days[0]): missing(days[0], dlyprcflg="SU"),
+        (1, days[1]): missing(days[1]),
+        (1, days[2]): daily(1, W1.entry, -0.2, dlyprevdt="2020-06-01", dlyretdurflg="P2"),
+    }
+    assert crsp_resolve_held(records, 1, "2020-06-01", days) == (((2, 0.8),), None)
+    assert crsp_resolve_held(records, 1, "2020-06-01", days[:1]) == (
+        (),
+        HeldRefusal(
+            "price gap tail", "[CRSP-011] held return for 1 ends with an unresolved price gap"
+        ),
+    )
+
+
+@pytest.mark.parametrize(("price_flag", "gap"), [("MP", 1), ("SU", 9)])
 def test_real_extract_labels_use_the_same_span_without_future_universe_filtering(
     tmp_path: Path,
+    price_flag: str,
+    gap: int,
 ) -> None:
-    manifest, _ = write_sources(tmp_path, missing_price_rows(), study_protocol())
+    manifest, _ = write_sources(
+        tmp_path, missing_price_rows(price_flag=price_flag, gap=gap), study_protocol()
+    )
     sources = load_crsp_sources(manifest)
     panel = build_crsp_panel(sources, "2019-02-01", "2019-02-28")
     assert tuple(feature.permno for feature in panel[0].features) == (8, 7, 6, 5, 4, 3)

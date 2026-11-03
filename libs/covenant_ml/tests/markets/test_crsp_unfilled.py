@@ -208,8 +208,8 @@ def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> Non
     document = trial_document(tmp_path)
     evaluation = require_dict(document, "evaluation")
     old_design = dict(require_dict(evaluation, "design"))
-    old_design.pop("held_return_rule")
-    old_design["version"] = 2
+    old_design["held_return_rule"] = "exact-missing-price-spans"
+    old_design["version"] = 3
     old_evaluation = dict(evaluation)
     old_evaluation["design"] = old_design
     old_digest = sha256(
@@ -238,8 +238,8 @@ def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> Non
 
 def test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data(tmp_path: Path) -> None:
     old_design = study_protocol()
-    old_design.pop("held_return_rule")
-    old_design["version"] = 2
+    old_design["held_return_rule"] = "exact-missing-price-spans"
+    old_design["version"] = 3
     source = tmp_path / "source"
     source.mkdir()
     manifest, _ = write_sources(source, pre_entry_rows(), old_design)
@@ -252,7 +252,7 @@ def test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data(tmp_p
         "confidence": 0.9,
     }
     trial = decode_research_trial(frozen_request(evaluation, sealed, ["momentum"]))
-    with pytest.raises(ValueError, match="CRSP-001"):
+    with pytest.raises(ValueError, match=r"MARKET-001.*version=3 must lie in \[4, 4\]"):
         execute_trial(
             trial,
             sample_run_fingerprint(image_digest="d" * 64),

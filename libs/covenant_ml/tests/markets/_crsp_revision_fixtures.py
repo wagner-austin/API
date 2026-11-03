@@ -33,8 +33,8 @@ def revision_case(root: Path, *, unchanged: bool = False) -> RevisionCase:
     protocol.write_text(dump_json_str(current))
     old = dict(current)
     if not unchanged:
-        old["version"] = 2
-        del old["held_return_rule"]
+        old["version"] = 3
+        old["held_return_rule"] = "exact-missing-price-spans"
     previous = root / "previous.json"
     previous.write_text(dump_json_str(old))
     outputs = root / "outputs"
