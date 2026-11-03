@@ -156,8 +156,10 @@ return date.[^catalog][^distribution]
 
 The implemented [[wrds-crsp-corporate-action-capture]] captures these fields
 for the authenticated cohort through the shared query, snapshot and encryption
-owners. Fleet verification and native synthetic capture passed; licensed
-capture remains pending. Linked
+owners. Fleet verification, native synthetic capture and bounded licensed
+capture passed. The licensed capture contains nineteen delisting events and
+328 distribution events, all with admissible detail rows. These counts do not
+establish usable consideration or repair the 27 refused paths. Linked
 identifiers do not authorize recursive security expansion, and event presence
 is recorded separately from details excluded by valuation/payment dates.
 This investigation supplies no replacement return policy.[^actions]

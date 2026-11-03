@@ -21,6 +21,13 @@ source_paths:
   - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-actions.json
   - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-completion.json
   - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-ciphertext-reading.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-completion.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-ciphertext-reading.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/staging-permission-correction.json
+  - tools/hpc3/src/hpc3/core/stage.py
+  - tools/hpc3/src/hpc3/core/remote.py
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py": "a62a7dd519ffcb861fa25c9318f54441f0dd8521"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py": "667cc6fd8d1b6d216ac5bf6271e63779260acfc6"
@@ -39,8 +46,15 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-actions.json": "89126a9b770b7eb56748996a023aad80d29b867b"
   "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-completion.json": "5bbc48d896921ee2f1bd0723924cfdb179abdb52"
   "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-ciphertext-reading.json": "98b0ba121c4cbadb6a8023d06875b01feb1b90a0"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json": "029d1492fe45296838e87ee259ca3e879a48e6f0"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-completion.json": "9d9c2f2f9379d08541f4189ed446cef134e3dabc"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-ciphertext-reading.json": "5776156b64f624c901e96f22577aeaa236ec970d"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json": "d71bc9b76d8514460031cb2fd0a01c2883b63095"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/staging-permission-correction.json": "67d9b332f8d142b8d5b40e65be7f73ea3ea9f4a5"
+  "tools/hpc3/src/hpc3/core/stage.py": "450870282e6df188076183fb5b65a24b795bc3f7"
+  "tools/hpc3/src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
 provenance:
-  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6; native synthetic 40569021 completed; licensed capture and independent implementation review pending."
+  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6; native synthetic 40569021 and licensed 40569098 completed; independent implementation review pending."
   - "Fleet ff02f00e-b5ad-4295-8dbe-f121812392c3 checked API 9b076cba5eff905617afd9335a09d3a44f2b8843 on Lavender: 5534 passed, zero failed, 100.00% coverage, exit zero, 277/300 seconds; completed 2026-11-03T02:48:06Z."
 fact_checked: 2026-11-03
 confidence: medium
@@ -97,9 +111,26 @@ outputs; the bundle inventory contains fourteen ciphertexts plus its metadata,
 and the receipt confirms normal plaintext cleanup. The existing controller
 retains the runtime fingerprint and published the native evidence.[^native]
 
-No licensed corporate-action capture or newly qualified economic outcome is
-reported here. The previous four-relation native comparison remains in
-[[wrds-crsp-source-comparison]].[^prior]
+Licensed job `40569098` captured nineteen delisting events and 328 distribution
+events, with the same counts of admissible detail rows and no events excluded
+from details by the partition date checks. Collection verified all sixteen
+outputs, including thirteen ciphertexts plus bundle metadata. The public receipt
+reports normal plaintext cleanup. Exact observations, SQL, snapshot readings
+and source lineage remain encrypted.[^licensed]
+
+HPC3 staging and separate complete-tree readback verified fourteen bundle files
+and exactly fifteen inventory entries including the certificate. The first
+inspection refused the newly created destination's mode `0755`; changing only
+that directory to `0700` allowed the repeated inventory check to pass. The
+generic stage command uses the account umask, so private destination creation
+must precede transfer; digest verification alone does not establish private
+permissions. No plaintext observations or keys were transferred.[^staging]
+
+Matching event/detail counts do not establish complete consideration or usable
+investment outcomes. The 27 economic refusals remain unresolved, and the
+substantive study remains stopped. No fitting or final-scoring release occurred.
+The previous four-relation comparison remains in
+[[wrds-crsp-source-comparison]].[^licensed][^prior]
 
 [^capture]: `libs/covenant_ml/scripts/crsp_extraction.py`, `main` diagnostic branch; `libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py`, `capture_crsp_diagnostic`; `crsp_actions.py`, `write_crsp_actions`.
 [^queries]: `libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py`, `CRSP_ACTIONS`; `crsp_queries.py`, `_universe`, `crsp_action_sql` and `crsp_driver_sql`; `libs/covenant_ml/tests/markets/test_crsp_action_queries.py`, exact-query, altered-scope and final-role refusals.
@@ -108,4 +139,6 @@ reported here. The previous four-relation native comparison remains in
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_actions.py`, capture, codec and refusal cases; `test_crsp_actions_process.py`, real child-process checks and privacy assertions.
 [^fleet]: Fleet job `ff02f00e-b5ad-4295-8dbe-f121812392c3`, terminal FLEET-CHECK receipt and full `libs-covenant_ml-lavender-1793673769.log`; exact source identity, counts and completion time in provenance.
 [^native]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-expected.json`, `rows`; sibling `synthetic-setup.sql`, fixture CTEs; `synthetic-actions.json`, `rows` and `plaintext_removed`; `synthetic-completion.json`, `outputs`, `runtime` and `record`; `synthetic-ciphertext-reading.json`, exact ciphertext inventory and digests; `source.json`, frozen source and worker identities. Native service report `7565ed95-a6ba-4447-aaab-723aac830dca` binds completed job `40569021` to those output digests.
+[^licensed]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json`, `rows`, `bundle` and `plaintext_removed`; sibling `licensed-completion.json`, exact output digests and runtime; `licensed-ciphertext-reading.json`, checked inventory. Native service report `818a292e-791b-4174-b113-88ce2ede75d6` records scheduler completion and output identities. These are capture measurements, not economic qualification; [[crsp-outcome-qualification]], § "Additional evidence to qualify", states the remaining requirements.
+[^staging]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json`, `manifest`, `verified_files`, `inventory.directories` and exact `inventory.files`; sibling `staging-permission-correction.json`, first refusal, measured modes and correction. Service report `a88d8a8d-9cfb-41a1-92eb-f803a0bde77a` records the independent readback. `tools/hpc3/src/hpc3/core/stage.py`, `stage_manifest` and `inspect_staged_tree`; `remote.py`, `make_directory`.
 [^prior]: [[wrds-crsp-source-comparison]], § "Native evidence".
