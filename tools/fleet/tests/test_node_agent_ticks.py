@@ -75,7 +75,6 @@ class TestATickThatClaimsNothing:
 
         assert tick == {
             "node": "lavender",
-            "elevated": False,
             "tags": [],
             "fits": [],
             "claiming": False,
@@ -167,7 +166,6 @@ class TestATickThatAsksTheQueue:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         assert tick == {
             "node": "lavender",
-            "elevated": False,
             "tags": ["linux"],
             "fits": [DEMO_PROJECT],
             "load": ROOMY,

@@ -122,12 +122,11 @@ SILENT = RunnerTick(
 
 class TestTheWireShape:
     def test_a_tick_encodes_to_dispatch_tick_s_arguments(self) -> None:
-        """``elevated`` is always false on the wire: MCPs' dispatch_tick still
-        requires the field until MCPs board task 5b040fdb drops it, and no
-        runner is elevated since board task e705f08c."""
+        """No ``elevated`` field: MCPs' dispatch_tick refuses one since MCPs
+        board task f36daa1c, and no runner is elevated since board task
+        e705f08c."""
         assert encode_runner_tick(SEDONA) == {
             "node": "sedona",
-            "elevated": False,
             "tags": ["cxx", "gpu", "linux"],
             "fits": ["libs/platform_core", "tools/fleet"],
             "claiming": True,
