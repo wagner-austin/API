@@ -137,7 +137,9 @@ def crsp_qualification_counts(value: CrspQualification) -> JSONObject:
     """
     by_reason = Counter(path["reason"] for path in value["refused"])
     by_period = Counter(path["period"] for path in value["refused"])
-    reasons: JSONObject = {reason: count for reason, count in sorted(by_reason.items())}
+    reasons: JSONObject = {}
+    for reason, count in sorted(by_reason.items()):
+        reasons[reason] = count
     periods: JSONObject = {period: by_period[period] for period in PERIODS}
     dependent = {path["decision"] for path in value["refused"]}
     return {
