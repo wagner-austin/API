@@ -51,7 +51,9 @@ from .research_keys import EvaluatorKeys
 from .validation import require_bounded_int
 
 
-def load_crsp_cohort_sources(manifest: Path, plan: CrspCohortPlan) -> tuple[CrspCohort, CrspSources]:
+def load_crsp_cohort_sources(
+    manifest: Path, plan: CrspCohortPlan
+) -> tuple[CrspCohort, CrspSources]:
     """Open authenticated diagnostic evidence through the canonical study-row reader.
 
     Args:
