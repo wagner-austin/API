@@ -1,0 +1,60 @@
+{
+  "destination": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation",
+  "files": [
+    {
+      "name": "bundle.json",
+      "sha256": "8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94",
+      "size_bytes": 2959
+    },
+    {
+      "name": "calendar.csv.age",
+      "sha256": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+      "size_bytes": 150323
+    },
+    {
+      "name": "calendar.sql.age",
+      "sha256": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+      "size_bytes": 488
+    },
+    {
+      "name": "delists.csv.age",
+      "sha256": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+      "size_bytes": 438816
+    },
+    {
+      "name": "delists.sql.age",
+      "sha256": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+      "size_bytes": 843
+    },
+    {
+      "name": "manifest.json.age",
+      "sha256": "17f4cf0d8003a60212463d4c362d7bbd35cc31a7d4cd339f9335087d37f3f944",
+      "size_bytes": 1484
+    },
+    {
+      "name": "membership.csv.age",
+      "sha256": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+      "size_bytes": 1323763
+    },
+    {
+      "name": "membership.sql.age",
+      "sha256": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+      "size_bytes": 740
+    },
+    {
+      "name": "protocol.json.age",
+      "sha256": "7393b0f513ca227703ac7890938f3498a9cf00489322615b3e48261f924be6cb",
+      "size_bytes": 1703
+    },
+    {
+      "name": "returns.sql.age",
+      "sha256": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f",
+      "size_bytes": 815
+    }
+  ],
+  "provenance": {
+    "source_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+    "runtime": "protocol-v5-cfd829d03",
+    "board_task": "f963ee0b-7382-4d7a-a1db-9a7b4d5467a3"
+  }
+}

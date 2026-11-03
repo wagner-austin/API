@@ -1,0 +1,40 @@
+{
+  "destination": "/data/homezvol1/wagnera3/research-images/protocol-v5-cfd829d03",
+  "files": [
+    {
+      "name": "GIT_COMMIT",
+      "sha256": "f894f7b85a2767f1894875d99e8d6903706a2fe3c317e1546819886bf3fd6dbe",
+      "size_bytes": 41
+    },
+    {
+      "name": "build.sbatch",
+      "sha256": "44dac8a5923ca8b532af6dbe75f4aae608a556c0574f59f8d77a874b4675da49",
+      "size_bytes": 2150
+    },
+    {
+      "name": "build.sh",
+      "sha256": "156b1200d908b4b845f046e8c48134546b23152a89526bd701107cc5bacbb2f6",
+      "size_bytes": 745
+    },
+    {
+      "name": "image.def",
+      "sha256": "f37575d20f32f65fd114ffe295a10fb3ce8ebfa3756a462da546c82b391889bc",
+      "size_bytes": 3124
+    },
+    {
+      "name": "requirements.txt",
+      "sha256": "941844d91063e3fdd4d6dacb2a6f52edd44ab71b39342d99a46300d895db47cb",
+      "size_bytes": 900
+    },
+    {
+      "name": "selfcheck.py",
+      "sha256": "04e05ab4dd87978f79cb738bd7053f11427ed81f8f06fc48bd817feb5747581d",
+      "size_bytes": 8145
+    }
+  ],
+  "provenance": {
+    "source_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+    "runtime": "protocol-v5-cfd829d03",
+    "board_task": "f963ee0b-7382-4d7a-a1db-9a7b4d5467a3"
+  }
+}

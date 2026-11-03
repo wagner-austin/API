@@ -1,0 +1,14 @@
+{
+  "source_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v5-cfd829d03/bin/python",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4",
+  "first_party_wheel_sha256": {
+    "cleargbm-0.1.0-py3-none-any.whl": "94b2db95f789c6ea43983d5498bd121f02d5c8d9ce50d41fefee8a72539c9ef7",
+    "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl": "9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad",
+    "covenant_domain-0.1.0-py3-none-any.whl": "f20a4a4bf265d6faf497aab46d4af7fc1389b61b9f4847d7269023f78ce08f9a",
+    "covenant_ml-0.1.0-py3-none-any.whl": "9159f71774d6868c6975a7f824d9da50efeca743499cb7e1185c38ccb07fff21",
+    "hpc3-0.1.0-py3-none-any.whl": "f6cb6edf72d5dca18c521ea6958de809f5213c72559ec731abca5f6a21835dfb",
+    "platform_core-0.1.0-py3-none-any.whl": "abb6a2318b763c63410282ebba6ab5a8e820a5e4e3b70e016d0d25b195ed38d2",
+    "platform_ml-0.1.0-py3-none-any.whl": "dd24792010c625a362e3d4bc2d959ca59aa6e703b1d47777922c4e587e714ab4"
+  }
+}

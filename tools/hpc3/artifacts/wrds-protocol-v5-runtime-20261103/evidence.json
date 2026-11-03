@@ -1,0 +1,106 @@
+{
+  "kind": "WRDS_PROTOCOL_V5_RUNTIME_EVIDENCE",
+  "task": "f963ee0b-7382-4d7a-a1db-9a7b4d5467a3",
+  "source_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+  "scope": "Licensed version-5 metadata revision, separate version-5 controller installation, native image build and private train-validation staging. No observation was opened by the revision; no final key exists in the HPC3 key directory; no study, candidate fit, selection or final release.",
+  "review": "Peer review by opus-mcps-1029-8f6e on board task f963ee0b at 2026-11-03T08:12:33Z accepted the version-5 rules and the qualification instrument; its two required changes landed in API cfd829d03.",
+  "source_export": {
+    "command": "git archive --format=tar.gz cfd829d03590ea57c247057e27a48510ab2b2078 -- libs tools/hpc3",
+    "owner_equivalent": "fleet.core.export.archive_commit runs the same git archive command",
+    "archive_sha256": "edf6e4d380373def375c241cf84dc24ea488c18fa6db669b4141cfabff0c1372",
+    "design_sha256": "3aebc90c9a6d71d16adff1335afe5737520c0d2b408bc0fad71d289898bfe6cf"
+  },
+  "revision": {
+    "host": "ziggurat",
+    "python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+    "source_overrides": [
+      "libs/covenant_ml/src",
+      "libs/covenant_ml",
+      "libs/platform_core/src",
+      "libs/platform_ml/src"
+    ],
+    "commands": [
+      "python -m scripts.crsp_extraction revise-protocol",
+      "python -m scripts.crsp_extraction verify-revision"
+    ],
+    "outputs": "/home/corvis/research-data/wrds/experiments/crsp-licensed-calendar-20261031/collected-first/outputs",
+    "previous_protocol": "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json",
+    "access": "/home/corvis/research-data/wrds/experiments/crsp-licensed-20261031/access.json (public recipients only)",
+    "destination": "/home/corvis/research-data/wrds/experiments/crsp-protocol-v5-cfd829d03-20261103",
+    "created_at": "2026-11-03T08:50:31Z",
+    "verified_at": "2026-11-03T08:51:04Z",
+    "revision_sha256": "ef28d519829153dda58a96f7b9e42d72a15d86b04df2d1d4b556fc3b5705d8c6",
+    "identical_report_sha256": "eb0ac7b87a1c0ee56baf857c021b0b999b95b403d01f6719ae55edbccb3ef410",
+    "train_validation_bundle_sha256": "8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94",
+    "final_bundle_sha256": "a5718c1b170feaeaa0b51c267dd0fd73ff3e0c49d3d04714a922ca9db0f61d9e",
+    "retained_relation_ciphertexts": 16,
+    "opened_observations": false,
+    "private_key_acquisition": false
+  },
+  "controller": {
+    "python": "/home/corvis/research-control/wrds-protocol-v5-cfd829d03/bin/python",
+    "install": "Separate /usr/bin/python3.11 venv; pip install --no-deps --only-binary=:all: of the 53 pinned requirements (identical to version 3) and seven first-party wheels.",
+    "wheel_build_host": "loki",
+    "wheel_build": "poetry build --format wheel in each of libs/cleargbm, libs/covenant_domain, libs/covenant_ml, libs/platform_core, libs/platform_ml and tools/hpc3 of the exported source.",
+    "preserved_compiled_wheel": "cleargbm_rs-0.1.0-cp311-cp311-linux_x86_64.whl, sha256 9541cdcaf10242d974f9f36f652f909a44f8217e1b47920d11258910b00111ad, reused because libs/cleargbm_rs is unchanged between 087f67b4c and cfd829d03.",
+    "dependency_comparison": "No pyproject.toml or poetry.lock change in the seven first-party packages between 087f67b4c and cfd829d03.",
+    "installed_files": 650,
+    "selfcheck": "image self-check OK",
+    "dependency_check": "No broken requirements found."
+  },
+  "image": {
+    "spec_change": "Version-3 spec with git_commit cfd829d03 and required_symbols updated: crsp_compound_held (removed in version 5) replaced by crsp_resolve_held, plus crsp_resolve_window_path, qualify_crsp_panel and execute_crsp_qualification.",
+    "path": "/data/homezvol1/wagnera3/research-images/protocol-v5-cfd829d03/research-crsp-v5.sif",
+    "sha256": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+    "job_id": "58820002",
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed_seconds": 94,
+    "started_at": "2026-11-03T08:56:11",
+    "ended_at": "2026-11-03T08:57:45",
+    "verified_files": 14,
+    "selfcheck_passes": 2,
+    "dependency_check": "passed"
+  },
+  "staging": {
+    "build_files": 6,
+    "wheels": 6,
+    "train_validation_destination": "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation",
+    "train_validation_files": 11,
+    "expected_record": "validation-expected.sha256 lists the ciphertext digests bundle.json declares and the bundle digest the verified revision report records, not digests of the staged copies.",
+    "deviation": "hpc3-stage sends each file through one ssh command bounded at 600 seconds; returns.csv.age (1,788,046,370 bytes) timed out at about 0.8 GB. Its ciphertext is unchanged by every revision and identical to the version-3 staging, so it was copied on HPC3 from /data/homezvol1/wagnera3/research-data/crsp-protocol-v3-f61db3a7/train-validation/returns.csv.age and its digest checked there (760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66). The other ten files went through hpc3-stage (validation-stage-without-returns.json). All eleven then passed sha256sum -c on HPC3 against the declared digests; directories are mode 0700 and files 0600.",
+    "key_directory": "/data/homezvol1/wagnera3/research/licensed-baseline-b3843a3d3-20261101/keys holds train-validation.agekey only (mode 0600, directory 0700); no final key is present."
+  },
+  "service_reports": {
+    "revision_create": "fb39c7b0-7e69-45a1-9053-e0259a7ed631",
+    "revision_readback": "47d5a5cf-4e37-4b92-9893-72eb89f7af92",
+    "controller": "7d8a7592-2729-4497-b792-c650fe877c95",
+    "build_stage": "7b05ad1a-3822-4f7a-8b2f-a68938f871cb",
+    "wheels_stage": "0bc3c2ae-032c-4436-8ee1-0a9b8cf870c1",
+    "image": "52f4aed1-1ce3-434c-a889-0fe0832ac378",
+    "qualification_stage": "8cb071c2-4e00-4222-bf33-b7cd31e75f7f",
+    "entrypoint_stage": "dd1373ba-d657-414f-acaa-e5b7879569e6",
+    "validation_stage_without_returns": "5203ca88-d8ed-496b-849b-16a7cb2ce0d3"
+  },
+  "remaining": [
+    "Independent audit of this runtime before any study preregistration uses it.",
+    "Independent reading of the native full-panel qualification recorded in tools/hpc3/artifacts/wrds-v5-qualification-20261103 (jobs 58820334 and 58820962).",
+    "A new study freeze only if the qualification leaves usable outcomes; the version-3 study stays stopped."
+  ],
+  "files": {
+    "build-stage.json": "3b7dbd8013900e4b460f661af0475dd1c2e3694e00fdac570124c5298e7cc529",
+    "capture-config.json": "ce355217053e3271680863912de764a895124f845e8cf6e1e3113d6a1e2daa76",
+    "controller-provenance.json": "99762ee1113298ce1d9f64eb33ec0179e88ab3ef6858ec3e4ed815fbf6569ce3",
+    "controller-report.json": "d8d24c19d8939201f0649031a405d5fa68f99fcc02423caa7cb76c139afda180",
+    "frozen-inputs.sha256": "ece0ea15c13da1dfee00f19e7cec0d2b8c89d7d21d40dd7ba5aed0febaaee951",
+    "image-expected.sha256": "45cab443ed3a94d5a405f9aff755fbe98d7592fb09e018494cfc0aa97ba51cee",
+    "image-report.json": "38e6427733b20f16c64b389eb62439601a3c1f397b8b707bd0481cefe116b0a1",
+    "image-spec.json": "2baa5c80dd1e3964234baae6a4721173ab41344f18cade8c6bef8b892a8106b3",
+    "revision-create.json": "eb0ac7b87a1c0ee56baf857c021b0b999b95b403d01f6719ae55edbccb3ef410",
+    "revision-verify.json": "eb0ac7b87a1c0ee56baf857c021b0b999b95b403d01f6719ae55edbccb3ef410",
+    "validation-expected.sha256": "56fd2fab4bc25459721c2716f67d3247f06ff1ef1faf095c18108b2552d5e31f",
+    "validation-stage.json": "fc3428b43bd19aecf96cbef681d0002f43f8a75bdf6679b7ddd913b7dc6817f8",
+    "validation-stage-without-returns.json": "d89ad280e9105df492e0edb55d3a2eda9d4c46c0025df9f9f1d7aacd8164c945",
+    "wheels-stage.json": "dcd464c03ca35a2568552fd6601270641de0b7f84fd1a1100f51d40a5b392c3a"
+  }
+}
