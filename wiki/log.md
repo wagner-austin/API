@@ -571,3 +571,7 @@ Notes: Checked each new claim against the current transformation, envelope, actu
 ## [2026-11-02] Source comparison | Native encrypted vintage check
 Page added: wrds-crsp-source-comparison; qualification, readiness and cohort pages updated; libs hub and index now 74 pages.
 Notes: Preserve failed synthetic import attempt separately from two verified database rehearsals. Licensed job 40568218 found all 81920 queried rows unchanged; its diagnostic ciphertext reached HPC3 with a complete private-tree readback. No economic refusal, baseline, candidate fit or final release is declared resolved. Board task 80ad9ec5-9a56-46dd-a87b-0ae652d712ad; live citation audits follow publication.
+
+## [2026-11-03] Corporate-action capture | Shared diagnostic owner
+Page added: wrds-crsp-corporate-action-capture; linked from qualification, comparison and libs, total 75 pages.
+Notes: Describe fixed event/detail projections and the lifted private capture lifecycle. Keep source implementation, fleet verification and native database evidence distinct; qualification remains open. Reverify affected source citations after moving the cohort reader and query bounds into shared owners. Board task fd32dc2e-b3c0-4e24-977c-8708667453e6.
