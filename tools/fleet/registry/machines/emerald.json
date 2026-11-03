@@ -40,7 +40,6 @@
     "cxx": null,
     "docker": null,
     "stack": null,
-    "elevated": false,
     "models": null
   }
 }
