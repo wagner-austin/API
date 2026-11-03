@@ -94,7 +94,7 @@ frozen study controller or its requests.[^preparation][^v3stop][^mounts]
 Follow-up task `f963ee0b` tracks that protocol/source qualification.
 [[crsp-outcome-qualification]] maps every diagnosed class to its evidence
 requirements, including partition-boundary event visibility. The reviewed source
-diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
+diagnosis remains the starting evidence.[^sources]
 
 Current source carries prospective version 5: version 4's extension for
 exactly closed suspension spans (independently reviewed), plus unfilled entries
@@ -102,8 +102,10 @@ without a closing trade, delistings on an unsold exit close, and labels dated by
 values dated after the exit ([[crsp-v5-boundary-policy]]). It rejects earlier
 runtime requests and keeps NT held, MV, DG and open-tail refusals. This is not a
 replacement installed controller, licensed dataset revision or native
-full-panel qualification; those remain gated by review. The original 27-case
-evidence and study stop still apply.[^qualification]
+full-panel qualification. An independent peer review accepted the version-5
+rules and the qualification instrument on 2026-11-03, so those licensed steps
+are the next to run; none has. The original 27-case evidence and study stop
+still apply.[^qualification]
 
 [[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
 derived for that source comparison, including its separate native
@@ -163,4 +165,4 @@ allocation-specific observations and their limits.[^preparation]
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement` and `record`; sibling `completion-preparation-report.json`, fifteen `attempts` with one failed, fourteen admitted, no selection or final-manifest identity and the unchanged journal digest. Diagnostic completion is not a model fit or a final evaluation.
 
 [^comparison]: [[wrds-crsp-source-comparison]], § "Native evidence", licensed job `40568218` and its primary comparison/collection artifacts.
-[^qualification]: [[crsp-outcome-qualification]], § "Qualification design" and § "Additional evidence to qualify", with captured independent audit verdicts and the checksummed historical catalog projection.
+[^qualification]: [[crsp-outcome-qualification]], § "Qualification design" and § "Additional evidence to qualify", with captured independent audit verdicts and the checksummed historical catalog projection; [[crsp-v5-boundary-policy]], § "Independent review", and board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3, review note by opus-mcps-1029-8f6e at 2026-11-03T08:12:33Z.

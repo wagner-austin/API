@@ -27,7 +27,7 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "752574db15efc98e09420383a36345b98946bc66"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
   tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json: b39cb05dfa388c8f0285508518118fe77325ec78
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "a17f46200e9c5c37d4eae0b7edfc4fc5a7840fa1"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "21b5d8b794f67352876ab9452d9d30858af533a3"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b4cbda6c030daf2a1cbd0c53f3b25c0354e23fc5"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "690e01a7b1b6a0b1be22d35d376e4715094886e0"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"

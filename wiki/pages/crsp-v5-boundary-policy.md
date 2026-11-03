@@ -23,7 +23,7 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_qualification.py"
   - "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py"
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "a17f46200e9c5c37d4eae0b7edfc4fc5a7840fa1"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "21b5d8b794f67352876ab9452d9d30858af533a3"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "08da2ef4c43700b587bc2ece90aa9b99dd3d7a64"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "0c6c56f05f23df1a239492e39798f935d47d6fdf"
@@ -36,11 +36,11 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "79e8c1a57c45e9014a3902d276dafb439efc69d7"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json": "b39cb05dfa388c8f0285508518118fe77325ec78"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py": "e243ecc4218c8024ed3de16136a18ea71061061c"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py": "98f92e84a790249f06fcca59307cb0ade6dc3adf"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py": "35cc1594079f941b856eeba5484ddd9a0c0ba9ff"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py": "7a121044d9a4f6421efb77109fca11f9ab28a112"
   "libs/covenant_ml/scripts/crsp_qualification.py": "7fd260c648cbeedc984cf639507dd4bf20403b62"
-  "libs/covenant_ml/tests/markets/test_crsp_qualification.py": "e606cab000d562a1660868da40870d2bf2e91fc8"
-  "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py": "11e054f12ee9f4935ded10d976f660e4045a4a61"
+  "libs/covenant_ml/tests/markets/test_crsp_qualification.py": "600274c114bf84fa379c562631cbddcd37fd23a3"
+  "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py": "b7a33b0ad233b0e571b7eb2caeaf3af0e5bdc857"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e, re-hashed 2026-11-03; pp. 11-13 (StkDelists, StkDistributions), 88 (PC price flags), 90-92 (RD and RM flags)."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; review of the version-4 suspension amendment is board post 43ba2e2b-c1d0-4a3c-ba3e-4fb75fc4123c."
@@ -51,7 +51,8 @@ confidence: medium
 # CRSP version-5 execution, delisting-boundary and incomplete-outcome policy
 
 This is the prospective protocol decision for every class of the 27 version-3
-first refusals in [[wrds-v3-refused-path-diagnosis]]. Version 5 changes two
+first refusals in [[wrds-v3-refused-path-diagnosis]], accepted by an
+independent review on 2026-11-03 (§ "Independent review"). Version 5 changes two
 declared accounting rules and keeps the version-4 held-return rule. It reads
 the same extraction columns and dates, so the existing encrypted extraction
 can be revised by metadata alone. **Nothing here is installed or measured on
@@ -99,7 +100,15 @@ delisting rule, which already did the same for one case.[^entry]
   neither sold nor assumed held).
 - **Direction of the assumption:** an investor might have traded near a quote;
   treating every non-TR entry as untradeable is the conservative execution
-  assumption, and it never values the security.
+  assumption, and it never reads a quote as a price.
+- **The label is not neutral:** the unfilled security still gets a label,
+  from its cash multiplier of exactly one against the benchmark. So it is
+  labelled positive in every month the equal-weight benchmark falls, and
+  unfilled members are mostly the illiquid securities the liquidity feature
+  describes. This is a declared change of target, the order's outcome rather
+  than the security's, not leakage: the qualification report counts unfilled
+  orders per decision and by period, so the study can state how many rows it
+  touches.[^labels][^instrument]
 
 ## Rule 2: a delisting on an exit close with no trade to sell into
 
@@ -162,9 +171,12 @@ period returns the paired bootstrap compares; this policy does not adopt it.
   none of its 27 refusals has this shape: its five held-path refusals that end
   on a DA or DP record each have their event inside the window. Version 5 newly assigns unsold-exit
   events to the earlier window, so the native scan is what measures it.
-  Whether such a decision should leave the known panel, because its labels
-  are not knowable by the boundary, is a design question for review and is
-  not decided here.[^cases]
+  Such a path stays refused, and its decision stays in the known panel.
+  Panel membership is calendar-only (a window exiting before the final
+  period); requiring every member to be valued by 2021-12-31 would condition
+  on an outcome, since late-resolving delistings are the distressed and
+  merger cases. If the native scan finds any, the repair is a declared
+  extraction change for those valuations, reviewed on its own.[^cases][^review]
 
 ## Why the 14 remaining refusals stay refusals
 
@@ -206,9 +218,30 @@ same convention as the version-3 diagnosis), decision index, period, counting
 key and entry and exit record digests, so the result joins to the 27 diagnosed
 cases without publishing an identifier, date, price or return. The report also
 counts the decisions, and the rows in them, that any refusal leaves
-unlabelled. The entrypoint pins design, bundle, entrypoint source and image
-before acquiring only the train-validation key, and publishes a shared run
-record.[^instrument]
+unlabelled, and each decision's unfilled orders with the training split, so
+unfilled orders are counted by period and published as run observations. The
+entrypoint pins design, bundle, entrypoint source and image before acquiring
+only the train-validation key, and publishes a shared run record.[^instrument]
+
+The record digests are unsalted SHA-256 of a licensed daily row. With the
+decision index giving the month and the liquidity ordinal pointing at a
+security, a holder of the same vendor row can confirm it. They are kept only
+because the version-3 diagnosis published the same digests for this join; a
+later publication should key them with a secret held beside the bundle. The
+join also relies on the loader building each row's fields in the same order,
+since the digest is of its JSON as built.[^review][^instrument]
+
+## Independent review
+
+A peer session that wrote none of the code (opus-mcps-1029-8f6e) reviewed
+rules 1 to 3, the retained refusals, the qualification instrument and the
+partition-boundary refusal against the code at API f3de1bef4 and accepted all
+six items. It required two changes before the native scan's numbers are read,
+both now made: the rule 1 label disclosure above and unfilled counts by period
+in the report. It also found the terminal-entry check comparing against a
+literal TR; that check now reads the design's execution flag. Its answer to
+the boundary question is the decision recorded above: keep refusing rather
+than drop decisions.[^review]
 
 ## Not established yet
 
@@ -233,8 +266,9 @@ record.[^instrument]
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting `valuation` predicate; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`, dated-field checks.
 [^return-path]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_resolve_held`: an absent row or a row whose delisting flag is not N refuses the span.
 [^rm]: CIZ guide pp. 91-92, RM flag table: DG delisting price more than 10 periods from the delisting date; MV missing corporate action value.
-[^instrument]: `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel` and `crsp_qualification_counts`; `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py`, `execute_crsp_qualification`; `libs/covenant_ml/scripts/crsp_qualification.py`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py` and `libs/covenant_ml/tests/markets/test_crsp_qualification_run.py`, an open suspension and a DG delisting counted at independently located ordinals, and a real encrypted subprocess run without the final key. Fleet job 368a7a90-73ec-4a33-9359-3e19c185aefb passed make check for libs/covenant_ml at API f3de1bef42c79c92b5c87717d3c1100fc303d1d5, the published tip carrying the eventless-delisting refusal, on serendipity at 2026-11-03T08:06:41Z: guard, mypy and 5,646 tests, 100.00% statements and branches. This is synthetic evidence for the code, not a licensed qualification.
+[^instrument]: `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel` and `crsp_qualification_counts`; `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py`, `execute_crsp_qualification`; `libs/covenant_ml/scripts/crsp_qualification.py`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py` and `libs/covenant_ml/tests/markets/test_crsp_qualification_run.py`, an open suspension and a DG delisting counted at independently located ordinals, and a real encrypted subprocess run without the final key. Fleet job 08b9a85a-9f0d-4cef-9792-edd40dbda34d passed make check for libs/covenant_ml at API cfd829d03590ea57c247057e27a48510ab2b2078, the published tip carrying the review's unfilled counts, on colossus at 2026-11-03T08:47:01Z: guard, mypy and 5,653 tests, 100.00% statements and branches. This is synthetic evidence for the code, not a licensed qualification.
 [^dlydel]: CIZ guide p. 12, StkDelists: DelDlyDt is the date the return is stored in StkDlySecurityData, by convention the trading date immediately after the delisting date; p. 17, StkDlySecurityPrimaryData: DlyDelFlg Y means a delisting return is present.
 [^eventless]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_eventless_delisting`, `_unsold` and `crsp_resolve_window_path`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py`, `test_a_delisting_the_partition_omits_is_named_rather_than_valued` (a real extract without security 8's event, one refusal at an independently located ordinal) and the held and unsold-exit cases of `test_each_refusal_has_its_counting_key_and_message`; `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_a_sold_exit_needs_no_event_for_a_delisting_flagged_after_it`.
+[^review]: Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3, review note posted by opus-mcps-1029-8f6e at 2026-11-03T08:12:33Z (ACCEPT on R1 to R6 of the request in post f7e04c03-1986-4608-b158-f0847a74aaf4); `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel`, `crsp_qualification_counts` and `decode_crsp_qualification`; `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry`.
 [^mthdel]: CIZ guide p. 20, StkMthSecurityData: MthDelFlg indicates if the returns from delists are included in the compounded period return.
 [^dist]: CIZ guide p. 13, StkDistributions: DisPERMNO, the PERMNO of a security received in a spinoff, exchange, merger or other distribution.
