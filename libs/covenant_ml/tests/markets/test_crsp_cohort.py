@@ -35,7 +35,7 @@ from covenant_ml.markets.research_trial_records import decode_research_trial
 
 from ._crsp_cohort_fixtures import CohortCase, cohort_case
 from ._crsp_database import database_protocol, relation_columns
-from ._crsp_study_fixtures import study_protocol
+from ._crsp_study_fixtures import DELISTED, study_protocol
 from ._encrypted_fixtures import evaluator_keys
 from ._trial_fixtures import frozen_request
 
@@ -58,6 +58,8 @@ def _assert_refused(case: CohortCase) -> None:
 
 def test_real_encrypted_cohort_keeps_lineage_and_cannot_load_as_a_study(tmp_path: Path) -> None:
     case = cohort_case(tmp_path)
+    assert {require_int(row, "permno") for row in case.rows["returns"]} == {1, DELISTED}
+    assert {require_int(row, "permno") for row in case.rows["delists"]} == {DELISTED}
     (tmp_path / "keys" / "final.agekey").unlink()
     result = _derive(case, case.plan)
     assert (result["cases"], result["securities"], result["plaintext_removed"]) == (2, 1, True)

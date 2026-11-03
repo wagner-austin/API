@@ -6,7 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import NamedTuple
 
-from platform_core.json_utils import JSONObject, dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str, require_int
 
 from covenant_ml.markets.crsp_cohort_records import CrspCohortPlan, decode_crsp_cohort_plan
 from covenant_ml.markets.crsp_queries import crsp_scopes
@@ -21,6 +21,7 @@ from ._crsp_extraction_fixtures import (
     limits,
     run_vendor,
 )
+from ._crsp_study_fixtures import DELISTED
 
 
 class CohortCase(NamedTuple):
@@ -35,12 +36,23 @@ class CohortCase(NamedTuple):
 
 
 def cohort_case(root: Path) -> CohortCase:
-    """Write a full fixture extraction with real encryption and two private-row anchors."""
+    """Encrypt the anchored security and a foreign delisted security with real keys.
+
+    The diagnostic needs two distinct entry anchors and evidence that derivation
+    excludes another security, not the eight-security model-training panel.
+    Keep both securities' entire histories and the complete partition calendar;
+    the shared database fixture still owns all dates, values and terminal rows.
+    """
     case = extraction(root)
-    with installed(FakeDatabase(database_rows())):
+    database = database_rows()
+    for relation in ("membership", "returns", "delists"):
+        database[relation] = [
+            row for row in database[relation] if require_int(row, "permno") in {1, DELISTED}
+        ]
+    with installed(FakeDatabase(database)):
         receipt = run_vendor(case, limits())
     protocol = database_protocol()
-    rows = partition_rows(database_rows(), protocol, crsp_scopes(protocol)[0])
+    rows = partition_rows(database, protocol, crsp_scopes(protocol)[0])
     document: JSONObject = {
         "results": [
             {
