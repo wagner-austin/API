@@ -6,10 +6,11 @@ from math import prod
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import JSONObject, require_float, require_str
+from platform_core.json_utils import JSONObject, JSONValue, require_float, require_str
 
 from covenant_ml.markets.crsp_extract import load_crsp_sources
 from covenant_ml.markets.crsp_holdings import (
+    CrspPath,
     crsp_window_path,
     evaluate_crsp_holdings,
     index_crsp_outcomes,
@@ -72,23 +73,50 @@ def test_terminal_record_with_a_contradictory_trade_flag_refuses_evaluation() ->
         crsp_window_path(evidence, 1, W1)
 
 
-@pytest.mark.parametrize("day", [W1.entry, W1.exit])
-def test_label_path_requires_trade_prices_at_both_ordinary_endpoints(day: str) -> None:
-    rows = [daily(1, W1.entry, 0.0), daily(1, "2020-02-04", 0.1), daily(1, W1.exit, 0.0)]
-    for row in rows:
-        if row["dlycaldt"] == day:
-            row["dlyprcflg"] = "BA"
+#: Entry or exit records that are present but are no closing trade (CIZ guide p.88).
+UNTRADED: list[dict[str, JSONValue]] = [
+    {"dlyprcflg": "BA"},
+    {"dlyprcflg": "SU", "dlyprc": None},
+    {"dlyprcflg": "HA", "dlyprc": None},
+    {"dlyprcflg": "NT", "dlyprc": None},
+    {"dlyprcflg": "MP", "dlyprc": None},
+]
+
+
+@pytest.mark.parametrize("fields", UNTRADED)
+def test_ordinary_exit_without_a_closing_trade_refuses_the_label_path(
+    fields: dict[str, JSONValue],
+) -> None:
+    rows = [daily(1, W1.entry, 0.0), daily(1, "2020-02-04", 0.1), daily(1, W1.exit, 0.0, **fields)]
     with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 
 
-@pytest.mark.parametrize("day", [W1.entry, W1.exit])
-def test_missing_price_at_either_endpoint_refuses_the_actual_label_path(day: str) -> None:
-    rows = [daily(1, W1.entry, 0.0), daily(1, "2020-02-04", 0.1), daily(1, W1.exit, 0.0)]
-    for row in rows:
-        if row["dlycaldt"] == day:
-            row["dlyprc"] = None
-            row["dlyprcflg"] = "NT"
+@pytest.mark.parametrize("fields", UNTRADED)
+def test_entry_without_a_closing_trade_is_an_unfilled_order_kept_in_cash(
+    fields: dict[str, JSONValue],
+) -> None:
+    # Later rows would value a bought position; none of them is read.
+    rows = [
+        daily(1, W1.entry, 0.0, **fields),
+        daily(1, "2020-02-04", 0.5),
+        daily(1, W1.exit, 0.0),
+        daily(2, W1.entry, 0.0),
+        daily(2, "2020-02-04", 0.1),
+        daily(2, W1.exit, 0.0),
+    ]
+    evidence = outcomes(rows, [])
+    assert crsp_window_path(evidence, 1, W1) == CrspPath(False, 1.0, None)
+    (period,) = evaluate_crsp_holdings(evidence, (W1,), ((1, 2),), 10)
+    # Two equal slots x: one stays cash, one buys stock 2; 2x + 0.001x = 1.
+    each = 1 / 2.001
+    assert period.unfilled == (1,)
+    assert period.turnover == pytest.approx(each + each * 1.1)
+    assert period.net_return == pytest.approx(each + each * 1.1 * 0.999 - 1)
+
+
+def test_closing_trade_flag_without_a_positive_price_still_refuses_entry() -> None:
+    rows = [daily(1, W1.entry, 0.0, dlyprc=None), daily(1, "2020-02-04", 0.1)]
     with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
         crsp_window_path(outcomes(rows, []), 1, W1)
 

@@ -69,8 +69,10 @@ def test_metadata_revision_preserves_originals_and_needs_no_keys(tmp_path: Path)
             max_plaintext_bytes=10_000_000,
         ) as manifest:
             sources = load_crsp_sources(manifest)
-            assert sources.protocol["version"] == 4
+            assert sources.protocol["version"] == 5
+            assert sources.protocol["entry_rule"] == "closing-trade-or-unfilled-cash"
             assert sources.protocol["held_return_rule"] == "exact-unpriced-held-spans"
+            assert sources.protocol["terminal_rule"] == "unsold-exit-event-label-at-valuation"
             assert len(sources.membership) == 3
             assert sources.manifest["extracted_at"] == revision["extracted_at"]
     assert not list(tmp_path.glob("crsp-revision-metadata-*"))

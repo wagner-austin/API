@@ -64,9 +64,10 @@ def test_frozen_protocol_roundtrip_preserves_dates_and_cost_order() -> None:
     assert protocol["holdout_end"] == "2024-12-31"
     assert protocol["coverage_end"] == "2025-02-28"
     assert protocol["cost_bps"] == (10, 5, 25)
-    assert protocol["version"] == 4
+    assert protocol["version"] == 5
     assert protocol["held_return_rule"] == "exact-unpriced-held-spans"
-    assert protocol["entry_rule"] == "confirmed-terminal-entry-cash"
+    assert protocol["entry_rule"] == "closing-trade-or-unfilled-cash"
+    assert protocol["terminal_rule"] == "unsold-exit-event-label-at-valuation"
     assert protocol["cost_rule"] == "actual-traded-notional"
     assert protocol["share_codes"] == (10, 11)
     assert protocol["membership_columns"] == ("permno", "namedt", "nameendt", "shrcd", "exchcd")
@@ -132,7 +133,9 @@ def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> No
         ("calendar_group", "CRSP"),
         ("execution_flag", "BA"),
         ("terminal_rule", "zero-on-delist"),
+        ("terminal_rule", "dated-value-next-rebalance"),
         ("entry_rule", "drop-unfilled"),
+        ("entry_rule", "confirmed-terminal-entry-cash"),
         ("cost_rule", "pre-fee-target-notional"),
         ("held_return_rule", "fill-missing-with-zero"),
         ("held_return_rule", "exact-missing-price-spans"),
@@ -149,6 +152,7 @@ def test_altered_extraction_columns_are_refused(field: str, mutation: str) -> No
         ("version", 1),
         ("version", 2),
         ("version", 3),
+        ("version", 4),
         ("liquidity_window", 253),
     ],
 )

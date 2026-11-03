@@ -218,7 +218,8 @@ def _change(
         (_change(drift_rows(), 2, "2020-02-04", dlyprevdt="2020-01-31"), "held return for 2"),
         (_change(drift_rows(), 2, "2020-02-04", dlyretmissflg="MR"), "held return for 2"),
         (_drop(drift_rows(), 3, "2020-03-02"), "no execution record for 3 on 2020-03-02"),
-        (_change(drift_rows(), 3, "2020-03-02", dlyprcflg="BA"), "CRSP-004"),
+        (_change(drift_rows(), 3, "2020-03-02", dlyprc=None), "CRSP-004"),
+        (_change(drift_rows(), 2, "2020-03-02", dlyprcflg="BA"), "CRSP-004"),
         (_change(drift_rows(), 1, "2020-03-02", dlyprcflg="BA"), "CRSP-004"),
         (_change(drift_rows(), 3, "2020-04-01", dlyprcflg="BA"), "CRSP-004"),
         (
@@ -237,15 +238,37 @@ def test_incomplete_held_evidence_publishes_no_outcome(
 
 
 @pytest.mark.parametrize(
+    ("key", "value"), [("delamtdt", "2020-03-03"), ("delnextdt", "2020-03-04")]
+)
+def test_value_dated_after_exit_stays_locked_until_the_following_rebalance(
+    key: str, value: str
+) -> None:
+    rows, delists = terminal_rows()
+    delists[0][key] = value
+    evidence = outcomes(rows, delists)
+    assert crsp_window_path(evidence, 4, W1).terminal == (value, 0.6)
+    first, second, third = evaluate_crsp_holdings(evidence, (W1, W2, W3), ((4, 5), (5,), (5,)), 10)
+    # Identical to a value dated on the exit: never reinvested at W2's entry.
+    entry = 0.5 / 1.001
+    assert first.receivables[0].valued == value
+    assert first.net_return == pytest.approx(entry * 1.6 - 1)
+    assert (second.turnover, second.receivables[0].valued) == (0.0, value)
+    start = entry * 1.6
+    invested = (start + 0.001 * entry) / 1.001
+    assert third.receivables == ()
+    assert third.net_return == pytest.approx(invested * 1.1 * 0.999 / start - 1)
+
+
+@pytest.mark.parametrize(
     ("key", "value", "message"),
     [
-        ("delamtdt", "2020-03-03", "dated after the exit"),
-        ("delnextdt", "2020-03-04", "dated after the exit"),
         ("delretmisstype", "DM", "CRSP-005"),
+        ("delretmisstype", "DG", "CRSP-005"),
+        ("delretmisstype", "MV", "CRSP-005"),
         ("delret", -1.0, "portfolio value was exhausted"),
     ],
 )
-def test_unresolved_or_late_terminal_values_are_refused(
+def test_unresolved_terminal_values_are_refused(
     key: str, value: JSONValue, message: str
 ) -> None:
     rows, delists = terminal_rows()

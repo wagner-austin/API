@@ -74,6 +74,16 @@ def panel_protocol() -> JSONObject:
     return protocol
 
 
+def version_three(protocol: JSONObject) -> JSONObject:
+    """The same design under the stopped study's installed version-3 rule names."""
+    old = dict(protocol)
+    old["version"] = 3
+    old["entry_rule"] = "confirmed-terminal-entry-cash"
+    old["held_return_rule"] = "exact-missing-price-spans"
+    old["terminal_rule"] = "dated-value-next-rebalance"
+    return old
+
+
 def write_sources(
     directory: Path, rows: dict[str, list[JSONObject]], protocol: JSONObject
 ) -> tuple[Path, JSONObject]:

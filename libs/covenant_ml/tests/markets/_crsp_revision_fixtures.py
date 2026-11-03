@@ -10,7 +10,7 @@ from covenant_ml.markets.crsp_extract import decode_crsp_extract, encode_crsp_ex
 from covenant_ml.markets.encrypted_storage import encrypt_bundle
 from covenant_ml.markets.research_keys import ResearchAccess
 
-from ._crsp_fixtures import panel_protocol, source_rows, write_sources
+from ._crsp_fixtures import panel_protocol, source_rows, version_three, write_sources
 from ._encrypted_fixtures import create_access, file_record
 from .test_crsp_extraction_records import receipt_document
 
@@ -31,10 +31,7 @@ def revision_case(root: Path, *, unchanged: bool = False) -> RevisionCase:
     current = panel_protocol()
     protocol = root / "current.json"
     protocol.write_text(dump_json_str(current))
-    old = dict(current)
-    if not unchanged:
-        old["version"] = 3
-        old["held_return_rule"] = "exact-missing-price-spans"
+    old = dict(current) if unchanged else version_three(current)
     previous = root / "previous.json"
     previous.write_text(dump_json_str(old))
     outputs = root / "outputs"
