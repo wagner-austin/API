@@ -5,7 +5,7 @@ from __future__ import annotations
 import socket
 import sys
 import threading
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 
 import pytest
@@ -19,7 +19,7 @@ from platform_core.json_utils import (
 from websockets.sync.client import connect
 from websockets.sync.server import ServerConnection, serve
 
-from fleet.core.native_rpc import _request, attempt_read_threads, read_threads
+from fleet.core.native_rpc import attempt_read_threads, read_threads, rpc_request
 
 SESSION = "11111111-1111-4111-8111-111111111111"
 
@@ -67,7 +67,9 @@ class RuntimeServer:
 
 
 @contextmanager
-def runtime(handler: RuntimeServer) -> Generator[tuple[str, ...], None, None]:
+def runtime(
+    handler: Callable[[ServerConnection], None],
+) -> Generator[tuple[str, ...], None, None]:
     """Run the actual WebSocket server and return a real proxy child command."""
     with socket.socket() as listener:
         listener.bind(("127.0.0.1", 0))
@@ -161,7 +163,7 @@ def test_request_checks_shared_deadline_before_reading() -> None:
                 connect(f"ws://127.0.0.1:{port}/", proxy=None, close_timeout=1) as connection,
                 pytest.raises(TimeoutError, match="CODEX_OBSERVE_TIMEOUT"),
             ):
-                _request(connection, 0, "initialize", {}, 0)
+                rpc_request(connection, 0, "initialize", {}, 0)
         finally:
             server.shutdown()
             thread.join(timeout=5)

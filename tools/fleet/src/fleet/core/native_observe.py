@@ -25,6 +25,24 @@ from platform_core.mcp_client import McpCredentials, call_mcp_tool
 from fleet.core import _test_hooks, _test_hooks_native
 from fleet.core.ssh_options import SSH_OPTIONS
 
+#: The deadline of one connection to a host's Codex runtime, handshake included.
+NATIVE_TIMEOUT_SECONDS = 20
+
+
+def proxy_argv(host: str, user: str) -> list[str]:
+    """The command that attaches to a host's running Codex daemon over the existing SSH route.
+
+    Args:
+        host: SSH alias from the fleet registry.
+        user: Provisioned account running Codex.
+
+    Returns:
+        ``ssh <options> <host> <codex> app-server proxy``: a disposable
+        child relaying stdio to the daemon's control socket, which starts
+        no daemon and opens no listener.
+    """
+    return ["ssh", *SSH_OPTIONS, host, f"/home/{user}/.local/bin/codex", "app-server", "proxy"]
+
 
 def registered_codex(board: McpCredentials, machine: str, identity: JSONObject) -> tuple[str, ...]:
     """Read every page of the existing ledger's machine-readable inventory.
@@ -155,9 +173,7 @@ def observe_codex(
         raise ValueError("CODEX_OBSERVE_LIMIT: more than 200 registered Codex sessions on host")
     observed = _test_hooks.now()
     threads, failure = _test_hooks_native.read(
-        ["ssh", *SSH_OPTIONS, host, f"/home/{user}/.local/bin/codex", "app-server", "proxy"],
-        targets,
-        timeout_seconds=20,
+        proxy_argv(host, user), targets, timeout_seconds=NATIVE_TIMEOUT_SECONDS
     )
     if failure is None and len(threads) != len(targets):
         raise ValueError("CODEX_OBSERVE_RESPONSE: incomplete runtime response batch")
@@ -209,4 +225,11 @@ def evidence_note(observations: list[JSONValue], evidence_seconds: int) -> str:
     )
 
 
-__all__ = ["evidence_note", "observe_codex", "registered_codex", "thread_status"]
+__all__ = [
+    "NATIVE_TIMEOUT_SECONDS",
+    "evidence_note",
+    "observe_codex",
+    "proxy_argv",
+    "registered_codex",
+    "thread_status",
+]
