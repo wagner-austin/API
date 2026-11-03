@@ -125,6 +125,13 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
     the control duty's machine cannot read; rcs-pair-watch is a devices row
     of MCPs' hub runner, and the tunnel retires with austinpc's devices.
 
+    The session host's journals are read with their cursors in the control
+    duty's state directory, ``fleet-mcp/state``, which MCPs' hub-mounts.json
+    mounts from the control export on whichever machine holds control: a
+    control move then carries them, where cursors in the checkout's root
+    stayed on the old holder and the new one replayed the session host's
+    journals from their first byte (MCPs board task 927bbd25).
+
     Args:
         workspace: This machine's MCPs checkout.
         python: The interpreter maketools' launcher runs under.
@@ -133,6 +140,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         The rows, each command and directory built from the arguments.
     """
     journals = str(workspace)
+    state = f"{journals}/fleet-mcp/state"
     return (
         {
             "name": "hpc-wake",
@@ -199,7 +207,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
                 "run",
                 "fleet-health-wake",
                 "--journal",
-                f"{journals}/fleet-mcp/state/health-events.jsonl",
+                f"{state}/health-events.jsonl",
             ),
             "cwd": "../fleet-health-wake",
         },
@@ -207,10 +215,10 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         # session host's fleet-lock journal -> board, through the same bridge
         # and standing task as the lock-wake row, since the sessions there take
         # their locks in its checkout. The bridge reads only the unread window
-        # over one ssh per tick and keeps its cursor on this machine, in the
-        # MCPs clone root beside the hub's own
+        # over one ssh per tick and keeps its cursor in the control duty's
+        # state directory, which moves with control
         # (.fleet-events.jsonl.lock-wake-ziggurat-offset.json, under that
-        # root's /.fleet-events.jsonl.* ignore).
+        # directory's own ignore).
         {
             "name": "lock-wake-ziggurat",
             "args": (
@@ -220,7 +228,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
                 "--remote-journal",
                 f"{SESSION_HOST}:{SESSION_HOST_CHECKOUT}/.fleet-events.jsonl",
                 "--cursor-dir",
-                journals,
+                state,
             ),
             "cwd": "../lock-wake",
         },
@@ -230,7 +238,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
         # action that failed or was refused is posted under ACTIONS tagging
         # who ran it. Its cursor is
         # .action-events.jsonl.lock-wake-ziggurat-offset.json in the same
-        # clone root, under that root's /.action-events.jsonl.* ignore.
+        # state directory, under that directory's own ignore.
         {
             "name": "lock-wake-ziggurat-actions",
             "args": (
@@ -240,7 +248,7 @@ def publishers(workspace: pathlib.Path, python: str) -> tuple[Publisher, ...]:
                 "--remote-action-journal",
                 f"{SESSION_HOST}:{SESSION_HOST_CHECKOUT}/.action-events.jsonl",
                 "--cursor-dir",
-                journals,
+                state,
             ),
             "cwd": "../lock-wake",
         },
