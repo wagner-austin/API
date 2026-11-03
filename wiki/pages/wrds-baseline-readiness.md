@@ -111,7 +111,8 @@ native synthetic rehearsal and licensed capture passed. Independent audit
 capture has nineteen delisting and 328 distribution events with admissible
 details. [[wrds-crsp-action-case-evidence]] records the completed native join:
 all 27 original cases matched, with actions within the window or on exit for
-18 cases. Its independent review remains pending. This measures coverage;
+18 cases. Independent audit `ffd0a417` verified that diagnostic milestone
+on November 3 at 05:08 UTC. This measures coverage;
 usable economic outcomes and a replacement study remain unqualified.[^qualification][^actions][^casejoin]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
@@ -144,7 +145,7 @@ allocation-specific observations and their limits.[^preparation]
 [^sources]: [[wrds-v3-refused-path-diagnosis]], § "Every original refusal", § "Data limitations versus implementation" and § "Next action", with native source-field evidence and the primary CIZ definitions.
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner", § "Admission is not permission to fit this subset" and § "Native evidence and limits".
 [^actions]: [[wrds-crsp-corporate-action-capture]], § "Verification status".
-[^casejoin]: [[wrds-crsp-action-case-evidence]], § "Licensed coverage and its limits".
+[^casejoin]: [[wrds-crsp-action-case-evidence]], § "Acceptance" and § "Licensed coverage and its limits".
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 

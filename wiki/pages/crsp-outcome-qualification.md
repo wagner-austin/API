@@ -4,6 +4,7 @@ tags: [wrds, crsp, qualification, missingness]
 hubs: [libs]
 related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]"]
 source_paths:
+  - tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py"
@@ -21,6 +22,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
+  tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json: b39cb05dfa388c8f0285508518118fe77325ec78
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
@@ -168,8 +170,20 @@ This investigation supplies no replacement return policy.[^actions]
 The authenticated [[wrds-crsp-action-case-evidence]] now matches all 27 cases
 to their original monthly windows. Eighteen have a captured action within the
 window or on exit; this is measured coverage, not eighteen repaired outcomes.
-The native replay and licensed join passed; their independent audit remains
-pending. The other nine cases do not acquire an outcome from this join.[^casejoin]
+Independent audit `ffd0a417` verified the native replay and licensed join on
+November 3 at 05:08 UTC. The other nine cases do not acquire an outcome from
+this join.[^casejoin]
+
+The case-by-case reconciliation binds the action report to the original entry
+digests, periods and exit offsets. All six NT cases, both SU cases and the open
+MP tail have no captured event inside the window or on exit. All six MV cases
+have relevant distributions, but each has at least one null distribution amount.
+Null does not mean zero and does not establish the form of consideration.
+For the three BA old-position exits, delisting amount dates are respectively
+three, one and one calendar days beyond exit. Thus accepting the event on exit
+alone would still leave a valuation-timing issue. The fourth entry-date
+delisting is the MV terminal case 173979 with a TR entry; it must not be
+grouped with the three rejected BA entry candidates.[^reconciliation]
 
 Interpretation must answer whether cash or security consideration is complete,
 when it is valued, and whether the daily total return already contains it.
@@ -194,5 +208,6 @@ before new study admission.[^distribution][^vendor][^owners]
 [^source-checks]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json`, captured live board responses: comparison audit `dc59b228` completed VERIFIED at 2026-11-03T01:44:51.513Z; scalar-error privacy audit `9ccc6e3a` completed VERIFIED at 2026-11-03T01:55:18.663Z, each against its own acceptance criteria.
 [^catalog]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json`, exact metadata rows from the October 27 inventory and SHA-256 identities of the source column/access CSV files, rechecked November 3 UTC.
 [^actions]: [[wrds-crsp-corporate-action-capture]], § "Scope and privacy" and § "Verification status".
-[^casejoin]: [[wrds-crsp-action-case-evidence]], § "Licensed coverage and its limits".
+[^casejoin]: [[wrds-crsp-action-case-evidence]], § "Acceptance" and § "Licensed coverage and its limits".
+[^reconciliation]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json`, exact source digests, method, case classes/counts, null-amount counts and delisting amount offsets from exit; original diagnosis `result.json`, path 173979 entry price flag and terminal event offset. No economic rule or return calculation is added by this metadata reconciliation.
 [^distribution]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–13, StkDelists and StkDistributions field definitions; pp. 17–18, DlyRet total-return definition. Archived primary source and digest in frontmatter. Interpretation and proposed investigation are this project's requirements, not a claim that those fields close the observed gaps.

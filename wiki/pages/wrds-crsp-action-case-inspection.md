@@ -33,8 +33,8 @@ confidence: medium
 
 Implementation passed the full fleet check at `89f23c71290e`.
 [[wrds-crsp-action-case-evidence]] records the completed native synthetic replay
-and licensed join; independent audit remains pending under board task
-`4fca73b7-9c36-47a9-a705-7541813c9338`.[^verification][^native]
+and licensed join. Independent audit `ffd0a417` verified board task
+`4fca73b7-9c36-47a9-a705-7541813c9338` on November 3.[^verification][^native]
 
 This diagnostic measures what the
 captured evidence contains; it does not qualify outcomes or authorize the
@@ -92,5 +92,5 @@ forced-termination or process-isolation guarantee.[^cli]
 [^events]: `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `_events` and `_detail`.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_action_cases.py`, boundary and calendar refusal tests; `libs/covenant_ml/tests/markets/test_crsp_action_inspection.py`, `test_real_encrypted_case_inspection_needs_no_final_key`, `test_authenticated_but_inconsistent_capture_refuses`, `test_real_inspection_child_emits_metrics_or_cleans_ciphertext_failure`.
 [^cli]: `libs/covenant_ml/scripts/crsp_extraction.py`, `_inspect_actions`; `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `inspect_crsp_actions` cleanup return.
-[^native]: [[wrds-crsp-action-case-evidence]], § "Frozen execution and synthetic replay" and § "Licensed coverage and its limits".
+[^native]: [[wrds-crsp-action-case-evidence]], § "Acceptance", § "Frozen execution and synthetic replay" and § "Licensed coverage and its limits".
 [^verification]: `tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-passed.json`, `job.sha`, `job.status`, `job.detail` and measured completion trail; sibling `fleet-typing-failure.json`, failed predecessor at `4dc47aaa833b`. `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `_events` typed natural-key ordering.
