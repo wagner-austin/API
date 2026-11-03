@@ -8,9 +8,10 @@ hold lenovold's file as a Linux machine run as corvis at that address, and
 that no file in the roster name lenovoold afterwards. Each case reads the
 shipped tree:
 
-- the shipped registry decodes lenovold as an enabled Linux machine run as
-  corvis, and its own file holds the tailnet address the live policy names
-  it at;
+- the shipped registry decodes lenovold as a Linux machine run as corvis,
+  and its own file holds the tailnet address the live policy names it at.
+  Whether it is enabled is not read: that says whether it answers now, and
+  it is off through its NixOS reinstall (MCPs board task 73417df8);
 - no file under ``registry/machines`` is lenovoold's, and the decoded
   workspace names no such machine;
 - no line of any registry file names lenovoold in any case, its notes
@@ -61,7 +62,6 @@ def test_lenovold_decodes_as_the_linux_worker_it_was_reimaged_to() -> None:
 
     assert require_str(declared, "platform") == "linux"
     assert lenovold["user"] == "corvis"
-    assert lenovold["enabled"] is True
     assert require_str(declared, "tailnetIp") == TAILNET_IP
 
 
