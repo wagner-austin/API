@@ -1,28 +1,18 @@
 """Real encrypted monthly workers distinguish closed suspension from an open tail."""
 
-import subprocess
-import sys
-from hashlib import sha256
 from pathlib import Path
 
 import pytest
-from platform_core.config import config_test_hooks
 from platform_core.json_utils import (
-    JSONObject,
-    dump_json_str,
     load_json_str,
     narrow_json_to_dict,
-    require_dict,
     require_list,
     require_str,
 )
 from platform_core.run_record import decode_run_record, run_record_sidecar
-from scripts import research_trial
 
-from ._crsp_fixtures import write_sources
-from ._crsp_study_fixtures import missing_price_rows, study_protocol
-from ._encrypted_fixtures import create_access, seal_extract
-from ._trial_fixtures import frozen_request
+from ._crsp_study_fixtures import missing_price_rows
+from ._crsp_worker_fixtures import run_monthly_worker
 
 
 @pytest.mark.parametrize("closed", [True, False])
@@ -41,47 +31,7 @@ def test_real_worker_scores_closed_suspension_or_refuses_and_cleans_an_open_tail
                     dlyprc=None,
                     dlyprcflg="SU",
                 )
-    source = tmp_path / "source"
-    source.mkdir()
-    manifest, _ = write_sources(source, rows, study_protocol())
-    access = create_access(tmp_path)
-    bundle = seal_extract(manifest, tmp_path / "encrypted", access, "train-validation")
-    (tmp_path / "keys" / "final.agekey").unlink()
-    evaluation: JSONObject = {
-        "design": study_protocol(),
-        "stopping_months": 6,
-        "fold_months": 12,
-        "confidence": 0.9,
-    }
-    document = frozen_request(evaluation, bundle, ["momentum", "liquidity"])
-    require_dict(document, "policy")["code_digest"] = sha256(
-        Path(research_trial.__file__).read_bytes()
-    ).hexdigest()
-    request = tmp_path / "request.json"
-    request.write_text(dump_json_str(document))
-    output = tmp_path / "result" / "evaluation.json"
-    environment = dict(config_test_hooks.get_environment())
-    environment["IMAGE_DIGEST"] = "d" * 64
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "scripts.research_trial",
-            "--request",
-            str(request),
-            "--out",
-            str(output),
-            "--access",
-            str(tmp_path / "access.json"),
-            "--scratch",
-            str(tmp_path),
-        ],
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=False,
-    )
+    result, output = run_monthly_worker(tmp_path, rows)
     assert list(tmp_path.glob("research-plaintext-*")) == []
     assert not (tmp_path / "keys" / "final.agekey").exists()
     if closed:

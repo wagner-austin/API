@@ -22,7 +22,7 @@ from covenant_ml.markets.crsp_holdings import crsp_window_path, evaluate_crsp_ho
 from covenant_ml.markets.research_trial import execute_trial
 from covenant_ml.markets.research_trial_records import decode_research_trial
 
-from ._crsp_fixtures import write_sources
+from ._crsp_fixtures import version_three, write_sources
 from ._crsp_study_fixtures import missing_price_rows, pre_entry_rows, study_protocol
 from ._encrypted_fixtures import create_access, evaluator_keys, seal_extract
 from ._trial_fixtures import frozen_request, trial_document
@@ -207,9 +207,7 @@ def test_encrypted_monthly_study_publishes_rejected_orders_and_cleans_plaintext(
 def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> None:
     document = trial_document(tmp_path)
     evaluation = require_dict(document, "evaluation")
-    old_design = dict(require_dict(evaluation, "design"))
-    old_design["held_return_rule"] = "exact-missing-price-spans"
-    old_design["version"] = 3
+    old_design = version_three(require_dict(evaluation, "design"))
     old_evaluation = dict(evaluation)
     old_evaluation["design"] = old_design
     old_digest = sha256(
@@ -237,9 +235,7 @@ def test_old_rule_identity_cannot_admit_the_new_evaluator(tmp_path: Path) -> Non
 
 
 def test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data(tmp_path: Path) -> None:
-    old_design = study_protocol()
-    old_design["held_return_rule"] = "exact-missing-price-spans"
-    old_design["version"] = 3
+    old_design = version_three(study_protocol())
     source = tmp_path / "source"
     source.mkdir()
     manifest, _ = write_sources(source, pre_entry_rows(), old_design)
@@ -252,7 +248,7 @@ def test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data(tmp_p
         "confidence": 0.9,
     }
     trial = decode_research_trial(frozen_request(evaluation, sealed, ["momentum"]))
-    with pytest.raises(ValueError, match=r"MARKET-001.*version=3 must lie in \[4, 4\]"):
+    with pytest.raises(ValueError, match=r"MARKET-001.*version=3 must lie in \[5, 5\]"):
         execute_trial(
             trial,
             sample_run_fingerprint(image_digest="d" * 64),

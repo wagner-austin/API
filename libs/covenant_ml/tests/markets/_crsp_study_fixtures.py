@@ -146,6 +146,38 @@ def pre_entry_rows() -> dict[str, list[JSONObject]]:
     return rows
 
 
+#: The quote-only exit close on which ``unsold_exit_rows`` delists security 8.
+UNSOLD_EXIT = "2019-04-01"
+#: Its delisting amount date, three calendar days after that exit.
+LATE_VALUE = "2019-04-04"
+
+
+def unsold_exit_rows() -> dict[str, list[JSONObject]]:
+    """Delist security 8 on an exit close it cannot be sold at, valued after it.
+
+    The February decision's window exits on 2019-04-01. That record is a bid/ask
+    average (BA), the delisting date is the same close and the amount is dated
+    three days later. The March decision enters at the same quote.
+    """
+    rows = study_rows()
+    rows["returns"] = [
+        row
+        for row in rows["returns"]
+        if row["permno"] != DELISTED or require_str(row, "dlycaldt") <= "2019-04-02"
+    ]
+    for row in rows["returns"]:
+        if row["permno"] == DELISTED and row["dlycaldt"] == UNSOLD_EXIT:
+            row["dlyprcflg"] = "BA"
+        if row["permno"] == DELISTED and row["dlycaldt"] == "2019-04-02":
+            row.update({"dlyret": 0.3, "dlydelflg": "Y", "dlyretdurflg": "DD", "dlyprcflg": "DA"})
+        if row["permno"] == DELISTED and row["dlycaldt"] == "2019-03-15":
+            row.update({"dlyret": 0.0, "dlydelflg": "N", "dlyretdurflg": "DU"})
+    rows["delists"][0].update(
+        {"delistingdt": UNSOLD_EXIT, "deldlydt": "2019-04-02", "delamtdt": LATE_VALUE}
+    )
+    return rows
+
+
 def final_manifest(directory: Path) -> Path:
     """Stage the evaluator's extract through the final period's last exit."""
     path, _ = write_sources(directory, study_rows(FINAL_END), study_protocol())
@@ -185,6 +217,8 @@ def missing_price_rows(*, price_flag: str = "MP", gap: int = 1) -> dict[str, lis
 __all__ = [
     "DELISTED",
     "FINAL_END",
+    "LATE_VALUE",
+    "UNSOLD_EXIT",
     "VALIDATION_END",
     "final_manifest",
     "missing_price_rows",
@@ -192,4 +226,5 @@ __all__ = [
     "study_protocol",
     "study_rows",
     "study_sources",
+    "unsold_exit_rows",
 ]
