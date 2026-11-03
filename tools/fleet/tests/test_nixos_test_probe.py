@@ -9,7 +9,6 @@ nix's version. The probe body's own line is pinned beside it.
 
 from __future__ import annotations
 
-import os
 import pathlib
 import subprocess
 
@@ -71,27 +70,25 @@ def _ask(
     Args:
         tmp_path: Where the stand-in nix's directory goes.
         device: The stand-in device.
-        with_nix: Whether the stand-in nix's directory leads the PATH.
+        with_nix: Whether a stand-in nix was written into that directory;
+            without one the directory is made empty.
 
     Returns:
         The finished program.
     """
-    # Without the stand-in, every PATH entry carrying a nix is dropped, so a
-    # NixOS node running this test does not answer with its own.
-    entries = os.environ["PATH"].split(":")
-    path = (
-        [(tmp_path / "bin").as_posix(), *entries]
-        if with_nix
-        else [entry for entry in entries if not (pathlib.Path(entry) / "nix").exists()]
-    )
+    # The program runs only shell builtins and nix, so its PATH is exactly the
+    # stand-in's directory: with the stand-in it is the nix asked, and without
+    # it no nix is found, whatever this host carries.
+    bin_dir = tmp_path / "bin"
+    if not with_nix:
+        bin_dir.mkdir()
     program = NIXOS_TEST_PROGRAM.replace(KVM_DEVICE, device.as_posix())
     return subprocess.run(
-        [*SH_INVOCATION, "-c", program],
+        [*SH_INVOCATION, "-c", f"PATH='{bin_dir.as_posix()}'\n{program}"],
         capture_output=True,
         text=True,
         check=False,
         timeout=60,
-        env={**os.environ, "PATH": ":".join(path)},
     )
 
 
