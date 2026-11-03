@@ -42,6 +42,14 @@ class FleetErrorCode(ErrorCodeBase):
     NODE_MEMORY_EXHAUSTED = "NODE_MEMORY_EXHAUSTED"
     NODE_DISK_EXHAUSTED = "NODE_DISK_EXHAUSTED"
     NODE_OWNER_RESERVED = "NODE_OWNER_RESERVED"
+    # The node is running on its battery (MCPs board task 3268afdf). Distinct
+    # from NODE_OWNER_RESERVED because nobody capped it and nothing it holds
+    # is short: it has the room and is the right kind of machine, and a check
+    # placed there drains the battery it runs on. Measured 2026-11-03 on
+    # loki, a laptop off its charger: 23 to 32 W through back-to-back NixOS
+    # VM checks, 35 percent falling to 30 in seven minutes. It clears when
+    # the node is back on mains, with no edit.
+    NODE_ON_BATTERY = "NODE_ON_BATTERY"
     NODE_UNREACHABLE = "NODE_UNREACHABLE"
     # Distinct from NODE_UNREACHABLE, and the distinction is the whole point:
     # "was never asked" is not "did not answer". A node the workspace declares
