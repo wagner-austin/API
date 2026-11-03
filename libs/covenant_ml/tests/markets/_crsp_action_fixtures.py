@@ -24,7 +24,7 @@ def action_rows() -> dict[str, list[JSONObject]]:
     """A paid distribution, null-linked fields, zero cash and an event without details."""
     rows: dict[str, list[JSONObject]] = {}
     for relation in CRSP_ACTIONS:
-        row: JSONObject = {name: None for name in relation.columns}
+        row: JSONObject = dict.fromkeys(relation.columns)
         row["permno"] = 1
         row[relation.dates[0]] = "2019-06-03"
         if relation.role.startswith("distribut"):

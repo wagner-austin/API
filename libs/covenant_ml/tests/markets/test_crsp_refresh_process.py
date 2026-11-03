@@ -32,6 +32,7 @@ from ._crsp_diagnostic_process import (
 from ._crsp_extraction_fixtures import FakeDatabase, database_rows, installed
 from ._crsp_refresh_fixtures import RefreshCase, refresh_case
 
+
 @pytest.fixture()
 def allocation(tmp_path: Path) -> Generator[RefreshCase, None, None]:
     case = refresh_case(tmp_path)

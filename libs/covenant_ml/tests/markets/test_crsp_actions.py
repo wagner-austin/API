@@ -87,7 +87,7 @@ def test_private_actions_retain_null_zero_flags_and_linked_ids_without_study_adm
                 NOW,
             )
             assert list(decoded) == database.rows[relation.role]
-        with pytest.raises(ValueError, match="CRSP-006.*exact extract fields"):
+        with pytest.raises(ValueError, match=r"CRSP-006.*exact extract fields"):
             load_crsp_sources(path)
         original = encode_crsp_action_evidence(record)
         changes: tuple[tuple[str, JSONValue], ...] = (
@@ -166,7 +166,7 @@ def test_post_query_validation_refuses_actual_out_of_contract_rows(
     (tmp_path / "train-validation").mkdir()
     (tmp_path / "extract.sql").write_text("")
     ActionDatabase(rows)(PSQL, tmp_path, seconds=120, max_file_bytes=2_000_000)
-    with pytest.raises(ValueError, match="CRSP_ACTION_LIMIT|CRSP_ACTION_SCOPE|CRSP_ACTION_KEY"):
+    with pytest.raises(ValueError, match=r"CRSP_ACTION_LIMIT|CRSP_ACTION_SCOPE|CRSP_ACTION_KEY"):
         check_crsp_action_rows(
             tmp_path / "train-validation", crsp_scopes(database_protocol())[0], (1,), NOW, bounds
         )
