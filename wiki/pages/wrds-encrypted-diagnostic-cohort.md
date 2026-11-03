@@ -7,6 +7,7 @@ source_paths:
   - libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py
   - libs/covenant_ml/tests/markets/test_crsp_cohort.py
+  - libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json
@@ -17,7 +18,8 @@ source_paths:
 source_git_blobs:
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 872c57d646327f0eb2fd9a6dc31325276830b88a
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py: 9b342cd7bd1a30524af932d900ddb5bc04111f51
-  libs/covenant_ml/tests/markets/test_crsp_cohort.py: 6717278e1b8fa58c8252d6edf1893338d86209e5
+  libs/covenant_ml/tests/markets/test_crsp_cohort.py: 2b5292c983b99204d74bb294fee41c7ec1495412
+  libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py: 1cc55e0a77b35070a5d7ed4d385d37d59fc70708
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json: ba647e0bbb1fed9db6c64fc67d7989aa454f0310
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json: 869b28d0615c22f5d5436317bf41f0c3fb3bac09
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json: 92e625e80fbb93d22f4e81ace4e9dde26b560c4d
@@ -62,6 +64,13 @@ result exists. Other real-crypto tests cover changed identities/ciphertext,
 final-partition refusal, budgets, existing destinations and plaintext removal
 on normal exception unwinding.[^tests]
 
+The diagnostic fixture encrypts the anchored security and an unrelated
+delisted security, retaining their complete histories and the full calendar.
+The derivation test requires both source identities and the foreign terminal
+record, then verifies every derived row. Unrelated training-panel securities
+are omitted from repeated fixture construction; the assertions and real
+encryption/process checks remain.[^fixture][^tests]
+
 ## Native evidence and limits
 
 The first native attempt, `58790343`, verified all 17 inputs and was
@@ -92,6 +101,7 @@ of the refused paths, a changed benchmark or release of the final holdout.[^owne
 [^owner]: `libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py`, `_anchors`, `_securities`, `_write_subset` and `derive_crsp_cohort`.
 [^envelope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py`, `decode_crsp_cohort` and `decode_crsp_cohort_plan`.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_cohort.py`, `test_actual_trial_refuses_a_cohort_even_when_its_bundle_is_admitted`, `test_real_encrypted_cohort_keeps_lineage_and_cannot_load_as_a_study`, and refusal regressions.
+[^fixture]: `libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py`, `cohort_case`, two-security projection of the shared database fixture before the real extraction writer.
 [^preempted]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json`, `accounting`, `inputs.compute_checksum_lines` and `inputs.verified_files`.
 [^retry]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json`, `admissions[0].spec`; sibling `retry1-submit.json`, `job_id`, `experiment` and `image_digest`.
 [^completed]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json`, `accounting`, `measurement` and `record`; sibling `result.json`, `results[0]`, input/code identities, derived counts, output bundle and cleanup assertions.
