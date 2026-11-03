@@ -139,9 +139,11 @@ def test_real_extract_dates_every_label_of_the_decision_by_its_latest_value(
     assert [int(labels.labels.flat[index]) for index in range(len(expected))] == expected
     # The universe benchmark depends on stock 8's late value, so no label of
     # the February decision is known before that value's date.
-    first = int((labels.decisions == 0).sum())
-    assert set(labels.available[:first].tolist()) == {date.fromisoformat(LATE_VALUE).toordinal()}
-    assert set(labels.available[first:].tolist()) == {date(2019, 5, 1).toordinal()}
+    decisions = [int(labels.decisions.flat[index]) for index in range(labels.decisions.size)]
+    available = [int(labels.available.flat[index]) for index in range(labels.available.size)]
+    first = decisions.count(0)
+    assert set(available[:first]) == {date.fromisoformat(LATE_VALUE).toordinal()}
+    assert set(available[first:]) == {date(2019, 5, 1).toordinal()}
 
 
 def test_real_worker_publishes_the_late_receivable_and_the_unfilled_reentry(
