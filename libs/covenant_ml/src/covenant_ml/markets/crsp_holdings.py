@@ -14,7 +14,7 @@ Positions then compound their own evidenced return intervals to the next
 rebalance. A security delisted inside the window, or on an exit close at which
 it has no closing trade to sell into, stops compounding at its delisting date
 and becomes a receivable worth its terminal multiplier, applied once and dated
-by ``crsp_terminal_value``; it is not reinvested until a rebalance strictly
+by ``crsp_resolve_terminal``; it is not reinvested until a rebalance strictly
 after that date, which may follow the exit. The last window also pays the cost
 of liquidating its remaining positions at its exit close.
 
@@ -28,18 +28,15 @@ from __future__ import annotations
 
 from bisect import bisect_left, bisect_right
 from itertools import pairwise
-from typing import NamedTuple
+from math import isfinite, prod
+from typing import Final, NamedTuple
 
 from platform_core.json_utils import JSONObject, require_int, require_str
 
-from .crsp_calendar import (
-    CrspWindow,
-    crsp_terminal_value,
-    require_crsp_execution_price,
-)
+from .crsp_calendar import CrspWindow, crsp_executable, crsp_resolve_terminal
 from .crsp_extract import CrspSources
 from .crsp_protocol import CrspProtocol
-from .crsp_return_path import crsp_compound_held
+from .crsp_return_path import crsp_resolve_held
 
 
 class CrspOutcomes(NamedTuple):
@@ -66,6 +63,10 @@ class CrspPath(NamedTuple):
     filled: bool
     growth: float
     terminal: tuple[str, float] | None
+
+
+#: The path of an order with no closing trade at entry: cash, no claim.
+UNFILLED: Final = CrspPath(False, 1.0, None)
 
 
 class CrspReceivable(NamedTuple):
@@ -153,8 +154,10 @@ def _sessions_after(sessions: tuple[str, ...], entry: str, end: str) -> tuple[st
     return sessions[start + 1 : bisect_right(sessions, end)]
 
 
-def _terminal_row(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> JSONObject | None:
-    """Find the one terminal event that stops a position inside the window.
+def _terminal_rows(
+    outcomes: CrspOutcomes, permno: int, window: CrspWindow
+) -> tuple[JSONObject, ...]:
+    """Find the terminal events that stop a position inside the window.
 
     DelistingDt is the security's last price on its exchange (CIZ guide p.11).
     An event on the exit close belongs to the next window when the exit record
@@ -168,23 +171,116 @@ def _terminal_row(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> JS
         window: The holding window.
 
     Returns:
-        The event dated in ``[entry, exit)``, or on the exit close when the
-        exit record is present without a closing trade, or None.
-
-    Raises:
-        ValueError: CRSP-009 for two events inside one window.
+        Every event dated in ``[entry, exit)``, and one on the exit close when
+        the exit record is present without a closing trade; more than one is
+        ambiguous.
     """
     exit_row = outcomes.returns.get((permno, window.exit))
     unsold = exit_row is not None and exit_row["dlyprcflg"] != outcomes.protocol["execution_flag"]
-    rows = [
+    return tuple(
         row
         for row in outcomes.delists.get(permno, ())
         if window.entry <= (day := require_str(row, "delistingdt")) < window.exit
         or (unsold and day == window.exit)
-    ]
-    if len(rows) > 1:
-        raise ValueError("[CRSP-009] one window cannot hold two terminal events")
-    return rows[0] if rows else None
+    )
+
+
+class CrspPathRefusal(NamedTuple):
+    """Why one security's window cannot be valued from the vendor's records.
+
+    Attributes:
+        reason: A short key for counting: ``entry absent``, ``entry terminal
+            inconsistent``, ``entry not a closing trade`` (a closing-trade flag
+            without a positive price), ``two terminal events``, a held-return
+            reason of :class:`~covenant_ml.markets.crsp_return_path.HeldRefusal`,
+            ``held growth not finite``, ``exit absent``, ``exit not a closing
+            trade`` or a terminal reason of
+            :func:`~covenant_ml.markets.crsp_calendar.crsp_resolve_terminal`.
+        message: The full error, naming its CRSP code.
+    """
+
+    reason: str
+    message: str
+
+
+def _fill_refusal(
+    outcomes: CrspOutcomes, permno: int, day: str, side: str
+) -> CrspPathRefusal | None:
+    """Explain why a close cannot execute a modeled trade, or None when it can.
+
+    Args:
+        outcomes: Indexed evidence.
+        permno: Security bought, sold or rebalanced.
+        day: The execution close.
+        side: ``entry``, ``exit`` or ``rebalance``, naming the counting key.
+
+    Returns:
+        None for a finite positive closing trade, else the refusal.
+    """
+    row = outcomes.returns.get((permno, day))
+    if row is None:
+        return CrspPathRefusal(
+            f"{side} absent", f"[CRSP-009] no execution record for {permno} on {day}"
+        )
+    if not crsp_executable(row, outcomes.protocol):
+        return CrspPathRefusal(
+            f"{side} not a closing trade",
+            "[CRSP-004] execution requires a finite positive closing trade",
+        )
+    return None
+
+
+def crsp_resolve_window_path(
+    outcomes: CrspOutcomes, permno: int, window: CrspWindow
+) -> CrspPath | CrspPathRefusal:
+    """Value one security's window, reporting rather than raising the first refusal.
+
+    Execution, held spans and the terminal event are judged in that order,
+    exactly as holdings and labels need them. Qualification counts the refusal
+    this returns; :func:`crsp_window_path` raises it.
+
+    Args:
+        outcomes: Indexed evidence.
+        permno: Security ordered at the entry close.
+        window: Holding window.
+
+    Returns:
+        The path, or the first reason the vendor's records cannot value it.
+
+    Raises:
+        ValueError: CRSP-009 when the window's closes are not declared sessions,
+            a calendar fault rather than a security's evidence.
+    """
+    days = _sessions_after(outcomes.sessions, window.entry, window.exit)
+    entry = _entry(outcomes, permno, window)
+    if entry is not None:
+        return entry
+    terminals = _terminal_rows(outcomes, permno, window)
+    if len(terminals) > 1:
+        return CrspPathRefusal(
+            "two terminal events", "[CRSP-009] one window cannot hold two terminal events"
+        )
+    end = window.exit if not terminals else require_str(terminals[0], "delistingdt")
+    held = crsp_resolve_held(
+        outcomes.returns, permno, window.entry, days[: bisect_right(days, end)]
+    )
+    if held.refusal is not None:
+        return CrspPathRefusal(held.refusal.reason, held.refusal.message)
+    growth = prod(span for _, span in held.spans)
+    if not isfinite(growth):
+        return CrspPathRefusal(
+            "held growth not finite", "[CRSP-009] compounded held return is not finite"
+        )
+    if not terminals:
+        refusal = _fill_refusal(outcomes, permno, window.exit, "exit")
+        return CrspPath(True, growth, None) if refusal is None else refusal
+    value = crsp_resolve_terminal(terminals[0])
+    if value.refusal is not None:
+        return CrspPathRefusal(
+            value.refusal,
+            f"[CRSP-005] terminal return or valuation chronology is unresolved: {value.refusal}",
+        )
+    return CrspPath(True, growth, (value.valued, value.multiplier))
 
 
 def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> CrspPath:
@@ -208,27 +304,22 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
         The ordinary growth and, for a delisting in this window, its dated value.
 
     Raises:
-        ValueError: CRSP-004 for a malformed entry trade or an unexecutable
-            ordinary exit; CRSP-009 for a missing entry record or a missing or
-            inconsistent held return; CRSP-005 propagates for an unresolved
-            terminal event; CRSP-010 for contradictory terminal-entry evidence;
-            CRSP-011 for an unresolved price gap at the boundary.
+        ValueError: :class:`CrspPathRefusal`'s message: CRSP-004 for a
+            malformed entry trade or an unexecutable ordinary exit; CRSP-009 for
+            a missing entry record, two terminal events or a missing or
+            inconsistent held return; CRSP-005 for an unresolved terminal event;
+            CRSP-010 for contradictory terminal-entry evidence; CRSP-011 for an
+            unresolved price gap at the boundary.
     """
-    days = _sessions_after(outcomes.sessions, window.entry, window.exit)
-    if not _entry_filled(outcomes, permno, window):
-        return CrspPath(False, 1.0, None)
-    terminal = _terminal_row(outcomes, permno, window)
-    end = window.exit if terminal is None else require_str(terminal, "delistingdt")
-    growth = crsp_compound_held(
-        outcomes.returns, permno, window.entry, days[: bisect_right(days, end)]
-    )
-    if terminal is None:
-        _require_fill(outcomes, permno, window.exit)
-        return CrspPath(True, growth, None)
-    return CrspPath(True, growth, crsp_terminal_value(terminal))
+    path = crsp_resolve_window_path(outcomes, permno, window)
+    if isinstance(path, CrspPathRefusal):
+        raise ValueError(path.message)
+    return path
 
 
-def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bool:
+def _entry(
+    outcomes: CrspOutcomes, permno: int, window: CrspWindow
+) -> CrspPath | CrspPathRefusal | None:
     """Distinguish an executed new purchase from an unfilled one and from no evidence.
 
     An order fills only at a recorded closing trade (CIZ price flag TR, guide
@@ -245,17 +336,13 @@ def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bo
         window: Decision and execution dates.
 
     Returns:
-        True for a verified closing trade, False for an unfilled order.
-
-    Raises:
-        ValueError: CRSP-009 for an absent entry record; CRSP-010 for
-            inconsistent terminal-entry evidence; CRSP-004 propagates for a
-            closing trade without a finite positive price.
+        None for a verified closing trade, the unfilled cash path, or the
+        refusal: an absent record (CRSP-009), inconsistent terminal-entry
+        evidence (CRSP-010) or a closing-trade flag without a finite positive
+        price (CRSP-004).
     """
     row = outcomes.returns.get((permno, window.entry))
-    if row is None:
-        raise ValueError(f"[CRSP-009] no execution record for {permno} on {window.entry}")
-    if row["dlydelflg"] == "Y":
+    if row is not None and row["dlydelflg"] == "Y":
         events = [
             item
             for item in outcomes.delists.get(permno, ())
@@ -267,30 +354,31 @@ def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bo
             or row["dlyretdurflg"] != "DD"
             or row["dlyprcflg"] == "TR"
         ):
-            raise ValueError(f"[CRSP-010] inconsistent terminal entry for {permno}")
-        return False
-    if row["dlyprcflg"] != outcomes.protocol["execution_flag"]:
-        return False
-    require_crsp_execution_price(row, outcomes.protocol)
-    return True
+            return CrspPathRefusal(
+                "entry terminal inconsistent",
+                f"[CRSP-010] inconsistent terminal entry for {permno}",
+            )
+        return UNFILLED
+    if row is not None and row["dlyprcflg"] != outcomes.protocol["execution_flag"]:
+        return UNFILLED
+    return _fill_refusal(outcomes, permno, window.entry, "entry")
 
 
 def _require_fill(outcomes: CrspOutcomes, permno: int, day: str) -> None:
-    """Require a modeled closing trade for every security traded at a close.
+    """Require a modeled closing trade for every held security at a close.
 
     Args:
         outcomes: Indexed evidence.
-        permno: Security bought, sold or rebalanced.
+        permno: Security sold or rebalanced.
         day: Rebalance or liquidation close.
 
     Raises:
-        ValueError: CRSP-009 when no daily record exists; CRSP-004 propagates
-            when the record is not a finite positive closing trade.
+        ValueError: CRSP-009 when no daily record exists; CRSP-004 when the
+            record is not a finite positive closing trade.
     """
-    row = outcomes.returns.get((permno, day))
-    if row is None:
-        raise ValueError(f"[CRSP-009] no execution record for {permno} on {day}")
-    require_crsp_execution_price(row, outcomes.protocol)
+    refusal = _fill_refusal(outcomes, permno, day, "rebalance")
+    if refusal is not None:
+        raise ValueError(refusal.message)
 
 
 def _require_design(
@@ -444,8 +532,10 @@ def _rebalance_notional(
 __all__ = [
     "CrspOutcomes",
     "CrspPath",
+    "CrspPathRefusal",
     "CrspPeriod",
     "CrspReceivable",
+    "crsp_resolve_window_path",
     "crsp_window_path",
     "evaluate_crsp_holdings",
     "index_crsp_outcomes",
