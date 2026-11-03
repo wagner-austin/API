@@ -268,9 +268,7 @@ def test_value_dated_after_exit_stays_locked_until_the_following_rebalance(
         ("delret", -1.0, "portfolio value was exhausted"),
     ],
 )
-def test_unresolved_terminal_values_are_refused(
-    key: str, value: JSONValue, message: str
-) -> None:
+def test_unresolved_terminal_values_are_refused(key: str, value: JSONValue, message: str) -> None:
     rows, delists = terminal_rows()
     delists[0][key] = value
     with pytest.raises(ValueError, match=message):
