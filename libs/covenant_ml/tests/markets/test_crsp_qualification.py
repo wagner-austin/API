@@ -75,7 +75,10 @@ def test_a_complete_extract_has_no_refusal_and_counts_every_path(tmp_path: Path)
     qualification = qualify_crsp_panel(sources)
     panel = crsp_known_panel(sources)
     assert qualification == CrspQualification(
-        members=tuple(len(item.features) for item in panel), refused=()
+        members=tuple(len(item.features) for item in panel),
+        unfilled=(0,) * len(panel),
+        training_decisions=sum(1 for item in panel if item.window.decision < "2018-07-01"),
+        refused=(),
     )
     counts = crsp_qualification_counts(qualification)
     assert counts == {
@@ -84,6 +87,8 @@ def test_a_complete_extract_has_no_refusal_and_counts_every_path(tmp_path: Path)
         "refused": 0,
         "reasons": {},
         "periods": {"training": 0, "validation": 0},
+        "unfilled_training": 0,
+        "unfilled_validation": 0,
         "dependent_decisions": 0,
         "dependent_rows": 0,
     }
@@ -106,9 +111,15 @@ def test_an_open_suspension_is_one_refusal_that_leaves_its_decision_unlabelled(
             exit_sha256=sha256(dump_json_str(returns[(7, "2019-04-01")]).encode()).hexdigest(),
         ),
     )
+    # Security 8 delists on that decision date, so its order at the next
+    # session's delisting-flagged record is unfilled cash in the same decision.
+    assert qualification["unfilled"] == tuple(
+        int(item == index) for item in range(len(qualification["members"]))
+    )
     counts = crsp_qualification_counts(qualification)
     assert counts["reasons"] == {"price gap tail": 1}
     assert counts["periods"] == {"training": 0, "validation": 1}
+    assert (counts["unfilled_training"], counts["unfilled_validation"]) == (0, 1)
     # One unknown member leaves every label of its decision unknown.
     assert (counts["dependent_decisions"], counts["dependent_rows"]) == (
         1,
@@ -226,9 +237,14 @@ def test_each_refusal_has_its_counting_key_and_message(
 
 
 def _refusals() -> CrspQualification:
-    """Two decisions of three and two members, one refusal in each."""
+    """Two decisions of three and two members, one refusal in each.
+
+    The first is a training decision with one unfilled order.
+    """
     return CrspQualification(
         members=(3, 2),
+        unfilled=(1, 0),
+        training_decisions=1,
         refused=(
             CrspRefusedPath(
                 ordinal=2,
@@ -256,6 +272,7 @@ def test_codec_round_trips_and_counts_dependent_rows() -> None:
     counts = crsp_qualification_counts(value)
     assert counts["reasons"] == {"delisting MV": 1, "span NT/MR": 1}
     assert (counts["dependent_decisions"], counts["dependent_rows"]) == (2, 5)
+    assert (counts["unfilled_training"], counts["unfilled_validation"]) == (1, 0)
 
 
 @pytest.mark.parametrize(
@@ -263,6 +280,13 @@ def test_codec_round_trips_and_counts_dependent_rows() -> None:
     [
         (None, "extra", 1, "exact qualification fields"),
         (None, "members", [3, -1], "nonnegative"),
+        (None, "unfilled", [1], "fit their decisions"),
+        (None, "unfilled", [1, 3], "fit their decisions"),
+        (None, "unfilled", [3, 0], "more unfilled and refused"),
+        (None, "training_decisions", 3, "outside the panel"),
+        (None, "training_decisions", -1, "outside the panel"),
+        (0, "period", "validation", "disagrees with its decision"),
+        (1, "period", "training", "disagrees with its decision"),
         (0, "extra", 1, "exact refused-path fields"),
         (0, "period", "final", "no panel decision or period"),
         (0, "decision", 2, "no panel decision or period"),
@@ -270,7 +294,7 @@ def test_codec_round_trips_and_counts_dependent_rows() -> None:
         (0, "exit_sha256", "a" * 63, "SHA-256 or null"),
         (0, "ordinal", 4, "outside its decision's walk"),
         (1, "ordinal", 3, "outside its decision's walk"),
-        (1, "decision", 0, "outside its decision's walk"),
+        (1, "decision", 0, "disagrees with its decision"),
     ],
 )
 def test_decoder_refuses_inconsistent_documents(
