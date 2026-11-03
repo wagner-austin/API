@@ -145,6 +145,8 @@ def decode_crsp_rows(
 
     Raises:
         ValueError: CRSP-007 for malformed projection, data or duplicate keys.
+            Scalar errors name the relation and column, never private values;
+            raw conversion exception chaining is suppressed.
     """
     if relation not in {"membership", "returns", "calendar", "delists"}:
         raise ValueError("[CRSP-007] unknown source relation")
@@ -157,9 +159,12 @@ def decode_crsp_rows(
     for values in reader:
         if len(values) != len(columns):
             raise ValueError("[CRSP-007] CSV row width differs from its projection")
-        row: JSONObject = {
-            column: _cell(column, value) for column, value in zip(columns, values, strict=True)
-        }
+        row: JSONObject = {}
+        for column, value in zip(columns, values, strict=True):
+            try:
+                row[column] = _cell(column, value)
+            except ValueError:
+                raise ValueError(f"[CRSP-007] invalid {column} scalar in {relation} CSV") from None
         key = _key(row, relation, extracted_day)
         if key in keys:
             raise ValueError("[CRSP-007] duplicate source key")
