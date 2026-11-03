@@ -59,6 +59,14 @@ def unsold_rows() -> tuple[list[JSONObject], list[JSONObject]]:
     return rows, [event]
 
 
+def test_a_sold_exit_needs_no_event_for_a_delisting_flagged_after_it() -> None:
+    # Sold at the exit's closing trade: the flagged session after it belongs
+    # to whoever buys at that close, so this window's path needs no event.
+    rows, _ = unsold_rows()
+    sold = [daily(1, W1.exit, 0.0) if row["dlycaldt"] == W1.exit else row for row in rows]
+    assert crsp_window_path(outcomes(sold, []), 1, W1) == CrspPath(True, (1 + 0.1) * 1.0, None)
+
+
 def test_delisting_on_an_unsold_exit_is_counted_once_and_locked_past_the_exit() -> None:
     rows, delists = unsold_rows()
     evidence = outcomes(rows, delists)
