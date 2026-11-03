@@ -106,7 +106,8 @@ The comparison and scalar-error privacy repair have passed independent review.
 [[crsp-outcome-qualification]] records those completed prerequisites and the
 bounded distribution/delisting investigation. The shared capture is implemented
 in [[wrds-crsp-corporate-action-capture]] and passed full fleet verification;
-native rehearsal remains pending. Additional catalog fields are available in the
+native synthetic rehearsal passed and licensed capture is in progress.
+Additional catalog fields are available in the
 historical inventory; their ability to resolve missing outcomes remains
 unmeasured.[^qualification][^actions]
 

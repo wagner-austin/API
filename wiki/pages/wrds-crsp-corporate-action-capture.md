@@ -15,6 +15,12 @@ source_paths:
   - libs/covenant_ml/tests/markets/test_crsp_actions_process.py
   - libs/covenant_ml/tests/markets/test_crsp_action_queries.py
   - libs/covenant_ml/tests/markets/test_crsp_refresh.py
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/source.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-expected.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-setup.sql
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-actions.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-completion.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-ciphertext-reading.json
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py": "a62a7dd519ffcb861fa25c9318f54441f0dd8521"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py": "667cc6fd8d1b6d216ac5bf6271e63779260acfc6"
@@ -27,8 +33,14 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_actions_process.py": "f62b54375902441dd35d75f5db5a500d2b6f9e10"
   "libs/covenant_ml/tests/markets/test_crsp_action_queries.py": "798b5d739e45026f2d9ef397a438ae9aa4a7b748"
   "libs/covenant_ml/tests/markets/test_crsp_refresh.py": "fdfe74bbc7918dce6853413d9622c81e983b47fa"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/source.json": "5f6ea00fe4e07dcb526513a3a2b076cbae77285d"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-expected.json": "e3b377b76883387645243ac085b6705c6ec10fee"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-setup.sql": "824d4fa7c335bd93e5d9a8b995abcbcb5f6bd2d4"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-actions.json": "89126a9b770b7eb56748996a023aad80d29b867b"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-completion.json": "5bbc48d896921ee2f1bd0723924cfdb179abdb52"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-ciphertext-reading.json": "98b0ba121c4cbadb6a8023d06875b01feb1b90a0"
 provenance:
-  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6; native capture and independent review pending."
+  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6; native synthetic 40569021 completed; licensed capture and independent implementation review pending."
   - "Fleet ff02f00e-b5ad-4295-8dbe-f121812392c3 checked API 9b076cba5eff905617afd9335a09d3a44f2b8843 on Lavender: 5534 passed, zero failed, 100.00% coverage, exit zero, 277/300 seconds; completed 2026-11-03T02:48:06Z."
 fact_checked: 2026-11-03
 confidence: medium
@@ -72,8 +84,18 @@ coverage, including lint, formatting, typing and guards. Tests cover encrypted
 round trips, scalar-error privacy, missing final keys,
 scope/limit refusals, real child-process success and nonzero failure, scratch
 cleanup, and attempted study admission. Those process tests use controlled
-CSV output; native PostgreSQL execution remains a separate rehearsal. Normal
+CSV output; native PostgreSQL execution is recorded separately below. Normal
 cleanup does not establish forced-termination cleanup.[^tests][^fleet]
+
+Native synthetic job `40569021` ran the frozen source `c5baa6df3` against
+PostgreSQL. Its predeclared oracle and collected receipt agree: two delisting
+events and two distribution events, with one admissible detail and one event
+without admissible details for each relation. The fixture includes foreign
+securities, events outside both date bounds, nulls, zero amounts and
+in-bound events with future-dated details. Collection verified all seventeen
+outputs; the bundle inventory contains fourteen ciphertexts plus its metadata,
+and the receipt confirms normal plaintext cleanup. The existing controller
+retains the runtime fingerprint and published the native evidence.[^native]
 
 No licensed corporate-action capture or newly qualified economic outcome is
 reported here. The previous four-relation native comparison remains in
@@ -85,4 +107,5 @@ reported here. The previous four-relation native comparison remains in
 [^record]: `libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py`, `decode_crsp_action_evidence`; `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, parameterized final-bundle and actual-trial refusals for both operations.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_actions.py`, capture, codec and refusal cases; `test_crsp_actions_process.py`, real child-process checks and privacy assertions.
 [^fleet]: Fleet job `ff02f00e-b5ad-4295-8dbe-f121812392c3`, terminal FLEET-CHECK receipt and full `libs-covenant_ml-lavender-1793673769.log`; exact source identity, counts and completion time in provenance.
+[^native]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/synthetic-expected.json`, `rows`; sibling `synthetic-setup.sql`, fixture CTEs; `synthetic-actions.json`, `rows` and `plaintext_removed`; `synthetic-completion.json`, `outputs`, `runtime` and `record`; `synthetic-ciphertext-reading.json`, exact ciphertext inventory and digests; `source.json`, frozen source and worker identities. Native service report `7565ed95-a6ba-4447-aaab-723aac830dca` binds completed job `40569021` to those output digests.
 [^prior]: [[wrds-crsp-source-comparison]], § "Native evidence".
