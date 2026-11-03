@@ -83,7 +83,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # preparation (MCPs board task 007bfc7e). 71 since MCPs/participant-mcp,
     # the chat app's subscription participants (MCPs board task 42512a6b).
     # 72 since the served lane follows control onto Lacrymal (MCPs board task 927bbd25).
-    assert len(prepared) == 72
+    # 73 since media-review-mcp joined (MCPs board task c33e4c11).
+    assert len(prepared) == 73
+    assert prepared["MCPs/media-review-mcp"] == (
+        {"phase": "install", "argv": (*PREPARE, "install")},
+        {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
+    )
     assert prepared["MCPs/instagram-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
