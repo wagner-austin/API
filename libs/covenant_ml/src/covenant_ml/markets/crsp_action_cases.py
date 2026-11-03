@@ -79,8 +79,9 @@ def _events(checked: CrspActionRows, security: int, window: CrspWindow) -> JSONO
         events, details = CRSP_ACTIONS[event_role], CRSP_ACTIONS[detail_role]
         by_key = {crsp_row_key(row, details.role): row for row in checked.rows[details.role]}
         joined: list[JSONValue] = []
-        ordered = sorted(checked.rows[events.role], key=lambda row: crsp_row_key(row, events.role))
-        for event in ordered:
+        by_event_key = {crsp_row_key(row, events.role): row for row in checked.rows[events.role]}
+        for key in sorted(by_event_key):
+            event = by_event_key[key]
             if require_int(event, "permno") != security:
                 continue
             day = require_str(event, events.dates[0])
