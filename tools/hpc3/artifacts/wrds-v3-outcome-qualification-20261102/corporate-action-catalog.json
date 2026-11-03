@@ -1,0 +1,350 @@
+{
+  "observed_at_utc": "2026-10-27T23:08:20.341789+00:00",
+  "scope": "Historical catalog metadata and zero-row accessibility; no licensed observations or fresh access verification.",
+  "files": {
+    "sql-columns.csv": {
+      "sha256": "2b5009ccdaad84cdc24b94091fe4d715f5dec61647c48386b10355d55926904c",
+      "rows": [
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "1",
+          "column_name": "permno",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "2",
+          "column_name": "delistingdt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "3",
+          "column_name": "deldtprc",
+          "data_type": "numeric(13,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "4",
+          "column_name": "deldtprcflg",
+          "data_type": "character varying(2)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "5",
+          "column_name": "delactiontype",
+          "data_type": "character varying(5)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "6",
+          "column_name": "delstatustype",
+          "data_type": "character varying(4)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "7",
+          "column_name": "delreasontype",
+          "data_type": "character varying(5)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "8",
+          "column_name": "delpaymenttype",
+          "data_type": "character varying(4)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "9",
+          "column_name": "delpermno",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "10",
+          "column_name": "delpermco",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "11",
+          "column_name": "delret",
+          "data_type": "numeric(10,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "12",
+          "column_name": "delretmisstype",
+          "data_type": "character varying(4)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "13",
+          "column_name": "delnextdt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "14",
+          "column_name": "delnextprc",
+          "data_type": "numeric(13,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "15",
+          "column_name": "delnextprcflg",
+          "data_type": "character varying(2)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "16",
+          "column_name": "delamtdt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "17",
+          "column_name": "deldivamt",
+          "data_type": "numeric(13,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "18",
+          "column_name": "deldistype",
+          "data_type": "character varying(2)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "ordinal": "19",
+          "column_name": "deldlydt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "1",
+          "column_name": "permno",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "2",
+          "column_name": "disexdt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "3",
+          "column_name": "disseqnbr",
+          "data_type": "smallint",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "4",
+          "column_name": "disordinaryflg",
+          "data_type": "character varying(1)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "5",
+          "column_name": "distype",
+          "data_type": "character varying(4)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "6",
+          "column_name": "disfreqtype",
+          "data_type": "character varying(3)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "7",
+          "column_name": "dispaymenttype",
+          "data_type": "character varying(4)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "8",
+          "column_name": "disdetailtype",
+          "data_type": "character varying(8)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "9",
+          "column_name": "distaxtype",
+          "data_type": "character varying(3)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "10",
+          "column_name": "disorigcurtype",
+          "data_type": "character varying(3)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "11",
+          "column_name": "disdivamt",
+          "data_type": "numeric(13,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "12",
+          "column_name": "disfacpr",
+          "data_type": "numeric(10,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "13",
+          "column_name": "disfacshr",
+          "data_type": "numeric(10,6)",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "14",
+          "column_name": "disdeclaredt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "15",
+          "column_name": "disrecorddt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "16",
+          "column_name": "dispaydt",
+          "data_type": "date",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "17",
+          "column_name": "dispermno",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "18",
+          "column_name": "dispermco",
+          "data_type": "integer",
+          "not_null": "f"
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "ordinal": "19",
+          "column_name": "disamountsourcetype",
+          "data_type": "character varying(3)",
+          "not_null": "f"
+        }
+      ]
+    },
+    "sql-accessible-relations.csv": {
+      "sha256": "f2ea791bf0c47ca08653d909f0d8d5697392dfb05cd0f0a6695ffe89de03bc3d",
+      "rows": [
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdelists",
+          "kind": "r",
+          "schema_usage": "t",
+          "table_select": "t",
+          "any_column_select": "t",
+          "row_security": "f",
+          "estimated_rows": "29833",
+          "estimated_bytes": "3497984",
+          "access_status": "direct_table_granted",
+          "guard_target": "",
+          "guard_schema_usage": "",
+          "guard_table_select": ""
+        },
+        {
+          "library": "crsp_a_stock",
+          "relation": "stkdistributions",
+          "kind": "r",
+          "schema_usage": "t",
+          "table_select": "t",
+          "any_column_select": "t",
+          "row_security": "f",
+          "estimated_rows": "1101681",
+          "estimated_bytes": "112009216",
+          "access_status": "direct_table_granted",
+          "guard_target": "",
+          "guard_schema_usage": "",
+          "guard_table_select": ""
+        }
+      ]
+    }
+  }
+}
