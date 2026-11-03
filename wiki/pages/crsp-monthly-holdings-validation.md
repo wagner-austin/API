@@ -19,18 +19,18 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_study.py"
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
-  "libs/covenant_ml/tests/markets/test_crsp_suspension_process.py": "1a35600640cb708e5306c93f1bf7d79b7a772097"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
+  "libs/covenant_ml/tests/markets/test_crsp_suspension_process.py": "fd513a076cdbc9475e4da1b7fe0c83459114f232"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
   "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "840edba442fe38ea109c34482522cccf422930a1"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "2abd15f50e785780a498105f4952d47ab100ecbf"
-  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "114e30d4fbee61b64cb2a257449bdfd5bda7edae"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "ad8b3f98f9c9cebf97327fcf513e352969d3327e"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "f315bb6ddce5fcc988221560818510d06e3da704"
+  "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "560d6591acd3971a387552e3019ad8d6eb89d509"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "77b54879136c9ef85c8cd2d0ef9db6172ed59dd4"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
-  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2311912957c18245f3d5c0630c96c301fd13c012"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "libs/covenant_ml/tests/markets/test_research_trial.py": "50dcf2341e759b4805b719757302d34165f68fa7"
 provenance:
@@ -50,7 +50,8 @@ Version 2 solves `slots × x + rate × turnover(x) = investable` on the linear
 segments between prior position values. This charges actual buys and sells
 against post-cost targets; the earlier pre-fee-target approximation is removed.
 Positions compound their own evidenced return intervals. Ordinary returns are
-checked against the declared predecessor session. Prospective version 4 permits
+checked against the declared predecessor session. Prospective version 5, whose
+held-return rule is version 4's, permits
 explicit unpriced MP or SU rows with MP/MR returns followed by one available NA/P1-P9 return
 whose previous-price date and duration cover exactly the intervening declared
 sessions. No intermediate close is assigned a value. Missing rows, other
@@ -68,15 +69,17 @@ licensed outcome or native cluster qualification.[^suspension]
 
 [^suspension]: `libs/covenant_ml/tests/markets/test_crsp_return_path.py`, `test_vendor_duration_must_cover_exactly_two_through_ten_sessions`, `test_mixed_suspension_and_missing_price_span_has_only_one_observed_value` and `test_real_extract_labels_use_the_same_span_without_future_universe_filtering`; `libs/covenant_ml/tests/markets/test_crsp_suspension_process.py`, `test_real_worker_scores_closed_suspension_or_refuses_and_cleans_an_open_tail`.
 
-A position delisted inside a window stops at
-its delisting date and becomes a receivable worth its `stkdelists` multiplier,
-applied once and never combined with the daily delisting-flagged row; it is
-reinvested only at a rebalance strictly after its valuation date. The last
-window pays the cost of liquidating its positions. An unresolved held interval,
-an unverifiable fill, an unresolved owned terminal event or a value
-dated after the scored exit refuses the whole evaluation. Hand-calculated cases
-check two-month drift, turnover and liquidation and a three-month delisting
-whose value waits one month before reinvestment.[^holdings]
+A position delisted inside a window, or on an exit close whose record is no
+closing trade, stops at its delisting date and becomes a receivable worth its
+`stkdelists` multiplier, applied once and never combined with the daily
+delisting-flagged row; it is reinvested only at a rebalance strictly after its
+valuation date, which version 5 allows to follow the exit. The last window pays
+the cost of liquidating its positions. An unresolved held interval, an
+unverifiable fill or an unresolved owned terminal event refuses the whole
+evaluation. Hand-calculated cases check two-month drift, turnover and
+liquidation, a three-month delisting whose value waits one month before
+reinvestment, and the same wait for values dated one and two days after the
+exit; [[crsp-v5-boundary-policy]] gives the reasons.[^holdings]
 
 Current source shares `crsp_resolve_held` between consumers: it returns the
 complete resolved spans or a refusal with no partial spans. Stock compounding
@@ -88,25 +91,31 @@ runtime and observed outcome remain in [[wrds-baseline-readiness]].[^spans]
 
 [^spans]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_resolve_held`, `crsp_held_spans`, `crsp_compound_held` and `_unpriced_held`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_return_span`, `crsp_resolve_terminal` and `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_return_path.py`, independent span, wealth, cost, label and boundary oracles, including first-refusal resolution without partial spans; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, encrypted evaluator integration with a missing-price span. Vendor meanings remain in the tech wiki's `crsp-ciz-daily-return-quality`; this permission is a versioned study assumption, not permission to fill or discard unknown observations.
 
-Label construction uses the same order outcome as holdings. Exactly one event
-at decision close, before entry, plus an entry-day terminal row with `DD`
-duration and a non-`TR` price flag confirms a rejected purchase. Its equal
-allocation remains zero-interest cash without replacement or redistribution;
-its gross label multiplier is one and remains in the universe benchmark.
-Missing rows/events and contradictory trade flags still refuse evaluation.
+Label construction uses the same order outcome as holdings. Under version 5 a
+new purchase fills only at a `TR` entry record; a present record with any other
+price flag is an unfilled order. A terminal entry row is unfilled only when
+exactly one event at decision close precedes entry, with `DD` duration and a
+non-`TR` price flag. The equal allocation remains zero-interest cash without
+replacement or redistribution; its gross label multiplier is one and remains in
+the universe benchmark. Absent rows, contradictory terminal rows, a `TR` flag
+without a positive price, and a held position with no trade at a rebalance
+still refuse evaluation.
 The monthly payload retains unfilled selections and cash weights alongside
 held positions; weights describe the end value before final liquidation.[^unfilled]
 
 Executed entry and ordinary exit must be closing trades. Current source reports
-an absent or null execution price as `CRSP-004`; malformed numeric values still
-raise a type error. The boundary tests exercise missing prices through the real
-label path at both entry and exit. This changes the refusal diagnostic, not
-which prices can execute, and does not update a frozen image.[^execution]
+an absent or null execution price at a `TR` record as `CRSP-004`; malformed
+numeric values still raise a type error. The boundary tests run quote,
+suspended, halted, untracked and missing-price records through the real label
+path: at an ordinary exit each refuses, at entry each is an unfilled order.
+None of this updates a frozen image.[^execution]
 The terminal interval is
-`[entry, exit)`: a delisting on entry is included, while a last ordinary trade
-on exit can be sold before the subsequent terminal outcome. Tests cover these
-boundaries and the pre-entry delisting found by the licensed baseline, without
-filtering decision-time selection using later outcomes. The encrypted synthetic
+`[entry, exit)`, plus the exit close itself when its record is no closing trade:
+a delisting on entry is included, a last ordinary trade on exit is sold before
+the subsequent terminal outcome, and a delisting on a quote-only exit ends the
+old position with its terminal value. Tests cover these boundaries and the
+pre-entry delisting found by the licensed baseline, without filtering
+decision-time selection using later outcomes. The encrypted synthetic
 study runs the real trainers and emits the rejected order and cash weight,
 checks that a prior holding's receivable survives exactly once until its release,
 then verifies private plaintext removal.[^execution][^unfilled]
@@ -117,8 +126,9 @@ then verifies private plaintext removal.[^execution][^unfilled]
 
 The validation study builds decisions only up to the day before the final
 period. Labels are whether a security's window multiplier, terminal value
-included, beats the eligible universe's equal-weight multiplier, available at
-the exit close. Validation decisions are scored in expanding folds of declared
+included, beats the eligible universe's equal-weight multiplier. Every label of
+a decision is available at the later of the exit close and the latest member's
+terminal valuation date, because each depends on the whole universe. Validation decisions are scored in expanding folds of declared
 length; each fold fits the existing baseline trainers on earlier decisions,
 uses the declared stopping months for early stopping, and drops every label not
 available before the next boundary. Candidates take the top

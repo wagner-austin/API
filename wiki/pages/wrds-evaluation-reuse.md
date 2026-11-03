@@ -43,16 +43,16 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/paired.py": "930ff0876202a68c51454352dc63c0b7d80160c8"
   "libs/covenant_ml/src/covenant_ml/evaluation/splits.py": "1a5b1a1a94e4666d039ea21557480b66eb95bbac"
   "libs/platform_core/src/platform_core/run_record.py": "7d3ca55d81674311342b179cbf476a3d61b14dd6"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "ad8b3f98f9c9cebf97327fcf513e352969d3327e"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "77b54879136c9ef85c8cd2d0ef9db6172ed59dd4"
   "libs/covenant_ml/src/covenant_ml/markets/research_execution.py": "be8e7dde20f59ac767b92309b670c1a98f65f4f6"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
   "tools/fleet/src/fleet/core/research_hpc.py": "053ee0e19441e00b3323196a5ffe8190b0451cc0"
   "tools/fleet/src/fleet/core/research_wrds.py": "b568e0005a3c960ba5d97d2e141611ea5a0d9a3b"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
-  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2311912957c18245f3d5c0630c96c301fd13c012"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "libs/covenant_ml/tests/markets/test_research_trial.py": "50dcf2341e759b4805b719757302d34165f68fa7"
   "tools/fleet/src/fleet/core/research_proposal.py": "5d55b036810db1a301137b2385dd75d5c5269e00"
@@ -89,7 +89,7 @@ monthly study now uses or replaces each seam:[^equity][^window][^sampling][^spli
 |---|---|---|
 | `equity_study.load_equity_study` | Binds a verified snapshot, cohort, selected weights and independently supplied session calendar. | Not reused: `crsp_panel` binds effective-dated CRSP membership and decision/entry/exit dates from the frozen protocol. |
 | `equity_outcomes.evaluate_equity_window` | Requires the entire frozen cohort and every declared session; scores adjusted-price endpoints and subtracts one fixed round-trip cost. | Not reused: `crsp_holdings` carries drifted holdings between rebalances, charges absolute traded notional against drifted pre-trade positions and values each terminal event once on its own date. |
-| `purge_label_overlap` (also inside `ChronologicalGroupedSplits`) | Requires actual label availability strictly before the stopping and scoring boundaries. | `crsp_study` passes each window's exit close as availability, so each fold drops exactly the decision immediately before its stopping and scoring boundaries. |
+| `purge_label_overlap` (also inside `ChronologicalGroupedSplits`) | Requires actual label availability strictly before the stopping and scoring boundaries. | `crsp_study` passes the later of each window's exit close and its latest member's terminal valuation date as availability; with every valuation on or before the exit, each fold drops exactly the decision immediately before its stopping and scoring boundaries. |
 | `moving_block_weights` | Samples overlapping, noncircular blocks and truncates the last block to preserve the exact observation count. | Used through `compare_moving_block` with the frozen block length, draw count and seed. |
 | `compare_moving_block` | Requires identical consecutive month identities and records a distinct moving-block percentile method. | Compares each candidate and the equal-weight universe with momentum at the primary cost. Its uncentered sign-tail probability is a diagnostic, not a calibrated null-hypothesis test. |
 

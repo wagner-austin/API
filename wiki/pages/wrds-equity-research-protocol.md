@@ -6,7 +6,7 @@ related: ["[[wrds-baseline-readiness]]", "[[crsp-monthly-study-design]]", "[[crs
 source_paths:
   - libs/covenant_ml/docs/MARKET_RESEARCH.md
 source_git_blobs:
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "ad8b3f98f9c9cebf97327fcf513e352969d3327e"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "77b54879136c9ef85c8cd2d0ef9db6172ed59dd4"
 provenance:
   - "Decomposed on 2026-10-30 from API 14b60b8610c98f17357869422cf2239ef4fddbf8 under board task daca401b-a9cc-4cc8-8626-8ee760bedad5. Detailed claims, source pins and dated measurements moved together."
 fact_checked: 2026-11-01

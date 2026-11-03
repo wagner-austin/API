@@ -20,17 +20,17 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "2abd15f50e785780a498105f4952d47ab100ecbf"
-  "libs/covenant_ml/docs/crsp-monthly.json": "c2e05e3bfd8c573416caeb5ff4bccdc7ad2fc53b"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "a056079aa5af72b6ab9cf601cd7e0b04902da124"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "92b9189fd6cb416afd50d572ff8750c16ebe73dd"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "f315bb6ddce5fcc988221560818510d06e3da704"
+  "libs/covenant_ml/docs/crsp-monthly.json": "4b42124fa38490ee0ff9baceaf7f1e5fa7d5748c"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "8c89057233c9b6f6361fd510b899652b6b9ec0ab"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "ad8b3f98f9c9cebf97327fcf513e352969d3327e"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "77b54879136c9ef85c8cd2d0ef9db6172ed59dd4"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
-  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2778e68c44c20c724ccd8403312888f168499350"
+  "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2311912957c18245f3d5c0630c96c301fd13c012"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "libs/covenant_ml/tests/markets/test_research_trial.py": "50dcf2341e759b4805b719757302d34165f68fa7"
 provenance:
@@ -45,11 +45,15 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-The prospective version-4 source design is `libs/covenant_ml/docs/crsp-monthly.json`.
-It retains confirmed rejected-order cash and actual traded-notional costs,
-and declares exact unpriced held spans, including closed suspension intervals,
-detailed in [[crsp-monthly-holdings-validation]]. It is not a qualified replacement
-study; [[crsp-outcome-qualification]] records the remaining data and review gates.
+The prospective version-5 source design is `libs/covenant_ml/docs/crsp-monthly.json`.
+It keeps actual traded-notional costs and version 4's exact unpriced held spans,
+including closed suspension intervals, and declares two changed boundaries: an
+entry without a closing trade is an unfilled cash order, and a delisting on an
+exit close with no trade ends the old position with a terminal value whose date
+also dates its decision's labels. [[crsp-monthly-holdings-validation]] details
+the accounting and [[crsp-v5-boundary-policy]] the reasons. It is not a qualified
+replacement study; [[crsp-outcome-qualification]] records the remaining data and
+review gates.
 The stopped version-1 and version-2
 studies retain their original journals and encrypted identities. The version-3
 runtime, input identities and observed study outcomes are tracked in
@@ -61,21 +65,22 @@ profitability findings.[^frozen][^holdings]
 
 | Decision | Rule |
 |---|---|
-| Question and target | Can lagged return/volume features improve monthly stock selection over fixed momentum? Target each selected order's value from the first trading close of the next month to the corresponding close one month later, relative to the eligible universe's equal-weight order value. A confirmed rejected purchase keeps a cash multiplier of one in both the row label and benchmark. |
+| Question and target | Can lagged return/volume features improve monthly stock selection over fixed momentum? Target each selected order's value from the first trading close of the next month to the corresponding close one month later, relative to the eligible universe's equal-weight order value. An unfilled purchase (no closing trade at entry) keeps a cash multiplier of one in both the row label and benchmark. A decision's labels are available at the later of its exit close and its latest member's terminal valuation date. |
 | Information and execution | Decide after month-end close using only observations dated through that close; execute at the next month's first trading-session close. Features cannot use that execution session's price or volume. Include distributions and delisting outcomes in targets. No fill at the same close that supplies the signal. |
 | Historical universe | At each decision date, common shares with effective share codes 10/11 and exchange codes 1/2/3, absolute closing price at least $5, and at least 252 prior sessions. Rank by trailing 60-session median absolute-price-times-volume; take at most 1,000. Resolve ties by PERMNO. Use effective-dated membership, including later-delisted securities; never today's constituent list. |
 | Historical availability | Preserve extraction vintage and source mappings. Effective dates govern membership. A current CRSP history is a revised historical backtest, not a proven as-published archive. Compustat stays outside v1; later financial features require report/publication availability and revision handling, not fiscal-period dates alone. |
 | Calendar and missingness | Establish an independent exchange-session calendar. No forward-filled return labels or silent dropping of held positions. Missing required prices, returns or delisting outcomes make the affected evaluation incomplete; log the failure. Eligibility excludes insufficient pre-decision history with counted reasons. |
-| Development and final period | Train 2000–2014; tune on 2015–2021 through expanding chronological folds, retaining only windows whose exit is before January 2022 (decisions through October 2021). Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose exit overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
+| Development and final period | Train 2000–2014; tune on 2015–2021 through expanding chronological folds, retaining only windows whose exit is before January 2022 (decisions through October 2021). Seal January 2022–December 2024 decisions as the final period, acquiring through February 2025 for the last exit. Purge training labels whose availability (the exit, or a later terminal valuation date) overlaps the next split and exclude the monthly training decision immediately before that split. Warm-up begins January 1998. |
 | Baselines and model family | Equal-weight eligible universe and fixed 12-to-2-month momentum (compound months t-12 through t-2, then select the top decile). Candidate: fixed boosted-tree family using lagged returns, volatility and volume; compare ClearGBM/LightGBM on identical rows and seeds. No Compustat or LLM text signals in v1. |
 | Portfolio and costs | Long-only, no leverage, equal-weight top decile, deterministic PERMNO ties, monthly rebalance. Rejected orders retain their equal cash slots without replacement or redistribution. Solve the post-cost allocation budget; primary cost is 10 basis points times actual absolute traded notional, with fixed 5/25-bp sensitivities. Retained cash earns zero interest and has no trade fee. Costs are declared assumptions, not calibrated capacity or actual execution claims. |
 | Primary measurement | Mean monthly net-return difference versus momentum on the same dates. Report annualized return, volatility, drawdown and turnover secondarily. Use paired 12-month moving-block bootstrap, 10,000 draws, seed 7, with intervals and sample length; 36 final decisions limit inference. |
 | Trial accounting | At most 20 distinct validation candidates under v1, five fixed seeds 11/23/37/53/71 each, identical candidate budget. Select one candidate on primary validation score, tie by fewer leaves then candidate id. Evaluate the selected candidate once on the sealed final period. Seeds are repetitions, not extra hypotheses or independent market histories. |
 
-The rejected-order rule requires exactly one event at the decision close,
-before entry, plus an entry-day terminal row with `DD` duration and a non-`TR`
-price flag. Missing or contradictory evidence still fails. The rule does not
-filter the decision-time universe and does not erase a held security's loss.
+Under version 5 a purchase fills only at a `TR` entry record; any other present
+entry record is an unfilled order. A terminal entry row additionally requires
+exactly one event at the decision close, before entry, with `DD` duration and a
+non-`TR` price flag. Absent or contradictory evidence still fails. The rule does
+not filter the decision-time universe and does not erase a held security's loss.
 Tests exercise mixed/all-cash selections, labels that retain rejected orders,
 and unknown terminal values for securities never purchased.[^unfilled]
 

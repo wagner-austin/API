@@ -96,11 +96,14 @@ Follow-up task `f963ee0b` tracks that protocol/source qualification.
 requirements, including partition-boundary event visibility. The reviewed source
 diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
 
-Current source contains a prospective version-4 extension for exactly closed
-suspension spans. It rejects version-3 runtime requests and retains unresolved
-tail and execution refusals. This is not a replacement installed controller,
-licensed dataset revision or native full-panel qualification; those remain
-gated by review. The original 27-case evidence and study stop still apply.[^qualification]
+Current source carries prospective version 5: version 4's extension for
+exactly closed suspension spans (independently reviewed), plus unfilled entries
+without a closing trade, delistings on an unsold exit close, and labels dated by
+values dated after the exit ([[crsp-v5-boundary-policy]]). It rejects earlier
+runtime requests and keeps NT held, MV, DG and open-tail refusals. This is not a
+replacement installed controller, licensed dataset revision or native
+full-panel qualification; those remain gated by review. The original 27-case
+evidence and study stop still apply.[^qualification]
 
 [[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
 derived for that source comparison, including its separate native
