@@ -139,6 +139,18 @@ def test_real_process_publishes_an_open_suspension_refusal(tmp_path: Path) -> No
         "entry_sha256",
         "exit_sha256",
     }
+    # Security 8's order at its delisting-day record in the same decision is
+    # unfilled cash, published as an aggregate count and a run observation.
+    unfilled = [
+        require_int({"count": item}, "count") for item in require_list(payload, "unfilled")
+    ]
+    assert (sum(unfilled), unfilled[require_int(refused, "decision")]) == (1, 1)
+    record = decode_run_record(load_json_str(run_record_sidecar(output).read_text()))
+    observed = {item["name"]: item["value"] for item in record["observations"]}
+    assert (
+        observed["qualification.unfilled_training"],
+        observed["qualification.unfilled_validation"],
+    ) == (0.0, 1.0)
 
 
 @pytest.mark.parametrize(
