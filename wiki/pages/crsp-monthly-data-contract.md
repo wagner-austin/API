@@ -22,9 +22,9 @@ source_paths:
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "5574c34391c88d77ed708d32ac02435588eb0e5e"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "b10994304c31e020bab370b7eb0f6fe2fd948b39"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "41c02cc391a40f28bd3dbd300e3608579d5db586"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
-  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "4b0707b97313b908c6c5790e92dc03592e1d764f"
+  "libs/covenant_ml/tests/markets/test_crsp_extract.py": "ae06440f1a7ff5b5b289cf499297fd86e77527b1"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
   "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "5e809a95dfd22a7c19755b10b69ee5e1e786571d"
@@ -83,6 +83,11 @@ reader lifted from the single-security diagnostic. It verifies consumed bytes,
 refuses duplicate source keys and changed projections, and preserves explicit
 missing values. A checksum binds bytes; it does not attest vendor authorship or
 prove that a supplied query generated those bytes.[^panel]
+
+Malformed scalar errors identify the relation and column while suppressing
+the conversion exception that can echo private cell text. Refusal preserves
+missingness and publishes no replacement value. [[wrds-crsp-source-comparison]]
+records the real-process privacy regression and its native-evidence boundary.[^panel]
 
 Decision construction uses only observations through the decision close, counts
 one first exclusion reason per rejected historical security, and keeps empty

@@ -33,10 +33,10 @@ source_git_blobs:
   libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py: 8d8e94ed142d6b4badb23faf9b0fdd9ae48e8d68
   libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py: 1e454f61a3b50a031c92803ebf3c54cc0343c4d1
   libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py: 2dc5d21a784e30c843e5e3857a615e03751f1141
-  libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py: b10994304c31e020bab370b7eb0f6fe2fd948b39
+  libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py: 41c02cc391a40f28bd3dbd300e3608579d5db586
   libs/covenant_ml/scripts/crsp_extraction.py: 590e709a6a702ce5143fd84d692f9b36a1ad91af
   libs/covenant_ml/tests/markets/test_crsp_refresh.py: 37b284c4cdd68cd694544633f5f20a1527fed899
-  libs/covenant_ml/tests/markets/test_crsp_refresh_process.py: 2afaf62b705e4f28b0807a2681381bb785a15a57
+  libs/covenant_ml/tests/markets/test_crsp_refresh_process.py: aec69e95cca000f88116219beb5af836470e882c
   libs/covenant_ml/tests/markets/test_crsp_comparison.py: eb978fb83e99e545de690e98d38f8f3e070bad96
   tools/hpc3/artifacts/wrds-source-refresh-20261102/source.json: 4f1d9f75bc21dbd8b725fa9436934d3925e6207f
   tools/hpc3/artifacts/wrds-source-refresh-20261102/failed-first.json: b2c92163502d0ba5dd44f01a4b999a77dd0ca026
@@ -80,6 +80,13 @@ actual client failure, file limits and timeout cleanup. The process tests use
 controlled CSV output; native database execution is separate evidence below.
 Normal-unwind cleanup does not prove cleanup after forced termination.[^tests]
 
+The current shared CSV decoder replaces scalar-conversion failures with a
+relation-and-column error and suppresses the raw exception chain. The real
+refresh-process regression supplies malformed integer, numeric and date cells,
+asserts that their private sentinel never reaches stdout or stderr, and checks
+empty public output and removed scratch. This source repair follows the native
+captures below; their frozen requests retain the earlier decoder.[^scalar]
+
 ## Native evidence
 
 The first synthetic job, `40568113`, failed before database access. Its source
@@ -121,6 +128,7 @@ new study admission or final-scoring release.[^envelope]
 [^comparison]: `libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py`, `compare_crsp_rows` and `_indexed`; `crsp_rows.py`, `crsp_row_key`; `libs/covenant_ml/tests/markets/test_crsp_comparison.py`, key, ordering, duplicate and empty-input cases.
 [^envelope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py`, `decode_crsp_refresh`; `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, encrypted differences, absent final key and actual-study rejection.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, successful encryption and refusal cases; `test_crsp_refresh_process.py`, CLI observations and `test_real_client_failures_remove_authenticated_plaintext_without_leaking_sql`.
+[^scalar]: `libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py`, `decode_crsp_rows`, scalar conversion boundary; `libs/covenant_ml/tests/markets/test_crsp_refresh_process.py`, `test_real_refresh_refuses_private_scalar_without_public_leak`; sibling native evidence `tools/hpc3/artifacts/wrds-source-refresh-20261102/source.json`, frozen source commit. Board task dd7fb220-0525-4047-8f8b-9bcc7c0ab9f7 owns this repair.
 [^snapshot]: `tools/hpc3/artifacts/wrds-source-refresh-20261102/failed-first.json`, accounting, payload traceback and service-report identity; sibling `source.json`, commit, archive digest and package inventory.
 [^synthetic]: `tools/hpc3/artifacts/wrds-source-refresh-20261102/synthetic-comparison.json`, row counts, bundle digest and `plaintext_removed`; sibling `synthetic-completion.json`, native job, request, runtime, output digests and RunRecord observations. Sibling `synthetic-collection.json` records collection and ciphertext-only verification. Program-authored board reading `4c7e854b-fd54-4cc2-83bc-b3e778bc207d` records terminal success and attestation checks.
 [^changed]: `tools/hpc3/artifacts/wrds-source-refresh-20261102/synthetic-mutations.json`, exact fixture digests and expected counts; sibling `changed-absent-comparison.json`, observed counts and cleanup, `changed-absent-completion.json`, native identity and output hashes, and `changed-absent-collection.json`, ciphertext verification.
