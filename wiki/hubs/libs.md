@@ -83,3 +83,5 @@ Shared libraries in `libs/` — the reusable core that services and clients buil
 [Bounded encrypted CRSP source comparison](../pages/wrds-crsp-source-comparison.md) -- shared vintage comparison, native rehearsals and diagnostic-only evidence
 
 [Bounded encrypted CRSP corporate-action evidence](../pages/wrds-crsp-corporate-action-capture.md) -- fixed event/detail projections, shared private capture and verification status
+
+[CRSP action-case inspection](../pages/wrds-crsp-action-case-inspection.md) -- authenticated event/detail joins to original audit anchors and canonical monthly windows
