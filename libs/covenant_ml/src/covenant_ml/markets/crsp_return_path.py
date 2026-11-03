@@ -1,9 +1,8 @@
-"""Compound evidenced held-return intervals without valuing missing closes."""
+"""Resolve evidenced held-return intervals without valuing missing closes."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping
-from math import isfinite, prod
 from typing import NamedTuple
 
 from platform_core.json_utils import JSONObject, require_float
@@ -112,60 +111,3 @@ def crsp_resolve_held(
         message = f"[CRSP-011] held return for {permno} ends with an unresolved price gap"
         return HeldResolution((), HeldRefusal("price gap tail", message))
     return HeldResolution(tuple(spans), None)
-
-
-def crsp_held_spans(
-    returns: Mapping[tuple[int, str], JSONObject],
-    permno: int,
-    entry: str,
-    days: tuple[str, ...],
-) -> tuple[tuple[int, float], ...]:
-    """Resolve a complete sequence of one- or multi-session held returns, span by span.
-
-    Args:
-        returns: Decoded daily rows indexed by security and date.
-        permno: Owned security, never filtered using its later observations.
-        entry: Validated entry close, the first return's required predecessor.
-        days: Every independently declared session after entry, ending at the
-            exit or in-window terminal event. Later rows cannot close a gap.
-
-    Returns:
-        :func:`crsp_resolve_held`'s spans.
-
-    Raises:
-        ValueError: CRSP-009 for missing rows or inconsistent spans; CRSP-011
-            for an unresolved missing-price tail.
-    """
-    resolution = crsp_resolve_held(returns, permno, entry, days)
-    if resolution.refusal is not None:
-        raise ValueError(resolution.refusal.message)
-    return resolution.spans
-
-
-def crsp_compound_held(
-    returns: Mapping[tuple[int, str], JSONObject],
-    permno: int,
-    entry: str,
-    days: tuple[str, ...],
-) -> float:
-    """Consume a complete sequence of one- or multi-session held returns once.
-
-    Args:
-        returns: Decoded daily rows indexed by security and date.
-        permno: Owned security, never filtered using its later observations.
-        entry: Validated entry close, the first return's required predecessor.
-        days: Every independently declared session after entry, ending at the
-            exit or in-window terminal event. Later rows cannot close a gap.
-
-    Returns:
-        Compounded value at the end of the complete interval: the product of
-        :func:`crsp_held_spans`' growths, in order.
-
-    Raises:
-        ValueError: CRSP-009 for missing rows, inconsistent spans or nonfinite
-            growth; CRSP-011 for an unresolved missing-price tail.
-    """
-    growth = prod(span for _, span in crsp_held_spans(returns, permno, entry, days))
-    if not isfinite(growth):
-        raise ValueError("[CRSP-009] compounded held return is not finite")
-    return growth

@@ -175,28 +175,28 @@ def crsp_member_on(
     )
 
 
-def require_crsp_execution_price(row: JSONObject, protocol: CrspProtocol) -> float:
-    """Accept only a finite positive closing trade for a modeled ordinary fill.
+def crsp_executable(row: JSONObject, protocol: CrspProtocol) -> bool:
+    """Whether a record is a finite positive closing trade a modeled order can fill at.
 
     Args:
         row: The exact execution date's daily record, already identity-joined.
         protocol: Frozen accepted price flag.
 
     Returns:
-        Positive trade price. Quotes, halts and delisting valuations are not fills.
+        True only for the protocol's closing-trade flag with a finite positive
+        price. Quotes, halts, suspensions, missing prices and delisting
+        valuations are not fills.
 
     Raises:
-        ValueError: CRSP-004 for an unexecutable or missing price.
+        TypeError: A present price that is not a number.
     """
     price = optional_float(row, "dlyprc")
-    if (
-        price is None
-        or require_str(row, "dlyprcflg") != protocol["execution_flag"]
-        or not isfinite(price)
-        or price <= 0
-    ):
-        raise ValueError("[CRSP-004] execution requires a finite positive closing trade")
-    return price
+    return (
+        price is not None
+        and require_str(row, "dlyprcflg") == protocol["execution_flag"]
+        and isfinite(price)
+        and price > 0
+    )
 
 
 class TerminalResolution(NamedTuple):
@@ -252,28 +252,3 @@ def crsp_resolve_terminal(row: JSONObject) -> TerminalResolution:
     if stored <= event or any(day < event for day in dates):
         return TerminalResolution(max(dates), 1.0, "delisting chronology")
     return TerminalResolution(max(dates), 1 + value, None)
-
-
-def crsp_terminal_value(row: JSONObject) -> tuple[str, float]:
-    """Return the terminal valuation date and multiplier, never an actual cash date.
-
-    The valuation is :func:`crsp_resolve_terminal`'s. The evaluator must not
-    treat the value as known, reinvestable or labelled before that date.
-
-    Args:
-        row: Complete stkdelists record. DelAmtDt is required; DelNextDt is nullable.
-
-    Returns:
-        Conservative recorded valuation date and one plus the delisting return.
-
-    Raises:
-        ValueError: CRSP-005 for unresolved value, inconsistent chronology or flags.
-        TypeError: Missing or malformed fields, including missing DelAmtDt.
-    """
-    resolution = crsp_resolve_terminal(row)
-    if resolution.refusal is not None:
-        raise ValueError(
-            f"[CRSP-005] terminal return or valuation chronology is unresolved: "
-            f"{resolution.refusal}"
-        )
-    return resolution.valued, resolution.multiplier

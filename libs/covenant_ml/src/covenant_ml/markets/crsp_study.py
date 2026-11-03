@@ -172,8 +172,10 @@ def crsp_study_rows(
         ]
         benchmark = sum(values) / len(values)
         known = max(
-            decision.window.exit,
-            *(path.terminal[0] for path in paths if path.terminal is not None),
+            (
+                decision.window.exit,
+                *(path.terminal[0] for path in paths if path.terminal is not None),
+            )
         )
         for feature, value in zip(decision.features, values, strict=True):
             matrix.append([_column(feature, name) for name in features])
