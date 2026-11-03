@@ -1,0 +1,17 @@
+{
+  "kind": "staging-permission-correction",
+  "native_job": "40569098",
+  "destination": "/data/homezvol1/wagnera3/research-data/crsp-corporate-actions-fd32dc2e-20261103",
+  "initial_stage": "Existing generic stage controller verified fourteen files and certificate.",
+  "first_inspection": {
+    "exit_code": 2,
+    "error": "STAGE_INVENTORY: study directories must be private regular directories",
+    "observed_mode": "0755",
+    "owner": "wagnera3",
+    "type": "directory"
+  },
+  "cause": "Private destination creation was omitted before the generic staging command; remote.make_directory uses mkdir -p and the account umask.",
+  "correction": "Changed only this newly created destination to mode 0700; stat readback confirms 700 wagnera3 directory.",
+  "data_boundary": "Only thirteen ciphertext files, public bundle metadata and the digest certificate were transferred; no plaintext observations or keys.",
+  "verification": "Independent complete-tree inspection is recorded separately in licensed-stage-inspection.json; the initial refusal is preserved here."
+}
