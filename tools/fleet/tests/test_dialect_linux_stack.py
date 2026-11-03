@@ -23,6 +23,7 @@ real one.
 from __future__ import annotations
 
 import pathlib
+import shutil
 import subprocess
 
 import pytest
@@ -78,6 +79,12 @@ def _run_with_docker(
     Returns:
         The probe's standard output.
     """
+    # The host's own sudo, found before the fake goes first on PATH: on a
+    # NixOS runner host envfs serves /usr/bin from the caller's PATH, so a
+    # fake handing on to /usr/bin/sudo ran itself until the 120 s timeout
+    # (lavender, fleet job 2a55334f, MCPs board task 9aba868d).
+    host_sudo = shutil.which("sudo")
+    assert host_sudo is not None, "the probe's other sudo calls need the host's sudo on PATH"
     tools = tmp_path / "tools"
     tools.mkdir()
     calls = (tmp_path / "calls").as_posix()
@@ -85,7 +92,7 @@ def _run_with_docker(
     runner.write_bytes(
         (
             "#!/bin/sh\n"
-            f'if [ "$1 $2 $3" != "-n {CHECK_UNIT_HELPER} run" ]; then exec /usr/bin/sudo "$@"; fi\n'
+            f'if [ "$1 $2 $3" != "-n {CHECK_UNIT_HELPER} run" ]; then exec {host_sudo} "$@"; fi\n'
             f"echo \"sudo $*\" >> '{calls}'\n" + ("" if unit_starts else "exit 1\n") + "shift 3\n"
             'exec "$@"\n'
         ).encode()
