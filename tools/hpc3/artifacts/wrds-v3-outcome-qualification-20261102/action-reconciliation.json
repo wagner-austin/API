@@ -1,0 +1,381 @@
+{
+  "kind": "CRSP_ACTION_QUALIFICATION_RECONCILIATION",
+  "sources": [
+    {
+      "path": "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json",
+      "sha256": "3dd11ddad1ea74724a44f7bcc1b82b4f581ea51462647fbd7592664abf75ec65"
+    },
+    {
+      "path": "tools/hpc3/artifacts/wrds-action-cases-20261103/licensed-cases.json",
+      "sha256": "6ac30bf99f64c8bcff00f6d6d583b35b87bc4acf3403e42a6ddfcf2c3d053736"
+    }
+  ],
+  "classification_source": "wiki/pages/wrds-v3-refused-path-diagnosis.md, Every original refusal table; mutually exclusive first-refusal categories, not all coexisting conditions",
+  "method": "Join original audit and native action metadata by path ordinal; require identical entry digest, period and exit offset. Count only inside_window OR on_exit events. Null amount means detail.zero.disdivamt is null. Subtract exit offset from delamtdt offset; no values, new decryption or return calculation.",
+  "cases": [
+    {
+      "path_ordinal": 9165,
+      "source_class": "BA_exit",
+      "period": "training",
+      "entry_row_sha256": "5e837d07cea5bd5a9b44ac6168057620f1da4153ce996062ac03fa100b425269",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        3
+      ]
+    },
+    {
+      "path_ordinal": 105499,
+      "source_class": "BA_exit",
+      "period": "training",
+      "entry_row_sha256": "6a645c9fb523e0252cae2118eb8d649fc014d776dddd317d5de17ea2442adf42",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 135749,
+      "source_class": "BA_exit",
+      "period": "training",
+      "entry_row_sha256": "347523c105fff3cfec66e830fdf2918b866de349f26e28435579d6d4aabe0270",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 10141,
+      "source_class": "BA_entry",
+      "period": "training",
+      "entry_row_sha256": "5712d5a9f7c4d2ea060578a885dcbdcf77dff129aefa55e65597b56944e200b7",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 1
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        -29
+      ]
+    },
+    {
+      "path_ordinal": 106500,
+      "source_class": "BA_entry",
+      "period": "training",
+      "entry_row_sha256": "7e1ba7ae9332033a985c173b139d38aa445335e56df30fa53a9e702d262bdd9b",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 1
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        -31
+      ]
+    },
+    {
+      "path_ordinal": 136773,
+      "source_class": "BA_entry",
+      "period": "training",
+      "entry_row_sha256": "1f8bace9e3d2912e93ebbd44a4c7d27d7b0603414da96bf118d14df38aab1bfe",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 2
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        -29
+      ]
+    },
+    {
+      "path_ordinal": 54734,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "f09de080dfbdfd2d734b50871fbb34741b56395122d06da4b029858c5af9fa36",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 62905,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "d274a0ec222e790b69c7ca89ac741a7a373f7034c53b05f5fe2232b6eba4da60",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 83373,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "eedb42d490d538819d49466a73e4e8e475e7198568eb3e7bc1517fc42b8413cc",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 84356,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "1aa2c9fd895e0b0173cb5a2e46a0fee8e384cf9226a6987ffc150432661d5951",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 84496,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "3345af205f02905fb03b1270f9988946f11e0a2a728c77c470dce33221cc42bc",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 92184,
+      "source_class": "NT",
+      "period": "training",
+      "entry_row_sha256": "63c888be36afd3efe5004a6fbda2de56adb620aa15b25800a96bb28853de78d3",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 10402,
+      "source_class": "MV",
+      "period": "training",
+      "entry_row_sha256": "68ce143bc155427da7bf86f42a3f584cfef2f23a8b166a6071da33cbfdf30d83",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 2
+      },
+      "distribution_null_amounts": 1,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 59635,
+      "source_class": "MV",
+      "period": "training",
+      "entry_row_sha256": "83c4857df182dbada15a3ffbbb76032dc64f724970d4331e5fe23ba7c6570aaf",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 3
+      },
+      "distribution_null_amounts": 1,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 134760,
+      "source_class": "MV",
+      "period": "training",
+      "entry_row_sha256": "c11cbe1d267868e0962c6bb91db27ecfd9151c15d306cf1c32fb1b0d57866fd9",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 2
+      },
+      "distribution_null_amounts": 1,
+      "delisting_amount_offsets_from_exit": [
+        -18
+      ]
+    },
+    {
+      "path_ordinal": 173979,
+      "source_class": "MV",
+      "period": "training",
+      "entry_row_sha256": "64d4c72bdd9f19caaa34a39d2602fb631e9717aeea229405a0513dd7fcaec572",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 2
+      },
+      "distribution_null_amounts": 1,
+      "delisting_amount_offsets_from_exit": [
+        -30
+      ]
+    },
+    {
+      "path_ordinal": 179591,
+      "source_class": "MV",
+      "period": "training",
+      "entry_row_sha256": "1a5549643aa427f4dde91e9d6386d224d04af50ff4d82e77978c62490ad000d0",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 3
+      },
+      "distribution_null_amounts": 2,
+      "delisting_amount_offsets_from_exit": [
+        -3
+      ]
+    },
+    {
+      "path_ordinal": 191467,
+      "source_class": "MV",
+      "period": "validation",
+      "entry_row_sha256": "a9ecf8b5f8d0331202ee7490b0399af7aeaa151897747832797c34bb43c2f110",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 2
+      },
+      "distribution_null_amounts": 1,
+      "delisting_amount_offsets_from_exit": [
+        -10
+      ]
+    },
+    {
+      "path_ordinal": 18863,
+      "source_class": "late_valuation",
+      "period": "training",
+      "entry_row_sha256": "421e092db8c97aca808a5ee80b3ffa40c7380e352125f9402e5002958122f00c",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 27156,
+      "source_class": "late_valuation",
+      "period": "training",
+      "entry_row_sha256": "664b09e65bc310e5fabb03670b43b888643f0e686f51fbe39a62ca4e4d11ff08",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        2
+      ]
+    },
+    {
+      "path_ordinal": 34781,
+      "source_class": "late_valuation",
+      "period": "training",
+      "entry_row_sha256": "a1f24671219b46c77d2cd9570b948df2c3223bbbffadf176ee19d2845ebf9044",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 44820,
+      "source_class": "late_valuation",
+      "period": "training",
+      "entry_row_sha256": "e881a6f53f5d9808ea293c2e32c89892f8374cab0789abc5b63be4eb183d9cdf",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 187445,
+      "source_class": "late_valuation",
+      "period": "validation",
+      "entry_row_sha256": "8ea7b149e1386c5cfabac0b478cb3658e503a4c4efca873171e4207b243cb097",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        1
+      ]
+    },
+    {
+      "path_ordinal": 12343,
+      "source_class": "SU",
+      "period": "training",
+      "entry_row_sha256": "887ea39383837be74673d491241d7536effc7903f6cc774e2262a76791f65239",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 23610,
+      "source_class": "SU",
+      "period": "training",
+      "entry_row_sha256": "152a3c1ab444cf4a3eab07977f839fd7fa330d3c22826fac2734c7972fb2136d",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    },
+    {
+      "path_ordinal": 133712,
+      "source_class": "DG",
+      "period": "training",
+      "entry_row_sha256": "c08643bf26a5fca13b8f45925d60fa910de7ef36dc2ba4022e02d14626aec8cb",
+      "event_counts": {
+        "delist-events": 1,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": [
+        48
+      ]
+    },
+    {
+      "path_ordinal": 169697,
+      "source_class": "open_MP",
+      "period": "training",
+      "entry_row_sha256": "51b45012fe0083267d74104cc5d3011bb583ecd9a738f9dfc97c29b528805bc0",
+      "event_counts": {
+        "delist-events": 0,
+        "distribution-events": 0
+      },
+      "distribution_null_amounts": 0,
+      "delisting_amount_offsets_from_exit": []
+    }
+  ],
+  "case_count": 27,
+  "outcomes_qualified": false,
+  "limits": [
+    "An event/detail row is not proof of complete consideration or historical availability.",
+    "A null distribution amount is not a zero amount and does not identify the economic form of consideration.",
+    "No absence outside the inspected event boundary is inferred.",
+    "No original refusal is waived by this reconciliation."
+  ]
+}
