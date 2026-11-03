@@ -17,6 +17,8 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py"
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/protocol.json"
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json"
+  - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json"
+  - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
@@ -32,11 +34,13 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/protocol.json": "a095650070b230379e759563df3c20b3c2476ded"
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json": "b2994cf9db46aff4a4714b987bd4f5c0729dd5b2"
+  "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json": "7c39757f5c5a238d9dabf24f0531f201adeba639"
+  "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json": "cba4424c62478199f45a23b26df2ddd4b992c2ec"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e; corpus 0264d5cc-4dec-4715-b17b-45f3c8e5fbec; reread November 2."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; this is qualification analysis, not an approved version-4 freeze."
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 
@@ -125,8 +129,7 @@ the original full-universe baseline.[^cases][^partition]
 
 [[wrds-encrypted-diagnostic-cohort]] documents the frozen-vintage subset
 derivation used to prepare this comparison. That diagnostic preserves source
-lineage and cannot pass the study loader; fresh vendor evidence is a separate
-step.[^cohort]
+lineage and cannot pass the study loader.[^cohort]
 
 The diagnostic query builder requires the exact train-validation scope
 derived from the supplied protocol, including all date bounds. Renaming a
@@ -134,10 +137,42 @@ final scope or altering an individual bound is refused before SQL is returned.
 This hardens future query admission; it supplies no missing outcome and does
 not establish that a previous extraction crossed its boundary.[^query-scope]
 
-[[wrds-crsp-source-comparison]] records the shared comparison owner, its
-synthetic database rehearsals and the bounded vendor comparison. Its diagnostic
-envelope is separate from a study dataset; unchanged source rows would not
-establish complete economic outcomes.[^refresh]
+The completed [[wrds-crsp-source-comparison]] measured all 81,920 queried
+rows unchanged. It establishes no correction within the frozen four-relation
+projection and validation bounds. The original full-universe target therefore
+remains unqualified; repeating the same extraction is not an outcome repair.
+The comparison and subsequent scalar-error privacy repair passed separate
+independent audits. Neither review approves a changed economic rule or a new
+study freeze.[^refresh][^source-checks]
+
+## Additional evidence to qualify
+
+The October 27 metadata inventory records direct access to
+`crsp_a_stock.stkdistributions` and additional `stkdelists` columns. This is
+historical schema/access evidence, not a fresh query or proof that a diagnosed
+security has a usable payment. The guide distinguishes distribution ex-date,
+payment date, amount and linked security from delisting amount date and stored
+return date.[^catalog][^distribution]
+
+The next diagnostic should capture those fields for the authenticated cohort,
+within the existing validation boundary, through the shared query, snapshot,
+encryption and native-job owners. It must preserve raw missingness and flags,
+retain exact queries and checksums, and keep licensed fields encrypted. A
+linked identifier is evidence to investigate, not permission to recursively
+expand to other securities or cross the final boundary. Event presence must be
+distinguished from unavailable valuation without importing future values.
+This is a proposed source investigation, not an implemented fifth study
+relation or a replacement return policy.[^catalog][^partition][^refresh]
+
+Interpretation must answer whether cash or security consideration is complete,
+when it is valued, and whether the daily total return already contains it.
+Adding distributions to a total return without that reconciliation can double
+count the same consideration. A populated payment field alone does not prove
+an executable liquidation, an exit-date mark or contemporaneous vendor
+availability. Unresolved NT, MV, DG and open tails continue to refuse; no
+selection on future completeness or zero-valued imputation is approved.
+Qualification still requires a reviewed policy and a full-panel native check
+before new study admission.[^distribution][^vendor][^owners]
 
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
@@ -149,3 +184,6 @@ establish complete economic outcomes.[^refresh]
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner" and § "Admission is not permission to fit this subset".
 [^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
 [^refresh]: [[wrds-crsp-source-comparison]], § "Diagnostic contract" and § "Native evidence".
+[^source-checks]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json`, captured live board responses: comparison audit `dc59b228` completed VERIFIED at 2026-11-03T01:44:51.513Z; scalar-error privacy audit `9ccc6e3a` completed VERIFIED at 2026-11-03T01:55:18.663Z, each against its own acceptance criteria.
+[^catalog]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json`, exact metadata rows from the October 27 inventory and SHA-256 identities of the source column/access CSV files, rechecked November 3 UTC.
+[^distribution]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–13, StkDelists and StkDistributions field definitions; pp. 17–18, DlyRet total-return definition. Archived primary source and digest in frontmatter. Interpretation and proposed investigation are this project's requirements, not a claim that those fields close the observed gaps.

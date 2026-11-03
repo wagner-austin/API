@@ -27,7 +27,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 
@@ -102,6 +102,11 @@ attempts and the enforced prohibition on using it as a study dataset.[^cohort]
 The completed [[wrds-crsp-source-comparison]] found all 81,920 queried rows
 unchanged. It supplied no fresh-vintage correction; economic qualification
 and the study stop remain in force.[^comparison]
+The comparison and scalar-error privacy repair have passed independent review.
+[[crsp-outcome-qualification]] records those completed prerequisites and the
+next bounded distribution/delisting investigation. Additional catalog fields
+are available in the historical inventory; their ability to resolve missing
+outcomes remains unmeasured.[^qualification]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
 verified the explicit protocol stop. Source-diagnosis task `a9ad53ae` then passed
@@ -140,3 +145,4 @@ allocation-specific observations and their limits.[^preparation]
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement` and `record`; sibling `completion-preparation-report.json`, fifteen `attempts` with one failed, fourteen admitted, no selection or final-manifest identity and the unchanged journal digest. Diagnostic completion is not a model fit or a final evaluation.
 
 [^comparison]: [[wrds-crsp-source-comparison]], § "Native evidence", licensed job `40568218` and its primary comparison/collection artifacts.
+[^qualification]: [[crsp-outcome-qualification]], § "Qualification design" and § "Additional evidence to qualify", with captured independent audit verdicts and the checksummed historical catalog projection.
