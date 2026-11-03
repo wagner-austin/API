@@ -141,8 +141,7 @@ NIXOS_TEST_PROGRAM: Final = (
     f"test -r {KVM_DEVICE} && test -w {KVM_DEVICE} && "
     'f=" $(nix --extra-experimental-features nix-command config show system-features) " && '
     + "".join(
-        f'case "$f" in *" {feature} "*) ;; *) exit 1 ;; esac && '
-        for feature in NIXOS_TEST_FEATURES
+        f'case "$f" in *" {feature} "*) ;; *) exit 1 ;; esac && ' for feature in NIXOS_TEST_FEATURES
     )
     + "nix --version"
 )

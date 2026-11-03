@@ -285,8 +285,7 @@ DEMO_RUN_ID = f"libs-demo-lavender-{DEMO_NOW}"
 #: (MCPs board task 3268afdf), and the GPU count of one with no display
 #: device (MCPs board task b4d5ca0f), which every probe prints.
 CALM = (
-    "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\ncheck_cpu_quota=max\non_battery=no\n"
-    "gpu_count=0\n"
+    "cpu_pressure_pct=0.00\nio_pressure_pct=0.00\ncheck_cpu_quota=max\non_battery=no\ngpu_count=0\n"
 )
 
 #: What a healthy capacity probe answers.

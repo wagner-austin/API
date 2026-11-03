@@ -33,29 +33,12 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from platform_core.errors import AppError, FleetErrorCode
-from typing_extensions import TypedDict
 
 from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag, missing_tags
-
-
-class DispatchVerdict(TypedDict):
-    """What one node would do with one project, right now.
-
-    Attributes:
-        workers: Workers the node would grant, or zero when it would refuse.
-        code: The error code a refusal carries, or None when it would accept.
-            Carried rather than re-derived so the raising wrapper and the
-            aggregating one cannot classify the same refusal differently.
-        reason: Why it would refuse, or an empty string when it would accept.
-    """
-
-    workers: int
-    code: FleetErrorCode | None
-    reason: str
-
+from fleet.core.node_refusal import DispatchVerdict, machine_refusal, wrong_node
 
 #: How close to its ``memory.high`` a ``runners.slice`` must be to count as
 #: at it: the kernel throttles the slice there, so its current hovers just
@@ -135,42 +118,6 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
             "~/.fleet/reservations), so it takes the next job when they end"
         )
     return "somebody is on this machine"
-
-
-def _wrong_node(node: NodeConfig, project: ProjectConfig) -> DispatchVerdict | None:
-    """The refusal of a node that is the wrong one whatever its load.
-
-    Args:
-        node: The node's declaration.
-        project: The work being dispatched.
-
-    Returns:
-        The refusal :func:`assess` gives first for a pin or a node that
-        checks only its pinned projects, in that order; None when the node
-        may be weighed.
-    """
-    pinned = project["node"]
-    if pinned is not None and pinned != node["host"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_NOT_PINNED,
-            reason=(
-                f"{node['host']} is not {pinned}: the project runs on {pinned} alone, because "
-                "it reads what only that host holds, so the answer is that node and never "
-                "this one."
-            ),
-        )
-    if pinned is None and node["budget"]["pinned_checks_only"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_NOT_PINNED,
-            reason=(
-                f"{node['host']} checks only the projects pinned to it: its own work leaves a "
-                "check no margin under the 300 s budget, so the answer is any other node "
-                "this project's tags fit."
-            ),
-        )
-    return None
 
 
 def assess(
@@ -256,9 +203,9 @@ def assess(
     Returns:
         The verdict. ``workers`` is zero exactly when ``code`` is set.
     """
-    wrong_node = _wrong_node(node, project)
-    if wrong_node is not None:
-        return wrong_node
+    pin = wrong_node(node, project)
+    if pin is not None:
+        return pin
     missing = missing_tags(carried, project["required_tags"])
     if missing:
         return DispatchVerdict(
@@ -272,26 +219,9 @@ def assess(
                 "this one once the missing tool is installed."
             ),
         )
-    if state["free_disk_gb"] < node["budget"]["max_disk_gb"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_DISK_EXHAUSTED,
-            reason=(
-                f"{node['host']} has {state['free_disk_gb']:.0f} GB free and this workspace "
-                f"reserves {node['budget']['max_disk_gb']:.0f} GB for staged trees. The first "
-                "dispatch to a node is a cold stage of a whole monorepo."
-            ),
-        )
-    if state["on_battery"]:
-        return DispatchVerdict(
-            workers=0,
-            code=FleetErrorCode.NODE_ON_BATTERY,
-            reason=(
-                f"{node['host']} is running on its battery: its probe read a power supply "
-                "discharging, and a check placed here drains it. It takes the next job once it "
-                "is back on mains."
-            ),
-        )
+    machine = machine_refusal(node, state)
+    if machine is not None:
+        return machine
     live = state["live"]
     carried_at_once = node["budget"]["checks_at_once"]
     if carried_at_once is not None and live["runs"] >= carried_at_once:
@@ -581,7 +511,6 @@ def plan_dispatch(
 
 
 __all__ = [
-    "DispatchVerdict",
     "assess",
     "fitting_projects",
     "job_ceiling",

@@ -148,22 +148,9 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         if sliced
         else None
     )
-    check_cpu_quota: float | None = None
-    if fields.get(CHECK_QUOTA_FIELD) != NO_QUOTA:
-        quota = _read_number(fields, CHECK_QUOTA_FIELD)
-        if quota is None:
-            return ProbeOutcome(
-                state=None, reason=_unreadable(host, fields, CHECK_QUOTA_FIELD, output)
-            )
-        if quota <= 0:
-            return ProbeOutcome(
-                state=None,
-                reason=(
-                    f"{host} reported {CHECK_QUOTA_FIELD}={quota!r}, which is no CPU a check "
-                    "could run on"
-                ),
-            )
-        check_cpu_quota = quota
+    check_cpu_quota, quota_problem = _read_quota(host, fields, output)
+    if quota_problem:
+        return ProbeOutcome(state=None, reason=quota_problem)
     battery = fields.get(BATTERY_FIELD)
     if battery not in BATTERY_READINGS:
         return ProbeOutcome(
@@ -196,6 +183,32 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
         ),
         reason="",
     )
+
+
+def _read_quota(host: str, fields: dict[str, str], output: str) -> tuple[float | None, str]:
+    """Read the CPUs a check may use (MCPs board task d77b8c73).
+
+    Args:
+        host: The node, for the message.
+        fields: The parsed key=value pairs.
+        output: The whole output, for the message.
+
+    Returns:
+        The quota in cores, or None where neither check slice has one
+        (:data:`NO_QUOTA`), and an empty string; or None and the reason the
+        field cannot be read, which a missing, unparsed or non-positive
+        value is, so none of them reads as a slice with no quota.
+    """
+    if fields.get(CHECK_QUOTA_FIELD) == NO_QUOTA:
+        return None, ""
+    quota = _read_number(fields, CHECK_QUOTA_FIELD)
+    if quota is None:
+        return None, _unreadable(host, fields, CHECK_QUOTA_FIELD, output)
+    if quota <= 0:
+        return None, (
+            f"{host} reported {CHECK_QUOTA_FIELD}={quota!r}, which is no CPU a check could run on"
+        )
+    return quota, ""
 
 
 def _read_action_cache(
