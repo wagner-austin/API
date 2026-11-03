@@ -842,16 +842,23 @@ database.
 
 ## Frozen monthly CRSP contract
 
-`docs/crsp-monthly.json` is the prospective version-4 design. Decode it through
+`docs/crsp-monthly.json` is the prospective version-5 design. Decode it through
 `markets.crsp_protocol.decode_crsp_protocol`, then bind its exact digest in the
 existing research policy. The codec rejects unknown fields and unsupported
 source/valuation conventions; proposals cannot replace the evaluator's policy.
 
-Version 4 retains `confirmed-terminal-entry-cash` and `actual-traded-notional`,
-and declares `exact-unpriced-held-spans`: unpriced MP or SU rows with MP/MR
-returns require exact available NA/P1-P9 closure inside the held interval.
-This bounded extension does not qualify the incomplete licensed dataset or
-authorize a replacement study; the wiki's `crsp-outcome-qualification` owns that status.
+Version 5 retains `actual-traded-notional` and version 4's
+`exact-unpriced-held-spans`: unpriced MP or SU rows with MP/MR returns require
+exact available NA/P1-P9 closure inside the held interval. It declares
+`closing-trade-or-unfilled-cash`: a new purchase fills only at a `TR` entry
+record, and any other present entry record is an unfilled order. It declares
+`unsold-exit-event-label-at-valuation`: a delisting dated on an exit close whose
+record is no closing trade ends the old position with its terminal value, and
+every label of a decision is available at the later of its exit and its latest
+member's terminal valuation date. These bounded rules do not qualify the
+incomplete licensed dataset or authorize a replacement study; the wiki's
+`crsp-v5-boundary-policy` gives the reasons and `crsp-outcome-qualification`
+owns that status.
 The stopped November 1 study used version 1, preserved as historical evidence at
 `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json` from the repo root.
 Old admitted requests and encrypted manifests cannot run under the new codec.
@@ -881,11 +888,13 @@ Changing, removing, adding or reordering a column is refused. The exact fields a
   Ordinary execution requires finite positive `TR` closing trades. Universe
   liquidity uses 60 pre-decision sessions; eligibility requires 252 prior
   sessions and decision price at least $5. Future entry prices cannot change
-  the ranked selection. A confirmed rejected new purchase retains its equal
-  allocation in zero-interest cash, with no replacement or redistribution.
-  Confirmation requires exactly one terminal event at decision close, before
-  entry, and an entry-day terminal row with `DD` duration and a non-`TR` price
-  flag. Missing or contradictory evidence still makes the run incomplete.
+  the ranked selection. A new purchase whose entry record is present but not a
+  `TR` closing trade is unfilled and retains its equal allocation in
+  zero-interest cash, with no replacement or redistribution. A terminal entry
+  row is unfilled only with exactly one terminal event at decision close,
+  before entry, `DD` duration and a non-`TR` price flag. An absent record,
+  contradictory evidence, a `TR` flag without a positive price or a held
+  position without a trade at a rebalance still makes the run incomplete.
   Both labels and the universe benchmark retain that cash multiplier of one.
   No missing held return or unresolved owned terminal value becomes cash.
 - `crsp_a_stock.stkdelists`: `permno,delistingdt,deldlydt,delamtdt,delnextdt,
@@ -894,12 +903,13 @@ Changing, removing, adding or reordering a column is refused. The exact fields a
   date is the latest of stored/amount/present next-price dates. Its multiplier
   reconciles the CIZ terminal return once; do not multiply by both returns.
 
-The declared `dated-value-next-rebalance` convention treats a terminal value
-as a receivable until its recorded valuation date, then allows modeled
-reinvestment at the first scheduled rebalance strictly after that date.
-An unresolved value or one dated after the scored exit makes that outcome
-incomplete. This is a revised-history valuation and settlement assumption,
-not evidence of historical cash availability or an executable liquidation.
+The declared `unsold-exit-event-label-at-valuation` convention treats a
+terminal value as a receivable until its recorded valuation date, then allows
+modeled reinvestment at the first scheduled rebalance strictly after that date,
+which may follow the exit. No label depending on it is available before that
+date. An unresolved value makes that outcome incomplete. This is a
+revised-history valuation and settlement assumption, not evidence of historical
+cash availability or an executable liquidation.
 
 ## Four-relation CRSP extraction
 
@@ -966,34 +976,36 @@ equal-weight portfolio across consecutive windows, each entering at the
 previous exit. Value starts as one unit of cash. At each rebalance close the
 investable value (positions plus terminal values dated strictly before that
 close), including retained cash, is split equally across the decision-time
-selection. Confirmed rejected purchases keep their slots in cash. Solve
+selection. Unfilled purchases keep their slots in cash. Solve
 `slots * x + rate * actual_turnover(x) = investable` for the post-cost
 allocation `x`; turnover uses actual buys and sells, not pre-fee targets.
 The piecewise-linear solver uses prior position values as breakpoints.
 Positions compound evidenced returns over `(entry, exit]`. Unpriced MP/SU gaps with MP/MR returns
 must close with one NA/P1-P9 return spanning the exact independent-calendar
 sessions from the previous priced date; intermediate closes receive no value.
-A position delisted inside the window stops at its
-delisting date and becomes a receivable worth its `stkdelists` multiplier,
-applied once; the daily delisting-flagged copy is never compounded. The last
+A position delisted inside the window, or on an exit close whose record is no
+closing trade, stops at its delisting date and becomes a receivable worth its
+`stkdelists` multiplier, applied once; the daily delisting-flagged copy is
+never compounded. The last
 window also pays the cost of liquidating its positions at its exit close. Each
 period retains its selection, rejected purchases, cash weight, drifted end
 weights, receivables, turnover, cost and net return. Cash and held weights use
 the pre-liquidation end value; terminal receivables remain separate. An absent
-row, unresolved return span, unverifiable fill, unresolved owned terminal
-event or a terminal value dated after the exit
-refuses the whole evaluation; no partial result is returned.
+row, unresolved return span, unverifiable fill or unresolved owned terminal
+event refuses the whole evaluation; no partial result is returned.
 
 `markets.crsp_study.run_crsp_validation` considers decisions from `train_start`
 to the day before `holdout_start`, then retains only windows whose exit is
 strictly before `holdout_start`, before attaching any outcome. A row's label is
 whether the security's window
-multiplier beats the eligible universe's equal-weight multiplier, available at
-the exit close. Validation decisions are scored in consecutive folds of the
-declared length; each fold fits on every earlier decision except the declared
-stopping months, which supply early stopping, and `purge_label_overlap` drops
-every training and stopping label not available strictly before the next
-boundary, which is exactly the decision immediately before each boundary.
+multiplier beats the eligible universe's equal-weight multiplier; every label of
+a decision is available at the later of its exit close and its latest member's
+terminal valuation date. Validation decisions are scored in consecutive folds of
+the declared length; each fold fits on every earlier decision except the
+declared stopping months, which supply early stopping, and `purge_label_overlap`
+drops every training and stopping label not available strictly before the next
+boundary, which is exactly the decision immediately before each boundary when
+no valuation falls after its exit.
 Candidates select the top `ceil(selection_fraction * eligible)` by predicted
 probability, momentum by its lagged return, ties by PERMNO; the equal-weight
 universe is reported beside them. Every arm is accounted at every frozen cost,
