@@ -579,3 +579,8 @@ Notes: Describe fixed event/detail projections and the lifted private capture li
 ## [2026-11-03] Action-case inspection | Reuse audit anchors and monthly windows
 Page added: wrds-crsp-action-case-inspection; capture linked, libs hub and index now 76 pages.
 Notes: Document authenticated case joins and their privacy and economic limits. Fleet verification and native rehearsal remain pending under board task 4fca73b7-9c36-47a9-a705-7541813c9338. Reverify existing cohort, capture, comparison and extraction claims after lifting the shared readers.
+
+## [2026-11-03] Action-case evidence | Native replay and licensed coverage
+Pages written: wrds-crsp-action-case-evidence.
+Pages updated: wrds-crsp-action-case-inspection, wrds-crsp-corporate-action-capture, crsp-outcome-qualification, wrds-baseline-readiness; libs hub and index now 77 pages.
+Notes: Preserve the failed strict-typing check and its corrected full-fleet pass. Native jobs 40569412 and 40569430 completed through existing controllers; synthetic output matches its fleet oracle exactly and the licensed join covers all 27 cases. Economic qualification remains open; independent review of task 4fca73b7-9c36-47a9-a705-7541813c9338 and live page audits follow publication.
