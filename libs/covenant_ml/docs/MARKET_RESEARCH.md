@@ -842,13 +842,16 @@ database.
 
 ## Frozen monthly CRSP contract
 
-`docs/crsp-monthly.json` is the version-3 machine-readable design. Decode it through
+`docs/crsp-monthly.json` is the prospective version-4 design. Decode it through
 `markets.crsp_protocol.decode_crsp_protocol`, then bind its exact digest in the
 existing research policy. The codec rejects unknown fields and unsupported
 source/valuation conventions; proposals cannot replace the evaluator's policy.
 
-Version 3 retains `confirmed-terminal-entry-cash` and `actual-traded-notional`,
-and declares `exact-missing-price-spans` for held returns.
+Version 4 retains `confirmed-terminal-entry-cash` and `actual-traded-notional`,
+and declares `exact-unpriced-held-spans`: unpriced MP or SU rows with MP/MR
+returns require exact available NA/P1-P9 closure inside the held interval.
+This bounded extension does not qualify the incomplete licensed dataset or
+authorize a replacement study; the wiki's `crsp-outcome-qualification` owns that status.
 The stopped November 1 study used version 1, preserved as historical evidence at
 `tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json` from the repo root.
 Old admitted requests and encrypted manifests cannot run under the new codec.
@@ -967,7 +970,7 @@ selection. Confirmed rejected purchases keep their slots in cash. Solve
 `slots * x + rate * actual_turnover(x) = investable` for the post-cost
 allocation `x`; turnover uses actual buys and sells, not pre-fee targets.
 The piecewise-linear solver uses prior position values as breakpoints.
-Positions compound evidenced returns over `(entry, exit]`. Explicit MP/MR gaps
+Positions compound evidenced returns over `(entry, exit]`. Unpriced MP/SU gaps with MP/MR returns
 must close with one NA/P1-P9 return spanning the exact independent-calendar
 sessions from the previous priced date; intermediate closes receive no value.
 A position delisted inside the window stops at its
