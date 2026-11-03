@@ -1,0 +1,23 @@
+{
+  "role": "client",
+  "platform": "linux",
+  "user": null,
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "standby": [],
+  "ledger_observer": "none",
+  "tailnetIp": "100.101.229.93",
+  "reachKey": null,
+  "bootMac": null,
+  "netbootWifi": false,
+  "installDisk": null,
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "Pixel 8 Android handset, tailnet name pixelate, with the native companion and key-only Termux SSH. Its address is canonical here so the existing tailnet policy renderer can preserve the device holder's access after the control role moves (board task 630740d5). Like lapis-lazuli, this client is excluded from compute provisioning and audit targets.",
+  "dispatch": "A phone client, never a compute or provisioning target. Its companion is driven by the devices duty holder; no fleet job runs on this handset."
+}
