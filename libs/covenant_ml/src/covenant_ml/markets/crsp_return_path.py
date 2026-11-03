@@ -11,8 +11,8 @@ from platform_core.json_utils import JSONObject, require_float
 from .crsp_calendar import crsp_return_span
 
 
-def _missing_price(row: JSONObject) -> bool:
-    """Recognize only the explicit unpriced, nonterminal MP/MR observation."""
+def _unpriced_held(row: JSONObject) -> bool:
+    """Recognize an unpriced MP or SU observation with a missing MP/MR return."""
     return (
         row["dlyret"] is None
         and row["dlyprevdt"] is None
@@ -20,7 +20,7 @@ def _missing_price(row: JSONObject) -> bool:
         and row["dlyretdurflg"] == "MR"
         and row["dlydelflg"] == "N"
         and row["dlyprc"] is None
-        and row["dlyprcflg"] == "MP"
+        and row["dlyprcflg"] in ("MP", "SU")
     )
 
 
@@ -29,7 +29,7 @@ class HeldRefusal(NamedTuple):
 
     Attributes:
         reason: A short key for counting: ``absent row``, ``span <missing
-            flag>/<duration flag>`` (with `` after a price gap`` when MP rows
+            flag>/<duration flag>`` (with `` after a price gap`` when unpriced rows
             preceded it) or ``price gap tail``.
         message: The full error, naming the code, security and session.
     """
@@ -57,7 +57,7 @@ def _refused_span(permno: int, day: str, row: JSONObject, missing: int) -> HeldR
         permno: Owned security.
         day: The row's session.
         row: The refused row.
-        missing: Explicit MP/MR rows immediately before it.
+        missing: Explicit unpriced MP/MR rows immediately before it.
 
     Returns:
         The refusal, keyed by the row's own missing and duration flags.
@@ -87,8 +87,8 @@ def crsp_resolve_held(
     Returns:
         One ``(index, growth)`` per resolved span, in order: the position in
         ``days`` of the session whose NA/P1-P9 return closes the span, and one
-        plus that return. Explicit MP/MR rows inside a span get no entry; no
-        value is assigned to an intermediate close. A missing row, a row whose
+        plus that return. MP/MR rows with MP or SU prices inside a span get no
+        entry; no value is assigned to an intermediate close. A missing row, a row whose
         flags do not close its span (including a return the vendor flags
         missing, such as MV, missing corporate action value) or an unclosed
         price-gap tail is the refusal instead.
@@ -101,7 +101,7 @@ def crsp_resolve_held(
         if row is None:
             message = f"[CRSP-009] held return for {permno} on {day} is absent"
             return HeldResolution((), HeldRefusal("absent row", message))
-        if _missing_price(row):
+        if _unpriced_held(row):
             missing += 1
             continue
         if not crsp_return_span(row, previous, missing + 1):

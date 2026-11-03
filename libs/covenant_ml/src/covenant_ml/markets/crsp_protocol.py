@@ -200,7 +200,7 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
     minimum = require_bounded_int(document, "min_history", 252, 10000)
     liquidity = require_bounded_int(document, "liquidity_window", 1, minimum)
     return CrspProtocol(
-        version=require_bounded_int(document, "version", 3, 3),
+        version=require_bounded_int(document, "version", 4, 4),
         library=_require_fixed(document, "library", "crsp_a_stock"),
         membership=_require_fixed(document, "membership", "dsenames"),
         returns=_require_fixed(document, "returns", "stkdlysecuritydata"),
@@ -254,7 +254,7 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
         execution_flag=_require_fixed(document, "execution_flag", "TR"),
         entry_rule=_require_fixed(document, "entry_rule", "confirmed-terminal-entry-cash"),
         cost_rule=_require_fixed(document, "cost_rule", "actual-traded-notional"),
-        held_return_rule=_require_fixed(document, "held_return_rule", "exact-missing-price-spans"),
+        held_return_rule=_require_fixed(document, "held_return_rule", "exact-unpriced-held-spans"),
         terminal_rule=_require_fixed(document, "terminal_rule", "dated-value-next-rebalance"),
         min_price=price,
         min_history=minimum,
