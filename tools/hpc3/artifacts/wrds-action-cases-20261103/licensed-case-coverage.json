@@ -1,0 +1,77 @@
+{
+  "source_sha256": "6ac30bf99f64c8bcff00f6d6d583b35b87bc4acf3403e42a6ddfcf2c3d053736",
+  "cases": 27,
+  "case_counts": {
+    "any_action_in_window_or_exit": 18,
+    "delist_in_window_or_exit": 16,
+    "delist_on_entry": 4,
+    "delist_on_exit": 3,
+    "detail_has_date_after_exit": 11
+  },
+  "case_ordinals": {
+    "any_action_in_window_or_exit": [
+      9165,
+      10141,
+      10402,
+      18863,
+      27156,
+      34781,
+      44820,
+      59635,
+      105499,
+      106500,
+      133712,
+      134760,
+      135749,
+      136773,
+      173979,
+      179591,
+      187445,
+      191467
+    ],
+    "delist_in_window_or_exit": [
+      9165,
+      10141,
+      18863,
+      27156,
+      34781,
+      44820,
+      105499,
+      106500,
+      133712,
+      134760,
+      135749,
+      136773,
+      173979,
+      179591,
+      187445,
+      191467
+    ],
+    "delist_on_entry": [
+      10141,
+      106500,
+      136773,
+      173979
+    ],
+    "delist_on_exit": [
+      9165,
+      105499,
+      135749
+    ],
+    "detail_has_date_after_exit": [
+      9165,
+      10402,
+      18863,
+      27156,
+      34781,
+      44820,
+      59635,
+      105499,
+      133712,
+      135749,
+      187445
+    ]
+  },
+  "outcomes_qualified": false,
+  "definition": "In window or exit uses the native inside_window OR on_exit predicates. Any date after exit includes every declared detail date, not only valuation or payment; it is not evidence of settlement or economic completeness."
+}

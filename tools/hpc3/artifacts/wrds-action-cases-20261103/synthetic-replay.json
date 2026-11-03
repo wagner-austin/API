@@ -1,0 +1,16 @@
+{
+  "synthetic_only": true,
+  "fixture_fleet": "ddc139fe-acb4-492d-9733-79bea64e3e09",
+  "fixture_node": "colossus",
+  "fixture_path": "/tmp/pytest-of-corvis/pytest-155/popen-gw1/test_real_inspection_child_emi0",
+  "fixture_test": "test_real_inspection_child_emits_metrics_or_cleans_ciphertext_failure[False]",
+  "oracle": "Exact input and metadata-output replay of the passed fleet child process; no native database query.",
+  "expected_output_sha256": "09a5dff90990e6be5c1c475f6071205ab435fc8f4298e5299deb3482e6968421",
+  "secret_files_collected_locally": 0,
+  "final_key_transferred": false,
+  "boundary_tests": "test_crsp_action_cases.py in the same passed fleet run separately asserts entry, exit, event-only and late-detail boundaries; the staged setup.sql is unused by this replay.",
+  "native_job_id": "40569430",
+  "actual_output_sha256": "09a5dff90990e6be5c1c475f6071205ab435fc8f4298e5299deb3482e6968421",
+  "exact_bytes_equal": true,
+  "cases": 2
+}

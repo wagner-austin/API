@@ -1,0 +1,493 @@
+{
+  "source_commit": "89f23c71290e13000dee61c2fdcbe0104955dff1",
+  "requests": [
+    {
+      "project": "wrds-crsp-diagnostic",
+      "name": "actions-cases-licensed-4fca73b7",
+      "host": "wrds",
+      "root": "/home/uci/awagner14/wrds-experiments",
+      "runtime": {
+        "python": "/home/uci/awagner14/research-runtime-calendar-5e61e1450/bin/python",
+        "sha256": "e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b",
+        "version": "3.11.16",
+        "packages": {
+          "alembic": "1.17.2",
+          "annotated-doc": "0.0.4",
+          "annotated-types": "0.7.0",
+          "anyio": "4.12.0",
+          "certifi": "2025.11.12",
+          "cffi": "2.1.1",
+          "cleargbm": "0.1.0",
+          "cleargbm-rs": "0.1.0",
+          "cloudpickle": "3.1.2",
+          "colorlog": "6.10.1",
+          "covenant-domain": "0.1.0",
+          "covenant-ml": "0.1.0",
+          "cryptography": "50.0.2",
+          "fastapi": "0.124.0",
+          "greenlet": "3.3.0",
+          "h11": "0.16.0",
+          "httpcore": "1.0.9",
+          "httpx": "0.28.1",
+          "idna": "3.11",
+          "joblib": "1.5.2",
+          "lightgbm": "4.6.0",
+          "llvmlite": "0.46.0",
+          "mako": "1.3.10",
+          "markdown-it-py": "4.0.0",
+          "markupsafe": "3.0.3",
+          "mdurl": "0.1.2",
+          "numba": "0.63.1",
+          "numpy": "2.3.5",
+          "nvidia-nccl-cu12": "2.27.5",
+          "optuna": "4.6.0",
+          "packaging": "25.0",
+          "pandas": "2.3.3",
+          "pip": "24.0",
+          "platform-core": "0.1.0",
+          "platform-ml": "0.1.0",
+          "polars": "1.36.1",
+          "polars-runtime-32": "1.36.1",
+          "pycparser": "3.11",
+          "pydantic": "2.12.5",
+          "pydantic-core": "2.41.5",
+          "pygments": "2.19.2",
+          "pyrage": "1.4.0",
+          "python-dateutil": "2.9.0.post0",
+          "pytz": "2025.2",
+          "pyyaml": "6.0.3",
+          "rich": "14.2.0",
+          "scikit-learn": "1.7.2",
+          "scipy": "1.16.3",
+          "sentencepiece": "0.2.1",
+          "setuptools": "79.0.1",
+          "shap": "0.51.0",
+          "six": "1.17.0",
+          "slicer": "0.0.8",
+          "sqlalchemy": "2.0.45",
+          "starlette": "0.50.0",
+          "threadpoolctl": "3.6.0",
+          "tqdm": "4.67.1",
+          "typing-extensions": "4.15.0",
+          "typing-inspection": "0.4.2",
+          "tzdata": "2025.3",
+          "xgboost": "3.1.2"
+        }
+      },
+      "slots": 2,
+      "memory_gb_per_slot": 12,
+      "seconds": 900,
+      "seed": 0,
+      "inputs": [
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/audit.json.age",
+          "name": "cohort/audit.json.age",
+          "sha256": "ecdcc8f8b20756d39d04ca95a453ff32fc464e1d026cbcd934983e6cdd62518a"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/bundle.json",
+          "name": "cohort/bundle.json",
+          "sha256": "182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/calendar.csv.age",
+          "name": "cohort/calendar.csv.age",
+          "sha256": "42a36cc0479c84ced8b9c08d430bbfe729fdbbfed92a14352fbc35f25e7173df"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/calendar.sql.age",
+          "name": "cohort/calendar.sql.age",
+          "sha256": "947ff7e8ca09eff06aee964fb06ce17cc7b1c681022d8e037892be784c9b4d72"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/cohort.json.age",
+          "name": "cohort/cohort.json.age",
+          "sha256": "e428c51c5652fce98e598e0ffa6c9bad8aa7412f3e2d32c14d4ae2663776f7af"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/delists.csv.age",
+          "name": "cohort/delists.csv.age",
+          "sha256": "d900fe43e2afffb1920119ce6fc2ef2b52c8028b6751c10ba6d8023305c959fb"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/delists.sql.age",
+          "name": "cohort/delists.sql.age",
+          "sha256": "51544bedbe769301fbfbdd6a53037c851e72d5d3248c4103750a2b55acd21985"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/membership.csv.age",
+          "name": "cohort/membership.csv.age",
+          "sha256": "aeeaf4b9917ae2c35b0024281568691b07182986f6f9670d86b6336ed9cc9b6d"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/membership.sql.age",
+          "name": "cohort/membership.sql.age",
+          "sha256": "7f88150a242056e3fa09f2cf75d6f863b9a9480e8487af489bf93d3a30631d39"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/protocol.json.age",
+          "name": "cohort/protocol.json.age",
+          "sha256": "912588f119fcda8daa8c9130bcf6631ebdd1af005ed02d4428c65e3b91560271"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/returns.csv.age",
+          "name": "cohort/returns.csv.age",
+          "sha256": "02843c3a3360b47d0a1d900fc904d901b36d62ba32a9b93410f40d592024fb32"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/returns.sql.age",
+          "name": "cohort/returns.sql.age",
+          "sha256": "565e16f8e61e23dc6662cfeaf0e784d13dbb9f259e8813a04d4bf457262f8a98"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-plan.json",
+          "name": "cohort/licensed-plan.json",
+          "sha256": "54b73d68ad08bfedfbb0e285bed4f8586d4a48e30483781fa591a5cf8e9831bb"
+        },
+        {
+          "path": "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-access.json",
+          "name": "cohort/licensed-access.json",
+          "sha256": "d38ec7445d2d9208bbdd6d904dba4c6faf79de4e181b978a0ec6f7009fa25b07"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/bundle.json",
+          "name": "actions/bundle.json",
+          "sha256": "5a5c3267211dc5edd8c2a6a76bfdbc9835b337766a6f5746bbafc74faf83dcd4"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/protocol.json.age",
+          "name": "actions/protocol.json.age",
+          "sha256": "b357c61254db62a27ccee2a4a2984e57024e11582d9fa7663b2fe8b653898941"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/extract.sql.age",
+          "name": "actions/extract.sql.age",
+          "sha256": "84301a2103c42eb2ce26012bab6c9c5f3a3ab1376a1cbfdcaf1246b3ad3a93a7"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/snapshot-first.csv.age",
+          "name": "actions/snapshot-first.csv.age",
+          "sha256": "7d322b7e859ecb5faca19046c07e8b7e1e967c62f2a11b2766c2c04c5c9a35c4"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/snapshot-last.csv.age",
+          "name": "actions/snapshot-last.csv.age",
+          "sha256": "7cd37ec8661bfef5b0345f35e60d9f2b384da88a1d7a9a48f414b76f8832612a"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/actions.json.age",
+          "name": "actions/actions.json.age",
+          "sha256": "39317a4c717686337e5909a2b7666d271d5c3f193256b2590c1961c98dc4f630"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/delist-events.csv.age",
+          "name": "actions/delist-events.csv.age",
+          "sha256": "39a33995def7761de5816f7b3ffb46287c9debe906b434f0fafd9cf53063b287"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/delist-events.sql.age",
+          "name": "actions/delist-events.sql.age",
+          "sha256": "bb5a985167619e170fbe1faedf143d2d1f433f96ffc43b6d4499707543ff6570"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/delist-details.csv.age",
+          "name": "actions/delist-details.csv.age",
+          "sha256": "bcd5008900b87348afab751f12e0cfb921974e0e186e77793fdf2cf7836ac76c"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/delist-details.sql.age",
+          "name": "actions/delist-details.sql.age",
+          "sha256": "b1089842e345f4233308287c4c5b07fba652b7b85542206d94c80cea14d83c12"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/distribution-events.csv.age",
+          "name": "actions/distribution-events.csv.age",
+          "sha256": "f5852cff8d16c0b2225ed0c6d8fc81f55683245f3a209f5b58517aca00cb6827"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/distribution-events.sql.age",
+          "name": "actions/distribution-events.sql.age",
+          "sha256": "04a00a947520e37623196d9c1d40e6d9755f5f3d886de63fc096bcc19667472f"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/distributions.csv.age",
+          "name": "actions/distributions.csv.age",
+          "sha256": "e55f86bfcd6a6fe00e365bc98d90b2b87df7b918c3ddea014527e1e375c93c74"
+        },
+        {
+          "path": "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/distributions.sql.age",
+          "name": "actions/distributions.sql.age",
+          "sha256": "b9d7eae44c7c6b593db810cf446ab9002f28183def551d6a4c81562e751bd6b7"
+        }
+      ],
+      "entrypoint": "crsp_extraction.py",
+      "arguments": [
+        "inspect-actions",
+        "--cohort",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/cohort/bundle.json",
+        "--cohort-sha256",
+        "182f9e58b6159750e39a469988bab5ea1256c2690559994ea2957effb35c6202",
+        "--plan",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-plan.json",
+        "--access",
+        "/home/uci/awagner14/source-refresh-80ad9ec5-20261102/licensed-access.json",
+        "--actions",
+        "/home/uci/awagner14/wrds-experiments/wrds-crsp-diagnostic/actions-licensed-fd32dc2e/fc1c3180032cb6a3d83abbf8d272a003c853b49591cf66c38499186b331b1e3d/native-1/outputs/actions/bundle.json",
+        "--actions-sha256",
+        "5a5c3267211dc5edd8c2a6a76bfdbc9835b337766a6f5746bbafc74faf83dcd4",
+        "--scratch-env",
+        "TMPDIR",
+        "--output-env",
+        "WRDS_OUTPUT_DIR"
+      ],
+      "outputs": [
+        "action-cases.json",
+        "metrics.json"
+      ]
+    },
+    {
+      "project": "wrds-crsp-diagnostic",
+      "name": "actions-cases-synthetic-4fca73b7",
+      "host": "wrds",
+      "root": "/home/uci/awagner14/wrds-experiments",
+      "runtime": {
+        "python": "/home/uci/awagner14/research-runtime-calendar-5e61e1450/bin/python",
+        "sha256": "e3cb8a51823871aa727c536610be96cd7351378dd3344c5cb6c84eacd959f12b",
+        "version": "3.11.16",
+        "packages": {
+          "alembic": "1.17.2",
+          "annotated-doc": "0.0.4",
+          "annotated-types": "0.7.0",
+          "anyio": "4.12.0",
+          "certifi": "2025.11.12",
+          "cffi": "2.1.1",
+          "cleargbm": "0.1.0",
+          "cleargbm-rs": "0.1.0",
+          "cloudpickle": "3.1.2",
+          "colorlog": "6.10.1",
+          "covenant-domain": "0.1.0",
+          "covenant-ml": "0.1.0",
+          "cryptography": "50.0.2",
+          "fastapi": "0.124.0",
+          "greenlet": "3.3.0",
+          "h11": "0.16.0",
+          "httpcore": "1.0.9",
+          "httpx": "0.28.1",
+          "idna": "3.11",
+          "joblib": "1.5.2",
+          "lightgbm": "4.6.0",
+          "llvmlite": "0.46.0",
+          "mako": "1.3.10",
+          "markdown-it-py": "4.0.0",
+          "markupsafe": "3.0.3",
+          "mdurl": "0.1.2",
+          "numba": "0.63.1",
+          "numpy": "2.3.5",
+          "nvidia-nccl-cu12": "2.27.5",
+          "optuna": "4.6.0",
+          "packaging": "25.0",
+          "pandas": "2.3.3",
+          "pip": "24.0",
+          "platform-core": "0.1.0",
+          "platform-ml": "0.1.0",
+          "polars": "1.36.1",
+          "polars-runtime-32": "1.36.1",
+          "pycparser": "3.11",
+          "pydantic": "2.12.5",
+          "pydantic-core": "2.41.5",
+          "pygments": "2.19.2",
+          "pyrage": "1.4.0",
+          "python-dateutil": "2.9.0.post0",
+          "pytz": "2025.2",
+          "pyyaml": "6.0.3",
+          "rich": "14.2.0",
+          "scikit-learn": "1.7.2",
+          "scipy": "1.16.3",
+          "sentencepiece": "0.2.1",
+          "setuptools": "79.0.1",
+          "shap": "0.51.0",
+          "six": "1.17.0",
+          "slicer": "0.0.8",
+          "sqlalchemy": "2.0.45",
+          "starlette": "0.50.0",
+          "threadpoolctl": "3.6.0",
+          "tqdm": "4.67.1",
+          "typing-extensions": "4.15.0",
+          "typing-inspection": "0.4.2",
+          "tzdata": "2025.3",
+          "xgboost": "3.1.2"
+        }
+      },
+      "slots": 2,
+      "memory_gb_per_slot": 12,
+      "seconds": 900,
+      "seed": 0,
+      "inputs": [
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/audit.json.age",
+          "name": "cohort/audit.json.age",
+          "sha256": "18b56586db248623ffdf0e763f24aad8bf18c5f8d5c1721e474d11ebe14564d9"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/bundle.json",
+          "name": "cohort/bundle.json",
+          "sha256": "26d163ad29a47b6849b9038f111b3ed08b1935d65c64c169ab7774de883cdbd6"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/calendar.csv.age",
+          "name": "cohort/calendar.csv.age",
+          "sha256": "423fc980f2f92b33a12d85c906f4a5b06a849ce3f8a615fe4223b35fb0700114"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/calendar.sql.age",
+          "name": "cohort/calendar.sql.age",
+          "sha256": "350e1aa170fe9acda63fb9aca03b3ce00b2e03167cb2b905e5c43d58167289e9"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/cohort.json.age",
+          "name": "cohort/cohort.json.age",
+          "sha256": "bdbafd25870d57161795ccecb42e3dab603d1237c0360e7629f90b71297aedfe"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/delists.csv.age",
+          "name": "cohort/delists.csv.age",
+          "sha256": "9405391169d2d5451ab849a07477a9e0b21f6ec84ef1ca983e83726c813fd279"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/delists.sql.age",
+          "name": "cohort/delists.sql.age",
+          "sha256": "53308954f2e02c3a4cbd01fed8ab57cb728dd336d0e9111c3f131c1242f3753a"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/membership.csv.age",
+          "name": "cohort/membership.csv.age",
+          "sha256": "57e58e7c41e261337b213bc02e25589ced77398a81dc1b5495c0febac349fbd5"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/membership.sql.age",
+          "name": "cohort/membership.sql.age",
+          "sha256": "a067bd495e77c6f72028e040a66522202b958d0a23f0dc60c1b9675123cab722"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/protocol.json.age",
+          "name": "cohort/protocol.json.age",
+          "sha256": "70f1dae5b999964e3cf63c7c9d9b60d60cc7ceaadc9d000002738e0998490090"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/returns.csv.age",
+          "name": "cohort/returns.csv.age",
+          "sha256": "563f34185ae0f787d8a8e644db63a81ba5ecabb683cc09171daf8d87882093fd"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/returns.sql.age",
+          "name": "cohort/returns.sql.age",
+          "sha256": "cd502dfc49ae950d2a93c75705419812f64a49c616e7bb43f08382c8fc45057c"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/actions.json.age",
+          "name": "actions/actions.json.age",
+          "sha256": "b4ac64134f77c76cb1efcf5df87d8419c8da8a162f499fe4b3eb62fd9e1e65d3"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/bundle.json",
+          "name": "actions/bundle.json",
+          "sha256": "73aa885026bdb2526451d26809b711c4b5bc10e449a89cf14e75e5546ae5fcb0"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/delist-details.csv.age",
+          "name": "actions/delist-details.csv.age",
+          "sha256": "a0968e942b455d195ce1908bf097cec3c22c505b73ccd47166dfdd0fa6c31d0b"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/delist-details.sql.age",
+          "name": "actions/delist-details.sql.age",
+          "sha256": "93fcc8bf155151154761124688d55609bd3ba059a69714b1d01f6ae695c65156"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/delist-events.csv.age",
+          "name": "actions/delist-events.csv.age",
+          "sha256": "efb050c95918b7d2163346e8212157f9dd5f0588c6a534f57eb174677c0e297a"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/delist-events.sql.age",
+          "name": "actions/delist-events.sql.age",
+          "sha256": "2ba73a29c791679199043c1000b5a9baac5dde39bffc9a250c830c78f3ca32ce"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/distribution-events.csv.age",
+          "name": "actions/distribution-events.csv.age",
+          "sha256": "1b3e8df71e754afa66067f821bae193a961158aaa6eeb2142de6cfc9da3058f6"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/distribution-events.sql.age",
+          "name": "actions/distribution-events.sql.age",
+          "sha256": "f0db5f4ef901f8d5ae10481e279d68c41eb5d86783941a669217f13636afb075"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/distributions.csv.age",
+          "name": "actions/distributions.csv.age",
+          "sha256": "3c1a42c7923b182c3550036187401ddfd091f434843445d89e62ff3d434448ab"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/distributions.sql.age",
+          "name": "actions/distributions.sql.age",
+          "sha256": "7db8edfc5c02082b67ab8380bc09b44c0bcfba76862642c72d488d6a07e0d53f"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/extract.sql.age",
+          "name": "actions/extract.sql.age",
+          "sha256": "f4cd3a26a8dea00291481ccde441afc7a9a50a0b82211a0e39913fb42fe06bf4"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/protocol.json.age",
+          "name": "actions/protocol.json.age",
+          "sha256": "fbb3be10daf8827f7f0c6a104fa27886bc8ccadb46f5fefa7483076512857202"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/snapshot-first.csv.age",
+          "name": "actions/snapshot-first.csv.age",
+          "sha256": "e6249e4c35ed94e625391b37e1e487154ef76e4b9c396b28223edc4f73524bfa"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/snapshot-last.csv.age",
+          "name": "actions/snapshot-last.csv.age",
+          "sha256": "7917f00f0212a4ba6d828ebb9f05106026986d3e03963864ba7d769a452e755d"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/plan.json",
+          "name": "plan.json",
+          "sha256": "6fcd2d0fa112fd962cb3dd94fadef27eb6a64f9badf081e31b519a972a94e194"
+        },
+        {
+          "path": "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/native-access.json",
+          "name": "native-access.json",
+          "sha256": "c01798134960358355b2291ab2b7cc9d012c1e97e5a4672e4852d922df6e066c"
+        }
+      ],
+      "entrypoint": "crsp_extraction.py",
+      "arguments": [
+        "inspect-actions",
+        "--cohort",
+        "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/cohort/bundle.json",
+        "--cohort-sha256",
+        "26d163ad29a47b6849b9038f111b3ed08b1935d65c64c169ab7774de883cdbd6",
+        "--actions",
+        "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/actions/bundle.json",
+        "--actions-sha256",
+        "73aa885026bdb2526451d26809b711c4b5bc10e449a89cf14e75e5546ae5fcb0",
+        "--plan",
+        "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/plan.json",
+        "--access",
+        "/home/uci/awagner14/action-cases-4fca73b7-20261103/synthetic/native-access.json",
+        "--scratch-env",
+        "TMPDIR",
+        "--output-env",
+        "WRDS_OUTPUT_DIR"
+      ],
+      "outputs": [
+        "action-cases.json",
+        "metrics.json"
+      ]
+    }
+  ]
+}

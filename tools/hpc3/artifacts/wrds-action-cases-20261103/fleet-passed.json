@@ -1,0 +1,72 @@
+{
+  "job": {
+    "researchRequest": null,
+    "modelEndpoint": null,
+    "model": null,
+    "id": "ddc139fe-acb4-492d-9733-79bea64e3e09",
+    "project": "libs/covenant_ml",
+    "command": "check",
+    "status": "passed",
+    "requestedNode": null,
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": "89f23c71290e13000dee61c2fdcbe0104955dff1",
+    "requiredTags": [
+      "rust"
+    ],
+    "taskId": "4fca73b7-9c36-47a9-a705-7541813c9338",
+    "node": "colossus",
+    "runId": "libs-covenant_ml-colossus-1793680213",
+    "exitCode": 0,
+    "detail": "FLEET-CHECK ddc139fe libs/covenant_ml sha=89f23c71290e13000dee61c2fdcbe0104955dff1 node=colossus exit=0 banner=yes tests=5555p/0f coverage=total=100.00% budget=within:213s/300s ended=2026-11-03T04:34:26Z log=colossus:/home/corvis/fleet/stage/logs/libs-covenant_ml-colossus-1793680213.log run=libs-covenant_ml-colossus-1793680213 workers=4 slowest=tests/markets/test_boosting_cli.py::test_actual_cli_and_replay_preserve_scores_and_models:16s,tests/backends/lightgbm/test_lightgbm_regressor.py::test_lightgbm_regressor_train_with_early_stopping:11s,tests/markets/test_research_trial_cli.py::test_real_final_worker_needs_neither_journal_nor_long_lived_keys:11s ci=none generation=1793345820 began=no phases=deps:2s,deps:25s,check:214s steps=unread",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027/libs/covenant_ml",
+    "claimedBy": "fleet-node-colossus",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-11-03T04:29:30.352Z",
+    "updatedAt": "2026-11-03T04:34:30.567Z",
+    "claimedAt": "2026-11-03T04:30:11.068Z",
+    "closedAt": "2026-11-03T04:34:30.567Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "02603b61-b996-4464-95a1-9730b62dd08f",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued make check for libs/covenant_ml at 89f23c71290e13000dee61c2fdcbe0104955dff1 on any node with capacity requiring rust for task 4fca73b7",
+      "createdAt": "2026-11-03T04:29:30.352Z"
+    },
+    {
+      "id": "7f1e4dd0-fa13-49f9-8708-5bbaef9386f5",
+      "kind": "claimed",
+      "actor": "fleet-node-colossus",
+      "body": "claimed by fleet-node-colossus under a 3600s lease",
+      "createdAt": "2026-11-03T04:30:11.068Z"
+    },
+    {
+      "id": "133782c0-358d-4bcf-b77d-ee714911a48e",
+      "kind": "progress",
+      "actor": "fleet-node-colossus",
+      "body": "started make check for libs/covenant_ml on colossus as run libs-covenant_ml-colossus-1793680213",
+      "createdAt": "2026-11-03T04:30:26.098Z"
+    },
+    {
+      "id": "eedbc528-2104-4dc3-9cfe-46ce4be76bbf",
+      "kind": "progress",
+      "actor": "fleet-node-colossus",
+      "body": "still running on colossus as libs-covenant_ml-colossus-1793680213",
+      "createdAt": "2026-11-03T04:33:43.683Z"
+    },
+    {
+      "id": "f6f32afd-253f-4b32-abac-39e220fea3a1",
+      "kind": "closed",
+      "actor": "fleet-node-colossus",
+      "body": "passed: FLEET-CHECK ddc139fe libs/covenant_ml sha=89f23c71290e13000dee61c2fdcbe0104955dff1 node=colossus exit=0 banner=yes tests=5555p/0f coverage=total=100.00% budget=within:213s/300s ended=2026-11-03T04:34:26Z log=colossus:/home/corvis/fleet/stage/logs/libs-covenant_ml-colossus-1793680213.log run=libs-covenant_ml-colossus-1793680213 workers=4 slowest=tests/markets/test_boosting_cli.py::test_actual_cli_and_replay_preserve_scores_and_models:16s,tests/backends/lightgbm/test_lightgbm_regressor.py::test_lightgbm_regressor_train_with_early_stopping:11s,tests/markets/test_research_trial_cli.py::test_real_final_worker_needs_neither_journal_nor_long_lived_keys:11s ci=none generation=1793345820 began=no phases=deps:2s,deps:25s,check:214s steps=unread",
+      "createdAt": "2026-11-03T04:34:30.567Z"
+    }
+  ],
+  "waiting": []
+}

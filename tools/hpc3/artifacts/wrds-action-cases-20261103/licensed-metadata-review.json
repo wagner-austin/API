@@ -1,0 +1,10 @@
+{
+  "source_sha256": "6ac30bf99f64c8bcff00f6d6d583b35b87bc4acf3403e42a6ddfcf2c3d053736",
+  "reviewed_all_metadata_leaves": {
+    "strings": 805,
+    "integers": 1866,
+    "booleans": 9298,
+    "nulls": 88
+  },
+  "permitted_string_values": "Diagnostic kind, training/validation labels and SHA256 identities only. Numeric observations are absent; integer leaves are counts, ordinals or relative day offsets as emitted by the inspected source."
+}

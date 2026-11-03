@@ -1,0 +1,72 @@
+{
+  "job": {
+    "researchRequest": null,
+    "modelEndpoint": null,
+    "model": null,
+    "id": "afcdd82d-f120-4205-ba5b-c54d68ca47d9",
+    "project": "libs/covenant_ml",
+    "command": "check",
+    "status": "failed",
+    "requestedNode": null,
+    "sessionTarget": null,
+    "sessionReason": null,
+    "sha": "4dc47aaa833bda70b20070746b674bae66ed1b21",
+    "requiredTags": [
+      "rust"
+    ],
+    "taskId": "4fca73b7-9c36-47a9-a705-7541813c9338",
+    "node": "serendipity",
+    "runId": "libs-covenant_ml-serendipity-1793679792",
+    "exitCode": 2,
+    "detail": "FLEET-CHECK afcdd82d libs/covenant_ml sha=4dc47aaa833bda70b20070746b674bae66ed1b21 node=serendipity exit=2 banner=no tests=5555p/0f coverage=total=100.00% budget=within:253s/300s ended=2026-11-03T04:28:05Z log=serendipity:/home/corvis/fleet/stage/logs/libs-covenant_ml-serendipity-1793679792.log run=libs-covenant_ml-serendipity-1793679792 workers=3 slowest=tests/markets/test_native_cohort_reproduction.py::test_published_native_cohort_and_quotes_reproduce:23s,tests/markets/test_forward_scoring.py::test_declared_dates_score_from_archives_without_requests:10s,tests/markets/test_boosting_cli.py::test_actual_cli_and_replay_preserve_scores_and_models:9s ci=none generation=1793528310 began=no phases=deps:1s,deps:24s,check:254s steps=unread",
+    "submittedBy": "codex-wrds-1027",
+    "sessionId": "01a17e81-fec7-7b01-846a-081765e939dc",
+    "cwd": "/home/corvis/PROJECTS/API-codex-wrds-runs-1027/libs/covenant_ml",
+    "claimedBy": "fleet-node-serendipity",
+    "leaseExpiresAt": null,
+    "createdAt": "2026-11-03T04:22:14.894Z",
+    "updatedAt": "2026-11-03T04:28:07.475Z",
+    "claimedAt": "2026-11-03T04:23:04.886Z",
+    "closedAt": "2026-11-03T04:28:07.475Z",
+    "reclaimable": false,
+    "claimsFirst": false
+  },
+  "trail": [
+    {
+      "id": "27808419-96a8-4e5c-8481-48c5cd382e57",
+      "kind": "submitted",
+      "actor": "codex-wrds-1027",
+      "body": "queued make check for libs/covenant_ml at 4dc47aaa833bda70b20070746b674bae66ed1b21 on any node with capacity requiring rust for task 4fca73b7",
+      "createdAt": "2026-11-03T04:22:14.894Z"
+    },
+    {
+      "id": "87ed34d8-0750-43df-a175-d22f94a2fc2c",
+      "kind": "claimed",
+      "actor": "fleet-node-serendipity",
+      "body": "claimed by fleet-node-serendipity under a 3600s lease",
+      "createdAt": "2026-11-03T04:23:04.886Z"
+    },
+    {
+      "id": "cc060f53-e433-44eb-87d3-fd2073d0547d",
+      "kind": "progress",
+      "actor": "fleet-node-serendipity",
+      "body": "started make check for libs/covenant_ml on serendipity as run libs-covenant_ml-serendipity-1793679792",
+      "createdAt": "2026-11-03T04:23:26.298Z"
+    },
+    {
+      "id": "d7baca80-cf2a-4987-bbc6-8bd8f5eaed50",
+      "kind": "progress",
+      "actor": "fleet-node-serendipity",
+      "body": "still running on serendipity as libs-covenant_ml-serendipity-1793679792",
+      "createdAt": "2026-11-03T04:26:51.904Z"
+    },
+    {
+      "id": "f15130ce-2583-4871-8494-c82c6f757a48",
+      "kind": "closed",
+      "actor": "fleet-node-serendipity",
+      "body": "failed: FLEET-CHECK afcdd82d libs/covenant_ml sha=4dc47aaa833bda70b20070746b674bae66ed1b21 node=serendipity exit=2 banner=no tests=5555p/0f coverage=total=100.00% budget=within:253s/300s ended=2026-11-03T04:28:05Z log=serendipity:/home/corvis/fleet/stage/logs/libs-covenant_ml-serendipity-1793679792.log run=libs-covenant_ml-serendipity-1793679792 workers=3 slowest=tests/markets/test_native_cohort_reproduction.py::test_published_native_cohort_and_quotes_reproduce:23s,tests/markets/test_forward_scoring.py::test_declared_dates_score_from_archives_without_requests:10s,tests/markets/test_boosting_cli.py::test_actual_cli_and_replay_preserve_scores_and_models:9s ci=none generation=1793528310 began=no phases=deps:1s,deps:24s,check:254s steps=unread",
+      "createdAt": "2026-11-03T04:28:07.475Z"
+    }
+  ],
+  "waiting": []
+}

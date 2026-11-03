@@ -1,0 +1,15 @@
+{
+  "source_commit": "89f23c71290e13000dee61c2fdcbe0104955dff1",
+  "source_inventory_sha256": "abaa5f5210cf9d7531a4d9a1d01a8248dfb28c3a17e41c8506971ed41a0af174",
+  "source_inventory_path": "/home/corvis/research-data/wrds/experiments/action-cases-4fca73b7-20261103/source.json",
+  "frozen_files": 641,
+  "worker_code_files": 505,
+  "worker_sha256": "e08cf9c01a850b7bf5acf4efdfcc2868ab965b81364c05f7da32922adda3e14a",
+  "controller_python": "/home/corvis/research-control/wrds-protocol-v3-087f67b4c/bin/python",
+  "verification": {
+    "fleet_job": "ddc139fe-acb4-492d-9733-79bea64e3e09",
+    "checked_commit": "89f23c71290e13000dee61c2fdcbe0104955dff1"
+  },
+  "scope": "Frozen diagnostic controller and five worker source packages. Existing runtime retained and measured per completion; not a replacement study image.",
+  "controller_python_sha256": "ca969be9adfbddc0a593745da84da0348a4c2baf849daae18806a344708934c4"
+}
