@@ -131,7 +131,7 @@ class TestProbe:
         with pytest.raises(AppError) as excinfo:
             probe.parse_probe("loki", output, live=IDLE)
 
-        assert excinfo.value.code == FleetErrorCode.NODE_UNREACHABLE
+        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
         assert (
             f"loki reported on_battery={shown} where yes or no belongs, so whether it is running "
             "on its battery is unknown"
