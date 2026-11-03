@@ -97,6 +97,14 @@ sources through poppler's pdftotext and depend on its exact page breaks,
 and no tag named the tool, so the queue would offer the suite to a node
 without it (MCPs board task 6dd73ada). It is a tool tag like ``ffmpeg``,
 found through the PATH.
+``nixos-test`` because MCPs ``fleet-mcp/nixos``'s check boots NixOS test VMs,
+and with no tag naming that the registry pinned the project to loki by
+name, so every flake check waited for one laptop that ran them on battery
+while three other NixOS nodes with kvm could have (MCPs board task
+3268afdf). It is a tool tag like ``ffmpeg``, asked inside a check's unit
+(:data:`fleet.contracts.tagged_tools.NIXOS_TEST_PROGRAM`): present when
+``/dev/kvm`` is usable there and nix's system features name kvm and
+nixos-test.
 
 Every tag is a floor: a runner claims whatever it can satisfy. A project
 row naming ``windows`` or ``elevated`` is refused at decode, since no node
@@ -120,9 +128,8 @@ class NodeTag(StrEnum):
     """A capability a project may require of a node.
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
-    570, 571, 615, 622, 639, 648, 668, 707 and 722) admits these twelve
-    words and the two this package no longer has, ``windows`` and
-    ``elevated``.
+    570, 571, 615, 622, 639, 648, 668, 707 and 722, narrowed by 873 and
+    widened by 902) admits exactly these thirteen words.
     """
 
     LINUX = "linux"
@@ -137,6 +144,7 @@ class NodeTag(StrEnum):
     GO = "go"
     CHROME = "chrome"
     PDFTOTEXT = "pdftotext"
+    NIXOS_TEST = "nixos-test"
 
 
 #: The tag each declared toolchain carries. A table rather than a lookup by
@@ -161,6 +169,7 @@ TOOL_TAG: Final[dict[str, NodeTag]] = {
     "go": NodeTag.GO,
     "chrome": NodeTag.CHROME,
     "pdftotext": NodeTag.PDFTOTEXT,
+    "nixos-test": NodeTag.NIXOS_TEST,
 }
 
 
@@ -229,9 +238,10 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (linux, a CUDA device nvidia-smi reports, the fleet test "
         "database, a Rust or C++ toolchain, the execution suite's rootless Docker daemon, "
-        "the corvis compose stack, or a tool, the hooks check's environment or Google "
-        "Chrome its probe found), and one it does not carry could never be satisfied: no "
-        "node runs windows or an elevated runner since board task e705f08c"
+        "the corvis compose stack, or a tool, the hooks check's environment, Google "
+        "Chrome or NixOS VM-test support its probe found), and one it does not carry "
+        "could never be satisfied: no node runs windows or an elevated runner since board "
+        "task e705f08c"
     )
 
 

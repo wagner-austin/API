@@ -120,6 +120,33 @@ GO_VERSION_ARGUMENT: Final = "version"
 #: Chromium distribution 'chrome' is not found at /opt/google/chrome/chrome``.
 CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
 
+#: The device a NixOS test VM's qemu opens for hardware virtualisation.
+KVM_DEVICE: Final = "/dev/kvm"
+
+#: The nix system features a builder must declare before nix schedules a
+#: NixOS VM test on it: ``nixos-test`` marks the derivation's kind, ``kvm``
+#: that qemu may use :data:`KVM_DEVICE`. Measured 2026-11-03 on lavender:
+#: ``benchmark big-parallel kvm nixos-test``.
+NIXOS_TEST_FEATURES: Final = ("kvm", "nixos-test")
+
+#: The probe's ``nixos-test`` question, a program for ``sh -c`` run inside a
+#: check's unit: it prints nix's version only when :data:`KVM_DEVICE` is
+#: readable and writable by the account builds run as and nix's
+#: ``system-features`` name every one of :data:`NIXOS_TEST_FEATURES`, and
+#: exits nonzero otherwise, nix absent included. ``nix config show`` is a
+#: ``nix-command`` subcommand, so the feature is enabled for this one call
+#: rather than assumed of the node's configuration. It holds no single quote,
+#: so the probe passes it to ``sh -c`` inside one.
+NIXOS_TEST_PROGRAM: Final = (
+    f"test -r {KVM_DEVICE} && test -w {KVM_DEVICE} && "
+    'f=" $(nix --extra-experimental-features nix-command config show system-features) " && '
+    + "".join(
+        f'case "$f" in *" {feature} "*) ;; *) exit 1 ;; esac && '
+        for feature in NIXOS_TEST_FEATURES
+    )
+    + "nix --version"
+)
+
 #: Tools only some projects need, each the source of a capability tag
 #: (:data:`fleet.contracts.tags.TOOL_TAG`). The toolchain probe asks about
 #: them every tick like the required tools, but a node without one is refused
@@ -153,6 +180,17 @@ CHROME_LINUX_PATH: Final = "/opt/google/chrome/chrome"
 #: runner had it only by accident, in ``/usr/bin``, while the runner roster's
 #: ``apt_packages`` did not carry poppler-utils, so a lavender-wsl rebuild
 #: would have dropped it.
+#:
+#: ``nixos-test`` because MCPs ``fleet-mcp/nixos``'s check is ``nix flake
+#: check``, which boots NixOS test VMs under qemu, and no tag named that: the
+#: fleet registry pinned the project to loki by name on 2026-10-28 (MCPs
+#: board task 3d7a9b7d), loki then being the one dispatching NixOS worker
+#: with kvm, and by 2026-11-03 serendipity, lacrymal and lavender qualified
+#: too while every flake check still waited for loki, a laptop running them
+#: on battery (MCPs board task 3268afdf). It is not one executable, so the
+#: probe asks :data:`NIXOS_TEST_PROGRAM` inside a check's unit. Its install
+#: mapping is empty: a NixOS generation provides nix and its features
+#: (MCPs ``fleet-mcp/nixos``), and no package manager here does.
 TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
     RequiredTool(
         name="ffmpeg",
@@ -206,6 +244,15 @@ TAGGED_TOOLS: Final[tuple[RequiredTool, ...]] = (
         install={"apt-get": "sudo apt-get install -y poppler-utils"},
         uninstall={"apt-get": "sudo apt-get remove -y poppler-utils"},
     ),
+    RequiredTool(
+        name="nixos-test",
+        reason=(
+            "MCPs fleet-mcp/nixos's check is nix flake check, which boots NixOS test VMs and "
+            "needs nix with a usable /dev/kvm and the kvm and nixos-test system features"
+        ),
+        install={},
+        uninstall={},
+    ),
 )
 
 
@@ -216,6 +263,9 @@ __all__ = [
     "HOOKS_CHECK_PACKAGES",
     "HOOKS_CHECK_PROGRAM",
     "HOOKS_ROUTE_FILE",
+    "KVM_DEVICE",
+    "NIXOS_TEST_FEATURES",
+    "NIXOS_TEST_PROGRAM",
     "TAGGED_TOOLS",
     "RequiredTool",
 ]

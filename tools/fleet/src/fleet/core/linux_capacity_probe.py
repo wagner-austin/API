@@ -66,6 +66,16 @@ and a quota set on it before the first check after a boot already applies.
 A value the reading cannot parse prints the field empty, which
 :mod:`fleet.core.probe` refuses as not a number, never as no quota.
 
+WHETHER THE NODE RUNS ON ITS BATTERY IS READ FROM THE KERNEL (MCPs board
+task 3268afdf). ``on_battery`` is ``yes`` when any ``/sys/class/power_supply``
+entry whose ``type`` is ``Battery`` reads ``status`` ``Discharging``, and
+``no`` otherwise, a node with no battery included. On 2026-11-03 loki, off
+its charger, ran back-to-back NixOS VM checks at 23 to 32 W, its battery
+falling from 35 to 30 percent in seven minutes, and nothing in the probe
+said it was not on mains. ``Discharging`` is the one status that means the
+machine runs from the cell: a full battery on mains reads ``Full`` or ``Not
+charging``.
+
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
 ``.reservation`` file's ``cores`` are summed into ``reserved_cores``, which
@@ -143,6 +153,25 @@ CHECK_QUOTA_PART = (
     + "printf 'check_cpu_quota=%s\\n' \"$check_cpu_quota\"\n"
 )
 
+#: Where the probe reads the node's power supplies from; the test replaces it.
+POWER_SUPPLY_LINE = "power_supply=/sys/class/power_supply\n"
+
+#: ``on_battery=yes`` when a battery among the supplies is discharging, else
+#: ``no``. A supply without a readable ``type`` is skipped, and a directory
+#: with no supplies at all leaves the glob unmatched, which reads as ``no``.
+BATTERY_PART = (
+    POWER_SUPPLY_LINE
+    + "on_battery=no\n"
+    + 'for supply in "$power_supply"/*; do\n'
+    + '  [ -r "$supply/type" ] || continue\n'
+    + '  if [ "$(cat "$supply/type")" = Battery ] && [ -r "$supply/status" ] &&'
+    + ' [ "$(cat "$supply/status")" = Discharging ]; then\n'
+    + "    on_battery=yes\n"
+    + "  fi\n"
+    + "done\n"
+    + "printf 'on_battery=%s\\n' \"$on_battery\"\n"
+)
+
 #: Where the probe reads the node's reservations from; the test replaces it.
 RESERVATIONS_LINE = f'reservations="$HOME/{reservations.DIRECTORY}"\n'
 
@@ -179,16 +208,19 @@ CAPACITY_PROBE_BODY = (
     "printf 'logical_cores=%s\\n' \"$(nproc)\"\n"
     + PRESSURE_PART
     + CHECK_QUOTA_PART
+    + BATTERY_PART
     + RESERVATIONS_PART
     + GPU_PROBE_PART
 )
 
 __all__ = [
+    "BATTERY_PART",
     "CAPACITY_PROBE_BODY",
     "CHECK_QUOTA_LINE",
     "CHECK_QUOTA_PART",
     "IO_PRESSURE_LINE",
     "MEMINFO_LINE",
+    "POWER_SUPPLY_LINE",
     "PRESSURE_LINE",
     "PRESSURE_PART",
     "RESERVATIONS_LINE",

@@ -71,13 +71,15 @@ worker snymore."), and the machine contract refuses a server whose budget
 would take the fleet's pool, so every server the roster ships is offered
 only what is pinned to it.
 
-loki has one project pinned to it, MCPs/fleet-nixos, the fleet's NixOS flake
-(MCPs board task 3d7a9b7d): its checks build every Linux worker
-configuration and boot one in a VM, which needs Nix and /dev/kvm, and loki
-is the one dispatching worker running NixOS, measured on 2026-10-29 with
-/dev/kvm and the kvm and nixos-test system features. Unlike the stack hosts
-it takes the pool's other checks too, so the pin is what keeps the flake on
-loki: every other node refuses it before its tags are read.
+MCPs/fleet-nixos, the fleet's NixOS flake, names no node and requires the
+``nixos-test`` tool tag (MCPs board task 3268afdf): its checks build every
+Linux worker configuration and boot one in a VM, which needs nix, a usable
+/dev/kvm and the kvm and nixos-test system features, and a node's toolchain
+probe finds those each tick. It was pinned to loki from 2026-10-28 (MCPs
+board task 3d7a9b7d), loki then being the one dispatching NixOS worker with
+kvm; by 2026-11-03 three more qualified while every flake check still
+waited for loki, a laptop running them on battery. Every pool worker whose
+probe finds the tag takes it, and the stack hosts still refuse it unpinned.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -93,7 +95,7 @@ from platform_core.errors import FleetErrorCode
 
 from fleet.contracts.machine import MachineRole
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
-from fleet.contracts.tags import missing_tags, node_tags
+from fleet.contracts.tags import NodeTag, missing_tags, node_tags
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
 from fleet.core.capacity import assess
 from fleet.core.workspace_files import read_workspace_document
@@ -160,6 +162,7 @@ def _idle(node: NodeConfig) -> NodeState:
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
         check_cpu_quota=None,
+        on_battery=False,
         gpus=(),
     )
 
@@ -344,19 +347,32 @@ def test_diphtheria_checks_the_projects_pinned_to_it_and_no_other() -> None:
         assert refused["code"] == FleetErrorCode.NODE_NOT_PINNED
 
 
-def test_loki_alone_checks_the_nixos_flake() -> None:
+def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -> None:
+    """MCPs board task 3268afdf: the flake check names no node, only the tag."""
     workspace = _shipped()
     project = workspace["projects"]["MCPs/fleet-nixos"]
-    codes = {
+    enabled = {name: node for name, node in workspace["nodes"].items() if node["enabled"]}
+    pool = {name for name, node in enabled.items() if not node["budget"]["pinned_checks_only"]}
+
+    assert project["node"] is None
+    assert project["required_tags"] == (NodeTag.LINUX, NodeTag.NIXOS_TEST)
+    with_tag = {
+        name: assess(node, _idle(node), project, node_tags(node) | {NodeTag.NIXOS_TEST})["code"]
+        for name, node in enabled.items()
+    }
+    without_tag = {
         name: assess(node, _idle(node), project, node_tags(node))["code"]
-        for name, node in workspace["nodes"].items()
-        if node["enabled"]
+        for name, node in enabled.items()
     }
 
-    assert codes == {
-        **dict.fromkeys(codes, FleetErrorCode.NODE_NOT_PINNED),
-        "loki": None,
-    }
-    # The workers that take the pool's checks refuse it too, not only the
-    # stack hosts that refuse everything unpinned.
-    assert {"colossus", "demure", "diphtheria", "lavender", "pendragon", "sedona"} < set(codes)
+    # Every pool worker whose toolchain probe found the tag takes it; the
+    # stack hosts still check only what is pinned to them.
+    assert {name for name, code in with_tag.items() if code is None} == pool
+    assert {name: code for name, code in with_tag.items() if name not in pool} == dict.fromkeys(
+        set(enabled) - pool, FleetErrorCode.NODE_NOT_PINNED
+    )
+    # No node is declared with it: it is a tool tag, present only when found.
+    assert {name: code for name, code in without_tag.items() if name in pool} == dict.fromkeys(
+        pool, FleetErrorCode.NODE_LACKS_TAG
+    )
+    assert {"lacrymal", "lavender", "loki", "serendipity"} <= pool

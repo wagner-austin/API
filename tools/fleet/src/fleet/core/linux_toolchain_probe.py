@@ -23,6 +23,7 @@ from fleet.contracts.tagged_tools import (
     HOOKS_CHECK_ARGUMENTS,
     HOOKS_CHECK_PROGRAM,
     HOOKS_ROUTE_FILE,
+    NIXOS_TEST_PROGRAM,
 )
 
 #: The toolchain probe's body, verbatim.
@@ -123,6 +124,15 @@ from fleet.contracts.tagged_tools import (
 #: them, or whose docker is refused, answers ``no`` on both lines, as a build
 #: there would fail.
 #:
+#: THE ``nixos-test`` LINE IS ASKED FROM INSIDE A CHECK'S UNIT too, for the
+#: same reason: ``/dev/kvm``'s permissions are read against the account and
+#: groups a build runs with, not the probe's ssh login (MCPs board task
+#: 3268afdf). It answers nix's version only when
+#: :data:`fleet.contracts.tagged_tools.NIXOS_TEST_PROGRAM` finds the device
+#: usable and nix's system features naming kvm and nixos-test, one ``if``
+#: condition for the ``set -e`` reason above, so a node with nix and no kvm
+#: (colossus, 2026-11-03) answers ``nixos-test=no=``.
+#:
 #: THE ``cargo`` LINE answers cargo's version only when the Rust check's
 #: whole toolchain answers too (MCPs board task b1089284,
 #: :data:`fleet.contracts.capability.RUST_CHECK_SUBCOMMANDS` and
@@ -220,6 +230,11 @@ TOOLCHAIN_PROBE_BODY = (
     "  printf 'chrome=no=\\n'\n"
     "fi\n"
     "report pdftotext pdftotext -v\n"
+    f"if n=\"$(unit sh -c '{NIXOS_TEST_PROGRAM}' 2>/dev/null)\"; then\n"
+    "  printf 'nixos-test=yes=%s\\n' \"$(printf '%s\\n' \"$n\" | head -n 1)\"\n"
+    "else\n"
+    "  printf 'nixos-test=no=\\n'\n"
+    "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"
 )

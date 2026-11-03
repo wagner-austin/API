@@ -163,9 +163,23 @@ PDFTOTEXT_REASON = (
 PDFTOTEXT_APT = "sudo apt-get install -y poppler-utils"
 
 #: How the tagged gap reads pdftotext's entry on a node whose managers cover
-#: none of its installs, the tail every such gap line now ends with.
+#: none of its installs.
 PDFTOTEXT_NO_INSTALL = (
     f"; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- no "
+    "automatic install on this node"
+)
+
+#: Why a node is told about nixos-test, in the tagged gap's words (MCPs board
+#: task 3268afdf): the NixOS flake check boots test VMs.
+NIXOS_TEST_REASON = (
+    "MCPs fleet-mcp/nixos's check is nix flake check, which boots NixOS test VMs and needs nix "
+    "with a usable /dev/kvm and the kvm and nixos-test system features"
+)
+
+#: How the tagged gap reads nixos-test's entry. No package manager installs
+#: it, so this is the tail every gap line naming it ends with, on any node.
+NIXOS_TEST_NO_INSTALL = (
+    f"; nixos-test -- {NIXOS_TEST_REASON}, so those jobs go to a node that has it -- no "
     "automatic install on this node"
 )
 
@@ -227,6 +241,8 @@ __all__ = [
     "GO_REASON",
     "HOOKS_INSTALL",
     "HOOKS_REASON",
+    "NIXOS_TEST_NO_INSTALL",
+    "NIXOS_TEST_REASON",
     "NO_MAKE",
     "NO_PYTHON",
     "OLD_NODE",

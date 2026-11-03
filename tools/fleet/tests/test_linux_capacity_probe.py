@@ -18,11 +18,13 @@ from fleet.contracts.action_cache import PROBE_FIELDS
 from fleet.core import probe
 from fleet.core.dialect import CAPACITY_PROBE_SCRIPT, PROLOGUE, SH_INVOCATION
 from fleet.core.linux_capacity_probe import (
+    BATTERY_PART,
     CAPACITY_PROBE_BODY,
     CHECK_QUOTA_LINE,
     CHECK_QUOTA_PART,
     IO_PRESSURE_LINE,
     MEMINFO_LINE,
+    POWER_SUPPLY_LINE,
     PRESSURE_LINE,
     PRESSURE_PART,
     RESERVATIONS_LINE,
@@ -57,8 +59,10 @@ def test_the_dialect_runs_the_body_after_its_prologue() -> None:
     assert CAPACITY_PROBE_BODY.startswith(MEMINFO_LINE)
     assert MEMINFO_LINE == "meminfo=/proc/meminfo\n"
     assert CAPACITY_PROBE_BODY.endswith(
-        PRESSURE_PART + CHECK_QUOTA_PART + RESERVATIONS_PART + GPU_PROBE_PART
+        PRESSURE_PART + CHECK_QUOTA_PART + BATTERY_PART + RESERVATIONS_PART + GPU_PROBE_PART
     )
+    assert BATTERY_PART.startswith(POWER_SUPPLY_LINE)
+    assert POWER_SUPPLY_LINE == "power_supply=/sys/class/power_supply\n"
     assert CHECK_QUOTA_PART.startswith(CHECK_QUOTA_LINE)
     assert CHECK_QUOTA_LINE == (
         "check_quota=$(systemctl show system-dispatch-checks.slice system-dispatch.slice"
@@ -100,7 +104,13 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     # b4d5ca0f); each line reads as a GPU, so none is a zero.
     assert read_gpus("this host", fields)[1] == ""
     devices = {f"gpu_{index}" for index in range(int(fields["gpu_count"]))}
-    reported = {*probe.REQUIRED_FIELDS, "logical_cores", probe.CHECK_QUOTA_FIELD, "gpu_count"}
+    reported = {
+        *probe.REQUIRED_FIELDS,
+        "logical_cores",
+        probe.CHECK_QUOTA_FIELD,
+        probe.BATTERY_FIELD,
+        "gpu_count",
+    }
     assert set(fields) == reported | counted | devices | (
         {"ci_slice_current_gb", "ci_slice_high_gb"} if sliced else set()
     )
@@ -113,6 +123,7 @@ def test_the_unaltered_probe_reports_this_host_s_numbers(tmp_path: pathlib.Path)
     assert re.fullmatch(r"\d+\.\d{2}", fields["cpu_pressure_pct"])
     assert re.fullmatch(r"\d+\.\d{2}", fields["io_pressure_pct"])
     assert re.fullmatch(r"max|\d+\.\d{3}", fields[probe.CHECK_QUOTA_FIELD])
+    assert fields[probe.BATTERY_FIELD] in probe.BATTERY_READINGS
 
 
 def _probe(
@@ -121,6 +132,7 @@ def _probe(
     pressure: str | None,
     io_pressure: str | None,
     quota: str = QUOTA,
+    supplies: pathlib.Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run the probe with its roots pointed at fakes.
 
@@ -135,11 +147,15 @@ def _probe(
             a kernel without one.
         quota: What ``systemctl show`` prints for the two check slices'
             ``CPUQuotaPerSecUSec``.
+        supplies: The fake ``/sys/class/power_supply``, or None for one that
+            does not exist, so the reading never depends on whether the node
+            running the test is itself on its battery.
 
     Returns:
         The finished probe.
     """
     reservations = held if held is not None else tmp_path / "no-reservations"
+    power_supply = supplies if supplies is not None else tmp_path / "no-power-supply"
     meminfo = tmp_path / "meminfo"
     meminfo.write_text(
         f"MemTotal:       32745488 kB\nMemFree:          362496 kB\n"
@@ -158,6 +174,7 @@ def _probe(
         .replace(PRESSURE_LINE, f"pressure='{cpu.as_posix()}'\n", 1)
         .replace(IO_PRESSURE_LINE, f"io_pressure='{io.as_posix()}'\n", 1)
         .replace(CHECK_QUOTA_LINE, f"check_quota='{quota}'\n", 1)
+        .replace(POWER_SUPPLY_LINE, f"power_supply='{power_supply.as_posix()}'\n", 1)
         .replace(RESERVATIONS_LINE, f"reservations='{reservations.as_posix()}'\n", 1),
         encoding="utf-8",
     )
@@ -176,6 +193,7 @@ def _run(
     pressure: str = PRESSURE,
     io_pressure: str = IO_PRESSURE,
     quota: str = QUOTA,
+    supplies: pathlib.Path | None = None,
 ) -> dict[str, str]:
     """Run the probe with its roots pointed at fakes, and read what it printed.
 
@@ -185,11 +203,12 @@ def _run(
         pressure: What the fake ``/proc/pressure/cpu`` holds.
         io_pressure: What the fake ``/proc/pressure/io`` holds.
         quota: What ``systemctl show`` prints for the check slices' quotas.
+        supplies: The fake ``/sys/class/power_supply``, or None for none.
 
     Returns:
         The probe's key=value fields.
     """
-    completed = _probe(tmp_path, held, pressure, io_pressure, quota)
+    completed = _probe(tmp_path, held, pressure, io_pressure, quota, supplies)
     assert completed.returncode == 0, completed.stderr
     return fields_of(completed.stdout)
 
@@ -348,7 +367,7 @@ class TestTheReservationsUnderSh:
         # Read after the body's other fields; the dialect's CI-slice lines,
         # printed only on a node with a runners.slice, follow it.
         keys = list(fields)
-        assert keys.index("reserved_cores") == keys.index("check_cpu_quota") + 1
+        assert keys.index("reserved_cores") == keys.index("on_battery") + 1
 
     def test_an_empty_directory_holds_nothing(self, tmp_path: pathlib.Path) -> None:
         held = tmp_path / "reservations"
@@ -376,3 +395,81 @@ class TestTheReservationsUnderSh:
         assert fields["reservation_unreadable"] == (held / "bad.reservation").as_posix()
         assert "reserved_cores" not in fields
         assert fields["logical_cores"].isdigit()
+
+
+def _supply(root: pathlib.Path, name: str, kind: str | None, status: str | None) -> None:
+    """Write one fake ``/sys/class/power_supply`` entry.
+
+    Args:
+        root: The fake power-supply directory.
+        name: The entry's name, as the kernel names it (``BAT0``, ``AC0``).
+        kind: What its ``type`` file holds, or None for an entry without one.
+        status: What its ``status`` file holds, or None for an entry without one.
+    """
+    entry = root / name
+    entry.mkdir(parents=True)
+    if kind is not None:
+        (entry / "type").write_text(f"{kind}\n", encoding="utf-8")
+    if status is not None:
+        (entry / "status").write_text(f"{status}\n", encoding="utf-8")
+
+
+@pytest.mark.host_linux
+class TestTheBatteryUnderSh:
+    """MCPs board task 3268afdf: a node running on its battery says so."""
+
+    def test_loki_off_its_charger_reads_on_battery_after_the_quota(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """loki at 08:53Z on 2026-11-03: AC0 offline, a USB-C source idle, BAT0 discharging."""
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "AC0", "Mains", None)
+        _supply(supplies, "ucsi-source-psy-USBC000:001", "USB", "Not charging")
+        _supply(supplies, "BAT0", "Battery", "Discharging")
+
+        fields = _run(tmp_path, supplies=supplies)
+
+        assert fields["on_battery"] == "yes"
+        keys = list(fields)
+        assert keys.index("on_battery") == keys.index("check_cpu_quota") + 1
+
+    @pytest.mark.parametrize("status", ["Charging", "Full", "Not charging", "Unknown"])
+    def test_a_battery_that_is_not_discharging_reads_mains(
+        self, tmp_path: pathlib.Path, status: str
+    ) -> None:
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "AC0", "Mains", None)
+        _supply(supplies, "BAT0", "Battery", status)
+
+        assert _run(tmp_path, supplies=supplies)["on_battery"] == "no"
+
+    def test_no_supply_an_empty_directory_and_mains_alone_all_read_mains(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A desktop lists no battery; a missing directory and an empty one agree."""
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        mains = tmp_path / "mains"
+        _supply(mains, "AC", "Mains", None)
+
+        assert _run(tmp_path)["on_battery"] == "no"
+        assert _run(tmp_path, supplies=empty)["on_battery"] == "no"
+        assert _run(tmp_path, supplies=mains)["on_battery"] == "no"
+
+    def test_an_entry_without_a_type_or_a_battery_without_a_status_is_not_discharging(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "hid-0", None, "Discharging")
+        _supply(supplies, "BAT1", "Battery", None)
+
+        assert _run(tmp_path, supplies=supplies)["on_battery"] == "no"
+
+    def test_one_discharging_battery_among_several_reads_on_battery(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "BAT0", "Battery", "Full")
+        _supply(supplies, "BAT1", "Battery", "Discharging")
+
+        assert _run(tmp_path, supplies=supplies)["on_battery"] == "yes"

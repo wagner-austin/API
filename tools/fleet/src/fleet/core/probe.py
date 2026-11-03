@@ -55,6 +55,13 @@ CHECK_QUOTA_FIELD = "check_cpu_quota"
 #: What :data:`CHECK_QUOTA_FIELD` reads when neither slice has a quota.
 NO_QUOTA = "max"
 
+#: Whether the node is running on its battery, ``yes`` or ``no`` (MCPs board
+#: task 3268afdf, :mod:`fleet.core.linux_capacity_probe`).
+BATTERY_FIELD = "on_battery"
+
+#: The two answers :data:`BATTERY_FIELD` may hold, and what each means.
+BATTERY_READINGS: dict[str, bool] = {"yes": True, "no": False}
+
 #: The numeric fields a node must report before anything can be decided about
 #: it; ``reserved_cores`` since MCPs board task 84a2b690, the cores its
 #: reservations hold (:mod:`fleet.core.reservations`), and the two pressure
@@ -157,6 +164,15 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
                 ),
             )
         check_cpu_quota = quota
+    battery = fields.get(BATTERY_FIELD)
+    if battery not in BATTERY_READINGS:
+        return ProbeOutcome(
+            state=None,
+            reason=(
+                f"{host} reported {BATTERY_FIELD}={battery!r} where yes or no belongs, so whether "
+                f"it is running on its battery is unknown; it reported: {output.strip()!r}"
+            ),
+        )
     action_cache, cache_problem = _read_action_cache(host, fields, output)
     if cache_problem:
         return ProbeOutcome(state=None, reason=cache_problem)
@@ -175,6 +191,7 @@ def read_state(host: str, output: str, *, live: LiveLoad) -> ProbeOutcome:
             cpu_pressure_pct=readings[PRESSURE_FIELD],
             io_pressure_pct=readings[IO_PRESSURE_FIELD],
             check_cpu_quota=check_cpu_quota,
+            on_battery=BATTERY_READINGS[battery],
             gpus=gpus,
         ),
         reason="",
