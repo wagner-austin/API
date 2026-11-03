@@ -106,6 +106,7 @@ def _state(host: str, *, free_ram_gb: float = 27.0) -> NodeState:
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
         check_cpu_quota=None,
+        on_battery=False,
         gpus=(),
     )
 

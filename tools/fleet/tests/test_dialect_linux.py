@@ -433,6 +433,7 @@ class TestForRealUnderSh:
             "hooks",
             "chrome",
             "pdftotext",
+            "nixos-test",
             "apt-get",
             "pipx",
         }

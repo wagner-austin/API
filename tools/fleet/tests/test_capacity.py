@@ -96,6 +96,7 @@ def _state(
     cpu_pressure_pct: float = 0.0,
     io_pressure_pct: float = 0.0,
     check_cpu_quota: float | None = None,
+    on_battery: bool = False,
 ) -> NodeState:
     """Build a probed state.
 
@@ -109,6 +110,7 @@ def _state(
         cpu_pressure_pct: Its CPU pressure.
         io_pressure_pct: Its I/O pressure.
         check_cpu_quota: The CPUs its check slices' quota allows, or None.
+        on_battery: Whether it is running on its battery.
 
     Returns:
         The state.
@@ -124,6 +126,7 @@ def _state(
         cpu_pressure_pct=cpu_pressure_pct,
         io_pressure_pct=io_pressure_pct,
         check_cpu_quota=check_cpu_quota,
+        on_battery=on_battery,
         gpus=(),
     )
 

@@ -148,10 +148,11 @@ class TestNodeTags:
             "go",
             "chrome",
             "pdftotext",
+            "nixos-test",
         ]
 
     def test_no_declaration_carries_a_tool_tag(self) -> None:
-        """ffmpeg, hooks, go, chrome and pdftotext come only from the toolchain probe
+        """ffmpeg, hooks, go, chrome, pdftotext and nixos-test come only from the toolchain probe
         (:func:`tool_tags`), so a node with every declaration set carries
         none of them."""
         loaded = _node(
@@ -219,6 +220,14 @@ class TestToolTags:
         assert tool_tags(found) == frozenset({NodeTag.PDFTOTEXT})
         assert tool_tags((ToolReport(name="pdftotext", present=False, version=""),)) == frozenset()
 
+    def test_a_probe_that_found_nixos_test_gives_its_tag(self) -> None:
+        """lavender on 2026-11-03 (MCPs board task 3268afdf): the line answers
+        with nix's own --version, and colossus, NixOS without /dev/kvm,
+        carries nothing for it."""
+        found = (ToolReport(name="nixos-test", present=True, version="nix (Nix) 2.31.2"),)
+        assert tool_tags(found) == frozenset({NodeTag.NIXOS_TEST})
+        assert tool_tags((ToolReport(name="nixos-test", present=False, version=""),)) == frozenset()
+
     def test_only_the_tagged_tools_have_tags(self) -> None:
         assert TOOL_TAG == {
             "ffmpeg": NodeTag.FFMPEG,
@@ -226,6 +235,7 @@ class TestToolTags:
             "go": NodeTag.GO,
             "chrome": NodeTag.CHROME,
             "pdftotext": NodeTag.PDFTOTEXT,
+            "nixos-test": NodeTag.NIXOS_TEST,
         }
         assert tool_tags((ToolReport(name="make", present=True, version="4.4"),)) == frozenset()
 
@@ -279,9 +289,10 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"^t must be one of linux, gpu, testdb, rust, cxx, docker, stack, ffmpeg, "
-            r"hooks, go, chrome, pdftotext, got 'podman'; .* a Rust or C\+\+ toolchain, the "
-            r"execution suite's rootless Docker daemon, the corvis compose stack, or a tool, "
-            r"the hooks check's environment or Google Chrome its probe found\), and one it "
+            r"hooks, go, chrome, pdftotext, nixos-test, got 'podman'; .* a Rust or C\+\+ "
+            r"toolchain, the execution suite's rootless Docker daemon, the corvis compose stack, "
+            r"or a tool, the hooks check's environment, Google Chrome or NixOS VM-test support "
+            r"its probe found\), and one it "
             r"does not carry could never be satisfied: no node runs windows or an elevated "
             r"runner since board task e705f08c$",
         ):

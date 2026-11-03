@@ -67,6 +67,7 @@ class TestReadySummary:
     def test_it_names_what_a_ready_node_was_judged_on(self) -> None:
         assert toolchain.ready_summary(toolchain.read_reports(DIPHTHERIA_2026_09_23)) == (
             READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent"
+            "; nixos-test absent"
         )
 
     def test_it_names_a_tagged_tool_the_probe_found(self) -> None:
@@ -77,6 +78,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             READY_HEAD + "ffmpeg present; hooks absent; go absent; chrome absent; pdftotext absent"
+            "; nixos-test absent"
         )
 
     def test_it_names_the_hooks_environment_the_probe_found(self) -> None:
@@ -87,6 +89,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             READY_HEAD + "ffmpeg absent; hooks present; go absent; chrome absent; pdftotext absent"
+            "; nixos-test absent"
         )
 
     def test_it_names_go_the_probe_found(self) -> None:
@@ -97,6 +100,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             READY_HEAD + "ffmpeg absent; hooks absent; go present; chrome absent; pdftotext absent"
+            "; nixos-test absent"
         )
 
     def test_it_names_chrome_the_probe_found(self) -> None:
@@ -108,6 +112,7 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome present; pdftotext absent"
+            "; nixos-test absent"
         )
 
     def test_it_names_pdftotext_the_probe_found(self) -> None:
@@ -119,6 +124,17 @@ class TestReadySummary:
         )
         assert toolchain.ready_summary(found) == (
             READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext present"
+            "; nixos-test absent"
+        )
+
+    def test_it_names_nixos_test_the_probe_found(self) -> None:
+        """lavender on 2026-11-03 (MCPs board task 3268afdf): its runner claims
+        with nixos-test, and the summary says so on the same line, so the tag
+        the NixOS flake check waits for is visible each tick."""
+        found = toolchain.read_reports(DIPHTHERIA_2026_09_23 + "nixos-test=yes=nix (Nix) 2.31.2\n")
+        assert toolchain.ready_summary(found) == (
+            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent"
+            "; nixos-test present"
         )
 
 

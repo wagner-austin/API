@@ -43,6 +43,7 @@ from tests._toolchain_fixtures import (
     GO_REASON,
     HOOKS_INSTALL,
     HOOKS_REASON,
+    NIXOS_TEST_NO_INSTALL,
     NO_MAKE,
     PDFTOTEXT_APT,
     PDFTOTEXT_NO_INSTALL,
@@ -163,7 +164,14 @@ class TestReadiness:
 
         assert missing(reports) == ()
         assert describe_gap("diphtheria", reports) == "diphtheria: ready"
-        assert toolchain.absent_tagged(reports) == ("ffmpeg", "hooks", "go", "chrome", "pdftotext")
+        assert toolchain.absent_tagged(reports) == (
+            "ffmpeg",
+            "hooks",
+            "go",
+            "chrome",
+            "pdftotext",
+            "nixos-test",
+        )
         assert toolchain.tagged_gap("diphtheria", reports) == (
             "diphtheria claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
@@ -172,6 +180,7 @@ class TestReadiness:
             f"those jobs go to a node that has it -- {GO_APT}; chrome -- {CHROME_REASON}, so "
             f"those jobs go to a node that has it -- {CHROME_APT}; pdftotext -- "
             f"{PDFTOTEXT_REASON}, so those jobs go to a node that has it -- {PDFTOTEXT_APT}"
+            f"{NIXOS_TEST_NO_INSTALL}"
         )
 
     def test_a_node_with_every_tagged_tool_has_no_tagged_gap(self) -> None:
@@ -181,6 +190,7 @@ class TestReadiness:
             "go=yes=go version go1.27.1 linux/amd64\n"
             "chrome=yes=155.0.8059.39\n"
             "pdftotext=yes=pdftotext version 24.02.0\n"
+            "nixos-test=yes=nix (Nix) 2.31.2\n"
         )
 
         assert toolchain.absent_tagged(reports) == ()
@@ -191,7 +201,8 @@ class TestReadiness:
         Chrome or pdftotext, and is offered the pinned pip line for the hooks
         check's tools (MCPs board task ec895824)."""
         reports = toolchain.parse_probe(
-            "ffmpeg=no=\nhooks=no=\ngo=no=\nchrome=no=\npdftotext=no=\npip=yes=pip 25.2\n"
+            "ffmpeg=no=\nhooks=no=\ngo=no=\nchrome=no=\npdftotext=no=\nnixos-test=no=\n"
+            "pip=yes=pip 25.2\n"
         )
 
         assert toolchain.tagged_gap("lenovoold", reports) == (
@@ -199,7 +210,7 @@ class TestReadiness:
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             f"it -- no automatic install on this node; hooks -- {HOOKS_REASON}, so those jobs go "
             f"to a node that has it -- {HOOKS_INSTALL}{GO_NO_INSTALL}{CHROME_NO_INSTALL}"
-            f"{PDFTOTEXT_NO_INSTALL}"
+            f"{PDFTOTEXT_NO_INSTALL}{NIXOS_TEST_NO_INSTALL}"
         )
 
     def test_a_node_is_offered_go_and_poppler_from_apt_get_and_chrome_as_the_deb(
@@ -214,7 +225,8 @@ class TestReadiness:
         6dd73ada)."""
         reports = toolchain.parse_probe(
             "ffmpeg=yes=ffmpeg version 6.1.1\nhooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
-            "go=no=\nchrome=no=\npdftotext=no=\napt-get=yes=apt 2.7.14 (amd64)\n"
+            "go=no=\nchrome=no=\npdftotext=no=\nnixos-test=yes=nix (Nix) 2.31.2\n"
+            "apt-get=yes=apt 2.7.14 (amd64)\n"
         )
 
         assert toolchain.absent_tagged(reports) == ("go", "chrome", "pdftotext")
@@ -224,6 +236,24 @@ class TestReadiness:
             f"{CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_APT}; "
             f"pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- "
             f"{PDFTOTEXT_APT}"
+        )
+
+    def test_a_node_without_nixos_test_is_offered_no_install_whatever_its_managers(
+        self,
+    ) -> None:
+        """colossus runs NixOS without /dev/kvm (MCPs board task 3268afdf): its
+        NixOS generation, not a package manager, would provide the capability."""
+        reports = toolchain.parse_probe(
+            "ffmpeg=yes=ffmpeg version 6.1.1\nhooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
+            "go=yes=go version go1.27.1 linux/amd64\nchrome=yes=156.0.8078.47\n"
+            "pdftotext=yes=pdftotext version 24.02.0\nnixos-test=no=\n"
+            "apt-get=yes=apt 2.7.14 (amd64)\npip=yes=pip 25.2\n"
+        )
+
+        assert toolchain.absent_tagged(reports) == ("nixos-test",)
+        assert toolchain.tagged_gap("colossus", reports) == (
+            "colossus claims without the tag of every tool it lacks: "
+            + NIXOS_TEST_NO_INSTALL.removeprefix("; ")
         )
 
     def test_the_wrong_python_is_not_ready_even_with_every_tool(self) -> None:

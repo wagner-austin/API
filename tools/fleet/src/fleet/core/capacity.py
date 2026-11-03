@@ -229,6 +229,11 @@ def assess(
     grant, and a node where they fall under the project's minimum waits,
     after the I/O refusal, naming the quota.
 
+    A NODE ON ITS BATTERY TAKES NO CHECK (MCPs board task 3268afdf), after the
+    disk refusal and before every load refusal, since no load falling clears
+    it: loki, off its charger, drew 23 to 32 W through back-to-back NixOS VM
+    checks on 2026-11-03. It takes the next job once it is back on mains.
+
     Args:
         node: The node's declaration.
         state: What it reported when last probed.
@@ -275,6 +280,16 @@ def assess(
                 f"{node['host']} has {state['free_disk_gb']:.0f} GB free and this workspace "
                 f"reserves {node['budget']['max_disk_gb']:.0f} GB for staged trees. The first "
                 "dispatch to a node is a cold stage of a whole monorepo."
+            ),
+        )
+    if state["on_battery"]:
+        return DispatchVerdict(
+            workers=0,
+            code=FleetErrorCode.NODE_ON_BATTERY,
+            reason=(
+                f"{node['host']} is running on its battery: its probe read a power supply "
+                "discharging, and a check placed here drains it. It takes the next job once it "
+                "is back on mains."
             ),
         )
     live = state["live"]

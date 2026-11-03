@@ -75,6 +75,7 @@ class TestProbe:
             "cpu_pressure_pct": 0.0,
             "io_pressure_pct": 0.0,
             "check_cpu_quota": None,
+            "on_battery": False,
             "gpus": (),
         }
 
@@ -82,8 +83,8 @@ class TestProbe:
         """diphtheria's readings at 17:43Z on 2026-10-18 (MCPs 2ce5dc13, 814c4555)."""
         output = (
             "free_ram_gb=4.073\nfree_disk_gb=206.206\nlogical_cores=8\n"
-            "cpu_pressure_pct=14.06\nio_pressure_pct=68.81\ncheck_cpu_quota=max\nreserved_cores=0\n"
-            "gpu_count=0\n"
+            "cpu_pressure_pct=14.06\nio_pressure_pct=68.81\ncheck_cpu_quota=max\non_battery=no\n"
+            "reserved_cores=0\ngpu_count=0\n"
         )
 
         state = probe.parse_probe("diphtheria", output, live=IDLE)
@@ -94,13 +95,47 @@ class TestProbe:
         """loki at 14:27Z on 2026-11-01, its check slice capped at runtime (MCPs d77b8c73)."""
         output = (
             "free_ram_gb=25.0\nfree_disk_gb=663.0\nlogical_cores=16\n"
-            "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=1.000\nreserved_cores=0\n"
-            "gpu_count=0\n"
+            "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=1.000\non_battery=no\n"
+            "reserved_cores=0\ngpu_count=0\n"
         )
 
         state = probe.parse_probe("loki", output, live=IDLE)
 
         assert state["check_cpu_quota"] == 1.0
+
+    def test_a_node_reports_it_is_running_on_its_battery(self) -> None:
+        """loki at 08:53Z on 2026-11-03, off its charger (MCPs board task 3268afdf)."""
+        output = (
+            "free_ram_gb=17.0\nfree_disk_gb=700.0\nlogical_cores=16\n"
+            "cpu_pressure_pct=1.20\nio_pressure_pct=0.10\ncheck_cpu_quota=max\non_battery=yes\n"
+            "reserved_cores=0\ngpu_count=0\n"
+        )
+
+        state = probe.parse_probe("loki", output, live=IDLE)
+
+        assert state["on_battery"] is True
+
+    @pytest.mark.parametrize(
+        ("battery", "shown"),
+        [("", "None"), ("on_battery=\n", "''"), ("on_battery=maybe\n", "'maybe'")],
+    )
+    def test_a_battery_reading_missing_or_other_than_yes_or_no_is_unreadable_not_mains(
+        self, battery: str, shown: str
+    ) -> None:
+        """Read as mains, a node on its battery would take checks again."""
+        output = (
+            "free_ram_gb=4.0\nfree_disk_gb=206.0\ncpu_pressure_pct=1.0\nio_pressure_pct=1.0\n"
+            f"check_cpu_quota=max\n{battery}reserved_cores=0\ngpu_count=0\n"
+        )
+
+        with pytest.raises(AppError) as excinfo:
+            probe.parse_probe("loki", output, live=IDLE)
+
+        assert excinfo.value.code == FleetErrorCode.NODE_UNREACHABLE
+        assert (
+            f"loki reported on_battery={shown} where yes or no belongs, so whether it is running "
+            "on its battery is unknown"
+        ) in excinfo.value.message
 
     @pytest.mark.parametrize(
         ("quota", "message"),
@@ -345,6 +380,7 @@ class TestDescribeNode:
         cpu_pressure_pct=0.0,
         io_pressure_pct=0.0,
         check_cpu_quota=None,
+        on_battery=False,
         gpus=(),
     )
 

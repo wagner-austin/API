@@ -35,6 +35,7 @@ from tests._toolchain_fixtures import (
     GO_APT,
     GO_REASON,
     HOOKS_REASON,
+    NIXOS_TEST_NO_INSTALL,
     NO_PYTHON,
     OLD_NODE,
     PDFTOTEXT_APT,
@@ -109,12 +110,13 @@ class TestTheToolTagsAClaimCarries:
         assert endpoint.arguments[1]["tags"] == ["ffmpeg", "linux"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
-            READY_HEAD + "ffmpeg present; hooks absent; go absent; chrome absent; pdftotext absent",
+            READY_HEAD + "ffmpeg present; hooks absent; go absent; chrome absent; pdftotext absent"
+            "; nixos-test absent",
             f"lavender claims without the tag of every tool it lacks: {HOOKS_GAP}; go -- "
             f"{GO_REASON}, so those jobs go to a node that has it -- {GO_APT}; chrome -- "
             f"{CHROME_REASON}, so those jobs go to a node that has it -- {CHROME_APT}; "
             f"pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that has it -- "
-            f"{PDFTOTEXT_APT}",
+            f"{PDFTOTEXT_APT}{NIXOS_TEST_NO_INSTALL}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -129,13 +131,15 @@ class TestTheToolTagsAClaimCarries:
         with go, so rcs-bridge's check may land here, with Chrome found (MCPs
         board task 2f596185) it claims with chrome, so web-scraper's check may
         land here, with pdftotext found (MCPs board task 6dd73ada) it claims
-        with pdftotext, so wiki-check's check may land here, and with every
-        tagged tool present it logs no gap."""
+        with pdftotext, so wiki-check's check may land here, with nixos-test
+        found (MCPs board task 3268afdf) it claims with nixos-test, so the
+        NixOS flake check may land here, and with every tagged tool present
+        it logs no gap."""
         found = (
             "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"
             "hooks=yes=/home/corvis/.claude/corvis-hooks.json\n"
             "go=yes=go version go1.27.1 linux/amd64\nchrome=yes=155.0.8059.39\n"
-            "pdftotext=yes=pdftotext version 24.02.0\n"
+            "pdftotext=yes=pdftotext version 24.02.0\nnixos-test=yes=nix (Nix) 2.31.2\n"
         )
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(DIPHTHERIA_2026_09_23 + found)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
@@ -150,12 +154,14 @@ class TestTheToolTagsAClaimCarries:
             "go",
             "hooks",
             "linux",
+            "nixos-test",
             "pdftotext",
         ]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-4:] == [
             READY_HEAD
-            + "ffmpeg present; hooks present; go present; chrome present; pdftotext present",
+            + "ffmpeg present; hooks present; go present; chrome present; pdftotext present"
+            "; nixos-test present",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,
@@ -218,14 +224,15 @@ class TestAToolchainThatCanBuild:
         assert endpoint.tools == ["dispatch_list", "dispatch_claim"]
         messages = [record.getMessage() for record in caplog.records]
         assert messages[-5:] == [
-            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent",
+            READY_HEAD + "ffmpeg absent; hooks absent; go absent; chrome absent; pdftotext absent"
+            "; nixos-test absent",
             "lavender claims without the tag of every tool it lacks: ffmpeg -- grandma-api's "
             "check converts real audio files through ffmpeg, so those jobs go to a node that has "
             f"it -- sudo apt-get install -y ffmpeg; {HOOKS_GAP}; "
             f"go -- {GO_REASON}, so those jobs go to a node that has it -- {GO_APT}; "
             f"chrome -- {CHROME_REASON}, so those jobs go to a node that has it -- "
             f"{CHROME_APT}; pdftotext -- {PDFTOTEXT_REASON}, so those jobs go to a node that "
-            f"has it -- {PDFTOTEXT_APT}",
+            f"has it -- {PDFTOTEXT_APT}{NIXOS_TEST_NO_INSTALL}",
             NOTHING_MATCHED,
             NOTHING_LAUNCHED,
             SERVED_HOLDING_NOTHING,

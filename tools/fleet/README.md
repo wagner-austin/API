@@ -752,6 +752,15 @@ pdftotext and depend on its exact page breaks (MCPs board task 6dd73ada). It
 is found on the PATH and asked `-v`. Every live runner had it on 2026-10-11,
 but nothing declared it and the roster's apt packages lacked poppler-utils;
 a node without it is offered `sudo apt-get install -y poppler-utils`.
+`nixos-test` routes MCPs `fleet-mcp/nixos`, whose check is `nix flake check`
+booting NixOS test VMs (MCPs board task 3268afdf). It is asked inside a
+check's unit, one `sh -c` of `NIXOS_TEST_PROGRAM`: present, with nix's
+version, when `/dev/kvm` is readable and writable there and nix's
+`system-features` name `kvm` and `nixos-test`. Until it existed the project
+was pinned to loki by name, and on 2026-11-03 loki ran those checks back to
+back on battery while serendipity, lacrymal and lavender could have taken
+them; colossus runs NixOS without `/dev/kvm` and answers absent. No package
+manager here installs it: a node gets it from its NixOS generation.
 lavender, the runner host, gets go, ffmpeg and pdftotext from
 `runners.json`'s base `nix_packages` and Chrome from its `assets`, so a
 reinstall keeps all four tags, and `test_runner_contracts.py` fails if a
@@ -1049,6 +1058,17 @@ and ruled colossus a server. Its `reserved_cores` fell from 8 to 4 the same
 day for the same reason: four were glimmer's and the desktop's (aa8a6d0e1),
 four the OCR service's two torch processes at `OMP_NUM_THREADS=4`
 (3f384639a), which stay.
+
+**A node on its battery takes no check** (MCPs board task 3268afdf). The
+Linux capacity probe prints `on_battery=yes` when any
+`/sys/class/power_supply` entry of type `Battery` reads `Discharging`, and
+`no` otherwise, a node with no battery included; a probe that prints neither
+is unreadable, never read as mains. `capacity.assess` refuses such a node
+with `NODE_ON_BATTERY` after the disk refusal and before every load
+refusal, since no load falling clears it, and the node takes the next job
+once it is back on mains. On 2026-11-03 loki, off its charger, drew 23 to
+32 W through back-to-back NixOS VM checks and fell from 35 to 30 percent in
+seven minutes.
 
 **How many runs a node holds is live, not declared** (MCPs board task
 939ec5c7). Every node used to declare `max_concurrent_runs`, and every node
