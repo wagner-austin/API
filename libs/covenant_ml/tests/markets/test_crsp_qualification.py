@@ -131,6 +131,31 @@ def test_a_vendor_flagged_delisting_return_is_counted_by_its_flag(tmp_path: Path
 
 #: The message a closing-trade check gives for a record it cannot execute at.
 UNEXECUTABLE = "[CRSP-004] execution requires a finite positive closing trade"
+#: A delisting return whose event the partition does not hold, by its stored day.
+EVENTLESS = "[CRSP-009] the delisting return for 1 on {day} has no terminal event in this partition"
+
+
+def test_a_delisting_the_partition_omits_is_named_rather_than_valued(tmp_path: Path) -> None:
+    # The extract a partition writes when security 8's event is valued after
+    # its observation end: the flagged daily row on DelDlyDt stays, the event
+    # does not. Its -25% value must never be read from anywhere.
+    rows = study_rows()
+    rows["delists"] = []
+    sources = _sources(tmp_path, rows)
+    index, ordinal = _position(sources, "2019-02-28", DELISTED)
+    returns = index_crsp_outcomes(sources).returns
+    assert qualify_crsp_panel(sources)["refused"] == (
+        CrspRefusedPath(
+            ordinal=ordinal,
+            decision=index,
+            period="validation",
+            reason="delisting return without event",
+            entry_sha256=sha256(
+                dump_json_str(returns[(DELISTED, "2019-03-01")]).encode()
+            ).hexdigest(),
+            exit_sha256=None,
+        ),
+    )
 
 
 @pytest.mark.parametrize(
@@ -173,6 +198,24 @@ UNEXECUTABLE = "[CRSP-004] execution requires a finite positive closing trade"
             CrspPathRefusal(
                 "two terminal events", "[CRSP-009] one window cannot hold two terminal events"
             ),
+        ),
+        (
+            [
+                daily(1, W1.entry, 0.0),
+                daily(1, "2020-02-04", -0.4, dlydelflg="Y", dlyretdurflg="DD", dlyprcflg="DA"),
+            ],
+            [],
+            CrspPathRefusal("delisting return without event", EVENTLESS.format(day="2020-02-04")),
+        ),
+        (
+            [
+                daily(1, W1.entry, 0.0),
+                daily(1, "2020-02-04", 0.1),
+                daily(1, W1.exit, 0.0, dlyprcflg="BA"),
+                daily(1, "2020-03-03", -0.4, dlydelflg="Y", dlyretdurflg="DD", dlyprcflg="DA"),
+            ],
+            [],
+            CrspPathRefusal("delisting return without event", EVENTLESS.format(day="2020-03-03")),
         ),
     ],
 )

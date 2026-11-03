@@ -214,7 +214,10 @@ def _change(
     ("rows", "message"),
     [
         (_drop(drift_rows(), 2, "2020-02-04"), "held return for 2 on 2020-02-04"),
-        (_change(drift_rows(), 2, "2020-02-04", dlydelflg="Y"), "held return for 2"),
+        (
+            _change(drift_rows(), 2, "2020-02-04", dlydelflg="Y"),
+            "delisting return for 2 on 2020-02-04 has no terminal event",
+        ),
         (_change(drift_rows(), 2, "2020-02-04", dlyprevdt="2020-01-31"), "held return for 2"),
         (_change(drift_rows(), 2, "2020-02-04", dlyretmissflg="MR"), "held return for 2"),
         (_drop(drift_rows(), 3, "2020-03-02"), "no execution record for 3 on 2020-03-02"),
