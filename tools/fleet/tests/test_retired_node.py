@@ -78,7 +78,6 @@ def test_a_stale_runner_for_the_retired_node_claims_nothing(
     assert [tick_body(tick) for tick in endpoint.ticks] == [
         {
             "node": "lavender",
-            "elevated": False,
             "tags": [],
             "fits": [],
             "claiming": False,
