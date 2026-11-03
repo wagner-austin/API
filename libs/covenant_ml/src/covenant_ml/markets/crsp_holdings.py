@@ -175,8 +175,7 @@ def _terminal_rows(
         the exit record is present without a closing trade; more than one is
         ambiguous.
     """
-    exit_row = outcomes.returns.get((permno, window.exit))
-    unsold = exit_row is not None and exit_row["dlyprcflg"] != outcomes.protocol["execution_flag"]
+    unsold = _unsold(outcomes, permno, window)
     return tuple(
         row
         for row in outcomes.delists.get(permno, ())
@@ -185,13 +184,57 @@ def _terminal_rows(
     )
 
 
+def _unsold(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bool:
+    """Whether the exit record is present but is no closing trade to sell into."""
+    exit_row = outcomes.returns.get((permno, window.exit))
+    return exit_row is not None and exit_row["dlyprcflg"] != outcomes.protocol["execution_flag"]
+
+
+def _eventless_delisting(
+    outcomes: CrspOutcomes, permno: int, window: CrspWindow, days: tuple[str, ...]
+) -> CrspPathRefusal | None:
+    """Name a delisting return the daily series holds for a window with no event.
+
+    CIZ stores the delisting return on DelDlyDt, the session after DelistingDt
+    (guide p.12), with DlyDelFlg ``Y`` (p.17). A delisting inside the window
+    therefore flags a held session, and one on an unsold exit close flags the
+    session after the exit. Extraction keeps an event only when its valuation
+    date is within the partition, so a flagged row without its event is the
+    trace of an event valued after the observation end, or of vendor evidence
+    missing it. It is refused by that name, never valued or read as a return.
+
+    Args:
+        outcomes: Indexed evidence.
+        permno: Held security.
+        window: The holding window, which has no terminal event.
+        days: Declared sessions in ``(entry, exit]``.
+
+    Returns:
+        The refusal for the first flagged session, or None.
+    """
+    following = bisect_right(outcomes.sessions, window.exit)
+    unsold = _unsold(outcomes, permno, window)
+    after = outcomes.sessions[following : following + 1] if unsold else ()
+    for day in (*days, *after):
+        row = outcomes.returns.get((permno, day))
+        if row is not None and row["dlydelflg"] == "Y":
+            return CrspPathRefusal(
+                "delisting return without event",
+                f"[CRSP-009] the delisting return for {permno} on {day}"
+                " has no terminal event in this partition",
+            )
+    return None
+
+
 class CrspPathRefusal(NamedTuple):
     """Why one security's window cannot be valued from the vendor's records.
 
     Attributes:
         reason: A short key for counting: ``entry absent``, ``entry terminal
             inconsistent``, ``entry not a closing trade`` (a closing-trade flag
-            without a positive price), ``two terminal events``, a held-return
+            without a positive price), ``two terminal events``, ``delisting
+            return without event`` (a flagged daily row whose event the
+            partition does not hold), a held-return
             reason of :class:`~covenant_ml.markets.crsp_return_path.HeldRefusal`,
             ``held growth not finite``, ``exit absent``, ``exit not a closing
             trade`` or a terminal reason of
@@ -260,7 +303,10 @@ def crsp_resolve_window_path(
         return CrspPathRefusal(
             "two terminal events", "[CRSP-009] one window cannot hold two terminal events"
         )
-    end = window.exit if not terminals else require_str(terminals[0], "delistingdt")
+    eventless = None if terminals else _eventless_delisting(outcomes, permno, window, days)
+    if eventless is not None:
+        return eventless
+    end =window.exit if not terminals else require_str(terminals[0], "delistingdt")
     held = crsp_resolve_held(
         outcomes.returns, permno, window.entry, days[: bisect_right(days, end)]
     )
@@ -292,8 +338,9 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
     same path as holdings: an unfilled order retains cash, while an executed
     order requires a tradable exit or a terminal event of this window. The
     terminal value may be dated after the exit; the caller dates the label
-    and the receivable by it, and the partition already excludes any event
-    whose valuation lies past its observation end.
+    and the receivable by it. The partition excludes any event whose
+    valuation lies past its observation end; a path whose delisting return
+    is then present without its event refuses by that name.
 
     Args:
         outcomes: Indexed evidence.
