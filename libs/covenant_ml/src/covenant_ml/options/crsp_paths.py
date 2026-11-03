@@ -9,14 +9,18 @@ or fill is needed at the start.
 
 TWO FIXING ASSUMPTIONS, both counted in :class:`PathCounts` rather than hidden:
 
-* A session inside a CIZ missing-price span (MP/MR rows) has no price, but an
-  Asian average fixes on every session. The last observed close is carried
-  through the span, and the NA/P1-P9 return that closes it is applied on the
-  closing session (:func:`~covenant_ml.markets.crsp_return_path.crsp_held_spans`),
-  so no later information reaches an earlier fixing.
+* A session inside a CIZ unpriced span (MP/MR return rows whose price flag is
+  MP, or SU for a suspension under protocol version 4 and later) has no price,
+  but an Asian average fixes on every session. The last observed close is
+  carried through the span, and the NA/P1-P9 return that closes it is applied
+  on the closing session
+  (:func:`~covenant_ml.markets.crsp_return_path.crsp_resolve_held`), so no
+  later information reaches an earlier fixing. Carrying a close through a
+  vendor-declared trading suspension is a fixing-disruption assumption, counted
+  with the other carried sessions.
 * A security delisted inside the contract's life stops at its delisting date;
   the ``stkdelists`` terminal multiplier
-  (:func:`~covenant_ml.markets.crsp_calendar.crsp_terminal_value`) is applied
+  (:func:`~covenant_ml.markets.crsp_calendar.crsp_resolve_terminal`) is applied
   once on the next session and the value is held flat to maturity. The
   daily rows after the delisting date are never read, so the terminal outcome
   is counted once, as in the holdings evaluator.
