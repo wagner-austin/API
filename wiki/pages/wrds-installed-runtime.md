@@ -14,6 +14,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json"
   - "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json"
+  - "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
@@ -25,9 +26,10 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/preparation.json": "b241815ebdf05dc49c92a4b6a786df80a230c96d"
   "tools/hpc3/artifacts/wrds-controller-handover-20261101/normal-completion.json": "3850961553a9736d1533616f23ea2b534ac712e1"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/audit-evidence.json": "3b52554a69ce12c549fc47b3cc60d2c332299fa7"
+  "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json": "6c1a4474a495bdbd5dd66b0b50c78e180281cdcf"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 
@@ -40,6 +42,28 @@ completed as job `58747974` and passed independent review. Licensed training-spa
 qualification also passed as job `58748788`; this checks the previously failed
 interval, not the whole dataset. Current study status is in
 [[wrds-baseline-readiness]].[^candidate][^v3][^v3-preparation]
+
+## Version-5 runtime
+
+A separate version-5 runtime was installed on November 3 from API
+`cfd829d03` for the native full-panel qualification; it replaces nothing above.
+Its controller and native image were inspected, and it has not been
+independently audited or used for a study.[^v5]
+
+| Component | Verified identity |
+|---|---|
+| Controller interpreter | `/home/corvis/research-control/wrds-protocol-v5-cfd829d03/bin/python` |
+| Controller source | `cfd829d03590ea57c247057e27a48510ab2b2078` |
+| HPC3 image | `/data/homezvol1/wagnera3/research-images/protocol-v5-cfd829d03/research-crsp-v5.sif` |
+| Image SHA-256 | `a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92` |
+
+The controller inspection verified 650 installed files against seven wheels;
+six pure-Python wheels were built on Loki from the exported commit, and the
+compiled Rust wheel and the 53 dependency pins were reused because neither
+changed since `087f67b4c`. Native image build `58820002` completed in 94
+seconds with exit `0:0`; inspection verified fourteen files and two self-check
+passes. The image spec's self-check names the version-5 resolvers and the
+qualification entry points in place of a symbol version 5 removed.[^v5]
 
 ## Installed identities
 
@@ -115,6 +139,7 @@ candidate runtime directory contained no journal or grant metadata. Journal
 and ledger hashes were unchanged across the reading. These are measurements
 of retained records, not a historical filesystem-access audit.[^source-scope]
 
+[^v5]: `tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json`, `source_export`, `controller`, `image`, `service_reports` and `remaining`.
 [^candidate]: `tools/hpc3/artifacts/wrds-protocol-v3-runtime-20261102/evidence.json`, `controller`, `image`, `construction`, `service_reports`, `source_checks`, `remaining` and `scope`; separate candidate installation, with no version-3 study execution.
 [^v3]: `tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json`, `prerequisite_audits`, `controller_python`, `image_sha256`, `queue`, `native_accounting` and `remaining`; subsequent synthetic execution is separate from installation and licensed qualification.
 

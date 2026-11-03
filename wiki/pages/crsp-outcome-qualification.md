@@ -23,6 +23,7 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json"
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
+  - "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json"
 source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "752574db15efc98e09420383a36345b98946bc66"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
@@ -43,6 +44,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json": "7c39757f5c5a238d9dabf24f0531f201adeba639"
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json": "cba4424c62478199f45a23b26df2ddd4b992c2ec"
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
+  "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json": "85b7e1763c9817abd7a82f29ffa93fdf27a89884"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e; corpus 0264d5cc-4dec-4715-b17b-45f3c8e5fbec; reread November 2."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; this is qualification analysis, not an approved version-4 or version-5 freeze."
@@ -122,9 +124,13 @@ every class: an entry without a closing trade is an unfilled cash order, a
 delisting on an exit close with no trade ends the old position with its
 terminal value, and a value dated after the exit dates every label of its
 decision. That gives 13 first refusals an explicit rule and keeps 14 (NT held,
-MV, DG and both open tails) refusing. It awaits independent review and a native
-full-panel scan; it is not installed.
+MV, DG and both open tails) refusing. An independent peer review accepted it,
+and the native full-panel scan under a separate version-5 runtime refused
+exactly those 14 paths, with the same record digests as the version-3
+diagnosis, in two runs that agree. The original full-universe target is
+therefore not qualified under version 5.[^v5]
 
+[^v5]: `tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json`, `attempts`, `reproduction`, `measurement`, `join_to_v3_diagnosis` and `conclusion`; review note by opus-mcps-1029-8f6e on board task f963ee0b at 2026-11-03T08:12:33Z.
 [^suspension]: `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, `test_old_rule_identity_cannot_admit_the_new_evaluator` and `test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data`.
 
 A replacement must distinguish selection, order execution, owned exposure and
@@ -148,6 +154,8 @@ event omitted by that predicate from a security with no terminal event; event
 identity and unavailable value are different facts. This is a prospective
 boundary check, not an established explanation of the 27 observed cases.
 Any repair must preserve the partition's prohibition on future valuations.[^partition]
+Version 5 refuses such a path by name (`delisting return without event`), and
+the native scan found none in this extract.[^v5]
 
 The required source check is bounded to the diagnosed paths and partition
 edges, using the existing encrypted extraction and evaluator controls. Compare

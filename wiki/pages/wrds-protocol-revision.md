@@ -9,12 +9,14 @@ source_paths:
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py"
   - "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py"
   - "tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json"
+  - "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
   "libs/covenant_ml/tests/markets/test_crsp_revision.py": "3db03bce47865acba6d75416a1308e2710726d49"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "0c6c56f05f23df1a239492e39798f935d47d6fdf"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "7e9ebdafddf540613819fc1310f9aaf0dd05602d"
   "tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json": "bd6ac340e20ce528c5a4ad2571714d69cd2fad34"
+  "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json": "6c1a4474a495bdbd5dd66b0b50c78e180281cdcf"
 fact_checked: 2026-11-03
 confidence: high
 ---
@@ -73,6 +75,21 @@ Extraction vintage remains `2026-10-31T18:44:04.122752+00:00`. Original
 and version-2 bundles and failed-study journals remain historical. The
 version-2 revision evidence remains available at its original path.[^v3-preparation][^measured]
 
+The licensed version-5 revision ran the same two commands on November 3 at
+08:50:31 and 08:51:04 UTC, from an exact export of API `cfd829d03` on the
+existing controller interpreter, again starting from the original extraction.
+The two reports are identical and retain all sixteen relation ciphertexts; no
+observation was opened and no private key acquired.[^v5]
+
+| Identity | SHA-256 |
+|---|---|
+| Version-5 protocol | `3aebc90c9a6d71d16adff1335afe5737520c0d2b408bc0fad71d289898bfe6cf` |
+| Revised train/validation bundle | `8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94` |
+| Revised final bundle | `a5718c1b170feaeaa0b51c267dd0fd73ff3e0c49d3d04714a922ca9db0f61d9e` |
+| Revision receipt | `ef28d519829153dda58a96f7b9e42d72a15d86b04df2d1d4b556fc3b5705d8c6` |
+
+Its use in the native qualification is recorded in [[crsp-v5-boundary-policy]].[^v5]
+
 ## Readiness boundary
 
 Revision itself reads no observations and proves no investment performance.
@@ -84,5 +101,7 @@ separate and unreleased.[^v3-preparation]
 [^revision]: `libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py`, `_inputs`, `revise_crsp_protocol` and `verify_crsp_revision`; current protocol validation, original manifest reconstruction, receipt publication and ciphertext comparison.
 [^storage]: `libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py`, `revise_encrypted_bundle`; exclusive destination, shared encryption, copied-byte verification and final manifest publication.
 [^measured]: `tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json`, `execution`, `service_reports`, `measurement`, `verification` and `limits`; program reports bind original/new metadata and unchanged ciphertext, without reading observations.
+
+[^v5]: `tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json`, `source_export`, `revision` and `service_reports` (`revision_create` and `revision_readback`).
 
 [^v3-preparation]: `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `rehearsal_audit`, `revision`, `staging`, `qualification`, `freeze`, `queue_submission` and `limits`; linked program reports retain exact inputs and observed boundaries.

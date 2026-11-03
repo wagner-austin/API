@@ -22,6 +22,8 @@ source_paths:
   - "libs/covenant_ml/scripts/crsp_qualification.py"
   - "libs/covenant_ml/tests/markets/test_crsp_qualification.py"
   - "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py"
+  - "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json"
+  - "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "21b5d8b794f67352876ab9452d9d30858af533a3"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "08da2ef4c43700b587bc2ece90aa9b99dd3d7a64"
@@ -41,6 +43,8 @@ source_git_blobs:
   "libs/covenant_ml/scripts/crsp_qualification.py": "7fd260c648cbeedc984cf639507dd4bf20403b62"
   "libs/covenant_ml/tests/markets/test_crsp_qualification.py": "600274c114bf84fa379c562631cbddcd37fd23a3"
   "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py": "b7a33b0ad233b0e571b7eb2caeaf3af0e5bdc857"
+  "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json": "6c1a4474a495bdbd5dd66b0b50c78e180281cdcf"
+  "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json": "85b7e1763c9817abd7a82f29ffa93fdf27a89884"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e, re-hashed 2026-11-03; pp. 11-13 (StkDelists, StkDistributions), 88 (PC price flags), 90-92 (RD and RM flags)."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; review of the version-4 suspension amendment is board post 43ba2e2b-c1d0-4a3c-ba3e-4fb75fc4123c."
@@ -55,10 +59,11 @@ first refusals in [[wrds-v3-refused-path-diagnosis]], accepted by an
 independent review on 2026-11-03 (§ "Independent review"). Version 5 changes two
 declared accounting rules and keeps the version-4 held-return rule. It reads
 the same extraction columns and dates, so the existing encrypted extraction
-can be revised by metadata alone. **Nothing here is installed or measured on
-licensed data**: the controller and image remain the version-3 freeze, no
-licensed version-5 revision exists, and the native full-panel scan that would
-count the remaining refusals has not run.[^protocol][^revision]
+can be revised by metadata alone.[^protocol][^revision] The licensed
+version-5 revision, runtime and native full-panel scan have since run: the
+scan refused exactly the 14 paths this page predicts, so **the full-universe
+target is not qualified under version 5** (§ "Native full-panel
+qualification").[^v5-runtime][^v5-scan]
 
 ## Decision by diagnosed class
 
@@ -170,7 +175,8 @@ period returns the paired bootstrap compares; this policy does not adopt it.
   version-3 full-panel diagnosis ran under the same extraction predicate, and
   none of its 27 refusals has this shape: its five held-path refusals that end
   on a DA or DP record each have their event inside the window. Version 5 newly assigns unsold-exit
-  events to the earlier window, so the native scan is what measures it.
+  events to the earlier window, so the native scan is what measures it: it
+  found none.[^v5-scan]
   Such a path stays refused, and its decision stays in the known panel.
   Panel membership is calendar-only (a window exiting before the final
   period); requiring every member to be valued by 2021-12-31 would condition
@@ -243,12 +249,47 @@ literal TR; that check now reads the design's execution flag. Its answer to
 the boundary question is the decision recorded above: keep refusing rather
 than drop decisions.[^review]
 
+## Native full-panel qualification
+
+The licensed version-5 revision changed only protocol and manifest metadata:
+creation and a separate readback produced identical reports, kept all sixteen
+relation ciphertexts and opened no observation. A separate controller and a
+native image were built from API cfd829d03 and inspected, and the revised
+train-validation ciphertext was staged privately on HPC3 beside the
+train-validation key alone. One ciphertext reached HPC3 by a cluster-side copy
+of the byte-identical version-3 file after the transfer bound stopped it; all
+eleven then matched their declared digests.[^v5-runtime]
+
+The scan walked all 262,000 paths of the 262 known decisions twice, as HPC3
+jobs 58820334 and 58820962. Only the second checksummed the image inside the
+job, so only it passed the execution inspector. The two results are equal
+except for the node's core count.[^v5-scan]
+
+| Measure | Value |
+|---|---|
+| Refused paths | 14 (13 training, 1 validation) |
+| By reason | NT held span 5, MV delisting 4, MV span 2, DG delisting 1, open price-gap tail 2 |
+| Delisting return without event | 0 |
+| Unfilled orders (cash) | 112 training, 45 validation |
+| Decisions and labels left unknown | 14 decisions, 14,000 labels |
+
+Every refused path is a version-3 diagnosed path with the same entry and exit
+record digests, and the 13 others version 3 refused are the explicit-rule
+cases above. No new refusal appeared, and the partition-boundary omission does
+not occur in this extract. As decided under "Why the 14 remaining refusals
+stay refusals", the full-universe 2000-2020 target is therefore **not
+qualified under version 5**.[^v5-scan][^cases]
+
 ## Not established yet
 
-- No licensed version-5 metadata revision, controller or image freeze.
-- No native full-panel version-5 scan, so no measured remaining-refusal count.
-- No candidate fit, queue admission or final release. The stopped version-3
-  study keeps its one failed and fourteen unsubmitted attempts.
+- No independent reading of the runtime or the scan yet; both are recorded for
+  one.
+- No route past the 14 refusals: the bounded MV source correction and a
+  declared incomplete-outcome rule with bounds each need their own design and
+  review.
+- No candidate fit, queue admission, new study freeze or final release. The
+  stopped version-3 study keeps its one failed and fourteen unsubmitted
+  attempts.
 - The Bermudan Asian options study (board task 5bec93df) does not use the
   holdings path that rules 1 to 3 change. It shares the held-return resolver
   and the protocol decoder, so its version-3 run reproduces only at its own
@@ -270,5 +311,7 @@ than drop decisions.[^review]
 [^dlydel]: CIZ guide p. 12, StkDelists: DelDlyDt is the date the return is stored in StkDlySecurityData, by convention the trading date immediately after the delisting date; p. 17, StkDlySecurityPrimaryData: DlyDelFlg Y means a delisting return is present.
 [^eventless]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_eventless_delisting`, `_unsold` and `crsp_resolve_window_path`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py`, `test_a_delisting_the_partition_omits_is_named_rather_than_valued` (a real extract without security 8's event, one refusal at an independently located ordinal) and the held and unsold-exit cases of `test_each_refusal_has_its_counting_key_and_message`; `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_a_sold_exit_needs_no_event_for_a_delisting_flagged_after_it`.
 [^review]: Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3, review note posted by opus-mcps-1029-8f6e at 2026-11-03T08:12:33Z (ACCEPT on R1 to R6 of the request in post f7e04c03-1986-4608-b158-f0847a74aaf4); `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel`, `crsp_qualification_counts` and `decode_crsp_qualification`; `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry`.
+[^v5-runtime]: `tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json`, `revision`, `controller`, `image`, `staging` (including `deviation`) and `service_reports`.
+[^v5-scan]: `tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json`, `attempts`, `reproduction`, `measurement`, `join_to_v3_diagnosis` and `conclusion`.
 [^mthdel]: CIZ guide p. 20, StkMthSecurityData: MthDelFlg indicates if the returns from delists are included in the compounded period return.
 [^dist]: CIZ guide p. 13, StkDistributions: DisPERMNO, the PERMNO of a security received in a spinoff, exchange, merger or other distribution.

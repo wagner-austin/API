@@ -14,6 +14,8 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json"
   - "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json"
   - "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json"
+  - "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json"
+  - "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/diagnosis-audit.json": "97556c4ac055d150ce3de0964fc0206a3cd862bb"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/parent-audit.json": "78746db728bf7fd34597498d2802519915b81291"
@@ -25,6 +27,8 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-protocol-v3-rehearsal-20261102/evidence.json": "fe2f9f8774c053a9e07826ace70b9187ae9b0ef0"
   "tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json": "71ec4235748ce5b67ee40c7bec09b27926ff9d97"
   "tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json": "3e3df28fd555e8d2b8165cc1fe8c56036d3cf95f"
+  "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json": "6c1a4474a495bdbd5dd66b0b50c78e180281cdcf"
+  "tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json": "85b7e1763c9817abd7a82f29ffa93fdf27a89884"
 provenance:
   - "Reorganized from wrds-baseline-readiness at API fbff31147581c22e1a91a13108e89217c41a4380 on 2026-11-01; original run records remain in artifacts and git history. Board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
 fact_checked: 2026-11-03
@@ -40,14 +44,19 @@ automatically. One attempt failed; fourteen remain admitted and unsubmitted.
 No candidate is selected and the final holdout remains unreleased. The completed
 diagnostic found 27 refused paths out of 262,000; it is not a model result.**[^v3stop][^pathaudit]
 
+**On 2026-11-03 the native full-panel qualification under the reviewed
+version 5 refused 14 of 262,000 paths, the 14 its policy predicted, leaving 14
+decisions (14,000 labels) unknown. The full-universe target is not qualified
+under version 5, so no new study is frozen.**[^v5]
+
 ## Current evidence
 
 | Area | Evidence and current boundary |
 |---|---|
-| Runtime | [[wrds-installed-runtime]] — source `087f67b4c`, separately inspected controller and image. |
+| Runtime | [[wrds-installed-runtime]]: source `087f67b4c`, separately inspected controller and image; a separate version-5 controller and image from `cfd829d03`, inspected, not yet independently audited.[^v5] |
 | Data | [[wrds-licensed-data-evidence]] — eleven encrypted version-3 validation files staged and independently reread on HPC3. |
 | Operations | [[wrds-operational-rehearsals]] — version-3 queue rehearsal independently verified; earlier selection/final rehearsals remain historical. |
-| Qualification | Native job `58748788` passed the exact two-session training interval that stopped version 2, with sixteen verified inputs. |
+| Qualification | Native job `58748788` passed the exact two-session training interval that stopped version 2, with sixteen verified inputs. Version-5 full-panel jobs `58820334` and `58820962` refused 14 paths, reproduced exactly; the target is not qualified.[^v5] |
 | Study | [[wrds-baseline-v3-freeze]] — three candidates, five seeds, fifteen admissions; one failed attempt, fourteen unsubmitted; study stopped.[^v3stop] |
 | Isolation | [[wrds-proposer-isolation]] and [[wrds-final-scoring]] — proposer boundary and evaluator-owned final release. |
 | Scientific rules | [[crsp-monthly-study-design]] and [[crsp-monthly-holdings-validation]] — target, chronology, accounting and uncertainty. |
@@ -84,10 +93,14 @@ frozen study controller or its requests.[^preparation][^v3stop][^mounts]
 
 ## Remaining work
 
-1. Resolve the execution, late-valuation and incomplete-outcome rules through
-   evidenced data corrections or an explicit reviewed protocol amendment.
-   Preserve failed requests; do not silently retry, treat quotes as trades,
-   accept flagged partial returns or exclude securities on future availability.
+1. Version 5 resolved the execution and late-valuation rules; 14 paths remain
+   without a vendor value (NT held spans, MV, DG and open price-gap tails).
+   Each route past them needs its own design and review: a bounded MV source
+   correction through the distribution's received security, or a declared
+   incomplete-outcome rule with sensitivity bounds reported beside the
+   unchanged target. Preserve failed requests; do not silently retry, treat
+   quotes as trades, accept flagged partial returns or exclude securities on
+   future availability.[^v5]
 2. Only after a qualified new freeze, execute validation, select under fixed
    rules, and perform the controlled final evaluation.[^v3stop]
 
@@ -100,12 +113,13 @@ Current source carries prospective version 5: version 4's extension for
 exactly closed suspension spans (independently reviewed), plus unfilled entries
 without a closing trade, delistings on an unsold exit close, and labels dated by
 values dated after the exit ([[crsp-v5-boundary-policy]]). It rejects earlier
-runtime requests and keeps NT held, MV, DG and open-tail refusals. This is not a
-replacement installed controller, licensed dataset revision or native
-full-panel qualification. An independent peer review accepted the version-5
-rules and the qualification instrument on 2026-11-03, so those licensed steps
-are the next to run; none has. The original 27-case evidence and study stop
-still apply.[^qualification]
+runtime requests and keeps NT held, MV, DG and open-tail refusals. An
+independent peer review accepted the version-5 rules and the qualification
+instrument on 2026-11-03.[^qualification] The licensed version-5 metadata
+revision, a separate version-5 runtime and the native full-panel qualification
+then ran; their result is the 14-refusal measurement above, recorded in
+[[crsp-v5-boundary-policy]]. The original 27-case evidence and study stop still
+apply.[^v5]
 
 [[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
 derived for that source comparison, including its separate native
@@ -165,4 +179,5 @@ allocation-specific observations and their limits.[^preparation]
 [^pathaudit]: `tools/hpc3/artifacts/wrds-baseline-v3-typed-execution-audit-20261102/result.json`, `results[0]` counts, `refusal_counts`, `first_failure` and `scope`; sibling `native-evidence.json`, `accounting`, `measurement` and `record`; sibling `completion-preparation-report.json`, fifteen `attempts` with one failed, fourteen admitted, no selection or final-manifest identity and the unchanged journal digest. Diagnostic completion is not a model fit or a final evaluation.
 
 [^comparison]: [[wrds-crsp-source-comparison]], § "Native evidence", licensed job `40568218` and its primary comparison/collection artifacts.
+[^v5]: `tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json`, `revision`, `controller`, `image` and `staging`; `tools/hpc3/artifacts/wrds-v5-qualification-20261103/evidence.json`, `attempts`, `reproduction`, `measurement`, `join_to_v3_diagnosis` and `conclusion`.
 [^qualification]: [[crsp-outcome-qualification]], § "Qualification design" and § "Additional evidence to qualify", with captured independent audit verdicts and the checksummed historical catalog projection; [[crsp-v5-boundary-policy]], § "Independent review", and board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3, review note by opus-mcps-1029-8f6e at 2026-11-03T08:12:33Z.
