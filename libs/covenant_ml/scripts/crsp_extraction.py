@@ -1,10 +1,12 @@
-"""Extract CRSP partitions, refresh a diagnostic cohort, or verify collected evidence.
+"""Extract CRSP partitions, capture cohort diagnostics, or verify collected evidence.
 
 ``extract`` runs inside the scheduler allocation: plaintext stays in its
 private scratch and only ciphertext, the receipt and metrics reach the output
 directory named by an environment variable. ``refresh`` uses those same
 allocation paths and bounds for a pinned validation cohort, writing encrypted
 differences and aggregate metrics for the native controller's RunRecord.
+``actions`` captures additional bounded corporate-action fields through that
+same private lifecycle, without changing or admitting a study dataset.
 ``verify`` runs on the evaluator
 host against the collected directory, posts its metadata on the named board
 task under the task's WRDS load-report identity, then writes the same metadata
@@ -23,8 +25,8 @@ from platform_core.load_report import post_load_report, report_identity
 
 from covenant_ml.markets import _test_hooks
 from covenant_ml.markets.crsp_cohort_records import decode_crsp_cohort_plan
+from covenant_ml.markets.crsp_diagnostic import capture_crsp_diagnostic
 from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
-from covenant_ml.markets.crsp_refresh import compare_crsp_vintages
 from covenant_ml.markets.crsp_revision import revise_crsp_protocol, verify_crsp_revision
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import extract_crsp
@@ -39,11 +41,12 @@ def _parser() -> argparse.ArgumentParser:
     extract = commands.add_parser("extract")
     extract.add_argument("--protocol", required=True, type=Path)
     extract.add_argument("--source", required=True)
-    refresh = commands.add_parser("refresh")
-    refresh.add_argument("--cohort", required=True, type=Path)
-    refresh.add_argument("--cohort-sha256", required=True)
-    refresh.add_argument("--plan", required=True, type=Path)
-    for capture in (extract, refresh):
+    refresh, actions = (commands.add_parser(name) for name in ("refresh", "actions"))
+    for diagnostic in (refresh, actions):
+        diagnostic.add_argument("--cohort", required=True, type=Path)
+        diagnostic.add_argument("--cohort-sha256", required=True)
+        diagnostic.add_argument("--plan", required=True, type=Path)
+    for capture in (extract, refresh, actions):
         capture.add_argument("--access", required=True, type=Path)
         capture.add_argument("--setup", type=Path)
         capture.add_argument("--max-rows", required=True, type=int)
@@ -93,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     command: str = args.command
     access: Path = args.access
     settings = decode_research_access(read_document(access))
-    if command in {"extract", "refresh"}:
+    if command in {"extract", "refresh", "actions"}:
         environment = config_test_hooks.get_environment()
         scratch_variable: str = args.scratch_env
         output_variable: str = args.output_env
@@ -111,31 +114,39 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
         output = Path(environment[output_variable])
-        if command == "refresh":
+        if command in {"refresh", "actions"}:
             cohort: Path = args.cohort
             cohort_digest: str = args.cohort_sha256
             plan: Path = args.plan
-            result = compare_crsp_vintages(
+            name = "comparison" if command == "refresh" else "actions"
+            result = capture_crsp_diagnostic(
                 cohort,
                 cohort_digest,
                 decode_crsp_cohort_plan(read_document(plan)),
                 EvaluatorKeys(settings),
+                operation="refresh" if command == "refresh" else "actions",
                 scratch=Path(environment[scratch_variable]),
-                destination=output / "comparison",
+                destination=output / name,
                 limits=bounds,
                 setup=setup,
             )
-            with (output / "comparison.json").open("x", encoding="utf-8") as stream:
+            with (output / (name + ".json")).open("x", encoding="utf-8") as stream:
                 stream.write(dump_json_str(result))
             counts = require_dict(result, "rows")
-            metrics: list[JSONObject] = [
-                {
-                    "name": role + "." + name,
-                    "value": float(require_int(require_dict(counts, role), name)),
-                }
-                for role in counts
-                for name in ("old", "fresh", "unchanged", "added", "removed", "changed")
-            ]
+            metrics: list[JSONObject] = []
+            if command == "refresh":
+                metrics = [
+                    {
+                        "name": role + "." + metric,
+                        "value": float(require_int(require_dict(counts, role), metric)),
+                    }
+                    for role in counts
+                    for metric in ("old", "fresh", "unchanged", "added", "removed", "changed")
+                ]
+            else:
+                metrics = [
+                    {"name": role, "value": float(require_int(counts, role))} for role in counts
+                ]
             with (output / "metrics.json").open("x", encoding="utf-8") as stream:
                 stream.write(dump_json_str(metrics))
             return 0
