@@ -126,9 +126,11 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     assert len(macs) == len(set(macs))
     # demure is a server since MCPs board task 4ec65b8f and keeps its MAC,
     # since its reinstall as the stack host is a netboot install too; loki is
-    # the vpn-jump the netboot installs (MCPs board task 7d7ea0e9).
+    # a worker the netboot installs (MCPs board task 7d7ea0e9), its vpn-jump
+    # role retired since nothing in the fleet reaches HPC3 (MCPs board task
+    # 1d9ad999).
     assert machines["demure"]["role"] == "server"
-    assert machines["loki"]["role"] == "vpn-jump"
+    assert machines["loki"]["role"] == "worker"
     # The hub is armable since the netboot duty moved to emerald (MCPs board
     # task ab48f939); the duty's holder never is, since it serves every
     # install, its own included (fleet-mcp's requireMachineBootMac).

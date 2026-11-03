@@ -12,7 +12,7 @@ So this file pins three things against the shipped registry: no project file
 names windows or elevated in its ``required_tags`` (read from the raw files,
 since the decoder refuses either word, so a row naming one fails here by
 name before it fails every decode), no machine file declares a platform but
-linux, loki included since it returned as a linux vpn-jump for its NixOS
+linux, loki included since it returned as a linux machine for its NixOS
 install (MCPs board task 7d7ea0e9), and every project that ever required
 windows (:data:`FORMERLY_WINDOWS` and :data:`LINUX_PROJECTS`) is granted
 workers by an enabled node, idle with memory to spare. A tool tag (ffmpeg,
