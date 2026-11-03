@@ -212,7 +212,7 @@ def _fill_refusal(
         outcomes: Indexed evidence.
         permno: Security bought, sold or rebalanced.
         day: The execution close.
-        side: ``entry``, ``exit`` or ``rebalance``, naming the counting key.
+        side: ``entry`` or ``exit``, naming the counting key.
 
     Returns:
         None for a finite positive closing trade, else the refusal.
@@ -364,23 +364,6 @@ def _entry(
     return _fill_refusal(outcomes, permno, window.entry, "entry")
 
 
-def _require_fill(outcomes: CrspOutcomes, permno: int, day: str) -> None:
-    """Require a modeled closing trade for every held security at a close.
-
-    Args:
-        outcomes: Indexed evidence.
-        permno: Security sold or rebalanced.
-        day: Rebalance or liquidation close.
-
-    Raises:
-        ValueError: CRSP-009 when no daily record exists; CRSP-004 when the
-            record is not a finite positive closing trade.
-    """
-    refusal = _fill_refusal(outcomes, permno, day, "rebalance")
-    if refusal is not None:
-        raise ValueError(refusal.message)
-
-
 def _require_design(
     protocol: CrspProtocol,
     windows: tuple[CrspWindow, ...],
@@ -443,11 +426,12 @@ def evaluate_crsp_holdings(
         investable = cash + sum(positions.values())
         investable += sum(item.amount for item in receivables if item.valued < window.entry)
         receivables = [item for item in receivables if item.valued >= window.entry]
+        # A held position needs no second fill check here or at liquidation:
+        # its own path already required a closing trade on its exit close,
+        # which is this entry and, in the last window, the liquidation close.
         paths = {permno: crsp_window_path(outcomes, permno, window) for permno in selected}
         filled = tuple(permno for permno in selected if paths[permno].filled)
         unfilled = tuple(permno for permno in selected if not paths[permno].filled)
-        for permno in positions:
-            _require_fill(outcomes, permno, window.entry)
         each, traded = _rebalance_notional(investable, positions, filled, len(selected), rate)
         cost = rate * traded
         cash = each * len(unfilled)
@@ -469,8 +453,6 @@ def evaluate_crsp_holdings(
         )
         cash_weight = cash / end
         if index == len(windows) - 1:
-            for permno in positions:
-                _require_fill(outcomes, permno, window.exit)
             liquidated = sum(positions.values())
             traded += liquidated
             cost += rate * liquidated
