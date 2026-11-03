@@ -200,7 +200,7 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
     minimum = require_bounded_int(document, "min_history", 252, 10000)
     liquidity = require_bounded_int(document, "liquidity_window", 1, minimum)
     return CrspProtocol(
-        version=require_bounded_int(document, "version", 4, 4),
+        version=require_bounded_int(document, "version", 5, 5),
         library=_require_fixed(document, "library", "crsp_a_stock"),
         membership=_require_fixed(document, "membership", "dsenames"),
         returns=_require_fixed(document, "returns", "stkdlysecuritydata"),
@@ -252,10 +252,12 @@ def decode_crsp_protocol(document: JSONObject) -> CrspProtocol:
         exchange_codes=_require_codes(document, "exchange_codes", (1, 2, 3)),
         calendar_group=_require_fixed(document, "calendar_group", "CIZ"),
         execution_flag=_require_fixed(document, "execution_flag", "TR"),
-        entry_rule=_require_fixed(document, "entry_rule", "confirmed-terminal-entry-cash"),
+        entry_rule=_require_fixed(document, "entry_rule", "closing-trade-or-unfilled-cash"),
         cost_rule=_require_fixed(document, "cost_rule", "actual-traded-notional"),
         held_return_rule=_require_fixed(document, "held_return_rule", "exact-unpriced-held-spans"),
-        terminal_rule=_require_fixed(document, "terminal_rule", "dated-value-next-rebalance"),
+        terminal_rule=_require_fixed(
+            document, "terminal_rule", "unsold-exit-event-label-at-valuation"
+        ),
         min_price=price,
         min_history=minimum,
         liquidity_window=liquidity,

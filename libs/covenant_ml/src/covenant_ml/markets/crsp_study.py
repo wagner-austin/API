@@ -2,11 +2,12 @@
 
 Rows are (decision, eligible security) pairs from ``build_crsp_panel``. A row's
 label is whether the security's window value multiplier, terminal value
-included once, beats the eligible universe's equal-weight multiplier; that
-label becomes available at the window's exit close. The existing binary
-trainers rank securities by predicted probability of beating the universe.
-An order rejected by the protocol's confirmed pre-entry delisting rule retains
-its cash multiplier of one in both the label benchmark and holdings. The
+included once, beats the eligible universe's equal-weight multiplier; every
+label of a decision becomes available at the window's exit close or at the
+latest member's terminal valuation date, whichever is later. The existing
+binary trainers rank securities by predicted probability of beating the
+universe. An order without a closing trade at entry retains its cash
+multiplier of one in both the label benchmark and holdings. The
 decision-time universe is never filtered by later execution or outcomes.
 
 Validation decisions are scored in consecutive expanding folds. Each fold fits
@@ -68,7 +69,9 @@ class CrspRows(NamedTuple):
         features: Requested decision-time features, shape (n_rows, n_features).
         labels: One when the security's window multiplier beats the universe's.
         times: Decision close as a proleptic ordinal day.
-        available: Exit close, when the label is first known, as an ordinal day.
+        available: The latest of the exit close and every member's terminal
+            valuation date, when the decision's labels are first known, as an
+            ordinal day; every label depends on every member's value.
         decisions: Index of each row's decision.
     """
 
@@ -160,16 +163,23 @@ def crsp_study_rows(
     for index, decision in enumerate(decisions):
         if not decision.features:
             raise ValueError(f"[CRSP-009] no eligible securities at {decision.window.decision}")
-        values: list[float] = []
-        for feature in decision.features:
-            path = crsp_window_path(outcomes, feature.permno, decision.window)
-            values.append(path.growth * (1.0 if path.terminal is None else path.terminal[1]))
+        paths = [
+            crsp_window_path(outcomes, feature.permno, decision.window)
+            for feature in decision.features
+        ]
+        values = [
+            path.growth * (1.0 if path.terminal is None else path.terminal[1]) for path in paths
+        ]
         benchmark = sum(values) / len(values)
+        known = max(
+            decision.window.exit,
+            *(path.terminal[0] for path in paths if path.terminal is not None),
+        )
         for feature, value in zip(decision.features, values, strict=True):
             matrix.append([_column(feature, name) for name in features])
             labels.append(1 if value > benchmark else 0)
             times.append(_ordinal(decision.window.decision))
-            available.append(_ordinal(decision.window.exit))
+            available.append(_ordinal(known))
             owners.append(index)
     return CrspRows(
         np.asarray(matrix, dtype=np.float64),
