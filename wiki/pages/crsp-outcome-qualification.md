@@ -27,14 +27,14 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "f315bb6ddce5fcc988221560818510d06e3da704"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
   tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json: b39cb05dfa388c8f0285508518118fe77325ec78
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "25fe7b63c4fe5cb59632f7475c544a0c7529d41b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b4cbda6c030daf2a1cbd0c53f3b25c0354e23fc5"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "690e01a7b1b6a0b1be22d35d376e4715094886e0"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
   "libs/covenant_ml/tests/markets/test_crsp_queries.py": "cca05554450299e2c0e111c031dfd1f88a930ac4"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "08da2ef4c43700b587bc2ece90aa9b99dd3d7a64"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
@@ -225,7 +225,7 @@ before new study admission.[^distribution][^vendor][^owners]
 
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
-[^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
+[^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_rows`, `_entry`, `crsp_resolve_window_path`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `crsp_executable`.
 [^features]: `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision` and `_feature`.
 [^labels]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_study_rows`, the mean of every eligible member's multiplier, and `crsp_arms`, `EQUAL_WEIGHT` selection; `libs/covenant_ml/tests/markets/test_crsp_study.py`, `test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark`.
 [^dependence]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json`, inputs, ordinal derivation and period counts; sibling `protocol.json`, `max_universe`, exact bytes matching `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `revision.revision.protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision`, universe cap; `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, consecutive `checked` increment and `path_ordinal` recording; sibling `result.json`, `results[0].decisions`, `eligible_paths` and `refused_cases`.

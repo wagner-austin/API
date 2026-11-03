@@ -20,15 +20,15 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_suspension_process.py": "fd513a076cdbc9475e4da1b7fe0c83459114f232"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
-  "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "840edba442fe38ea109c34482522cccf422930a1"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "690e01a7b1b6a0b1be22d35d376e4715094886e0"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b4cbda6c030daf2a1cbd0c53f3b25c0354e23fc5"
+  "libs/covenant_ml/tests/markets/test_crsp_return_path.py": "28a60e00a071e7f45b821a6d02a8fbf50e01af59"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial.py": "28faea8bff58470c1a8b73230949f45dba82be9d"
   "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "f315bb6ddce5fcc988221560818510d06e3da704"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "560d6591acd3971a387552e3019ad8d6eb89d509"
   "libs/covenant_ml/docs/MARKET_RESEARCH.md": "77b54879136c9ef85c8cd2d0ef9db6172ed59dd4"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "25fe7b63c4fe5cb59632f7475c544a0c7529d41b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "08da2ef4c43700b587bc2ece90aa9b99dd3d7a64"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2311912957c18245f3d5c0630c96c301fd13c012"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
@@ -83,13 +83,14 @@ exit; [[crsp-v5-boundary-policy]] gives the reasons.[^holdings]
 
 Current source shares `crsp_resolve_held` between consumers: it returns the
 complete resolved spans or a refusal with no partial spans. Stock compounding
-uses those spans through `crsp_held_spans`; an unresolved interval still raises.
-Terminal valuation similarly uses `crsp_resolve_terminal`, with
-`crsp_terminal_value` refusing unresolved records. These shared owners do not
+multiplies those spans inside `crsp_resolve_window_path`, which also judges
+execution and the terminal event (`crsp_resolve_terminal`) and returns the
+path or its first named refusal; `crsp_window_path` raises that refusal, and
+qualification ([[crsp-v5-boundary-policy]]) counts it. These shared owners do not
 establish which source is installed in an older frozen image; the exact study
 runtime and observed outcome remain in [[wrds-baseline-readiness]].[^spans]
 
-[^spans]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_resolve_held`, `crsp_held_spans`, `crsp_compound_held` and `_unpriced_held`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_return_span`, `crsp_resolve_terminal` and `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_return_path.py`, independent span, wealth, cost, label and boundary oracles, including first-refusal resolution without partial spans; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, encrypted evaluator integration with a missing-price span. Vendor meanings remain in the tech wiki's `crsp-ciz-daily-return-quality`; this permission is a versioned study assumption, not permission to fill or discard unknown observations.
+[^spans]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_resolve_held` and `_unpriced_held`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_return_span` and `crsp_resolve_terminal`; `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `crsp_resolve_window_path`; `libs/covenant_ml/tests/markets/test_crsp_return_path.py`, independent span, wealth, cost, label and boundary oracles, including first-refusal resolution without partial spans; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, encrypted evaluator integration with a missing-price span. Vendor meanings remain in the tech wiki's `crsp-ciz-daily-return-quality`; this permission is a versioned study assumption, not permission to fill or discard unknown observations.
 
 Label construction uses the same order outcome as holdings. Under version 5 a
 new purchase fills only at a `TR` entry record; a present record with any other
@@ -120,9 +121,9 @@ study runs the real trainers and emits the rejected order and cash weight,
 checks that a prior holding's receivable survives exactly once until its release,
 then verifies private plaintext removal.[^execution][^unfilled]
 
-[^unfilled]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry_filled` and `_rebalance_notional`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, hand-calculated mixed/all-rejected portfolios, contradictory evidence, held-loss refusals, encrypted study and old protocol rejection; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `_encode_series`.
+[^unfilled]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry` and `_rebalance_notional`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, hand-calculated mixed/all-rejected portfolios, contradictory evidence, held-loss refusals, encrypted study and old protocol rejection; `libs/covenant_ml/src/covenant_ml/markets/research_trial.py`, `_encode_series`.
 
-[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `crsp_window_path` and `_require_fill`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `require_crsp_execution_price`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic, missing entry/exit prices and verified-extract cash labels with unchanged selection.
+[^execution]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_rows`, `_fill_refusal`, `crsp_resolve_window_path`, `crsp_window_path` and `evaluate_crsp_holdings`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_executable`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, terminal-boundary arithmetic, missing entry/exit prices and verified-extract cash labels with unchanged selection.
 
 The validation study builds decisions only up to the day before the final
 period. Labels are whether a security's window multiplier, terminal value

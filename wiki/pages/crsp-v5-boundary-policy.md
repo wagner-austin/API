@@ -17,20 +17,30 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_holdings.py"
   - "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json"
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py"
+  - "libs/covenant_ml/scripts/crsp_qualification.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_qualification.py"
+  - "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py"
 source_git_blobs:
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "25fe7b63c4fe5cb59632f7475c544a0c7529d41b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "08da2ef4c43700b587bc2ece90aa9b99dd3d7a64"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "0c6c56f05f23df1a239492e39798f935d47d6fdf"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b4cbda6c030daf2a1cbd0c53f3b25c0354e23fc5"
   "libs/covenant_ml/docs/crsp-monthly.json": "4b42124fa38490ee0ff9baceaf7f1e5fa7d5748c"
-  "libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py": "0237555caaf76abb82a0b3c65aac4055bc4dd26f"
+  "libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py": "05460e798eecbf34d9b9a94b66322dff6ff6d70f"
   "libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py": "560d6591acd3971a387552e3019ad8d6eb89d509"
   "libs/covenant_ml/tests/markets/test_crsp_holdings.py": "2311912957c18245f3d5c0630c96c301fd13c012"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
   "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json": "b39cb05dfa388c8f0285508518118fe77325ec78"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py": "e243ecc4218c8024ed3de16136a18ea71061061c"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py": "98f92e84a790249f06fcca59307cb0ade6dc3adf"
+  "libs/covenant_ml/scripts/crsp_qualification.py": "7fd260c648cbeedc984cf639507dd4bf20403b62"
+  "libs/covenant_ml/tests/markets/test_crsp_qualification.py": "1c9c008e8982d9a6340f41d5d1f0c84e234662a6"
+  "libs/covenant_ml/tests/markets/test_crsp_qualification_run.py": "11e054f12ee9f4935ded10d976f660e4045a4a61"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e, re-hashed 2026-11-03; pp. 11-13 (StkDelists, StkDistributions), 88 (PC price flags), 90-92 (RD and RM flags)."
   - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; review of the version-4 suspension amendment is board post 43ba2e2b-c1d0-4a3c-ba3e-4fb75fc4123c."
@@ -170,6 +180,21 @@ Two routes could reduce the 14, and each needs its own review before use:
    cases no source can value (NT, DG, open tails). That would be a changed
    target, reported beside the unchanged one, not a repair.
 
+## The qualification instrument
+
+The native scan uses the production evaluator, not the archived version-3
+audit script. `qualify_crsp_panel` walks the known panel in label order and
+asks `crsp_resolve_window_path` for every path; that resolver is the one
+`crsp_window_path` raises from, so the scan and the study cannot disagree
+about which paths refuse. Each refused path keeps its one-based ordinal (the
+same convention as the version-3 diagnosis), decision index, period, counting
+key and entry and exit record digests, so the result joins to the 27 diagnosed
+cases without publishing an identifier, date, price or return. The report also
+counts the decisions, and the rows in them, that any refusal leaves
+unlabelled. The entrypoint pins design, bundle, entrypoint source and image
+before acquiring only the train-validation key, and publishes a shared run
+record.[^instrument]
+
 ## Not established yet
 
 - No licensed version-5 metadata revision, controller or image freeze.
@@ -186,11 +211,12 @@ Two routes could reduce the 14, and each needs its own review before use:
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`: signature, entry and exit price flags, terminal-row day offsets and return-missing flags per path ordinal.
 [^reconciliation]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json`, per-case event counts, null distribution amounts and delisting amount offsets from exit (3, 1, 1 for the BA exits).
 [^pc]: CIZ guide p. 88, PC flag table: SU Suspended, BA Bid Ask Average, MP Missing Price, HA Halted, TR Closing Trade Price, NT Not Tracked.
-[^entry]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry_filled` and `evaluate_crsp_holdings`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, `test_entry_without_a_closing_trade_is_an_unfilled_order_kept_in_cash`, `test_ordinary_exit_without_a_closing_trade_refuses_the_label_path` and `test_closing_trade_flag_without_a_positive_price_still_refuses_entry`.
+[^entry]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_entry` and `evaluate_crsp_holdings`; `libs/covenant_ml/tests/markets/test_crsp_execution_boundaries.py`, `test_entry_without_a_closing_trade_is_an_unfilled_order_kept_in_cash`, `test_ordinary_exit_without_a_closing_trade_refuses_the_label_path` and `test_closing_trade_flag_without_a_positive_price_still_refuses_entry`.
 [^delist]: CIZ guide pp. 11-12, StkDelists: DelistingDt, DelRet, DelAmtDt and DelDlyDt definitions.
-[^exit]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row` and `crsp_window_path`; `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_delisting_on_an_unsold_exit_is_counted_once_and_locked_past_the_exit`, `test_events_inside_and_on_an_unsold_exit_are_ambiguous` and `test_real_worker_publishes_the_late_receivable_and_the_unfilled_reentry`.
+[^exit]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_rows` and `crsp_resolve_window_path`; `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_delisting_on_an_unsold_exit_is_counted_once_and_locked_past_the_exit`, `test_events_inside_and_on_an_unsold_exit_are_ambiguous` and `test_real_worker_publishes_the_late_receivable_and_the_unfilled_reentry`.
 [^labels]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_study_rows` (`known`) and `crsp_fold` (`purge_label_overlap`); `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_real_extract_dates_every_label_of_the_decision_by_its_latest_value`; `libs/covenant_ml/tests/markets/test_crsp_holdings.py`, `test_value_dated_after_exit_stays_locked_until_the_following_rebalance`.
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting `valuation` predicate; `libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py`, `check_crsp_partition`, dated-field checks.
 [^return-path]: `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `crsp_resolve_held`: an absent row or a row whose delisting flag is not N refuses the span.
 [^rm]: CIZ guide pp. 91-92, RM flag table: DG delisting price more than 10 periods from the delisting date; MV missing corporate action value.
+[^instrument]: `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel` and `crsp_qualification_counts`; `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py`, `execute_crsp_qualification`; `libs/covenant_ml/scripts/crsp_qualification.py`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py` and `libs/covenant_ml/tests/markets/test_crsp_qualification_run.py`, an open suspension and a DG delisting counted at independently located ordinals, and a real encrypted subprocess run without the final key. Fleet job 15e5883a-58fd-42c0-a079-950cc9aa455c passed make check for libs/covenant_ml at API 86353339804498ff7c8c493435acc80301d20d97 on lacrymal at 2026-11-03T07:13:57Z: guard, mypy and 5,642 tests, 100.00% statements and branches. This is synthetic evidence for the code, not a licensed qualification.
 [^dist]: CIZ guide p. 13, StkDistributions: DisPERMNO, the PERMNO of a security received in a spinoff, exchange, merger or other distribution.

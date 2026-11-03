@@ -28,8 +28,8 @@ source_git_blobs:
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
   "libs/covenant_ml/docs/crsp-monthly.json": "4b42124fa38490ee0ff9baceaf7f1e5fa7d5748c"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "8c89057233c9b6f6361fd510b899652b6b9ec0ab"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "690e01a7b1b6a0b1be22d35d376e4715094886e0"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "4c287d3b327592d3e9235a14a0d7795b57c5c302"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json": "3aa4b35290d76b1a8f3c404521c96b0bddb96291"
   "libs/covenant_ml/src/covenant_ml/evaluation/wrds.py": "bb7b6f6db20f501916ba08821c0e4efd2166bbe7"
   "tools/fleet/src/fleet/core/research_control.py": "ba591e0282354ffd6b6293717384ada763077f05"
@@ -110,6 +110,6 @@ This is input construction; the holdings and validation study in [[crsp-monthly-
 
 [^ciz-schema]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json`, candidate_fields, relation_column_counts and limits. The underlying metadata CSV, identified by that receipt's artifact_sha256, additionally confirms stkdlysecuritydata.dlyprevdt; read 2026-10-29, no security observations.
 
-[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, current prospective settings (not an installed replacement study); `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_resolve_terminal` and `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples, `test_missing_execution_price_is_a_named_protocol_refusal` and `test_unresolved_terminal_value_names_its_reason_and_fails`. The resolver reports missingness; the valuation caller still refuses unresolved values. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
+[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, current prospective settings (not an installed replacement study); `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `crsp_executable` and `crsp_resolve_terminal`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples, `test_missing_execution_price_is_not_executable` and `test_unresolved_terminal_value_names_its_reason`. The resolver reports missingness; `crsp_resolve_window_path` in `crsp_holdings.py` turns it into a CRSP-005 refusal, which the valuation path raises. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
 
 [^ciz-contract]: External tech-wiki pages `crsp-ciz-daily-return-contract`, `crsp-ciz-daily-return-quality`, `crsp-ciz-aggregate-return-quality`, field and flag dictionaries plus Application notes. Their single captured vendor guide is https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d, pp. 14-18, 49, 63, 81-82 and 90-92; text capture SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e. Application constraints are study choices rather than vendor guarantees; the frozen-rules and holdings footnotes cite their implementation separately.
