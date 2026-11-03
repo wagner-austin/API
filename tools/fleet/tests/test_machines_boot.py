@@ -42,6 +42,11 @@ DEMURE_MAC = "d8:43:ae:24:7c:04"
 #: ab48f939), declared once the netboot duty left the hub for emerald.
 DIPHTHERIA_MAC = "f4:8e:38:a4:cd:82"
 
+#: pendragon's USB-C ethernet adapter, a QinHeng 1a86:5396 on cdc_ether
+#: (enx3cab725a74a1), measured over ssh at 2026-11-03T18:07:18Z for its NixOS
+#: install (MCPs board task 7b5127ce).
+PENDRAGON_MAC = "3c:ab:72:5a:74:a1"
+
 #: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
 #: SSD. demure's one NVMe, whose netboot install accepted it on 2026-10-22
@@ -49,7 +54,10 @@ DIPHTHERIA_MAC = "f4:8e:38:a4:cd:82"
 #: 7d7ea0e9). loki's one NVMe, read with udevadm on its NixOS install on
 #: 2026-10-26 (arm 2ec3a579). diphtheria's internal SATA SSD, read with
 #: udevadm on 2026-11-02 (MCPs board task ab48f939), never its two USB drives.
+#: pendragon's one NVMe, read with udevadm at 2026-11-03T18:07:18Z (MCPs board
+#: task 7b5127ce), never its SD card.
 DIPHTHERIA_INSTALL_DISK = "Samsung_SSD_860_EVO_1TB_S3Z6NB0K305596H"
+PENDRAGON_INSTALL_DISK = "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
 LOKI_INSTALL_DISK = "SAMSUNG_MZVL81T0HELB-00BTW_S7HZNX0XC49177_1"
 DEMURE_INSTALL_DISK = "Samsung_SSD_990_PRO_2TB_S73WNJ0TC01638D_1"
@@ -114,11 +122,14 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     declared = {name: m["bootMac"] for name, m in machines.items() if m["bootMac"] is not None}
     # Automatic admission adds a disabled worker before its first install.
     # Pin measured identities without making each admission a test-code edit.
-    assert {name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki")} == {
+    assert {
+        name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon")
+    } == {
         "demure": DEMURE_MAC,
         "diphtheria": DIPHTHERIA_MAC,
         "lavender": LAVENDER_MAC,
         "loki": LOKI_MAC,
+        "pendragon": PENDRAGON_MAC,
     }
     # An arm keys on the MAC, so two machines naming one adapter would hand
     # one's installer to the other (MCPs board task 7d7ea0e9).
@@ -143,15 +154,14 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
         assert machines[name]["role"] in ("worker", "server", "vpn-jump", "hub")
         assert machines[name]["platform"] == "linux"
         assert "netboot" not in narrow_json_to_list(machines[name]["duties"])
-    assert machines["pendragon"]["bootMac"] is None
 
 
 def test_no_machine_declares_netboot_wifi_and_every_machine_says_whether_it_does() -> None:
     # MCPs board task f78f7e33: pendragon's one USB-C port is also its
     # charging port, so its netboot install must bring up Wi-Fi to lose the
     # dock. fleet-mcp's decoder requires the key and refuses true without a
-    # bootMac, and pendragon has none until its new adapter is measured
-    # (MCPs board task 7d7ea0e9).
+    # bootMac. pendragon installs over a wired USB-C adapter instead (MCPs
+    # board task 7b5127ce), so it declares false like every other machine.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     assert {name: type(m.get("netbootWifi")) for name, m in machines.items()} == dict.fromkeys(
         machines, bool
@@ -167,11 +177,14 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     # a disk. Every other machine still carries null.
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
-    assert {name: named[name] for name in ("demure", "diphtheria", "lavender", "loki")} == {
+    assert {
+        name: named[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon")
+    } == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
         "diphtheria": {"rule": "serial", "serial": DIPHTHERIA_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
         "loki": {"rule": "serial", "serial": LOKI_INSTALL_DISK},
+        "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
     }
     assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
         name for name, m in machines.items() if m["bootMac"] is None
