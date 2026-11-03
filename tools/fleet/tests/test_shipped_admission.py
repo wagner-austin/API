@@ -257,18 +257,19 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
     # rewrites a worker's roster file with what its provision measured (MCPs
     # board task 9fa23d42), and it should fail here only if it makes that
     # node refuse. The stack hosts refuse because each checks only its pinned
-    # suites.
+    # suites. lenovold's own refusal is the first assertion, read whether or
+    # not its dispatch is held: a held node decodes not enabled (MCPs board
+    # task 73417df8 held it for its NixOS reinstall).
     refused = {
         name: verdict["code"]
         for name, node in workspace["nodes"].items()
-        if node["enabled"] and not missing_tags(node_tags(node), project["required_tags"])
+        if name != "lenovold"
+        and node["enabled"]
+        and not missing_tags(node_tags(node), project["required_tags"])
         for verdict in (assess(node, _idle(node), project, node_tags(node)),)
         if verdict["code"] is not None
     }
-    assert refused == {
-        **dict.fromkeys(unpinned, FleetErrorCode.NODE_NOT_PINNED),
-        "lenovold": FleetErrorCode.NODE_MEMORY_EXHAUSTED,
-    }
+    assert refused == dict.fromkeys(unpinned, FleetErrorCode.NODE_NOT_PINNED)
 
 
 def test_only_the_stack_hosts_check_only_their_pinned_projects() -> None:
