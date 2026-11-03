@@ -306,7 +306,7 @@ def crsp_resolve_window_path(
     eventless = None if terminals else _eventless_delisting(outcomes, permno, window, days)
     if eventless is not None:
         return eventless
-    end =window.exit if not terminals else require_str(terminals[0], "delistingdt")
+    end = window.exit if not terminals else require_str(terminals[0], "delistingdt")
     held = crsp_resolve_held(
         outcomes.returns, permno, window.entry, days[: bisect_right(days, end)]
     )
