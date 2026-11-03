@@ -72,14 +72,12 @@ def machine_file(*, enabled: bool = True, held: str | None = None) -> str:
 
 
 #: The node runners :data:`REGISTRY_FILES`' roster declares, in machine order:
-#: one per worker, since no node runs an elevated runner beside its node
-#: runner (board task e705f08c).
+#: one per worker.
 RUNNERS: Final = ("fleet-node-sedona", "fleet-node-serendipity")
 
 #: The registry a rolled commit declares in these cases: a hub whose
 #: dispatch is a reason, a machine that is off, one held out of dispatch,
-#: and two workers, one of whose files still carries ``elevated: true``,
-#: which no reader here reads.
+#: and two workers.
 REGISTRY_FILES = {
     "tools/fleet/registry/settings.json": "{}\n",
     "tools/fleet/registry/projects/MCPs.json": project_file([]),
@@ -95,9 +93,7 @@ REGISTRY_FILES = {
     "tools/fleet/registry/machines/lacrymal.json": machine_file(enabled=False),
     "tools/fleet/registry/machines/pendragon.json": machine_file(held="armed for netboot"),
     "tools/fleet/registry/machines/sedona.json": machine_file(),
-    "tools/fleet/registry/machines/serendipity.json": machine_file().replace(
-        '"elevated": false', '"elevated": true'
-    ),
+    "tools/fleet/registry/machines/serendipity.json": machine_file(),
 }
 
 

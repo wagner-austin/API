@@ -14,9 +14,7 @@ def dispatch_document() -> JSONObject:
     """The ``dispatch`` object of a worker that claims work.
 
     Returns:
-        Its capacity, with ``held`` null, and ``elevated`` false as every
-        machine file still carries it for MCPs' readers (MCPs board task
-        5b040fdb), which this package does not read.
+        Its capacity, with ``held`` null.
     """
     return {
         "held": None,
@@ -29,7 +27,6 @@ def dispatch_document() -> JSONObject:
         "cxx": None,
         "docker": None,
         "stack": None,
-        "elevated": False,
         "budget": {
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,

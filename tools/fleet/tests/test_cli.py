@@ -72,7 +72,6 @@ def _workspace_document() -> JSONObject:
         "cxx": None,
         "docker": None,
         "stack": None,
-        "elevated": False,
         "budget": budget,
         "models": None,
     }

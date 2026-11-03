@@ -62,7 +62,7 @@ def _file(**changes: JSONValue) -> JSONObject:
         "enabled": True,
         "ledger_observer": "fleet-arm",
         "guest": None,
-        "dispatch": {**encode_node_config(node()), "elevated": False, "held": None},
+        "dispatch": {**encode_node_config(node()), "held": None},
         "tailnetIp": "100.65.161.27",
         "notes": "read by MCPs' decoder, carried here untouched",
     }
@@ -111,19 +111,11 @@ class TestNodeConfig:
         """``host`` and ``enabled`` are said once, in the machine's file, so
         the capacity carries neither and the decoder takes them as given."""
         encoded = encode_node_config(node())
-        assert not {"host", "platform", "enabled", "wsl_host", "elevated"} & set(encoded)
+        assert not {"host", "platform", "enabled", "wsl_host"} & set(encoded)
 
         decoded = decode_node_config(encoded, host="colossus", enabled=False)
 
         assert (decoded["host"], decoded["enabled"]) == ("colossus", False)
-
-    def test_the_elevated_flag_mcps_still_reads_is_not_read_here(self) -> None:
-        """Every machine file carries ``elevated: false`` until MCPs' readers
-        drop it (MCPs board task 5b040fdb); no node runs an elevated runner
-        since board task e705f08c, so this package reads nothing from it."""
-        encoded = encode_node_config(node())
-
-        assert _decode({**encoded, "elevated": False}) == _decode({**encoded, "elevated": True})
 
     def test_an_absent_gpu_key_is_refused(self) -> None:
         """Absence is indistinguishable from unfilled.
