@@ -8,7 +8,7 @@ from math import prod
 from pathlib import Path
 
 import numpy as np
-from platform_core.json_utils import JSONObject, require_float, require_str
+from platform_core.json_utils import JSONObject, require_float, require_int, require_str
 
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 
@@ -160,11 +160,14 @@ def unsold_exit_rows() -> dict[str, list[JSONObject]]:
     three days later. The March decision enters at the same quote.
     """
     rows = study_rows()
-    rows["returns"] = [
-        row
-        for row in rows["returns"]
-        if row["permno"] != DELISTED or require_str(row, "dlycaldt") <= "2019-04-02"
-    ]
+    # study_rows stops security 8 at its 2019-03-15 delisting; extend its own
+    # ordinary sessions through 2019-04-02 with security 7's returns.
+    rows["returns"].extend(
+        {**row, "permno": DELISTED, "dlyvol": 8000.0}
+        for row in study_rows()["returns"]
+        if row["permno"] == 7 and "2019-03-18" <= require_str(row, "dlycaldt") <= "2019-04-02"
+    )
+    rows["returns"].sort(key=lambda row: (require_int(row, "permno"), require_str(row, "dlycaldt")))
     for row in rows["returns"]:
         if row["permno"] == DELISTED and row["dlycaldt"] == UNSOLD_EXIT:
             row["dlyprcflg"] = "BA"
