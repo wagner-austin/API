@@ -139,8 +139,11 @@ def test_existing_position_cannot_be_reclassified_as_unfilled_cash() -> None:
     for row in rows:
         if row["permno"] == 1 and row["dlycaldt"] == W2.entry:
             row.update({"dlydelflg": "Y", "dlyretdurflg": "DD", "dlyprcflg": "DP"})
-    # Without an event inside its first holding window, the held loss is unknown.
-    with pytest.raises(ValueError, match="held return for 1"):
+    # Without an event inside its first holding window, the held loss is unknown
+    # and the flagged row is named, never read as a return.
+    with pytest.raises(
+        ValueError, match="delisting return for 1 on 2020-03-02 has no terminal event"
+    ):
         evaluate_crsp_holdings(outcomes(rows, []), (W1, W2), ((1, 2), (2, 3)), 10)
 
 
