@@ -4,6 +4,8 @@ tags: [wrds, crsp, encryption, diagnostics]
 hubs: [libs]
 related: ["[[crsp-outcome-qualification]]", "[[wrds-crsp-source-comparison]]", "[[wrds-encrypted-diagnostic-cohort]]"]
 source_paths:
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json
+  - tools/hpc3/artifacts/wrds-corporate-actions-20261103/fixture-audit.json
   - libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py
@@ -29,6 +31,8 @@ source_paths:
   - tools/hpc3/src/hpc3/core/stage.py
   - tools/hpc3/src/hpc3/core/remote.py
 source_git_blobs:
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json": "f062921fbf4784ce66199719cdde8ff49343e8cd"
+  "tools/hpc3/artifacts/wrds-corporate-actions-20261103/fixture-audit.json": "2358a8ef26c32e8561bc81c390d954976ac2af82"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py": "a62a7dd519ffcb861fa25c9318f54441f0dd8521"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py": "667cc6fd8d1b6d216ac5bf6271e63779260acfc6"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py": "108f53efd42dd0d1de61297df3f1970ece097c33"
@@ -54,7 +58,7 @@ source_git_blobs:
   "tools/hpc3/src/hpc3/core/stage.py": "450870282e6df188076183fb5b65a24b795bc3f7"
   "tools/hpc3/src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
 provenance:
-  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6; native synthetic 40569021 and licensed 40569098 completed; independent implementation review pending."
+  - "Implementation task fd32dc2e-b3c0-4e24-977c-8708667453e6 independently VERIFIED by audit 2bfe3456-5bc7-46d4-abeb-db0042405b2f at 2026-11-03T04:00:56.684Z. Native source remains c5baa6df3; reviewed published revision f10fd982cb7e includes the accepted test-fixture repair."
   - "Fleet ff02f00e-b5ad-4295-8dbe-f121812392c3 checked API 9b076cba5eff905617afd9335a09d3a44f2b8843 on Lavender: 5534 passed, zero failed, 100.00% coverage, exit zero, 277/300 seconds; completed 2026-11-03T02:48:06Z."
 fact_checked: 2026-11-03
 confidence: medium
@@ -92,6 +96,18 @@ digests. It is rejected by the study loader and actual evaluation path; it
 does not add a study relation or change holdings accounting.[^record]
 
 ## Verification status
+
+Independent audit `2bfe3456` verified all three capture criteria on November 3
+at 04:00 UTC. Its checks include the native receipts, encrypted staging
+readback and published wiki audits. The final controller check passed 2,205
+tests at 100% coverage in 32 seconds; the evaluator check passed 5,534 at 100%
+in 208 seconds, both within the unchanged 300-second budget. An earlier
+evaluator run passed every test but exceeded that budget at 303 seconds.
+Repair `4df253cc`, independently accepted before this audit, reduced repeated
+cohort-fixture encryption while retaining real encryption and foreign-security
+exclusion assertions. These runs used different fleet hosts and do not measure
+a controlled speedup. The acceptance verifies capture, not economic
+qualification.[^audit]
 
 The full package fleet check passed 5,534 tests with zero failures and 100%
 coverage, including lint, formatting, typing and guards. Tests cover encrypted
@@ -142,3 +158,4 @@ The previous four-relation comparison remains in
 [^licensed]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json`, `rows`, `bundle` and `plaintext_removed`; sibling `licensed-completion.json`, exact output digests and runtime; `licensed-ciphertext-reading.json`, checked inventory. Native service report `818a292e-791b-4174-b113-88ce2ede75d6` records scheduler completion and output identities. These are capture measurements, not economic qualification; [[crsp-outcome-qualification]], § "Additional evidence to qualify", states the remaining requirements.
 [^staging]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json`, `manifest`, `verified_files`, `inventory.directories` and exact `inventory.files`; sibling `staging-permission-correction.json`, first refusal, measured modes and correction. Service report `a88d8a8d-9cfb-41a1-92eb-f803a0bde77a` records the independent readback. `tools/hpc3/src/hpc3/core/stage.py`, `stage_manifest` and `inspect_staged_tree`; `remote.py`, `make_directory`.
 [^prior]: [[wrds-crsp-source-comparison]], § "Native evidence".
+[^audit]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json`, captured live `task_get` response: verdict, criteria, fleet checks `33ee64b6` and `b5cdaa51` and independent review evidence; sibling `fixture-audit.json`, accepted repair `4df253cc`, preserved budget failure and reviewer checks of the reduced fixture. [[wrds-encrypted-diagnostic-cohort]], § "Native evidence and limits", describes the retained assertions.

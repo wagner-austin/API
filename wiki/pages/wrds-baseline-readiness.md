@@ -106,7 +106,8 @@ The comparison and scalar-error privacy repair have passed independent review.
 [[crsp-outcome-qualification]] records those completed prerequisites and the
 bounded distribution/delisting investigation. The shared capture is implemented
 in [[wrds-crsp-corporate-action-capture]] and passed full fleet verification;
-native synthetic rehearsal and licensed capture passed. The encrypted licensed
+native synthetic rehearsal and licensed capture passed. Independent audit
+`2bfe3456` verified that capture milestone on November 3 at 04:00 UTC. The encrypted licensed
 capture has nineteen delisting and 328 distribution events with admissible
 details. Their ability to resolve the 27 refused economic paths remains
 unmeasured; capture success does not qualify a replacement study.[^qualification][^actions]
