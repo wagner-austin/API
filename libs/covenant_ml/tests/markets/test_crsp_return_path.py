@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 from datetime import date, timedelta
 from math import prod
 from pathlib import Path
@@ -13,17 +12,13 @@ from platform_core.json_utils import JSONObject, JSONValue, require_float, requi
 from covenant_ml.markets.crsp_calendar import CrspWindow, crsp_return_span
 from covenant_ml.markets.crsp_extract import load_crsp_sources
 from covenant_ml.markets.crsp_holdings import (
+    CrspPath,
     crsp_window_path,
     evaluate_crsp_holdings,
     index_crsp_outcomes,
 )
 from covenant_ml.markets.crsp_panel import build_crsp_panel
-from covenant_ml.markets.crsp_return_path import (
-    HeldRefusal,
-    crsp_compound_held,
-    crsp_held_spans,
-    crsp_resolve_held,
-)
+from covenant_ml.markets.crsp_return_path import HeldRefusal, crsp_resolve_held
 from covenant_ml.markets.crsp_study import crsp_study_rows
 
 from ._crsp_fixtures import write_sources
@@ -48,6 +43,15 @@ def missing(day: str, **changes: JSONValue) -> JSONObject:
     )
     row.update(changes)
     return row
+
+
+def compound(
+    records: dict[tuple[int, str], JSONObject], entry: str, days: tuple[str, ...]
+) -> float:
+    """Security 1's resolved spans multiplied in order; the resolution must have no refusal."""
+    resolution = crsp_resolve_held(records, 1, entry, days)
+    assert resolution.refusal is None
+    return prod(growth for _, growth in resolution.spans)
 
 
 def bridged_rows() -> list[JSONObject]:
@@ -90,7 +94,7 @@ def test_vendor_duration_must_cover_exactly_two_through_ten_sessions(
     close = daily(1, W1.entry, -0.2, dlycaldt=end, dlyprevdt=entry, dlyretdurflg=f"P{gap}")
     records[(1, end)] = close
     assert not crsp_return_span(close, sessions[gap], 1)
-    assert crsp_compound_held(records, 1, entry, sessions[1 : gap + 2]) == 0.8
+    assert compound(records, entry, sessions[1 : gap + 2]) == 0.8
 
 
 @pytest.mark.parametrize(
@@ -188,13 +192,14 @@ def test_missing_exit_cannot_borrow_a_future_return_or_supply_a_fill(price_flag:
 
 
 @pytest.mark.parametrize("price_flag", ["MP", "SU"])
-def test_missing_entry_is_not_a_filled_position_even_when_later_span_exists(
+def test_unpriced_entry_is_an_unfilled_order_even_when_later_span_exists(
     price_flag: str,
 ) -> None:
+    # Version 5: no closing trade at entry means no purchase; the later +10%
+    # span is never credited to a security that was not bought.
     rows = bridged_rows()
     rows[0] = missing(W1.entry, dlyprcflg=price_flag)
-    with pytest.raises(ValueError, match="CRSP-004"):
-        crsp_window_path(outcomes(rows, []), 1, W1)
+    assert crsp_window_path(outcomes(rows, []), 1, W1) == CrspPath(False, 1.0, None)
 
 
 @pytest.mark.parametrize("price_flag", ["MP", "SU"])
@@ -202,8 +207,13 @@ def test_unsupported_long_gap_is_not_accepted_as_an_arbitrary_vendor_span(price_
     days = tuple(f"2020-06-{day:02}" for day in range(2, 13))
     records = {(1, day): missing(day, dlyprcflg=price_flag) for day in days[:-1]}
     records[(1, days[-1])] = daily(1, W1.entry, 0.2, dlyretdurflg="P10")
-    with pytest.raises(ValueError, match="CRSP-009"):
-        crsp_compound_held(records, 1, "2020-06-01", days)
+    assert crsp_resolve_held(records, 1, "2020-06-01", days) == (
+        (),
+        HeldRefusal(
+            "span NA/P10 after a price gap",
+            "[CRSP-009] held return for 1 on 2020-06-12 has an invalid span",
+        ),
+    )
 
 
 FLAGGED_ENTRY = "2020-06-01"
@@ -250,8 +260,6 @@ def test_resolution_names_its_first_refusal_and_keeps_no_partial_span(
 ) -> None:
     days = FLAGGED_DAYS[: max(1, len(records))]
     assert crsp_resolve_held(records, 1, FLAGGED_ENTRY, days) == ((), refusal)
-    with pytest.raises(ValueError, match=re.escape(refusal.message)):
-        crsp_held_spans(records, 1, FLAGGED_ENTRY, days)
 
 
 def test_two_separate_gaps_do_not_accumulate_or_double_count_their_returns() -> None:
@@ -259,7 +267,7 @@ def test_two_separate_gaps_do_not_accumulate_or_double_count_their_returns() -> 
     records = {(1, days[0]): missing(days[0]), (1, days[2]): missing(days[2])}
     records[(1, days[1])] = daily(1, W1.entry, 0.1, dlyprevdt="2020-06-01", dlyretdurflg="P1")
     records[(1, days[3])] = daily(1, W1.entry, -0.2, dlyprevdt=days[1], dlyretdurflg="P1")
-    assert crsp_compound_held(records, 1, "2020-06-01", days) == pytest.approx(0.88)
+    assert compound(records, "2020-06-01", days) == pytest.approx(0.88)
 
 
 def test_mixed_suspension_and_missing_price_span_has_only_one_observed_value() -> None:

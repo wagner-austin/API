@@ -11,11 +11,10 @@ from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, requi
 
 from covenant_ml.markets.crsp_calendar import (
     CrspWindow,
+    crsp_executable,
     crsp_member_on,
     crsp_resolve_terminal,
-    crsp_terminal_value,
     crsp_windows,
-    require_crsp_execution_price,
 )
 from covenant_ml.markets.crsp_protocol import decode_crsp_protocol, encode_crsp_protocol
 from covenant_ml.markets.validation import read_document
@@ -253,10 +252,9 @@ def test_membership_uses_inclusive_dates_and_rejects_ambiguous_intervals() -> No
 
 def test_execution_price_is_a_trade_not_absolute_quote_or_terminal_amount() -> None:
     protocol = decode_crsp_protocol(protocol_document())
-    assert require_crsp_execution_price({"dlyprc": 25.0, "dlyprcflg": "TR"}, protocol) == 25.0
+    assert crsp_executable({"dlyprc": 25.0, "dlyprcflg": "TR"}, protocol)
     for price, flag in ((-25.0, "BA"), (25.0, "DP"), (nan, "TR"), (0.0, "TR"), (-1.0, "TR")):
-        with pytest.raises(ValueError, match="CRSP-004"):
-            require_crsp_execution_price({"dlyprc": price, "dlyprcflg": flag}, protocol)
+        assert not crsp_executable({"dlyprc": price, "dlyprcflg": flag}, protocol)
 
 
 @pytest.mark.parametrize(
@@ -267,15 +265,14 @@ def test_execution_price_is_a_trade_not_absolute_quote_or_terminal_amount() -> N
         {"dlyprc": None, "dlyprcflg": "NT"},
     ],
 )
-def test_missing_execution_price_is_a_named_protocol_refusal(row: JSONObject) -> None:
-    with pytest.raises(ValueError, match=r"CRSP-004.*positive closing trade"):
-        require_crsp_execution_price(row, decode_crsp_protocol(protocol_document()))
+def test_missing_execution_price_is_not_executable(row: JSONObject) -> None:
+    assert not crsp_executable(row, decode_crsp_protocol(protocol_document()))
 
 
 @pytest.mark.parametrize("price", [True, "25"])
 def test_malformed_execution_price_remains_a_type_error(price: JSONValue) -> None:
     with pytest.raises(JSONTypeError, match="Field 'dlyprc' must be a number"):
-        require_crsp_execution_price(
+        crsp_executable(
             {"dlyprc": price, "dlyprcflg": "TR"},
             decode_crsp_protocol(protocol_document()),
         )
@@ -283,11 +280,11 @@ def test_malformed_execution_price_remains_a_type_error(price: JSONValue) -> Non
 
 def test_terminal_value_uses_dated_amount_and_returns_one_multiplier() -> None:
     row = terminal_document()
-    assert crsp_terminal_value(row) == ("2024-01-15", 0.6)
+    assert crsp_resolve_terminal(row) == ("2024-01-15", 0.6, None)
     row["delnextdt"] = "2024-01-20"
-    assert crsp_terminal_value(row) == ("2024-01-20", 0.6)
+    assert crsp_resolve_terminal(row) == ("2024-01-20", 0.6, None)
     row["delret"] = -1.0
-    assert crsp_terminal_value(row) == ("2024-01-20", 0.0)
+    assert crsp_resolve_terminal(row) == ("2024-01-20", 0.0, None)
 
 
 @pytest.mark.parametrize(
@@ -301,28 +298,19 @@ def test_terminal_value_uses_dated_amount_and_returns_one_multiplier() -> None:
         ({"delamtdt": "2024-01-04"}, "delisting chronology"),
     ],
 )
-def test_unresolved_terminal_value_names_its_reason_and_fails(
-    changes: JSONObject, reason: str
-) -> None:
+def test_unresolved_terminal_value_names_its_reason(changes: JSONObject, reason: str) -> None:
     row = terminal_document()
     row.update(changes)
     resolution = crsp_resolve_terminal(row)
     assert (resolution.multiplier, resolution.refusal) == (1.0, reason)
-    with pytest.raises(ValueError, match=f"CRSP-005.*: {reason}$"):
-        crsp_terminal_value(row)
-
-
-def test_a_resolved_terminal_value_has_no_refusal() -> None:
-    resolution = crsp_resolve_terminal(terminal_document())
-    assert resolution == ("2024-01-15", 0.6, None)
 
 
 def test_terminal_dates_are_required_not_imputed() -> None:
     row = terminal_document()
     del row["delnextdt"]
     with pytest.raises(ValueError, match="CRSP-005"):
-        crsp_terminal_value(row)
+        crsp_resolve_terminal(row)
     row = terminal_document()
     row["delamtdt"] = None
-    with pytest.raises((ValueError, TypeError)):
-        crsp_terminal_value(row)
+    with pytest.raises(JSONTypeError):
+        crsp_resolve_terminal(row)
