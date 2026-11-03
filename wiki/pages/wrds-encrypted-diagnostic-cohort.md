@@ -16,10 +16,10 @@ source_paths:
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json
 source_git_blobs:
-  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 872c57d646327f0eb2fd9a6dc31325276830b88a
+  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: dac732909d85ff89967b8c345d7f7af769149ebd
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py: 9b342cd7bd1a30524af932d900ddb5bc04111f51
   libs/covenant_ml/tests/markets/test_crsp_cohort.py: 2b5292c983b99204d74bb294fee41c7ec1495412
-  libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py: 1cc55e0a77b35070a5d7ed4d385d37d59fc70708
+  libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py: 3b2a3b467e2aa4cdc499ef15dd671e5476bc4eb8
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json: ba647e0bbb1fed9db6c64fc67d7989aa454f0310
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/preempted-input-evidence.json: 869b28d0615c22f5d5436317bf41f0c3fb3bac09
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-preflight-report.json: 92e625e80fbb93d22f4e81ace4e9dde26b560c4d
@@ -98,7 +98,7 @@ No result from this derivation permits removal
 of the refused paths, a changed benchmark or release of the final holdout.[^owner][^tests]
 
 [^request]: `tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json`, `plan`, `source_commit` and source/program identities.
-[^owner]: `libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py`, `_anchors`, `_securities`, `_write_subset` and `derive_crsp_cohort`.
+[^owner]: `libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py`, `crsp_audit_cases`, `resolve_crsp_anchors`, `_write_subset` and `derive_crsp_cohort`.
 [^envelope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py`, `decode_crsp_cohort` and `decode_crsp_cohort_plan`.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_cohort.py`, `test_actual_trial_refuses_a_cohort_even_when_its_bundle_is_admitted`, `test_real_encrypted_cohort_keeps_lineage_and_cannot_load_as_a_study`, and refusal regressions.
 [^fixture]: `libs/covenant_ml/tests/markets/_crsp_cohort_fixtures.py`, `cohort_case`, two-security projection of the shared database fixture before the real extraction writer.

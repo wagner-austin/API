@@ -31,12 +31,12 @@ source_paths:
   - tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-stage-inspection.json
 source_git_blobs:
   libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py: 7f7ba67c59ff2294f0dbdcb1adca53866a2c4ab2
-  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 872c57d646327f0eb2fd9a6dc31325276830b88a
+  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: dac732909d85ff89967b8c345d7f7af769149ebd
   libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py: 8d8e94ed142d6b4badb23faf9b0fdd9ae48e8d68
   libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py: 725538d01aa9bf59bc4070345995c15101a18ea7
   libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py: 2dc5d21a784e30c843e5e3857a615e03751f1141
   libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py: 3c2f55409d11a293113bf42ef050a5e2fbff3de3
-  libs/covenant_ml/scripts/crsp_extraction.py: edb2cfb8dbd7f4646ea0c4ecf6da7b70d9b2cf1c
+  libs/covenant_ml/scripts/crsp_extraction.py: 89ae6f053b812a620055a585ebb3d361331330cf
   libs/covenant_ml/tests/markets/test_crsp_refresh.py: fdfe74bbc7918dce6853413d9622c81e983b47fa
   libs/covenant_ml/tests/markets/test_crsp_refresh_process.py: d46ae20a27a0a8959b4b0ab11e3e2490d5c089f9
   libs/covenant_ml/tests/markets/test_crsp_comparison.py: eb978fb83e99e545de690e98d38f8f3e070bad96

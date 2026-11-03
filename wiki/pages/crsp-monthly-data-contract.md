@@ -21,7 +21,7 @@ source_paths:
   - "tools/fleet/src/fleet/core/research_wrds.py"
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "5574c34391c88d77ed708d32ac02435588eb0e5e"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "85ee73a0726c6e43bea6d5af991d2ed78a9a0252"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "3c2f55409d11a293113bf42ef050a5e2fbff3de3"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
   "libs/covenant_ml/tests/markets/test_crsp_extract.py": "ae06440f1a7ff5b5b289cf499297fd86e77527b1"

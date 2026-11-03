@@ -35,12 +35,12 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-corporate-actions-20261103/fixture-audit.json": "2358a8ef26c32e8561bc81c390d954976ac2af82"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_schema.py": "a62a7dd519ffcb861fa25c9318f54441f0dd8521"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_action_records.py": "667cc6fd8d1b6d216ac5bf6271e63779260acfc6"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py": "108f53efd42dd0d1de61297df3f1970ece097c33"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py": "2cf03ae973b98bfd3a0a0edb9d7fabc7acf54663"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py": "7f7ba67c59ff2294f0dbdcb1adca53866a2c4ab2"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "3c2f55409d11a293113bf42ef050a5e2fbff3de3"
-  "libs/covenant_ml/scripts/crsp_extraction.py": "edb2cfb8dbd7f4646ea0c4ecf6da7b70d9b2cf1c"
-  "libs/covenant_ml/tests/markets/test_crsp_actions.py": "677a639a0e779b79251b58cdc2377fa2f44c9c1b"
+  "libs/covenant_ml/scripts/crsp_extraction.py": "89ae6f053b812a620055a585ebb3d361331330cf"
+  "libs/covenant_ml/tests/markets/test_crsp_actions.py": "b18dd3e4542ab12c26f862ac4696796e8e044176"
   "libs/covenant_ml/tests/markets/test_crsp_actions_process.py": "f62b54375902441dd35d75f5db5a500d2b6f9e10"
   "libs/covenant_ml/tests/markets/test_crsp_action_queries.py": "798b5d739e45026f2d9ef397a438ae9aa4a7b748"
   "libs/covenant_ml/tests/markets/test_crsp_refresh.py": "fdfe74bbc7918dce6853413d9622c81e983b47fa"
@@ -74,6 +74,8 @@ scratch, complete-evidence byte bounds, encryption and cleanup have one owner.
 No final key is acquired. Public receipts contain identities, timestamps,
 aggregate counts and cleanup status; observations and exact SQL stay encrypted.
 The operation supplies evidence for [[crsp-outcome-qualification]].[^capture]
+
+The pending per-case join is documented in [[wrds-crsp-action-case-inspection]].
 
 One fixed projection registry defines four roles: delisting event identities,
 delisting details, distribution event identities and distribution details.
@@ -158,4 +160,4 @@ The previous four-relation comparison remains in
 [^licensed]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json`, `rows`, `bundle` and `plaintext_removed`; sibling `licensed-completion.json`, exact output digests and runtime; `licensed-ciphertext-reading.json`, checked inventory. Native service report `818a292e-791b-4174-b113-88ce2ede75d6` records scheduler completion and output identities. These are capture measurements, not economic qualification; [[crsp-outcome-qualification]], § "Additional evidence to qualify", states the remaining requirements.
 [^staging]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json`, `manifest`, `verified_files`, `inventory.directories` and exact `inventory.files`; sibling `staging-permission-correction.json`, first refusal, measured modes and correction. Service report `a88d8a8d-9cfb-41a1-92eb-f803a0bde77a` records the independent readback. `tools/hpc3/src/hpc3/core/stage.py`, `stage_manifest` and `inspect_staged_tree`; `remote.py`, `make_directory`.
 [^prior]: [[wrds-crsp-source-comparison]], § "Native evidence".
-[^audit]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json`, captured live `task_get` response: verdict, criteria, fleet checks `33ee64b6` and `b5cdaa51` and independent review evidence; sibling `fixture-audit.json`, accepted repair `4df253cc`, preserved budget failure and reviewer checks of the reduced fixture. [[wrds-encrypted-diagnostic-cohort]], § "Native evidence and limits", describes the retained assertions.
+[^audit]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json`, captured live `task_get` response: verdict, criteria, fleet checks `33ee64b6` and `b5cdaa51` and independent review evidence; sibling `fixture-audit.json`, accepted repair `4df253cc`, preserved budget failure and reviewer checks of the reduced fixture. [[wrds-encrypted-diagnostic-cohort]], § "Admission is not permission to fit this subset", describes the retained assertions.
