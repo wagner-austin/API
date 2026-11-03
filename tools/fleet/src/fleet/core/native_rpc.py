@@ -1,9 +1,16 @@
-"""Read-only Codex JSON-RPC over its existing WebSocket stdio proxy.
+"""Codex JSON-RPC over its existing WebSocket stdio proxy.
 
 The proxy copies WebSocket bytes, not newline JSON. A socket pair attaches
 the SSH child's standard streams to the maintained websockets client without
 another network listener, remote Python dependency, or framing implementation.
-The caller owns the target identities; this module never starts model turns.
+The caller owns the target identities.
+
+Reading is :func:`read_threads`. The one write is :func:`deliver_wake`
+(board task 562cfa7a), which starts a turn in an existing thread only after
+re-reading it idle on the same connection, and only when no turn already
+carries the wake's key; the methods and fields it sends were read from the
+schema ``codex app-server generate-json-schema`` prints for the running
+daemon's release (0.166.0, measured 2026-11-03).
 """
 
 from __future__ import annotations
@@ -12,7 +19,8 @@ import socket
 import subprocess
 import tempfile
 import time
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager
 
 from platform_core.json_utils import (
     JSONObject,
@@ -30,7 +38,7 @@ class RuntimeReadError(ValueError):
     """The runtime explicitly refused one JSON-RPC request."""
 
 
-def _request(
+def rpc_request(
     connection: ClientConnection,
     request_id: int,
     method: str,
@@ -42,9 +50,9 @@ def _request(
     Args:
         connection: Already initialized WebSocket connection.
         request_id: Unique request number on this connection.
-        method: Read-only protocol method.
+        method: Protocol method.
         params: Validated request parameters.
-        deadline: Monotonic absolute deadline for the entire observation.
+        deadline: Monotonic absolute deadline for the entire pass.
 
     Returns:
         The response result object.
@@ -92,6 +100,36 @@ def read_threads(
         WebSocketException: The runtime refused or lost its connection.
         ValueError: A response cannot be validated.
     """
+    with runtime_connection(argv, "corvis_fleet_observer", timeout_seconds) as (
+        connection,
+        deadline,
+    ):
+        return tuple(
+            _read_thread(connection, index, thread_id, deadline)
+            for index, thread_id in enumerate(thread_ids, start=1)
+        )
+
+
+@contextmanager
+def runtime_connection(
+    argv: Sequence[str], client: str, timeout_seconds: int
+) -> Generator[tuple[ClientConnection, float], None, None]:
+    """Open one initialized connection through a bounded, disposable proxy child.
+
+    Args:
+        argv: Local proxy or SSH invocation; no shell interpolation.
+        client: The ``clientInfo`` name the runtime records for this caller.
+        timeout_seconds: Entire pass deadline, including the handshake.
+
+    Yields:
+        The initialized connection and the pass's monotonic deadline.
+
+    Raises:
+        OSError: Process or socket cannot be opened.
+        TimeoutError: Handshake deadline expired.
+        WebSocketException: The runtime refused or lost its connection.
+        ValueError: The handshake response cannot be validated.
+    """
     deadline = time.monotonic() + timeout_seconds
     parent, child = socket.socketpair()
     with parent, child, tempfile.TemporaryFile() as diagnostics:
@@ -111,28 +149,32 @@ def read_threads(
                 open_timeout=timeout_seconds,
                 close_timeout=1,
                 ping_interval=None,
-                max_size=1024 * 1024,
+                max_size=MAX_MESSAGE_BYTES,
             ) as connection:
-                _request(
+                rpc_request(
                     connection,
                     0,
                     "initialize",
                     {
-                        "clientInfo": {"name": "corvis_fleet_observer", "version": "1.0"},
+                        "clientInfo": {"name": client, "version": "1.0"},
                         "capabilities": {"experimentalApi": True},
                     },
                     deadline,
                 )
                 connection.send(dump_json_str({"method": "initialized"}))
-                return tuple(
-                    _read_thread(connection, index, thread_id, deadline)
-                    for index, thread_id in enumerate(thread_ids, start=1)
-                )
+                yield connection, deadline
         finally:
             # Only the disposable proxy child is ours. Never stop the daemon.
             if process.poll() is None:
                 process.kill()
             process.wait(timeout=5)
+
+
+#: The largest message one connection accepts. The biggest answer read is a
+#: page of 50 summary turns, each its user message and final reply:
+#: measured 2026-11-03 on ziggurat, 75,894 bytes for the longest-running
+#: registered thread (01a17515), so 1 MiB is over thirteen times that.
+MAX_MESSAGE_BYTES = 1024 * 1024
 
 
 def attempt_read_threads(
@@ -161,7 +203,7 @@ def _read_thread(
     """Read one target; an explicit RPC refusal is unavailable, never departed."""
     try:
         return require_dict(
-            _request(
+            rpc_request(
                 connection,
                 request_id,
                 "thread/read",
@@ -179,4 +221,11 @@ def _read_thread(
         return str(error)
 
 
-__all__ = ["RuntimeReadError", "attempt_read_threads", "read_threads"]
+__all__ = [
+    "MAX_MESSAGE_BYTES",
+    "RuntimeReadError",
+    "attempt_read_threads",
+    "read_threads",
+    "rpc_request",
+    "runtime_connection",
+]

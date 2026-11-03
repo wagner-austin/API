@@ -62,7 +62,7 @@ from platform_core.json_utils import JSONObject, JSONValue, load_json_str
 from platform_core.mcp_client import McpCredentials
 
 from fleet.contracts.machine import LedgerObserver, Machine
-from fleet.core import dialect, native_observe, queue, remote
+from fleet.core import dialect, native_observe, native_wake, queue, remote
 
 #: What the script is called on the node, before the dialect's extension,
 #: under the provisioned account's ``.fleet`` directory -- the same
@@ -370,10 +370,15 @@ def observe_node(
         identity=identity,
         native_observations=native,
     )
+    # After the ledger holds this pass's runtime reading, so the idle state
+    # each wake acts on is the one the board already shows (MCPs board task
+    # 562cfa7a).
+    woken = native_wake.wake_idle(board, identity, node["name"], user, native)
+    wakes = "".join(f"; {line}" for line in woken)
     return NodeOutcome(
         node=node["name"],
         recorded=True,
-        detail=f"{native_observe.evidence_note(native, evidence_seconds)}{detail}",
+        detail=f"{native_observe.evidence_note(native, evidence_seconds)}{detail}{wakes}",
     )
 
 
