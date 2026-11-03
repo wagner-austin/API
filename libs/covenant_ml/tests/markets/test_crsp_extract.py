@@ -157,6 +157,19 @@ def test_malformed_source_cells_fail(
         load_crsp_sources(path)
 
 
+@pytest.mark.parametrize("field", ["permno", "dlyret", "dlycaldt"])
+def test_scalar_conversion_errors_exclude_private_values(tmp_path: Path, field: str) -> None:
+    rows = source_rows()
+    sentinel = "PRIVATE_SOURCE_SCALAR_123456"
+    rows["returns"][0][field] = sentinel
+    path, _ = write_sources(tmp_path, rows, panel_protocol())
+    with pytest.raises(ValueError) as failure:
+        load_crsp_sources(path)
+    assert str(failure.value) == f"[CRSP-007] invalid {field} scalar in returns CSV"
+    assert failure.value.__suppress_context__ is True
+    assert failure.value.__cause__ is None
+
+
 def test_reordered_projection_with_valid_checksum_fails(tmp_path: Path) -> None:
     path, document = write_sources(tmp_path, source_rows(), panel_protocol())
     stream = io.StringIO()

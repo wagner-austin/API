@@ -6,6 +6,8 @@ query semantics. Native synthetic database rehearsal remains a separate check.
 
 from __future__ import annotations
 
+import csv
+import io
 import signal
 import subprocess
 import sys
@@ -114,13 +116,19 @@ def test_refresh_cli_writes_native_observations_in_process(allocation: RefreshCa
     assert list(allocation.cohort.extraction.scratch.iterdir()) == []
 
 
-def test_real_refresh_process_captures_and_encrypts_client_output(tmp_path: Path) -> None:
-    case = refresh_case(tmp_path)
-    source = tmp_path / "copy-source"
+def _client_output(root: Path) -> Path:
+    """Write the controlled CSVs and transaction readings consumed by the real child."""
+    source = root / "copy-source"
     (source / "train-validation").mkdir(parents=True)
     (source / "extract.sql").write_text("")
     FakeDatabase(database_rows(), securities=(1,))(PSQL, source, seconds=1, max_file_bytes=1)
     (source / "extract.sql").unlink()
+    return source
+
+
+def test_real_refresh_process_captures_and_encrypts_client_output(tmp_path: Path) -> None:
+    case = refresh_case(tmp_path)
+    source = _client_output(tmp_path)
     result = _run(case, f'exec cp -R "{source}/." .\n', 120, 2_000_000)
     assert (result.returncode, result.stdout, result.stderr) == (0, "", "")
     output = tmp_path / "native-output"
@@ -140,6 +148,29 @@ def test_real_refresh_process_captures_and_encrypts_client_output(tmp_path: Path
         for name in ("old", "fresh", "unchanged", "added", "removed", "changed")
     }
     assert all(item["value"] == 0 for item in metrics if item["name"].endswith(".changed"))
+
+
+@pytest.mark.parametrize("field", ["permno", "dlyret", "dlycaldt"])
+def test_real_refresh_refuses_private_scalar_without_public_leak(
+    tmp_path: Path, field: str
+) -> None:
+    case = refresh_case(tmp_path)
+    source = _client_output(tmp_path)
+    path = source / "train-validation" / "returns.csv"
+    rows = list(csv.reader(io.StringIO(path.read_text("utf-8"))))
+    sentinel = "PRIVATE_SOURCE_SCALAR_123456"
+    rows[1][rows[0].index(field)] = sentinel
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        csv.writer(stream).writerows(rows)
+    result = _run(case, f'exec cp -R "{source}/." .\n', 120, 2_000_000)
+    assert result.returncode == 1
+    assert result.stdout == ""
+    assert result.stderr.splitlines()[-1] == (
+        f"ValueError: [CRSP-007] invalid {field} scalar in returns CSV"
+    )
+    assert sentinel not in result.stderr
+    assert list(case.cohort.extraction.scratch.iterdir()) == []
+    assert list((tmp_path / "native-output").iterdir()) == []
 
 
 @pytest.mark.parametrize(
