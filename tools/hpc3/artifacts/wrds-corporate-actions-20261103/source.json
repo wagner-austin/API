@@ -1,0 +1,20 @@
+{
+  "source_commit": "c5baa6df374bbe90c4ce3cbecd49f376b1629914",
+  "archive_sha256": "dad42facb8453c4286d440d48d4f43503494213f45ffe63237187395fe65ec93",
+  "packages": [
+    "platform_core",
+    "platform_ml",
+    "covenant_domain",
+    "cleargbm",
+    "covenant_ml"
+  ],
+  "verification": {
+    "fleet_job": "ff02f00e-b5ad-4295-8dbe-f121812392c3",
+    "checked_commit": "9b076cba5eff905617afd9335a09d3a44f2b8843",
+    "difference": "Only wiki documentation changed after the checked commit."
+  },
+  "frozen_files": 640,
+  "worker_code_files": 504,
+  "worker_sha256": "e08cf9c01a850b7bf5acf4efdfcc2868ab965b81364c05f7da32922adda3e14a",
+  "scope": "Frozen diagnostic controller and five worker source packages. Existing installed interpreter and third-party dependencies retained and measured per completion. This is not a new study image."
+}

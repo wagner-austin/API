@@ -1,0 +1,79 @@
+{
+  "kind": "ciphertext-inventory-reading",
+  "bundle_sha256": "820460ef97506fd87e14b4d772b2c79e4d5dd1fc022d71253151f66f445a6d51",
+  "file_count": 14,
+  "files": [
+    {
+      "name": "actions.json.age",
+      "sha256": "45b61836d58cd146f8185e0a5c1bd44a28d4928291d09550d7ece0033793f3af",
+      "size_bytes": 5301
+    },
+    {
+      "name": "delist-details.csv.age",
+      "sha256": "b91ab7bf8bbde739339feaa3c9772c83489a1ccbdcdd0b58bc1da669f34fac15",
+      "size_bytes": 578
+    },
+    {
+      "name": "delist-details.sql.age",
+      "sha256": "82c314d6718bb8dcd9f703fa93bd57f89476c4d20e90667fb3f207fc1b194e74",
+      "size_bytes": 2534
+    },
+    {
+      "name": "delist-events.csv.age",
+      "sha256": "3012921a7ec7c953e143466e9b2a29ef62420d1502a8669c390f813e7f2fda43",
+      "size_bytes": 311
+    },
+    {
+      "name": "delist-events.sql.age",
+      "sha256": "1865db05fd0dbedf293db0bed4c22d548967c2ef15fca507414129c3a5ea0e92",
+      "size_bytes": 2383
+    },
+    {
+      "name": "distribution-events.csv.age",
+      "sha256": "fae5ac195744026b9dfc0b206cd0b56ec451d7dd0c63e320c9ee9ec3ee899a8d",
+      "size_bytes": 396
+    },
+    {
+      "name": "distribution-events.sql.age",
+      "sha256": "f8cba43874a05e50688a62dbb698e56cd242e5fb34d7e2faf73e7067799d6c76",
+      "size_bytes": 2389
+    },
+    {
+      "name": "distributions.csv.age",
+      "sha256": "6a77740d542d4b963664830cd863766f68f47d49e02bf5bebe7064e8c5a170dc",
+      "size_bytes": 554
+    },
+    {
+      "name": "distributions.sql.age",
+      "sha256": "8ddb1b29f6eca8daf49565062bd42e5b893ef85ae3591ec4cb6e012080b78b1d",
+      "size_bytes": 2560
+    },
+    {
+      "name": "extract.sql.age",
+      "sha256": "903da361ed6baa8fe785ab9d02e77d6f9576ee1309853c4b1b965da71acce938",
+      "size_bytes": 1031
+    },
+    {
+      "name": "protocol.json.age",
+      "sha256": "8a89950c1c72da82a48719378ee9eb4e18168ead160ea3e0959b0ea2b7a60d98",
+      "size_bytes": 1531
+    },
+    {
+      "name": "setup.sql.age",
+      "sha256": "819b5ae017f72a4d5af446df78d8c7b1336622a507f3993661d03613ba9e0219",
+      "size_bytes": 1927
+    },
+    {
+      "name": "snapshot-first.csv.age",
+      "sha256": "9ea1b6a2f54f747430e0e51a4a147d03eb55ec9a4ecada1254f115ae497c983c",
+      "size_bytes": 389
+    },
+    {
+      "name": "snapshot-last.csv.age",
+      "sha256": "8ce2c6e7808b55a61a539e979a81fe8bec322614a4a79693612c6daa6b2dda14",
+      "size_bytes": 318
+    }
+  ],
+  "plaintext_output_files": [],
+  "receipt_plaintext_removed": true
+}
