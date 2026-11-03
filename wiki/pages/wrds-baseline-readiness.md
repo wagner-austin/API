@@ -104,9 +104,11 @@ unchanged. It supplied no fresh-vintage correction; economic qualification
 and the study stop remain in force.[^comparison]
 The comparison and scalar-error privacy repair have passed independent review.
 [[crsp-outcome-qualification]] records those completed prerequisites and the
-next bounded distribution/delisting investigation. Additional catalog fields
-are available in the historical inventory; their ability to resolve missing
-outcomes remains unmeasured.[^qualification]
+bounded distribution/delisting investigation. The shared capture is implemented
+in [[wrds-crsp-corporate-action-capture]] and passed full fleet verification;
+native rehearsal remains pending. Additional catalog fields are available in the
+historical inventory; their ability to resolve missing outcomes remains
+unmeasured.[^qualification][^actions]
 
 Stock-selection task `f61db3a7` closed after independent audit `fe0cc4fc`
 verified the explicit protocol stop. Source-diagnosis task `a9ad53ae` then passed
@@ -137,6 +139,7 @@ allocation-specific observations and their limits.[^preparation]
 [^mounts]: [HPC3 mount ownership](../../tools/hpc3/wiki/pages/declared-image-mounts.md), § "Native verification and limits", jobs `58776025` and `58776026`, with original native reports and controller identity.
 [^sources]: [[wrds-v3-refused-path-diagnosis]], § "Every original refusal", § "Data limitations versus implementation" and § "Next action", with native source-field evidence and the primary CIZ definitions.
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner", § "Admission is not permission to fit this subset" and § "Native evidence and limits".
+[^actions]: [[wrds-crsp-corporate-action-capture]], § "Verification status".
 [^stop]: `tools/hpc3/artifacts/wrds-licensed-baseline-20261101/stopped.json`, `study_action` and native failure; the original failed study remains historical.
 [^diagnosis]: `tools/hpc3/artifacts/wrds-baseline-v2-validation-20261102/diagnosis.json`, `observed_boundary`, `interpretation`, `service_posts` and `limits`; no raw return observations or security identifiers are published.
 

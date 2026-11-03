@@ -24,8 +24,8 @@ source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "13da81586926004b2f0ea07534af2dd295c5a1ea"
-  "libs/covenant_ml/tests/markets/test_crsp_queries.py": "254aa595426041e71931fbe0b724d60844a8597b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
+  "libs/covenant_ml/tests/markets/test_crsp_queries.py": "cca05554450299e2c0e111c031dfd1f88a930ac4"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
@@ -154,15 +154,12 @@ security has a usable payment. The guide distinguishes distribution ex-date,
 payment date, amount and linked security from delisting amount date and stored
 return date.[^catalog][^distribution]
 
-The next diagnostic should capture those fields for the authenticated cohort,
-within the existing validation boundary, through the shared query, snapshot,
-encryption and native-job owners. It must preserve raw missingness and flags,
-retain exact queries and checksums, and keep licensed fields encrypted. A
-linked identifier is evidence to investigate, not permission to recursively
-expand to other securities or cross the final boundary. Event presence must be
-distinguished from unavailable valuation without importing future values.
-This is a proposed source investigation, not an implemented fifth study
-relation or a replacement return policy.[^catalog][^partition][^refresh]
+The implemented [[wrds-crsp-corporate-action-capture]] captures these fields
+for the authenticated cohort through the shared query, snapshot and encryption
+owners. Fleet verification passed; native capture remains pending. Linked
+identifiers do not authorize recursive security expansion, and event presence
+is recorded separately from details excluded by valuation/payment dates.
+This investigation supplies no replacement return policy.[^actions]
 
 Interpretation must answer whether cash or security consideration is complete,
 when it is valued, and whether the daily total return already contains it.
@@ -182,8 +179,9 @@ before new study admission.[^distribution][^vendor][^owners]
 [^dependence]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json`, inputs, ordinal derivation and period counts; sibling `protocol.json`, `max_universe`, exact bytes matching `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `revision.revision.protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision`, universe cap; `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, consecutive `checked` increment and `path_ordinal` recording; sibling `result.json`, `results[0].decisions`, `eligible_paths` and `refused_cases`.
 [^partition]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, delisting valuation predicate; `crsp_partition.py`, `check_crsp_partition`, dated-field checks.
 [^cohort]: [[wrds-encrypted-diagnostic-cohort]], § "One transformation owner" and § "Admission is not permission to fit this subset".
-[^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
+[^query-scope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `_universe` called by `crsp_relation_sql`, equality with `crsp_scopes(protocol)[0]`; `libs/covenant_ml/tests/markets/test_crsp_queries.py`, `test_renaming_final_scope_cannot_admit_its_observations_to_a_diagnostic`, `test_diagnostic_refuses_each_altered_protocol_boundary`, and unchanged valid-statement assertions.
 [^refresh]: [[wrds-crsp-source-comparison]], § "Diagnostic contract" and § "Native evidence".
 [^source-checks]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json`, captured live board responses: comparison audit `dc59b228` completed VERIFIED at 2026-11-03T01:44:51.513Z; scalar-error privacy audit `9ccc6e3a` completed VERIFIED at 2026-11-03T01:55:18.663Z, each against its own acceptance criteria.
 [^catalog]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json`, exact metadata rows from the October 27 inventory and SHA-256 identities of the source column/access CSV files, rechecked November 3 UTC.
+[^actions]: [[wrds-crsp-corporate-action-capture]], § "Scope and privacy" and § "Verification status".
 [^distribution]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–13, StkDelists and StkDistributions field definitions; pp. 17–18, DlyRet total-return definition. Archived primary source and digest in frontmatter. Interpretation and proposed investigation are this project's requirements, not a claim that those fields close the observed gaps.

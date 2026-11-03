@@ -15,7 +15,7 @@ source_paths:
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json
   - tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json
 source_git_blobs:
-  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 660628f90d5027b3c57af7ce06bca2700ec2f166
+  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 872c57d646327f0eb2fd9a6dc31325276830b88a
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort_records.py: 9b342cd7bd1a30524af932d900ddb5bc04111f51
   libs/covenant_ml/tests/markets/test_crsp_cohort.py: 6717278e1b8fa58c8252d6edf1893338d86209e5
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/request.json: ba647e0bbb1fed9db6c64fc67d7989aa454f0310
@@ -25,7 +25,7 @@ source_git_blobs:
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/result.json: bf4b5280854c31a97d4b6fea1ac68d711c1eb782
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/retry1-native-evidence.json: bcd67522677a3c7cccdda8835f091c8669e77ace
   tools/hpc3/artifacts/wrds-cohort-98379d28-20261102/ciphertext-collection.json: b9c632847496d1b6523645a5eb4411c910445b71
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 

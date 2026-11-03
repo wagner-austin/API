@@ -15,11 +15,11 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/native-evidence.json": "ef35b0e783656e3573b4aa35f741d66a778b30bd"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/completion-preparation-report.json": "032a26faf8678ed0dd56d2d70e7895c036d62210"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "41c02cc391a40f28bd3dbd300e3608579d5db586"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "13da81586926004b2f0ea07534af2dd295c5a1ea"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "3c2f55409d11a293113bf42ef050a5e2fbff3de3"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
 provenance:
   - "Vendor definitions use the existing tech-wiki capture crsp-ciz-guide-20260731.txt, SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e, corpus document 0264d5cc-4dec-4715-b17b-45f3c8e5fbec."
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 
@@ -66,8 +66,9 @@ No correctable extraction defect is established by this evidence. The frozen
 files pass their checksums; extraction projects the price/return fields directly,
 and decoding preserves blank nullable values. This proves retained-byte
 consistency, not that the vendor's economic observations are complete or that a
-fresh vendor vintage would be identical. No fresh vendor correction or external
-replacement observation was measured.[^native][^extract]
+fresh vendor vintage would be identical. The later
+[[wrds-crsp-source-comparison]] found all queried rows unchanged; it supplied
+no fresh-vintage correction within its frozen projection and bounds.[^native][^extract][^comparison]
 
 There is a narrow reporting defect: the frozen execution validator reads a null
 price before issuing its documented `CRSP-004` refusal. The current-source
@@ -101,6 +102,7 @@ prices or return values.[^program]
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, each `path_ordinal`, `source_window.daily_rows`, `source_window.terminal_rows`, boundary digests, counts and `prior_counts_reproduced`; source `087f67b4c`, unchanged image `369ae415a20a1ad8a7d672d839e12c7e62ee29d1432667d95f479d333c578fde`.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12 (delisting fields), 17–18 (daily fields), 88 (PC), 90–91 (RD), 91–92 (RM); archived capture identified in frontmatter. Existing tech-wiki pages `crsp-ciz-daily-return-contract` and `crsp-ciz-daily-return-quality` retain the primary-source analysis.
 [^extract]: `libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py`, `crsp_relation_sql` returns/delists projections; `libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py`, `_cell` and `decode_crsp_rows`; no missing numeric value is replaced with zero.
+[^comparison]: [[wrds-crsp-source-comparison]], § "Native evidence", licensed job 40568218 and its bounded interpretation.
 [^implementation]: `wiki/pages/crsp-monthly-holdings-validation.md:67`, current shared resolver; `wiki/pages/crsp-monthly-holdings-validation.md:86`, execution-price refusal and boundary tests; [[wrds-baseline-v3-freeze]], frozen design and execution boundary. Proposed permission changes here are not installed rules.
 [^journal]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/completion-preparation-report.json`, `observed_at`, `journal_sha256` and all fifteen `attempts`; live service post c13f1621-06fc-4af0-adb0-d9037f7f48ab after native completion.
 [^program]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, `source_window_context`, train-validation key acquisition, prior-result comparisons and private-directory removal assertion.

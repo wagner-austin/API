@@ -22,7 +22,7 @@ source_paths:
 source_git_blobs:
   "libs/covenant_ml/src/covenant_ml/evaluation/evidence.py": "9bc1459b035fcedeab41f91b84960faebfbe73a2"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py": "5574c34391c88d77ed708d32ac02435588eb0e5e"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "41c02cc391a40f28bd3dbd300e3608579d5db586"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py": "3c2f55409d11a293113bf42ef050a5e2fbff3de3"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
   "libs/covenant_ml/tests/markets/test_crsp_extract.py": "ae06440f1a7ff5b5b289cf499297fd86e77527b1"
   "libs/covenant_ml/tests/markets/test_crsp_panel.py": "00cf8f5894f7a2eb52c1d411ddcd99788a6b0cd9"
@@ -39,7 +39,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "2026-10-31 live WRDS calendar aggregation for 1998-01-01 through 2025-02-28: 6832 CIZ/Y and 3089 N/A/N rows; no other pairs. Native licensed job 40554134 exposed the earlier CIZ-only predicate error. Board task a622165c-bb63-4714-933b-10d527f21478. The vendor guide describes all civil dates; N/A closed-day encoding was measured against the subscribed table."
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 

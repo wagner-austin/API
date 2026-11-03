@@ -4,7 +4,8 @@ tags: [wrds, crsp, encryption, provenance]
 hubs: [libs]
 related: ["[[wrds-encrypted-diagnostic-cohort]]", "[[crsp-outcome-qualification]]", "[[wrds-baseline-readiness]]"]
 source_paths:
-  - libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py
+  - libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py
+  - libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py
@@ -29,14 +30,15 @@ source_paths:
   - tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-stage.json
   - tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-stage-inspection.json
 source_git_blobs:
-  libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py: 11e16545808e5aa1ec05c5ca1bdeb858eceff88c
+  libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py: 7f7ba67c59ff2294f0dbdcb1adca53866a2c4ab2
+  libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: 872c57d646327f0eb2fd9a6dc31325276830b88a
   libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py: 8d8e94ed142d6b4badb23faf9b0fdd9ae48e8d68
-  libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py: 1e454f61a3b50a031c92803ebf3c54cc0343c4d1
+  libs/covenant_ml/src/covenant_ml/markets/crsp_snapshot.py: 725538d01aa9bf59bc4070345995c15101a18ea7
   libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py: 2dc5d21a784e30c843e5e3857a615e03751f1141
-  libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py: 41c02cc391a40f28bd3dbd300e3608579d5db586
-  libs/covenant_ml/scripts/crsp_extraction.py: 590e709a6a702ce5143fd84d692f9b36a1ad91af
-  libs/covenant_ml/tests/markets/test_crsp_refresh.py: 37b284c4cdd68cd694544633f5f20a1527fed899
-  libs/covenant_ml/tests/markets/test_crsp_refresh_process.py: aec69e95cca000f88116219beb5af836470e882c
+  libs/covenant_ml/src/covenant_ml/markets/crsp_rows.py: 3c2f55409d11a293113bf42ef050a5e2fbff3de3
+  libs/covenant_ml/scripts/crsp_extraction.py: edb2cfb8dbd7f4646ea0c4ecf6da7b70d9b2cf1c
+  libs/covenant_ml/tests/markets/test_crsp_refresh.py: fdfe74bbc7918dce6853413d9622c81e983b47fa
+  libs/covenant_ml/tests/markets/test_crsp_refresh_process.py: d46ae20a27a0a8959b4b0ab11e3e2490d5c089f9
   libs/covenant_ml/tests/markets/test_crsp_comparison.py: eb978fb83e99e545de690e98d38f8f3e070bad96
   tools/hpc3/artifacts/wrds-source-refresh-20261102/source.json: 4f1d9f75bc21dbd8b725fa9436934d3925e6207f
   tools/hpc3/artifacts/wrds-source-refresh-20261102/failed-first.json: b2c92163502d0ba5dd44f01a4b999a77dd0ca026
@@ -53,7 +55,7 @@ source_git_blobs:
   tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-collection.json: 85fec6da6bdeb1ec9c72fe33fa196496c5dcb3a0
   tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-stage.json: 0f28df6757d073fc7efc9f0612d0f33b872a6912
   tools/hpc3/artifacts/wrds-source-refresh-20261102/licensed-stage-inspection.json: 1670a63dc99b18eb429d28904083894b50c81f85
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: high
 ---
 
@@ -67,6 +69,11 @@ only that cohort's securities within the frozen train-validation bounds and
 shares query preparation, snapshot execution and manifest sealing with the
 partition writer. Exact SQL, transaction readings, source rows and differences
 are encrypted; public outputs contain identities, timestamps and counts.[^owner]
+
+`capture_crsp_diagnostic` now owns the private capture lifecycle for both
+`refresh` and the [[wrds-crsp-corporate-action-capture]] `actions` command.
+The cohort module owns authenticated cohort-source loading. These source
+changes do not change the identities of the older native captures below.[^owner]
 
 The comparison shares natural keys with the source decoder. It separates
 unchanged, added, removed and changed rows, rejects duplicate keys and
@@ -124,7 +131,7 @@ The substantive study remains stopped. [[crsp-outcome-qualification]] owns the
 unresolved economic requirements; the diagnostic does not authorize fitting,
 new study admission or final-scoring release.[^envelope]
 
-[^owner]: `libs/covenant_ml/scripts/crsp_extraction.py`, `main` refresh branch; `libs/covenant_ml/src/covenant_ml/markets/crsp_refresh.py`, `compare_crsp_vintages`, `_cohort_sources` and `_refresh`; `crsp_snapshot.py`, `prepare_crsp_queries`, `execute_crsp_snapshot` and `seal_crsp_manifest`.
+[^owner]: `libs/covenant_ml/scripts/crsp_extraction.py`, `main` diagnostic branch; `libs/covenant_ml/src/covenant_ml/markets/crsp_diagnostic.py`, `capture_crsp_diagnostic` and `_refresh`; `crsp_cohort.py`, `load_crsp_cohort_sources`; `crsp_snapshot.py`, `prepare_crsp_queries`, `execute_crsp_snapshot` and `seal_crsp_manifest`.
 [^comparison]: `libs/covenant_ml/src/covenant_ml/markets/crsp_comparison.py`, `compare_crsp_rows` and `_indexed`; `crsp_rows.py`, `crsp_row_key`; `libs/covenant_ml/tests/markets/test_crsp_comparison.py`, key, ordering, duplicate and empty-input cases.
 [^envelope]: `libs/covenant_ml/src/covenant_ml/markets/crsp_refresh_records.py`, `decode_crsp_refresh`; `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, encrypted differences, absent final key and actual-study rejection.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_refresh.py`, successful encryption and refusal cases; `test_crsp_refresh_process.py`, CLI observations and `test_real_client_failures_remove_authenticated_plaintext_without_leaking_sql`.
