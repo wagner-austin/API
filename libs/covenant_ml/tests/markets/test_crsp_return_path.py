@@ -270,7 +270,7 @@ def test_mixed_suspension_and_missing_price_span_has_only_one_observed_value() -
         (1, days[2]): daily(1, W1.entry, -0.2, dlyprevdt="2020-06-01", dlyretdurflg="P2"),
     }
     assert crsp_resolve_held(records, 1, "2020-06-01", days) == (((2, 0.8),), None)
-    assert crsp_resolve_held(records, 1, "2020-06-01", days[:1]) == (
+    assert crsp_resolve_held(records, 1, "2020-06-01", ("2020-06-02",)) == (
         (),
         HeldRefusal(
             "price gap tail", "[CRSP-011] held return for 1 ends with an unresolved price gap"
