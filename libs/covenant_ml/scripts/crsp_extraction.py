@@ -20,17 +20,24 @@ import sys
 from pathlib import Path
 
 from platform_core.config import config_test_hooks
-from platform_core.json_utils import JSONObject, dump_json_str, require_dict, require_int
+from platform_core.json_utils import (
+    JSONObject,
+    dump_json_str,
+    require_dict,
+    require_int,
+    require_list,
+)
 from platform_core.load_report import post_load_report, report_identity
 
 from covenant_ml.markets import _test_hooks
+from covenant_ml.markets.crsp_action_cases import inspect_crsp_actions
 from covenant_ml.markets.crsp_cohort_records import decode_crsp_cohort_plan
 from covenant_ml.markets.crsp_diagnostic import capture_crsp_diagnostic
 from covenant_ml.markets.crsp_extraction_records import decode_crsp_limits
 from covenant_ml.markets.crsp_revision import revise_crsp_protocol, verify_crsp_revision
 from covenant_ml.markets.crsp_verify import verify_crsp_extraction
 from covenant_ml.markets.crsp_writer import extract_crsp
-from covenant_ml.markets.research_keys import EvaluatorKeys, decode_research_access
+from covenant_ml.markets.research_keys import EvaluatorKeys, ResearchAccess, decode_research_access
 from covenant_ml.markets.validation import read_document
 
 
@@ -42,19 +49,23 @@ def _parser() -> argparse.ArgumentParser:
     extract.add_argument("--protocol", required=True, type=Path)
     extract.add_argument("--source", required=True)
     refresh, actions = (commands.add_parser(name) for name in ("refresh", "actions"))
-    for diagnostic in (refresh, actions):
+    inspect = commands.add_parser("inspect-actions")
+    inspect.add_argument("--actions", required=True, type=Path)
+    inspect.add_argument("--actions-sha256", required=True)
+    for diagnostic in (refresh, actions, inspect):
         diagnostic.add_argument("--cohort", required=True, type=Path)
         diagnostic.add_argument("--cohort-sha256", required=True)
         diagnostic.add_argument("--plan", required=True, type=Path)
-    for capture in (extract, refresh, actions):
+    for capture in (extract, refresh, actions, inspect):
         capture.add_argument("--access", required=True, type=Path)
+        capture.add_argument("--scratch-env", required=True)
+        capture.add_argument("--output-env", required=True)
+    for capture in (extract, refresh, actions):
         capture.add_argument("--setup", type=Path)
         capture.add_argument("--max-rows", required=True, type=int)
         capture.add_argument("--max-relation-bytes", required=True, type=int)
         capture.add_argument("--max-partition-bytes", required=True, type=int)
         capture.add_argument("--seconds", required=True, type=int)
-        capture.add_argument("--scratch-env", required=True)
-        capture.add_argument("--output-env", required=True)
     verify = commands.add_parser("verify")
     verify.add_argument("--collected", required=True, type=Path)
     verify.add_argument("--access", required=True, type=Path)
@@ -73,6 +84,38 @@ def _parser() -> argparse.ArgumentParser:
         revision.add_argument("--destination", required=True, type=Path)
         revision.add_argument("--report-task", required=True)
     return parser
+
+
+def _inspect_actions(args: argparse.Namespace, settings: ResearchAccess) -> None:
+    """Write inspection metadata and native metrics only after authenticated cleanup."""
+    environment = config_test_hooks.get_environment()
+    cohort: Path = args.cohort
+    cohort_digest: str = args.cohort_sha256
+    plan: Path = args.plan
+    actions: Path = args.actions
+    actions_digest: str = args.actions_sha256
+    scratch_variable: str = args.scratch_env
+    output_variable: str = args.output_env
+    output = Path(environment[output_variable])
+    targets = (output / "action-cases.json", output / "metrics.json")
+    if any(path.exists() or path.is_symlink() for path in targets):
+        raise FileExistsError("CRSP_ACTION_OUTPUT: refusing to replace an inspection")
+    result = inspect_crsp_actions(
+        cohort,
+        cohort_digest,
+        actions,
+        actions_digest,
+        decode_crsp_cohort_plan(read_document(plan)),
+        EvaluatorKeys(settings),
+        scratch=Path(environment[scratch_variable]),
+    )
+    with targets[0].open("x", encoding="utf-8") as stream:
+        stream.write(dump_json_str(result))
+    metrics: list[JSONObject] = [
+        {"name": "cases", "value": float(len(require_list(result, "cases")))}
+    ]
+    with targets[1].open("x", encoding="utf-8") as stream:
+        stream.write(dump_json_str(metrics))
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -96,6 +139,9 @@ def main(argv: list[str] | None = None) -> int:
     command: str = args.command
     access: Path = args.access
     settings = decode_research_access(read_document(access))
+    if command == "inspect-actions":
+        _inspect_actions(args, settings)
+        return 0
     if command in {"extract", "refresh", "actions"}:
         environment = config_test_hooks.get_environment()
         scratch_variable: str = args.scratch_env
