@@ -584,3 +584,7 @@ Notes: Document authenticated case joins and their privacy and economic limits. 
 Pages written: wrds-crsp-action-case-evidence.
 Pages updated: wrds-crsp-action-case-inspection, wrds-crsp-corporate-action-capture, crsp-outcome-qualification, wrds-baseline-readiness; libs hub and index now 77 pages.
 Notes: Preserve the failed strict-typing check and its corrected full-fleet pass. Native jobs 40569412 and 40569430 completed through existing controllers; synthetic output matches its fleet oracle exactly and the licensed join covers all 27 cases. Economic qualification remains open; independent review of task 4fca73b7-9c36-47a9-a705-7541813c9338 and live page audits follow publication.
+
+## [2026-11-03] Version-5 boundary policy | Prospective decision for all 27 refusals
+Page added: crsp-v5-boundary-policy; linked from crsp-outcome-qualification and the libs hub, index now 78 pages.
+Notes: Two declared rule changes (unfilled entries without a closing trade; a delisting on an unsold exit with labels dated by late values) give 13 first refusals an explicit rule; NT held, MV, DG and both open tails keep refusing. Not installed, not run on licensed data; independent review and the native full-panel scan remain. Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3.
