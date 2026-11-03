@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from covenant_ml.markets.crsp_extraction_records import CRSP_RELATIONS
 from covenant_ml.markets.crsp_protocol import decode_crsp_protocol
 from covenant_ml.markets.crsp_queries import (
     CrspScope,
@@ -131,7 +132,9 @@ def test_row_limit_must_be_positive() -> None:
 
 
 def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
-    driver = crsp_driver_sql(120, partitions=("train-validation", "final")).splitlines()
+    driver = crsp_driver_sql(
+        120, partitions=("train-validation", "final"), relations=CRSP_RELATIONS
+    ).splitlines()
     assert driver[:6] == [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         "SET LOCAL statement_timeout = '120s';",
@@ -159,7 +162,7 @@ def test_driver_runs_every_relation_inside_one_read_only_transaction() -> None:
 
 def test_statement_timeout_must_be_positive() -> None:
     with pytest.raises(ValueError, match=r"\[CRSP-010\] the statement timeout"):
-        crsp_driver_sql(0, partitions=("train-validation", "final"))
+        crsp_driver_sql(0, partitions=("train-validation", "final"), relations=CRSP_RELATIONS)
 
 
 def test_cohort_queries_preserve_every_existing_bound_and_the_full_calendar() -> None:
@@ -218,7 +221,9 @@ def test_diagnostic_refuses_each_altered_protocol_boundary(field: str) -> None:
 
 
 def test_diagnostic_driver_opens_only_train_validation_in_one_snapshot() -> None:
-    driver = crsp_driver_sql(60, partitions=("train-validation",)).splitlines()
+    driver = crsp_driver_sql(
+        60, partitions=("train-validation",), relations=CRSP_RELATIONS
+    ).splitlines()
     assert driver == [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         "SET LOCAL statement_timeout = '60s';",
@@ -248,4 +253,4 @@ def test_driver_refuses_unknown_repeated_or_final_only_partitions(
     partitions: tuple[str, ...],
 ) -> None:
     with pytest.raises(ValueError, match=r"\[CRSP-010\] invalid extraction partition sequence"):
-        crsp_driver_sql(60, partitions=partitions)
+        crsp_driver_sql(60, partitions=partitions, relations=CRSP_RELATIONS)

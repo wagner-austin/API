@@ -8,8 +8,8 @@ from typing import NamedTuple
 from platform_core.json_utils import JSONObject, require_dict, require_str
 
 from covenant_ml.markets.crsp_cohort import derive_crsp_cohort
+from covenant_ml.markets.crsp_diagnostic import capture_crsp_diagnostic
 from covenant_ml.markets.crsp_extraction_records import CrspLimits
-from covenant_ml.markets.crsp_refresh import compare_crsp_vintages
 
 from ._crsp_cohort_fixtures import CohortCase, cohort_case
 from ._crsp_extraction_fixtures import FakeDatabase, database_rows, installed
@@ -42,11 +42,12 @@ def refresh_case(root: Path) -> RefreshCase:
 def refresh(case: RefreshCase, bounds: CrspLimits, setup: Path | None = None) -> JSONObject:
     """Run the actual comparison using the independently pinned fixture lineage."""
     cohort = case.cohort
-    return compare_crsp_vintages(
+    return capture_crsp_diagnostic(
         cohort.destination / "bundle.json",
         case.digest,
         cohort.plan,
         evaluator_keys(cohort.extraction.root),
+        operation="refresh",
         scratch=cohort.extraction.scratch,
         destination=case.destination,
         limits=bounds,

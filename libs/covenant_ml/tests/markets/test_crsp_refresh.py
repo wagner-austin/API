@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from platform_core.json_utils import (
@@ -21,8 +22,8 @@ from covenant_ml.markets.crsp_cohort_records import (
     decode_crsp_cohort_plan,
     encode_crsp_cohort_plan,
 )
+from covenant_ml.markets.crsp_diagnostic import capture_crsp_diagnostic
 from covenant_ml.markets.crsp_extract import load_crsp_sources
-from covenant_ml.markets.crsp_refresh import compare_crsp_vintages
 from covenant_ml.markets.crsp_refresh_records import (
     decode_crsp_refresh,
     encode_crsp_refresh,
@@ -35,6 +36,7 @@ from covenant_ml.markets.encrypted_storage import (
 from covenant_ml.markets.research_trial import execute_trial
 from covenant_ml.markets.research_trial_records import decode_research_trial
 
+from ._crsp_action_fixtures import ActionDatabase, action_rows, capture_actions, installed_actions
 from ._crsp_database import database_protocol, relation_columns
 from ._crsp_extraction_fixtures import (
     NOW,
@@ -210,12 +212,13 @@ def test_changed_plan_is_refused_before_the_client_runs(tmp_path: Path) -> None:
     document["audit_sha256"] = "f" * 64
     plan = decode_crsp_cohort_plan(document)
     database = FakeDatabase(database_rows(), securities=(1,))
-    with installed(database), pytest.raises(ValueError, match="CRSP_REFRESH_LINEAGE"):
-        compare_crsp_vintages(
+    with installed(database), pytest.raises(ValueError, match="CRSP_COHORT_LINEAGE"):
+        capture_crsp_diagnostic(
             case.cohort.destination / "bundle.json",
             case.digest,
             plan,
             evaluator_keys(tmp_path),
+            operation="refresh",
             scratch=case.cohort.extraction.scratch,
             destination=case.destination,
             limits=limits(),
@@ -228,7 +231,7 @@ def test_changed_plan_is_refused_before_the_client_runs(tmp_path: Path) -> None:
 def test_existing_destination_is_not_replaced(tmp_path: Path) -> None:
     case = refresh_case(tmp_path)
     case.destination.mkdir()
-    with pytest.raises(FileExistsError, match="CRSP_REFRESH_OUTPUT"):
+    with pytest.raises(FileExistsError, match="CRSP_DIAGNOSTIC_OUTPUT"):
         refresh(case, limits())
     assert list(case.destination.iterdir()) == []
     assert list(case.cohort.extraction.scratch.iterdir()) == []
@@ -248,7 +251,7 @@ def test_total_evidence_budget_includes_queries_metadata_and_differences(tmp_pat
     ]
     with (
         installed(FakeDatabase(database_rows(), securities=(1,))),
-        pytest.raises(ValueError, match="CRSP_REFRESH_LIMIT"),
+        pytest.raises(ValueError, match="CRSP_DIAGNOSTIC_LIMIT"),
     ):
         refresh(case, limits(max_relation_bytes=max(sizes), max_partition_bytes=sum(sizes)))
     _refused(case)
@@ -257,21 +260,25 @@ def test_total_evidence_budget_includes_queries_metadata_and_differences(tmp_pat
 def test_dangling_output_link_is_refused_before_query(tmp_path: Path) -> None:
     case = refresh_case(tmp_path)
     case.destination.symlink_to(tmp_path / "absent")
-    with pytest.raises(FileExistsError, match="CRSP_REFRESH_OUTPUT"):
+    with pytest.raises(FileExistsError, match="CRSP_DIAGNOSTIC_OUTPUT"):
         refresh(case, limits())
     assert case.destination.is_symlink()
     assert not (tmp_path / "absent").exists()
 
 
-def test_final_bundle_cannot_be_opened_as_a_diagnostic(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["refresh", "actions"])
+def test_final_bundle_cannot_be_opened_as_a_diagnostic(
+    tmp_path: Path, operation: Literal["refresh", "actions"]
+) -> None:
     case = refresh_case(tmp_path)
     final = case.cohort.extraction.output / "final" / "bundle.json"
     with pytest.raises(ValueError, match="ENCRYPTED_ACCESS"):
-        compare_crsp_vintages(
+        capture_crsp_diagnostic(
             final,
             sha256(final.read_bytes()).hexdigest(),
             case.cohort.plan,
             evaluator_keys(tmp_path),
+            operation=operation,
             scratch=case.cohort.extraction.scratch,
             destination=case.destination,
             limits=limits(),
@@ -280,10 +287,15 @@ def test_final_bundle_cannot_be_opened_as_a_diagnostic(tmp_path: Path) -> None:
     _refused(case)
 
 
-def test_actual_study_trial_refuses_the_diagnostic_envelope(tmp_path: Path) -> None:
+@pytest.mark.parametrize("operation", ["refresh", "actions"])
+def test_actual_study_trial_refuses_the_diagnostic_envelope(tmp_path: Path, operation: str) -> None:
     case = refresh_case(tmp_path)
-    with installed(FakeDatabase(database_rows(), securities=(1,))):
-        refresh(case, limits())
+    if operation == "refresh":
+        with installed(FakeDatabase(database_rows(), securities=(1,))):
+            refresh(case, limits())
+    else:
+        with installed_actions(ActionDatabase(action_rows())):
+            capture_actions(case)
     evaluation: JSONObject = {
         "design": study_protocol(),
         "stopping_months": 6,
