@@ -2,7 +2,8 @@
   "worker_ram_gb": 0.5,
   "minimum_workers": 2,
   "expected_minutes": 10,
-  "required_tags": ["cxx"],
+  "required_tags": ["linux", "cxx"],
+  "node": "lavender",
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "media-review-mcp",
