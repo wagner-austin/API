@@ -6,7 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import NamedTuple
 
-from platform_core.json_utils import JSONObject, dump_json_str, require_int
+from platform_core.json_utils import JSONObject, dump_json_str, require_int, require_str
 
 from covenant_ml.markets.crsp_cohort_records import CrspCohortPlan, decode_crsp_cohort_plan
 from covenant_ml.markets.crsp_queries import crsp_scopes
@@ -70,8 +70,17 @@ def cohort_case(root: Path) -> CohortCase:
                             "present": True,
                             "row_sha256": sha256(dump_json_str(row).encode()).hexdigest(),
                         },
+                        "source_window": {"exit_day_offset": 28 if ordinal == 1 else 33},
                     }
-                    for ordinal, row in enumerate(rows["returns"][:2], start=1)
+                    for ordinal, row in enumerate(
+                        (
+                            row
+                            for row in rows["returns"]
+                            if require_int(row, "permno") == 1
+                            and require_str(row, "dlycaldt") in {"2017-02-01", "2017-03-01"}
+                        ),
+                        start=1,
+                    )
                 ],
             }
         ]

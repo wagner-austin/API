@@ -168,7 +168,14 @@ def test_post_query_validation_refuses_actual_out_of_contract_rows(
     ActionDatabase(rows)(PSQL, tmp_path, seconds=120, max_file_bytes=2_000_000)
     with pytest.raises(ValueError, match=r"CRSP_ACTION_LIMIT|CRSP_ACTION_SCOPE|CRSP_ACTION_KEY"):
         check_crsp_action_rows(
-            tmp_path / "train-validation", crsp_scopes(database_protocol())[0], (1,), NOW, bounds
+            {
+                item.role: (tmp_path / "train-validation" / (item.role + ".csv")).read_bytes()
+                for item in CRSP_ACTIONS
+            },
+            crsp_scopes(database_protocol())[0],
+            (1,),
+            NOW,
+            bounds,
         )
 
 
