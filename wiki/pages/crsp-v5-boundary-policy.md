@@ -128,11 +128,13 @@ training or stopping label not available before the fold boundary.[^labels]
 **One convention to review explicitly.** The holdings evaluation still
 attributes the terminal value to the window in which the delisting happened:
 that month's end value and net return include the receivable at its later-dated
-value. That is the same attribution CRSP makes when it stores a delisting return
-in the delisting period, and no decision reads it early: the receivable is not
-reinvestable, and no label using it is available, before its date. But it does
-report a monthly return containing a value not yet known at that month's exit.
-The alternative, attributing it to the month in which it is dated, changes the
+value. CRSP likewise stores a delisting return on DelDlyDt, the session after
+the delisting date, rather than on its amount date, and its monthly series
+flags whether a period's compounded return includes it.[^dlydel][^mthdel] No
+decision reads the value early: the receivable is not reinvestable, and no
+label using it is available, before its date.[^labels] But it does report a
+monthly return containing a value not yet known at that month's exit. The
+alternative, attributing it to the month in which it is dated, changes the
 period returns the paired bootstrap compares; this policy does not adopt it.
 
 ## Leakage and boundary protections
@@ -177,7 +179,8 @@ period returns the paired bootstrap compares; this policy does not adopt it.
 - **Open tails (2):** no closing span by exit.
 
 No imputation is adopted: zero, carry-forward and a literature delisting
-haircut would each be an invented outcome. Dropping securities or decision
+haircut would each be an invented outcome, and the resolvers refuse instead.[^return-path]
+Dropping securities or decision
 months would select on future outcome availability. **So if the native
 version-5 scan confirms any remaining refusal, the full-universe 2000-2020
 target is not qualified under version 5, and the record must say so.**
@@ -233,4 +236,5 @@ record.[^instrument]
 [^instrument]: `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification.py`, `qualify_crsp_panel` and `crsp_qualification_counts`; `libs/covenant_ml/src/covenant_ml/markets/crsp_qualification_run.py`, `execute_crsp_qualification`; `libs/covenant_ml/scripts/crsp_qualification.py`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py` and `libs/covenant_ml/tests/markets/test_crsp_qualification_run.py`, an open suspension and a DG delisting counted at independently located ordinals, and a real encrypted subprocess run without the final key. Fleet job 368a7a90-73ec-4a33-9359-3e19c185aefb passed make check for libs/covenant_ml at API f3de1bef42c79c92b5c87717d3c1100fc303d1d5, the published tip carrying the eventless-delisting refusal, on serendipity at 2026-11-03T08:06:41Z: guard, mypy and 5,646 tests, 100.00% statements and branches. This is synthetic evidence for the code, not a licensed qualification.
 [^dlydel]: CIZ guide p. 12, StkDelists: DelDlyDt is the date the return is stored in StkDlySecurityData, by convention the trading date immediately after the delisting date; p. 17, StkDlySecurityPrimaryData: DlyDelFlg Y means a delisting return is present.
 [^eventless]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_eventless_delisting`, `_unsold` and `crsp_resolve_window_path`; `libs/covenant_ml/tests/markets/test_crsp_qualification.py`, `test_a_delisting_the_partition_omits_is_named_rather_than_valued` (a real extract without security 8's event, one refusal at an independently located ordinal) and the held and unsold-exit cases of `test_each_refusal_has_its_counting_key_and_message`; `libs/covenant_ml/tests/markets/test_crsp_unsold_exit.py`, `test_a_sold_exit_needs_no_event_for_a_delisting_flagged_after_it`.
+[^mthdel]: CIZ guide p. 20, StkMthSecurityData: MthDelFlg indicates if the returns from delists are included in the compounded period return.
 [^dist]: CIZ guide p. 13, StkDistributions: DisPERMNO, the PERMNO of a security received in a spinoff, exchange, merger or other distribution.
