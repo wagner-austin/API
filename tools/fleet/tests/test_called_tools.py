@@ -48,8 +48,10 @@ CALLED: Final[frozenset[str]] = frozenset(
 #: with action ``lost``, which fleet-mcp serves since MCPs 60a8dbb05. The
 #: 19th and 20th are :mod:`fleet.core.queue_models`'s, actions ``loaded``
 #: and ``ended`` (MCPs board task b9235198), which fleet-mcp serves since
-#: MCPs d3ea102d2.
-CALL_SITES: Final[int] = 20
+#: MCPs d3ea102d2. The 21st is :func:`fleet.core.native_wake._post`'s
+#: ``task_post`` of each Codex wake stage (MCPs board task 562cfa7a), a tool
+#: the taskboard already serves to this package's other two posts.
+CALL_SITES: Final[int] = 21
 
 
 def constants(tree: ast.Module) -> dict[str, str]:
