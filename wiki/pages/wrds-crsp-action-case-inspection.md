@@ -4,6 +4,8 @@ tags: [wrds, crsp, diagnostics, provenance]
 hubs: [libs]
 related: ["[[wrds-crsp-corporate-action-capture]]", "[[crsp-outcome-qualification]]"]
 source_paths:
+  - tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-passed.json
+  - tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-typing-failure.json
   - libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py
   - libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py
@@ -13,6 +15,8 @@ source_paths:
   - libs/covenant_ml/tests/markets/test_crsp_action_cases.py
   - libs/covenant_ml/tests/markets/test_crsp_action_inspection.py
 source_git_blobs:
+  tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-passed.json: 682d66b51576a88169b8bdabf55ee545a40f14cf
+  tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-typing-failure.json: 52083b62bc6df8b4b64d1dd6b1c45cecbb715978
   libs/covenant_ml/src/covenant_ml/markets/crsp_cohort.py: dac732909d85ff89967b8c345d7f7af769149ebd
   libs/covenant_ml/src/covenant_ml/markets/crsp_actions.py: 2cf03ae973b98bfd3a0a0edb9d7fabc7acf54663
   libs/covenant_ml/src/covenant_ml/markets/crsp_extract.py: 85ee73a0726c6e43bea6d5af991d2ed78a9a0252
@@ -27,10 +31,14 @@ confidence: medium
 
 # CRSP action evidence matched to refused holding windows
 
-Implementation is awaiting fleet verification and native rehearsal under board
-task `4fca73b7-9c36-47a9-a705-7541813c9338`. This diagnostic measures what the
+Implementation passed the full fleet check at `89f23c71290e`.
+[[wrds-crsp-action-case-evidence]] records the completed native synthetic replay
+and licensed join; independent audit remains pending under board task
+`4fca73b7-9c36-47a9-a705-7541813c9338`.[^verification][^native]
+
+This diagnostic measures what the
 captured evidence contains; it does not qualify outcomes or authorize the
-baseline. The accepted capture is described in [[wrds-crsp-corporate-action-capture]].
+baseline. The accepted capture is described in [[wrds-crsp-corporate-action-capture]].[^inspection]
 
 ## Authentication and calendar ownership
 
@@ -68,7 +76,11 @@ remains governed by [[crsp-outcome-qualification]].[^inspection]
 The tests specify entry/exit and late-detail boundaries, event-only rows, altered
 authenticated lineage, extra files, scope violations, combined plaintext limits
 and corrupt ciphertext. Real child processes exercise success and failure;
-successful inspection requires no final key. Execution results are still pending.[^tests]
+successful inspection requires no final key. Fleet `ddc139fe` passed all
+5,555 tests with 100% coverage, strict typing and guards, in 213/300 seconds.
+The earlier `afcdd82d` run passed the tests but failed strict typing on a sort
+callback; direct natural-key ordering corrected it without relaxing the checks.
+These are different hosts, not a controlled timing comparison.[^tests][^verification]
 
 The existing extraction CLI exposes `inspect-actions` and emits metadata plus
 the native controller's metrics file. It refuses occupied result paths before
@@ -80,3 +92,5 @@ forced-termination or process-isolation guarantee.[^cli]
 [^events]: `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `_events` and `_detail`.
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_action_cases.py`, boundary and calendar refusal tests; `libs/covenant_ml/tests/markets/test_crsp_action_inspection.py`, `test_real_encrypted_case_inspection_needs_no_final_key`, `test_authenticated_but_inconsistent_capture_refuses`, `test_real_inspection_child_emits_metrics_or_cleans_ciphertext_failure`.
 [^cli]: `libs/covenant_ml/scripts/crsp_extraction.py`, `_inspect_actions`; `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `inspect_crsp_actions` cleanup return.
+[^native]: [[wrds-crsp-action-case-evidence]], § "Frozen execution and synthetic replay" and § "Licensed coverage and its limits".
+[^verification]: `tools/hpc3/artifacts/wrds-action-cases-20261103/fleet-passed.json`, `job.sha`, `job.status`, `job.detail` and measured completion trail; sibling `fleet-typing-failure.json`, failed predecessor at `4dc47aaa833b`. `libs/covenant_ml/src/covenant_ml/markets/crsp_action_cases.py`, `_events` typed natural-key ordering.

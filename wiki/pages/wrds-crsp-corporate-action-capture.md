@@ -75,7 +75,7 @@ No final key is acquired. Public receipts contain identities, timestamps,
 aggregate counts and cleanup status; observations and exact SQL stay encrypted.
 The operation supplies evidence for [[crsp-outcome-qualification]].[^capture]
 
-The pending per-case join is documented in [[wrds-crsp-action-case-inspection]].
+The per-case join and its verification limits are documented in [[wrds-crsp-action-case-inspection]].[^casejoin]
 
 One fixed projection registry defines four roles: delisting event identities,
 delisting details, distribution event identities and distribution details.
@@ -160,4 +160,5 @@ The previous four-relation comparison remains in
 [^licensed]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-actions.json`, `rows`, `bundle` and `plaintext_removed`; sibling `licensed-completion.json`, exact output digests and runtime; `licensed-ciphertext-reading.json`, checked inventory. Native service report `818a292e-791b-4174-b113-88ce2ede75d6` records scheduler completion and output identities. These are capture measurements, not economic qualification; [[crsp-outcome-qualification]], § "Additional evidence to qualify", states the remaining requirements.
 [^staging]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/licensed-stage-inspection.json`, `manifest`, `verified_files`, `inventory.directories` and exact `inventory.files`; sibling `staging-permission-correction.json`, first refusal, measured modes and correction. Service report `a88d8a8d-9cfb-41a1-92eb-f803a0bde77a` records the independent readback. `tools/hpc3/src/hpc3/core/stage.py`, `stage_manifest` and `inspect_staged_tree`; `remote.py`, `make_directory`.
 [^prior]: [[wrds-crsp-source-comparison]], § "Native evidence".
+[^casejoin]: [[wrds-crsp-action-case-inspection]], § "Authentication and calendar ownership" and § "Verification boundary".
 [^audit]: `tools/hpc3/artifacts/wrds-corporate-actions-20261103/capture-audit.json`, captured live `task_get` response: verdict, criteria, fleet checks `33ee64b6` and `b5cdaa51` and independent review evidence; sibling `fixture-audit.json`, accepted repair `4df253cc`, preserved budget failure and reviewer checks of the reduced fixture. [[wrds-encrypted-diagnostic-cohort]], § "Admission is not permission to fit this subset", describes the retained assertions.

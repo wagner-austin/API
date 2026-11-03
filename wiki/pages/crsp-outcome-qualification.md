@@ -165,6 +165,12 @@ identifiers do not authorize recursive security expansion, and event presence
 is recorded separately from details excluded by valuation/payment dates.
 This investigation supplies no replacement return policy.[^actions]
 
+The authenticated [[wrds-crsp-action-case-evidence]] now matches all 27 cases
+to their original monthly windows. Eighteen have a captured action within the
+window or on exit; this is measured coverage, not eighteen repaired outcomes.
+The native replay and licensed join passed; their independent audit remains
+pending. The other nine cases do not acquire an outcome from this join.[^casejoin]
+
 Interpretation must answer whether cash or security consideration is complete,
 when it is valued, and whether the daily total return already contains it.
 Adding distributions to a total return without that reconciliation can double
@@ -188,4 +194,5 @@ before new study admission.[^distribution][^vendor][^owners]
 [^source-checks]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/source-check-audits.json`, captured live board responses: comparison audit `dc59b228` completed VERIFIED at 2026-11-03T01:44:51.513Z; scalar-error privacy audit `9ccc6e3a` completed VERIFIED at 2026-11-03T01:55:18.663Z, each against its own acceptance criteria.
 [^catalog]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json`, exact metadata rows from the October 27 inventory and SHA-256 identities of the source column/access CSV files, rechecked November 3 UTC.
 [^actions]: [[wrds-crsp-corporate-action-capture]], § "Scope and privacy" and § "Verification status".
+[^casejoin]: [[wrds-crsp-action-case-evidence]], § "Licensed coverage and its limits".
 [^distribution]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–13, StkDelists and StkDistributions field definitions; pp. 17–18, DlyRet total-return definition. Archived primary source and digest in frontmatter. Interpretation and proposed investigation are this project's requirements, not a claim that those fields close the observed gaps.
