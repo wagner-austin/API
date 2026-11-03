@@ -1,30 +1,27 @@
-"""Refresh an authenticated diagnostic cohort in private storage and encrypt its differences."""
+"""One authenticated, private capture lifecycle for CRSP source diagnostics."""
 
 from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Literal
 
-from platform_core.json_utils import (
-    JSONObject,
-    dump_json_str,
-    load_json_str,
-    require_int,
-)
+from platform_core.json_utils import JSONObject, dump_json_str, require_int
 from platform_core.stage_manifest import encode_staged_file
 
 from ..evaluation.evidence import read_evidence, require_private_directory
 from . import _test_hooks as hooks
+from .crsp_actions import write_crsp_actions
+from .crsp_cohort import load_crsp_cohort_sources
 from .crsp_cohort_records import (
     CrspCohort,
     CrspCohortPlan,
-    decode_crsp_cohort,
     decode_crsp_cohort_plan,
     encode_crsp_cohort_plan,
 )
 from .crsp_comparison import compare_crsp_rows
-from .crsp_extract import CrspSources, encode_crsp_extract, load_crsp_sources
+from .crsp_extract import CrspSources, load_crsp_sources
 from .crsp_extraction_records import (
     CRSP_RELATIONS,
     CrspLimits,
@@ -41,20 +38,6 @@ from .crsp_snapshot import (
 )
 from .encrypted_storage import decrypted_bundle, encrypt_bundle, staged_file_record
 from .research_keys import EvaluatorKeys
-
-
-def _cohort_sources(manifest: Path, plan: CrspCohortPlan) -> tuple[CrspCohort, CrspSources]:
-    """Open the pinned diagnostic through the canonical reader in private storage only."""
-    cohort = decode_crsp_cohort(load_json_str(manifest.read_text("utf-8")))
-    if cohort["plan"] != plan:
-        raise ValueError("CRSP_REFRESH_LINEAGE: cohort differs from the independently pinned plan")
-    # This disposable view is never published as the diagnostic's manifest.
-    view = manifest.parent / "manifest.json"
-    with view.open("x", encoding="utf-8") as stream:
-        stream.write(dump_json_str(encode_crsp_extract(cohort["subset"])))
-    sources = load_crsp_sources(view)
-    check_crsp_partition(sources, crsp_scopes(sources.protocol)[0], plan["max_source_rows"])
-    return cohort, sources
 
 
 def _differences(old: CrspSources, fresh: CrspSources) -> tuple[JSONObject, JSONObject]:
@@ -93,9 +76,9 @@ def _refresh(
     cohort_digest: str,
     limits: CrspLimits,
     setup: Path | None,
-) -> tuple[CrspRefresh, JSONObject]:
+    started: str,
+) -> tuple[Path, JSONObject, str]:
     """Capture a bounded snapshot and preserve exact private source and change evidence."""
-    started = hooks.clock()
     protocol = old.protocol
     scope = crsp_scopes(protocol)[0]
     securities = tuple(sorted({require_int(row, "permno") for row in old.returns}))
@@ -110,7 +93,7 @@ def _refresh(
     prepare_crsp_queries(
         root, protocol_bytes, protocol, (scope,), source, limits["max_rows"], securities=securities
     )
-    snapshot = execute_crsp_snapshot(root, limits, (scope,))
+    snapshot = execute_crsp_snapshot(root, limits, (scope,), CRSP_RELATIONS)
     directory = root / scope.partition
     seal_crsp_manifest(directory, started, limits)
     fresh = load_crsp_sources(directory / "manifest.json")
@@ -149,15 +132,16 @@ def _refresh(
     )
     with (directory / "comparison.json").open("x", encoding="utf-8") as stream:
         stream.write(dump_json_str(encode_crsp_refresh(record)))
-    return record, counts
+    return directory / "comparison.json", counts, record["completed_at"]
 
 
-def compare_crsp_vintages(
+def capture_crsp_diagnostic(
     bundle: Path,
     bundle_sha256: str,
     plan: CrspCohortPlan,
     keys: EvaluatorKeys,
     *,
+    operation: Literal["refresh", "actions"],
     scratch: Path,
     destination: Path,
     limits: CrspLimits,
@@ -170,6 +154,7 @@ def compare_crsp_vintages(
         bundle_sha256: Independently pinned cohort bundle identity.
         plan: Independently pinned original bundle, protocol and source-path audit.
         keys: Trusted evaluator custody; only train-validation is acquired.
+        operation: Source-vintage comparison or additional corporate-action evidence.
         scratch: Private scheduler storage for decrypted and queried evidence.
         destination: New exclusive directory receiving ciphertext and bundle metadata.
         limits: Explicit query row, file, total-byte and wall-time bounds.
@@ -189,7 +174,7 @@ def compare_crsp_vintages(
     plan = decode_crsp_cohort_plan(encode_crsp_cohort_plan(plan))
     limits = decode_crsp_limits(encode_crsp_limits(limits))
     if destination.exists() or destination.is_symlink():
-        raise FileExistsError("CRSP_REFRESH_OUTPUT: refusing to replace a comparison")
+        raise FileExistsError("CRSP_DIAGNOSTIC_OUTPUT: refusing to replace diagnostic evidence")
     with (
         decrypted_bundle(
             bundle,
@@ -203,30 +188,38 @@ def compare_crsp_vintages(
     ):
         root = Path(temporary)
         require_private_directory(root)
-        cohort, old = _cohort_sources(manifest, plan)
-        record, counts = _refresh(root, manifest, cohort, old, bundle_sha256, limits, setup)
-        directory = root / "train-validation"
+        cohort, old = load_crsp_cohort_sources(manifest, plan)
+        started = hooks.clock()
+        writer = _refresh if operation == "refresh" else write_crsp_actions
+        evidence, counts, completed = writer(
+            root, manifest, cohort, old, bundle_sha256, limits, setup, started
+        )
+        directory = evidence.parent
         files = tuple(staged_file_record(path) for path in sorted(directory.iterdir()))
         if sum(item["size_bytes"] for item in files) > limits["max_partition_bytes"]:
-            raise ValueError("CRSP_REFRESH_LIMIT: comparison evidence exceeds its byte budget")
+            raise ValueError("CRSP_DIAGNOSTIC_LIMIT: complete evidence exceeds its byte budget")
         encrypt_bundle(
             directory,
             destination,
             files=files,
-            manifest=staged_file_record(directory / "comparison.json"),
+            manifest=staged_file_record(evidence),
             recipient=keys.access["validation_recipient"],
             partition="train-validation",
         )
     return {
-        "kind": "CRSP_DIAGNOSTIC_REFRESH",
+        "kind": (
+            "CRSP_DIAGNOSTIC_REFRESH"
+            if operation == "refresh"
+            else "CRSP_CORPORATE_ACTION_DIAGNOSTIC"
+        ),
         "cohort_bundle_sha256": bundle_sha256,
         "bundle": encode_staged_file(staged_file_record(destination / "bundle.json")),
-        "source": record["source"],
-        "started_at": record["fresh"]["extracted_at"],
-        "completed_at": record["completed_at"],
+        "source": old.protocol["library"] if setup is None else "synthetic",
+        "started_at": started,
+        "completed_at": completed,
         "rows": counts,
         "plaintext_removed": not root.exists() and not manifest.parent.exists(),
     }
 
 
-__all__ = ["compare_crsp_vintages"]
+__all__ = ["capture_crsp_diagnostic"]

@@ -36,7 +36,12 @@ from .crsp_cohort_records import (
     encode_crsp_cohort,
     encode_crsp_cohort_plan,
 )
-from .crsp_extract import CrspSources, crsp_extract_from_records, load_crsp_sources
+from .crsp_extract import (
+    CrspSources,
+    crsp_extract_from_records,
+    encode_crsp_extract,
+    load_crsp_sources,
+)
 from .crsp_extraction_records import CRSP_RELATIONS
 from .crsp_partition import check_crsp_partition
 from .crsp_queries import crsp_scopes
@@ -44,6 +49,34 @@ from .crsp_rows import encode_crsp_rows
 from .encrypted_storage import decrypted_bundle, encrypt_bundle, staged_file_record
 from .research_keys import EvaluatorKeys
 from .validation import require_bounded_int
+
+
+def load_crsp_cohort_sources(
+    manifest: Path, plan: CrspCohortPlan
+) -> tuple[CrspCohort, CrspSources]:
+    """Open authenticated diagnostic evidence through the canonical study-row reader.
+
+    Args:
+        manifest: Decrypted cohort manifest in disposable private storage.
+        plan: Independently pinned diagnostic lineage and resource bounds.
+
+    Returns:
+        The cohort and its checked validation-only source rows.
+
+    Raises:
+        ValueError: CRSP_COHORT_LINEAGE for changed lineage; source and partition
+            refusals propagate before a database request can run.
+        FileExistsError: A manifest view already exists in the disposable directory.
+    """
+    cohort = decode_crsp_cohort(load_json_str(manifest.read_text("utf-8")))
+    if cohort["plan"] != plan:
+        raise ValueError("CRSP_COHORT_LINEAGE: cohort differs from the independently pinned plan")
+    view = manifest.parent / "manifest.json"
+    with view.open("x", encoding="utf-8") as stream:
+        stream.write(dump_json_str(encode_crsp_extract(cohort["subset"])))
+    sources = load_crsp_sources(view)
+    check_crsp_partition(sources, crsp_scopes(sources.protocol)[0], plan["max_source_rows"])
+    return cohort, sources
 
 
 def _anchors(payload: bytes, plan: CrspCohortPlan) -> tuple[str, ...]:
@@ -244,4 +277,4 @@ def derive_crsp_cohort(
     }
 
 
-__all__ = ["derive_crsp_cohort"]
+__all__ = ["derive_crsp_cohort", "load_crsp_cohort_sources"]

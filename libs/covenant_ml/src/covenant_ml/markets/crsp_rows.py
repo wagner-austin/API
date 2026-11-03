@@ -10,6 +10,7 @@ from math import isfinite
 
 from platform_core.json_utils import JSONObject, JSONValue, require_int, require_str
 
+from .crsp_action_schema import CRSP_ACTIONS
 from .validation import require_day
 
 _KEY_FIELDS = {
@@ -17,6 +18,7 @@ _KEY_FIELDS = {
     "returns": ("permno", "dlycaldt"),
     "calendar": ("caldt",),
     "delists": ("permno", "delistingdt"),
+    **{relation.role: relation.key for relation in CRSP_ACTIONS},
 }
 
 
@@ -25,7 +27,7 @@ def crsp_row_key(row: JSONObject, relation: str) -> tuple[str, ...]:
 
     Args:
         row: A previously decoded source row.
-        relation: One of the four protocol relation roles.
+        relation: A study role or fixed corporate-action diagnostic role.
 
     Returns:
         The exact key fields, preserving date spelling and integer identity.
@@ -35,7 +37,9 @@ def crsp_row_key(row: JSONObject, relation: str) -> tuple[str, ...]:
         TypeError: A key field differs from its decoded type.
     """
     return tuple(
-        str(require_int(row, field)) if field == "permno" else require_str(row, field)
+        str(require_int(row, field))
+        if field in {"permno", "disseqnbr"}
+        else require_str(row, field)
         for field in _KEY_FIELDS[relation]
     )
 
@@ -67,12 +71,32 @@ def encode_crsp_rows(rows: Sequence[JSONObject], columns: tuple[str, ...]) -> by
 
 def _cell(column: str, text: str) -> JSONValue:
     """Validate source scalar spelling; blank nullable fields stay explicitly null."""
-    if column in {"permno", "shrcd", "exchcd"}:
+    if column in {
+        "permno",
+        "shrcd",
+        "exchcd",
+        "disseqnbr",
+        "delpermno",
+        "delpermco",
+        "dispermno",
+        "dispermco",
+    }:
         number = int(text)
         if str(number) != text or (column == "permno" and number <= 0):
             raise ValueError("[CRSP-007] invalid integer identifier or classification")
         return number
-    if column in {"dlyret", "dlyprc", "dlyvol", "delret"}:
+    if column in {
+        "dlyret",
+        "dlyprc",
+        "dlyvol",
+        "delret",
+        "deldtprc",
+        "delnextprc",
+        "deldivamt",
+        "disdivamt",
+        "disfacpr",
+        "disfacshr",
+    }:
         if text == "":
             return None
         value = float(text)
@@ -95,6 +119,10 @@ def _cell(column: str, text: str) -> JSONValue:
         "deldlydt",
         "delamtdt",
         "delnextdt",
+        "disexdt",
+        "disdeclaredt",
+        "disrecorddt",
+        "dispaydt",
     }:
         return require_day({"day": text}, "day")
     if not text.strip():
@@ -118,7 +146,7 @@ def _key(row: JSONObject, relation: str, extracted_day: str) -> tuple[str, ...]:
         # End dates may be vendor open-ended bounds after extraction.
         day = first
     else:
-        field = "dlycaldt" if relation == "returns" else "delistingdt"
+        field = _KEY_FIELDS[relation][1]
         day = require_str(row, field)
         if relation == "returns":
             previous = row["dlyprevdt"]
@@ -136,8 +164,8 @@ def decode_crsp_rows(
 
     Args:
         payload: Previously checksum-verified CSV bytes.
-        relation: One of the four protocol relation roles.
-        columns: Exact ordered columns from the frozen protocol decoder.
+        relation: A study role or fixed corporate-action diagnostic role.
+        columns: Exact ordered protocol columns or fixed diagnostic projection.
         extracted_at: Validated extraction timestamp.
 
     Returns:
@@ -148,8 +176,12 @@ def decode_crsp_rows(
             Scalar errors name the relation and column, never private values;
             raw conversion exception chaining is suppressed.
     """
-    if relation not in {"membership", "returns", "calendar", "delists"}:
+    if relation not in _KEY_FIELDS:
         raise ValueError("[CRSP-007] unknown source relation")
+    actions = {item.role: item for item in CRSP_ACTIONS}
+    action = actions.get(relation)
+    if action is not None and columns != action.columns:
+        raise ValueError("[CRSP-007] diagnostic projection differs from its fixed columns")
     reader = csv.reader(io.StringIO(payload.decode("utf-8")), strict=True)
     if next(reader, None) != list(columns):
         raise ValueError("[CRSP-007] CSV projection differs from frozen ordered columns")
@@ -161,6 +193,9 @@ def decode_crsp_rows(
             raise ValueError("[CRSP-007] CSV row width differs from its projection")
         row: JSONObject = {}
         for column, value in zip(columns, values, strict=True):
+            if action is not None and column not in action.key and value == "":
+                row[column] = None
+                continue
             try:
                 row[column] = _cell(column, value)
             except ValueError:

@@ -92,7 +92,7 @@ class CrspSnapshot(NamedTuple):
 
 
 def execute_crsp_snapshot(
-    root: Path, limits: CrspLimits, scopes: tuple[CrspScope, ...]
+    root: Path, limits: CrspLimits, scopes: tuple[CrspScope, ...], relations: tuple[str, ...]
 ) -> CrspSnapshot:
     """Run prepared queries with the existing bounded client and verify snapshot equality.
 
@@ -100,6 +100,7 @@ def execute_crsp_snapshot(
         root: Private working directory containing prepared partition directories.
         limits: Frozen wall-time and per-file byte limits.
         scopes: Exact partitions rendered by the shared query owner.
+        relations: Exact study or corporate-action roles rendered by that owner.
 
     Returns:
         Snapshot, server start time, client completion time and exact driver digest.
@@ -109,7 +110,9 @@ def execute_crsp_snapshot(
         TimeoutExpired: Client exceeds the frozen wall deadline.
         OSError: Client startup or private file access fails.
     """
-    driver = crsp_driver_sql(limits["seconds"], partitions=tuple(s.partition for s in scopes))
+    driver = crsp_driver_sql(
+        limits["seconds"], partitions=tuple(s.partition for s in scopes), relations=relations
+    )
     (root / "extract.sql").write_text(driver, encoding="utf-8")
     code = hooks.bounded_runner(
         PSQL, root, seconds=limits["seconds"], max_file_bytes=limits["max_relation_bytes"]

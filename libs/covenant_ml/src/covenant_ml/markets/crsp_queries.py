@@ -18,7 +18,9 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import NamedTuple
 
+from .crsp_action_schema import CRSP_ACTIONS
 from .crsp_calendar import crsp_month
+from .crsp_extraction_records import CRSP_RELATIONS
 from .crsp_protocol import CrspProtocol
 
 
@@ -120,6 +122,37 @@ def _codes(values: tuple[int, ...]) -> str:
     return ", ".join(str(value) for value in values)
 
 
+def _universe(
+    protocol: CrspProtocol,
+    scope: CrspScope,
+    source: CrspSource,
+    max_rows: int,
+    securities: tuple[int, ...] | None,
+) -> str:
+    """Validate query bounds and render the shared decision-time membership selection."""
+    if max_rows < 1:
+        raise ValueError("[CRSP-010] the row limit must be positive")
+    if securities is not None:
+        if scope != crsp_scopes(protocol)[0]:
+            raise ValueError("[CRSP-010] diagnostic cohorts require the frozen validation scope")
+        if (
+            not securities
+            or any(type(value) is not int or value < 1 for value in securities)
+            or tuple(sorted(set(securities))) != securities
+        ):
+            raise ValueError("[CRSP-010] the cohort must contain sorted unique positive integers")
+    query = (
+        f"SELECT DISTINCT permno FROM {source.qualifier}{protocol['membership']}"
+        f" WHERE shrcd IN ({_codes(protocol['share_codes'])})"
+        f" AND exchcd IN ({_codes(protocol['exchange_codes'])})"
+        f" AND namedt <= DATE '{scope.observation_end}'"
+        f" AND nameendt >= DATE '{scope.universe_start}'"
+    )
+    if securities is not None:
+        query += f" AND permno IN ({_codes(securities)})"
+    return query
+
+
 def crsp_relation_sql(
     protocol: CrspProtocol,
     scope: CrspScope,
@@ -154,17 +187,7 @@ def crsp_relation_sql(
         ValueError: CRSP-010 for a nonpositive row limit, malformed cohort or a
             cohort scope differing from the frozen train-validation bounds.
     """
-    if max_rows < 1:
-        raise ValueError("[CRSP-010] the row limit must be positive")
-    if securities is not None:
-        if scope != crsp_scopes(protocol)[0]:
-            raise ValueError("[CRSP-010] diagnostic cohorts require the frozen validation scope")
-        if (
-            not securities
-            or any(type(value) is not int or value < 1 for value in securities)
-            or tuple(sorted(set(securities))) != securities
-        ):
-            raise ValueError("[CRSP-010] the cohort must contain sorted unique positive integers")
+    universe = _universe(protocol, scope, source, max_rows, securities)
 
     def copy(select: str) -> str:
         """Wrap one bounded query as CSV with its header on standard output."""
@@ -173,14 +196,6 @@ def crsp_relation_sql(
     qualified = source.qualifier
     end, start = f"DATE '{scope.observation_end}'", f"DATE '{scope.history_start}'"
     names = f"{qualified}{protocol['membership']}"
-    universe = (
-        f"SELECT DISTINCT permno FROM {names}"
-        f" WHERE shrcd IN ({_codes(protocol['share_codes'])})"
-        f" AND exchcd IN ({_codes(protocol['exchange_codes'])})"
-        f" AND namedt <= {end} AND nameendt >= DATE '{scope.universe_start}'"
-    )
-    if securities is not None:
-        universe += f" AND permno IN ({_codes(securities)})"
     limit = f" LIMIT {max_rows + 1}"
     membership = ", ".join(
         f"LEAST(nameendt, {end}) AS nameendt" if column == "nameendt" else column
@@ -213,7 +228,43 @@ def crsp_relation_sql(
     }
 
 
-def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> str:
+def crsp_action_sql(
+    protocol: CrspProtocol,
+    scope: CrspScope,
+    source: CrspSource,
+    max_rows: int,
+    securities: tuple[int, ...],
+) -> dict[str, str]:
+    """Render fixed diagnostic projections without crossing validation date bounds.
+
+    Event identities survive even when payment/valuation dates exclude details.
+    Unknown dates and values remain null; their presence establishes no economic
+    completeness or historical vendor publication time.
+
+    Raises:
+        ValueError: CRSP-010 for altered scope, invalid cohort or nonpositive limit.
+    """
+    universe = _universe(protocol, scope, source, max_rows, securities)
+    queries: dict[str, str] = {}
+    for relation in CRSP_ACTIONS:
+        event = relation.dates[0]
+        end = f"DATE '{scope.observation_end}'"
+        select = (
+            f"SELECT {', '.join(relation.columns)} FROM {source.qualifier}{relation.table}"
+            f" WHERE permno IN ({universe})"
+            f" AND {event} BETWEEN DATE '{scope.history_start}' AND {end}"
+            f" AND GREATEST({', '.join(relation.dates)}) <= {end}"
+            f" ORDER BY {', '.join(relation.key)} LIMIT {max_rows + 1}"
+        )
+        queries[relation.role] = (
+            f"COPY ({source.definitions}{select}) TO STDOUT WITH (FORMAT CSV, HEADER);\n"
+        )
+    return queries
+
+
+def crsp_driver_sql(
+    statement_seconds: int, *, partitions: tuple[str, ...], relations: tuple[str, ...]
+) -> str:
     """Render the one-session script running every partition in one snapshot.
 
     All requested COPY files and two snapshot readings share one
@@ -223,6 +274,7 @@ def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> s
         statement_seconds: Positive per-statement server timeout.
         partitions: Train-validation alone for a diagnostic, or train-validation
             followed by final for the complete study extraction.
+        relations: Exact study roles, or fixed corporate-action diagnostic roles.
 
     Returns:
         Exact psql script bytes, using only paths relative to its directory.
@@ -235,6 +287,11 @@ def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> s
         raise ValueError("[CRSP-010] the statement timeout must be positive")
     if partitions not in (("train-validation",), ("train-validation", "final")):
         raise ValueError("[CRSP-010] invalid extraction partition sequence")
+    if relations != CRSP_RELATIONS and (
+        relations != tuple(item.role for item in CRSP_ACTIONS)
+        or partitions != ("train-validation",)
+    ):
+        raise ValueError("[CRSP-010] invalid relations or final corporate-action request")
     lines = [
         "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;",
         f"SET LOCAL statement_timeout = '{statement_seconds}s';",
@@ -244,7 +301,7 @@ def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> s
         "COPY (SELECT pg_current_snapshot()::text, now()) TO STDOUT WITH (FORMAT CSV);",
     ]
     for partition in partitions:
-        for relation in ("membership", "returns", "calendar", "delists"):
+        for relation in relations:
             lines += [f"\\o {partition}/{relation}.csv", f"\\i {partition}/{relation}.sql"]
     lines += [
         "\\o snapshot-last.csv",
@@ -258,6 +315,7 @@ def crsp_driver_sql(statement_seconds: int, *, partitions: tuple[str, ...]) -> s
 __all__ = [
     "CrspScope",
     "CrspSource",
+    "crsp_action_sql",
     "crsp_driver_sql",
     "crsp_relation_sql",
     "crsp_scopes",

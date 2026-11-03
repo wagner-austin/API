@@ -163,7 +163,7 @@ def extract_crsp(
         prepare_crsp_queries(
             root, protocol_bytes, protocol, scopes, relations, limits["max_rows"], securities=None
         )
-        snapshot = execute_crsp_snapshot(root, limits, scopes)
+        snapshot = execute_crsp_snapshot(root, limits, scopes, CRSP_RELATIONS)
         sealed = [_partition(root / scope.partition, scope, started, limits) for scope in scopes]
         bundles = _encrypt(root, output, scopes, access, sealed)
     for scope in scopes:
