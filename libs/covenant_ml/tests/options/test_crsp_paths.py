@@ -11,7 +11,7 @@ from platform_core.json_utils import JSONObject, require_float, require_str
 from covenant_ml.markets.crsp_calendar import crsp_month
 from covenant_ml.markets.crsp_extract import CrspSources, load_crsp_sources
 from covenant_ml.markets.crsp_holdings import index_crsp_outcomes
-from covenant_ml.markets.crsp_return_path import crsp_compound_held, crsp_held_spans
+from covenant_ml.markets.crsp_return_path import crsp_resolve_held
 from covenant_ml.options.crsp_paths import (
     ContractPath,
     PathCounts,
@@ -70,18 +70,22 @@ def test_ordinary_sessions_carry_their_own_returns(tmp_path: Path) -> None:
     assert (path.gap_sessions, path.terminal, path.exclusion) == (0, False, None)
 
 
-def test_a_missing_price_span_is_carried_flat_and_closed_once(tmp_path: Path) -> None:
-    rows = missing_price_rows()
+@pytest.mark.parametrize("price_flag", ["MP", "SU"])
+def test_an_unpriced_span_is_carried_flat_and_closed_once(tmp_path: Path, price_flag: str) -> None:
+    # A suspension (SU) is carried exactly like a missing price (MP) and
+    # counted among the carried sessions.
+    rows = missing_price_rows(price_flag=price_flag)
     outcomes = index_crsp_outcomes(_sources(tmp_path, rows))
     days = ("2019-03-11", "2019-03-12", "2019-03-13")
-    spans = crsp_held_spans(outcomes.returns, 7, "2019-03-08", days)
-    assert [index for index, _ in spans] == [1, 2]
+    held = crsp_resolve_held(outcomes.returns, 7, "2019-03-08", days)
+    assert held.refusal is None
+    assert [index for index, _ in held.spans] == [1, 2]
     path = contract_path(outcomes, 7, "2019-03-08", days)
     closed = _return(rows, 7, "2019-03-12")
     expected: list[float] = [0.0, closed, _return(rows, 7, "2019-03-13")]
     assert listed(path.returns) == pytest.approx(expected)
     assert (path.gap_sessions, path.terminal, path.exclusion) == (1, False, None)
-    growth = crsp_compound_held(outcomes.returns, 7, "2019-03-08", days)
+    growth = math.prod(span for _, span in held.spans)
     assert growth == pytest.approx((1 + closed) * (1 + _return(rows, 7, "2019-03-13")))
 
 
