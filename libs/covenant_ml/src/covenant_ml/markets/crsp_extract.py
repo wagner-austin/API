@@ -158,7 +158,7 @@ def crsp_extract_from_records(
     )
 
 
-def _read_staged(directory: Path, record: StagedFile) -> bytes:
+def read_crsp_evidence(directory: Path, record: StagedFile) -> bytes:
     """Verify shared staging size in addition to the lifted reader's digest."""
     payload = read_evidence(directory, record["name"], record["sha256"])
     if len(payload) != record["size_bytes"]:
@@ -186,7 +186,7 @@ def load_crsp_sources(path: Path) -> CrspSources:
     manifest = decode_crsp_extract(load_json_str(path.read_text("utf-8")))
     protocol = decode_crsp_protocol(
         narrow_json_to_dict(
-            load_json_str(_read_staged(path.parent, manifest["protocol"]).decode("utf-8"))
+            load_json_str(read_crsp_evidence(path.parent, manifest["protocol"]).decode("utf-8"))
         )
     )
     records: list[tuple[JSONObject, ...]] = []
@@ -196,9 +196,9 @@ def load_crsp_sources(path: Path) -> CrspSources:
         ("calendar", manifest["calendar"], protocol["calendar_columns"]),
         ("delists", manifest["delists"], protocol["delists_columns"]),
     ):
-        query = _read_staged(path.parent, relation["query"])
+        query = read_crsp_evidence(path.parent, relation["query"])
         if not query.strip():
             raise ValueError("[CRSP-006] extraction SQL must not be blank")
-        payload = _read_staged(path.parent, relation["csv"])
+        payload = read_crsp_evidence(path.parent, relation["csv"])
         records.append(decode_crsp_rows(payload, name, columns, manifest["extracted_at"]))
     return CrspSources(manifest, protocol, records[0], records[1], records[2], records[3])

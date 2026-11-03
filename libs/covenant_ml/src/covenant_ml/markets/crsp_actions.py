@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from hashlib import sha256
 from pathlib import Path
+from typing import NamedTuple
 
 from platform_core.json_utils import JSONObject, dump_json_str, require_int, require_str
 
@@ -23,13 +24,20 @@ from .crsp_snapshot import execute_crsp_snapshot
 from .encrypted_storage import staged_file_record
 
 
+class CrspActionRows(NamedTuple):
+    """Checked source rows and coverage counts from the same decoding pass."""
+
+    rows: dict[str, tuple[JSONObject, ...]]
+    counts: JSONObject
+
+
 def check_crsp_action_rows(
-    directory: Path,
+    payloads: dict[str, bytes],
     scope: CrspScope,
     securities: tuple[int, ...],
     started_at: str,
     limits: CrspLimits,
-) -> JSONObject:
+) -> CrspActionRows:
     """Validate actual returned bytes before publishing any diagnostic evidence.
 
     All dated observations must fit the partition, even if a database or a
@@ -40,15 +48,18 @@ def check_crsp_action_rows(
         ValueError: CRSP_ACTION_LIMIT/SCOPE/KEY for excessive or inconsistent
             evidence; canonical CSV reader errors for malformed source rows.
     """
-    sizes = [(directory / (item.role + ".csv")).stat().st_size for item in CRSP_ACTIONS]
+    if set(payloads) != {item.role for item in CRSP_ACTIONS}:
+        raise ValueError("CRSP_ACTION_KEY: require every action projection exactly once")
+    sizes = [len(payloads[item.role]) for item in CRSP_ACTIONS]
     if max(sizes) > limits["max_relation_bytes"] or sum(sizes) > limits["max_partition_bytes"]:
         raise ValueError("CRSP_ACTION_LIMIT: source bytes exceed diagnostic bounds")
     counts: JSONObject = {}
+    records: dict[str, tuple[JSONObject, ...]] = {}
     keys: dict[str, set[tuple[str, ...]]] = {}
     allowed = set(securities)
     for relation in CRSP_ACTIONS:
         rows = decode_crsp_rows(
-            (directory / (relation.role + ".csv")).read_bytes(),
+            payloads[relation.role],
             relation.role,
             relation.columns,
             started_at,
@@ -67,6 +78,7 @@ def check_crsp_action_rows(
                 raise ValueError("CRSP_ACTION_SCOPE: observations exceed the pinned cohort scope")
         keys[relation.role] = {crsp_row_key(row, relation.role) for row in rows}
         counts[relation.role] = len(rows)
+        records[relation.role] = rows
     for events, details in (
         ("delist-events", "delist-details"),
         ("distribution-events", "distributions"),
@@ -75,7 +87,7 @@ def check_crsp_action_rows(
             raise ValueError("CRSP_ACTION_KEY: detail has no corresponding event identity")
         count_name = events.removesuffix("-events") + "-without-details"
         counts[count_name] = len(keys[events] - keys[details])
-    return counts
+    return CrspActionRows(records, counts)
 
 
 def write_crsp_actions(
@@ -118,7 +130,8 @@ def write_crsp_actions(
     snapshot = execute_crsp_snapshot(
         root, limits, (scope,), tuple(item.role for item in CRSP_ACTIONS)
     )
-    counts = check_crsp_action_rows(directory, scope, securities, started, limits)
+    payloads = {item.role: (directory / (item.role + ".csv")).read_bytes() for item in CRSP_ACTIONS}
+    checked = check_crsp_action_rows(payloads, scope, securities, started, limits)
     for name in ("extract.sql", "snapshot-first.csv", "snapshot-last.csv"):
         (root / name).rename(directory / name)
     if definitions is not None:
@@ -143,7 +156,7 @@ def write_crsp_actions(
     evidence = directory / "actions.json"
     with evidence.open("x", encoding="utf-8") as stream:
         stream.write(dump_json_str(encode_crsp_action_evidence(record)))
-    return evidence, counts, snapshot.completed_at
+    return evidence, checked.counts, snapshot.completed_at
 
 
-__all__ = ["check_crsp_action_rows", "write_crsp_actions"]
+__all__ = ["CrspActionRows", "check_crsp_action_rows", "write_crsp_actions"]

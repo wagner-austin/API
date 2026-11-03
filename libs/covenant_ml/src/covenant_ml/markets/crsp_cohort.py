@@ -79,7 +79,7 @@ def load_crsp_cohort_sources(
     return cohort, sources
 
 
-def _anchors(payload: bytes, plan: CrspCohortPlan) -> tuple[str, ...]:
+def crsp_audit_cases(payload: bytes, plan: CrspCohortPlan) -> tuple[JSONObject, ...]:
     """Require every pinned refused case to identify a distinct present entry row."""
     document = narrow_json_to_dict(load_json_str(payload.decode()))
     results = require_list(document, "results")
@@ -102,6 +102,7 @@ def _anchors(payload: bytes, plan: CrspCohortPlan) -> tuple[str, ...]:
         raise ValueError("CRSP_COHORT_AUDIT: audit case counts differ from the plan")
     ordinals: list[int] = []
     anchors: list[str] = []
+    records: list[JSONObject] = []
     for value in cases:
         case = narrow_json_to_dict(value)
         entry = require_dict(case, "entry")
@@ -110,22 +111,25 @@ def _anchors(payload: bytes, plan: CrspCohortPlan) -> tuple[str, ...]:
             raise ValueError("CRSP_COHORT_AUDIT: require a present non-final entry anchor")
         ordinals.append(require_bounded_int(case, "path_ordinal", 1, paths))
         anchors.append(require_digest(entry, "row_sha256"))
+        records.append(case)
     if ordinals != sorted(set(ordinals)) or len(set(anchors)) != len(anchors):
         raise ValueError("CRSP_COHORT_AUDIT: require distinct ordered cases and entry anchors")
-    return tuple(anchors)
+    return tuple(records)
 
 
-def _securities(sources: CrspSources, anchors: tuple[str, ...]) -> frozenset[int]:
+def resolve_crsp_anchors(
+    sources: CrspSources, cases: tuple[JSONObject, ...]
+) -> dict[str, JSONObject]:
     """Resolve pinned row hashes in authenticated sources without exposing identifiers."""
-    expected = set(anchors)
-    matched: dict[str, int] = {}
+    expected = {require_digest(require_dict(case, "entry"), "row_sha256") for case in cases}
+    matched: dict[str, JSONObject] = {}
     for row in sources.returns:
         digest = sha256(dump_json_str(row).encode()).hexdigest()
         if digest in expected:
-            matched[digest] = require_int(row, "permno")
+            matched[digest] = row
     if set(matched) != expected:
         raise ValueError("CRSP_COHORT_ANCHOR: an audited entry row is absent or changed")
-    return frozenset(matched.values())
+    return matched
 
 
 def _write_subset(
@@ -231,7 +235,7 @@ def derive_crsp_cohort(
     if destination.exists() or destination.is_symlink():
         raise FileExistsError("CRSP_COHORT_OUTPUT: refusing to replace a diagnostic")
     audit_bytes = read_evidence(audit_path.parent, audit_path.name, plan["audit_sha256"])
-    anchors = _anchors(audit_bytes, plan)
+    cases = crsp_audit_cases(audit_bytes, plan)
     with (
         decrypted_bundle(
             bundle_path,
@@ -249,7 +253,8 @@ def derive_crsp_cohort(
         if sources.manifest["protocol"]["sha256"] != plan["protocol_sha256"]:
             raise ValueError("CRSP_COHORT_PROTOCOL: source protocol differs from the plan")
         check_crsp_partition(sources, crsp_scopes(sources.protocol)[0], plan["max_source_rows"])
-        securities = _securities(sources, anchors)
+        anchors = resolve_crsp_anchors(sources, cases)
+        securities = frozenset(require_int(row, "permno") for row in anchors.values())
         cohort, counts = _write_subset(
             manifest.parent, private, sources, securities, audit_bytes, plan
         )
@@ -277,4 +282,9 @@ def derive_crsp_cohort(
     }
 
 
-__all__ = ["derive_crsp_cohort", "load_crsp_cohort_sources"]
+__all__ = [
+    "crsp_audit_cases",
+    "derive_crsp_cohort",
+    "load_crsp_cohort_sources",
+    "resolve_crsp_anchors",
+]
