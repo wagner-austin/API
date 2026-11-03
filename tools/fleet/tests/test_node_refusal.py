@@ -19,9 +19,14 @@ class TestWrongNode:
     def test_a_project_pinned_elsewhere_is_refused_naming_its_node(self) -> None:
         refused = wrong_node(_node(host="lavender"), _project(node="colossus"))
 
-        assert refused is not None
-        assert refused["code"] is FleetErrorCode.NODE_NOT_PINNED
-        assert refused["reason"].startswith("lavender is not colossus: ")
+        assert refused == {
+            "workers": 0,
+            "code": FleetErrorCode.NODE_NOT_PINNED,
+            "reason": (
+                "lavender is not colossus: the project runs on colossus alone, because it reads "
+                "what only that host holds, so the answer is that node and never this one."
+            ),
+        }
 
 
 class TestMachineRefusal:
@@ -45,5 +50,11 @@ class TestMachineRefusal:
             _node(max_disk_gb=20.0), _state(free_disk_gb=5.0, on_battery=True)
         )
 
-        assert refused is not None
-        assert refused["code"] is FleetErrorCode.NODE_DISK_EXHAUSTED
+        assert refused == {
+            "workers": 0,
+            "code": FleetErrorCode.NODE_DISK_EXHAUSTED,
+            "reason": (
+                "lavender has 5 GB free and this workspace reserves 20 GB for staged trees. The "
+                "first dispatch to a node is a cold stage of a whole monorepo."
+            ),
+        }
