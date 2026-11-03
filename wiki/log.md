@@ -575,3 +575,7 @@ Notes: Preserve failed synthetic import attempt separately from two verified dat
 ## [2026-11-03] Corporate-action capture | Shared diagnostic owner
 Page added: wrds-crsp-corporate-action-capture; linked from qualification, comparison and libs, total 75 pages.
 Notes: Describe fixed event/detail projections and the lifted private capture lifecycle. Keep source implementation, fleet verification and native database evidence distinct; qualification remains open. Reverify affected source citations after moving the cohort reader and query bounds into shared owners. Board task fd32dc2e-b3c0-4e24-977c-8708667453e6.
+
+## [2026-11-03] Action-case inspection | Reuse audit anchors and monthly windows
+Page added: wrds-crsp-action-case-inspection; capture linked, libs hub and index now 76 pages.
+Notes: Document authenticated case joins and their privacy and economic limits. Fleet verification and native rehearsal remain pending under board task 4fca73b7-9c36-47a9-a705-7541813c9338. Reverify existing cohort, capture, comparison and extraction claims after lifting the shared readers.
