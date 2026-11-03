@@ -14,6 +14,16 @@ entry and exit daily records so a reviewer can join it to earlier diagnostics.
 No security identifier, calendar date, price or return is published. Every
 label depends on its decision's full-universe benchmark, so the report also
 counts the decisions, and the rows in them, that any refusal leaves unlabelled.
+
+An unfilled order (an entry record without a closing trade) is valued as cash,
+so its row is labelled against the benchmark with a multiplier of exactly one:
+positive in every month the benchmark falls. That is a changed target, the
+order's outcome rather than the security's, so each decision's unfilled count
+is published beside its size and counted by period.
+
+The record digests are unsalted, so a holder of the same vendor row can confirm
+it; they are kept only to join the version-3 diagnosis, which published the
+same digests.
 """
 
 from __future__ import annotations
@@ -36,7 +46,7 @@ from typing_extensions import ReadOnly, TypedDict
 from .crsp_extract import CrspSources
 from .crsp_holdings import (
     CrspOutcomes,
-    CrspPathRefusal,
+    CrspPath,
     crsp_resolve_window_path,
     index_crsp_outcomes,
 )
@@ -72,10 +82,14 @@ class CrspQualification(TypedDict):
 
     Attributes:
         members: Eligible securities per decision, in panel order.
+        unfilled: Unfilled orders per decision, valued as cash, in panel order.
+        training_decisions: How many leading decisions precede validation.
         refused: Every refused path, in walk order.
     """
 
     members: ReadOnly[tuple[int, ...]]
+    unfilled: ReadOnly[tuple[int, ...]]
+    training_decisions: ReadOnly[int]
     refused: ReadOnly[tuple[CrspRefusedPath, ...]]
 
 
@@ -92,8 +106,9 @@ def qualify_crsp_panel(sources: CrspSources) -> CrspQualification:
         sources: Verified train-validation evidence carrying the frozen design.
 
     Returns:
-        Decision sizes and every refused path; an empty refusal tuple means
-        every label and every holding the design can need is valued.
+        Decision sizes, unfilled orders and every refused path; an empty
+        refusal tuple means every label and every holding the design can
+        need is valued.
 
     Raises:
         ValueError: CRSP-002/CRSP-009 for a calendar fault the panel or the
@@ -103,15 +118,20 @@ def qualify_crsp_panel(sources: CrspSources) -> CrspQualification:
     outcomes = index_crsp_outcomes(sources)
     validation = sources.protocol["validation_start"]
     members: list[int] = []
+    unfilled: list[int] = []
     refused: list[CrspRefusedPath] = []
     ordinal = 0
-    for index, decision in enumerate(crsp_known_panel(sources)):
+    panel = crsp_known_panel(sources)
+    for index, decision in enumerate(panel):
         window = decision.window
         members.append(len(decision.features))
+        unfilled.append(0)
         for feature in decision.features:
             ordinal += 1
             path = crsp_resolve_window_path(outcomes, feature.permno, window)
-            if isinstance(path, CrspPathRefusal):
+            if isinstance(path, CrspPath):
+                unfilled[-1] += 0 if path.filled else 1
+            else:
                 refused.append(
                     CrspRefusedPath(
                         ordinal=ordinal,
@@ -122,7 +142,12 @@ def qualify_crsp_panel(sources: CrspSources) -> CrspQualification:
                         exit_sha256=_digest(outcomes, feature.permno, window.exit),
                     )
                 )
-    return CrspQualification(members=tuple(members), refused=tuple(refused))
+    return CrspQualification(
+        members=tuple(members),
+        unfilled=tuple(unfilled),
+        training_decisions=sum(1 for item in panel if item.window.decision < validation),
+        refused=tuple(refused),
+    )
 
 
 def crsp_qualification_counts(value: CrspQualification) -> JSONObject:
@@ -132,9 +157,11 @@ def crsp_qualification_counts(value: CrspQualification) -> JSONObject:
         value: A complete qualification.
 
     Returns:
-        Path and decision totals, refusals by reason and period, and the
-        decisions and rows whose full-universe labels a refusal leaves unknown.
+        Path and decision totals, refusals by reason and period, unfilled
+        orders by period, and the decisions and rows whose full-universe
+        labels a refusal leaves unknown.
     """
+    split = value["training_decisions"]
     by_reason = Counter(path["reason"] for path in value["refused"])
     by_period = Counter(path["period"] for path in value["refused"])
     reasons: JSONObject = {}
@@ -148,6 +175,8 @@ def crsp_qualification_counts(value: CrspQualification) -> JSONObject:
         "refused": len(value["refused"]),
         "reasons": reasons,
         "periods": periods,
+        "unfilled_training": sum(value["unfilled"][:split]),
+        "unfilled_validation": sum(value["unfilled"][split:]),
         "dependent_decisions": len(dependent),
         "dependent_rows": sum(value["members"][index] for index in dependent),
     }
@@ -163,6 +192,7 @@ def encode_crsp_qualification(value: CrspQualification) -> JSONObject:
         Canonical document; refused paths are the published ``results``.
     """
     members: list[JSONValue] = list(value["members"])
+    unfilled: list[JSONValue] = list(value["unfilled"])
     results: list[JSONValue] = []
     for path in value["refused"]:
         encoded: JSONObject = {
@@ -174,7 +204,12 @@ def encode_crsp_qualification(value: CrspQualification) -> JSONObject:
             "exit_sha256": path["exit_sha256"],
         }
         results.append(encoded)
-    return {"members": members, "results": results}
+    return {
+        "members": members,
+        "unfilled": unfilled,
+        "training_decisions": value["training_decisions"],
+        "results": results,
+    }
 
 
 def _optional_digest(document: JSONObject, key: str) -> str | None:
@@ -187,14 +222,16 @@ def _optional_digest(document: JSONObject, key: str) -> str | None:
     return digest
 
 
-def _decode_path(document: JSONObject, decisions: int) -> CrspRefusedPath:
-    """Require one refused path's exact fields and bounds."""
+def _decode_path(document: JSONObject, decisions: int, training: int) -> CrspRefusedPath:
+    """Require one refused path's exact fields, bounds and period."""
     if set(document) != set(CrspRefusedPath.__annotations__):
         raise ValueError("CRSP_QUALIFICATION: exact refused-path fields required")
     period = require_str(document, "period")
     decision = require_int(document, "decision")
     if period not in PERIODS or not 0 <= decision < decisions:
         raise ValueError("CRSP_QUALIFICATION: refused path names no panel decision or period")
+    if period != ("validation" if decision >= training else "training"):
+        raise ValueError("CRSP_QUALIFICATION: a refused path's period disagrees with its decision")
     return CrspRefusedPath(
         ordinal=require_int(document, "ordinal"),
         decision=decision,
@@ -216,17 +253,26 @@ def decode_crsp_qualification(document: JSONObject) -> CrspQualification:
 
     Raises:
         ValueError: CRSP_QUALIFICATION for unknown fields, a negative decision
-            size, a refused path outside the panel, or ordinals that are not
-            strictly increasing within the walk.
+            size, unfilled counts that do not fit their decisions, a training
+            split outside the panel, a refused path outside the panel or in
+            the wrong period, more unfilled and refused paths than members,
+            or ordinals that are not strictly increasing within the walk.
     """
-    if set(document) != {"members", "results"}:
+    if set(document) != {"members", "unfilled", "training_decisions", "results"}:
         raise ValueError("CRSP_QUALIFICATION: exact qualification fields required")
-    sizes = require_list(document, "members")
-    members = tuple(require_int({"size": size}, "size") for size in sizes)
+    members = _sizes(document, "members")
+    unfilled = _sizes(document, "unfilled")
     if any(size < 0 for size in members):
         raise ValueError("CRSP_QUALIFICATION: decision sizes must be nonnegative")
+    if len(unfilled) != len(members) or any(
+        not 0 <= count <= size for count, size in zip(unfilled, members, strict=True)
+    ):
+        raise ValueError("CRSP_QUALIFICATION: unfilled counts must fit their decisions")
+    training = require_int(document, "training_decisions")
+    if not 0 <= training <= len(members):
+        raise ValueError("CRSP_QUALIFICATION: the training split lies outside the panel")
     refused = tuple(
-        _decode_path(narrow_json_to_dict(item), len(members))
+        _decode_path(narrow_json_to_dict(item), len(members), training)
         for item in require_list(document, "results")
     )
     starts = [sum(members[:index]) for index in range(len(members))]
@@ -236,7 +282,17 @@ def decode_crsp_qualification(document: JSONObject) -> CrspQualification:
             raise ValueError("CRSP_QUALIFICATION: an ordinal lies outside its decision's walk")
     if any(later["ordinal"] <= earlier["ordinal"] for earlier, later in pairwise(refused)):
         raise ValueError("CRSP_QUALIFICATION: ordinals must strictly increase")
-    return CrspQualification(members=members, refused=refused)
+    refusals = Counter(path["decision"] for path in refused)
+    if any(unfilled[index] + count > members[index] for index, count in refusals.items()):
+        raise ValueError("CRSP_QUALIFICATION: a decision has more unfilled and refused paths")
+    return CrspQualification(
+        members=members, unfilled=unfilled, training_decisions=training, refused=refused
+    )
+
+
+def _sizes(document: JSONObject, key: str) -> tuple[int, ...]:
+    """Require a list of integers, one per decision."""
+    return tuple(require_int({key: size}, key) for size in require_list(document, key))
 
 
 __all__ = [
