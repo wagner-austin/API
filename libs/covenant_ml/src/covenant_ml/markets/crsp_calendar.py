@@ -218,9 +218,10 @@ class TerminalResolution(NamedTuple):
 def crsp_resolve_terminal(row: JSONObject) -> TerminalResolution:
     """Value a delisting record, reporting rather than raising an unresolved one.
 
-    ``dated-value-next-rebalance`` marks the terminal receivable on the latest of
-    DelDlyDt, DelAmtDt and a present DelNextDt. It becomes modeled reinvestable
-    value at the next scheduled rebalance strictly after that date. This is a
+    ``unsold-exit-event-label-at-valuation`` marks the terminal receivable on the
+    latest of DelDlyDt, DelAmtDt and a present DelNextDt. It becomes modeled
+    reinvestable value at the next scheduled rebalance strictly after that date,
+    and no label that depends on it is available before it. This is a
     retrospective settlement assumption, not observed cash receipt. A return
     the vendor flags missing is never read, so its null DelRet is no error.
 
@@ -256,8 +257,8 @@ def crsp_resolve_terminal(row: JSONObject) -> TerminalResolution:
 def crsp_terminal_value(row: JSONObject) -> tuple[str, float]:
     """Return the terminal valuation date and multiplier, never an actual cash date.
 
-    The valuation is :func:`crsp_resolve_terminal`'s. The evaluator must refuse
-    an outcome whose required value is dated after its scoring exit.
+    The valuation is :func:`crsp_resolve_terminal`'s. The evaluator must not
+    treat the value as known, reinvestable or labelled before that date.
 
     Args:
         row: Complete stkdelists record. DelAmtDt is required; DelNextDt is nullable.

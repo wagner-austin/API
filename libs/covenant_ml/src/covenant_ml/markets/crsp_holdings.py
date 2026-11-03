@@ -5,18 +5,23 @@ the first trading close of a month, the investable value (held positions plus
 cash whose terminal valuation date lies strictly before that close) is split
 equally across the selected securities. Traded notional is measured against
 the drifted pre-trade positions and actual post-cost targets. The budget
-equation pays that cost from the portfolio. A confirmed pre-entry delisting
-rejects a new purchase: its equal allocation stays in zero-interest cash,
-without replacement or redistribution. Positions then compound their own
-evidenced return intervals to the next rebalance. A security delisted inside the
-window stops compounding at its delisting date and becomes a receivable worth
-its terminal multiplier, applied once and dated by ``crsp_terminal_value``; it
-is not reinvested until a rebalance strictly after that date. The last window
-also pays the cost of liquidating its remaining positions at its exit close.
+equation pays that cost from the portfolio. A new purchase whose entry record
+is present but is not a recorded closing trade (a confirmed pre-entry
+delisting, a quote, a suspension or an untracked day) is unfilled: its equal
+allocation stays in zero-interest cash, without replacement or redistribution.
+A position already held still needs a closing trade at every rebalance.
+Positions then compound their own evidenced return intervals to the next
+rebalance. A security delisted inside the window, or on an exit close at which
+it has no closing trade to sell into, stops compounding at its delisting date
+and becomes a receivable worth its terminal multiplier, applied once and dated
+by ``crsp_terminal_value``; it is not reinvested until a rebalance strictly
+after that date, which may follow the exit. The last window also pays the cost
+of liquidating its remaining positions at its exit close.
 
-Only explicit missing-price rows resolved by an exactly dated multi-session
-return are accepted. Missing fills, unresolved held intervals or terminal
-values refuse the whole evaluation. A partial result is never returned.
+Only unpriced rows resolved by an exactly dated multi-session return are
+accepted. An absent entry record, a held position without a closing trade,
+unresolved held intervals or terminal values refuse the whole evaluation. A
+partial result is never returned.
 """
 
 from __future__ import annotations
@@ -54,8 +59,8 @@ class CrspPath(NamedTuple):
             retains cash with growth one and no terminal claim.
         growth: Compounded evidenced returns after entry, through the exit
             or, for a delisted security, through its delisting date.
-        terminal: Terminal valuation date and multiplier when the security was
-            delisted inside the window, else None.
+        terminal: Terminal valuation date, possibly after the exit, and
+            multiplier when the security was delisted in this window, else None.
     """
 
     filled: bool
@@ -77,7 +82,7 @@ class CrspPeriod(NamedTuple):
     Args:
         window: Decision, entry and exit closes.
         selected: Decision-time selections, including rejected purchases.
-        unfilled: Selections whose confirmed terminal record prevented purchase.
+        unfilled: Selections with no closing trade at entry, kept as cash.
         cash: Reinvestable cash as a share of the pre-liquidation end value.
         turnover: Traded notional over the start value, liquidation included.
         cost: Transaction cost over the start value.
@@ -151,21 +156,31 @@ def _sessions_after(sessions: tuple[str, ...], entry: str, end: str) -> tuple[st
 def _terminal_row(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> JSONObject | None:
     """Find the one terminal event that stops a position inside the window.
 
+    DelistingDt is the security's last price on its exchange (CIZ guide p.11).
+    An event on the exit close belongs to the next window when the exit record
+    is a closing trade, because the position is sold into it. When the exit
+    record is present but is no closing trade, nothing can be sold there and
+    the position ends with this window's terminal value instead.
+
     Args:
         outcomes: Indexed evidence.
         permno: Held security.
-        window: The holding window; events on its exit close belong to the next.
+        window: The holding window.
 
     Returns:
-        The event dated in ``[entry, exit)``, or None.
+        The event dated in ``[entry, exit)``, or on the exit close when the
+        exit record is present without a closing trade, or None.
 
     Raises:
         ValueError: CRSP-009 for two events inside one window.
     """
+    exit_row = outcomes.returns.get((permno, window.exit))
+    unsold = exit_row is not None and exit_row["dlyprcflg"] != outcomes.protocol["execution_flag"]
     rows = [
         row
         for row in outcomes.delists.get(permno, ())
-        if window.entry <= require_str(row, "delistingdt") < window.exit
+        if window.entry <= (day := require_str(row, "delistingdt")) < window.exit
+        or (unsold and day == window.exit)
     ]
     if len(rows) > 1:
         raise ValueError("[CRSP-009] one window cannot hold two terminal events")
@@ -178,8 +193,11 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
     The daily series' own delisting-flagged rows after the delisting date are
     never compounded: the terminal multiplier comes from ``stkdelists`` alone,
     so a terminal outcome is counted exactly once. Label construction uses this
-    same path as holdings: a confirmed rejected order retains cash, while an
-    executed order requires a tradable exit or an in-window terminal event.
+    same path as holdings: an unfilled order retains cash, while an executed
+    order requires a tradable exit or a terminal event of this window. The
+    terminal value may be dated after the exit; the caller dates the label
+    and the receivable by it, and the partition already excludes any event
+    whose valuation lies past its observation end.
 
     Args:
         outcomes: Indexed evidence.
@@ -187,14 +205,14 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
         window: Holding window.
 
     Returns:
-        The ordinary growth and, for an in-window delisting, its dated value.
+        The ordinary growth and, for a delisting in this window, its dated value.
 
     Raises:
-        ValueError: CRSP-004 for an unexecutable entry or ordinary exit;
-            CRSP-009 for a missing or inconsistent held return or a
-            terminal value dated after the exit; CRSP-005 propagates for an
-            unresolved terminal event; CRSP-010 for contradictory terminal-entry
-            evidence; CRSP-011 for an unresolved price gap at the boundary.
+        ValueError: CRSP-004 for a malformed entry trade or an unexecutable
+            ordinary exit; CRSP-009 for a missing entry record or a missing or
+            inconsistent held return; CRSP-005 propagates for an unresolved
+            terminal event; CRSP-010 for contradictory terminal-entry evidence;
+            CRSP-011 for an unresolved price gap at the boundary.
     """
     days = _sessions_after(outcomes.sessions, window.entry, window.exit)
     if not _entry_filled(outcomes, permno, window):
@@ -207,19 +225,19 @@ def crsp_window_path(outcomes: CrspOutcomes, permno: int, window: CrspWindow) ->
     if terminal is None:
         _require_fill(outcomes, permno, window.exit)
         return CrspPath(True, growth, None)
-    valued, multiplier = crsp_terminal_value(terminal)
-    if valued > window.exit:
-        raise ValueError(f"[CRSP-009] terminal value for {permno} is dated after the exit")
-    return CrspPath(True, growth, (valued, multiplier))
+    return CrspPath(True, growth, crsp_terminal_value(terminal))
 
 
 def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bool:
-    """Distinguish one confirmed rejected new purchase from unverifiable evidence.
+    """Distinguish an executed new purchase from an unfilled one and from no evidence.
 
-    A terminal daily row is a rejected order only when exactly one event at
+    An order fills only at a recorded closing trade (CIZ price flag TR, guide
+    p.88). A present entry record with any other price flag (a quote BA, SU,
+    HA, NT, MP) is an unfilled order: no security was bought and no return is
+    imputed. A terminal daily row is unfilled only when exactly one event at
     the decision close precedes entry, the duration is DD and the price is
-    not marked as a closing trade. No terminal return is imputed: no security
-    was bought. Missing or contradictory evidence still refuses evaluation.
+    not marked as a closing trade. An absent record, a contradictory terminal
+    row or a malformed trade still refuses evaluation.
 
     Args:
         outcomes: Indexed verified source records.
@@ -227,14 +245,17 @@ def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bo
         window: Decision and execution dates.
 
     Returns:
-        True for a verified closing trade, False for a confirmed rejection.
+        True for a verified closing trade, False for an unfilled order.
 
     Raises:
-        ValueError: CRSP-010 for inconsistent terminal-entry evidence;
-            CRSP-004/009 propagate for other unexecutable entries.
+        ValueError: CRSP-009 for an absent entry record; CRSP-010 for
+            inconsistent terminal-entry evidence; CRSP-004 propagates for a
+            closing trade without a finite positive price.
     """
     row = outcomes.returns.get((permno, window.entry))
-    if row is not None and row["dlydelflg"] == "Y":
+    if row is None:
+        raise ValueError(f"[CRSP-009] no execution record for {permno} on {window.entry}")
+    if row["dlydelflg"] == "Y":
         events = [
             item
             for item in outcomes.delists.get(permno, ())
@@ -248,7 +269,9 @@ def _entry_filled(outcomes: CrspOutcomes, permno: int, window: CrspWindow) -> bo
         ):
             raise ValueError(f"[CRSP-010] inconsistent terminal entry for {permno}")
         return False
-    _require_fill(outcomes, permno, window.entry)
+    if row["dlyprcflg"] != outcomes.protocol["execution_flag"]:
+        return False
+    require_crsp_execution_price(row, outcomes.protocol)
     return True
 
 
