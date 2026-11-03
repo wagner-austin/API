@@ -96,6 +96,12 @@ Follow-up task `f963ee0b` tracks that protocol/source qualification.
 requirements, including partition-boundary event visibility. The reviewed source
 diagnosis remains the starting evidence; no new outcome policy is approved.[^sources]
 
+Current source contains a prospective version-4 extension for exactly closed
+suspension spans. It rejects version-3 runtime requests and retains unresolved
+tail and execution refusals. This is not a replacement installed controller,
+licensed dataset revision or native full-panel qualification; those remain
+gated by review. The original 27-case evidence and study stop still apply.[^qualification]
+
 [[wrds-encrypted-diagnostic-cohort]] records the verified encrypted subset
 derived for that source comparison, including its separate native
 attempts and the enforced prohibition on using it as a study dataset.[^cohort]

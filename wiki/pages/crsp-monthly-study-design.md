@@ -20,13 +20,13 @@ source_paths:
   - "libs/covenant_ml/tests/markets/test_research_trial.py"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-freeze-20261031/protocol.json": "42137d1e107819d0030fcae10ca1ca560d6e8f6d"
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "5c3466abb1a51adcee45af46c3520eb8cd3b0eeb"
-  "libs/covenant_ml/docs/crsp-monthly.json": "a095650070b230379e759563df3c20b3c2476ded"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "5e809a95dfd22a7c19755b10b69ee5e1e786571d"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "2abd15f50e785780a498105f4952d47ab100ecbf"
+  "libs/covenant_ml/docs/crsp-monthly.json": "c2e05e3bfd8c573416caeb5ff4bccdc7ad2fc53b"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "a056079aa5af72b6ab9cf601cd7e0b04902da124"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
-  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "9bebea9b06d2962c8cde8c0b874ecaf9cfd2586b"
+  "libs/covenant_ml/tests/markets/test_crsp_protocol.py": "92b9189fd6cb416afd50d572ff8750c16ebe73dd"
   "tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json": "5f5d4ee9854c67bb76bf3894333c965b2add1763"
-  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "8e6b7f132dfb8696ef8f88c794243b68e1ec9f23"
+  "libs/covenant_ml/docs/MARKET_RESEARCH.md": "ad8b3f98f9c9cebf97327fcf513e352969d3327e"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
   "libs/covenant_ml/src/covenant_ml/markets/research_trial_records.py": "325bc527818cfa1c6464541208c1cb15baa5967f"
@@ -37,7 +37,7 @@ provenance:
   - "Lifted from wrds-equity-research-protocol at API 14b60b8610c98f17357869422cf2239ef4fddbf8 on 2026-10-30; dated measurements retain their original scope. Board task daca401b-a9cc-4cc8-8626-8ee760bedad5."
   - "Vendor semantics: tech-wiki pages crsp-ciz-daily-return-contract, crsp-ciz-daily-return-quality and crsp-ciz-aggregate-return-quality pin the July 2026 CRSP CIZ guide; these external references remain authoritative for field meanings. Board task 54b55cc7-ff40-4753-a04e-776bce1830d0."
   - "Operator request 2026-10-28: bounded extraction and replay, define substantive evaluation before expansion, then integrate agent-driven research into existing systems; board 35895aac-1b12-4cf5-b868-516196914789"
-fact_checked: 2026-11-02
+fact_checked: 2026-11-03
 confidence: medium
 ---
 
@@ -45,10 +45,12 @@ confidence: medium
 
 - Research entry point: [[wrds-equity-research-protocol]].
 
-The current version-3 source design is `libs/covenant_ml/docs/crsp-monthly.json`.
+The prospective version-4 source design is `libs/covenant_ml/docs/crsp-monthly.json`.
 It retains confirmed rejected-order cash and actual traded-notional costs,
-and declares exact missing-price spans for held returns, detailed in
-[[crsp-monthly-holdings-validation]]. The stopped version-1 and version-2
+and declares exact unpriced held spans, including closed suspension intervals,
+detailed in [[crsp-monthly-holdings-validation]]. It is not a qualified replacement
+study; [[crsp-outcome-qualification]] records the remaining data and review gates.
+The stopped version-1 and version-2
 studies retain their original journals and encrypted identities. The version-3
 runtime, input identities and observed study outcomes are tracked in
 [[wrds-baseline-readiness]]. Its codec,
@@ -92,7 +94,7 @@ edge needs a later prospective frozen follow-up.[^request]
 
 [^request]: Board task 35895aac-1b12-4cf5-b868-516196914789, § "OPERATOR", submitted 2026-10-28T16:38:53Z; the study rules are this session's proposed design, introduced in API commit 3358191792a4a655825b5647694fc0430cf7bd33 and calendar-corrected in 78b009119, not quotations or empirical findings.
 
-[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, complete frozen settings; `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
+[^frozen]: `libs/covenant_ml/docs/crsp-monthly.json`, current prospective settings (not an installed replacement study); `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py`, `crsp_windows`, `crsp_member_on`, `require_crsp_execution_price`, `crsp_terminal_value`; `libs/covenant_ml/tests/markets/test_crsp_protocol.py`, independent calendar examples and invalid-evidence refusals. Vendor guide pp. 7, 11–12, 25, 88, 91–92 supplies calendar, date, price and missingness definitions; reinvestment timing is a study assumption, not a vendor guarantee.
 
 [^coverage]: `tools/hpc3/artifacts/research-queue-fresh-20261029/crsp-date-coverage.json`, date_extents, query_sha256 and limits; read-only native job 40544470 on 2026-10-29, extending the three-relation probe 40544368 with stkdelists coverage. No security observations were returned or scored.
 

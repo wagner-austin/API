@@ -4,6 +4,8 @@ tags: [wrds, crsp, qualification, missingness]
 hubs: [libs]
 related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]"]
 source_paths:
+  - "libs/covenant_ml/tests/markets/test_crsp_unfilled.py"
+  - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
   - tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py"
@@ -22,9 +24,11 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "2abd15f50e785780a498105f4952d47ab100ecbf"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "a056079aa5af72b6ab9cf601cd7e0b04902da124"
   tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json: b39cb05dfa388c8f0285508518118fe77325ec78
   "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "b0979d5cd4994793c83e3b15e743b4d7fcf21760"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
   "libs/covenant_ml/tests/markets/test_crsp_queries.py": "cca05554450299e2c0e111c031dfd1f88a930ac4"
@@ -66,7 +70,7 @@ cash receipt. A finite number or a later date cannot erase these distinctions.[^
 | NT | 6 | One entry and five held paths lack tracked evidence. An unfilled-new-order assumption supplies no value for an already owned security. Retain refusal unless bounded source review supplies the missing outcome. |
 | MV | 6 | Two held paths and four terminal paths contain numbers flagged incomplete. Require complete corporate-action evidence; neither a numeric value nor monthly aggregation establishes completeness. |
 | Valuation after exit | 5 | Four are one calendar day late and one is two days late. Later-known terminal value must not be booked as known wealth at the earlier exit. Extending maturity changes the target and split requirements. |
-| SU | 2 | One exactly linked P9 span closes nine suspended sessions; extending the current MP-only predicate needs an explicit rule and adversarial tests. The other suspension remains open at exit and has no complete span. |
+| SU | 2 | One exactly linked P9 span closes nine suspended sessions; the prospective version-4 resolver now accepts that flag pattern, subject to exact span closure. Independent review and licensed qualification remain pending. The other suspension remains open at exit and has no complete span. |
 | DG | 1 | The return is missing and valuation is 69 calendar days after the event. The current flag-first resolver improves refusal reporting; it does not manufacture a return. |
 | Open MP tail | 1 | No closing span is present by exit. Carrying the last mark or assigning zero would introduce an economic assumption. |
 
@@ -101,6 +105,16 @@ or flipped labels, selected holdings, or realized losses; no new data was
 decrypted to derive it.[^dependence]
 
 ## Qualification design
+
+The bounded suspension amendment extends the existing held-return owner and
+requires version 4 with `exact-unpriced-held-spans`; version-3 requests and
+encrypted source metadata cannot silently run under that codec. It assigns no
+intermediate prices and changes no execution or terminal rule. Synthetic
+regressions and the encrypted real-process test are described in
+[[crsp-monthly-holdings-validation]]. This is a reviewable implementation,
+not a replacement freeze or proof that the original 27 refusals are repaired.[^suspension]
+
+[^suspension]: `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, `test_old_rule_identity_cannot_admit_the_new_evaluator` and `test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data`.
 
 A replacement must distinguish selection, order execution, owned exposure and
 label availability. Decision-time membership and features remain past-only.
@@ -197,7 +211,7 @@ before new study admission.[^distribution][^vendor][^owners]
 
 [^cases]: `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json`, `results[0].refused_cases`, source-window flags, relative date offsets and first-refusal counts.
 [^vendor]: [CRSP CIZ guide](https://indexes.morningstar.com/api/docs/6a71c517e35d02a71403136d), pp. 11–12, delisting date/value definitions; p. 88, PC; pp. 90–92, RD and RM; archived source and digest in frontmatter. Tech-wiki `crsp-ciz-aggregate-return-quality`, AR and DE definitions, cites the same guide pp. 49 and 63.
-[^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_missing_price` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
+[^owners]: `libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py`, `_terminal_row`, `_entry_filled`, `crsp_window_path` and `evaluate_crsp_holdings`; `crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `crsp_calendar.py`, `crsp_resolve_terminal` and `require_crsp_execution_price`.
 [^features]: `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision` and `_feature`.
 [^labels]: `libs/covenant_ml/src/covenant_ml/markets/crsp_study.py`, `crsp_study_rows`, the mean of every eligible member's multiplier, and `crsp_arms`, `EQUAL_WEIGHT` selection; `libs/covenant_ml/tests/markets/test_crsp_study.py`, `test_one_unavailable_outcome_invalidates_the_full_universe_label_benchmark`.
 [^dependence]: `tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/benchmark-dependence.json`, inputs, ordinal derivation and period counts; sibling `protocol.json`, `max_universe`, exact bytes matching `tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json`, `revision.revision.protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py`, `_decision`, universe cap; `tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py`, consecutive `checked` increment and `path_ordinal` recording; sibling `result.json`, `results[0].decisions`, `eligible_paths` and `refused_cases`.
