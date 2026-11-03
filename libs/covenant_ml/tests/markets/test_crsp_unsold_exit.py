@@ -98,7 +98,7 @@ def test_unsold_exit_terminal_value_must_itself_be_resolved() -> None:
     rows, delists = unsold_rows()
     delists[0]["delretmisstype"] = "DG"
     delists[0]["delret"] = None
-    with pytest.raises(ValueError, match="CRSP-005.*delisting DG"):
+    with pytest.raises(ValueError, match=r"CRSP-005.*delisting DG"):
         crsp_window_path(outcomes(rows, delists), 1, W1)
 
 
