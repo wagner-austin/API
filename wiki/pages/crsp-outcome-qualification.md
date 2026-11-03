@@ -2,7 +2,7 @@
 title: CRSP outcome qualification before a replacement study
 tags: [wrds, crsp, qualification, missingness]
 hubs: [libs]
-related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]"]
+related: ["[[wrds-v3-refused-path-diagnosis]]", "[[wrds-baseline-readiness]]", "[[crsp-monthly-holdings-validation]]", "[[crsp-v5-boundary-policy]]"]
 source_paths:
   - "libs/covenant_ml/tests/markets/test_crsp_unfilled.py"
   - "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py"
@@ -24,17 +24,17 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/corporate-action-catalog.json"
   - "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json"
 source_git_blobs:
-  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "2abd15f50e785780a498105f4952d47ab100ecbf"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "a056079aa5af72b6ab9cf601cd7e0b04902da124"
+  "libs/covenant_ml/tests/markets/test_crsp_unfilled.py": "f315bb6ddce5fcc988221560818510d06e3da704"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py": "529faea3403d889659003b10db690354d1f7376a"
   tools/hpc3/artifacts/wrds-v3-outcome-qualification-20261102/action-reconciliation.json: b39cb05dfa388c8f0285508518118fe77325ec78
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "8db552627c0a8cf8962514d5c2a49b8d7dcd1416"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_holdings.py": "3b532fbe7a7b0102c89c7c62b6e2a35c6ba3bc5b"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py": "f4cdd6c1ba7d1d86991bfdb2cb22edf362619c71"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "87201520de3acd3aa06b8f59d222e1bd53bbf667"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_calendar.py": "565c8ddad5836aaac5eb07d372cb3baaea746b15"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_queries.py": "4e6afdb5f0fe6d1730185aa31f3ca13a39aad1dc"
   "libs/covenant_ml/tests/markets/test_crsp_queries.py": "cca05554450299e2c0e111c031dfd1f88a930ac4"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_partition.py": "b8752083aca89e252059bfef5e39cb29c1bdbb57"
   "libs/covenant_ml/src/covenant_ml/markets/crsp_panel.py": "1a5c4f11e1e90bf50d29d800eeb03fc941721cc6"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "824b9bad6e08e7d4955dad45f2b8a48bfa4ab6a9"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_study.py": "a6ad643fc3641382e127370155fddb7c713469f8"
   "libs/covenant_ml/tests/markets/test_crsp_study.py": "ac6baa65e78f71d8bed5728e162e05773551b81d"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json": "5fca13ce388bd45adc74f8e52efa5d7d42af7775"
   "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/audit-execution.py": "c9c37944ab5ca06f18953e9f9e3d4d21cb0e8438"
@@ -45,7 +45,7 @@ source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
 provenance:
   - "Primary capture: tech-wiki/sources/crsp-ciz-guide-20260731.txt; SHA-256 bb4792deb927b972a8bef1a656ba1fc5442b80783e10eecb3e633d4243334b2e; corpus 0264d5cc-4dec-4715-b17b-45f3c8e5fbec; reread November 2."
-  - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; this is qualification analysis, not an approved version-4 freeze."
+  - "Board task f963ee0b-7382-4d7a-a1db-9a7b4d5467a3; this is qualification analysis, not an approved version-4 or version-5 freeze."
 fact_checked: 2026-11-03
 confidence: medium
 ---
@@ -66,11 +66,11 @@ cash receipt. A finite number or a later date cannot erase these distinctions.[^
 
 | Diagnosed class | Count | Qualification requirement |
 |---|---:|---|
-| BA on a rebalance delisting | 6 | Preserve three old-position exits separately from three new-order entries. A quote cannot satisfy a TR fill. A terminal boundary amendment must account for the old claim once and separately specify rejection of a new order. |
-| NT | 6 | One entry and five held paths lack tracked evidence. An unfilled-new-order assumption supplies no value for an already owned security. Retain refusal unless bounded source review supplies the missing outcome. |
+| BA on a rebalance delisting | 6 | Preserve three old-position exits separately from three new-order entries. A quote cannot satisfy a TR fill. A terminal boundary amendment must account for the old claim once and separately specify rejection of a new order. Version 5 proposes both (rules 1 and 2 of [[crsp-v5-boundary-policy]]). |
+| NT | 6 | One entry and five held paths lack tracked evidence. An unfilled-new-order assumption supplies no value for an already owned security. Retain refusal unless bounded source review supplies the missing outcome. Version 5 treats the NT entry as an unfilled order and keeps the five held paths refusing. |
 | MV | 6 | Two held paths and four terminal paths contain numbers flagged incomplete. Require complete corporate-action evidence; neither a numeric value nor monthly aggregation establishes completeness. |
-| Valuation after exit | 5 | Four are one calendar day late and one is two days late. Later-known terminal value must not be booked as known wealth at the earlier exit. Extending maturity changes the target and split requirements. |
-| SU | 2 | One exactly linked P9 span closes nine suspended sessions; the prospective version-4 resolver now accepts that flag pattern, subject to exact span closure. Independent review and licensed qualification remain pending. The other suspension remains open at exit and has no complete span. |
+| Valuation after exit | 5 | Four are one calendar day late and one is two days late. Later-known terminal value must not be booked as known wealth at the earlier exit. Extending maturity changes the target and split requirements. Version 5 dates the labels at the valuation and keeps the value unreinvestable until then; it still attributes the value to the delisting month's return, a convention [[crsp-v5-boundary-policy]] states for review. |
+| SU | 2 | One exactly linked P9 span closes nine suspended sessions; the prospective version-4 resolver, kept in version 5, accepts that flag pattern, subject to exact span closure. Independent review passed (board post 43ba2e2b); licensed qualification remains pending. The other suspension remains open at exit and has no complete span. |
 | DG | 1 | The return is missing and valuation is 69 calendar days after the event. The current flag-first resolver improves refusal reporting; it does not manufacture a return. |
 | Open MP tail | 1 | No closing span is present by exit. Carrying the last mark or assigning zero would introduce an economic assumption. |
 
@@ -106,13 +106,24 @@ decrypted to derive it.[^dependence]
 
 ## Qualification design
 
-The bounded suspension amendment extends the existing held-return owner and
-requires version 4 with `exact-unpriced-held-spans`; version-3 requests and
-encrypted source metadata cannot silently run under that codec. It assigns no
-intermediate prices and changes no execution or terminal rule. Synthetic
+The bounded suspension amendment extends the existing held-return owner as
+`exact-unpriced-held-spans`, introduced in version 4 and kept in version 5;
+version-3 requests and encrypted source metadata cannot silently run under that
+codec. It assigns no intermediate prices and, by itself, changes no execution or
+terminal rule. An independent review (board post 43ba2e2b) found it preserves
+interval arithmetic, assigns no intermediate value, keeps execution boundaries
+and adds no future-completeness selection. Synthetic
 regressions and the encrypted real-process test are described in
 [[crsp-monthly-holdings-validation]]. This is a reviewable implementation,
 not a replacement freeze or proof that the original 27 refusals are repaired.[^suspension]
+
+[[crsp-v5-boundary-policy]] records the prospective version-5 decision for
+every class: an entry without a closing trade is an unfilled cash order, a
+delisting on an exit close with no trade ends the old position with its
+terminal value, and a value dated after the exit dates every label of its
+decision. That gives 13 first refusals an explicit rule and keeps 14 (NT held,
+MV, DG and both open tails) refusing. It awaits independent review and a native
+full-panel scan; it is not installed.
 
 [^suspension]: `libs/covenant_ml/src/covenant_ml/markets/crsp_protocol.py`, `decode_crsp_protocol`; `libs/covenant_ml/src/covenant_ml/markets/crsp_return_path.py`, `_unpriced_held` and `crsp_resolve_held`; `libs/covenant_ml/tests/markets/test_crsp_unfilled.py`, `test_old_rule_identity_cannot_admit_the_new_evaluator` and `test_old_encrypted_protocol_is_refused_without_reinterpreting_its_data`.
 
@@ -124,9 +135,12 @@ silently redistribute its allocation. Missing value on an owned position
 remains a different problem.[^owners][^features]
 
 A terminal-date extension requires explicit valuation and label-maturity dates,
-purging through that maturity and compatible portfolio accounting. The current
-resolver deliberately refuses valuation beyond exit. Relaxing that comparison
-alone would book later information into an earlier month's wealth.[^owners]
+purging through that maturity and compatible portfolio accounting. Through
+version 4 the resolver refused valuation beyond exit, because relaxing that
+comparison alone would book later information into an earlier month's labels.
+Version 5 removes the refusal only together with dating every label of the
+decision at its latest valuation, which the existing purge then respects; the
+receivable rule already kept such a value out of reinvestment.[^owners]
 
 The current extraction also filters entire delisting rows by their latest
 valuation date at the partition boundary. Source review must distinguish an

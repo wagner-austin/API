@@ -11,8 +11,8 @@ source_paths:
   - "tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json"
 source_git_blobs:
   "tools/hpc3/artifacts/wrds-baseline-v3-preparation-20261102/evidence.json": "6e90bce84aae5ac72a0bca3a10d84da0e7c05c33"
-  "libs/covenant_ml/tests/markets/test_crsp_revision.py": "05cf4d3154fbed467e0a1d697c800ff14ae76c5a"
-  "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "1a855414b25c2eda01dc2d6c34c9e42012cd836c"
+  "libs/covenant_ml/tests/markets/test_crsp_revision.py": "3db03bce47865acba6d75416a1308e2710726d49"
+  "libs/covenant_ml/src/covenant_ml/markets/crsp_revision.py": "0c6c56f05f23df1a239492e39798f935d47d6fdf"
   "libs/covenant_ml/src/covenant_ml/markets/encrypted_storage.py": "7e9ebdafddf540613819fc1310f9aaf0dd05602d"
   "tools/hpc3/artifacts/wrds-protocol-revision-20261102/evidence.json": "bd6ac340e20ce528c5a4ad2571714d69cd2fad34"
 fact_checked: 2026-11-03
@@ -31,17 +31,19 @@ recipients. No private key was acquired and no observation was opened during rev
 The existing extraction CLI exposes `revise-protocol` and `verify-revision`.
 Both pin the original extraction receipt and protocol, require identical
 extraction settings, reconstruct the exact original manifests, and verify
-original and revised ciphertext. Only version, entry, cost and held-return rules may differ.
+original and revised ciphertext. Only version, entry, cost, held-return and terminal rules may differ.
 The revision is explicit; the evaluator does not accept the old protocol.[^revision][^measured]
 
-The existing revision validator already admits an explicit held-return rule change,
-shared by creation and independent verification. Current real-file regressions exercise
-the version-3 to prospective version-4 amendment without acquiring keys, preserve all sixteen
-relation/SQL ciphertext identities and reject changed extraction settings through
-both entry points. The separate licensed version-3 measurement below now
-establishes metadata lineage; runtime identity remains a different
-measurement. No licensed version-4 revision or replacement study is established
-by those synthetic regressions.[^tests][^v3-preparation]
+The revision validator admits explicit entry, held-return and terminal rule
+changes, shared by creation and independent verification; the terminal rule was
+added for prospective version 5 ([[crsp-v5-boundary-policy]]), which changes no
+extraction column or date. Current real-file regressions exercise the version-3
+to prospective version-5 amendment, all four rules at once, without acquiring
+keys, preserve all sixteen relation/SQL ciphertext identities and reject changed
+extraction settings through both entry points. The separate licensed version-3
+measurement below now establishes metadata lineage; runtime identity remains a
+different measurement. No licensed version-4 or version-5 revision or
+replacement study is established by those synthetic regressions.[^tests][^v3-preparation]
 
 [^tests]: `libs/covenant_ml/tests/markets/test_crsp_revision.py`, `test_metadata_revision_preserves_originals_and_needs_no_keys` and `test_accounting_amendment_cannot_change_extraction_settings`; real encrypted files, synthetic observations, key-free revision and immutable extraction settings.
 
