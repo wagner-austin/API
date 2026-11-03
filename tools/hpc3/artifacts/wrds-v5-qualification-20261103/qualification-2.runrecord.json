@@ -1,0 +1,76 @@
+{
+ "experiment": "crsp-qualification-v5",
+ "label": "v5-full-panel-qualification",
+ "fingerprint": {
+  "image_digest": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+  "gpu_model": "",
+  "driver_version": "",
+  "determinism": {
+   "stack": "cpu",
+   "settings": {
+    "MKL_NUM_THREADS": "1",
+    "NUMEXPR_NUM_THREADS": "1",
+    "OMP_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+   }
+  },
+  "host": {
+   "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+   "machine": "x86_64",
+   "logical_cores": 24
+  },
+  "packages": [
+   {
+    "name": "cleargbm",
+    "version": "0.1.0"
+   },
+   {
+    "name": "cleargbm_rs",
+    "version": "0.1.0"
+   },
+   {
+    "name": "lightgbm",
+    "version": "4.6.0"
+   },
+   {
+    "name": "numpy",
+    "version": "2.3.5"
+   },
+   {
+    "name": "scikit-learn",
+    "version": "1.7.2"
+   },
+   {
+    "name": "xgboost",
+    "version": "3.1.2"
+   }
+  ]
+ },
+ "observations": [
+  {
+   "name": "qualification.dependent_decisions",
+   "value": 14.0
+  },
+  {
+   "name": "qualification.dependent_rows",
+   "value": 14000.0
+  },
+  {
+   "name": "qualification.paths",
+   "value": 262000.0
+  },
+  {
+   "name": "qualification.refused",
+   "value": 14.0
+  },
+  {
+   "name": "qualification.unfilled_training",
+   "value": 112.0
+  },
+  {
+   "name": "qualification.unfilled_validation",
+   "value": 45.0
+  }
+ ],
+ "payload_digest": "164b151e9170d445fe1bb9c3a66527d13fea052622ce5615d0199690ff534f2c"
+}

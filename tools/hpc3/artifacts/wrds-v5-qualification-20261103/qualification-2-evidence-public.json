@@ -1,0 +1,204 @@
+{
+ "kind": "HPC3_ATTEMPT_EVIDENCE",
+ "ledger": {
+  "job_id": "58820962",
+  "project": "cleargbm",
+  "name": "cleargbm.licensed-v5-full-panel-qualification-2",
+  "host": "hpc3",
+  "partition": "free",
+  "submitted_at": "2026-11-03T09:47:27.221028+00:00",
+  "log_dir": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/cleargbm/logs",
+  "deterministic": true,
+  "experiment": {
+   "research_attempt": "licensed-v5-cfd829d03-full-panel-qualification-2",
+   "request_sha256": "ce9983ad5bca1a461d3e55986296b7c7383179ba0e4294cf45b17a61f488afd2"
+  },
+  "image_digest": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+  "submitter": "opus-mcps-1103-2516",
+  "artifact": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/result/qualification.json",
+  "image_drift": {
+   "image_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+   "head": "d4fc2a1a4dac38baae32cf1c3fabc2ff7356e47d",
+   "modules": [
+    {
+     "directory": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint",
+     "module": "scripts.crsp_qualification",
+     "compared": [],
+     "changed": [],
+     "not_compared": "resolved from /data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+    }
+   ]
+  }
+ },
+ "accounting": {
+  "job": {
+   "job_id": "58820962",
+   "name": "cleargbm.licensed-v5-full-panel-qualification-2",
+   "partition": "free",
+   "state": "COMPLETED",
+   "elapsed_seconds": 2456,
+   "billing_tres": 8,
+   "gpu_count": 0,
+   "cpu_count": 8,
+   "node_list": "hpc3-19-12"
+  },
+  "exit_code": "0:0",
+  "started_at": "2026-11-03T09:47:35",
+  "ended_at": "2026-11-03T10:28:31"
+ },
+ "measurement": {
+  "ledger": {
+   "job_id": "58820962",
+   "project": "cleargbm",
+   "name": "cleargbm.licensed-v5-full-panel-qualification-2",
+   "host": "hpc3",
+   "partition": "free",
+   "submitted_at": "2026-11-03T09:47:27.221028+00:00",
+   "log_dir": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/cleargbm/logs",
+   "deterministic": true,
+   "experiment": {
+    "research_attempt": "licensed-v5-cfd829d03-full-panel-qualification-2",
+    "request_sha256": "ce9983ad5bca1a461d3e55986296b7c7383179ba0e4294cf45b17a61f488afd2"
+   },
+   "image_digest": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+   "submitter": "opus-mcps-1103-2516",
+   "artifact": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/result/qualification.json",
+   "image_drift": {
+    "image_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+    "head": "d4fc2a1a4dac38baae32cf1c3fabc2ff7356e47d",
+    "modules": [
+     {
+      "directory": "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint",
+      "module": "scripts.crsp_qualification",
+      "compared": [],
+      "changed": [],
+      "not_compared": "resolved from /data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint/scripts, outside the image's environment, so the image's commit does not describe its code"
+     }
+    ]
+   }
+  },
+  "accounting": {
+   "job": {
+    "job_id": "58820962",
+    "name": "cleargbm.licensed-v5-full-panel-qualification-2",
+    "partition": "free",
+    "state": "COMPLETED",
+    "elapsed_seconds": 2456,
+    "billing_tres": 8,
+    "gpu_count": 0,
+    "cpu_count": 8,
+    "node_list": "hpc3-19-12"
+   },
+   "exit_code": "0:0",
+   "started_at": "2026-11-03T09:47:35",
+   "ended_at": "2026-11-03T10:28:31"
+  },
+  "result_sha256": "86c8d2734096e2a78d06ea2518389b208fedb4d4259833abc8e05aa584972581",
+  "record_sha256": "ad3e535f3cf1f52b83f3898cfd0cdbdb121935d1cad00dc4415fd5a18d7dfa5f",
+  "stdout_sha256": "eeca7cc9aa4fc0708db12030cd8968bca33dc68f120dc523096c5b348f903e33",
+  "verified_files": {
+   "/data/homezvol1/wagnera3/research-images/protocol-v5-cfd829d03/research-crsp-v5.sif": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+   "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint/scripts/__init__.py": "4a51961040c1a5e0b93106ef6331bb247b69872d446f8e2e8d7fe8cee65b50cf",
+   "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/entrypoint/scripts/crsp_qualification.py": "049ab942cce241bcba360eeb93e801d67606863066304e4b2dc1a308d701596c",
+   "/data/homezvol1/wagnera3/research/licensed-v5-qualification-cfd829d03/qualification-2/request.json": "ce9983ad5bca1a461d3e55986296b7c7383179ba0e4294cf45b17a61f488afd2",
+   "/data/homezvol1/wagnera3/research/licensed-baseline-b3843a3d3-20261101/access.json": "a8f35bd37ac939bbc2f67c4923192a39ee9cbb1cb225b298a3257ef11c5e9631",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/bundle.json": "8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/calendar.csv.age": "15291e7bea4a2c39a46b572b7e57da9387fb6ecb1687ae63842595a8aab7cb24",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/calendar.sql.age": "14214ee4d7a816a84172e79ab36ab82cc8f630ed1ac3bc891b3738c8b4db20e1",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/delists.csv.age": "36598dbaf3b1b65a340da1152250ebb59349169152014337f58929f09b202ad2",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/delists.sql.age": "91aea9936e713fafd652ec2c2aa10a50a02148f241dc262299ecd35adb1de395",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/manifest.json.age": "17f4cf0d8003a60212463d4c362d7bbd35cc31a7d4cd339f9335087d37f3f944",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/membership.csv.age": "87f05c1e7748b734a9472d02e1d1791d26f1ef28f64051da100f4ff6ea6a9c32",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/membership.sql.age": "57b75052a10f2fb46c0acb4ab6de68e5656c0ec4bff2b48a8bf8135d18706aeb",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/protocol.json.age": "7393b0f513ca227703ac7890938f3498a9cf00489322615b3e48261f924be6cb",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/returns.csv.age": "760199fa2beafbb1455592a2f878619e8970ced8a101a0fab8a61aa34bf4da66",
+   "/data/homezvol1/wagnera3/research-data/crsp-protocol-v5-cfd829d03/train-validation/returns.sql.age": "0365ecaad48c54653a6f404e6f957b49d94cd9adad260fc3f1b5b312e31cc23f"
+  },
+  "compute_checksum_lines": 16,
+  "result_mtime": 1793701704,
+  "record_mtime": 1793701704,
+  "dataset": {
+   "bundle_sha256": "8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94"
+  }
+ },
+ "record": {
+  "experiment": "crsp-qualification-v5",
+  "label": "v5-full-panel-qualification",
+  "fingerprint": {
+   "image_digest": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+   "gpu_model": "",
+   "driver_version": "",
+   "determinism": {
+    "stack": "cpu",
+    "settings": {
+     "MKL_NUM_THREADS": "1",
+     "NUMEXPR_NUM_THREADS": "1",
+     "OMP_NUM_THREADS": "1",
+     "OPENBLAS_NUM_THREADS": "1"
+    }
+   },
+   "host": {
+    "platform": "Linux-5.14.0-611.55.1.el9_7.x86_64-x86_64-with-glibc2.36",
+    "machine": "x86_64",
+    "logical_cores": 24
+   },
+   "packages": [
+    {
+     "name": "cleargbm",
+     "version": "0.1.0"
+    },
+    {
+     "name": "cleargbm_rs",
+     "version": "0.1.0"
+    },
+    {
+     "name": "lightgbm",
+     "version": "4.6.0"
+    },
+    {
+     "name": "numpy",
+     "version": "2.3.5"
+    },
+    {
+     "name": "scikit-learn",
+     "version": "1.7.2"
+    },
+    {
+     "name": "xgboost",
+     "version": "3.1.2"
+    }
+   ]
+  },
+  "observations": [
+   {
+    "name": "qualification.dependent_decisions",
+    "value": 14.0
+   },
+   {
+    "name": "qualification.dependent_rows",
+    "value": 14000.0
+   },
+   {
+    "name": "qualification.paths",
+    "value": 262000.0
+   },
+   {
+    "name": "qualification.refused",
+    "value": 14.0
+   },
+   {
+    "name": "qualification.unfilled_training",
+    "value": 112.0
+   },
+   {
+    "name": "qualification.unfilled_validation",
+    "value": 45.0
+   }
+  ],
+  "payload_digest": "164b151e9170d445fe1bb9c3a66527d13fea052622ce5615d0199690ff534f2c"
+ },
+ "projection_of": {
+  "sha256": "55476bb5c0970228ddd950da0eb731eb7d9de49fedce0037f28c2909115ee095",
+  "removed": "licensed plaintext file identities (bundle plaintext entries); the bundle digest is kept"
+ }
+}

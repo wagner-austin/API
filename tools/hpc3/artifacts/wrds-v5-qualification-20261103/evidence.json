@@ -1,0 +1,85 @@
+{
+  "kind": "WRDS_V5_FULL_PANEL_QUALIFICATION_EVIDENCE",
+  "task": "f963ee0b-7382-4d7a-a1db-9a7b4d5467a3",
+  "source_commit": "cfd829d03590ea57c247057e27a48510ab2b2078",
+  "scope": "Native full-panel qualification of the licensed train-validation partition under protocol version 5, before any fitting. No candidate was fitted, selected or released; the final key does not exist on HPC3.",
+  "runtime": "tools/hpc3/artifacts/wrds-protocol-v5-runtime-20261103/evidence.json",
+  "instrument": "libs/covenant_ml/scripts/crsp_qualification.py (sha256 049ab942cce241bcba360eeb93e801d67606863066304e4b2dc1a308d701596c) over covenant_ml.markets.crsp_qualification.qualify_crsp_panel, which walks crsp_known_panel through the evaluator's own crsp_resolve_window_path.",
+  "request_sha256": "ce9983ad5bca1a461d3e55986296b7c7383179ba0e4294cf45b17a61f488afd2",
+  "image_sha256": "a266a8b3bf6bae74b3a390af16b0ba439782f35bd2685b4a5d5287fec03cfb92",
+  "dataset_bundle_sha256": "8cf3ef0ce5021bb2a1f8ec47a663f0ddcae1e3b46040531838fc7f2ad4cecc94",
+  "attempts": [
+    {
+      "attempt": "licensed-v5-cfd829d03-full-panel-qualification",
+      "job_id": "58820334",
+      "node": "hpc3-15-01",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "elapsed_seconds": 2168,
+      "resources": "8 CPU, 128 GiB, 121 minutes, free",
+      "in_job_checksums": 15,
+      "image_in_job_checksums": false,
+      "result_sha256": "a5bb43b54b78462bee4964342632211a992fedbfbf247ad349cd2f3543c5097f",
+      "record_sha256": "077d5fc50a35ea35c2442c8eb256e7ed9ece6014abac0b015f248e697439fe79",
+      "limit": "Its in-job sha256sum gate checked the entrypoint, request, access file and all eleven ciphertexts but not the image, so the hpc3 execution inspector refuses it (HPC_EVIDENCE_INPUTS). Its runtime identity rests on the image digest the scheduler exported and the request check against it, not on an in-job file digest."
+    },
+    {
+      "attempt": "licensed-v5-cfd829d03-full-panel-qualification-2",
+      "job_id": "58820962",
+      "node": "hpc3-19-12",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "elapsed_seconds": 2456,
+      "started_at": "2026-11-03T09:47:35",
+      "ended_at": "2026-11-03T10:28:31",
+      "resources": "8 CPU, 128 GiB, 121 minutes, free",
+      "in_job_checksums": 16,
+      "image_in_job_checksums": true,
+      "result_sha256": "86c8d2734096e2a78d06ea2518389b208fedb4d4259833abc8e05aa584972581",
+      "record_sha256": "ad3e535f3cf1f52b83f3898cfd0cdbdb121935d1cad00dc4415fd5a18d7dfa5f",
+      "execution_inspection": "HPC3_ATTEMPT_EVIDENCE, 16 inputs verified on the cluster and as 'OK' lines in the job log; service post 8e4216bf-7395-4d57-9467-2a78c5d72973."
+    }
+  ],
+  "reproduction": "The two results are equal in every field except fingerprint.host.logical_cores (40 against 24, different nodes): counts, members, unfilled, training_decisions, every refused path with its digests, dataset, source, design and code digests. Their run-record observations are equal.",
+  "measurement": {
+    "decisions": 262,
+    "paths": 262000,
+    "training_decisions": 180,
+    "refused": 14,
+    "periods": {"training": 13, "validation": 1},
+    "reasons": {
+      "span NT/MR": 5,
+      "delisting MV": 4,
+      "span MV/D1": 1,
+      "span MV/D4": 1,
+      "delisting DG": 1,
+      "price gap tail": 2
+    },
+    "delisting_return_without_event": 0,
+    "unfilled_training": 112,
+    "unfilled_validation": 45,
+    "dependent_decisions": 14,
+    "dependent_rows": 14000
+  },
+  "join_to_v3_diagnosis": {
+    "source": "tools/hpc3/artifacts/wrds-v3-source-path-audit-20261102/result.json, results[0].refused_cases",
+    "remaining_ordinals": [10402, 23610, 54734, 59635, 62905, 83373, 84496, 92184, 133712, 134760, 169697, 173979, 179591, 191467],
+    "remaining_digests": "Each remaining path's entry and exit record digests equal the version-3 diagnosis digests at the same ordinal.",
+    "resolved_ordinals": [9165, 10141, 12343, 18863, 27156, 34781, 44820, 84356, 105499, 106500, 135749, 136773, 187445],
+    "new_refusals": 0
+  },
+  "conclusion": "Version 5 values the thirteen explicit-rule cases and leaves the fourteen predicted refusals (NT held 5, MV 6, DG 1, open SU and MP tails 2). The full-universe 2000-2020 target is therefore not qualified under version 5: fourteen decisions, 14,000 labels, cannot be labelled. No partition-boundary omission occurs in this extract.",
+  "publication": "The committed results are projections: the licensed extract's plaintext file identities are removed and each projection records the full file's sha256. Full results remain in private storage on HPC3 and Ziggurat.",
+  "files": {
+    "checksums-1.txt": "bacc09591c83d8b77da78060693078f2fcde137205f88df18d5d467b3a070e67",
+    "checksums-2.txt": "bcd5d651104482f4dc75f79c4cf8554f7419eb9c2a2dd0dd401223f1e9212a47",
+    "qualification-1-public.json": "4564252461b5fa1069d6c67e31fc83ba75542b877c6db3b0fd8ad7d90402568a",
+    "qualification-1.runrecord.json": "077d5fc50a35ea35c2442c8eb256e7ed9ece6014abac0b015f248e697439fe79",
+    "qualification-2-evidence-public.json": "4d826777283bd9012f935ce55b0c4c83b6e0c885da1ecae94279e2f47488d5f2",
+    "qualification-2-public.json": "df66f77aa959649ba45fd06d14cd37d1b6788425eb1b87d0891cb9e55bf53bcd",
+    "qualification-2.runrecord.json": "ad3e535f3cf1f52b83f3898cfd0cdbdb121935d1cad00dc4415fd5a18d7dfa5f",
+    "request.json": "ce9983ad5bca1a461d3e55986296b7c7383179ba0e4294cf45b17a61f488afd2",
+    "run-1.json": "06412341ff535be1a1e49cf4b89b5a7d8424ed1b67f63f1a3e21a9045633cfdc",
+    "run-2.json": "b13df1c2582363af6bbdacf14d395753177df6453e6643b59ebc93265681bba6"
+  }
+}
