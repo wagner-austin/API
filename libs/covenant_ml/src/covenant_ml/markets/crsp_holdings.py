@@ -399,7 +399,7 @@ def _entry(
             len(events) != 1
             or window.decision >= window.entry
             or row["dlyretdurflg"] != "DD"
-            or row["dlyprcflg"] == "TR"
+            or row["dlyprcflg"] == outcomes.protocol["execution_flag"]
         ):
             return CrspPathRefusal(
                 "entry terminal inconsistent",

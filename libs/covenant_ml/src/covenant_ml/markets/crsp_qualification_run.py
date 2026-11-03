@@ -34,7 +34,14 @@ from .research_keys import EvaluatorKeys
 from .validation import require_nonempty
 
 #: The counts the shared run record carries, by observation name.
-OBSERVED = ("paths", "refused", "dependent_decisions", "dependent_rows")
+OBSERVED = (
+    "paths",
+    "refused",
+    "unfilled_training",
+    "unfilled_validation",
+    "dependent_decisions",
+    "dependent_rows",
+)
 
 
 class CrspQualificationRequest(TypedDict):
