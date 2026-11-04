@@ -45,7 +45,7 @@ One row per package, each column read as the list above says, at API `adda8c020`
 | `clients/OrderedKernels` | none | none | 2026-10-30 `f561db26d` | 32 | 671 KB | yes | keep: research |
 | `clients/RustedWarfareBot` | none | none | 2026-10-25 `2a6920546` | 85 | 11 MB | yes | keep: research |
 | `clients/TankpitBot` | none | none | 2026-10-30 `f3d7367e2` | 362 | 26 MB | yes | keep: research |
-| `clients/TankpitBot-colossus-execution` | none | none | 2026-10-18 `3d92aa80b` | 6 | 1 KB | no | keep until board task 05d4f095 settles it |
+| `clients/TankpitBot-colossus-execution` | none | none | 2026-10-18 `3d92aa80b` | 6 | 1 KB | no | retired 2026-11-04 (MCPs board task f19d66a5): the move it measured has no subject since colossus's 2026-10-30 reinstall |
 | `clients/TankpitBot-execution` | none | none | 2026-10-05 `0411bc0c8` | 47 | 1 KB | no | keep: fleet recipe |
 | `libs/cleargbm` | library | covenant_ml | 2026-09-26 `bdc043690` | 7 | 4 MB | yes | keep: research |
 | `libs/cleargbm_rs` | library | cleargbm, covenant-radar-api | 2026-10-25 `4a59de86e` | 17 | 2 MB | yes | keep: research |
