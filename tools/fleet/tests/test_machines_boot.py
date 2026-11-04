@@ -129,7 +129,8 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     # Automatic admission adds a disabled worker before its first install.
     # Pin measured identities without making each admission a test-code edit.
     assert {
-        name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon", "ziggurat")
+        name: declared[name]
+        for name in ("demure", "diphtheria", "lavender", "loki", "pendragon", "ziggurat")
     } == {
         "demure": DEMURE_MAC,
         "diphtheria": DIPHTHERIA_MAC,
