@@ -21,10 +21,10 @@ from collections.abc import Callable
 
 import pytest
 
-from fleet.cli import _config
 from fleet.core import _test_hooks, export, mirror_fetch, rolled
 from tests._git_fixtures import git
 from tests._host import READING_PROPERTY
+from tests._hub_reading import hub_workspace
 
 
 def _ref_of(mirror: pathlib.Path) -> str:
@@ -72,12 +72,7 @@ def test_the_rolled_code_fetches_into_the_mirror_ref(
 def test_every_mirror_holds_its_ref_and_no_dead_fetch_s_pack(
     fleet_hub: pathlib.Path, record_property: Callable[[str, str], None]
 ) -> None:
-    loaded = _config.load_workspace(
-        {
-            _config.CONFIG_FLAG: str(fleet_hub / rolled.REGISTRY_DIRECTORY),
-            _config.RECORDS_FLAG: str(fleet_hub / rolled.RECORDS_DIR),
-        }
-    )
+    loaded = hub_workspace(fleet_hub)
     readings: list[str] = []
     unreferenced: list[str] = []
     dead: list[str] = []

@@ -6,7 +6,8 @@ Measured 2026-10-18T18:11Z, the seven nodes held 106 run ids no retire would
 ever reach: refused while
 staging, orphaned when the hub moved, or left by a retire that failed. This
 case reads, from the hub, every enabled node's stage root over the hub's own
-ssh and the runners' records in the hub's API checkout, and fails on any
+ssh, the registry of the commit ``refs/fleet/rolled`` names and the runners'
+records in the hub's API checkout (:mod:`tests._hub_reading`), and fails on any
 run's directory, staging directory or root script whose run is neither live
 (a held lease, a running ledger row) nor still owed a retire. A node that does
 not answer fails it too, since its stage root cannot be read.
@@ -25,10 +26,10 @@ from typing import Final
 import pytest
 from platform_core.errors import AppError
 
-from fleet.cli import _config
 from fleet.contracts.node import NodeConfig
-from fleet.core import names, remote, retire_owed, rolled
+from fleet.core import names, remote, retire_owed
 from tests._host import READING_PROPERTY
+from tests._hub_reading import hub_workspace
 
 #: The root scripts a run leaves under its stage root, by the prefix of each
 #: stem :func:`fleet.core.names.root_script_stems` names.
@@ -109,12 +110,7 @@ def test_a_run_s_entries_are_told_from_a_companion_s() -> None:
 def test_every_run_directory_on_every_node_is_live_or_owed_its_retire(
     fleet_hub: pathlib.Path, record_property: Callable[[str, str], None]
 ) -> None:
-    loaded = _config.load_workspace(
-        {
-            _config.CONFIG_FLAG: str(fleet_hub / rolled.REGISTRY_DIRECTORY),
-            _config.RECORDS_FLAG: str(fleet_hub / rolled.RECORDS_DIR),
-        }
-    )
+    loaded = hub_workspace(fleet_hub)
     live = retire_owed.live_runs(loaded.leases, loaded.ledger)
     left: list[str] = []
     unanswered: list[str] = []
