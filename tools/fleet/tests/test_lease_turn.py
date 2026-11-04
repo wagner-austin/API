@@ -1,11 +1,11 @@
-"""The lease file's turn across processes (MCPs board task b1089284).
+"""The lease file's turn across processes (MCPs board tasks b1089284 and 1e0ee821).
 
 Every node runner is its own process on the hub and all of them share one
-lease file, rewritten in place. On 2026-10-11 serendipity's runner read it
-mid-write and its serving loop ended on ``InvalidJsonError``. Each case runs
-against a real lease file and a real lock beside it: another process's turn
-is a lock file this process did not create, and its writing is what the
-case's sleep does while the reader waits.
+lease file. A rewrite reads, checks and writes in the file's turn; a read
+takes none, since every rewrite renames a whole file over the path. Each
+case runs against a real lease file and a real lock beside it: another
+process's turn is a lock file this process did not create, and its writing
+is what the case's sleep does while the rewrite waits.
 """
 
 from __future__ import annotations
@@ -82,48 +82,67 @@ def test_a_read_leaves_no_lock_behind(tmp_path: pathlib.Path) -> None:
     assert leases.lock_path(path) == tmp_path / "leases.json.lock"
 
 
-def test_a_read_waits_out_another_processs_rewrite_and_reads_it_whole(
+def test_a_read_takes_no_turn_while_another_process_holds_one(tmp_path: pathlib.Path) -> None:
+    """Every rewrite renames a whole file over the path, so a read never waits
+    (MCPs board task 1e0ee821): with another process's turn held it reads the
+    last whole document at once and leaves that process's lock alone."""
+    path = tmp_path / "leases.json"
+    _test_hooks.write_text(path, dump_json_str([encode_lease(_lease("run-2"))]))
+    lock = leases.lock_path(path)
+    lock.write_text("fleet process 4242 pid 4242 turn writing", encoding="utf-8")
+    slept: list[int] = []
+    _test_hooks.sleep = _sleeping([], slept)
+
+    assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-2"]
+    assert slept == []
+    assert lock.read_text(encoding="utf-8") == "fleet process 4242 pid 4242 turn writing"
+
+
+def test_a_rewrite_waits_out_another_processs_turn_and_rewrites_what_it_left(
     tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """The torn read of 2026-10-11, made the filesystem's: the file holds half
-    a document while the other process's turn is held, and the reader reads
-    only after that turn is given back."""
+    """A release reads, checks and writes in one turn, so it waits while
+    another process holds the turn and rewrites the file that process left,
+    losing neither process's change."""
     path = tmp_path / "leases.json"
-    path.write_text('[{"node": "lav', encoding="utf-8")
+    _write(path, _lease("run-6"))
     lock = leases.lock_path(path)
     lock.write_text("fleet process 4242 pid 4242 turn writing", encoding="utf-8")
     clock = [int(time.time())]
     slept: list[int] = []
 
     def the_other_process_finishes_its_rewrite() -> None:
-        _write(path, _lease("run-2"))
+        _write(path, _lease("run-6"), _lease("run-7"))
         lock.unlink()
         clock[0] += 1
 
     _test_hooks.now = lambda: clock[0]
     _test_hooks.sleep = _sleeping([the_other_process_finishes_its_rewrite], slept)
     with caplog.at_level("INFO"):
-        held = leases.read_leases(path)
+        leases.release(path, run_id="run-6", now_unix=_NOW)
 
-    assert [lease["run_id"] for lease in held] == ["run-2"]
+    assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-7"]
     assert slept == [leases.LEASE_TURN["poll_seconds"]]
     assert (
         f"fleet process {os.getpid()} took its lease turn after waiting 1 s for another "
-        "process reading or rewriting the lease file"
+        "process rewriting the lease file"
     ) in [record.getMessage() for record in caplog.records]
+    assert not lock.exists()
 
 
 def test_a_turn_left_by_a_process_that_died_inside_it_is_taken_away(
     tmp_path: pathlib.Path,
 ) -> None:
     path = tmp_path / "leases.json"
-    _write(path, _lease("run-3"))
+    _write(path, _lease("run-3"), _lease("run-8"))
     lock = leases.lock_path(path)
     lock.write_text("fleet process 4243 pid 4243 turn dead", encoding="utf-8")
     died = time.time() - leases.LEASE_TURN["stale_seconds"] - 5
     os.utime(lock, (died, died))
 
-    assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-3"]
+    leases.release(path, run_id="run-3", now_unix=_NOW)
+
+    assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-8"]
     assert not lock.exists()
 
 

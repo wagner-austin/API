@@ -38,11 +38,13 @@ this module re-exports :class:`~fleet.core._command.CommandResult` and
 
 from __future__ import annotations
 
+import os
 import pathlib
 import socket
 import subprocess
 import tempfile
 import time
+import uuid
 from collections.abc import Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from typing import Protocol
@@ -494,14 +496,19 @@ def _default_make_directory(path: pathlib.Path) -> None:
 
 
 def _default_write_text(path: pathlib.Path, text: str) -> None:
-    """Replace a real file's contents.
+    """Replace a real file's contents whole: a file of this process's own beside it, renamed over.
+
+    A reader anywhere finds the old document or the new one, never part of
+    either: the lease file's reads take no turn (MCPs board task 1e0ee821).
 
     Args:
         path: Absolute path to write.
         text: The complete new contents.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8", newline="\n")
+    staged = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
+    staged.write_text(text, encoding="utf-8", newline="\n")
+    os.replace(staged, path)
 
 
 def _default_env(name: str) -> str | None:

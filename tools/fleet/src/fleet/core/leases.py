@@ -18,15 +18,18 @@ having run is a package that is wrong whenever that process is not running.
 An expired lease is simply not returned by :func:`held_leases`, so the
 resource frees itself at the moment anybody looks.
 
-EVERY READ AND EVERY REWRITE TAKES THE FILE'S TURN (:func:`_turn`, MCPs
-board task b1089284). Every node runner is its own process on the hub and
-they all share this one file, and it is rewritten in place: on 2026-10-11 at
-17:00:10Z serendipity's runner read it while another process was writing it,
-got half a JSON document, and its serving loop ended on ``InvalidJsonError``
-(its runner log on the hub). Reading without the turn was a deliberate
-choice while one process used the file; with eight, a reader has the reason
-to hold one that the choice said it lacked, and a rewrite from what it read
-needs one for the same lost-update reason :data:`REWRITING` gives in-process.
+EVERY REWRITE TAKES THE FILE'S TURN, AND NO READ DOES (:func:`_turn`, MCPs
+board tasks b1089284 and 1e0ee821). Every node runner is its own process on
+the hub and they all share this one file. A rewrite reads, checks and writes
+in one turn, for the same lost-update reason :data:`REWRITING` gives
+in-process. A read once needed the turn too: the file was rewritten in
+place, and on 2026-10-11 at 17:00:10Z serendipity's runner read half a JSON
+document and its serving loop ended on ``InvalidJsonError``. Now every
+rewrite renames a whole new file over it (:func:`fleet.core._test_hooks._default_write_text`),
+so a read finds one whole document, the last rename's, with no turn. The
+turn every read took was most of the hub's waiting: on 2026-11-04 the node
+runners' logs recorded 16,800 waits for it, 86,385 s in all, and a gate
+job's launch waited on it between its lease and its stage.
 """
 
 from __future__ import annotations
@@ -58,7 +61,7 @@ from fleet.core import _test_hooks, file_turn
 #: half a minute old was left by a process that died holding it.
 LEASE_TURN: Final = file_turn.TurnBounds(
     what="lease turn",
-    waited_for="another process reading or rewriting the lease file",
+    waited_for="another process rewriting the lease file",
     stale_seconds=30,
     poll_seconds=1,
 )
@@ -117,7 +120,11 @@ def _turn(path: pathlib.Path) -> Generator[None, None, None]:
 
 
 def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
-    """Read every lease the file records, expired ones included.
+    """Read every lease the file records, expired ones included, with no turn.
+
+    Every rewrite renames a whole file over the path, so what is read is one
+    whole document, the last rewrite's; a rewrite in another process waits
+    for no reader, and a reader for no rewrite.
 
     Args:
         path: The lease file.
@@ -134,10 +141,9 @@ def read_leases(path: pathlib.Path) -> tuple[Lease, ...]:
             be read is a file whose claims cannot be honoured, and treating
             it as empty would hand out a resource somebody holds.
     """
-    with _turn(path):
-        if not _test_hooks.file_exists(path):
-            return ()
-        raw = load_json_str(_test_hooks.read_text(path))
+    if not _test_hooks.file_exists(path):
+        return ()
+    raw = load_json_str(_test_hooks.read_text(path))
     if not isinstance(raw, list):
         raise AppError(
             FleetErrorCode.LEASE_NOT_HELD,

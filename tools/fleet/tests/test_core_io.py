@@ -293,9 +293,14 @@ class TestDefaultHooks:
         path = tmp_path / "nested" / "leases.json"
 
         _test_hooks._default_write_text(path, "[]")
+        first = path.stat().st_ino
         _test_hooks._default_write_text(path, "[1]")
 
         assert path.read_text(encoding="utf-8") == "[1]"
+        # Renamed over the path rather than rewritten in it, so a reader holds
+        # the old document or the new one; nothing staged is left beside it.
+        assert path.stat().st_ino != first
+        assert sorted(child.name for child in path.parent.iterdir()) == ["leases.json"]
 
     def test_read_text_returns_what_was_written(self, tmp_path: pathlib.Path) -> None:
         path = tmp_path / "feed.jsonl"
