@@ -28,17 +28,15 @@ name: packages
 # locally rather than debugged through pushes.
 #
 # WHAT THIS DOES NOT COVER, deliberately:
-#   * clients/NavProbe keeps its own workflow. It MUST run on windows-latest
-#     -- its tests call the real Win32 boundary -- and folding a per-package
-#     runner into this matrix to serve one package would put a hardcoded OS
-#     table here. It is excluded by the selector's caller below, not by a
-#     rule inside the selector. services/turkic-api kept its own workflow too
-#     until the operator had it archived on 2026-11-01 (MCPs board task
-#     a276f973).
-#   * clients/TankpitBot keeps its own workflow on windows-latest. Its suite
-#     is written against Windows separators and a case-insensitive filesystem
-#     -- 17 failures on ubuntu, none of them a defect in the bot, all of them
-#     a Windows path separator, which is an ordinary character on Linux.
+#   * clients/NavProbe keeps its own workflow, on ubuntu-latest since its
+#     Win32 power-throttling opt-out was removed (board task 0433e335). It is
+#     excluded by the selector's caller below, not by a rule inside the
+#     selector. services/turkic-api kept its own workflow too until the
+#     operator had it archived on 2026-11-01 (MCPs board task a276f973).
+#   * clients/TankpitBot keeps its own workflow, for the Playwright, guard,
+#     undecoded-field and wiki-gate steps it runs beside its suite. It runs
+#     on ubuntu-latest since MCPs board task 0e0acaef; it ran on
+#     windows-latest while its suite split paths on a backslash.
 #   * libs/covenant_ml keeps its own workflow on ubuntu-latest. Its encrypted
 #     WRDS/HPC3 evaluator requires Linux private-storage semantics; the entire
 #     suite, including those security cases, runs in covenant-ml.yml.
