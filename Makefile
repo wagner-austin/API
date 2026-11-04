@@ -67,16 +67,18 @@ infra: commit-tasks executed services-executed
 # board task 465689f5). The hub's scheduled ticks run fleet-agent and every
 # fleet-node-agent from the commit refs/fleet/rolled names, extracted by
 # tools/fleet's fleet.cli.rolled, never from this checkout; this is the only
-# thing that moves the ref, and only after executed passed at HEAD. It is
-# pushed to origin, and every tick fetches origin's ref before reading it
-# (tools/fleet's fleet.core.rolled_fetch, MCPs board task 8db0f536), so a
-# roll made on any machine is what the hub's next tick runs; MCPs maketools
-# release-sync also fetches it and aligns each hub-runner machine's checkout
-# to it (MCPs board task c39ee056). A roll may move the ref back, so the
-# push forces it.
+# thing that moves the ref, and only after executed passed at HEAD. MCPs
+# maketools fleet-roll-push pushes it into the API checkout of the machine
+# the roster gives control, its home, sets this repository's ref and copies
+# it to origin (MCPs board task 18ca6bab: origin was the home until GitHub
+# refused the fleet's key on 2026-11-04 and every tick refused with it).
+# Every tick fetches the home's ref before reading it (tools/fleet's
+# fleet.core.rolled_fetch, MCPs board task 8db0f536), so a roll made on any
+# machine is what the hub's next tick runs; MCPs maketools release-sync also
+# fetches it and aligns each hub-runner machine's checkout to it (MCPs board
+# task c39ee056). A roll may move the ref back, so every push forces it.
 fleet-roll: commit-tasks executed
-	git update-ref refs/fleet/rolled HEAD
-	git push origin +refs/fleet/rolled:refs/fleet/rolled
+	$(PYTHON) .githooks/published_maketools.py fleet-roll-push .
 
 # ---------------------------------------------------------------------------
 # Individual Services (each starts infra first)
