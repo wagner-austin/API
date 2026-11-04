@@ -1497,6 +1497,12 @@ its window through the window manager and requires that jar's own complete
 audit of the trace it wrote; on colossus at osrs-lab bc0a28b it passed with
 the same counts.
 
+**`osrs-lab/brain`** (board task 488e5f06, 2026-11-04) is the planner
+library's own `make check`, run in the same image since osrs-lab 4fd53f3; it
+holds the hash-pinned manual-play replay corpus the observer's replays also
+read. On colossus it passed 267 tests at lines 1112/1112 and branches
+1109/1109, with the same tags and workers as the observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
