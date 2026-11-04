@@ -21,6 +21,16 @@
         ]
       },
       {
+        "phase": "rehearsal-images",
+        "argv": [
+          "make",
+          "-s",
+          "-C",
+          "scripts/fleet-prepare",
+          "rehearsal-images"
+        ]
+      },
+      {
         "phase": "workspace-build",
         "argv": [
           "make",

@@ -97,14 +97,21 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # Board task 007bfc7e: these lanes run execution and its nested proxy
     # twin. The existing planner includes their dependencies and generated
     # outputs; a bare invocation builds consumers from the entire repository.
-    for name in ("MCPs/execution-deploy", "MCPs/execution-linux"):
-        assert prepared[name] == (
-            InstallStep(phase="install", argv=(*PREPARE, "install")),
-            InstallStep(
-                phase="workspace-build",
-                argv=(*PREPARE, "workspace-build", "ROOTS=execution:mcp-proxy"),
-            ),
-        )
+    lanes_build = InstallStep(
+        phase="workspace-build", argv=(*PREPARE, "workspace-build", "ROOTS=execution:mcp-proxy")
+    )
+    assert prepared["MCPs/execution-linux"] == (
+        InstallStep(phase="install", argv=(*PREPARE, "install")),
+        lanes_build,
+    )
+    # MCPs board task 1e0ee821: the deploy lane starts its rehearsals' image
+    # build between the two and goes on while it builds, so the build runs
+    # beside the workspace build, the lint and the suite's first files.
+    assert prepared["MCPs/execution-deploy"] == (
+        InstallStep(phase="install", argv=(*PREPARE, "install")),
+        InstallStep(phase="rehearsal-images", argv=(*PREPARE, "rehearsal-images")),
+        lanes_build,
+    )
     assert prepared["MCPs/packages/wiki-check"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
@@ -113,9 +120,12 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
         ),
         InstallStep(phase="peer-wikis", argv=(*PREPARE, "peer-wikis")),
     )
+    # Every prepared tree is installed, then built; a phase that only starts
+    # a child beside the build changes neither.
     for steps in prepared.values():
-        assert [step["phase"] for step in steps[:2]] == ["install", "workspace-build"]
-        assert [step["argv"][4] for step in steps[:2]] == ["install", "workspace-build"]
+        built = [step for step in steps if step["phase"] != "rehearsal-images"]
+        assert [step["phase"] for step in built[:2]] == ["install", "workspace-build"]
+        assert [step["argv"][4] for step in built[:2]] == ["install", "workspace-build"]
 
 
 def test_a_test_database_step_names_its_container_and_its_phase() -> None:
