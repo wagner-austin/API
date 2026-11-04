@@ -1503,6 +1503,13 @@ holds the hash-pinned manual-play replay corpus the observer's replays also
 read. On colossus it passed 267 tests at lines 1112/1112 and branches
 1109/1109, with the same tags and workers as the observer.
 
+**`osrs-lab/live-coverage`** (board task 488e5f06, 2026-11-04) is the shared
+check of kept JaCoCo live runs that the recorder's and the observer's coverage
+gates both execute, refusing a run whose classes or class ids differ from the
+build's, run by its own `make check` in the same image. On colossus, over the
+sources osrs-lab 7558b0a committed, it passed with input-policy, 13 tests at
+lines 85/85 and branches 60/60, with the same tags and workers as the observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
