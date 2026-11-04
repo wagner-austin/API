@@ -8,9 +8,19 @@ Usage:
     fleet-runners --spec runners.json --host lavender --onboard owner/repo
     fleet-runners --spec runners.json --host lavender --register yes
     fleet-runners --spec runners.json --prune yes
+    fleet-runners --spec runners.json --host lavender --drain yes
+    fleet-runners --spec runners.json --host lavender --resume yes
 
 This module parses the flags and refuses what it cannot honour; each mode's
 act is :mod:`fleet.cli._runner_acts`.
+
+``--drain yes`` and ``--resume yes`` bracket a switch of a runner host
+(MCPs board task f19d66a5): the drain removes each runner's custom labels so
+GitHub assigns it nothing new, waits until GitHub reads it idle, and stops
+its unit; the resume starts each unit, puts the roster's labels back and
+reads each runner online (:mod:`fleet.core.runner_drain`). Switch between the
+two, never with a runner serving: a hand drain that read a unit idle and
+then stopped it cut two MCPs jobs on 2026-11-04.
 
 A runner host is a NixOS machine whose generation declares every runner
 unit, script and asset from the roster (MCPs board task 9aba868d), so no
@@ -90,6 +100,10 @@ REGISTER_FLAG = "--register"
 
 PRUNE_FLAG = "--prune"
 
+DRAIN_FLAG = "--drain"
+
+RESUME_FLAG = "--resume"
+
 _FLAGS = (
     SPEC_FLAG,
     HOST_FLAG,
@@ -99,7 +113,12 @@ _FLAGS = (
     ONBOARD_FLAG,
     REGISTER_FLAG,
     PRUNE_FLAG,
+    DRAIN_FLAG,
+    RESUME_FLAG,
 )
+
+#: The modes that change a host, the roster or GitHub, each run by :func:`_change`.
+_CHANGE_FLAGS = (ONBOARD_FLAG, REGISTER_FLAG, PRUNE_FLAG, DRAIN_FLAG, RESUME_FLAG)
 
 
 def load_reserved_cores(registry: str, host_name: str) -> int:
@@ -181,7 +200,7 @@ def select_hosts(spec: RunnerSpec, host_name: str | None) -> list[HostRunnerSpec
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Audit, sample, report, onboard, register or prune, per the flags.
+    """Audit, sample, report, onboard, register, prune, drain or resume, per the flags.
 
     Args:
         argv: Command-line arguments excluding the program name. Defaults to
@@ -190,22 +209,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     Returns:
         0 when the audit found every check passing on every reachable host
         and every registration declared, the prune left no undeclared
-        registration, or the onboard, sample or report completed. 1 when any
-        audited check drifted, any audited host did not answer, or the prune
-        kept a registration GitHub reads online or busy.
+        registration, or the onboard, sample, report, drain or resume
+        completed. 1 when any audited check drifted, any audited host did not
+        answer, or the prune kept a registration GitHub reads online or busy.
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value,
             ``--spec`` is absent, more than one mode flag is given (each
             names a different act and a combined invocation would do one
-            silently), ``--onboard`` or ``--register`` was given without
-            ``--host``, ``--prune`` with it, ``--register`` or ``--prune``
-            with any value but ``yes``, ``--report`` without ``--cores``,
-            or ``--cores`` is not a positive integer.
+            silently), ``--onboard``, ``--register``, ``--drain`` or
+            ``--resume`` was given without ``--host``, ``--prune`` with it,
+            ``--register``, ``--prune``, ``--drain`` or ``--resume`` with any
+            value but ``yes``, ``--report`` without ``--cores``, or
+            ``--cores`` is not a positive integer.
         AppError: ``RUNNER_SPEC_UNREADABLE``, ``RUNNER_HOST_UNKNOWN``,
             ``RUNNER_AUDIT_UNPARSABLE``, ``RUNNER_TOKEN_UNAVAILABLE``,
             ``RUNNER_GITHUB_UNREADABLE``, ``RUNNER_DEREGISTRATION_REFUSED``,
-            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` as the acts describe.
+            ``RUNNER_LABELS_DRIFTED``, ``RUNNER_LABELS_REFUSED``,
+            ``RUNNER_DRAIN_TIMEOUT``, ``NODE_UNREACHABLE`` or
+            ``DISPATCH_FAILED`` as the acts describe.
     """
     tokens = list(argv) if argv is not None else list(sys.argv[1:])
     parsed = cli_args.parse_single_flags(tokens, _FLAGS)
@@ -216,7 +238,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     modes = [
         flag
-        for flag in (SAMPLE_FLAG, REPORT_FLAG, ONBOARD_FLAG, REGISTER_FLAG, PRUNE_FLAG)
+        for flag in (SAMPLE_FLAG, REPORT_FLAG, *_CHANGE_FLAGS)
         if flag in parsed
     ]
     if len(modes) > 1:
@@ -225,7 +247,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     spec = load_runner_spec(spec_path)
     hosts = select_hosts(spec, parsed.get(HOST_FLAG))
-    if ONBOARD_FLAG in parsed or REGISTER_FLAG in parsed or PRUNE_FLAG in parsed:
+    if any(flag in parsed for flag in _CHANGE_FLAGS):
         return _change(parsed, spec, spec_path, hosts)
     return _read(parsed, spec, hosts)
 
@@ -233,10 +255,10 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _change(
     parsed: dict[str, str], spec: RunnerSpec, spec_path: str, hosts: list[HostRunnerSpec]
 ) -> int:
-    """Run the one mode that changes the roster, a host or GitHub: onboard, register or prune.
+    """Run the one mode that changes the roster, a host or GitHub, of :data:`_CHANGE_FLAGS`.
 
     Args:
-        parsed: The parsed flags, naming exactly one of the three.
+        parsed: The parsed flags, naming exactly one of those modes.
         spec: The roster.
         spec_path: Where it lives, which an onboard rewrites.
         hosts: The hosts ``--host`` selected.
@@ -255,6 +277,14 @@ def _change(
         _require_confirmation(parsed, REGISTER_FLAG, "it registers runners with GitHub")
         _require_host(parsed, REGISTER_FLAG, "a registration is of one machine's runners")
         return _runner_acts.register(hosts[0])
+    if DRAIN_FLAG in parsed:
+        _require_confirmation(parsed, DRAIN_FLAG, "it takes runners out of GitHub's pool")
+        _require_host(parsed, DRAIN_FLAG, "a drain stops one machine's runners for its switch")
+        return _runner_acts.drain(hosts[0])
+    if RESUME_FLAG in parsed:
+        _require_confirmation(parsed, RESUME_FLAG, "it starts runners and puts them in the pool")
+        _require_host(parsed, RESUME_FLAG, "a resume starts one machine's runners after its switch")
+        return _runner_acts.resume(hosts[0])
     _require_confirmation(parsed, PRUNE_FLAG, "it deletes registrations from GitHub")
     if HOST_FLAG in parsed:
         raise ValueError(
@@ -309,7 +339,7 @@ def _require_confirmation(parsed: dict[str, str], flag: str, act: str) -> None:
 
     Args:
         parsed: The parsed flags, ``flag`` among them.
-        flag: ``--register`` or ``--prune``.
+        flag: ``--register``, ``--prune``, ``--drain`` or ``--resume``.
         act: The clause naming what the mode does that needs confirming.
 
     Raises:
@@ -370,6 +400,8 @@ __all__ = [
     "HOST_FLAG",
     "ONBOARD_FLAG",
     "PRUNE_FLAG",
+    "DRAIN_FLAG",
+    "RESUME_FLAG",
     "REGISTER_FLAG",
     "REPORT_FLAG",
     "SAMPLE_FLAG",

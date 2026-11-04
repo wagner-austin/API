@@ -1,4 +1,4 @@
-"""The two ``gh`` reads and the one removal, against fakes at the command seam.
+"""The ``gh`` reads, the removal and the label changes, against fakes at the command seam.
 
 Each fake answers through ``_test_hooks.run`` exactly as
 :mod:`tests.test_core_io` describes, so the argv each test asserts is the one
@@ -149,3 +149,146 @@ class TestDeleteRegistration:
         with pytest.raises(AppError) as fault:
             runner_github.delete_registration("wagner-austin/API", 21)
         assert "<no stderr>" in fault.value.message
+
+
+#: Where one fixture runner's labels live.
+_LABELS = "repos/wagner-austin/MCPs/actions/runners/7/labels"
+
+
+class TestReadCustomLabels:
+    """The drain's check of a runner's labels against the roster's (MCPs board task f19d66a5)."""
+
+    def test_the_custom_labels_are_read_one_per_line(self) -> None:
+        runner = FakeRun([ok("lavender\ngpu\n")])
+        _test_hooks.run = runner
+        assert runner_github.read_custom_labels("wagner-austin/MCPs", 7) == ["lavender", "gpu"]
+        assert tuple(runner.calls[0]) == (
+            "gh",
+            "api",
+            _LABELS,
+            "--jq",
+            '.labels[] | select(.type == "custom") | .name',
+        )
+        assert runner.timeouts[0] == runner_github.GH_API_TIMEOUT_SECONDS
+
+    def test_a_runner_with_no_custom_label_reads_empty(self) -> None:
+        _test_hooks.run = FakeRun([ok("")])
+        assert runner_github.read_custom_labels("wagner-austin/MCPs", 7) == []
+
+    def test_a_gh_failure_is_a_local_auth_condition(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "HTTP 404: Not Found")])
+        with pytest.raises(AppError) as fault:
+            runner_github.read_custom_labels("wagner-austin/MCPs", 7)
+        assert fault.value.code is FleetErrorCode.RUNNER_GITHUB_UNREADABLE
+        assert fault.value.message == (
+            "gh could not read the labels of runner 7 of wagner-austin/MCPs: HTTP 404: Not Found. "
+            "This is local auth or repo permissions, not the fleet."
+        )
+
+    def test_a_silent_gh_failure_says_so(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "")])
+        with pytest.raises(AppError) as fault:
+            runner_github.read_custom_labels("wagner-austin/MCPs", 7)
+        assert "<no stderr>" in fault.value.message
+
+
+class TestClearCustomLabels:
+    """The drain's removal of a runner from GitHub's pool."""
+
+    def test_every_custom_label_is_removed_and_none_is_read_back(self) -> None:
+        runner = FakeRun([ok("")])
+        _test_hooks.run = runner
+        runner_github.clear_custom_labels("wagner-austin/MCPs", 7)
+        assert tuple(runner.calls[0]) == (
+            "gh",
+            "api",
+            "-X",
+            "DELETE",
+            _LABELS,
+            "--jq",
+            runner_github.CUSTOM_LABELS_JQ,
+        )
+        assert runner.timeouts[0] == runner_github.GH_API_TIMEOUT_SECONDS
+
+    def test_a_label_github_still_lists_is_refused(self) -> None:
+        _test_hooks.run = FakeRun([ok("lavender\n")])
+        with pytest.raises(AppError) as fault:
+            runner_github.clear_custom_labels("wagner-austin/MCPs", 7)
+        assert fault.value.code is FleetErrorCode.RUNNER_LABELS_REFUSED
+        assert fault.value.message == (
+            "GitHub still lists custom labels ['lavender'] on runner 7 of wagner-austin/MCPs "
+            f"after removing them. {runner_github.LABELS_REPAIR}"
+        )
+
+    def test_a_gh_failure_names_the_resume_that_repairs_it(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "HTTP 403: Must have admin rights")])
+        with pytest.raises(AppError) as fault:
+            runner_github.clear_custom_labels("wagner-austin/MCPs", 7)
+        assert fault.value.code is FleetErrorCode.RUNNER_LABELS_REFUSED
+        assert fault.value.message == (
+            "gh could not remove the labels of runner 7 of wagner-austin/MCPs: HTTP 403: Must "
+            "have admin rights. This is local auth or repo permissions, not the fleet; "
+            "fleet-runners --resume yes for the runner's host puts the roster's labels back."
+        )
+
+    def test_a_silent_gh_failure_says_so(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "")])
+        with pytest.raises(AppError) as fault:
+            runner_github.clear_custom_labels("wagner-austin/MCPs", 7)
+        assert "<no stderr>" in fault.value.message
+
+
+class TestSetCustomLabels:
+    """The resume's return of a runner to GitHub's pool, with the roster's labels."""
+
+    def test_the_labels_are_set_as_one_array_and_read_back(self) -> None:
+        runner = FakeRun([ok("gpu\nlavender\n")])
+        _test_hooks.run = runner
+        runner_github.set_custom_labels("wagner-austin/MCPs", 7, ["lavender", "gpu"])
+        assert tuple(runner.calls[0]) == (
+            "gh",
+            "api",
+            "-X",
+            "PUT",
+            _LABELS,
+            "-f",
+            "labels[]=lavender",
+            "-f",
+            "labels[]=gpu",
+            "--jq",
+            runner_github.CUSTOM_LABELS_JQ,
+        )
+        assert runner.timeouts[0] == runner_github.GH_API_TIMEOUT_SECONDS
+
+    def test_an_answer_with_other_labels_is_refused(self) -> None:
+        _test_hooks.run = FakeRun([ok("lavender\nstale\n")])
+        with pytest.raises(AppError) as fault:
+            runner_github.set_custom_labels("wagner-austin/MCPs", 7, ["lavender"])
+        assert fault.value.code is FleetErrorCode.RUNNER_LABELS_REFUSED
+        assert fault.value.message == (
+            "GitHub lists custom labels ['lavender', 'stale'] on runner 7 of wagner-austin/MCPs "
+            f"after setting them to ['lavender']. {runner_github.LABELS_REPAIR}"
+        )
+
+    def test_a_gh_failure_is_refused_with_gh_s_words(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "HTTP 422: Validation Failed")])
+        with pytest.raises(AppError) as fault:
+            runner_github.set_custom_labels("wagner-austin/MCPs", 7, ["lavender"])
+        assert fault.value.code is FleetErrorCode.RUNNER_LABELS_REFUSED
+        assert fault.value.message == (
+            "gh could not set the labels of runner 7 of wagner-austin/MCPs to ['lavender']: "
+            f"HTTP 422: Validation Failed. {runner_github.LABELS_REPAIR}"
+        )
+
+    def test_a_silent_gh_failure_says_so(self) -> None:
+        _test_hooks.run = FakeRun([failed(1, "")])
+        with pytest.raises(AppError) as fault:
+            runner_github.set_custom_labels("wagner-austin/MCPs", 7, ["lavender"])
+        assert "<no stderr>" in fault.value.message
+
+    def test_no_label_is_refused_before_gh_runs(self) -> None:
+        runner = FakeRun([])
+        _test_hooks.run = runner
+        with pytest.raises(ValueError, match="clear_custom_labels is how"):
+            runner_github.set_custom_labels("wagner-austin/MCPs", 7, [])
+        assert runner.calls == []

@@ -20,6 +20,7 @@ from fleet.contracts.runners import HostRunnerSpec, RunnerSpec, encode_runner_sp
 from fleet.core import (
     _test_hooks,
     runner_audit,
+    runner_drain,
     runner_load,
     runner_onboard,
     runner_register,
@@ -166,7 +167,12 @@ def onboard(spec: RunnerSpec, spec_path: str, host: HostRunnerSpec, repo: str) -
     _log.info("NEXT, in order, for %s:", host["name"])
     _log.info("  1. make render-documents, then commit and push the roster and its render")
     _log.info("  2. in MCPs, fleet-reach render, then commit and push fleet-mcp/nixos/roster.json")
-    _log.info("  3. switch %s to the new generation", host["name"])
+    _log.info(
+        "  3. fleet-runners --spec <roster> --host %s --drain yes, switch %s to the new "
+        "generation, then the same with --resume yes",
+        host["name"],
+        host["name"],
+    )
     _log.info("  4. fleet-runners --spec <roster> --host %s --register yes", host["name"])
     return 0
 
@@ -192,6 +198,51 @@ def register(host: HostRunnerSpec) -> int:
         _log.info("%d fault(s) after registering; the drift lines name the repairs", faults)
         return 1
     _log.info("registration verified: every check green on %s", host["name"])
+    return 0
+
+
+def drain(host: HostRunnerSpec) -> int:
+    """Take one runner host's runners out of GitHub's pool and stop them, and print each step.
+
+    Args:
+        host: The host to drain.
+
+    Returns:
+        0: every runner was stopped holding no job, which is the only way
+        the drain returns.
+
+    Raises:
+        AppError: As :func:`fleet.core.runner_drain.drain` describes.
+    """
+    drained = runner_drain.drain(host)
+    for step in drained["steps"]:
+        _log.info("%s drain: %s", host["name"], step)
+    _log.info(
+        "drained: every runner of %s is stopped and out of the pool; switch it, then "
+        "fleet-runners --resume yes --host %s",
+        host["name"],
+        host["name"],
+    )
+    return 0
+
+
+def resume(host: HostRunnerSpec) -> int:
+    """Start one runner host's runners, restore their labels, and print each step.
+
+    Args:
+        host: The host to resume.
+
+    Returns:
+        0: every runner reads online with the roster's labels, which is the
+        only way the resume returns.
+
+    Raises:
+        AppError: As :func:`fleet.core.runner_drain.resume` describes.
+    """
+    resumed = runner_drain.resume(host)
+    for step in resumed["steps"]:
+        _log.info("%s resume: %s", host["name"], step)
+    _log.info("resumed: every runner of %s is online and in the pool", host["name"])
     return 0
 
 

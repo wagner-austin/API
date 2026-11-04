@@ -164,6 +164,8 @@ node lacks for them. `fleet-runners` holds the hosts to it:
 fleet-runners --spec runners.json                                   # audit every host
 fleet-runners --spec runners.json --host lavender --onboard owner/repo
 fleet-runners --spec runners.json --host lavender --register yes
+fleet-runners --spec runners.json --host lavender --drain yes        # before a switch
+fleet-runners --spec runners.json --host lavender --resume yes       # after it
 ```
 
 The operator, on 2026-09-26, while lavender was being recovered by hand from a
@@ -200,6 +202,25 @@ A registered install is skipped, so a registration cut short by anything is
 finished by running the same command again, and one over a healthy host
 mints nothing. `--onboard` adds a repository's install to the roster and
 prints the render, switch and register steps that lay it.
+
+**A switch is bracketed by `--drain yes` and `--resume yes`** (`runner_drain`,
+MCPs board task f19d66a5). A switch restarts every runner unit whose
+definition changed, and a restart ends the job the unit holds. On 2026-11-04
+lavender was switched by a hand loop that read each unit idle and then stopped
+it, and two MCPs jobs (packages/wiki-cli and taskboard-mcp of run
+41764089450) were taken by their runners between the reading and the stop and
+ended with no step run. So the drain stops GitHub's assignment first: it
+removes each runner's custom labels, which every workflow on the fleet
+targets, then stops each unit only once GitHub has read its runner not busy at
+every reading across 30 seconds after the labels went, and reads it back
+inactive. A job a runner already held runs to its end, up to the host's
+`job_timeout_minutes`; past that the drain starts what it stopped, restores
+every label and refuses with `RUNNER_DRAIN_TIMEOUT`. `--resume yes` starts
+each unit that is not active, restores the roster's labels and waits for
+GitHub to read each runner online. Both refuse with `RUNNER_LABELS_DRIFTED`,
+changing nothing, when GitHub's labels for a runner are not the roster's, and
+an install GitHub has not registered yet (one an onboard just added) is
+stopped and started without its labels, for `--register yes` to register.
 
 **What a runner host holds, and why none of it needs saving:**
 

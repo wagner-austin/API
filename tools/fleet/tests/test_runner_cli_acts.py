@@ -1,4 +1,4 @@
-"""fleet-runners' acts end to end: sampling and its report, onboarding, registering.
+"""fleet-runners' acts end to end: sampling and its report, onboarding, registering, draining.
 
 Every invocation goes through :func:`fleet.cli.runners.main` with a real
 roster file in a temporary directory and the command seam faked at
@@ -24,7 +24,7 @@ from tests._runner_roster_files import (
     roster_host,
     write_roster,
 )
-from tests.conftest import FakeRun, failed, ok
+from tests.conftest import FakeClock, FakeRun, FakeSleep, failed, ok
 
 
 class TestSampleAndReport:
@@ -161,7 +161,8 @@ class TestOnboardMode:
             "NEXT, in order, for lavender:",
             "  1. make render-documents, then commit and push the roster and its render",
             "  2. in MCPs, fleet-reach render, then commit and push fleet-mcp/nixos/roster.json",
-            "  3. switch lavender to the new generation",
+            "  3. fleet-runners --spec <roster> --host lavender --drain yes, switch lavender to "
+            "the new generation, then the same with --resume yes",
             "  4. fleet-runners --spec <roster> --host lavender --register yes",
         ]
 
@@ -221,6 +222,92 @@ class TestRegisterMode:
             messages
         )
         assert messages[-1] == "1 fault(s) after registering; the drift lines name the repairs"
+
+
+def _drain_argv(spec_path: str, flag: str) -> list[str]:
+    """A confirmed drain or resume of lavender's runners.
+
+    Args:
+        spec_path: The roster.
+        flag: ``--drain`` or ``--resume``.
+
+    Returns:
+        The arguments after the program name.
+    """
+    return ["--spec", spec_path, "--host", "lavender", flag, "yes"]
+
+
+class TestDrainAndResumeModes:
+    """The --drain and --resume modes: confirmation, host, and what each prints (f19d66a5)."""
+
+    @pytest.mark.parametrize("flag", ["--drain", "--resume"])
+    def test_each_requires_host(self, tmp_path: pathlib.Path, flag: str) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        with pytest.raises(ValueError, match=f"{flag} requires --host"):
+            runners.main(["--spec", spec_path, flag, "yes"])
+
+    @pytest.mark.parametrize(
+        ("flag", "act"),
+        [
+            ("--drain", "it takes runners out of GitHub's pool"),
+            ("--resume", "it starts runners and puts them in the pool"),
+        ],
+    )
+    def test_each_takes_only_the_literal_yes(
+        self, tmp_path: pathlib.Path, flag: str, act: str
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        with pytest.raises(ValueError) as refused:
+            runners.main(["--spec", spec_path, "--host", "lavender", flag, "true"])
+        assert str(refused.value) == (
+            f"{flag} takes the literal value yes, got 'true': {act}, and a value is its "
+            "confirmation"
+        )
+
+    def test_drain_and_resume_are_different_acts(self, tmp_path: pathlib.Path) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        argv = [*_drain_argv(spec_path, "--drain"), "--resume", "yes"]
+        with pytest.raises(ValueError, match="are different acts"):
+            runners.main(argv)
+
+    def test_a_drain_prints_each_step_and_the_switch_that_follows(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        clock = FakeClock(1_000)
+        _test_hooks.now = clock
+        _test_hooks.sleep = FakeSleep(clock)
+        idle = "1 lavender online false\n"
+        answers = [idle, "lavender\n", "", idle, idle, idle, "", "inactive\n"]
+        _test_hooks.run = FakeRun([ok(text) for text in answers])
+        with caplog.at_level("INFO"):
+            assert runners.main(_drain_argv(spec_path, "--drain")) == 0
+        assert [record.getMessage() for record in caplog.records] == [
+            "lavender drain: labels: removed from 1 runner(s); GitHub assigns them nothing new",
+            "lavender drain: stopped: actions.runner.wagner-austin-API.lavender.service, idle "
+            "for 30s with no label",
+            "drained: every runner of lavender is stopped and out of the pool; switch it, then "
+            "fleet-runners --resume yes --host lavender",
+        ]
+
+    def test_a_resume_prints_each_step(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        spec_path = write_roster(tmp_path, [raw_host("lavender")])
+        clock = FakeClock(1_000)
+        _test_hooks.now = clock
+        _test_hooks.sleep = FakeSleep(clock)
+        online = "1 lavender online false\n"
+        answers = [online, "", "active\n", "lavender\n", online]
+        _test_hooks.run = FakeRun([ok(text) for text in answers])
+        with caplog.at_level("INFO"):
+            assert runners.main(_drain_argv(spec_path, "--resume")) == 0
+        assert [record.getMessage() for record in caplog.records] == [
+            "lavender resume: started: none, every unit was active",
+            "lavender resume: labels: the roster's restored on 1 runner(s)",
+            "lavender resume: online: all 1 runner(s), as GitHub reads them",
+            "resumed: every runner of lavender is online and in the pool",
+        ]
 
 
 class TestPruneMode:
