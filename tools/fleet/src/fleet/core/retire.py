@@ -1,14 +1,15 @@
 """Retiring a settled dispatch's directory on its node (MCPs board task bfca20e6).
 
-A dispatch's export lives under ``<stage_root>/<run_id>`` on the node it ran
-on, beside its transcript. Until this module nothing removed it: measured on
+A dispatch's export lives in its run's enclosure ``<stage_root>/<run_id>``
+(:func:`fleet.core.names.run_enclosure`) on the node it ran on, beside its
+transcript. Until this module nothing removed it: measured on
 diphtheria 2026-09-27, the stage root held 130 exports in 293 GB and the disk
 was at 96 percent, with 133 ``mkdir-`` scripts at the root outliving the trees
 they made. Nothing reads an export again once its runner has read the
 transcript's tail, so the runner retires it at that moment: the transcript
 moves to ``<stage_root>/logs/<run_id>.log`` (:func:`fleet.core.names.retained_log_path`),
-which is the path the verdict line names, and the export and the run's root
-scripts are removed.
+which is the path the verdict line names, and the enclosure and the run's
+root scripts are removed.
 
 ONE RETIRE, FOUR CALLERS, like :mod:`fleet.core.stop`: the node runner's
 settle (a finished run, or one stopped past its lease), every stop that
@@ -83,7 +84,8 @@ def attempt_retire_on_node(node: NodeConfig, *, run_id: str) -> remote.RemoteOut
         node["host"],
         dialect.script_path(stage_root, names.retire_stem(run_id)),
         dialect.retire_script(
-            target=names.dispatch_directory(stage_root, run_id),
+            stage_root=stage_root,
+            run_id=run_id,
             retained=names.retained_log_path(stage_root, run_id),
             scripts=tuple(
                 dialect.script_path(stage_root, stem) for stem in names.root_script_stems(run_id)

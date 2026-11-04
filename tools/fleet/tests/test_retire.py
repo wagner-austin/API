@@ -66,7 +66,8 @@ def _retire_script(*, isolated: bool) -> str:
         The script's text.
     """
     return dialect.retire_script(
-        target=f"{STAGE_ROOT}/{DEMO_RUN_ID}",
+        stage_root=STAGE_ROOT,
+        run_id=DEMO_RUN_ID,
         retained=names.retained_log_path(STAGE_ROOT, DEMO_RUN_ID),
         scripts=tuple(
             dialect.script_path(STAGE_ROOT, stem) for stem in names.root_script_stems(DEMO_RUN_ID)
@@ -195,7 +196,7 @@ class TestTheShScriptRunsForReal:
         Returns:
             The run's directory.
         """
-        target = root / DEMO_RUN_ID
+        target = pathlib.Path(names.dispatch_directory(root.as_posix(), DEMO_RUN_ID))
         objects = target / ".git" / "objects"
         objects.mkdir(parents=True)
         loose = objects / "ab"
@@ -206,14 +207,19 @@ class TestTheShScriptRunsForReal:
             (target / f"{names.RESULT_NAME}.log").write_text("887 passed\n", encoding="utf-8")
         for stem in names.root_script_stems(DEMO_RUN_ID):
             (root / f"{stem}.sh").write_text(PROLOGUE, encoding="utf-8")
-        # The staging directory beside the export: the archive and the
-        # scripts that staged it, none of them inside the tree.
+        # The staging directory beside the export in the run's enclosure: the
+        # archive and the scripts that staged it, none of them inside the tree.
         staged = pathlib.Path(names.staging_directory(target.as_posix()))
         staged.mkdir()
         (staged / names.ARCHIVE_NAME).write_bytes(b"\x1f\x8b")
         (staged / "extract.sh").write_text(PROLOGUE, encoding="utf-8")
         (root / "cache").mkdir()
         (root / "libs-other-1757000001").mkdir()
+        # A companion in the stage root, linked into the enclosure as
+        # staging.link_companions links it: the run's to read, not to remove.
+        companion = root / "MCPs"
+        (companion / "wiki").mkdir(parents=True)
+        (target.parent / "MCPs").symlink_to(companion, target_is_directory=True)
         # Releases sealed read-only, the way MCPs f27b4822e seals them: one
         # where a maketools run's tests leave their fixtures, one staged, and
         # one outside both trees that a link inside the run names.
@@ -233,7 +239,8 @@ class TestTheShScriptRunsForReal:
         script = pathlib.Path(root / f"{names.retire_stem(DEMO_RUN_ID)}.sh")
         script.write_text(
             dialect.retire_script(
-                target=names.dispatch_directory(stage_root, DEMO_RUN_ID),
+                stage_root=stage_root,
+                run_id=DEMO_RUN_ID,
                 retained=names.retained_log_path(stage_root, DEMO_RUN_ID),
                 scripts=tuple(
                     dialect.script_path(stage_root, stem)
@@ -262,15 +269,18 @@ class TestTheShScriptRunsForReal:
         assert (tmp_path / "logs" / f"{DEMO_RUN_ID}.log").read_text(encoding="utf-8") == (
             "887 passed\n"
         )
-        # The cache and another run's directory are not this run's to remove;
-        # the release the run's link named is left whole and still locked.
+        # The cache, the companion and another run's directory are not this
+        # run's to remove: its enclosure goes whole, its links with it, and
+        # what the links named is left whole and still locked.
         assert sorted(entry.name for entry in tmp_path.iterdir()) == [
+            "MCPs",
             "cache",
             "libs-other-1757000001",
             "logs",
         ]
         assert self.outside_modes(tmp_path) == [0o555, 0o555]
         assert (tmp_path / "cache" / "MCPs" / "scripts" / "release-kinds.json").is_file()
+        assert (tmp_path / "MCPs" / "wiki").is_dir()
 
     def test_a_run_that_wrote_no_transcript_is_retired_all_the_same_and_twice(
         self, tmp_path: pathlib.Path
@@ -284,5 +294,4 @@ class TestTheShScriptRunsForReal:
 
         assert list((tmp_path / "logs").iterdir()) == []
         assert not (tmp_path / DEMO_RUN_ID).exists()
-        assert not (tmp_path / f"{DEMO_RUN_ID}.stage").exists()
         assert self.outside_modes(tmp_path) == [0o555, 0o555]

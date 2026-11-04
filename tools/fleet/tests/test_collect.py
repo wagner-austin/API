@@ -196,7 +196,8 @@ class TestPollResult:
         assert polled["unlaunched"] == refusal.value.message
         assert refusal.value.code is FleetErrorCode.DISPATCH_NOT_LAUNCHED
         assert refusal.value.message == (
-            f"DISPATCH_NOT_LAUNCHED: /home/corvis/fleet/stage/{DEMO_RUN_ID} on lavender holds "
+            f"DISPATCH_NOT_LAUNCHED: /home/corvis/fleet/stage/{DEMO_RUN_ID}/{DEMO_RUN_ID} on "
+            "lavender holds "
             f"no unit-end script, which the launch writes before it starts the unit, so "
             f"{DEMO_RUN_ID} was launched under another stage root than "
             "/home/corvis/fleet/stage, the one the rolled workspace declares now"

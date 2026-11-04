@@ -236,11 +236,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         raise ValueError(
             f"{SPEC_FLAG} is required: the roster's path is passed, never searched for"
         )
-    modes = [
-        flag
-        for flag in (SAMPLE_FLAG, REPORT_FLAG, *_CHANGE_FLAGS)
-        if flag in parsed
-    ]
+    modes = [flag for flag in (SAMPLE_FLAG, REPORT_FLAG, *_CHANGE_FLAGS) if flag in parsed]
     if len(modes) > 1:
         raise ValueError(
             f"{' and '.join(modes)} are different acts; give one, or neither for the audit"
@@ -397,13 +393,13 @@ def entrypoint() -> None:
 
 __all__ = [
     "CORES_FLAG",
+    "DRAIN_FLAG",
     "HOST_FLAG",
     "ONBOARD_FLAG",
     "PRUNE_FLAG",
-    "DRAIN_FLAG",
-    "RESUME_FLAG",
     "REGISTER_FLAG",
     "REPORT_FLAG",
+    "RESUME_FLAG",
     "SAMPLE_FLAG",
     "SPEC_FLAG",
     "entrypoint",

@@ -168,7 +168,8 @@ class TestANodeThatMissesTheTailRead:
         assert collected["line"].endswith(
             f"run={DEMO_RUN_ID}: did not answer the read of its transcript's tail: ssh to "
             "lavender failed while sending "
-            f"/home/corvis/fleet/stage/{DEMO_RUN_ID}/log-tail.sh: Connection timed out during "
+            f"/home/corvis/fleet/stage/{DEMO_RUN_ID}/{DEMO_RUN_ID}/log-tail.sh: Connection "
+            "timed out during "
             "banner exchange"
         )
         assert endpoint.tools == []

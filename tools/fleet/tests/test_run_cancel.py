@@ -331,7 +331,8 @@ class TestCancel:
         assert runner.stdin[0] == dialect.stop_script(DEMO_RUN_ID).encode("utf-8")
         stage_root = node["stage_root"]
         retire_body = dialect.retire_script(
-            target=names.dispatch_directory(stage_root, DEMO_RUN_ID),
+            stage_root=stage_root,
+            run_id=DEMO_RUN_ID,
             retained=names.retained_log_path(stage_root, DEMO_RUN_ID),
             scripts=tuple(
                 dialect.script_path(stage_root, stem)

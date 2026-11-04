@@ -1,7 +1,7 @@
 """Every run's directory is owed a retire from its lease until one is done.
 
-MCPs board tasks 8776b828 and 3d9eec0d. A dispatch makes
-``<stage_root>/<run_id>`` and its staging directory on its node after it
+MCPs board tasks 8776b828 and 3d9eec0d. A dispatch makes its enclosure
+``<stage_root>/<run_id>`` and the export and staging directory in it after it
 takes its lease (:mod:`fleet.core.dispatch`), and only a
 retire removes them (:mod:`fleet.core.retire`). So the debt starts at the
 lease: :func:`owe` records the run ``owed`` in the retire record beside the

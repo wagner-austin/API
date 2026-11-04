@@ -40,6 +40,7 @@ import gzip
 import hashlib
 import io
 import pathlib
+import posixpath
 import tarfile
 
 from platform_core.errors import AppError, FleetErrorCode
@@ -215,7 +216,7 @@ def stage_companion(
     source: pathlib.Path,
     payload: bytes,
 ) -> str:
-    """Put one companion repository on a node, beside the exports.
+    """Put one companion repository in a node's stage root.
 
     The directory is REPLACED rather than cloned over, and the bundle
     never enters it: :func:`fleet.core.names.companion_directory` and
@@ -482,10 +483,44 @@ def stage_registry(
     return landed
 
 
+def link_companions(host: str, *, target: str, trees: tuple[str, ...]) -> None:
+    """Link each companion a dispatch declared into its run's enclosure.
+
+    A companion lands once per node in the stage root
+    (:func:`fleet.core.names.companion_directory`), and the export sits in
+    its run's enclosure (:func:`fleet.core.names.run_enclosure`), so a
+    recipe's ``../<directory>`` reaches only a companion its project
+    declared: a link to the shared tree, never a copy of it. A dispatch that
+    declares none sends nothing, and its export has nothing beside it.
+
+    Args:
+        host: SSH destination.
+        target: The run's export directory, already staged.
+        trees: The companions' trees on the node, from
+            :func:`stage_companions`.
+
+    Raises:
+        AppError: From the transport, or naming the ``ln`` that failed.
+    """
+    if not trees:
+        return
+    enclosure = posixpath.dirname(target)
+    remote.run_script(
+        host,
+        dialect.script_path(names.staging_directory(target), names.LINK_COMPANIONS_STEM),
+        dialect.checked_script(
+            tuple(
+                ("ln", "-sfn", tree, f"{enclosure}/{posixpath.basename(tree)}") for tree in trees
+            )
+        ),
+    )
+
+
 __all__ = [
     "EXCLUDED_DIRECTORIES",
     "archive",
     "digest",
+    "link_companions",
     "registry_payload",
     "send_verified",
     "stage",

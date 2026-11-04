@@ -99,11 +99,15 @@ SH_REMOVE_UNUSED: Final = (
 )
 
 #: A fleet node's ``generations_in_use STAGE``: the name each
-#: :data:`~fleet.core.names.GENERATION_MARKER_NAME` one directory below the
-#: stage root holds, one per run directory still on the node.
+#: :data:`~fleet.core.names.GENERATION_MARKER_NAME` in a run directory still
+#: on the node holds. A run's export is two directories below the node's
+#: stage root, in its enclosure (:func:`fleet.core.names.run_enclosure`,
+#: MCPs board task 6beb7d14), and an execdocker copy one below that user's
+#: (:func:`fleet.core.linux_isolated_build.exec_root`), so both depths are
+#: read: a marker missed is a generation removed under a running build.
 SH_STAGE_GENERATIONS_IN_USE: Final = (
     "generations_in_use() {",
-    f'    $as find "$1" -mindepth 2 -maxdepth 2 -name {names.GENERATION_MARKER_NAME} '
+    f'    $as find "$1" -mindepth 2 -maxdepth 3 -name {names.GENERATION_MARKER_NAME} '
     "-exec cat {} +",
     "}",
 )

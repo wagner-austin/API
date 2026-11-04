@@ -62,8 +62,12 @@ INIT_REPOSITORY_STEM = "init-repo"
 #: The script that clones a staged companion from its bundle.
 COMPANION_REPOSITORY_STEM = "companion-repo"
 
+#: The script that links a dispatch's declared companions into its enclosure.
+LINK_COMPANIONS_STEM = "link-companions"
+
 #: What a staging directory is called: the name of the directory it stages
-#: and this suffix, beside it under the node's stage root.
+#: and this suffix, beside it: a companion's under the node's stage root, an
+#: export's in its run's enclosure (:func:`run_enclosure`).
 #:
 #: THE TRANSPORT FILES ARE KEPT OUT OF EVERY STAGED TREE, a dispatch's export
 #: as well as a companion. Each is read as a repository: an export's claim is
@@ -177,8 +181,21 @@ def cache_root(stage_root: str) -> str:
     return f"{stage_root}/{CACHE_DIRECTORY}"
 
 
-def dispatch_directory(stage_root: str, run_id: str) -> str:
-    """Where one dispatch's export, scripts and result live on its node.
+def run_enclosure(stage_root: str, run_id: str) -> str:
+    """The directory one dispatch's export sits in, beside only what it declared.
+
+    A RUN SEES BESIDE ITS EXPORT WHAT IT DECLARED AND NOTHING ELSE (MCPs board
+    task 6beb7d14). A recipe reads ``..`` from its root as a workstation's
+    ``~/PROJECTS``, and until then ``..`` was the stage root itself, holding
+    every other run's export and every companion any project had staged on
+    the node. So a check's verdict on a fixed commit read the node's disk:
+    on pendragon on 2026-11-03 fleet job 1506d000 re-checked MCPs 1a864f364
+    for a review and failed on ``MCPs/wiki``, the MCPs companion another
+    project had staged at a newer commit, while a80737b6 at e95a3dfb passed
+    on the same node four minutes later. The enclosure holds the export, its
+    staging directory and a link to each companion the dispatch declares
+    (:func:`fleet.core.staging.link_companions`), and the retire removes it
+    whole.
 
     Args:
         stage_root: The node's declared stage root.
@@ -188,6 +205,23 @@ def dispatch_directory(stage_root: str, run_id: str) -> str:
         ``<stage_root>/<run_id>``.
     """
     return f"{stage_root}/{run_id}"
+
+
+def dispatch_directory(stage_root: str, run_id: str) -> str:
+    """Where one dispatch's export, scripts and result live on its node.
+
+    Named after the run inside its enclosure, as it was in the stage root
+    before, so every name derived from the directory's own (a compose
+    project's, an isolated copy's) stays unique to the run.
+
+    Args:
+        stage_root: The node's declared stage root.
+        run_id: The dispatch.
+
+    Returns:
+        ``<stage_root>/<run_id>/<run_id>``.
+    """
+    return f"{run_enclosure(stage_root, run_id)}/{run_id}"
 
 
 def log_path(target: str) -> str:
@@ -219,14 +253,15 @@ def retained_log_path(stage_root: str, run_id: str) -> str:
 def companion_directory(stage_root: str, directory: str) -> str:
     """Where one companion's repository lands on a node.
 
-    BESIDE THE EXPORTS, NOT INSIDE ONE, and never named after a run. A
-    recipe reaches its companion as ``../<directory>`` from its own root,
-    which is where a workstation keeps the same checkout, so the project's
-    Makefile names one path and neither end has to know which machine it is
-    on. The cost is that a companion is shared by every run on that node and
-    replaced by each of them, rather than copied per run: nothing sweeps a
-    stage root, and a per-run copy of a workspace this size would spend a
-    node's whole disk budget in a handful of runs.
+    IN THE STAGE ROOT, NOT IN A RUN, and never named after a run. A recipe
+    reaches its companion as ``../<directory>`` from its own root, which is
+    where a workstation keeps the same checkout, so the project's Makefile
+    names one path and neither end has to know which machine it is on; the
+    run's enclosure links ``<directory>`` here (:func:`run_enclosure`). The
+    cost is that a companion is shared by every run on that node and
+    replaced by each of them, rather than copied per run: a per-run copy of
+    a workspace this size would spend a node's whole disk budget in a
+    handful of runs.
 
     Args:
         stage_root: The node's declared stage root.
@@ -466,6 +501,7 @@ __all__ = [
     "INIT_REPOSITORY_STEM",
     "INSTALL_STEM",
     "LAUNCH_STEM",
+    "LINK_COMPANIONS_STEM",
     "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
     "POETRY_IN_PROJECT",
@@ -486,6 +522,7 @@ __all__ = [
     "retained_log_path",
     "retire_stem",
     "root_script_stems",
+    "run_enclosure",
     "stage_name",
     "staging_directory",
     "stop_stem",

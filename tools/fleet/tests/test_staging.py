@@ -27,6 +27,7 @@ from fleet.core import (
     staging,
 )
 from fleet.core.ssh_options import SSH_OPTIONS
+from tests._host_bash import bash_says
 from tests.conftest import (
     DEMO_DEPENDENCY,
     DEMO_PROJECT,
@@ -215,7 +216,9 @@ class TestStage:
         )
 
         staged = f"{target}.stage"
-        assert target == f"{STAGE_ROOT}/{DEMO_RUN_ID}"
+        # In the run's enclosure, which holds nothing the run did not declare
+        # (MCPs board task 6beb7d14).
+        assert target == f"{STAGE_ROOT}/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
         # The archive crosses as bytes over scp, with no stdin to re-encode,
         # and lands beside the export under the name the digest and extract
         # scripts read.
@@ -243,7 +246,7 @@ class TestStage:
             payload=payload,
         )
 
-        assert target == f"/home/corvis/fleet/stage/{DEMO_RUN_ID}"
+        assert target == f"/home/corvis/fleet/stage/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
         assert runner.calls[0][-1] == (
             f"mkdir -p \"$(dirname '/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh')\" && "
             f"cat > '/home/corvis/fleet/stage/mkdir-{DEMO_RUN_ID}.sh'"
@@ -296,7 +299,7 @@ class TestStage:
         )
 
         sent = [payload or b"" for payload in runner.stdin]
-        target = f"{STAGE_ROOT}/{DEMO_RUN_ID}"
+        target = f"{STAGE_ROOT}/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
         assert any(f"git -C {target} init --quiet".encode() in body for body in sent)
         # After the tree lands: before extraction there is nothing for the
         # ignore rules to cover, and the .gitignore that gives them content
@@ -335,7 +338,7 @@ class TestStage:
                 payload=b"bytes",
             )
 
-        staged = f"{STAGE_ROOT}/{DEMO_RUN_ID}.stage"
+        staged = f"{STAGE_ROOT}/{DEMO_RUN_ID}/{DEMO_RUN_ID}.stage"
         assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
         assert excinfo.value.message == (
             f"copying {SOURCE.name} to {staged}/{names.ARCHIVE_NAME} on lavender exited 1: "
@@ -501,3 +504,56 @@ class TestStagingACompanion:
         assert excinfo.value.code is FleetErrorCode.STAGE_DIGEST_MISMATCH
         assert f"the MCPs companion at {COMPANION_SHA}" in excinfo.value.message
         assert not any(b"merge-base" in (sent or b"") for sent in runner.stdin)
+
+
+class TestLinkCompanions:
+    """A run's enclosure links the companions it declared and holds nothing
+    else (MCPs board task 6beb7d14): on pendragon fleet job 1506d000
+    re-checked MCPs 1a864f364 beside a newer MCPs companion another project
+    had staged, read it as an unregistered wiki, and failed."""
+
+    def test_a_run_declaring_no_companion_sends_nothing(self) -> None:
+        runner = FakeRun([])
+        _test_hooks.run = runner
+
+        staging.link_companions(
+            "lavender", target=names.dispatch_directory(STAGE_ROOT, DEMO_RUN_ID), trees=()
+        )
+
+        assert runner.calls == []
+
+    def test_each_declared_companion_is_linked_beside_the_export_from_its_staging_script(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Run for real: the links resolve to the stage root's trees, which
+        stay where they are, so ``../MCPs`` from the export reads the
+        companion and the enclosure is its run's alone."""
+        stage_root = tmp_path.as_posix()
+        target = names.dispatch_directory(stage_root, DEMO_RUN_ID)
+        trees = tuple(names.companion_directory(stage_root, name) for name in ("MCPs", "wiki"))
+        for tree in trees:
+            pathlib.Path(tree, "pages").mkdir(parents=True)
+        pathlib.Path(target).mkdir(parents=True)
+        runner = FakeRun([ok(""), ok("")])
+        _test_hooks.run = runner
+
+        staging.link_companions("lavender", target=target, trees=trees)
+
+        script = dialect.checked_script(
+            (
+                ("ln", "-sfn", trees[0], f"{stage_root}/{DEMO_RUN_ID}/MCPs"),
+                ("ln", "-sfn", trees[1], f"{stage_root}/{DEMO_RUN_ID}/wiki"),
+            )
+        )
+        assert runner.stdin[0] == script.encode("utf-8")
+        assert runner.calls[1][-1].endswith(f"{target}.stage/{names.LINK_COMPANIONS_STEM}.sh")
+        bash_says(script)
+        bash_says(script)
+        enclosure = tmp_path / DEMO_RUN_ID
+        assert sorted(entry.name for entry in enclosure.iterdir()) == [
+            "MCPs",
+            DEMO_RUN_ID,
+            "wiki",
+        ]
+        assert (pathlib.Path(target).parent / "MCPs" / "pages").is_dir()
+        assert (enclosure / "wiki").resolve() == pathlib.Path(trees[1]).resolve()

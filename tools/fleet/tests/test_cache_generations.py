@@ -159,16 +159,22 @@ def _remove(stage: pathlib.Path, current: str) -> subprocess.CompletedProcess[st
     )
 
 
-def _mark(stage: pathlib.Path, run: str, generation: str) -> None:
+def _mark(stage: pathlib.Path, run: str, generation: str, *, enclosed: bool) -> None:
     """Lay out a live run's directory reading one generation.
 
     Args:
         stage: The stage root.
         run: The run's id.
         generation: The generation its marker names.
+        enclosed: Whether the run's directory sits in its enclosure, as a
+            node's own export does (MCPs board task 6beb7d14), or directly
+            under the root, as an execdocker copy does.
     """
-    (stage / run).mkdir()
-    (stage / run / names.GENERATION_MARKER_NAME).write_text(f"{generation}\n", encoding="utf-8")
+    directory = (
+        pathlib.Path(names.dispatch_directory(stage.as_posix(), run)) if enclosed else stage / run
+    )
+    directory.mkdir(parents=True)
+    (directory / names.GENERATION_MARKER_NAME).write_text(f"{generation}\n", encoding="utf-8")
 
 
 def test_only_a_generation_no_run_reads_and_long_out_of_use_is_removed(
@@ -177,9 +183,13 @@ def test_only_a_generation_no_run_reads_and_long_out_of_use_is_removed(
     tools = tmp_path / names.CACHE_DIRECTORY / names.TOOL_CACHES_DIRECTORY
     unread = _generation(tools, seconds_ago=30 * DAY)
     marked = _generation(tools, seconds_ago=16 * DAY)
+    copied = _generation(tools, seconds_ago=15 * DAY)
     current = _generation(tools, seconds_ago=2 * 3600)
     racing = _generation(tools, seconds_ago=60)
-    _mark(tmp_path, "MCPs-search-lavender-wsl-1792000000", marked)
+    # Both depths keep what they name: a marker missed is a generation
+    # removed under a running build.
+    _mark(tmp_path, "MCPs-search-lavender-wsl-1792000000", marked, enclosed=True)
+    _mark(tmp_path, "slime-check-lavender-1792000100", copied, enclosed=False)
     (tmp_path / names.LOGS_DIRECTORY).mkdir()
 
     ran = _remove(tmp_path, current)
@@ -187,10 +197,10 @@ def test_only_a_generation_no_run_reads_and_long_out_of_use_is_removed(
     assert ran.returncode == 0, ran.stderr
     assert ran.stdout == (
         f"cache-generations: {tools.as_posix()}: generation {current} current, "
-        "removed 1 of 4 (1 MB)\n"
+        "removed 1 of 5 (1 MB)\n"
     )
     assert sorted(entry.name for entry in tools.iterdir()) == sorted(
-        [marked, current, racing, names.CURRENT_GENERATION_NAME]
+        [marked, copied, current, racing, names.CURRENT_GENERATION_NAME]
     )
     assert not (tools / unread).exists()
 

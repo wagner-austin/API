@@ -155,7 +155,7 @@ class TestClaiming:
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
         rows = records.read_ledger(loaded.ledger)
         assert len(rows) == 1
-        target = f"/home/corvis/fleet/stage/{DEMO_RUN_ID}"
+        target = f"/home/corvis/fleet/stage/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
         expected = dialect.build_script(
             target=target,
             path=DEMO_PROJECT,

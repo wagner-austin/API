@@ -84,16 +84,20 @@ def test_the_names_are_one_spelling() -> None:
     assert names.stage_name("MCPs") == f"MCPs{names.STAGE_SUFFIX}"
 
 
-def test_a_companion_sits_beside_an_export_and_each_one_s_staging_sits_beside_it() -> None:
-    """The recipe runs at ``<stage_root>/<run id>`` and reaches its companion
-    as ``../MCPs``, which is the same spelling a workstation answers; each
-    staging directory is beside the tree it stages so nothing of the
-    transport is inside the tree that gets committed (MCPs board task
-    a8ee9b21, where an export's own digest, extract and init-repo scripts
-    were committed into it)."""
+def test_a_companion_sits_in_the_stage_root_and_an_export_in_its_run_s_enclosure() -> None:
+    """The recipe runs at ``<stage_root>/<run id>/<run id>`` and reaches its
+    companion as ``../MCPs``, the enclosure's link to the stage root's tree,
+    which is the same spelling a workstation answers, and ``..`` holds
+    nothing the run did not declare (MCPs board task 6beb7d14); each staging
+    directory is beside the tree it stages so nothing of the transport is
+    inside the tree that gets committed (MCPs board task a8ee9b21, where an
+    export's own digest, extract and init-repo scripts were committed into
+    it)."""
     assert names.companion_directory("/fleet/stage", "MCPs") == "/fleet/stage/MCPs"
     assert names.staging_directory("/fleet/stage/MCPs") == "/fleet/stage/MCPs.stage"
-    assert names.staging_directory(names.dispatch_directory("/s", "r-1")) == "/s/r-1.stage"
+    assert names.run_enclosure("/s", "r-1") == "/s/r-1"
+    assert names.dispatch_directory("/s", "r-1") == "/s/r-1/r-1"
+    assert names.staging_directory(names.dispatch_directory("/s", "r-1")) == "/s/r-1/r-1.stage"
     assert names.recipe_directory("/fleet/stage/slime-17", "") == "/fleet/stage/slime-17"
 
 

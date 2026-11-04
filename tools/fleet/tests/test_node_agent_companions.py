@@ -15,7 +15,15 @@ from platform_core.json_utils import dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion
-from fleet.core import _test_hooks, dialect, mirror_fetch, records, stage_repository, staging
+from fleet.core import (
+    _test_hooks,
+    dialect,
+    mirror_fetch,
+    names,
+    records,
+    stage_repository,
+    staging,
+)
 from tests._node_agent_fixtures import (
     ATTEMPT_DIRECTORY,
     COMPANION_DIRECTORY,
@@ -32,7 +40,15 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests._registry import write_registry
-from tests.conftest import FakeRun, failed, ok, registry_replies, stage_replies, timed_out
+from tests.conftest import (
+    DEMO_RUN_ID,
+    FakeRun,
+    failed,
+    ok,
+    registry_replies,
+    stage_replies,
+    timed_out,
+)
 
 __all__ = ["_credentials_in_env"]
 
@@ -164,6 +180,8 @@ def _companion_replies(
         ok(companion_digest),  # companion: run reassemble
         ok(""),  # companion: send the clone script
         ok(""),  # companion: run the clone
+        ok(""),  # enclosure: send the companion-link script
+        ok(""),  # enclosure: run it
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
         ok("launched"),  # launch: run the registration script
@@ -262,10 +280,19 @@ class TestCompanions:
 
         sent = [body or b"" for body in runner.stdin]
         committed = sent.index(_companion_commit_script().encode())
+        # Linked into the run's enclosure, so ``../MCPs`` from the export is
+        # the companion and the enclosure holds nothing else the run did not
+        # declare (MCPs board task 6beb7d14).
+        enclosure = names.run_enclosure("/home/corvis/fleet/stage", DEMO_RUN_ID)
+        linked = sent.index(
+            dialect.checked_script(
+                (("ln", "-sfn", "/home/corvis/fleet/stage/MCPs", f"{enclosure}/MCPs"),)
+            ).encode()
+        )
         built = next(
             index for index, body in enumerate(sent) if b"POETRY_KEYRING_ENABLED='false'" in body
         )
-        assert committed < built
+        assert committed < linked < built
 
     def test_an_earlier_attempts_bundles_left_behind_never_meet_this_attempt(
         self, config_path: pathlib.Path

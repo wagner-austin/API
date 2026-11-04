@@ -28,10 +28,11 @@ states. Measured on sedona 2026-09-22, ``git ls-remote`` of the workspace
 remote there exits 128 with "could not read Username for
 'https://github.com'". So a companion travels from the hub with the work,
 through the same mirror, the same archive and the same digest-verified
-transport as the project's own commit, and lands BESIDE the export at
-``<stage_root>/<directory>`` -- which is ``../<directory>`` from the export
-root, the layout a workstation already has, so the recipe needs no
-knowledge of where it is running.
+transport as the project's own commit, and lands at
+``<stage_root>/<directory>``, linked into the run's enclosure beside the
+export (:func:`fleet.core.names.run_enclosure`) -- so it is
+``../<directory>`` from the export root, the layout a workstation already
+has, and the recipe needs no knowledge of where it is running.
 
 WHY A COMPANION NAMES A REF AND THE PROJECT NAMES A SHA. The queue row is
 the citation for the project's commit, and a citation must resolve to the
@@ -121,9 +122,10 @@ class ProjectCompanion(TypedDict):
         remote: The git remote the runner mirrors and fetches the ref from.
         ref: The ref whose TIP is exported, ``main`` or ``refs/heads/main``;
             never a sha, for the reason the module docstring gives.
-        directory: The single directory name it lands in beside the export,
-            at ``<stage_root>/<directory>``, which the recipe reaches as
-            ``../<directory>`` from its own root.
+        directory: The single directory name it lands in, at
+            ``<stage_root>/<directory>``, linked beside the export in the
+            run's enclosure, which the recipe reaches as ``../<directory>``
+            from its own root.
     """
 
     remote: str

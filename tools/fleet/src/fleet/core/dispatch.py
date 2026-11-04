@@ -397,6 +397,7 @@ def launch(
         # which the node runner removes however the attempt ends (board
         # task 2e3e69cf), so the memory a bundle holds is freed here.
         companion["path"].unlink()
+    staging.link_companions(node["host"], target=target, trees=staged_companions)
 
     remote.send_script(
         node["host"],

@@ -93,11 +93,14 @@ def _stage_root() -> pathlib.Path:
     """The stage root this run's directory lies in.
 
     The build writes the generation it read into its run's directory, which
-    is the nearest directory above this suite holding that marker, so this
-    holds for the node's own builds and for execdocker's copies alike.
+    is the nearest directory above this suite holding that marker. A node's
+    own export sits in its run's enclosure, named as the run is
+    (:func:`fleet.core.names.run_enclosure`, MCPs board task 6beb7d14), and
+    an execdocker copy directly under that user's stage root.
 
     Returns:
-        The run directory's parent.
+        The enclosure's parent for a node's export, the run directory's
+        parent for an execdocker copy.
     """
     here = pathlib.Path.cwd().resolve()
     run = next(
@@ -105,7 +108,7 @@ def _stage_root() -> pathlib.Path:
         for directory in (here, *here.parents)
         if (directory / names.GENERATION_MARKER_NAME).is_file()
     )
-    return run.parent
+    return run.parent.parent if run.parent.name == run.name else run.parent
 
 
 def _readers(stage_root: pathlib.Path) -> dict[str, int]:
@@ -118,7 +121,10 @@ def _readers(stage_root: pathlib.Path) -> dict[str, int]:
         Each named generation and its count of runs.
     """
     counts: dict[str, int] = {}
-    for marker in stage_root.glob(f"*/{names.GENERATION_MARKER_NAME}"):
+    for marker in (
+        *stage_root.glob(f"*/{names.GENERATION_MARKER_NAME}"),
+        *stage_root.glob(f"*/*/{names.GENERATION_MARKER_NAME}"),
+    ):
         generation = marker.read_text(encoding="utf-8").strip()
         counts[generation] = counts.get(generation, 0) + 1
     return counts

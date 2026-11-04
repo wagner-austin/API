@@ -256,7 +256,9 @@ def reset_directory_script(target: str) -> str:
     return checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
 
 
-def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], isolated: bool) -> str:
+def retire_script(
+    *, stage_root: str, run_id: str, retained: str, scripts: tuple[str, ...], isolated: bool
+) -> str:
     """Keep a settled run's transcript, then remove its directories and scripts.
 
     Run once the runner has read the transcript's tail, when a run has
@@ -267,9 +269,9 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], isola
     it when the build exits, failed or not.
 
     Args:
-        target: The dispatch's absolute remote directory; its staging
-            directory beside it (:func:`fleet.core.names.staging_directory`)
-            goes with it.
+        stage_root: The node's declared stage root.
+        run_id: The dispatch; its enclosure (:func:`fleet.core.names.run_enclosure`)
+            goes whole, named by the run so no path can make it the stage root.
         retained: Where its transcript is kept, under the stage root's logs
             directory, which is created if absent.
         scripts: The scripts it left under the stage root, this one included.
@@ -289,24 +291,22 @@ def retire_script(*, target: str, retained: str, scripts: tuple[str, ...], isola
         packages/maketools run leaves fixture releases sealed under its
         ``.pytest-tmp``, and from 2026-10-23T23:26Z to 2026-10-24T03:51Z the
         retires of 15 such runs on six nodes stopped at ``rm -rf``, stranding
-        them. ``find`` follows no link, so nothing outside the two trees is
-        unlocked. Every step tolerates what an earlier attempt already did,
-        so a retire that failed part way succeeds when it is run again.
+        them. Neither ``find`` nor ``rm`` follows a link, so a linked
+        companion is untouched. Every step tolerates what an earlier attempt
+        already did, so a retire that failed part way succeeds when rerun.
     """
-    log = shlex.quote(names.log_path(target))
-    trees = f"{shlex.quote(target)} {shlex.quote(names.staging_directory(target))}"
+    log = shlex.quote(names.log_path(names.dispatch_directory(stage_root, run_id)))
+    enclosure = shlex.quote(names.run_enclosure(stage_root, run_id))
     lines = [
         f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
         f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
-        f"for tree in {trees}; do",
-        '  if [ -d "$tree" ]; then find "$tree" -type d ! -perm -u=w -exec chmod u+w {} +; fi',
-        "done",
-        f"rm -rf {trees}",
+        f"if [ -d {enclosure} ]; then "
+        f"find {enclosure} -type d ! -perm -u=w -exec chmod u+w {{}} +; fi",
+        f"rm -rf {enclosure}",
         "rm -f " + " ".join(shlex.quote(script) for script in scripts),
     ]
     if isolated:
-        run = posixpath.basename(target.rstrip("/"))
-        copy = exec_root(run)
+        copy = exec_root(run_id)
         lines += [EXEC_HOME_LINE, f'sudo -n rm -rf "{copy}" "{names.staging_directory(copy)}"']
     return PROLOGUE + "".join(f"{line}\n" for line in lines)
 
