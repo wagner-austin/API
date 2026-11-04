@@ -228,7 +228,8 @@ def _active_state(spec: HostRunnerSpec, service: str) -> str:
         ValueError: When the unit's name cannot be carried verbatim.
     """
     unit = scriptable(service, label="service")
-    return remote.run_ssh(spec["host"], ("systemctl", "show", "-p", "ActiveState", "--value", unit)).strip()
+    argv = ("systemctl", "show", "-p", "ActiveState", "--value", unit)
+    return remote.run_ssh(spec["host"], argv).strip()
 
 
 def _change_unit(spec: HostRunnerSpec, service: str, verb: str, expected: str) -> None:
@@ -256,9 +257,7 @@ def _change_unit(spec: HostRunnerSpec, service: str, verb: str, expected: str) -
         )
 
 
-def _restore_pool(
-    spec: HostRunnerSpec, stopped: list[str], targets: list[DrainTarget]
-) -> None:
+def _restore_pool(spec: HostRunnerSpec, stopped: list[str], targets: list[DrainTarget]) -> None:
     """Put a drained host back as it served: units started, labels restored.
 
     Args:
