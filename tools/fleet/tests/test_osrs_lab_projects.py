@@ -1,4 +1,4 @@
-"""osrs-lab's two Gradle builds run on the fleet's docker lane (board task fd8e5f9b).
+"""osrs-lab's Gradle builds run on the fleet's docker lane (board task fd8e5f9b).
 
 No fleet node has a JDK, Gradle or an X server: measured over ssh on
 2026-11-02, colossus, demure and lavender each answered none of java,
@@ -14,6 +14,11 @@ observer-input-coverage (board task 4a83389f) runs the same observer build,
 then only its own per-class JaCoCo gate over the observer's input classes
 that read no live Client, so its COVERAGE TOTAL is theirs alone: on
 colossus 479 tests passed at lines 142/142 and branches 66/66.
+
+recorder (board task bc97ff15) runs the passive recorder's own make check in
+the same image, whose release gate merges the recorded logged-in coverage of
+its live readers: on colossus 359 tests passed at lines 1723/1723 and
+branches 1453/1453.
 """
 
 from __future__ import annotations
@@ -27,7 +32,7 @@ from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
 
-DIRECTORIES: Final[tuple[str, ...]] = ("desktop-input", "observer", "observer-input-coverage")
+DIRECTORIES: Final[tuple[str, ...]] = ("desktop-input", "observer", "observer-input-coverage", "recorder")
 
 
 @pytest.mark.parametrize("directory", DIRECTORIES)

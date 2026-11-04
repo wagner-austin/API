@@ -1485,6 +1485,13 @@ classes' alone, and `check-summary.gradle` prints a `COVERAGE CLASS` row for
 each. On colossus it passed 479 tests at lines 142/142 and branches 66/66,
 with the same tags and workers as the observer.
 
+**`osrs-lab/recorder`** (board task bc97ff15, 2026-11-04) is the passive
+recorder's own `make check`, run in the same image since osrs-lab 6cf54e9. Its
+release gate merges the recorded logged-in coverage of its live readers and
+refuses a recording whose class ids differ from the build. On colossus it
+passed 359 tests at lines 1723/1723 and branches 1453/1453, with the same tags
+and workers as the observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
