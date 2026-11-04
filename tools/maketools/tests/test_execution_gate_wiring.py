@@ -62,12 +62,12 @@ def test_every_deploy_runs_the_gate_for_the_linux_execution_project() -> None:
 def test_a_fleet_roll_moves_the_ref_only_after_the_suite_passed_at_head() -> None:
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8").replace("\r\n", "\n")
     assert "\nfleet-roll: commit-tasks executed\n" in makefile
-    # The ref is pushed once moved, forced since a roll may move it back, so a
-    # machine holding a hub-runner duty other than the hub's aligns to it
-    # from origin (7875aaab1, MCPs board task c39ee056).
+    # MCPs' published fleet-roll-push pushes the ref into the API checkout of
+    # the machine holding control, its home, and copies it to origin, so no
+    # tick reads GitHub's copy (MCPs board task 18ca6bab, after GitHub refused
+    # the fleet's key on 2026-11-04 and every tick on the hub refused).
     assert _recipe("Makefile", "fleet-roll") == [
-        "git update-ref refs/fleet/rolled HEAD",
-        "git push origin +refs/fleet/rolled:refs/fleet/rolled",
+        "$(PYTHON) .githooks/published_maketools.py fleet-roll-push .",
     ]
 
 
