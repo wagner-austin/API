@@ -297,9 +297,21 @@ class TestDefaultHooks:
         _test_hooks._default_write_text(path, "[1]")
 
         assert path.read_text(encoding="utf-8") == "[1]"
-        # Renamed over the path rather than rewritten in it, so a reader holds
-        # the old document or the new one; nothing staged is left beside it.
         assert path.stat().st_ino != first
+        assert sorted(child.name for child in path.parent.iterdir()) == ["leases.json"]
+
+    def test_a_write_the_os_refuses_leaves_the_path_and_no_staged_file(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The rename over a directory fails, and the file staged beside it
+        goes with the refusal (MCPs board task 1e0ee821)."""
+        path = tmp_path / "nested" / "leases.json"
+        path.mkdir(parents=True)
+
+        with pytest.raises(IsADirectoryError):
+            _test_hooks._default_write_text(path, "[1]")
+
+        assert path.is_dir()
         assert sorted(child.name for child in path.parent.iterdir()) == ["leases.json"]
 
     def test_read_text_returns_what_was_written(self, tmp_path: pathlib.Path) -> None:

@@ -496,10 +496,7 @@ def _default_make_directory(path: pathlib.Path) -> None:
 
 
 def _default_write_text(path: pathlib.Path, text: str) -> None:
-    """Replace a real file's contents whole: a file of this process's own beside it, renamed over.
-
-    A reader anywhere finds the old document or the new one, never part of
-    either: the lease file's reads take no turn (MCPs board task 1e0ee821).
+    """Replace a file whole, renaming a file of this process's own over it, so no reader sees part.
 
     Args:
         path: Absolute path to write.
@@ -508,7 +505,10 @@ def _default_write_text(path: pathlib.Path, text: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     staged = path.with_name(f".{path.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
     staged.write_text(text, encoding="utf-8", newline="\n")
-    os.replace(staged, path)
+    try:
+        os.replace(staged, path)
+    finally:
+        staged.unlink(missing_ok=True)
 
 
 def _default_env(name: str) -> str | None:
