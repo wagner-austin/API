@@ -102,7 +102,9 @@ LOKI_ON_BATTERY = RunnerTick(
         on_battery=True,
     ),
     claiming=False,
-    verdict="has room for nothing; claiming nothing: NODE_ON_BATTERY: loki is running on its battery",
+    verdict=(
+        "has room for nothing; claiming nothing: NODE_ON_BATTERY: loki is running on its battery"
+    ),
 )
 
 #: Counts that cannot describe one set of runners: more reading than counted.
