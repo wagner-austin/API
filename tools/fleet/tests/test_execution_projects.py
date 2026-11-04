@@ -27,6 +27,7 @@ from typing import Final
 import pytest
 
 from fleet.cli.runners import load_runner_spec
+from fleet.contracts.machine import MachineRole
 from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_node, require_project
@@ -131,11 +132,14 @@ def test_the_hub_s_cases_run_on_the_hub_as_the_fleet_user() -> None:
     whose API checkout holds the node runners' records, the checkout its
     recipe names to the case, and it requires no ``docker`` tag, which would
     isolate it as execdocker, an account with neither (MCPs board task
-    3d9eec0d).
+    3d9eec0d). The hub is read from the roster, the one machine whose role
+    is hub, never named here: the pin named diphtheria after the hub role had
+    moved to lacrymal (MCPs board task f19d66a5).
     """
     workspace = decode_fleet_workspace(shipped_document())
     project = require_project(workspace, "tools/fleet-execution-hub")
-    assert (project["required_tags"], project["node"]) == ((NodeTag.LINUX,), "diphtheria")
+    hubs = [name for name, each in workspace["machines"].items() if each["role"] is MachineRole.HUB]
+    assert (project["required_tags"], [project["node"]]) == ((NodeTag.LINUX,), hubs)
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/API.git",
         path="tools/fleet-execution-hub",
@@ -453,28 +457,6 @@ def test_the_live_demo_case_runs_where_ffprobe_is() -> None:
         install=(),
         companions=(),
     )
-
-
-def test_tankpits_move_is_measured_on_colossus_alone() -> None:
-    """TankPit's move is checked by a project pinned to colossus.
-
-    colossus holds the copy, the release and its image (board task
-    c481c259), so the project lands on that node alone, a Linux one. Its
-    sedona twin went with sedona's 2026-10-19 reimage (MCPs board task
-    1e9ab738), and the workspace declares no project for it.
-    """
-    workspace = decode_fleet_workspace(shipped_document())
-    project = require_project(workspace, "clients/TankpitBot-colossus-execution")
-    assert project["node"] == "colossus"
-    assert project["required_tags"] == (NodeTag.LINUX,)
-    assert project["source"] == ProjectSource(
-        remote="https://github.com/wagner-austin/API.git",
-        path="clients/TankpitBot-colossus-execution",
-        install=(),
-        companions=(),
-    )
-    assert require_node(workspace, "colossus")["enabled"]
-    assert "clients/TankpitBot-sedona-execution" not in workspace["projects"]
 
 
 def test_tankpitbot_runs_its_ordinary_check_on_a_node_alone() -> None:

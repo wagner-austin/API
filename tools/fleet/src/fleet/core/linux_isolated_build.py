@@ -71,6 +71,7 @@ from fleet.core.names import (
     REGISTRY_VARIABLE,
     WORKSPACE_VARIABLE,
 )
+from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import sh_phase_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
@@ -87,13 +88,9 @@ EXEC_STAGE = "$exec_home/fleet/stage"
 #: That user's cache root, over ``$exec_home``.
 EXEC_CACHE = "$exec_home/fleet/cache"
 
-#: The PATH the isolated build starts from: the system's tools only, since
-#: ``env -i`` leaves none, and the runner's own ``~/.local/bin`` is unreadable.
-#: A NixOS node keeps them in its setuid wrappers and its system profile,
-#: both root's, and has nothing in /usr/bin but env; an Ubuntu node has
-#: neither directory, so each finds its tools where it keeps them (MCPs board
-#: task c2e3f31f).
-EXEC_PATH = "/run/wrappers/bin:/run/current-system/sw/bin:/usr/local/bin:/usr/bin:/bin"
+# The isolated build starts from :data:`fleet.core.node_programs.EXEC_PATH`:
+# the system's tools only, since ``env -i`` leaves none, and the runner's own
+# ``~/.local/bin`` is unreadable (MCPs board task c2e3f31f).
 
 #: The library path the isolated build carries across ``env -i``: the one the
 #: check's unit was started with, or empty where it set none. A NixOS node's
@@ -229,7 +226,6 @@ __all__ = [
     "EXEC_HOME_LINE",
     "EXEC_LANE_LOCK",
     "EXEC_LIBRARY_PATH",
-    "EXEC_PATH",
     "EXEC_STAGE",
     "EXEC_USER",
     "exec_root",

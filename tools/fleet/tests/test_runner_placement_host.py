@@ -44,6 +44,7 @@ from platform_core.json_utils import load_json_str, narrow_json_to_dict, require
 from fleet.cli.runners import load_reserved_cores
 from fleet.contracts.runner_slice import CI_SLICE_NAME, LISTENER_SLICE_NAME
 from fleet.contracts.runners import HostRunnerSpec
+from fleet.core.node_programs import EXEC_PATH
 from fleet.core.runner_cpuset_render import render_ci_cpu_select_lines
 from fleet.core.runner_proc_bash import JOB_SCOPE_PREFIX, is_runner_worker
 from tests._host import READING_PROPERTY, command_output, unit_properties
@@ -290,7 +291,7 @@ def test_a_slice_over_its_high_stalls_its_own_tasks_and_not_an_unbounded_sibling
     runner_host: HostRunnerSpec, record_property: Callable[[str, str], None]
 ) -> None:
     uid = command_output(["id", "-u"]).strip()
-    environment = {"PATH": "/usr/local/bin:/usr/bin:/bin", "XDG_RUNTIME_DIR": f"/run/user/{uid}"}
+    environment = {"PATH": EXEC_PATH, "XDG_RUNTIME_DIR": f"/run/user/{uid}"}
     tag = f"{runner_host['name']}-{os.getpid()}"
     full = f"fleet-placement-full-{tag}.slice"
     sibling = f"fleet-placement-free-{tag}.slice"

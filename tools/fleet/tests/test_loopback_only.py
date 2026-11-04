@@ -30,8 +30,8 @@ from fleet.contracts.project import decode_loopback_only, decode_project_config
 from fleet.contracts.source import InstallStep
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import dialect, names, recipe
-from fleet.core.linux_isolated_build import EXEC_PATH
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
+from fleet.core.node_programs import EXEC_PATH
 from tests._registry import shipped_document
 
 #: The projects that declare ``loopback_only``, and why each check reads only lo.

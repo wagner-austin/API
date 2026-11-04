@@ -24,7 +24,8 @@ from platform_core.json_utils import (
 
 from fleet.contracts.research import require_digest
 from fleet.core import _test_hooks, remote
-from fleet.core.linux_isolated_build import EXEC_PATH, EXEC_USER
+from fleet.core.linux_isolated_build import EXEC_USER
+from fleet.core.node_programs import EXEC_PATH
 
 MAX_BYTES = 8192
 

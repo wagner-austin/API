@@ -41,13 +41,16 @@ from platform_core.errors import AppError, ErrorCode
 
 from fleet.core import _test_hooks
 from fleet.core.commit_tree import step_refusal
+from fleet.core.node_programs import EXEC_PATH_SETTING
 
 #: Where a process reads the control group it runs in.
 PROC_SELF_CGROUP: Final = pathlib.Path("/proc/self/cgroup")
 
-#: The systemctl the distribution installs, asking the user's own manager;
-#: named, never searched for.
-SYSTEMCTL: Final[tuple[str, ...]] = ("/usr/bin/systemctl", "--user")
+#: systemctl asking the user's own manager, found on the node's own programs'
+#: PATH (:data:`fleet.core.node_programs.EXEC_PATH`) and never by a path of
+#: one distribution's: ``/usr/bin/systemctl``, named here until MCPs board
+#: task f19d66a5, is on no NixOS node, the hub included.
+SYSTEMCTL: Final[tuple[str, ...]] = ("systemctl", "--user")
 
 #: The two properties a run's liveness is read from.
 SHOWN: Final[tuple[str, ...]] = ("show", "--property=ActiveState", "--property=ControlGroup")
@@ -190,7 +193,9 @@ def read_run_state(unit: str) -> RunState:
             or answers without both properties.
     """
     argv = (*SYSTEMCTL, *SHOWN, unit)
-    result = _test_hooks.run(argv, timeout_seconds=SHOW_TIMEOUT_SECONDS)
+    result = _test_hooks.run(
+        argv, timeout_seconds=SHOW_TIMEOUT_SECONDS, set_env=(EXEC_PATH_SETTING,)
+    )
     shown: dict[str, str] = {}
     for line in result["stdout"].splitlines():
         name, _, value = line.partition("=")

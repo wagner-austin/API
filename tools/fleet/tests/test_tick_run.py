@@ -13,6 +13,7 @@ import pytest
 from platform_core.errors import AppError
 
 from fleet.core import _test_hooks, tick_run
+from fleet.core.node_programs import EXEC_PATH
 from tests._agent_cli import HUB_HOST, TICK_CGROUP, TICK_UNIT, bind_hub_tick
 from tests.conftest import FakeRun, failed, ok
 
@@ -102,7 +103,7 @@ class TestTheRunsState:
         assert state["shown"].startswith("ActiveState=active ControlGroup=/user.slice/")
         assert run.calls == [
             (
-                "/usr/bin/systemctl",
+                "systemctl",
                 "--user",
                 "show",
                 "--property=ActiveState",
@@ -111,6 +112,7 @@ class TestTheRunsState:
             )
         ]
         assert run.timeouts == [tick_run.SHOW_TIMEOUT_SECONDS]
+        assert run.set_env == [(("PATH", EXEC_PATH),)]
 
     def test_a_unit_stopped_with_no_control_group_is_gone(self) -> None:
         _test_hooks.run = FakeRun([ok(GONE_SHOWN)])
@@ -139,7 +141,7 @@ class TestTheRunsState:
             tick_run.read_run_state(TICK_UNIT)
 
         assert str(refused.value) == (
-            f"{tick_run.UNREADABLE_CODE}: /usr/bin/systemctl --user show "
+            f"{tick_run.UNREADABLE_CODE}: systemctl --user show "
             f"--property=ActiveState --property=ControlGroup {TICK_UNIT} exited 1: "
             "Failed to connect to bus: No medium found; it answered ''"
         )

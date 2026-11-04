@@ -11,6 +11,9 @@ the one a tick names its jobs' runs by, reads live.
 
 ``tools/fleet-execution-hub`` runs them, pinned to the hub; GitHub's Linux
 runners have no user manager to ask, which is why they are not ``host_linux``.
+Each program a case starts itself is found on the node's own programs
+(:func:`tests._system_tools.system_program`): the hub is a NixOS machine,
+with no ``/usr/bin/systemd-run`` or ``/bin/sleep`` (MCPs board task f19d66a5).
 """
 
 from __future__ import annotations
@@ -29,12 +32,26 @@ from fleet.cli import orphans
 from fleet.core import _test_hooks, queue, tick_run
 from tests._host import READING_PROPERTY
 from tests._queue_fakes import QUEUE_CREDENTIALS, FakeQueue, queue_job
+from tests._system_tools import system_program
 
 #: How long a killed unit may take to read stopped.
 STOP_WAIT_SECONDS: Final = 15
 
 #: The runner label the held jobs name.
 AGENT: Final = "fleet-netboot-diphtheria"
+
+
+def systemctl(*words: str) -> list[str]:
+    """The argv of :data:`fleet.core.tick_run.SYSTEMCTL` with its program found on this node.
+
+    Args:
+        *words: What follows ``systemctl --user``.
+
+    Returns:
+        The argv.
+    """
+    program, *flags = tick_run.SYSTEMCTL
+    return [system_program(program), *flags, *words]
 
 
 def start_unit() -> str:
@@ -46,13 +63,13 @@ def start_unit() -> str:
     unit = f"fleet-tick-run-test-{uuid.uuid4().hex}.service"
     subprocess.run(
         [
-            "/usr/bin/systemd-run",
+            system_program("systemd-run"),
             "--user",
             "--collect",
             "--quiet",
             f"--unit={unit}",
             "--property=KillSignal=SIGKILL",
-            "/bin/sleep",
+            system_program("sleep"),
             "300",
         ],
         check=True,
@@ -67,7 +84,7 @@ def kill_unit(unit: str) -> None:
     Args:
         unit: The unit.
     """
-    subprocess.run([*tick_run.SYSTEMCTL, "kill", "--signal=SIGKILL", unit], check=True, timeout=60)
+    subprocess.run(systemctl("kill", "--signal=SIGKILL", unit), check=True, timeout=60)
 
 
 def stop_unit(unit: str) -> None:
@@ -76,7 +93,7 @@ def stop_unit(unit: str) -> None:
     Args:
         unit: The unit.
     """
-    subprocess.run([*tick_run.SYSTEMCTL, "stop", unit], check=False, timeout=60)
+    subprocess.run(systemctl("stop", unit), check=False, timeout=60)
 
 
 def wait_gone(unit: str) -> tick_run.RunState:
@@ -154,7 +171,7 @@ def test_a_user_service_names_its_own_run_and_reads_live(
     )
     result = subprocess.run(
         [
-            "/usr/bin/systemd-run",
+            system_program("systemd-run"),
             "--user",
             "--collect",
             "--quiet",

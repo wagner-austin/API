@@ -4,9 +4,11 @@ Until MCPs board task c2e3f31f the cases linked ``/usr/bin`` and ``/bin``,
 which is where an Ubuntu node keeps its programs. A NixOS node keeps them in
 its system profile and its setuid wrappers and has nothing in ``/usr/bin``
 but ``env``, so on loki every such case ran the probe with no ``head`` or
-``sed`` and read nothing. The directories are the isolated build's own
-:data:`fleet.core.linux_isolated_build.EXEC_PATH`, the system's programs on
-either.
+``sed`` and read nothing. The directories are
+:data:`fleet.core.node_programs.EXEC_PATH`, the system's programs on either.
+A case that starts one of them itself names it through
+:func:`system_program` (MCPs board task f19d66a5: the hub cases named
+``/usr/bin/systemd-run`` and ``/bin/sleep``, which diphtheria's NixOS lacks).
 """
 
 from __future__ import annotations
@@ -14,12 +16,33 @@ from __future__ import annotations
 import pathlib
 from typing import Final
 
-from fleet.core.linux_isolated_build import EXEC_PATH
+from fleet.core.node_programs import EXEC_PATH
 
 #: The system's program directories this machine has, in EXEC_PATH's order.
 SYSTEM_BINARIES: Final[tuple[pathlib.Path, ...]] = tuple(
     directory for directory in map(pathlib.Path, EXEC_PATH.split(":")) if directory.is_dir()
 )
+
+
+def system_program(name: str) -> str:
+    """The path of one of this machine's programs, as the shell finds it on EXEC_PATH.
+
+    Args:
+        name: The program, e.g. ``systemd-run``.
+
+    Returns:
+        Its path in the first of :data:`SYSTEM_BINARIES` that holds it.
+
+    Raises:
+        FileNotFoundError: When none does, naming the program and the
+            directories read, so a case on a machine without it fails by name.
+    """
+    for directory in SYSTEM_BINARIES:
+        program = directory / name
+        if program.is_file():
+            return str(program)
+    searched = ", ".join(str(directory) for directory in SYSTEM_BINARIES)
+    raise FileNotFoundError(f"no {name} in this machine's system programs ({searched})")
 
 
 def link_system_tools(tools: pathlib.Path, placed: frozenset[str]) -> None:

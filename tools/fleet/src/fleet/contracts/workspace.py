@@ -35,7 +35,7 @@ from typing_extensions import TypedDict
 
 from fleet.contracts.machine import Machine, decode_machine, encode_machine
 from fleet.contracts.node import NodeConfig
-from fleet.contracts.pins import check_pinned_nodes
+from fleet.contracts.pins import check_hub_suite, check_pinned_nodes
 from fleet.contracts.project import ProjectConfig, decode_project_config, encode_project_config
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import decode_path, decode_remote
@@ -491,7 +491,8 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
             declares capacity, a machine fails
             :func:`fleet.contracts.machine.decode_machine`, a node-local
             resource is declared by no project, a
-            project is pinned to a node it cannot match, the
+            project is pinned to a node it cannot match, the hub suite is
+            pinned anywhere but the roster's one hub, the
             node serve or poll lies outside its bounds, or a node or project fails
             its own decoder.
     """
@@ -511,12 +512,15 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
             "no machine declares what dispatch may take from it; the workspace could dispatch "
             "nothing, and every command would fail naming an empty list"
         )
-    projects = check_pinned_nodes(
-        {
-            path: decode_project_config(project)
-            for path, project in _decode_named(value, "projects").items()
-        },
-        nodes,
+    projects = check_hub_suite(
+        check_pinned_nodes(
+            {
+                path: decode_project_config(project)
+                for path, project in _decode_named(value, "projects").items()
+            },
+            nodes,
+        ),
+        machines,
     )
     return FleetWorkspace(
         machines=machines,

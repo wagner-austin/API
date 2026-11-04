@@ -5,7 +5,7 @@
   "required_tags": [
     "linux"
   ],
-  "node": "diphtheria",
+  "node": "lacrymal",
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "tools/fleet-execution-hub",

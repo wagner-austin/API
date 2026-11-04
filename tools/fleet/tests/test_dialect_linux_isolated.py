@@ -30,7 +30,8 @@ from fleet.contracts.toolchain import REQUIRED_PYTHON
 from fleet.core import dialect, names, recipe, tool_caches
 from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines
 from fleet.core.dialect import PROLOGUE
-from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_PATH, EXEC_USER
+from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_USER
+from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import SH_UTC_STAMP
 from fleet.core.run_summary import sh_run_summary_line
 from tests.conftest import DEMO_PROJECT

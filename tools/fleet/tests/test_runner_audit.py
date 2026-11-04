@@ -19,7 +19,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.runners import FileAsset, HostRunnerSpec
 from fleet.core import _test_hooks, runner_audit, runner_audit_disk, runner_dropped_check
-from fleet.core.linux_isolated_build import EXEC_PATH
+from fleet.core.node_programs import EXEC_PATH
 from fleet.core.runner_audit_types import AuditFinding, AuditOutcome
 from fleet.core.runner_job_scope_render import JOB_SCOPE_PATH
 from fleet.core.runner_reaper_render import REAPER_PATH
