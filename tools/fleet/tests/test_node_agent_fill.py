@@ -155,6 +155,7 @@ class TestARoomyNode:
                 "freeDiskGb": 860.0,
                 "actionCache": None,
                 "gpus": [],
+                "onBattery": False,
             }
             for runs, workers in ((0, 0), (1, 7), (2, 14))
         ]

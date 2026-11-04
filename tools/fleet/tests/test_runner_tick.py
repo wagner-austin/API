@@ -63,6 +63,7 @@ SEDONA = RunnerTick(
         free_disk_gb=412.5,
         action_cache=None,
         gpus=(SEDONA_GPU,),
+        on_battery=False,
     ),
     claiming=True,
     verdict="sedona asked for 2 fitting project(s); nothing in the node lane matched",
@@ -80,9 +81,28 @@ LAVENDER = RunnerTick(
         free_disk_gb=150.0,
         action_cache=ActionCacheCounts(runners=8, reading=8, served=8, missed=0),
         gpus=(),
+        on_battery=False,
     ),
     claiming=True,
     verdict="lavender-wsl asked for 1 fitting project(s)",
+)
+
+#: loki's tick on its battery on 2026-11-03 at 18:26:52Z, refused.
+LOKI_ON_BATTERY = RunnerTick(
+    node="loki",
+    tags=(NodeTag.LINUX, NodeTag.NIXOS_TEST),
+    fits=(),
+    load=TickLoad(
+        runs=0,
+        workers=0,
+        free_ram_gb=40.0,
+        free_disk_gb=300.0,
+        action_cache=None,
+        gpus=(),
+        on_battery=True,
+    ),
+    claiming=False,
+    verdict="has room for nothing; claiming nothing: NODE_ON_BATTERY: loki is running on its battery",
 )
 
 #: Counts that cannot describe one set of runners: more reading than counted.
@@ -106,6 +126,7 @@ def _sedona_load(action_cache: JSONValue, gpus: JSONValue) -> JSONObject:
         "freeDiskGb": 412.5,
         "actionCache": action_cache,
         "gpus": gpus,
+        "onBattery": False,
     }
 
 
@@ -138,6 +159,7 @@ class TestTheWireShape:
                 "freeDiskGb": 412.5,
                 "actionCache": None,
                 "gpus": [SEDONA_GPU_WIRE],
+                "onBattery": False,
             },
         }
 
@@ -149,13 +171,28 @@ class TestTheWireShape:
             "freeDiskGb": 150.0,
             "actionCache": {"runners": 8, "reading": 8, "served": 8, "missed": 0},
             "gpus": [],
+            "onBattery": False,
+        }
+
+    def test_a_node_on_its_battery_says_so_in_its_load(self) -> None:
+        """The queue keeps it in the tick's history (MCPs mig 903)."""
+        assert encode_runner_tick(LOKI_ON_BATTERY)["load"] == {
+            "runs": 0,
+            "workers": 0,
+            "freeRamGb": 40.0,
+            "freeDiskGb": 300.0,
+            "actionCache": None,
+            "gpus": [],
+            "onBattery": True,
         }
 
     def test_a_silent_node_omits_its_load(self) -> None:
         assert "load" not in encode_runner_tick(SILENT)
 
     @pytest.mark.parametrize(
-        "tick", [SEDONA, LAVENDER, SILENT], ids=["with load", "with cache counts", "without load"]
+        "tick",
+        [SEDONA, LAVENDER, LOKI_ON_BATTERY, SILENT],
+        ids=["with load", "with cache counts", "on battery", "without load"],
     )
     def test_it_round_trips(self, tick: RunnerTick) -> None:
         assert decode_runner_tick(encode_runner_tick(tick)) == tick
@@ -201,6 +238,20 @@ class TestTheWireShape:
                 },
                 "0000:01:00.0's vendor is outside the vocabulary: 'NVIDIA'",
             ),
+            (
+                {
+                    **encode_runner_tick(SEDONA),
+                    "load": {k: v for k, v in _sedona_load(None, []).items() if k != "onBattery"},
+                },
+                "Missing required field 'onBattery'",
+            ),
+            (
+                {
+                    **encode_runner_tick(SEDONA),
+                    "load": {**_sedona_load(None, []), "onBattery": "Discharging"},
+                },
+                "Field 'onBattery' must be a boolean, got str",
+            ),
         ],
         ids=[
             "not an object",
@@ -214,6 +265,8 @@ class TestTheWireShape:
             "no gpus key",
             "gpus not a list",
             "a gpu outside its shape",
+            "no onBattery key",
+            "onBattery not a bool",
         ],
     )
     def test_a_malformed_tick_is_refused_by_name(self, value: JSONValue, message: str) -> None:
