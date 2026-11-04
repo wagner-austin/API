@@ -82,7 +82,6 @@ from __future__ import annotations
 
 import functools
 import sys
-import uuid
 from collections.abc import Sequence
 
 from board_watch import config as board_config
@@ -112,26 +111,6 @@ _log = get_logger(__name__)
 NODE_FLAG = "--node"
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
-
-#: The namespace the runner's session UUID is derived in.
-IDENTITY_NAMESPACE = uuid.NAMESPACE_URL
-
-
-def node_identity(alias: str) -> tuple[str, str]:
-    """The label and session id a node's runner acts as.
-
-    Args:
-        alias: The node's workspace name.
-
-    Returns:
-        ``fleet-node-<alias>`` and the version-5 UUID of
-        ``fleet-node-agent/<alias>`` in :data:`IDENTITY_NAMESPACE`, lowercase
-        hyphenated as the board wants it.
-    """
-    return names.node_runner_label(alias), str(
-        uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}")
-    )
-
 
 def claim_pass(
     loaded: _config.LoadedWorkspace,
@@ -195,7 +174,8 @@ def claim_pass(
             message verbatim and does not propagate: transport, not
             recovery.
     """
-    with host_claims.claim_turn(loaded.host_claims, alias=alias, runner=node_identity(alias)[0]):
+    runner = names.node_runner_label(alias)
+    with host_claims.claim_turn(loaded.host_claims, alias=alias, runner=runner):
         return _claim_in_turn(
             loaded, credentials, identity, alias=alias, node=node, launcher=launcher
         )
@@ -344,7 +324,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     alias = cli_args.require_flag(parsed, NODE_FLAG)
     node = require_node(loaded.workspace, alias)
     tags = node_tags(node)
-    agent, session_id = node_identity(alias)
+    agent, session_id = names.node_identity(alias)
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     board = board_config.load_credentials()
     if announce:
@@ -439,11 +419,9 @@ if __name__ == "__main__":
 
 
 __all__ = [
-    "IDENTITY_NAMESPACE",
     "NODE_FLAG",
     "claim_pass",
     "entrypoint",
     "fill_pass",
     "main",
-    "node_identity",
 ]

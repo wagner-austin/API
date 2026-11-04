@@ -31,7 +31,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 from fleet.cli import _config, node_agent
 from fleet.cli.node_launch import Launcher
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
-from fleet.core import _test_hooks, host_claims, leases, queue, records, staging
+from fleet.core import _test_hooks, host_claims, leases, names, queue, records, staging
 from fleet.core.workspace_files import read_workspace_document
 from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
 from tests._node_agent_fixtures import (
@@ -82,7 +82,7 @@ def _process(
     Returns:
         Its identity arguments and its launcher.
     """
-    agent, session_id = node_agent.node_identity("lavender")
+    agent, session_id = names.node_identity("lavender")
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     launcher = Launcher(
         loaded,

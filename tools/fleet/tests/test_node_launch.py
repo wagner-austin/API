@@ -28,7 +28,7 @@ from fleet.cli.node_prepare import Admitted
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.workspace import require_project
-from fleet.core import _test_hooks, host_claims, queue, records, staging
+from fleet.core import _test_hooks, host_claims, names, queue, records, staging
 from fleet.core.queue_transport import answering
 from tests._holder_fakes import RecordingHolder
 from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
@@ -72,7 +72,7 @@ def _launcher(
         The workspace and the launcher.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    agent, session_id = node_agent.node_identity("lavender")
+    agent, session_id = names.node_identity("lavender")
     identity = queue.identity_arguments(agent, session_id, str(loaded.directory))
     launcher = Launcher(
         loaded,
@@ -96,7 +96,7 @@ def _fill(loaded: _config.LoadedWorkspace, launcher: Launcher) -> tuple[str, ...
     Returns:
         The jobs it claimed and handed to a launch.
     """
-    agent, session_id = node_agent.node_identity("lavender")
+    agent, session_id = names.node_identity("lavender")
     return node_agent.fill_pass(
         loaded,
         queue.load_credentials(),

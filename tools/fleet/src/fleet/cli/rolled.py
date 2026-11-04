@@ -28,6 +28,18 @@ tick of the same roll runs from it (MCPs board task fb505198).
 The exit status is the agent's, 2 when no rolled tree could be extracted,
 and the child's own timeout status when it outlives
 :data:`AGENT_WALL_SECONDS`.
+
+A NODE RUNNER'S REFUSED LAUNCH IS STILL A TICK (MCPs board task b841c214).
+The node agent records each tick through ``dispatch_tick``, which keeps the
+runner's row and a 30-day history (MCPs mig 903); a launch refused before
+the agent started recorded nothing. From 2026-11-04T09:39Z GitHub refused
+the hub's key, every node runner's tick ended ``FLEET_ROLL_FETCH_FAILED``,
+and for 29 minutes the history said nothing about any of them while the
+reason sat only in each runner's log on the hub. So when the refused launch
+is a node runner's serving tick, the launcher records that tick itself,
+through the same writer, under the runner's own identity: no load, since no
+probe ran, no tags or fits, not claiming, and the refusal as its verdict. An
+announce run (``--announce``) is a check-in, not a tick, and records none.
 """
 
 from __future__ import annotations
@@ -44,7 +56,8 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.report_line import emit_error_line, emit_line
 
 from fleet.cli import _config
-from fleet.core import _test_hooks, rolled
+from fleet.contracts.runner_tick import RunnerTick
+from fleet.core import _test_hooks, names, queue, rolled, tick_report
 
 _log = get_logger(__name__)
 
@@ -69,6 +82,16 @@ AGENT_WALL_SECONDS: Final[int] = 39 * 60
 
 #: The exit status when no rolled tree could be extracted.
 REFUSED_EXIT: Final[int] = 2
+
+#: The console-script name of the agent whose ticks the queue records.
+NODE_AGENT: Final = "fleet-node-agent"
+
+#: The node agent's flag naming the node it serves, which the tick passes it
+#: (:func:`fleet.cli.tick.plan_tick`).
+NODE_FLAG: Final = "--node"
+
+#: The verdict a refused launch records, before the refusal itself.
+REFUSED_VERDICT: Final = "ran no runner code; claiming nothing: "
 
 #: How the launcher's own log stream encodes, whatever code page started it.
 #: It relays the agent's streams, and on 2026-09-29 (MCPs board task
@@ -146,6 +169,59 @@ def require_module(agent: str) -> str:
     return module
 
 
+def served_node(agent: str, passthrough: Sequence[str]) -> str | None:
+    """The node a launch would have served a tick for, if it is a tick.
+
+    Args:
+        agent: The launcher's ``--agent``.
+        passthrough: The agent's own command line.
+
+    Returns:
+        The node the node agent's ``--node`` names, or None for another
+        agent and for an announce run.
+
+    Raises:
+        ValueError: When a node agent's command line carries a flag other
+            than ``--node`` and ``--announce``, repeats one, or names no node,
+            as the agent itself would refuse it.
+    """
+    if agent != NODE_AGENT or queue.ANNOUNCE_FLAG in passthrough:
+        return None
+    return cli_args.require_flag(cli_args.parse_single_flags(passthrough, (NODE_FLAG,)), NODE_FLAG)
+
+
+def record_refused_tick(node: str, refusal: str, records: pathlib.Path) -> str:
+    """Record a node runner's tick that no rolled agent could serve.
+
+    Args:
+        node: The node the runner serves.
+        refusal: Why no rolled tree could be extracted.
+        records: The checkout's records directory, the identity's cwd.
+
+    Returns:
+        When the queue stored the tick.
+
+    Raises:
+        AppError: When the queue's credentials are missing, or it cannot be
+            reached or refuses the tick; the launch's refusal was logged
+            first, so the tick's log still says why nothing ran.
+    """
+    agent, session_id = names.node_identity(node)
+    tick = RunnerTick(
+        node=node,
+        tags=(),
+        fits=(),
+        load=None,
+        claiming=False,
+        verdict=f"{REFUSED_VERDICT}{refusal}",
+    )
+    return tick_report.record_tick(
+        queue.load_credentials(),
+        tick,
+        identity=queue.identity_arguments(agent, session_id, str(records)),
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Extract the rolled tree and run one agent from it.
 
@@ -155,22 +231,29 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Returns:
         The agent's exit status, or :data:`REFUSED_EXIT` when the rolled
-        tree could not be extracted and nothing ran.
+        tree could not be extracted and nothing ran; a node runner's refused
+        tick is recorded on the queue first (:func:`record_refused_tick`).
 
     Raises:
         ValueError: For a malformed command line.
+        AppError: From :func:`record_refused_tick`.
     """
     parsed, passthrough = split_command_line(list(argv) if argv is not None else sys.argv[1:])
-    module = require_module(cli_args.require_flag(parsed, AGENT_FLAG))
+    agent = cli_args.require_flag(parsed, AGENT_FLAG)
+    module = require_module(agent)
+    node = served_node(agent, passthrough)
     repo_root = pathlib.Path(cli_args.require_flag(parsed, REPO_ROOT_FLAG))
+    records = repo_root / pathlib.PurePosixPath(rolled.RECORDS_DIR)
     tree = rolled.extract_rolled_tree(repo_root)
     if isinstance(tree, str):
         _log.error("%s", tree)
+        if node is not None:
+            stored = record_refused_tick(node, tree, records)
+            _log.info("fleet-roll: recorded %s's refused tick at %s", node, stored)
         return REFUSED_EXIT
     _log.info("fleet-roll: %s runs from %s at %s", module, rolled.ROLLED_REF, tree["commit"])
     if tree["reaped"]:
         _log.info("fleet-roll: removed what was left behind: %s", ", ".join(tree["reaped"]))
-    records = repo_root / pathlib.PurePosixPath(rolled.RECORDS_DIR)
     result = _test_hooks.run(
         (
             sys.executable,
@@ -225,14 +308,19 @@ __all__ = [
     "AGENT_WALL_SECONDS",
     "LOG_ENCODING",
     "LOG_ERRORS",
+    "NODE_AGENT",
+    "NODE_FLAG",
     "REFUSED_EXIT",
+    "REFUSED_VERDICT",
     "REPO_ROOT_FLAG",
     "SEPARATOR",
     "configure_logging",
     "encode_log_stream",
     "entrypoint",
     "main",
+    "record_refused_tick",
     "require_module",
+    "served_node",
     "split_command_line",
 ]
 

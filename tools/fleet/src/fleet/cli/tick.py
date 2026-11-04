@@ -159,7 +159,7 @@ def runner_identity(lane: DispatchLane, alias: str) -> tuple[str, str]:
 
     Derived from the queue lane its duty claims and the machine's alias, as
     a node runner's are from the alias
-    (:func:`fleet.cli.node_agent.node_identity`): one stable session per
+    (:func:`fleet.core.names.node_identity`): one stable session per
     duty and machine, so a check-in binds one label to one session for
     good, and a duty moving to another machine gives that machine its own.
     Until MCPs board task c39ee056 the one hub was austinpc, whose fixed
@@ -356,9 +356,9 @@ def plan_tick(
             rolled_cli.REPO_ROOT_FLAG,
             repo,
             rolled_cli.AGENT_FLAG,
-            "fleet-node-agent",
+            rolled_cli.NODE_AGENT,
             rolled_cli.SEPARATOR,
-            "--node",
+            rolled_cli.NODE_FLAG,
             node,
             *announce,
         ),

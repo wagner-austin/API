@@ -22,7 +22,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
-from fleet.core import _test_hooks, dialect, mirror_fetch, records, staging
+from fleet.core import _test_hooks, dialect, mirror_fetch, names, records, staging
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
     NPM_CI,
@@ -82,13 +82,13 @@ def _mirror(config_path: pathlib.Path) -> str:
 
 class TestIdentity:
     def test_the_label_and_session_are_derived_from_the_node(self) -> None:
-        label, session = node_agent.node_identity("sedona")
+        label, session = names.node_identity("sedona")
 
         assert label == "fleet-node-sedona"
         assert session == str(uuid.uuid5(uuid.NAMESPACE_URL, "fleet-node-agent/sedona"))
         assert uuid.UUID(session).version == 5
         # Stable across calls, so every tick is one session on the ledger.
-        assert node_agent.node_identity("sedona") == (label, session)
+        assert names.node_identity("sedona") == (label, session)
 
 
 class TestClaiming:

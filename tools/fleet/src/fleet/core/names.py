@@ -14,6 +14,9 @@ to a stem. The names below that are scripts are therefore stems.
 
 from __future__ import annotations
 
+import uuid
+from typing import Final
+
 #: Where a dispatch's result is left on the node, under its own directory.
 #:
 #: The build's last act writes the recipe's exit status here, so the file's
@@ -413,9 +416,9 @@ def node_runner_label(alias: str) -> str:
     """The board label a node's runner acts as.
 
     The one spelling of it: the runner checks in and ticks under it
-    (:func:`fleet.cli.node_agent.node_identity`), and the hub's registry
-    publication names it among the runners the roster declares
-    (:mod:`fleet.core.declared`), retiring every tick no label names.
+    (:func:`node_identity`), and the hub's registry publication names it
+    among the runners the roster declares (:mod:`fleet.core.declared`),
+    retiring every tick no label names.
 
     Args:
         alias: The node's workspace name.
@@ -424,6 +427,32 @@ def node_runner_label(alias: str) -> str:
         ``fleet-node-<alias>``.
     """
     return f"fleet-node-{alias}"
+
+
+#: The namespace a node runner's session UUID is derived in.
+IDENTITY_NAMESPACE: Final = uuid.NAMESPACE_URL
+
+
+def node_identity(alias: str) -> tuple[str, str]:
+    """The label and session id a node's runner acts as.
+
+    Here rather than in :mod:`fleet.cli.node_agent` because two programs act
+    as it: the agent, and the tick launcher (:mod:`fleet.cli.rolled`), which
+    records the runner's tick itself when no rolled agent could start (MCPs
+    board task b841c214) and runs from the checkout without importing the
+    agent.
+
+    Args:
+        alias: The node's workspace name.
+
+    Returns:
+        ``fleet-node-<alias>`` and the version-5 UUID of
+        ``fleet-node-agent/<alias>`` in :data:`IDENTITY_NAMESPACE`, lowercase
+        hyphenated as the board wants it.
+    """
+    return node_runner_label(alias), str(
+        uuid.uuid5(IDENTITY_NAMESPACE, f"fleet-node-agent/{alias}")
+    )
 
 
 def capacity_probe_stem(writer: str) -> str:
@@ -527,6 +556,7 @@ __all__ = [
     "INSTALL_STEM",
     "LAUNCH_STEM",
     "LINK_COMPANIONS_STEM",
+    "IDENTITY_NAMESPACE",
     "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
     "NODE_MIRRORS_DIRECTORY",
@@ -543,6 +573,7 @@ __all__ = [
     "dispatch_directory",
     "log_path",
     "make_directory_stem",
+    "node_identity",
     "node_mirror",
     "node_runner_label",
     "recipe_directory",

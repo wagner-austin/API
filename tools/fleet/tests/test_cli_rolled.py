@@ -20,8 +20,9 @@ import sys
 import pytest
 
 from fleet.cli import rolled as rolled_cli
-from fleet.core import _test_hooks, rolled, scratch
+from fleet.core import _test_hooks, names, rolled, scratch
 from tests._git_fixtures import rolled_at_origin
+from tests._queue_fakes import IDENTITY_KEYS, TICKED_AT, FakeQueue, queue_env, tick_body
 from tests._rolled_fetch_script import fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
@@ -74,6 +75,20 @@ class TestCommandLine:
             "is the rolled commit's own and the records are the checkout's"
         )
 
+    def test_only_a_node_runners_serving_tick_names_a_node(self) -> None:
+        assert rolled_cli.served_node("fleet-node-agent", ["--node", "loki"]) == "loki"
+        assert rolled_cli.served_node("fleet-node-agent", ["--node", "loki", "--announce"]) is None
+        assert rolled_cli.served_node("fleet-agent", ["--node", "loki"]) is None
+        assert rolled_cli.served_node("fleet-research", ["--session", "s"]) is None
+
+    def test_a_node_runners_command_line_the_agent_would_refuse_is_refused(self) -> None:
+        with pytest.raises(ValueError) as unknown:
+            rolled_cli.served_node("fleet-node-agent", ["--node", "loki", "--session", "s"])
+        assert str(unknown.value) == "unknown argument '--session'; expected one of ['--node']"
+        with pytest.raises(ValueError) as nameless:
+            rolled_cli.served_node("fleet-node-agent", [])
+        assert str(nameless.value) == "--node is required"
+
     def test_each_agent_names_its_module_and_nothing_else_is_accepted(self) -> None:
         assert rolled_cli.require_module("fleet-agent") == "fleet.cli.agent"
         assert rolled_cli.require_module("fleet-node-agent") == "fleet.cli.node_agent"
@@ -87,24 +102,82 @@ class TestCommandLine:
 
 
 class TestLaunch:
+    @pytest.mark.parametrize(
+        "agent_line",
+        [
+            ["fleet-agent", "--", "--session", "s"],
+            ["fleet-node-agent", "--", "--node", "x", "--announce"],
+        ],
+    )
     def test_no_roll_runs_nothing_and_exits_refused(
-        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture, agent_line: list[str]
     ) -> None:
+        """A hub agent's refused launch, and an announce run's, record no tick."""
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         runner = FakeRun(
             [*fetch_replies(tmp_path / "git"), failed(128, "fatal: Needed a single revision")]
         )
         _test_hooks.run = runner
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
 
         with caplog.at_level("INFO"):
-            status = rolled_cli.main(
-                ["--repo-root", str(tmp_path), "--agent", "fleet-node-agent", "--", "--node", "x"]
-            )
+            status = rolled_cli.main(["--repo-root", str(tmp_path), "--agent", *agent_line])
 
         assert status == rolled_cli.REFUSED_EXIT == 2
         assert len(runner.calls) == 3
         [message] = [record.getMessage() for record in caplog.records]
         assert message.startswith("FLEET_ROLL_REF_UNRESOLVED: refs/fleet/rolled in ")
+        assert (endpoint.ticks, endpoint.tools) == ([], [])
+
+    def test_a_node_runners_refused_launch_records_its_tick(
+        self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The 2026-11-04 GitHub refusal, re-run with a real fetch that fails.
+
+        From 09:39Z every hub runner's tick ended FLEET_ROLL_FETCH_FAILED and
+        recorded nothing (MCPs board task b841c214). Here the checkout's
+        origin is a repository that does not exist, so real git refuses the
+        fetch, and the tick the launcher records is the one row the queue
+        keeps for it: the runner's own identity, no load, not claiming, the
+        refusal as its verdict.
+        """
+        api = tmp_path / "api"
+        subprocess.run(("git", "init", "--quiet", str(api)), check=True)
+        missing = tmp_path / "missing.git"
+        subprocess.run(("git", "-C", str(api), "remote", "add", "origin", str(missing)), check=True)
+        _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
+        _test_hooks.env = queue_env()
+        endpoint = FakeQueue([])
+        _test_hooks.http_post = endpoint
+
+        with caplog.at_level("INFO"):
+            status = rolled_cli.main(
+                ["--repo-root", str(api), "--agent", "fleet-node-agent", "--", "--node", "lavender"]
+            )
+
+        assert status == rolled_cli.REFUSED_EXIT
+        refusal, recorded = [record.getMessage() for record in caplog.records]
+        assert refusal.startswith(
+            f"FLEET_ROLL_FETCH_FAILED: git fetch origin +refs/fleet/rolled:refs/fleet/rolled "
+            f"in {api} exited 128: "
+        )
+        assert recorded == f"fleet-roll: recorded lavender's refused tick at {TICKED_AT}"
+        [tick] = endpoint.ticks
+        agent, session_id = names.node_identity("lavender")
+        assert {key: tick[key] for key in sorted(IDENTITY_KEYS)} == {
+            "agent": agent,
+            "cwd": str(api / "tools" / "fleet"),
+            "sessionId": session_id,
+        }
+        assert tick_body(tick) == {
+            "node": "lavender",
+            "tags": [],
+            "fits": [],
+            "claiming": False,
+            "verdict": f"ran no runner code; claiming nothing: {refusal}",
+        }
+        assert endpoint.tools == []
 
     def test_the_agent_runs_from_the_extraction_with_its_own_arguments(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
