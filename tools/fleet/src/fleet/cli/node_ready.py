@@ -143,7 +143,8 @@ def tick_load(state: NodeState) -> TickLoad:
 
     Returns:
         Its live runs and their workers, its free memory, the free space on
-        its staging drive, its runners' action cache counts and its GPUs.
+        its staging drive, its runners' action cache counts, its GPUs and
+        whether it is running on its battery.
     """
     return TickLoad(
         runs=state["live"]["runs"],
@@ -152,6 +153,7 @@ def tick_load(state: NodeState) -> TickLoad:
         free_disk_gb=state["free_disk_gb"],
         action_cache=state["action_cache"],
         gpus=state["gpus"],
+        on_battery=state["on_battery"],
     )
 
 

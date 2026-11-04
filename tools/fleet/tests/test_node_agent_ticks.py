@@ -40,6 +40,7 @@ ROOMY: JSONObject = {
     "freeDiskGb": 860.0,
     "actionCache": None,
     "gpus": [],
+    "onBattery": False,
 }
 
 
@@ -149,8 +150,33 @@ class TestATickThatClaimsNothing:
             "freeDiskGb": 860.0,
             "actionCache": None,
             "gpus": [],
+            "onBattery": False,
         }
         assert narrow_json_to_str(tick["verdict"]).startswith(verdict)
+
+    def test_a_node_on_its_battery_records_the_reading_and_claims_nothing(
+        self, sourced_config: pathlib.Path
+    ) -> None:
+        """MCPs board task 3268afdf: the queue keeps this tick in its history
+        (MCPs mig 903), so an audit reads the refusal and the power reading
+        after the next tick has replaced it."""
+        endpoint, tick = _ticked(
+            sourced_config,
+            [
+                ok(""),
+                ok(PROBE_OK.replace("on_battery=no", "on_battery=yes")),
+                ok(""),
+                ok(DIPHTHERIA_2026_09_23),
+            ],
+            [dump_json_str({"jobs": []})],
+        )
+
+        assert endpoint.tools == ["dispatch_list"]
+        assert (tick["load"], tick["claiming"]) == ({**ROOMY, "onBattery": True}, False)
+        assert narrow_json_to_str(tick["verdict"]).startswith(
+            "has room for nothing; claiming nothing: NODE_ON_BATTERY: lavender is running on its "
+            "battery"
+        )
 
 
 class TestATickThatAsksTheQueue:

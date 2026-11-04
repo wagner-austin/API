@@ -9,8 +9,11 @@ which keeps one row per runner (MCPs mig 640), and ``fleet_status`` renders
 them node by node: the tags its probe detected, the runs and workers it
 holds, its free memory and free disk (MCPs board task b109a596), its CI
 runners' use of the action archive cache (MCPs board task ce2b92e0), its GPUs
-and their free memory (MCPs board task b4d5ca0f), the
-projects it could launch and why it is or is not claiming.
+and their free memory (MCPs board task b4d5ca0f), whether it runs on its
+battery (MCPs board task 3268afdf), the
+projects it could launch and why it is or is not claiming. The queue also
+appends every tick to a 30-day history (MCPs mig 903), so what a node did
+across a window outlives the next tick.
 """
 
 from __future__ import annotations
@@ -54,6 +57,12 @@ class TickLoad(TypedDict):
         gpus: Every GPU on the node with its memory when a driver counter
             reads it (:mod:`fleet.contracts.gpu_reading`, MCPs board task
             b4d5ca0f, MCPs mig 895); empty for a node with none.
+        on_battery: Whether its capacity probe read a battery among the
+            node's power supplies discharging (MCPs board task 3268afdf, MCPs
+            mig 903), the reading the runner refuses a node on
+            (NODE_ON_BATTERY); False on mains and on a node with no battery.
+            The queue keeps it in each tick's history, so an audit can read
+            a node's power source at every tick of a window.
     """
 
     runs: int
@@ -62,6 +71,7 @@ class TickLoad(TypedDict):
     free_disk_gb: float
     action_cache: ActionCacheCounts | None
     gpus: tuple[GpuReading, ...]
+    on_battery: bool
 
 
 class RunnerTick(TypedDict):
@@ -112,6 +122,7 @@ def encode_runner_tick(tick: RunnerTick) -> JSONObject:
             "freeDiskGb": load["free_disk_gb"],
             "actionCache": encode_action_cache(load["action_cache"]),
             "gpus": encode_gpus(load["gpus"]),
+            "onBattery": load["on_battery"],
         }
     return encoded
 
@@ -152,6 +163,7 @@ def decode_runner_tick(value: JSONValue) -> RunnerTick:
             free_disk_gb=require_float(raw_load, "freeDiskGb"),
             action_cache=decode_action_cache(raw_load["actionCache"]),
             gpus=decode_gpus(raw_load["gpus"]),
+            on_battery=require_bool(raw_load, "onBattery"),
         )
     return RunnerTick(
         node=require_str(value, "node"),
