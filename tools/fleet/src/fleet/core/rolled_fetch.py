@@ -65,6 +65,13 @@ REMOTE: Final = "fleet"
 #: 180 s between boundaries, so each boundary fetches once.
 FRESH_SECONDS: Final[int] = 60
 
+#: ssh as the fetch runs it: the host's own identity, no prompt, and a
+#: deadline on the connect. A duty host's API checkout pins
+#: ``core.sshCommand`` to its GitHub deploy key, which the hub does not admit:
+#: emerald's release sync of 2026-11-04T14:08Z was refused "Permission denied
+#: (publickey)" fetching from the hub through that key.
+SSH_COMMAND: Final = "core.sshCommand=ssh -o BatchMode=yes -o ConnectTimeout=15"
+
 #: The fetch's deadline, in seconds: one ref of a commit the checkout mostly
 #: holds already.
 FETCH_TIMEOUT_SECONDS: Final[int] = 60
@@ -105,7 +112,17 @@ def fetch_argv(checkout: pathlib.Path) -> tuple[str, ...]:
     Returns:
         The argv.
     """
-    return ("git", "-C", str(checkout), "fetch", "--quiet", REMOTE, f"+{REF}:{REF}")
+    return (
+        "git",
+        "-C",
+        str(checkout),
+        "-c",
+        SSH_COMMAND,
+        "fetch",
+        "--quiet",
+        REMOTE,
+        f"+{REF}:{REF}",
+    )
 
 
 def git_directory(checkout: pathlib.Path) -> pathlib.Path | str:
@@ -194,6 +211,7 @@ __all__ = [
     "LOCK_NAME",
     "REF",
     "REMOTE",
+    "SSH_COMMAND",
     "STAMP_NAME",
     "UNLOCATED_CODE",
     "fetch_argv",

@@ -62,6 +62,8 @@ class TestScriptedFetch:
             "git",
             "-C",
             str(tmp_path / "api"),
+            "-c",
+            "core.sshCommand=ssh -o BatchMode=yes -o ConnectTimeout=15",
             "fetch",
             "--quiet",
             "fleet",
