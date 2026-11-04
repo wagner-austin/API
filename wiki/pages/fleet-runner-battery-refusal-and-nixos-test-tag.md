@@ -8,6 +8,7 @@ source_paths:
   - tools/fleet/src/fleet/core/node_refusal.py
   - tools/fleet/src/fleet/contracts/tagged_tools.py
   - tools/fleet/src/fleet/contracts/runner_tick.py
+  - tools/fleet/src/fleet/cli/rolled.py
   - tools/fleet/registry/projects/MCPs/fleet-nixos.json
   - tools/fleet/tests/test_linux_capacity_probe.py
   - tools/fleet/tests/test_capacity_battery.py
@@ -16,6 +17,7 @@ source_git_blobs:
   "tools/fleet/src/fleet/core/node_refusal.py": dbb0f0022d762d541623f72848f494420bcac4ef
   "tools/fleet/src/fleet/contracts/tagged_tools.py": 404b961a3ff567cb1bdc06aa33de128a812db152
   "tools/fleet/src/fleet/contracts/runner_tick.py": e0f87e25be83cbf421fcc8a274a99352c05fb1b3
+  "tools/fleet/src/fleet/cli/rolled.py": 2cfadec4898974adf278be94666c911df4f231e3
   "tools/fleet/registry/projects/MCPs/fleet-nixos.json": b238202a7cea3ef2ac7eb35cac69fd16913bd6db
   "tools/fleet/tests/test_linux_capacity_probe.py": 99fe2bd463e46c0d6ae9085db814c77ca7edd210
   "tools/fleet/tests/test_capacity_battery.py": c818a01fdcb98d2aa64d85397adc89ff91cf69b1
@@ -48,7 +50,7 @@ The toolchain probe reports a `nixos-test` tool tag, asked inside a check's unit
 
 On 2026-11-04 the operator pulled loki's charger at about 09:36Z. Loki's next four ticks, 09:36:20Z to 09:37:14Z, and its tick at 10:06:10Z each read `on_battery` true, `claiming` false and `NODE_ON_BATTERY`, and loki claimed no job in the window. An unpinned `MCPs/fleet-nixos` check queued at 09:36:56Z was claimed at 09:37:00Z by lavender, whose last tick read it on mains.[^window]
 
-Two limits showed up in the same window. A runner tick that ends before its probe, as every hub runner's tick did from 09:39Z on `FLEET_ROLL_FETCH_FAILED` while GitHub refused the hub's key, records no tick, so the history is silent for those 29 minutes (MCPs board task b841c214). And a node whose Nix store has never built the VM tests builds them all at once in its check: lavender's run hit the 300 s step timeout on the hub test, where loki's store already held most results. That cold rebuild is MCPs board task d6b03ba3's.[^cold]
+Two limits showed up in the same window. A runner tick that ended before its probe, as every hub runner's tick did from 09:39Z on `FLEET_ROLL_FETCH_FAILED` while GitHub refused the hub's key, recorded no tick, so the history is silent for those 29 minutes. The tick launcher now records such a tick itself under the runner's identity, with no load, not claiming and the refusal as its verdict, so the next refusal is in the history (MCPs board task b841c214).[^refused] And a node whose Nix store has never built the VM tests builds them all at once in its check: lavender's run hit the 300 s step timeout on the hub test, where loki's store already held most results. That cold rebuild is MCPs board task d6b03ba3's.[^cold]
 
 [^loki]: `tools/fleet/src/fleet/core/linux_capacity_probe.py:74-75` -- "back-to-back NixOS VM checks at 23 to 32 W, its battery falling from 35 to"
 [^pin]: `tools/fleet/src/fleet/contracts/tagged_tools.py:184-186` -- "fleet registry pinned the project to loki by name on 2026-10-28 (MCPs"
@@ -64,4 +66,5 @@ Two limits showed up in the same window. A runner tick that ends before its prob
 [^project]: `tools/fleet/registry/projects/MCPs/fleet-nixos.json:5-8` -- `"required_tags": [` with `"linux"` and `"nixos-test"`, and no `node` key.
 [^nodes]: [synthesis] -- `fleet_status`'s Runners section read at 2026-11-04T03:29:04Z, each runner's detected tags; colossus's lack of `/dev/kvm` is MCPs board task 3268afdf's 2026-11-03T08:59Z measurement.
 [^window]: [synthesis] -- `fleet_runner_tick_history` rows for loki and lavender and `fleet_dispatch_jobs` row 678e46e6 (requested node null, required tags linux and nixos-test), read 2026-11-04T10:08Z for MCPs board task 3268afdf; errand 6aa1795a is the charger pull.
+[^refused]: `tools/fleet/src/fleet/cli/rolled.py:32` -- "A NODE RUNNER'S REFUSED LAUNCH IS STILL A TICK (MCPs board task b841c214)."
 [^cold]: [synthesis] -- fleet job 678e46e6's log on lavender (`vm-test-run-corvis-hub` timed out after 300 seconds) beside loki's job 3ee4adbe at 09:21Z, whose uci-vpn and storage-exports steps took 0 s; posted on MCPs board task d6b03ba3.
