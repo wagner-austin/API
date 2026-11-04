@@ -80,7 +80,9 @@ rule. [forward_weather_plan_20261103.json](forward_weather_plan_20261103.json),
 SHA-256 `bfdb77a0694048bc950df34029f6e82f49689acfe0c42a69108a481b8a9bd33c`, was
 recorded on MCPs board task `269fd5c0` at 2026-11-02T09:58:35Z, before the first
 of its 40 event dates (November 3 to December 12, 2026) was captured. It scores
-the continuation campaign `f57a191b` on diphtheria: the 12 UTC
+the continuation campaign `f57a191b` on the control duty's holder, diphtheria
+when the plan was frozen and lacrymal since API `96a73d084` moved that duty on
+2026-11-02 (the campaign directory moved with it): the 12 UTC
 `market_plus_forecast` logistic arm against `raw_market`, the bid-ask midpoint.
 
 ```bash
@@ -112,3 +114,22 @@ smallest effect of interest; and `forecast_policy.quoted_policy`, unchanged,
 over the same contracts. A date with no eligible contract is listed with its
 plans' dispositions and scores nothing. With fewer than three scored dates,
 every criterion fails.
+
+The plan is scored once, on schedule, by MCPs hub-jobs row
+`market-forward-weather-20261214` (MCPs board task `68420fef`). It is a control
+row run once at 2026-12-14T17:00:00Z, an hour after the last declared date's
+settlement window closes, with a 3,000-second deadline. It writes
+`market-edge-20261012/forward-evaluation-20261214.json`. The campaign's frozen
+`campaign-runtime/` cannot run the scorer: it lacks `platform_core`'s newer
+modules and `cryptography`. So the row runs its own runtime,
+`market-edge-20261012/forward-runtime-e2119a444f45/`. That runtime holds the six
+libraries exported from this repository at `e2119a444`, each file's git blob
+checked equal to that commit's and its SHA-256 recorded in
+`source-receipts.json`, and a locked `poetry install --only main` environment in
+`libs/covenant_ml`. On 2026-11-04 that runtime, run with the row's exact
+arguments, refused with `FORWARD-007` and wrote nothing, as it must while
+acquisitions are outstanding. A refusal on December 14 likewise leaves no
+report. MCPs `execution/tests/served/forward-weather-run.test.ts` reports that
+as red on the control holder's served lane, so the run is repaired and never
+read as a partial score. To cancel the run, delete the row; the runtime and the
+campaign's evidence stay.
