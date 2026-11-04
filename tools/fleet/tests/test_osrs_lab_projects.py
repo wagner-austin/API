@@ -32,7 +32,12 @@ from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
 
-DIRECTORIES: Final[tuple[str, ...]] = ("desktop-input", "observer", "observer-input-coverage", "recorder")
+DIRECTORIES: Final[tuple[str, ...]] = (
+    "desktop-input",
+    "observer",
+    "observer-input-coverage",
+    "recorder",
+)
 
 
 @pytest.mark.parametrize("directory", DIRECTORIES)
