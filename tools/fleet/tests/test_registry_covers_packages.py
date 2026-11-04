@@ -88,8 +88,10 @@ def test_every_package_with_a_check_is_declared_or_excused() -> None:
     # 2026-10-11, and a walk that found none would read as clean. The
     # archive of MCPs board task a276f973 took twelve packages out on
     # 2026-11-01, which left 47, and archiving data-bank-api the same day
-    # (MCPs board task a9566810) left 46.
-    assert len(checkable) >= 46
+    # (MCPs board task a9566810) left 46. Retiring
+    # clients/TankpitBot-colossus-execution on 2026-11-04, whose subject went
+    # with colossus's reinstall (MCPs board task f19d66a5), left 45.
+    assert len(checkable) >= 45
 
 
 def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None:
@@ -110,9 +112,11 @@ def test_every_declared_path_is_a_directory_whose_makefile_has_a_check() -> None
     # Not a pass over nothing: the registry's projects sourced from this
     # repository ran in 59 distinct paths on 2026-10-25, after board task
     # e705f08c removed tools/ps-harness and the Windows TankpitBot twin, and
-    # 47 after the archive of MCPs board task a276f973 on 2026-11-01, and 46
-    # once data-bank-api followed it the same day (MCPs board task a9566810).
-    assert len(declared) >= 46
+    # 47 after the archive of MCPs board task a276f973 on 2026-11-01, 46
+    # once data-bank-api followed it the same day (MCPs board task a9566810),
+    # and 45 once clients/TankpitBot-colossus-execution was retired on
+    # 2026-11-04 (MCPs board task f19d66a5).
+    assert len(declared) >= 45
 
 
 def test_every_excuse_names_a_package_that_still_needs_one() -> None:
