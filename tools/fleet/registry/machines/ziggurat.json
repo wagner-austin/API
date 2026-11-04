@@ -9,10 +9,13 @@
   "ledger_observer": "fleet-arm",
   "tailnetIp": "100.86.243.5",
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAII408kXbqK2ka+DZwYYvLfIXfmAQ1a6XlMgAuxdMfTiH corvis@ziggurat",
-  "bootMac": null,
+  "bootMac": "d8:9e:f3:9c:46:42",
   "netbootWifi": false,
-  "secureBoot": null,
-  "installDisk": null,
+  "secureBoot": "enforced",
+  "installDisk": {
+    "rule": "serial",
+    "serial": "Samsung_SSD_870_EVO_500GB_S6PXNZ0T318531D"
+  },
   "tunnel": null,
   "guest": null,
   "ciWorkersPerRunner": null,

@@ -47,6 +47,10 @@ DIPHTHERIA_MAC = "f4:8e:38:a4:cd:82"
 #: install (MCPs board task 7b5127ce).
 PENDRAGON_MAC = "3c:ab:72:5a:74:a1"
 
+#: ziggurat's onboard Realtek RTL8168h (enp1s0, r8169), read from sysfs there
+#: at 2026-11-04T22:47:39Z for its NixOS install (MCPs board task 59b6684d).
+ZIGGURAT_MAC = "d8:9e:f3:9c:46:42"
+
 #: The udev ID_SERIAL of each netboot machine's install disk, read over ssh
 #: with udevadm on 2026-10-22 (MCPs board task c64006b9): lavender's one SATA
 #: SSD. demure's one NVMe, whose netboot install accepted it on 2026-10-22
@@ -55,8 +59,10 @@ PENDRAGON_MAC = "3c:ab:72:5a:74:a1"
 #: 2026-10-26 (arm 2ec3a579). diphtheria's internal SATA SSD, read with
 #: udevadm on 2026-11-02 (MCPs board task ab48f939), never its two USB drives.
 #: pendragon's one NVMe, read with udevadm at 2026-11-03T18:07:18Z (MCPs board
-#: task 7b5127ce), never its SD card.
+#: task 7b5127ce), never its SD card. ziggurat's one SATA SSD, read with
+#: udevadm at 2026-11-04T22:47:51Z (MCPs board task 59b6684d).
 DIPHTHERIA_INSTALL_DISK = "Samsung_SSD_860_EVO_1TB_S3Z6NB0K305596H"
+ZIGGURAT_INSTALL_DISK = "Samsung_SSD_870_EVO_500GB_S6PXNZ0T318531D"
 PENDRAGON_INSTALL_DISK = "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"
 LAVENDER_INSTALL_DISK = "Samsung_SSD_870_EVO_1TB_S75BNL0WA21603B"
 LOKI_INSTALL_DISK = "SAMSUNG_MZVL81T0HELB-00BTW_S7HZNX0XC49177_1"
@@ -123,13 +129,14 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     # Automatic admission adds a disabled worker before its first install.
     # Pin measured identities without making each admission a test-code edit.
     assert {
-        name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon")
+        name: declared[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon", "ziggurat")
     } == {
         "demure": DEMURE_MAC,
         "diphtheria": DIPHTHERIA_MAC,
         "lavender": LAVENDER_MAC,
         "loki": LOKI_MAC,
         "pendragon": PENDRAGON_MAC,
+        "ziggurat": ZIGGURAT_MAC,
     }
     # An arm keys on the MAC, so two machines naming one adapter would hand
     # one's installer to the other (MCPs board task 7d7ea0e9).
@@ -150,8 +157,11 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     assert machines["diphtheria"]["role"] == "worker"
     assert machines["diphtheria"]["duties"] == ["devices"]
     assert machines["diphtheria"]["standby"] == ["sessions"]
+    # The session host is armable since its NixOS configuration is the
+    # flake's (MCPs board task 59b6684d); its install wipes every session.
+    assert machines["ziggurat"]["role"] == "session-host"
     for name in declared:
-        assert machines[name]["role"] in ("worker", "server", "vpn-jump", "hub")
+        assert machines[name]["role"] in ("worker", "server", "vpn-jump", "hub", "session-host")
         assert machines[name]["platform"] == "linux"
         assert "netboot" not in narrow_json_to_list(machines[name]["duties"])
 
@@ -195,13 +205,15 @@ def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() 
     machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
     named = {name: m["installDisk"] for name, m in machines.items() if m["installDisk"] is not None}
     assert {
-        name: named[name] for name in ("demure", "diphtheria", "lavender", "loki", "pendragon")
+        name: named[name]
+        for name in ("demure", "diphtheria", "lavender", "loki", "pendragon", "ziggurat")
     } == {
         "demure": {"rule": "serial", "serial": DEMURE_INSTALL_DISK},
         "diphtheria": {"rule": "serial", "serial": DIPHTHERIA_INSTALL_DISK},
         "lavender": {"rule": "serial", "serial": LAVENDER_INSTALL_DISK},
         "loki": {"rule": "serial", "serial": LOKI_INSTALL_DISK},
         "pendragon": {"rule": "serial", "serial": PENDRAGON_INSTALL_DISK},
+        "ziggurat": {"rule": "serial", "serial": ZIGGURAT_INSTALL_DISK},
     }
     assert sorted(name for name, m in machines.items() if m["installDisk"] is None) == sorted(
         name for name, m in machines.items() if m["bootMac"] is None
