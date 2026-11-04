@@ -267,7 +267,8 @@ class TestEntrypoint:
         assert caught.value.code == 0
         assert capsys.readouterr().out == (
             "usage: --spec <value> --host <value> --sample <value> --report <value> "
-            "--cores <value> --onboard <value> --register <value> --prune <value>\n"
+            "--cores <value> --onboard <value> --register <value> --prune <value> "
+            "--drain <value> --resume <value>\n"
         )
 
     def test_a_refusal_is_one_line_on_stderr_and_exit_two(
