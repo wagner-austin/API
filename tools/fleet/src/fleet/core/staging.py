@@ -509,9 +509,7 @@ def link_companions(host: str, *, target: str, trees: tuple[str, ...]) -> None:
         host,
         dialect.script_path(names.staging_directory(target), names.LINK_COMPANIONS_STEM),
         dialect.checked_script(
-            tuple(
-                ("ln", "-sfn", tree, f"{enclosure}/{posixpath.basename(tree)}") for tree in trees
-            )
+            tuple(("ln", "-sfn", tree, f"{enclosure}/{posixpath.basename(tree)}") for tree in trees)
         ),
     )
 
