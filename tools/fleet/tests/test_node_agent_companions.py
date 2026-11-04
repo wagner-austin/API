@@ -24,12 +24,14 @@ from fleet.core import (
     stage_repository,
     staging,
 )
+from tests._commit_stage_replies import commit_stage_replies
 from tests._node_agent_fixtures import (
     ATTEMPT_DIRECTORY,
     COMPANION_DIRECTORY,
     COMPANION_REF,
     COMPANION_REMOTE,
     COMPANION_SHA,
+    EXPORT_BUNDLE_BYTES,
     NPM_CI,
     PROBED,
     _credentials_in_env,
@@ -46,7 +48,6 @@ from tests.conftest import (
     failed,
     ok,
     registry_replies,
-    stage_replies,
     timed_out,
 )
 
@@ -120,7 +121,10 @@ class BundlingRun(FakeRun):
         """
         if tuple(argv[3:5]) == ("bundle", "create"):
             path = pathlib.Path(argv[-2])
-            path.write_bytes(b"# v2 git bundle\nworkspace-at-" + COMPANION_SHA.encode("ascii"))
+            companion = b"# v2 git bundle\nworkspace-at-" + COMPANION_SHA.encode("ascii")
+            path.write_bytes(
+                companion if argv[-1] == mirror_fetch.COMPANION_REF else EXPORT_BUNDLE_BYTES
+            )
             self.bundles.append(path)
         return super().__call__(
             argv,
@@ -168,8 +172,7 @@ def _companion_replies(
         ok(""),  # the companion: git fetch the ref
         ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
         ok(""),  # the companion: git bundle create
-        ok(""),  # the project: git archive
-        *stage_replies(export_digest),
+        *commit_stage_replies(export_digest),
         *registry_replies(registry),
         ok(""),  # companion: send reset script
         ok(""),  # companion: run reset
@@ -371,7 +374,6 @@ class TestCompanions:
         its deadline, the job is given back to be claimed again, and the
         attempt's directory, made by the real seam, goes with the attempt."""
         sourced = _companion_config(config_path)
-        prebuilt_export(sourced)
         bundled = BundlingRun(
             [
                 *PROBED,
@@ -381,10 +383,12 @@ class TestCompanions:
                 ok(""),  # the companion: git fetch the ref
                 ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
                 ok(""),  # the companion: git bundle create, which BundlingRun writes
-                ok(""),  # the project: git archive
-                ok(""),  # stage: send the export's mkdir script
-                ok(""),  # stage: run it
-                timed_out(120),  # stage: the payload's send, ended at its deadline
+                ok(""),  # stage: send the commit's prepare script
+                ok(""),  # stage: run it; the node's mirror does not exist yet
+                ok(""),  # the commit: git update-ref of the run's bundle ref
+                ok(""),  # the commit: git bundle create, which BundlingRun writes
+                ok(""),  # the commit: git update-ref -d of the run's bundle ref
+                timed_out(120),  # stage: the bundle's send, ended at its deadline
             ]
         )
         _test_hooks.run = bundled
@@ -400,7 +404,9 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         assert queue.arguments[2]["action"] == "lost"
-        assert len(bundled.bundles) == 1
+        # The companion's bundle and the commit's, both in the attempt's directory.
+        assert len(bundled.bundles) == 2
+        assert {bundle.parent for bundle in bundled.bundles} == {bundled.bundles[0].parent}
         assert bundled.bundles[0].parent.name.startswith(f"{DEFAULT_JOB_ID}-")
         archives = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
         assert sorted(path.name for path in archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
@@ -413,8 +419,9 @@ class TestCompanions:
         refused, and the attempt's directory goes with it (board task
         2e3e69cf, check review d9dbf931)."""
         sourced = _companion_config(config_path)
-        export_payload = prebuilt_export(sourced)
-        bundled = BundlingRun(_companion_replies(staging.digest(export_payload), "0" * 64, sourced))
+        bundled = BundlingRun(
+            _companion_replies(staging.digest(EXPORT_BUNDLE_BYTES), "0" * 64, sourced)
+        )
         _test_hooks.run = bundled
         queue = FakeQueue(
             [

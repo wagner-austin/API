@@ -3,45 +3,25 @@ finished check becomes (A3).
 
 The export half runs git through the one command hook: what is asserted is
 the exact argv of every git call, its deadline, and which of git's refusals
-becomes which fleet code; the fetches are ``tests/test_mirror_fetch.py``'s.
-The mirror directory and the archive file are real, in a temporary
-directory, because the file hooks are left on their
-real implementations by the autouse reset. The verdict half is pure: real
-transcript tails from vitest and pytest-cov in, the one thread line out.
+becomes which fleet code; the fetches are ``tests/test_mirror_fetch.py``'s
+and a commit's bundle and unpack ``tests/test_commit_stage.py``'s. The
+mirror directory and the bundle file are real, in a temporary directory,
+because the file hooks are left on their real implementations by the
+autouse reset. The verdict half is pure: real transcript tails from vitest
+and pytest-cov in, the one thread line out.
 """
 
 from __future__ import annotations
 
 import pathlib
 import socket
-import subprocess
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.source import ProjectCompanion, ProjectSource
-from fleet.core import _test_hooks, dialect, export, mirror_fetch, verdict
+from fleet.core import _test_hooks, export, mirror_fetch, verdict
 from tests.conftest import FakeRun, failed, ok
-
-#: The four bytes every zstd frame opens with.
-ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
-
-
-def _real_git(repo: pathlib.Path, *args: str) -> str:
-    """Run real git in a test's own repository.
-
-    Args:
-        repo: The repository.
-        *args: The arguments after ``git -C <repo>``.
-
-    Returns:
-        Its standard output.
-    """
-    done = subprocess.run(
-        ("git", "-C", str(repo), *args), check=True, capture_output=True, text=True
-    )
-    return done.stdout
-
 
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
 REMOTE = "https://github.com/wagner-austin/MCPs.git"
@@ -117,124 +97,6 @@ class TestEnsureMirror:
 
         with pytest.raises(AppError, match=r"\(git wrote nothing to stderr\)"):
             export.ensure_mirror(tmp_path / "slime.git")
-
-
-class TestArchiveCommit:
-    def test_the_archive_is_written_by_git_and_read_back_as_bytes(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        destination = tmp_path / "archives" / "run-1-lavender.tgz"
-        payload = ZSTD_MAGIC + b"archive"
-        # git is faked, so the bytes it would have written are placed first;
-        # the read after the call is the real file hook.
-        destination.parent.mkdir()
-        destination.write_bytes(payload)
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        data = export.archive_commit(tmp_path / "slime.git", SHA, destination, ())
-
-        assert data == payload
-        assert runner.calls == [
-            (
-                "git",
-                "-C",
-                str(tmp_path / "slime.git"),
-                "-c",
-                "tar.tar.zst.command=zstd -T0 -3 -q -c",
-                "archive",
-                "--format=tar.zst",
-                "-o",
-                str(destination),
-                SHA,
-            )
-        ]
-        assert runner.timeouts == [export.ARCHIVE_TIMEOUT_SECONDS]
-        assert destination.parent.is_dir()
-
-    def test_a_real_commit_s_archive_is_zstd_and_unpacks_by_the_node_s_own_extract(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """Real git writes the export and real tar unpacks it, with the very
-        command a node runs: the zstd the filter names reaches the tree whole,
-        under the clock-keeping ``-m`` and no ``-z``."""
-        repo = tmp_path / "repo"
-        (repo / "src").mkdir(parents=True)
-        (repo / "src" / "a.py").write_text("print('a')\n", encoding="utf-8")
-        _real_git(repo, "init", "--quiet")
-        _real_git(repo, "add", "--all")
-        _real_git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "c")
-        sha = _real_git(repo, "rev-parse", "HEAD").strip()
-        destination = tmp_path / "archives" / "run-4-colossus.tgz"
-
-        payload = export.archive_commit(repo, sha, destination, ())
-
-        assert payload[: len(ZSTD_MAGIC)] == ZSTD_MAGIC
-        unpacked = tmp_path / "unpacked"
-        unpacked.mkdir()
-        (command,) = dialect.extract_commands(str(destination), str(unpacked))
-        subprocess.run(command, check=True, capture_output=True)
-        assert (unpacked / "src" / "a.py").read_text(encoding="utf-8") == "print('a')\n"
-
-    def test_an_empty_scope_appends_no_separator_let_alone_a_pathspec(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """The unscoped command must be the one this always ran, byte for byte.
-
-        Asserted on its own rather than left to the case above, because the
-        thing at stake is a NEGATIVE: that ``--`` does not appear. slime and
-        the three MCPs projects declare no data paths, so their payloads go
-        on being built by this exact argv, and a stray separator would be a
-        change to four projects nobody asked to change.
-        """
-        destination = tmp_path / "archives" / "run-2-loki.tgz"
-        destination.parent.mkdir()
-        destination.write_bytes(b"\x1f\x8b")
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        export.archive_commit(tmp_path / "slime.git", SHA, destination, ())
-
-        assert "--" not in runner.calls[0]
-        assert runner.calls[0][-1] == SHA
-
-    def test_a_scope_reaches_git_after_a_separator_in_declaration_order(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        """A pathspec unseparated from the sha is how git reads a path as a ref."""
-        destination = tmp_path / "archives" / "run-3-sedona.tgz"
-        destination.parent.mkdir()
-        destination.write_bytes(b"\x1f\x8b")
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        export.archive_commit(
-            tmp_path / "api.git",
-            SHA,
-            destination,
-            (
-                ".",
-                ":(exclude)services/covenant-radar-api/data/external",
-                ":(exclude)tools/hpc3/artifacts",
-            ),
-        )
-
-        assert runner.calls[0][-4:] == (
-            "--",
-            ".",
-            ":(exclude)services/covenant-radar-api/data/external",
-            ":(exclude)tools/hpc3/artifacts",
-        )
-        assert runner.calls[0][-5] == SHA
-
-    def test_a_failing_archive_is_an_export_failure(self, tmp_path: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun([failed(128, f"fatal: not a valid object name: {SHA}")])
-
-        with pytest.raises(AppError) as raised:
-            export.archive_commit(tmp_path / "slime.git", SHA, tmp_path / "out.tgz", ())
-
-        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert raised.value.message.startswith(f"git archive {SHA} from ")
 
 
 class TestRequireSourceAndPrepare:

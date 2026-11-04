@@ -115,10 +115,12 @@ class TestARunRefusedWhileStaging:
                 *PROBED,
                 ok(""),  # git init --bare (the mirror is new)
                 ok(""),  # git cat-file -e: the sha is present
-                ok(""),  # git archive -o
-                ok(""),  # stage: send mkdir script
-                ok(""),  # stage: run mkdir, so the run's directory is on the node
-                timed_out(120),  # stage: send the payload, ended at its deadline
+                ok(""),  # stage: send the prepare script
+                ok(""),  # stage: run it, so the run's directory is on the node
+                ok(""),  # the commit: git update-ref of the run's bundle ref
+                ok(""),  # the commit: git bundle create
+                ok(""),  # the commit: git update-ref -d of the run's bundle ref
+                timed_out(120),  # stage: send the bundle, ended at its deadline
             ]
         )
         _test_hooks.http_post = FakeQueue(

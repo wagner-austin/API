@@ -49,6 +49,7 @@ from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import MAKE_TARGET, ProjectConfig
 from fleet.core import (
     _test_hooks,
+    commit_stage,
     dialect,
     export,
     leases,
@@ -138,51 +139,52 @@ def closed_row(
     )
 
 
-class Payload(TypedDict):
-    """The archive a dispatch stages, and how the feed describes it.
+class StagedTree(TypedDict):
+    """Where a dispatch's tree landed on its node, and how the feed describes it.
 
     Attributes:
-        path: The local file the archive was written to, which scp copies
-            to the node (:func:`fleet.core.remote.send_file`).
-        data: The same archive's bytes, which the node's digest is compared
-            against before it unpacks.
-        description: What the archive holds, for the ``staged`` feed line:
-            counted, never listed (a working tree carries about forty-six
-            members; an export is one commit).
+        target: The absolute remote directory the tree was unpacked into.
+        detail: The ``staged`` feed line's words: the bytes sent and what
+            they hold, counted, never listed (a working tree carries about
+            forty-six members; an export is one commit).
     """
 
-    path: pathlib.Path
-    data: bytes
-    description: str
+    target: str
+    detail: str
 
 
-class PayloadBuilder(Protocol):
-    """Builds the archive a dispatch stages, once the lease is held.
+class TreeStager(Protocol):
+    """Stages a dispatch's tree on its node, once the lease is held.
 
-    A callable rather than bytes, so the lease is taken BEFORE the archive
-    is built whichever tree it comes from: staging into a project another
-    dispatch holds would be pointless work at best.
+    A callable rather than a tree, so the lease is taken BEFORE anything is
+    built or sent whichever tree it comes from: staging into a project
+    another dispatch holds would be pointless work at best. ``fleet-run``
+    stages the hub's working tree as an archive (:func:`working_tree_stager`);
+    the queue's node lane stages a commit from the node's own mirror
+    (:func:`commit_stager`).
     """
 
-    def __call__(self, run_id: str) -> Payload:
-        """Build the archive for one run.
+    def __call__(self, host: str, *, stage_root: str, run_id: str) -> StagedTree:
+        """Stage the tree for one run.
 
         Args:
-            run_id: The dispatch, which names the scratch file.
+            host: SSH destination.
+            stage_root: The node's declared stage root.
+            run_id: The dispatch, which names its directory and scratch files.
 
         Returns:
-            The archive and its description.
+            Where it landed, and the feed's words for it.
         """
         ...
 
 
-def working_tree_payload(
+def working_tree_stager(
     project_root: pathlib.Path,
     *,
     project: str,
     plan: ProjectConfig,
     archive_dir: pathlib.Path,
-) -> PayloadBuilder:
+) -> TreeStager:
     """The archive of the hub's working tree, as ``fleet-run`` dispatches it.
 
     Args:
@@ -196,21 +198,49 @@ def working_tree_payload(
             FROM is carried by the next dispatch.
 
     Returns:
-        A builder that computes the manifest and tars it when called.
+        A stager that computes the manifest, tars it and stages the archive.
     """
 
-    def build(run_id: str) -> Payload:
+    def stage(host: str, *, stage_root: str, run_id: str) -> StagedTree:
         members = manifest.build_tree(project_root, project, external=plan["external_paths"])
         # Named by the run alone: archives share one scratch directory, and a
         # run id names its node (run_lease.run_id_for), so two dispatches of
         # one project to two nodes in one second write two files.
         path = archive_dir / f"{run_id}.tgz"
-        data = staging.archive(project_root, members, path)
-        return Payload(
-            path=path, data=data, description=f"{len(members)} member(s) of the working tree"
-        )
+        # The stage is the archive's one reader, so the file goes however it ends: 245 kept
+        # after successes filled the hub (bfca20e6), failures left 3.6 GB in its memory root
+        # (fb505198).
+        try:
+            data = staging.archive(project_root, members, path)
+            target = staging.stage(
+                host, run_id=run_id, stage_root=stage_root, source=path, payload=data
+            )
+            held = f"{len(members)} member(s) of the working tree"
+            return StagedTree(target=target, detail=f"{len(data)} bytes, {held}, to {target}")
+        finally:
+            path.unlink(missing_ok=True)
 
-    return build
+    return stage
+
+
+def commit_stager(commit: commit_stage.CommitExport) -> TreeStager:
+    """One queued commit, staged from the node's mirror of its remote.
+
+    Args:
+        commit: The commit and the hub's mirror holding it.
+
+    Returns:
+        A stager that sends the node only what its mirror lacks
+        (:func:`fleet.core.commit_stage.stage_commit`).
+    """
+
+    def stage(host: str, *, stage_root: str, run_id: str) -> StagedTree:
+        staged = commit_stage.stage_commit(
+            host, stage_root=stage_root, run_id=run_id, commit=commit
+        )
+        return StagedTree(target=staged["target"], detail=staged["detail"])
+
+    return stage
 
 
 def start(
@@ -227,10 +257,11 @@ def start(
     agent: str,
     session_id: str,
     node_local: tuple[str, ...],
-    build_payload: PayloadBuilder,
+    stage_tree: TreeStager,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
     registry: pathlib.Path,
+    scratch: pathlib.Path,
 ) -> LedgerEntry:
     """Take the lease, then :func:`launch` under it: ``fleet-run``'s dispatch.
 
@@ -255,10 +286,11 @@ def start(
         session_id: That session's UUID.
         node_local: The workspace's node-local resource names, which the
             lease holds as this node's copy.
-        build_payload: Builds the archive once the lease is held.
+        stage_tree: Stages the tree once the lease is held.
         companions: The repositories staged beside the export.
         recipe: Where in the tree the recipe runs and what readies it.
         registry: The registry directory this command loaded.
+        scratch: The hub's directory for the run's local archives.
 
     Returns:
         The running ledger row.
@@ -285,10 +317,11 @@ def start(
         lease=lease,
         node=node,
         workers=workers,
-        build_payload=build_payload,
+        stage_tree=stage_tree,
         companions=companions,
         recipe=recipe,
         registry=registry,
+        scratch=scratch,
     )
 
 
@@ -299,10 +332,11 @@ def launch(
     lease: Lease,
     node: NodeConfig,
     workers: int,
-    build_payload: PayloadBuilder,
+    stage_tree: TreeStager,
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
     registry: pathlib.Path,
+    scratch: pathlib.Path,
 ) -> LedgerEntry:
     """Stage the tree, launch the suite, and record it, under a held lease.
 
@@ -313,43 +347,32 @@ def launch(
             names the run, its node and its project.
         node: The node's declaration.
         workers: Test workers the capacity check granted.
-        build_payload: Builds the archive once the lease is held:
-            :func:`working_tree_payload` for ``fleet-run``, the export of a
-            commit for the queue's node lane (:mod:`fleet.core.export`).
+        stage_tree: Stages the tree once the lease is held:
+            :func:`working_tree_stager` for ``fleet-run``, :func:`commit_stager`
+            for the queue's node lane.
         companions: The repositories staged beside the export, in declared
             order, before the build script is sent. Empty for a project
             whose check reads only its own tree.
         recipe: Where in the tree the recipe runs and what readies it.
         registry: The registry directory staged beside the export.
+        scratch: The hub's directory for the run's local archives, where
+            the registry's is written.
 
     Returns:
         The running ledger row.
 
     Raises:
-        AppError: With the builder's own codes (``STAGE_ARCHIVE_UNREADABLE``,
-            ``SHA_NOT_ON_REMOTE``, ``REMOTE_CREDENTIAL_REJECTED``,
-            ``EXPORT_FAILED``),
-            ``STAGE_DIGEST_MISMATCH`` from staging, or ``NODE_UNREACHABLE``
-            or ``DISPATCH_FAILED`` from the transport. The lease is still
-            held then; giving it back is the caller's act.
+        AppError: With the stager's own codes (``STAGE_ARCHIVE_UNREADABLE``,
+            ``EXPORT_FAILED``), ``STAGE_DIGEST_MISMATCH`` from staging, or
+            ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED`` from the transport.
+            The lease is still held then; giving it back is the caller's act.
     """
     run_id = lease["run_id"]
     node_name = lease["node"]
     project = lease["project"]
-    payload = build_payload(run_id)
-    # The stage is the archive's one reader, so the file goes however it ends: 245 kept after
-    # successes filled the hub (bfca20e6), failures left 3.6 GB in its memory root (fb505198).
-    try:
-        target = staging.stage(
-            node["host"],
-            run_id=run_id,
-            stage_root=node["stage_root"],
-            source=payload["path"],
-            payload=payload["data"],
-        )
-    finally:
-        payload["path"].unlink()
-    local = payload["path"].with_name(f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz")
+    staged = stage_tree(node["host"], stage_root=node["stage_root"], run_id=run_id)
+    target = staged["target"]
+    local = scratch / f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz"
     staging.stage_registry(node["host"], target=target, registry=registry, local=local)
     run_lease.emit(
         loaded_feed,
@@ -363,7 +386,7 @@ def launch(
         # line into two thousand characters. The members are derivable from
         # `fleet.core.manifest`; the feed's job is to say a run reached this
         # step, with enough to spot a stage that carried the wrong amount.
-        detail=f"{len(payload['data'])} bytes, {payload['description']}, to {target}",
+        detail=staged["detail"],
         now_unix=_test_hooks.now(),
     )
     # BEFORE the build script is sent, because the install steps are part of
@@ -508,12 +531,13 @@ _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
 
 
 __all__ = [
-    "Payload",
-    "PayloadBuilder",
+    "StagedTree",
+    "TreeStager",
     "closed_row",
+    "commit_stager",
     "finish",
     "launch",
     "start",
     "started_row",
-    "working_tree_payload",
+    "working_tree_stager",
 ]

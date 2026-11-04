@@ -122,9 +122,10 @@ class TestClaiming:
         assert started["node"] == "lavender"
         assert started["runId"] == DEMO_RUN_ID
         # The node's two probes, capacity then toolchain (two ssh calls each),
-        # BEFORE the claim, then the mirror, the commit probe and the archive,
-        # then the fleet's own sequence: no tar of any working tree anywhere,
-        # and no second probe.
+        # BEFORE the claim, then the mirror and the commit probe, then the
+        # node's mirror asked what it holds, and the commit bundled less
+        # that under a ref of the run's own (MCPs board task 1e0ee821): no
+        # tar of any working tree anywhere, and no second probe.
         mirror = _mirror(sourced_config)
         probes = len(PROBED)
         assert [call[0] for call in runner.calls[:probes]] == ["ssh"] * probes
@@ -137,18 +138,12 @@ class TestClaiming:
             "-e",
             f"{DEFAULT_SHA}^{{commit}}",
         )
-        archive = runner.calls[probes + 2]
-        assert archive[:8] == (
-            "git",
-            "-C",
-            mirror,
-            "-c",
-            "tar.tar.zst.command=zstd -T0 -3 -q -c",
-            "archive",
-            "--format=tar.zst",
-            "-o",
-        )
-        assert archive[9] == DEFAULT_SHA
+        assert [call[0] for call in runner.calls[probes + 2 : probes + 4]] == ["ssh", "ssh"]
+        ref = f"refs/fleet/bundle/{DEMO_RUN_ID}"
+        assert runner.calls[probes + 4] == ("git", "-C", mirror, "update-ref", ref, DEFAULT_SHA)
+        assert runner.calls[probes + 5][3:6] == ("bundle", "create", "--quiet")
+        assert runner.calls[probes + 5][-1] == ref
+        assert runner.calls[probes + 6] == ("git", "-C", mirror, "update-ref", "-d", ref)
         assert not any(call[0] == "tar" for call in runner.calls)
 
     def test_the_build_script_carries_the_install_steps_and_the_node_cache(
@@ -230,7 +225,7 @@ class TestClaiming:
         assert "opus-weight-injection-0902" in ledger
         assert "acc774c0-3bc3-4cce-9dda-c7a12fb99519" in ledger
         feed = (sourced_config.parent / "runs" / "feed.jsonl").read_text(encoding="utf-8")
-        assert f"git archive of {DEFAULT_SHA}" in feed
+        assert f"bytes, git bundle of {DEFAULT_SHA} over an empty mirror, to " in feed
 
 
 class TestClaimingNothing:

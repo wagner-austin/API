@@ -28,6 +28,8 @@ from fleet.contracts.lease import Lease
 from fleet.contracts.workspace import require_project
 from fleet.core import _test_hooks, leases, records, run_lease
 from tests._node_agent_fixtures import (
+    ATTEMPT_DIRECTORY,
+    EXPORT_BUNDLE,
     PROBED,
     _credentials_in_env,
     _sourced_config,
@@ -52,10 +54,12 @@ UP_TO_THE_PAYLOAD: tuple[_test_hooks.CommandResult, ...] = (
     *PROBED,  # the probe, before any claim
     ok(""),  # git init --bare (the mirror is new)
     ok(""),  # git cat-file -e: the sha is present
-    ok(""),  # git archive -o
-    ok(""),  # stage: send mkdir script
-    ok(""),  # stage: run mkdir
-    timed_out(SSH_DEADLINE_SECONDS),  # stage: send the payload, ended at its deadline
+    ok(""),  # stage: send the prepare script
+    ok(""),  # stage: run it; the node's mirror does not exist yet
+    ok(""),  # the commit: git update-ref of the run's bundle ref
+    ok(""),  # the commit: git bundle create
+    ok(""),  # the commit: git update-ref -d of the run's bundle ref
+    timed_out(SSH_DEADLINE_SECONDS),  # stage: send the bundle, ended at its deadline
 )
 
 #: Every command the tick runs before it asks for the lease: the probe and
@@ -85,8 +89,8 @@ class TestAStagingFaultIsReported:
         ee3d6cdc the tick refused it, and 12 of loki's 585 jobs in a week were
         refused that way, each submitter left to resubmit.
         """
-        # The archive the faked ``git archive`` would have written, where the
-        # tick reads it: the payload has to be real for staging to carry it.
+        # The bundle the faked ``git bundle create`` would have written, where
+        # the tick reads it: the payload has to be real for staging to carry it.
         prebuilt_export(sourced_config)
         _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
         endpoint = FakeQueue(
@@ -110,13 +114,12 @@ class TestAStagingFaultIsReported:
         # only "it failed" would send the reader to the node.
         assert f"timed out after {SSH_DEADLINE_SECONDS} s" in detail
         assert detail.endswith("; nothing ran on lavender, so the job is given back")
-        # The archive's one reader was this stage, so the failed stage
-        # removes it too: kept, failed stages left 3.6 GB of exports on the
-        # hub, whose scratch root is memory now (MCPs board task fb505198).
+        # The bundle's one reader was this stage, so the failed stage removes
+        # it, and the launch attempt's own directory with it, so nothing is
+        # left on the hub, whose scratch root is memory (MCPs board task
+        # fb505198), for the job's next claim to meet (board task 2e3e69cf).
         loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
-        assert not (loaded.archives / f"{DEMO_RUN_ID}.tgz").exists()
-        # Nor is the launch attempt's own bundle directory left behind for
-        # the job's next claim to meet (board task 2e3e69cf).
+        assert not (loaded.archives / ATTEMPT_DIRECTORY / EXPORT_BUNDLE).exists()
         assert sorted(path.name for path in loaded.archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
 
     def test_a_job_given_back_before_is_failed_by_the_queue_and_the_log_says_so(

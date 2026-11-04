@@ -405,7 +405,9 @@ def read_script(host: str, remote_path: str, body: str) -> Answered:
     raise AppError(failure["code"], failure["message"])
 
 
-def run_script(host: str, remote_path: str, body: str) -> str:
+def run_script(
+    host: str, remote_path: str, body: str, *, timeout_seconds: int = SSH_TIMEOUT_SECONDS
+) -> str:
     """Send a script to a node and run it by path.
 
     The raising boundary over :func:`attempt_script`.
@@ -414,6 +416,9 @@ def run_script(host: str, remote_path: str, body: str) -> str:
         host: SSH destination.
         remote_path: Absolute path on the node to write and then execute.
         body: The script's complete text.
+        timeout_seconds: Execution deadline: the short commands' flat bound,
+            or one scaled to the bytes a script reads, as a commit's unpack
+            from its bundle (:mod:`fleet.core.commit_stage`).
 
     Returns:
         The script's standard output.
@@ -421,7 +426,7 @@ def run_script(host: str, remote_path: str, body: str) -> str:
     Raises:
         AppError: With ``NODE_UNREACHABLE`` or ``DISPATCH_FAILED``.
     """
-    outcome = attempt_script(host, remote_path, body)
+    outcome = attempt_script(host, remote_path, body, timeout_seconds=timeout_seconds)
     _raise_on(outcome["failure"])
     return outcome["output"]
 

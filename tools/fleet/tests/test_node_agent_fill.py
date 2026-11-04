@@ -71,14 +71,12 @@ def _two_projects(config_path: pathlib.Path) -> pathlib.Path:
 
 
 def _other_export(config_path: pathlib.Path) -> None:
-    """Write the second run's archive where its ``git archive`` would have.
+    """Write the second job's bundle where its ``git bundle create`` would have.
 
     Args:
         config_path: The workspace document.
     """
-    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    source = loaded.archives / f"{DEMO_RUN_ID}.tgz"
-    (loaded.archives / f"{OTHER_RUN_ID}.tgz").write_bytes(source.read_bytes())
+    prebuilt_export(config_path, OTHER_JOB_ID)
 
 
 def _tick(

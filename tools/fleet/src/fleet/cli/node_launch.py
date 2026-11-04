@@ -53,7 +53,15 @@ from fleet.contracts.dispatch import DispatchJob
 from fleet.contracts.host_claim import HostClaim
 from fleet.contracts.ledger import LedgerEntry
 from fleet.contracts.node import LiveLoad, NodeConfig
-from fleet.core import _test_hooks, dispatch, export, host_claims, recipe, run_lease
+from fleet.core import (
+    _test_hooks,
+    commit_stage,
+    dispatch,
+    export,
+    host_claims,
+    recipe,
+    run_lease,
+)
 from fleet.core.claim_window import CLAIM_LEASE_SECONDS
 from fleet.core.queue_lost import report_lost
 from fleet.core.queue_transport import unanswered
@@ -136,7 +144,7 @@ def launch_claimed(
     alias: str,
     node: NodeConfig,
     prepared: Prepared,
-    build: dispatch.PayloadBuilder,
+    stage_tree: dispatch.TreeStager,
 ) -> Launched:
     """Take the project's lease on this node and launch the job under it.
 
@@ -162,7 +170,7 @@ def launch_claimed(
         alias: This node's workspace name.
         node: Its declaration.
         prepared: What :func:`fleet.cli.node_prepare.prepare` resolved for the job.
-        build: Builds the job's export once the lease is held.
+        stage_tree: Stages the job's commit once the lease is held.
 
     Returns:
         The running ledger row, or why nothing was launched.
@@ -189,7 +197,7 @@ def launch_claimed(
             lease=lease,
             node=node,
             workers=prepared["workers"],
-            build_payload=build,
+            stage_tree=stage_tree,
             companions=prepared["companions"],
             recipe=recipe.recipe_for(
                 prepared["plan"],
@@ -197,6 +205,7 @@ def launch_claimed(
                 install=prepared["source"]["install"],
             ),
             registry=loaded.registry,
+            scratch=loaded.archives,
         )
     except AppError as refusal:
         unlaunched = _unlaunched(refusal)
@@ -450,13 +459,19 @@ class Launcher:
             )
             return None
 
-        def build(run_id: str) -> dispatch.Payload:
-            path = self._loaded.archives / f"{run_id}.tgz"
-            data = export.archive_commit(prepared["mirror"], sha, path, prepared["scope"])
-            return dispatch.Payload(path=path, data=data, description=f"git archive of {sha}")
-
-        # The attempt's own bundle directory goes however the launch ends,
-        # content and all (MCPs board task 2e3e69cf).
+        # Bundled into the attempt's own directory, beside its companions'
+        # bundles, which goes however the launch ends, content and all (MCPs
+        # board task 2e3e69cf).
+        key = export.remote_mirror_key(prepared["source"]["remote"])
+        stage_tree = dispatch.commit_stager(
+            commit_stage.CommitExport(
+                mirror=prepared["mirror"],
+                key=key,
+                sha=sha,
+                scope=prepared["scope"],
+                bundle=prepared["bundles"] / f"{key}-{sha}.bundle",
+            )
+        )
         try:
             launched = launch_claimed(
                 self._loaded,
@@ -464,7 +479,7 @@ class Launcher:
                 alias=self._alias,
                 node=self._node,
                 prepared=prepared,
-                build=build,
+                stage_tree=stage_tree,
             )
         finally:
             shutil.rmtree(prepared["bundles"])

@@ -252,7 +252,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         agent=agent,
         session_id=session_id,
         node_local=loaded.workspace["node_local_resources"],
-        build_payload=dispatch.working_tree_payload(
+        stage_tree=dispatch.working_tree_stager(
             project_root,
             project=project,
             plan=plan,
@@ -266,6 +266,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         companions=(),
         recipe=recipe.working_tree_recipe(project, plan),
         registry=loaded.registry,
+        scratch=loaded.archives,
     )
 
     _log.info(

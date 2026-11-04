@@ -37,6 +37,7 @@ from tests._queue_fakes import (
     queue_job,
 )
 from tests._registry import write_registry
+from tests._commit_stage_replies import commit_stage_replies
 from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import (
@@ -47,7 +48,6 @@ from tests.conftest import (
     failed,
     ok,
     registry_replies,
-    stage_replies,
     workspace_document,
 )
 
@@ -62,8 +62,13 @@ COMPANION_DIRECTORY = "MCPs"
 COMPANION_SHA = "7b3d51c0e9a2f4681becd3057a9f2416c8d0e5b9"
 
 #: The launch attempt's own bundle directory under the archives, which
-#: :func:`prebuilt_companion` binds the attempt seam to.
+#: :func:`attempt_directory` binds the attempt seam to.
 ATTEMPT_DIRECTORY = f"{DEFAULT_JOB_ID}-attempt"
+
+#: The commit's bundle as the hub writes it in the attempt's directory:
+#: the demo remote's mirror key and the commit, and what it holds.
+EXPORT_BUNDLE = f"wagner-austin-API-{DEFAULT_SHA}.bundle"
+EXPORT_BUNDLE_BYTES = b"# v2 git bundle\n" + b"export-of-" + DEFAULT_SHA.encode("ascii")
 
 #: The pre-claim probes every claiming tick pays, each script sent and then
 #: run: lavender answering room for a dispatch, then its toolchain as it
@@ -180,21 +185,48 @@ def node_argv(config_path: pathlib.Path) -> list[str]:
     return ["--config", str(config_path), node_agent.NODE_FLAG, "lavender"]
 
 
-def prebuilt_export(config_path: pathlib.Path) -> bytes:
-    """Write the archive ``git archive`` would have, where the tick reads it.
+def attempt_directory(config_path: pathlib.Path, job_id: str) -> pathlib.Path:
+    """Bind each launch attempt's own directory to ``<job_id>-attempt`` under the archives.
+
+    :func:`fleet.cli.node_prepare.prepare` makes the attempt's directory, and
+    the hub writes the commit's and the companions' bundles there, so a
+    bundle a faked ``git bundle create`` would have written can be placed
+    before the tick reads it. :data:`ATTEMPT_DIRECTORY` is the default job's.
 
     Args:
         config_path: The workspace document.
+        job_id: The job whose attempt's directory is wanted.
 
     Returns:
-        The archive bytes.
+        That directory, made.
     """
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    destination = loaded.archives / f"{DEMO_RUN_ID}.tgz"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    payload = b"\x1f\x8b" + b"export-of-" + DEFAULT_SHA.encode("ascii")
-    destination.write_bytes(payload)
-    return payload
+
+    def fresh(parent: pathlib.Path, prefix: str) -> pathlib.Path:
+        assert parent == loaded.archives
+        made = parent / f"{prefix}attempt"
+        made.mkdir(parents=True, exist_ok=True)
+        return made
+
+    attempt_hooks.fresh_directory = fresh
+    return fresh(loaded.archives, f"{job_id}-")
+
+
+def prebuilt_export(config_path: pathlib.Path, job_id: str = DEFAULT_JOB_ID) -> bytes:
+    """Write the bundle the commit's ``git bundle create`` would have, where the tick reads it.
+
+    Named by the demo remote's mirror key and the commit, in the launch
+    attempt's own directory (:func:`attempt_directory`).
+
+    Args:
+        config_path: The workspace document.
+        job_id: The job whose attempt stages the commit.
+
+    Returns:
+        The bundle bytes.
+    """
+    (attempt_directory(config_path, job_id) / EXPORT_BUNDLE).write_bytes(EXPORT_BUNDLE_BYTES)
+    return EXPORT_BUNDLE_BYTES
 
 
 def prebuilt_companion(config_path: pathlib.Path) -> bytes:
@@ -202,10 +234,9 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     the tick reads it.
 
     Named by the companion's own commit, in the launch attempt's own
-    directory, which is where :func:`fleet.cli.node_prepare.prepare` has
-    :func:`fleet.core.export.export_companions` write it: this binds the
-    attempt's directory to :data:`ATTEMPT_DIRECTORY` under the archives, so
-    the bundle can be written before the faked ``git bundle create``.
+    directory (:func:`attempt_directory`), which is where
+    :func:`fleet.cli.node_prepare.prepare` has
+    :func:`fleet.core.export.export_companions` write it.
 
     Args:
         config_path: The workspace document.
@@ -213,15 +244,7 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     Returns:
         The bundle bytes.
     """
-    loaded = _config.load_workspace({_config.CONFIG_FLAG: str(config_path)})
-    attempt = loaded.archives / ATTEMPT_DIRECTORY
-    attempt.mkdir(parents=True)
-
-    def fresh(parent: pathlib.Path, prefix: str) -> pathlib.Path:
-        assert (parent, prefix) == (loaded.archives, f"{DEFAULT_JOB_ID}-")
-        return attempt
-
-    attempt_hooks.fresh_directory = fresh
+    attempt = attempt_directory(config_path, DEFAULT_JOB_ID)
     destination = attempt / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
     payload = b"# v2 git bundle\n" + b"workspace-at-" + COMPANION_SHA.encode("ascii")
     destination.write_bytes(payload)
@@ -278,8 +301,7 @@ def launch_steps(
     return [
         ok(""),  # git init --bare (the mirror is new)
         *fetched,  # git cat-file -e: present; or absent, then git fetch
-        ok(""),  # git archive -o
-        *stage_replies(digest),
+        *commit_stage_replies(digest),
         *registry_replies(registry),
         ok(""),  # launch: send the build script
         ok(""),  # launch: send the registration script
@@ -331,6 +353,8 @@ __all__ = [
     "COMPANION_REF",
     "COMPANION_REMOTE",
     "COMPANION_SHA",
+    "EXPORT_BUNDLE",
+    "EXPORT_BUNDLE_BYTES",
     "NOTHING_LAUNCHED",
     "NOTHING_MATCHED",
     "PASSING_TAIL",
@@ -338,6 +362,7 @@ __all__ = [
     "REMOTE",
     "SERVED_HOLDING_NOTHING",
     "VERDICT_TASK",
+    "attempt_directory",
     "claim_replies",
     "held_answer",
     "launch",

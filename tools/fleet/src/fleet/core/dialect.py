@@ -552,16 +552,16 @@ def stop_script(run_id: str) -> str:
 def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], ...]:
     """The command that unpacks a verified archive, whatever compressed it.
 
-    No ``-z``: GNU tar reads the compression off the file's first bytes, so
-    an export's zstd (:data:`fleet.core.export.ARCHIVE_FILTER`) and a
-    working tree's gzip (:func:`fleet.core.staging.archive`) both unpack.
+    No ``-z``: GNU tar reads the compression off the file's first bytes, so a
+    working tree's gzip (:func:`fleet.core.staging.archive`) and a commit's
+    plain tar (:func:`fleet.core.commit_stage.unpack_commands`) both unpack.
     ``-m`` gives files the node's clock: a fast sender's makes targets look
     newer than their sources, and a build that does nothing reads as passed.
 
     THE TWO PATHS ARE SEPARATE so a payload can stay out of the tree it
-    builds; a project's dispatch passes its own directory for both, which is
-    where its archive already sits. A companion is cloned from a bundle
-    instead (:func:`fleet.core.stage_repository.companion_repository_commands`).
+    builds: each archive sits in the export's staging directory and unpacks
+    into the export. A companion is cloned from a bundle instead
+    (:func:`fleet.core.stage_repository.companion_repository_commands`).
 
     Args:
         archive: Absolute path to the archive on the node.

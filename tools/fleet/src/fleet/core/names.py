@@ -22,9 +22,9 @@ from __future__ import annotations
 #: it as ``<RESULT_NAME>.log``.
 RESULT_NAME = "result.txt"
 
-#: The payload as scp lands it, under a dispatch's directory or a companion's
-#: staging directory: an export's ``git archive`` (zstd since MCPs board task
-#: 1e0ee821), or since MCPs board task 2026dfbc a companion's ``git bundle``.
+#: The payload as scp lands it, in an export's or a companion's staging
+#: directory: a working tree's archive, a commit's ``git bundle`` since MCPs
+#: board task 1e0ee821, or since MCPs board task 2026dfbc a companion's.
 #: One name for all because the digest script reads it; tar and git read
 #: either by its contents, so the ``.tgz`` spelling misleads a reader but no tool.
 ARCHIVE_NAME = "tree.tgz"
@@ -58,6 +58,18 @@ EXTRACT_STEM = "extract"
 
 #: The script that makes the staged tree a git repository.
 INIT_REPOSITORY_STEM = "init-repo"
+
+#: The script that fetches a commit's bundle into the node's mirror and
+#: unpacks the commit from there (:mod:`fleet.core.commit_stage`).
+UNPACK_STEM = "unpack"
+
+#: Where the node's mirror writes the commit's tar before it is unpacked,
+#: in the export's staging directory beside :data:`ARCHIVE_NAME`.
+TREE_TAR_NAME = "tree.tar"
+
+#: The directory under a cache root that holds the node's bare mirror of
+#: each remote it has been staged from (:func:`node_mirror`).
+NODE_MIRRORS_DIRECTORY = "mirrors"
 
 #: The script that clones a staged companion from its bundle.
 COMPANION_REPOSITORY_STEM = "companion-repo"
@@ -179,6 +191,19 @@ def cache_root(stage_root: str) -> str:
         ``<stage_root>/cache``.
     """
     return f"{stage_root}/{CACHE_DIRECTORY}"
+
+
+def node_mirror(stage_root: str, key: str) -> str:
+    """Where a node keeps its bare mirror of one remote, which outlives every run.
+
+    Args:
+        stage_root: The node's declared stage root.
+        key: The hub mirror's key, :func:`fleet.core.export.remote_mirror_key`.
+
+    Returns:
+        ``<stage_root>/cache/mirrors/<key>.git``.
+    """
+    return f"{cache_root(stage_root)}/{NODE_MIRRORS_DIRECTORY}/{key}.git"
 
 
 def run_enclosure(stage_root: str, run_id: str) -> str:
@@ -504,17 +529,21 @@ __all__ = [
     "LINK_COMPANIONS_STEM",
     "LOGS_DIRECTORY",
     "LOG_TAIL_STEM",
+    "NODE_MIRRORS_DIRECTORY",
     "POETRY_IN_PROJECT",
     "RESULT_NAME",
     "STAGE_SUFFIX",
     "TOOL_CACHES_DIRECTORY",
+    "TREE_TAR_NAME",
     "UNINSTALL_STEM",
+    "UNPACK_STEM",
     "cache_root",
     "capacity_probe_stem",
     "companion_directory",
     "dispatch_directory",
     "log_path",
     "make_directory_stem",
+    "node_mirror",
     "node_runner_label",
     "recipe_directory",
     "registry_directory",
