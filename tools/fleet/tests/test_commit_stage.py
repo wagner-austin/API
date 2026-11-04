@@ -403,9 +403,7 @@ class TestStagingOneCommit:
         assert runner.timeouts[10] == remote.send_deadline_seconds(len(payload))
         assert not commit["bundle"].exists()
 
-    def test_a_commit_the_node_s_mirror_holds_is_sent_nothing(
-        self, tmp_path: pathlib.Path
-    ) -> None:
+    def test_a_commit_the_node_s_mirror_holds_is_sent_nothing(self, tmp_path: pathlib.Path) -> None:
         commit = _export(tmp_path, b"unsent")
         runner = FakeRun([ok(""), ok(f"{TIP}\nheld\n"), ok(""), ok("")])
         _test_hooks.run = runner

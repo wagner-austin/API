@@ -28,6 +28,7 @@ from fleet.contracts.source import (
 )
 from fleet.core import _test_hooks, staging
 from fleet.core import _test_hooks_attempts as attempt_hooks
+from tests._commit_stage_replies import commit_stage_replies
 from tests._queue_fakes import (
     DEFAULT_JOB_ID,
     DEFAULT_SHA,
@@ -37,7 +38,6 @@ from tests._queue_fakes import (
     queue_job,
 )
 from tests._registry import write_registry
-from tests._commit_stage_replies import commit_stage_replies
 from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import (
