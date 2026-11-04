@@ -77,17 +77,19 @@ def test_every_scheduled_tick_runs_the_rolled_commit() -> None:
     # suite since MCPs board task b27bd34a), and the tick runs its agent only
     # through the rolled launcher: the duty plan chooses fleet-research for
     # research and fleet-agent for hub, sessions and netboot. A node plan
-    # names fleet-node-agent. Fleet's test_cli_tick checks the actual argv for
-    # each lane; this cross-package check pins their rolled-launcher wiring.
-    tick = (ROOT / "tools" / "fleet" / "src" / "fleet" / "cli" / "tick.py").read_text(
-        encoding="utf-8"
-    )
+    # names fleet-node-agent, through the rolled launcher's own NODE_AGENT
+    # since db1799df2. Fleet's test_cli_tick checks the actual argv for each
+    # lane; this cross-package check pins their rolled-launcher wiring.
+    cli = ROOT / "tools" / "fleet" / "src" / "fleet" / "cli"
+    tick = (cli / "tick.py").read_text(encoding="utf-8")
     assert '(sys.executable, "-m", "fleet.cli.rolled", *plan["arguments"])' in tick
     assert (
         'module = "fleet-research" if agent_lane is DispatchLane.RESEARCH else "fleet-agent"'
         in tick
     )
-    plans = ("module", '"fleet-node-agent"')
+    rolled = (cli / "rolled.py").read_text(encoding="utf-8")
+    assert '\nNODE_AGENT: Final = "fleet-node-agent"\n' in rolled.replace("\r\n", "\n")
+    plans = ("module", "rolled_cli.NODE_AGENT")
     for agent in plans:
         assert len(list(re.finditer(rf"rolled_cli\.AGENT_FLAG,\s+{re.escape(agent)},", tick))) == 1
     assert len(list(re.finditer(r"rolled_cli\.AGENT_FLAG,", tick))) == len(plans)
