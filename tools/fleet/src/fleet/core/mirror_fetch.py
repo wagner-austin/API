@@ -104,11 +104,22 @@ INIT_TIMEOUT_SECONDS: Final = 60
 #: within one probe's deadline and the fetch's budget, so a lock older than
 #: both with a probe's deadline to spare was left by a process that died
 #: inside its turn.
+#:
+#: LOOKED AT EVERY SECOND (MCPs board task 1e0ee821). Every job of one push
+#: gate exports the same commit, so all but the first wait here for the
+#: first one's fetch, then each finds the commit held in one probe. Looked
+#: at every :data:`FETCH_PAUSE_SECONDS`, the pause before a lost fetch is
+#: sent again, a waiter missed each release by up to ten seconds and then
+#: lost the turn to another waiter's probe: on lacrymal on 2026-11-04 the
+#: export of MCPs 6f20029f0 for MCPs/execution-deploy took its turn after
+#: waiting 21 s, all of it between that job's claim and its lease, where the
+#: push gate holds the job to 150 s from claim to verdict. A look is one
+#: open of the lock file, as the hub's other turns take every second.
 FETCH_TURN: Final = file_turn.TurnBounds(
     what="mirror fetch turn",
     waited_for="another export fetching into the same mirror",
     stale_seconds=FETCH_BUDGET_SECONDS + 2 * INIT_TIMEOUT_SECONDS,
-    poll_seconds=FETCH_PAUSE_SECONDS,
+    poll_seconds=1,
 )
 
 #: What git says when the remote will not serve the object asked for: the

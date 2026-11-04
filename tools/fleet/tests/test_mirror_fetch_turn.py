@@ -176,7 +176,10 @@ class TestTheTurn:
     ) -> None:
         """The six fetches of 2026-10-22, made one: the other export holds the
         turn and fetches the commit while this one waits, and this one then
-        probes, finds it and fetches nothing."""
+        probes, finds it and fetches nothing. It looks again after one
+        second, not after the pause before a lost fetch is sent again: that
+        pause cost an export 21 s of lacrymal's push gate on 2026-11-04 (MCPs
+        board task 1e0ee821)."""
         origin, first = _origin(tmp_path)
         mirror = _mirror(tmp_path)
         lock = mirror_fetch.turn_lock(mirror)
@@ -187,18 +190,18 @@ class TestTheTurn:
         def the_other_export_fetches_it() -> None:
             git(mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other")
             lock.unlink()
-            clock[0] += mirror_fetch.FETCH_PAUSE_SECONDS
+            clock[0] += mirror_fetch.FETCH_TURN["poll_seconds"]
 
         _test_hooks.now = lambda: clock[0]
         _test_hooks.sleep = _sleeping([the_other_export_fetches_it], slept)
         with caplog.at_level("INFO"):
             mirror_fetch.fetch_commit(mirror, str(origin), first)
 
-        assert slept == [mirror_fetch.FETCH_PAUSE_SECONDS]
+        assert slept == [1]
         assert _in_pack(mirror) == 6
         assert not lock.exists()
         assert (
-            f"the export of {first} took its mirror fetch turn after waiting 10 s for "
+            f"the export of {first} took its mirror fetch turn after waiting 1 s for "
             "another export fetching into the same mirror"
         ) in [record.getMessage() for record in caplog.records]
 
@@ -241,13 +244,13 @@ class TestTheTurn:
         def the_other_fetch_ends() -> None:
             assert runner.calls == []
             lock.unlink()
-            clock[0] += mirror_fetch.FETCH_PAUSE_SECONDS
+            clock[0] += mirror_fetch.FETCH_TURN["poll_seconds"]
 
         _test_hooks.now = lambda: clock[0]
         _test_hooks.sleep = _sleeping([the_other_fetch_ends], slept)
 
         companion = "https://github.com/wagner-austin/MCPs.git"
         assert mirror_fetch.fetch_ref(tmp_path, companion, "main") == SHA
-        assert slept == [mirror_fetch.FETCH_PAUSE_SECONDS]
+        assert slept == [1]
         assert [call[3] for call in runner.calls] == ["fetch", "rev-parse"]
         assert not lock.exists()
