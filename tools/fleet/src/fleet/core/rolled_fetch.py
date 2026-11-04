@@ -1,8 +1,8 @@
-"""Bring this checkout's ``refs/fleet/rolled`` to origin's before it is read.
+"""Bring this checkout's ``refs/fleet/rolled`` to its home's before it is read.
 
 THE GAP (MCPs board task 8db0f536). ``make fleet-roll`` moves the ref in the
-repository it runs in and pushes it to origin. The hub's ticks resolve the
-ref in the hub's own API checkout, so a roll made on another machine, as the
+repository it runs in and pushes it on. The hub's ticks resolve the ref in
+the hub's own API checkout, so a roll made on another machine, as the
 sessions on ziggurat make them, reached the hub only when MCPs maketools
 release-sync fetched it, every 900 s. Measured: the roll of 2026-10-24T20:34Z
 left serendipity's runner on bd3ae7d48 at 20:37Z (fleet job 8c2a7982), and the
@@ -10,10 +10,22 @@ roll of about 2026-10-26T00:13:40Z left lavender's on 3b17480c6 until its
 handover at 00:20:50Z, so wiki-check job 47b60226, claimed at 00:14:32Z, ran
 without the creator-wiki companion that roll added.
 
-WHAT IS FETCHED. ``git fetch origin +refs/fleet/rolled:refs/fleet/rolled``,
-forced as the roll's push is, since a roll may move the ref back. Origin's
+THE HOME IS THE HUB'S CHECKOUT, NOT GITHUB (MCPs board task 18ca6bab). The
+ref was fetched from origin until 2026-11-04, when GitHub refused the
+fleet's SSH key about two times in three from 09:39Z and every node runner
+on the hub refused its tick together whenever a window's fetch was refused:
+29 :data:`FETCH_FAILED_CODE` lines in the hub's day log by 11:21Z, with every
+node idle. A roll now pushes the ref into the API checkout of the machine
+holding the control duty (MCPs maketools ``fleet-roll-push``), and copies
+it to origin, which nothing here reads. Every duty host's checkout carries
+the remote :data:`REMOTE`, which MCPs release-sync points at that home: the
+checkout itself on the hub, so the hub's fetch never leaves the machine, and
+the hub's checkout at its roster address on the other duty hosts.
+
+WHAT IS FETCHED. ``git fetch fleet +refs/fleet/rolled:refs/fleet/rolled``,
+forced as the roll's push is, since a roll may move the ref back. The home's
 ref is the roll: one made anywhere is what the next read here sees, and a
-local ref no push carried is put back to origin's.
+local ref no roll carried is put back to the home's.
 
 ONCE PER FIRE BOUNDARY, IN A TURN. Every node runner reads the ref
 :data:`fleet.cli.node_serve.HANDOVER_SECONDS` before each boundary and every
@@ -27,7 +39,8 @@ repository.
 
 A FETCH THAT FAILS REFUSES BY NAME. Its refusal is the stamp's text, so every
 read inside the window answers with the same :data:`FETCH_FAILED_CODE`
-refusal without asking origin again, and the read after it fetches again.
+refusal without asking the home again, and the read after it fetches again;
+a checkout with no :data:`REMOTE` refuses the same way, naming git's words.
 Nothing is read from a ref the fetch could not bring up to date: a tick on
 code origin has moved past is the defect this removes.
 """
@@ -43,8 +56,9 @@ from fleet.core import _test_hooks, commit_tree, file_turn
 #: The ref ``make fleet-roll`` sets and pushes; :data:`fleet.core.rolled.ROLLED_REF`.
 REF: Final = "refs/fleet/rolled"
 
-#: The remote the roll is pushed to.
-REMOTE: Final = "origin"
+#: The remote naming the rolled ref's home, the API checkout of the machine
+#: holding control (MCPs maketools ``fleet.rolled_home.REMOTE``).
+REMOTE: Final = "fleet"
 
 #: How long one fetch answers for: longer than a boundary's reads span
 #: (the handover's 10 s before it and a launch's few after), shorter than the
@@ -83,7 +97,7 @@ FETCH_FAILED_CODE: Final = "FLEET_ROLL_FETCH_FAILED"
 
 
 def fetch_argv(checkout: pathlib.Path) -> tuple[str, ...]:
-    """The fetch that brings the checkout's ref to origin's.
+    """The fetch that brings the checkout's ref to its home's.
 
     Args:
         checkout: A directory inside the checkout.
@@ -122,14 +136,14 @@ def git_directory(checkout: pathlib.Path) -> pathlib.Path | str:
 
 
 def fetch_rolled(checkout: pathlib.Path) -> str | None:
-    """Fetch origin's rolled ref into the checkout, once per fresh window.
+    """Fetch the home's rolled ref into the checkout, once per fresh window.
 
     Args:
         checkout: A directory inside the checkout whose ref is about to be
             read.
 
     Returns:
-        None when the ref is origin's as of a fetch younger than
+        None when the ref is the home's as of a fetch younger than
         :data:`FRESH_SECONDS`, or the refusal that fetch, or this one, met.
     """
     directory = git_directory(checkout)

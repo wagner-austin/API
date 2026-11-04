@@ -12,7 +12,7 @@ from __future__ import annotations
 import pathlib
 from collections.abc import Mapping
 
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, rolled_fetch
 
 
 def git(repo: pathlib.Path, *arguments: str) -> str:
@@ -68,29 +68,31 @@ def committed_repository(repo: pathlib.Path, files: Mapping[str, str], ref: str)
     return commit
 
 
-def rolled_at_origin(repo: pathlib.Path, files: Mapping[str, str]) -> str:
-    """Commit ``files`` in a new repository and roll the commit at its origin only.
+def rolled_at_home(repo: pathlib.Path, files: Mapping[str, str]) -> str:
+    """Commit ``files`` in a new repository and roll the commit at its home only.
 
-    The roll a session host makes (MCPs board task 8db0f536): the commit is
-    pushed to a bare ``origin`` beside the repository as
-    ``refs/fleet/rolled``, and the repository's own ``refs/fleet/rolled`` is
-    never set, so only a fetch of origin's ref can bring the roll here.
+    The roll a session host makes (MCPs board tasks 8db0f536 and 18ca6bab):
+    the commit is pushed as ``refs/fleet/rolled`` to the rolled ref's home, a
+    repository beside this one that its ``fleet`` remote names, as a duty
+    host's names the hub's checkout, and the repository's own
+    ``refs/fleet/rolled`` is never set, so only a fetch of the home's ref can
+    bring the roll here.
 
     Args:
-        repo: Where to build the repository; its origin is
-            ``<repo>-origin.git`` beside it.
+        repo: Where to build the repository; its home is
+            ``<repo>-home.git`` beside it.
         files: Repository-relative paths and their contents.
 
     Returns:
-        The commit origin's ``refs/fleet/rolled`` names.
+        The commit the home's ``refs/fleet/rolled`` names.
     """
-    origin = repo.parent / f"{repo.name}-origin.git"
-    origin.mkdir()
-    git(origin, "init", "--quiet", "--bare")
+    home = repo.parent / f"{repo.name}-home.git"
+    home.mkdir()
+    git(home, "init", "--quiet", "--bare")
     commit = committed_repository(repo, files, "refs/heads/rolled-source")
-    git(repo, "remote", "add", "origin", str(origin))
-    git(repo, "push", "--quiet", "origin", f"{commit}:refs/fleet/rolled")
+    git(repo, "remote", "add", rolled_fetch.REMOTE, str(home))
+    git(repo, "push", "--quiet", rolled_fetch.REMOTE, f"{commit}:refs/fleet/rolled")
     return commit
 
 
-__all__ = ["committed_repository", "git", "rolled_at_origin"]
+__all__ = ["committed_repository", "git", "rolled_at_home"]

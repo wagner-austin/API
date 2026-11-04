@@ -17,7 +17,7 @@ import pathlib
 import pytest
 
 from fleet.core import _test_hooks, commit_tree, rolled, rolled_fetch, scratch
-from tests._git_fixtures import committed_repository, git, rolled_at_origin
+from tests._git_fixtures import committed_repository, git, rolled_at_home
 from tests._rolled_fetch_script import FETCH_TIMEOUTS, fetch_calls, fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
@@ -264,21 +264,21 @@ class TestScriptedExtraction:
         assert len(runner.calls) == 3
 
     def test_a_failed_fetch_refuses_before_the_ref_is_read(self, tmp_path: pathlib.Path) -> None:
-        """A roll origin holds is not read off a ref the fetch could not move
-        (MCPs board task 8db0f536)."""
+        """A roll the home holds is not read off a ref the fetch could not move
+        (MCPs board tasks 8db0f536 and 18ca6bab)."""
         api = tmp_path / "api"
         scratch_root = tmp_path / "scratch"
         _test_hooks.temp_root = FakeTempRoot(scratch_root)
         located, _ = fetch_replies(tmp_path / "git")
-        runner = FakeRun([located, failed(128, "fatal: unable to access origin")])
+        runner = FakeRun([located, failed(128, "fatal: Could not read from remote repository.")])
         _test_hooks.run = runner
 
         refusal = refusal_of(rolled.extract_rolled_tree(api))
 
         assert refusal == (
-            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch fleet "
             f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128: "
-            "fatal: unable to access origin"
+            "fatal: Could not read from remote repository."
         )
         assert runner.calls == fetch_calls(api)
         assert not (scratch_root / "fleet-rolled").exists()
@@ -405,7 +405,7 @@ class TestRealExtraction:
         self, tmp_path: pathlib.Path
     ) -> None:
         api = tmp_path / "api"
-        commit = rolled_at_origin(api, ROLLED_FILES)
+        commit = rolled_at_home(api, ROLLED_FILES)
         agent_source = api / "tools/fleet/src/fleet/cli/agent.py"
         agent_source.write_text("ROLLED = False\n", encoding="utf-8")
         (api / "tools/fleet/registry/settings.json").write_text(
@@ -441,12 +441,12 @@ class TestRealExtraction:
     ) -> None:
         """A serving agent knows only its records directory, tools/fleet in
         the checkout, and reads the ref from there; a roll moves what it
-        reads (MCPs board task 8993c306) once origin holds it and the last
+        reads (MCPs board task 8993c306) once its home holds it and the last
         fetch is no longer fresh (MCPs board task 8db0f536)."""
         clock = FakeClock(DEMO_NOW)
         _test_hooks.now = clock
         api = tmp_path / "api"
-        first = rolled_at_origin(api, ROLLED_FILES)
+        first = rolled_at_home(api, ROLLED_FILES)
         records = api / pathlib.PurePosixPath(rolled.RECORDS_DIR)
 
         assert rolled.rolled_state(records) == first
@@ -456,7 +456,7 @@ class TestRealExtraction:
         )
         git(api, "commit", "--quiet", "--all", "-m", "the next roll")
         second = git(api, "rev-parse", "HEAD")
-        git(api, "push", "--quiet", "--force", "origin", f"{second}:{rolled.ROLLED_REF}")
+        git(api, "push", "--quiet", "--force", "fleet", f"{second}:{rolled.ROLLED_REF}")
         clock.seconds += rolled_fetch.FRESH_SECONDS
 
         assert rolled.rolled_state(records) == second
@@ -469,7 +469,7 @@ class TestRealExtraction:
         never_rolled(api)
 
         assert rolled.rolled_state(api).startswith(
-            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch fleet "
             f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128: "
             "fatal: couldn't find remote ref refs/fleet/rolled"
         )
@@ -482,21 +482,21 @@ class TestRealExtraction:
         refusal = refusal_of(rolled.extract_rolled_tree(api))
 
         assert refusal.startswith(
-            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch origin "
+            f"{rolled_fetch.FETCH_FAILED_CODE}: git fetch fleet "
             f"+refs/fleet/rolled:refs/fleet/rolled in {api} exited 128"
         )
         assert not (tmp_path / "scratch" / "fleet-rolled").exists()
 
 
 def never_rolled(api: pathlib.Path) -> None:
-    """Build a repository whose origin holds a branch and no roll.
+    """Build a repository whose rolled ref's home holds a branch and no roll.
 
     Args:
-        api: Where to build it; its origin is ``<api>-origin.git`` beside it.
+        api: Where to build it; its home is ``<api>-home.git`` beside it.
     """
-    origin = api.parent / f"{api.name}-origin.git"
-    origin.mkdir()
-    git(origin, "init", "--quiet", "--bare")
+    home = api.parent / f"{api.name}-home.git"
+    home.mkdir()
+    git(home, "init", "--quiet", "--bare")
     committed_repository(api, ROLLED_FILES, "refs/heads/elsewhere")
-    git(api, "remote", "add", "origin", str(origin))
-    git(api, "push", "--quiet", "origin", "refs/heads/elsewhere")
+    git(api, "remote", "add", rolled_fetch.REMOTE, str(home))
+    git(api, "push", "--quiet", rolled_fetch.REMOTE, "refs/heads/elsewhere")

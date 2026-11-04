@@ -20,8 +20,10 @@ The dependencies stay the checkout's tools/fleet environment; the code and
 the configuration are pinned.
 
 WHY A REF. It names a commit git already holds, nothing that edits files
-can move it, and ``make fleet-roll`` pushes it to origin, where a roll made
-on any machine lands. Every read here fetches origin's ref first
+can move it, and ``make fleet-roll`` pushes it into the hub's own API
+checkout, its home, where a roll made on any machine lands (MCPs board task
+18ca6bab; it went to origin, GitHub, until GitHub's refusals of 2026-11-04
+stopped every tick). Every read here fetches the home's ref first
 (:mod:`fleet.core.rolled_fetch`, MCPs board task 8db0f536), so a roll made
 on ziggurat is what the hub's next boundary runs; until then only the
 worktrees sharing the hub's object store reached it at once, and a roll from
@@ -168,8 +170,8 @@ def extract_rolled_tree(api_root: pathlib.Path) -> RolledTree | str:
 
     Returns:
         The commit's extraction, or a ``CODE: message`` refusal when any
-        step fails, the fetch of origin's ref first; nothing is run from the
-        working tree instead.
+        step fails, the fetch of the home's ref first; nothing is run from
+        the working tree instead.
     """
     unfetched = rolled_fetch.fetch_rolled(api_root)
     if unfetched is not None:
@@ -293,7 +295,7 @@ def rolled_state(checkout: pathlib.Path) -> str:
             read: the agent's records directory, ``tools/fleet`` there.
 
     Returns:
-        The commit the ref names once origin's has been fetched, or the
+        The commit the ref names once the home's has been fetched, or the
         refusal saying why it names none, the fetch's among them; either
         compares unequal to a different answer, so a ref that stops
         resolving hands over too, and the next start reports the refusal as

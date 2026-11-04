@@ -21,7 +21,7 @@ import pytest
 
 from fleet.cli import rolled as rolled_cli
 from fleet.core import _test_hooks, names, rolled, scratch
-from tests._git_fixtures import rolled_at_origin
+from tests._git_fixtures import rolled_at_home
 from tests._queue_fakes import IDENTITY_KEYS, TICKED_AT, FakeQueue, queue_env, tick_body
 from tests._rolled_fetch_script import fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
@@ -136,16 +136,17 @@ class TestLaunch:
         """The 2026-11-04 GitHub refusal, re-run with a real fetch that fails.
 
         From 09:39Z every hub runner's tick ended FLEET_ROLL_FETCH_FAILED and
-        recorded nothing (MCPs board task b841c214). Here the checkout's
-        origin is a repository that does not exist, so real git refuses the
-        fetch, and the tick the launcher records is the one row the queue
-        keeps for it: the runner's own identity, no load, not claiming, the
-        refusal as its verdict.
+        recorded nothing (MCPs board task b841c214). Here the rolled ref's
+        home, the checkout's ``fleet`` remote, is a repository that does not
+        exist, as the hub is to a duty host that cannot reach it, so real git
+        refuses the fetch, and the tick the launcher records is the one row
+        the queue keeps for it: the runner's own identity, no load, not
+        claiming, the refusal as its verdict.
         """
         api = tmp_path / "api"
         subprocess.run(("git", "init", "--quiet", str(api)), check=True)
         missing = tmp_path / "missing.git"
-        subprocess.run(("git", "-C", str(api), "remote", "add", "origin", str(missing)), check=True)
+        subprocess.run(("git", "-C", str(api), "remote", "add", "fleet", str(missing)), check=True)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         _test_hooks.env = queue_env()
         endpoint = FakeQueue([])
@@ -159,7 +160,7 @@ class TestLaunch:
         assert status == rolled_cli.REFUSED_EXIT
         refusal, recorded = [record.getMessage() for record in caplog.records]
         assert refusal.startswith(
-            f"FLEET_ROLL_FETCH_FAILED: git fetch origin +refs/fleet/rolled:refs/fleet/rolled "
+            f"FLEET_ROLL_FETCH_FAILED: git fetch fleet +refs/fleet/rolled:refs/fleet/rolled "
             f"in {api} exited 128: "
         )
         assert recorded == f"fleet-roll: recorded lavender's refused tick at {TICKED_AT}"
@@ -235,7 +236,7 @@ class TestLaunch:
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
         api = tmp_path / "api"
-        commit = rolled_at_origin(api, STAND_IN_FILES)
+        commit = rolled_at_home(api, STAND_IN_FILES)
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         launch = tmp_path / "scratch" / "fleet-rolled" / commit
         config = launch / "tools" / "fleet" / "registry"
@@ -267,7 +268,7 @@ class TestLaunch:
         tree (MCPs board task fb505198).
         """
         api = tmp_path / "api"
-        commit = rolled_at_origin(api, STAND_IN_FILES)
+        commit = rolled_at_home(api, STAND_IN_FILES)
         tree = _test_hooks._default_temp_root() / "fleet-rolled" / commit
         config = tree / "tools" / "fleet" / "registry"
         command = (

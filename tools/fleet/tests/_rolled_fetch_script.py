@@ -1,7 +1,7 @@
 """The two commands a read of the rolled ref runs first, for scripted suites.
 
-Every read of ``refs/fleet/rolled`` fetches origin's ref first
-(:mod:`fleet.core.rolled_fetch`, MCPs board task 8db0f536): it finds the git
+Every read of ``refs/fleet/rolled`` fetches its home's ref first
+(:mod:`fleet.core.rolled_fetch`, MCPs board tasks 8db0f536 and 18ca6bab): it finds the git
 directory, then, with no fresh stamp there, fetches. The suites that script
 the extraction's commands (``test_rolled``, ``test_cli_rolled``) script
 these two ahead of it, against a git directory the test makes.
