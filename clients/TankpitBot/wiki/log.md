@@ -6872,3 +6872,20 @@ the observed movement/status refuel pattern now lowers local container confidenc
 and fuel selectors prefer eligible higher-confidence alternatives. Documented the
 bounded inference, partial-consumption uncertainty, refresh authority, neutral
 container logs and executable regressions. No live bot restart was performed.
+
+## [2026-11-04] remove | The colossus move measurement is retired with its subject
+
+`make colossus-move-colossus`, `scripts/colossus_move.py`, its tests and
+the fleet project `clients/TankpitBot-colossus-execution` are deleted (MCPs
+board task f19d66a5). colossus was reinstalled by netboot on 2026-10-30
+(MCPs board task 7c8cb3e2), so the copy the measurement hashed is gone: at
+2026-11-04T06:46Z colossus read `ID=nixos`, its `/home/user` was made on
+2026-10-30 and held no `tankpit-archive`, and fleet job 649547b3 failed in
+5 s on `MOVE_TREE_MISSING`. TankPit's state was kept before the wipe on
+emerald, where `/srv/keep/colossus` holds `tankpit`, `tankpit-archive`
+(with `sedona-2026-10-18`), `tankpit-releases`, `tankpit-sim` and
+`volumes`. The move's committed evidence stays in
+`docs/sources/colossus-move-2026-10-18/`. The measurement was a move's, not
+a standing check, as the 2026-10-18 entry above says, and a gate whose
+subject is gone is removed rather than made to pass. [[make-targets]] no
+longer lists the target. A new game host is a task of its own.
