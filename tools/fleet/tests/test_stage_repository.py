@@ -30,7 +30,7 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
         ("git", "-C", "/s/run", "init", "--quiet"),
         ("git", "-C", "/s/run", "config", "gc.auto", "0"),
         ("git", "-C", "/s/run", "config", "maintenance.auto", "false"),
-        ("git", "-C", "/s/run", "add", "--all", "--force"),
+        ("git", "-C", "/s/run", "-c", "core.looseCompression=0", "add", "--all", "--force"),
         (
             "git",
             "-C",
@@ -216,6 +216,33 @@ def test_a_staged_export_tracks_every_file_its_commit_tracks(tmp_path: pathlib.P
     tracked = _git("-C", str(target), "ls-files")
     assert tracked.splitlines() == _git("-C", str(source), "ls-files").splitlines()
     assert "runs/sweep.json" in tracked.splitlines()
+
+
+def test_a_staged_tree_stores_its_objects_uncompressed_without_keeping_the_setting(
+    tmp_path: pathlib.Path,
+) -> None:
+    """MCPs board task 1e0ee821: zlib was most of the add's time, 6.3 s of
+    an MCPs tree on lacrymal against 1.9 s at level 0. Run for real: 64 KiB
+    of one byte deflates to well under a kilobyte at git's default level and
+    is stored whole at level 0, so the loose blob's size says which level
+    wrote it, and the repository's config is read for the setting after."""
+    content = b"a" * 65536
+    target = tmp_path / "run"
+    target.mkdir()
+    (target / "repeated.txt").write_bytes(content)
+    blob = hashlib.sha1(b"blob %d\x00" % len(content) + content, usedforsecurity=False)
+
+    for command in stage_repository.init_repository_commands(target.as_posix(), "run-1"):
+        subprocess.run(command, check=True, capture_output=True, timeout=60)
+
+    loose = target / ".git" / "objects" / blob.hexdigest()[:2] / blob.hexdigest()[2:]
+    assert loose.stat().st_size > len(content)
+    stored = subprocess.run(
+        ["git", "-C", str(target), "config", "--local", "--get", "core.looseCompression"],
+        capture_output=True,
+        timeout=60,
+    )
+    assert (stored.returncode, stored.stdout) == (1, b"")
 
 
 def _sampled_blobs(count: int) -> list[tuple[bytes, str]]:

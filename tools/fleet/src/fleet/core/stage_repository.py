@@ -23,6 +23,10 @@ from fleet.core.mirror_fetch import COMPANION_REF
 EXPORT_AUTHOR_NAME = "fleet"
 EXPORT_AUTHOR_EMAIL = "fleet@corvis.invalid"
 
+#: The setting a staged tree's ``git add`` runs under: its loose objects
+#: stored without zlib (:func:`init_repository_commands`).
+UNCOMPRESSED_OBJECTS = "core.looseCompression=0"
+
 
 def _no_auto_gc_command(target: str) -> tuple[str, ...]:
     """The setting that keeps git from packing a staged repository behind the build.
@@ -231,6 +235,15 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
     node's git, whose add warned once per file (MCPs board task ee3d6cdc); a
     Linux node's git converts no line endings unless it is asked to.
 
+    THE ADD WRITES ITS OBJECTS UNCOMPRESSED (MCPs board task 1e0ee821). It
+    hashes and stores every file of the tree, and zlib was most of its
+    time: on lacrymal on 2026-11-04 the add of an
+    extracted MCPs tree took 6.3 s at git's default loose compression and
+    1.9 s at ``core.looseCompression`` 0, every gate job paying it between
+    its claim and its first phase. The setting is the add's alone
+    (:data:`UNCOMPRESSED_OBJECTS`), so the repository stores nothing, and the
+    objects it leaves, 417 MB for that tree against 216 MB, go with the run.
+
     Args:
         target: Absolute remote directory holding the staged tree.
         run_id: The dispatch, recorded in the message so the tree on the
@@ -244,7 +257,7 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
         ("git", "-C", target, "init", "--quiet"),
         _no_auto_gc_command(target),
         _no_auto_maintenance_command(target),
-        ("git", "-C", target, "add", "--all", "--force"),
+        ("git", "-C", target, "-c", UNCOMPRESSED_OBJECTS, "add", "--all", "--force"),
         _commit_command(target, f"fleet export {run_id}"),
     )
 
@@ -252,6 +265,7 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
 __all__ = [
     "EXPORT_AUTHOR_EMAIL",
     "EXPORT_AUTHOR_NAME",
+    "UNCOMPRESSED_OBJECTS",
     "companion_repository_commands",
     "init_repository_commands",
 ]
