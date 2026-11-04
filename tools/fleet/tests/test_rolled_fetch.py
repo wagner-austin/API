@@ -234,10 +234,9 @@ class TestARollIntoTheHub:
         assert settings.read_text(encoding="utf-8") == '{"roll": 2}\n'
 
         second = roll_from(session_host, hub, '{"roll": 3}\n')
-        # Inside the window the boundary's fetch still answers.
-        assert rolled.rolled_state(records) == first
-        clock.seconds += rolled_fetch.FRESH_SECONDS
-
+        # The roll lands in the very ref the hub reads, so no fetch window
+        # stands between it and the hub's next read; the window only spaces
+        # the reads of a duty host fetching from the hub.
         assert rolled.rolled_state(records) == second
 
     def test_reaches_a_duty_host_that_fetches_it_from_the_hub(self, tmp_path: pathlib.Path) -> None:
