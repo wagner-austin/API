@@ -14,6 +14,7 @@
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIC4Pf/KNHEl/qIJFVr9+JSw0ZumsjlgNjSBbwlvjpTkE corvis@lacrymal sessions duty host",
   "bootMac": "6c:3c:8c:32:89:be",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "Samsung_SSD_970_EVO_1TB_S5H9NS0N548365Y_1"

@@ -15,6 +15,7 @@
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIHoLsl1JQAe3FE/QsOfx8XpcOrEGI5NOtce5aADvRwnP corvis@diphtheria fleet hub",
   "bootMac": "f4:8e:38:a4:cd:82",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "Samsung_SSD_860_EVO_1TB_S3Z6NB0K305596H"

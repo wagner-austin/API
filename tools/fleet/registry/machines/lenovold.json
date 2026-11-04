@@ -11,6 +11,7 @@
   "reachKey": null,
   "bootMac": "00:e0:4c:4e:74:70",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "LITEON_IT_LDS-128L9S_SD0G54240L1TH4C104YK"

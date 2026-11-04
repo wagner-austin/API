@@ -11,6 +11,7 @@
   "reachKey": null,
   "bootMac": "3c:ab:72:5a:74:a1",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "Micron_2400_MTFDKBK512QFM_2316400BBFD4_1"

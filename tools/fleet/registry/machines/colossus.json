@@ -11,6 +11,7 @@
   "reachKey": null,
   "bootMac": "30:56:0f:84:2e:f0",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "Inland_TN320_NVMe_SSD_IB26AI0001P00436_1"

@@ -13,6 +13,7 @@
   "reachKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIPJOXKDSln98+LifubdIhrOyTCN9crZo/ipI0OvjYK8 corvis@emerald duty host",
   "bootMac": null,
   "netbootWifi": false,
+  "secureBoot": null,
   "installDisk": null,
   "tunnel": null,
   "guest": null,

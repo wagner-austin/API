@@ -11,6 +11,7 @@
   "reachKey": null,
   "bootMac": "d8:5e:d3:84:53:d4",
   "netbootWifi": false,
+  "secureBoot": "enforced",
   "installDisk": {
     "rule": "serial",
     "serial": "SAMSUNG_MZVL81T0HELB-00BTW_S7HZNX0XC49177_1"
