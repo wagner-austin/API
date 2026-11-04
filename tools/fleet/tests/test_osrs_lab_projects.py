@@ -25,6 +25,11 @@ jar's own complete audit of the trace it writes.
 brain (board task 488e5f06) runs the planner library's own make check in the
 same image since osrs-lab 4fd53f3, with the manual-play replay corpus it
 holds: on colossus 267 tests passed at lines 1112/1112 and branches 1109/1109.
+
+live-coverage (board task 488e5f06) runs the shared check of kept JaCoCo live
+runs, which the recorder and observer gates both execute, in the same image:
+on colossus it passed with input-policy, 13 tests at lines 85/85 and branches
+60/60.
 """
 
 from __future__ import annotations
@@ -41,6 +46,7 @@ from tests._registry import shipped_document
 DIRECTORIES: Final[tuple[str, ...]] = (
     "brain",
     "desktop-input",
+    "live-coverage",
     "observer",
     "observer-input-coverage",
     "recorder",
