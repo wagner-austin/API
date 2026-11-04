@@ -169,6 +169,23 @@ def test_no_machine_declares_netboot_wifi_and_every_machine_says_whether_it_does
     assert [name for name, m in machines.items() if m["netbootWifi"] is True] == []
 
 
+def test_every_netbooted_machine_says_whether_its_firmware_enforces_secure_boot() -> None:
+    # MCPs board task 433ad455: a netboot install enrolls the fleet's keys and
+    # leaves Secure Boot enforced, except where the firmware cannot. sedona's
+    # AMI FB09 enforces only on Gigabyte's factory keys, which reject the
+    # fleet-signed image, and offers no way to add the fleet's certificate,
+    # measured over the KVM on 2026-11-04. A machine no netboot install
+    # reaches (no bootMac) claims nothing; fleet-mcp's decoder requires the
+    # key and refuses a value on such a machine.
+    machines = {name: narrow_json_to_dict(entry) for name, entry in _machines().items()}
+    declared = {name: m["secureBoot"] for name, m in machines.items()}
+    expected = {
+        name: None if m["bootMac"] is None else "unenforceable" if name == "sedona" else "enforced"
+        for name, m in machines.items()
+    }
+    assert declared == expected
+
+
 def test_measured_disk_serials_stay_pinned_and_only_boot_macs_have_disk_rules() -> None:
     # MCPs board task c64006b9: a netboot install wipes only the disk the
     # roster selects. Keep the measured serials pinned; newly admitted
