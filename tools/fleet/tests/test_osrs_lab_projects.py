@@ -18,7 +18,9 @@ colossus 479 tests passed at lines 142/142 and branches 66/66.
 recorder (board task bc97ff15) runs the passive recorder's own make check in
 the same image, whose release gate merges the recorded logged-in coverage of
 its live readers: on colossus 359 tests passed at lines 1723/1723 and
-branches 1453/1453.
+branches 1453/1453. recorder-release runs the same build through its
+packaging gate, then starts the jar it packed accountless and requires that
+jar's own complete audit of the trace it writes.
 """
 
 from __future__ import annotations
@@ -37,6 +39,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "observer",
     "observer-input-coverage",
     "recorder",
+    "recorder-release",
 )
 
 

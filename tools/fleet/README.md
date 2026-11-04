@@ -1490,7 +1490,12 @@ recorder's own `make check`, run in the same image since osrs-lab 6cf54e9. Its
 release gate merges the recorded logged-in coverage of its live readers and
 refuses a recording whose class ids differ from the build. On colossus it
 passed 359 tests at lines 1723/1723 and branches 1453/1453, with the same tags
-and workers as the observer.
+and workers as the observer. **`osrs-lab/recorder-release`** (the same task)
+goes on to the jar: its `make check` runs the recorder's packaging gate,
+`shadowJar`, then starts the archive it packed accountless under Xvfb, closes
+its window through the window manager and requires that jar's own complete
+audit of the trace it wrote; on colossus at osrs-lab bc0a28b it passed with
+the same counts.
 
 ## A project that names its node: `node`
 
