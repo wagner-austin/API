@@ -138,8 +138,17 @@ class TestClaiming:
             f"{DEFAULT_SHA}^{{commit}}",
         )
         archive = runner.calls[probes + 2]
-        assert archive[:6] == ("git", "-C", mirror, "archive", "--format=tar.gz", "-o")
-        assert archive[7] == DEFAULT_SHA
+        assert archive[:8] == (
+            "git",
+            "-C",
+            mirror,
+            "-c",
+            "tar.tar.zst.command=zstd -T0 -3 -q -c",
+            "archive",
+            "--format=tar.zst",
+            "-o",
+        )
+        assert archive[9] == DEFAULT_SHA
         assert not any(call[0] == "tar" for call in runner.calls)
 
     def test_the_build_script_carries_the_install_steps_and_the_node_cache(

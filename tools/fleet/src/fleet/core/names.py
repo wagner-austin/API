@@ -23,10 +23,10 @@ from __future__ import annotations
 RESULT_NAME = "result.txt"
 
 #: The payload as scp lands it, under a dispatch's directory or a companion's
-#: staging directory: an export's ``git archive``, or since MCPs board task
-#: 2026dfbc a companion's ``git bundle``. One name for both because the
-#: digest script reads it; git reads a bundle by its contents, so the
-#: ``.tgz`` spelling misleads a reader but no tool.
+#: staging directory: an export's ``git archive`` (zstd since MCPs board task
+#: 1e0ee821), or since MCPs board task 2026dfbc a companion's ``git bundle``.
+#: One name for all because the digest script reads it; tar and git read
+#: either by its contents, so the ``.tgz`` spelling misleads a reader but no tool.
 ARCHIVE_NAME = "tree.tgz"
 
 #: The script that runs the suite, which is all it does.

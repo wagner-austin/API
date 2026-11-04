@@ -14,13 +14,33 @@ from __future__ import annotations
 
 import pathlib
 import socket
+import subprocess
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.contracts.source import ProjectCompanion, ProjectSource
-from fleet.core import _test_hooks, export, mirror_fetch, verdict
+from fleet.core import _test_hooks, dialect, export, mirror_fetch, verdict
 from tests.conftest import FakeRun, failed, ok
+
+#: The four bytes every zstd frame opens with.
+ZSTD_MAGIC = b"\x28\xb5\x2f\xfd"
+
+
+def _real_git(repo: pathlib.Path, *args: str) -> str:
+    """Run real git in a test's own repository.
+
+    Args:
+        repo: The repository.
+        *args: The arguments after ``git -C <repo>``.
+
+    Returns:
+        Its standard output.
+    """
+    done = subprocess.run(
+        ("git", "-C", str(repo), *args), check=True, capture_output=True, text=True
+    )
+    return done.stdout
 
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
 REMOTE = "https://github.com/wagner-austin/MCPs.git"
@@ -103,7 +123,7 @@ class TestArchiveCommit:
         self, tmp_path: pathlib.Path
     ) -> None:
         destination = tmp_path / "archives" / "run-1-lavender.tgz"
-        payload = b"\x1f\x8b\x08\x00archive"
+        payload = ZSTD_MAGIC + b"archive"
         # git is faked, so the bytes it would have written are placed first;
         # the read after the call is the real file hook.
         destination.parent.mkdir()
@@ -119,8 +139,10 @@ class TestArchiveCommit:
                 "git",
                 "-C",
                 str(tmp_path / "slime.git"),
+                "-c",
+                "tar.tar.zst.command=zstd -T0 -3 -q -c",
                 "archive",
-                "--format=tar.gz",
+                "--format=tar.zst",
                 "-o",
                 str(destination),
                 SHA,
@@ -128,6 +150,30 @@ class TestArchiveCommit:
         ]
         assert runner.timeouts == [export.ARCHIVE_TIMEOUT_SECONDS]
         assert destination.parent.is_dir()
+
+    def test_a_real_commit_s_archive_is_zstd_and_unpacks_by_the_node_s_own_extract(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Real git writes the export and real tar unpacks it, with the very
+        command a node runs: the zstd the filter names reaches the tree whole,
+        under the clock-keeping ``-m`` and no ``-z``."""
+        repo = tmp_path / "repo"
+        (repo / "src").mkdir(parents=True)
+        (repo / "src" / "a.py").write_text("print('a')\n", encoding="utf-8")
+        _real_git(repo, "init", "--quiet")
+        _real_git(repo, "add", "--all")
+        _real_git(repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "--quiet", "-m", "c")
+        sha = _real_git(repo, "rev-parse", "HEAD").strip()
+        destination = tmp_path / "archives" / "run-4-colossus.tgz"
+
+        payload = export.archive_commit(repo, sha, destination, ())
+
+        assert payload[: len(ZSTD_MAGIC)] == ZSTD_MAGIC
+        unpacked = tmp_path / "unpacked"
+        unpacked.mkdir()
+        (command,) = dialect.extract_commands(str(destination), str(unpacked))
+        subprocess.run(command, check=True, capture_output=True)
+        assert (unpacked / "src" / "a.py").read_text(encoding="utf-8") == "print('a')\n"
 
     def test_an_empty_scope_appends_no_separator_let_alone_a_pathspec(
         self, tmp_path: pathlib.Path

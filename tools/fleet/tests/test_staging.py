@@ -265,7 +265,7 @@ class TestStage:
         # a command that failed: the silent stage this pair pins was a
         # PowerShell script that had to be asked for that and was not.
         assert runner.stdin[7] == (
-            f"{dialect.PROLOGUE}tar -xzmf {staged}/tree.tgz -C {target}\n".encode()
+            f"{dialect.PROLOGUE}tar -xmf {staged}/tree.tgz -C {target}\n".encode()
         )
         assert (
             runner.stdin[9]
@@ -367,7 +367,7 @@ class TestStage:
         The build then does nothing, which reads as a suite that passed
         instantly.
         """
-        assert "-xzmf" in dialect.extract_commands("/s/run-1/tree.tgz", "/s/run-1")[0]
+        assert "-xmf" in dialect.extract_commands("/s/run-1/tree.tgz", "/s/run-1")[0]
 
     def test_a_mismatched_digest_refuses_before_unpacking(self) -> None:
         """Nothing is extracted, so no unverified tree lands where make looks."""
@@ -388,7 +388,7 @@ class TestStage:
             f"lavender received an archive digesting {'0' * 64} where "
             f"{staging.digest(b'bytes')} was sent; nothing has been unpacked"
         )
-        assert not any(b"tar -xzmf" in (sent or b"") for sent in runner.stdin)
+        assert not any(b"tar -xmf" in (sent or b"") for sent in runner.stdin)
 
 
 class TestStagingACompanion:

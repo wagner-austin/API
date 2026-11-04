@@ -3,7 +3,7 @@
 THE TREE ON THE NODE IS THE COMMIT, BY CONSTRUCTION. Until MCPs board task
 fd5cabfa a dispatch carried the hub's working tree, tarred as it stood, so no
 run of it could be cited as the check of a commit. Here the payload is the
-bytes ``git archive --format=tar.gz <sha>`` writes for the commit the queue
+bytes ``git archive --format=tar.zst <sha>`` writes for the commit the queue
 row names, read out of a bare mirror on the hub that was fetched from the
 project's declared remote. Nothing on the hub's disk but the mirror is
 consulted, and the mirror holds only what the remote served, so an uncommitted
@@ -39,9 +39,22 @@ from fleet.core import _test_hooks, mirror_fetch
 MIRRORS_DIRECTORY = "mirrors"
 
 #: The deadline of an archive or a companion's bundle, in seconds; either of
-#: the largest repository here (MCPs: a 38 MB archive, a 62 MB bundle) takes
-#: well under a minute.
+#: the largest repository here takes well under a minute (MCPs at 75e0a6921:
+#: a 170 MB archive in 1.9 s on lacrymal, MCPs board task 1e0ee821).
 ARCHIVE_TIMEOUT_SECONDS = 300
+
+#: The archive format :func:`archive_commit` asks git for, which git has no
+#: filter for of its own, so it is defined beside it by
+#: :data:`ARCHIVE_FILTER`.
+ARCHIVE_FORMAT = "tar.zst"
+
+#: The filter git pipes the format's tar through: zstd at level 3 on every
+#: core. MCPs board task 1e0ee821 measured git's ``tar.gz`` of MCPs at
+#: 75e0a6921 on lacrymal, under a load of 15, at 11.7 s and 185,522,862
+#: bytes, every MCPs gate job paying it before its stage began, and this at
+#: 1.9 s and 169,928,161 bytes. Every node unpacks it with the tar and zstd
+#: the fleet's NixOS toolchain installs (:func:`fleet.core.dialect.extract_commands`).
+ARCHIVE_FILTER = f"tar.{ARCHIVE_FORMAT}.command=zstd -T0 -3 -q -c"
 
 
 def mirror_path(mirrors_root: pathlib.Path, key: str) -> pathlib.Path:
@@ -116,12 +129,13 @@ def ensure_mirror(mirror: pathlib.Path) -> None:
 def archive_commit(
     mirror: pathlib.Path, sha: str, destination: pathlib.Path, paths: tuple[str, ...]
 ) -> bytes:
-    """Write ``git archive --format=tar.gz <sha>`` and read the bytes back.
+    """Write ``git archive --format=tar.zst <sha>`` and read the bytes back.
 
     Written to a file and read back rather than captured from git's
     standard output, because the command runner decodes streams as UTF-8
-    and a gzip stream is not text (the same reason :mod:`fleet.core.staging`
-    gives for tar).
+    and a zstd stream is not text (the same reason :mod:`fleet.core.staging`
+    gives for tar). The format's filter is passed with ``-c``
+    (:data:`ARCHIVE_FILTER`), so the mirror's own config never decides it.
 
     Args:
         mirror: The mirror's path, holding the commit.
@@ -154,8 +168,10 @@ def archive_commit(
             "git",
             "-C",
             str(mirror),
+            "-c",
+            ARCHIVE_FILTER,
             "archive",
-            "--format=tar.gz",
+            f"--format={ARCHIVE_FORMAT}",
             "-o",
             str(destination),
             sha,
@@ -421,6 +437,8 @@ def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -
 
 
 __all__ = [
+    "ARCHIVE_FILTER",
+    "ARCHIVE_FORMAT",
     "ARCHIVE_TIMEOUT_SECONDS",
     "MIRRORS_DIRECTORY",
     "CompanionExport",

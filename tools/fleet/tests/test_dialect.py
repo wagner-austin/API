@@ -38,12 +38,13 @@ def test_every_act_renders_its_script() -> None:
     assert "sessions" in dialect.OBSERVE_SESSIONS_SCRIPT
 
 
-def test_the_extract_keeps_the_node_s_clock() -> None:
+def test_the_extract_keeps_the_node_s_clock_and_names_no_compression() -> None:
     """-m keeps a fast sender's clock from making targets look newer than
-    their sources. The git acts are pinned in test_stage_repository."""
+    their sources, and with no -z tar reads the export's zstd and a working
+    tree's gzip alike. The git acts are pinned in test_stage_repository."""
     archive = f"/s/run/{names.ARCHIVE_NAME}"
     assert dialect.extract_commands(archive, "/s/run") == (
-        ("tar", "-xzmf", archive, "-C", "/s/run"),
+        ("tar", "-xmf", archive, "-C", "/s/run"),
     )
 
 
@@ -52,7 +53,7 @@ def test_the_extract_takes_the_archive_and_the_destination_separately() -> None:
     repository lands in the directory the recipe reads, so the tree committed
     there is the export and nothing else."""
     assert dialect.extract_commands("/s/MCPs.stage/tree.tgz", "/s/MCPs") == (
-        ("tar", "-xzmf", "/s/MCPs.stage/tree.tgz", "-C", "/s/MCPs"),
+        ("tar", "-xmf", "/s/MCPs.stage/tree.tgz", "-C", "/s/MCPs"),
     )
 
 
