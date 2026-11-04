@@ -229,8 +229,9 @@ class NodeState(TypedDict):
             d77b8c73), or None where neither has one. A runtime cap set by
             whoever is using the machine lands here: loki's check slice was
             held to one CPU while its probe reported 16 cores.
-        on_battery: Whether the node is running on its battery, any
-            ``/sys/class/power_supply`` battery reading ``Discharging``
+        on_battery: Whether the node is running on its battery, a
+            ``/sys/class/power_supply`` battery reading ``Discharging`` while
+            no external supply reads ``online`` 1
             (:mod:`fleet.core.linux_capacity_probe`, MCPs board task
             3268afdf). False on mains and on a node with no battery.
         gpus: Every display device on the node with its memory, when a

@@ -397,7 +397,15 @@ class TestTheReservationsUnderSh:
         assert fields["logical_cores"].isdigit()
 
 
-def _supply(root: pathlib.Path, name: str, kind: str | None, status: str | None) -> None:
+def _supply(
+    root: pathlib.Path,
+    name: str,
+    kind: str | None,
+    status: str | None,
+    *,
+    online: str | None = None,
+    scope: str | None = None,
+) -> None:
     """Write one fake ``/sys/class/power_supply`` entry.
 
     Args:
@@ -405,13 +413,14 @@ def _supply(root: pathlib.Path, name: str, kind: str | None, status: str | None)
         name: The entry's name, as the kernel names it (``BAT0``, ``AC0``).
         kind: What its ``type`` file holds, or None for an entry without one.
         status: What its ``status`` file holds, or None for an entry without one.
+        online: What its ``online`` file holds, or None for an entry without one.
+        scope: What its ``scope`` file holds, or None for an entry without one.
     """
     entry = root / name
     entry.mkdir(parents=True)
-    if kind is not None:
-        (entry / "type").write_text(f"{kind}\n", encoding="utf-8")
-    if status is not None:
-        (entry / "status").write_text(f"{status}\n", encoding="utf-8")
+    for field, value in (("type", kind), ("status", status), ("online", online), ("scope", scope)):
+        if value is not None:
+            (entry / field).write_text(f"{value}\n", encoding="utf-8")
 
 
 @pytest.mark.host_linux
@@ -423,8 +432,8 @@ class TestTheBatteryUnderSh:
     ) -> None:
         """loki at 08:53Z on 2026-11-03: AC0 offline, a USB-C source idle, BAT0 discharging."""
         supplies = tmp_path / "power_supply"
-        _supply(supplies, "AC0", "Mains", None)
-        _supply(supplies, "ucsi-source-psy-USBC000:001", "USB", "Not charging")
+        _supply(supplies, "AC0", "Mains", None, online="0")
+        _supply(supplies, "ucsi-source-psy-USBC000:001", "USB", "Not charging", online="0")
         _supply(supplies, "BAT0", "Battery", "Discharging")
 
         fields = _run(tmp_path, supplies=supplies)
@@ -473,3 +482,39 @@ class TestTheBatteryUnderSh:
         _supply(supplies, "BAT1", "Battery", "Discharging")
 
         assert _run(tmp_path, supplies=supplies)["on_battery"] == "yes"
+
+    def test_a_battery_discharging_beside_an_online_adapter_reads_mains(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """lenovold at 2026-11-04T03:06Z: its firmware's conservation mode held BAT0
+        at 93 percent reading Discharging while ADP0 read online 1, on its charger."""
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "ADP0", "Mains", None, online="1")
+        _supply(supplies, "BAT0", "Battery", "Discharging")
+
+        assert _run(tmp_path, supplies=supplies)["on_battery"] == "no"
+
+    def test_a_usb_c_charger_the_machine_sinks_from_reads_mains(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """loki on its USB-C charger with AC0 offline: the port's supply reads online 1."""
+        supplies = tmp_path / "power_supply"
+        _supply(supplies, "AC0", "Mains", None, online="0")
+        _supply(supplies, "ucsi-source-psy-USBC000:002", "USB", "Charging", online="1")
+        _supply(supplies, "BAT0", "Battery", "Discharging")
+
+        assert _run(tmp_path, supplies=supplies)["on_battery"] == "no"
+
+    def test_a_peripheral_s_discharging_battery_is_not_the_machine_s(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A desktop with a wireless mouse: its battery's scope is Device, and a
+        device-scoped supply reading online does not stand for the machine's mains."""
+        mouse = tmp_path / "mouse"
+        _supply(mouse, "hidpp_battery_0", "Battery", "Discharging", scope="Device")
+        laptop = tmp_path / "laptop"
+        _supply(laptop, "hid-dock", "USB", None, online="1", scope="Device")
+        _supply(laptop, "BAT0", "Battery", "Discharging", scope="System")
+
+        assert _run(tmp_path, supplies=mouse)["on_battery"] == "no"
+        assert _run(tmp_path, supplies=laptop)["on_battery"] == "yes"

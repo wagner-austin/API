@@ -67,14 +67,20 @@ A value the reading cannot parse prints the field empty, which
 :mod:`fleet.core.probe` refuses as not a number, never as no quota.
 
 WHETHER THE NODE RUNS ON ITS BATTERY IS READ FROM THE KERNEL (MCPs board
-task 3268afdf). ``on_battery`` is ``yes`` when any ``/sys/class/power_supply``
-entry whose ``type`` is ``Battery`` reads ``status`` ``Discharging``, and
-``no`` otherwise, a node with no battery included. On 2026-11-03 loki, off
-its charger, ran back-to-back NixOS VM checks at 23 to 32 W, its battery
-falling from 35 to 30 percent in seven minutes, and nothing in the probe
-said it was not on mains. ``Discharging`` is the one status that means the
-machine runs from the cell: a full battery on mains reads ``Full`` or ``Not
-charging``.
+task 3268afdf). ``on_battery`` is ``yes`` when a ``/sys/class/power_supply``
+entry whose ``type`` is ``Battery`` reads ``status`` ``Discharging`` and no
+external supply (any other ``type``: ``Mains``, or a ``USB`` port the
+machine sinks power from) reads ``online`` ``1``, and ``no`` otherwise, a
+node with no battery included. On 2026-11-03 loki, off its charger, ran
+back-to-back NixOS VM checks at 23 to 32 W, its battery falling from 35 to
+30 percent in seven minutes, and nothing in the probe said it was not on
+mains. ``Discharging`` alone does not say the machine runs from the cell:
+lenovold's firmware conservation mode holds its battery near full on mains,
+and at 2026-11-04T03:06Z its BAT0 read ``Discharging`` at 93 percent while
+its ADP0 read ``online`` 1, so the battery's status refused a node on its
+charger until the adapter was read beside it. A battery whose ``scope`` is
+``Device`` is a peripheral's (a wireless mouse or keyboard), not the
+machine's, and is skipped, as is any supply of that scope.
 
 THE NODE'S RESERVATIONS ARE CHARGED LAST (MCPs board task 84a2b690,
 :mod:`fleet.core.reservations` for the file and why). Each live
@@ -156,19 +162,32 @@ CHECK_QUOTA_PART = (
 #: Where the probe reads the node's power supplies from; the test replaces it.
 POWER_SUPPLY_LINE = "power_supply=/sys/class/power_supply\n"
 
-#: ``on_battery=yes`` when a battery among the supplies is discharging, else
-#: ``no``. A supply without a readable ``type`` is skipped, and a directory
-#: with no supplies at all leaves the glob unmatched, which reads as ``no``.
+#: ``on_battery=yes`` when a system battery among the supplies is discharging
+#: and no external supply reads ``online`` 1, else ``no``. A supply without a
+#: readable ``type`` is skipped, and so is a device's own battery (``scope``
+#: ``Device``: a wireless mouse or keyboard), and a directory with no
+#: supplies at all leaves the glob unmatched, which reads as ``no``.
 BATTERY_PART = (
     POWER_SUPPLY_LINE
-    + "on_battery=no\n"
+    + "discharging=no\n"
+    + "external=no\n"
     + 'for supply in "$power_supply"/*; do\n'
     + '  [ -r "$supply/type" ] || continue\n'
-    + '  if [ "$(cat "$supply/type")" = Battery ] && [ -r "$supply/status" ] &&'
-    + ' [ "$(cat "$supply/status")" = Discharging ]; then\n'
-    + "    on_battery=yes\n"
+    + '  if [ -r "$supply/scope" ] && [ "$(cat "$supply/scope")" = Device ]; then\n'
+    + "    continue\n"
+    + "  fi\n"
+    + '  if [ "$(cat "$supply/type")" = Battery ]; then\n'
+    + '    if [ -r "$supply/status" ] && [ "$(cat "$supply/status")" = Discharging ]; then\n'
+    + "      discharging=yes\n"
+    + "    fi\n"
+    + '  elif [ -r "$supply/online" ] && [ "$(cat "$supply/online")" = 1 ]; then\n'
+    + "    external=yes\n"
     + "  fi\n"
     + "done\n"
+    + "on_battery=no\n"
+    + 'if [ "$discharging" = yes ] && [ "$external" = no ]; then\n'
+    + "  on_battery=yes\n"
+    + "fi\n"
     + "printf 'on_battery=%s\\n' \"$on_battery\"\n"
 )
 
