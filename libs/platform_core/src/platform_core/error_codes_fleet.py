@@ -245,6 +245,24 @@ class FleetErrorCode(ErrorCodeBase):
     # auth or permissions question, raised so the registrations not yet
     # removed are not reported as gone.
     RUNNER_DEREGISTRATION_REFUSED = "RUNNER_DEREGISTRATION_REFUSED"
+    # fleet-runners --drain and --resume (MCPs board task f19d66a5). A drain
+    # takes a runner out of GitHub's pool by removing its custom labels, which
+    # is what every workflow on the self-hosted fleet targets, before it waits
+    # for the runner to be idle and stops it; on 2026-11-04 a hand drain of
+    # lavender that read the unit idle and then stopped it cut two MCPs jobs
+    # the runners had taken in between. Three codes, split where the reader's
+    # next action splits. DRIFTED: GitHub's reading of a runner is not the
+    # roster's (it carries custom labels the roster does not declare, or its
+    # registration went while the act ran), so removing and restoring the
+    # roster's labels would change the pool the roster describes; a refusal
+    # before the first change changes nothing. REFUSED: gh would not change a
+    # runner's labels, or its answer did not hold what was asked, the same
+    # LOCAL auth or permissions question as the other runner codes. TIMEOUT:
+    # a runner still held a job at the host's job timeout; the drain put every
+    # label back and started the units it had stopped before raising.
+    RUNNER_LABELS_DRIFTED = "RUNNER_LABELS_DRIFTED"
+    RUNNER_LABELS_REFUSED = "RUNNER_LABELS_REFUSED"
+    RUNNER_DRAIN_TIMEOUT = "RUNNER_DRAIN_TIMEOUT"
 
 
 __all__ = ["FleetErrorCode"]
