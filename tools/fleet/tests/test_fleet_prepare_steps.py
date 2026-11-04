@@ -213,7 +213,14 @@ def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() 
     Keycloak and mailpit, so its row requires the docker tag, which runs its
     build as execdocker against that user's rootless daemon, and the step
     follows install and workspace-build, which store the tree's untracked
-    files for the node's next row."""
+    files for the node's next row.
+
+    Its workspace build names mcp-proxy as a root beside execution, as the
+    deploy and linux lanes' do: the twin's check page names the relay bundle
+    by the hash of mcp-proxy/assets/relay.js, which only mcp-proxy's build
+    writes, and execution's own plan never reaches mcp-proxy. Without the
+    root, fleet job b5ef14b9 at MCPs 266eece7e failed reading that file
+    (MCPs board task f9074c8f)."""
     workspace = decode_fleet_workspace(shipped_document())
     marking = {
         name: steps
@@ -227,9 +234,13 @@ def test_a_twin_lane_step_runs_last_and_only_for_the_docker_lane_twin_project() 
     assert project["source"] == ProjectSource(
         remote="https://github.com/wagner-austin/MCPs.git",
         path="execution",
-        install=tuple(
-            InstallStep(phase=phase, argv=(*PREPARE, phase))
-            for phase in ("install", "workspace-build", "twin-lane")
+        install=(
+            InstallStep(phase="install", argv=(*PREPARE, "install")),
+            InstallStep(
+                phase="workspace-build",
+                argv=(*PREPARE, "workspace-build", "ROOTS=execution:mcp-proxy"),
+            ),
+            InstallStep(phase="twin-lane", argv=(*PREPARE, "twin-lane")),
         ),
         companions=(),
     )

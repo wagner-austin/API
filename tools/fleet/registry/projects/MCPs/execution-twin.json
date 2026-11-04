@@ -27,7 +27,8 @@
           "-s",
           "-C",
           "scripts/fleet-prepare",
-          "workspace-build"
+          "workspace-build",
+          "ROOTS=execution:mcp-proxy"
         ]
       },
       {
