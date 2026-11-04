@@ -57,10 +57,11 @@ class TickLoad(TypedDict):
         gpus: Every GPU on the node with its memory when a driver counter
             reads it (:mod:`fleet.contracts.gpu_reading`, MCPs board task
             b4d5ca0f, MCPs mig 895); empty for a node with none.
-        on_battery: Whether its capacity probe read a battery among the
-            node's power supplies discharging (MCPs board task 3268afdf, MCPs
-            mig 903), the reading the runner refuses a node on
-            (NODE_ON_BATTERY); False on mains and on a node with no battery.
+        on_battery: Whether its capacity probe read the node running from
+            its battery, a system battery discharging while no external
+            supply reads online (MCPs board task 3268afdf, MCPs mig 903),
+            the reading the runner refuses a node on (NODE_ON_BATTERY);
+            False on mains and on a node with no battery.
             The queue keeps it in each tick's history, so an audit can read
             a node's power source at every tick of a window.
     """
