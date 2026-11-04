@@ -84,7 +84,14 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # the chat app's subscription participants (MCPs board task 42512a6b).
     # 72 since the served lane follows control onto Lacrymal (MCPs board task 927bbd25).
     # 73 since media-review-mcp joined (MCPs board task c33e4c11).
-    assert len(prepared) == 73
+    # 74 since the CI contracts joined (MCPs board task cf418418).
+    assert len(prepared) == 74
+    assert prepared["MCPs/scripts/ci-contracts"] == (
+        InstallStep(phase="install", argv=(*PREPARE, "install")),
+        InstallStep(
+            phase="workspace-build", argv=(*PREPARE, "workspace-build", "ROOTS=mcp-shared")
+        ),
+    )
     assert prepared["MCPs/media-review-mcp"] == (
         {"phase": "install", "argv": (*PREPARE, "install")},
         {"phase": "workspace-build", "argv": (*PREPARE, "workspace-build")},
