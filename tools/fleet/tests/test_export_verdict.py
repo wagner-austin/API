@@ -43,7 +43,7 @@ def _real_git(repo: pathlib.Path, *args: str) -> str:
     return done.stdout
 
 
-SHA ="4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
+SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
 REMOTE = "https://github.com/wagner-austin/MCPs.git"
 PROJECT = "MCPs/packages/wiki-search"
 
