@@ -88,14 +88,15 @@ class TestARunTheRollMoved:
                 launching=frozenset(),
             )
 
+        moved = f"{MOVED_ROOT}/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
         detail = (
-            f"DISPATCH_NOT_LAUNCHED: {MOVED_ROOT}/{DEMO_RUN_ID} on lavender holds no unit-end "
+            f"DISPATCH_NOT_LAUNCHED: {moved} on lavender holds no unit-end "
             f"script, which the launch writes before it starts the unit, so {DEMO_RUN_ID} was "
             f"launched under another stage root than {MOVED_ROOT}, the one the rolled workspace "
             "declares now; its job was given back and the runner ended its unit"
         )
         # The read went to the moved root, the only one the rolled workspace names.
-        assert f"{MOVED_ROOT}/{DEMO_RUN_ID}/collect.sh" in " ".join(runner.calls[0])
+        assert f"{moved}/collect.sh" in " ".join(runner.calls[0])
         # Given back before the stop: no exit status is invented for it.
         assert endpoint.tools == ["dispatch_list", "dispatch_report"]
         report = endpoint.arguments[1]
