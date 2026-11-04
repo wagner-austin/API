@@ -112,6 +112,7 @@ NODE_FLAG = "--node"
 
 _FLAGS = (_config.CONFIG_FLAG, _config.RECORDS_FLAG, NODE_FLAG)
 
+
 def claim_pass(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
