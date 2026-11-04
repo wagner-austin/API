@@ -21,6 +21,10 @@ its live readers: on colossus 359 tests passed at lines 1723/1723 and
 branches 1453/1453. recorder-release runs the same build through its
 packaging gate, then starts the jar it packed accountless and requires that
 jar's own complete audit of the trace it writes.
+
+brain (board task 488e5f06) runs the planner library's own make check in the
+same image since osrs-lab 4fd53f3, with the manual-play replay corpus it
+holds: on colossus 267 tests passed at lines 1112/1112 and branches 1109/1109.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from fleet.contracts.workspace import decode_fleet_workspace, require_project
 from tests._registry import shipped_document
 
 DIRECTORIES: Final[tuple[str, ...]] = (
+    "brain",
     "desktop-input",
     "observer",
     "observer-input-coverage",
