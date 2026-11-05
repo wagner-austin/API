@@ -58,6 +58,7 @@ from fleet.core import (
     records,
     remote,
     run_lease,
+    run_registry,
     staging,
 )
 from fleet.core.recipe import Recipe, loopback_unit
@@ -261,6 +262,7 @@ def start(
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
     registry: pathlib.Path,
+    registry_commit: str,
     scratch: pathlib.Path,
 ) -> LedgerEntry:
     """Take the lease, then :func:`launch` under it: ``fleet-run``'s dispatch.
@@ -290,6 +292,8 @@ def start(
         companions: The repositories staged beside the export.
         recipe: Where in the tree the recipe runs and what readies it.
         registry: The registry directory this command loaded.
+        registry_commit: The commit that registry was extracted from, or
+            :data:`fleet.core.run_registry.WORKING_TREE`.
         scratch: The hub's directory for the run's local archives.
 
     Returns:
@@ -321,6 +325,7 @@ def start(
         companions=companions,
         recipe=recipe,
         registry=registry,
+        registry_commit=registry_commit,
         scratch=scratch,
     )
 
@@ -336,6 +341,7 @@ def launch(
     companions: tuple[export.CompanionExport, ...],
     recipe: Recipe,
     registry: pathlib.Path,
+    registry_commit: str,
     scratch: pathlib.Path,
 ) -> LedgerEntry:
     """Stage the tree, launch the suite, and record it, under a held lease.
@@ -355,6 +361,10 @@ def launch(
             whose check reads only its own tree.
         recipe: Where in the tree the recipe runs and what readies it.
         registry: The registry directory staged beside the export.
+        registry_commit: The commit that registry was extracted from, or
+            :data:`fleet.core.run_registry.WORKING_TREE`, which the launch
+            writes beside the run for its verdict to name
+            (:mod:`fleet.core.run_registry`, MCPs board task 1fd01f09).
         scratch: The hub's directory for the run's local archives, where
             the registry's is written.
 
@@ -439,7 +449,7 @@ def launch(
     remote.run_script(
         node["host"],
         dialect.script_path(target, names.LAUNCH_STEM),
-        dialect.launch_script(target=target, run_id=run_id),
+        run_registry.launch_script(target=target, run_id=run_id, registry_commit=registry_commit),
     )
     row = started_row(lease=lease, host=node["host"], workers=workers, detail=f"staged to {target}")
     records.append_ledger(loaded_ledger, row)

@@ -30,6 +30,7 @@ from typing_extensions import TypedDict
 from fleet.core.build_steps import read_build_steps
 from fleet.core.ci_load import read_ci_load
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
+from fleet.core.run_registry import read_registry
 from fleet.core.run_summary import read_run_summary
 
 #: The line every package's ``make check`` prints last when it passed.
@@ -173,6 +174,12 @@ class Verdict(TypedDict):
             (:func:`fleet.core.build_steps.read_build_steps`), or
             ``unread``: which step inside a build a phase's seconds went to
             (MCPs board task eb6586e4).
+        registry: The rolled commit whose registry gave the build its
+            install steps, as its launch recorded it beside the run
+            (:mod:`fleet.core.run_registry`), ``working-tree`` for a
+            ``fleet-run`` from a checkout, or ``unread`` for a run launched
+            before the record. A serve on an older roll ran job 0fa14fab's
+            install steps and nothing said so (MCPs board task 1fd01f09).
     """
 
     job_id: str
@@ -194,6 +201,7 @@ class Verdict(TypedDict):
     began: str
     phases: str
     steps: str
+    registry: str
 
 
 def read_slowest(tail: str) -> str:
@@ -376,6 +384,7 @@ def judge(
         began=summary["began"],
         phases=summary["phases"],
         steps=read_build_steps(ANSI.sub("", tail)),
+        registry=read_registry(tail),
     )
 
 
@@ -390,7 +399,7 @@ def render_verdict(verdict: Verdict) -> str:
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
         slowest=<...> ci=<...> generation=<...> began=<...> phases=<...>
-        steps=<...>``,
+        steps=<...> registry=<commit>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
         field the readers in MCPs' maketools and session-audit match, each
@@ -405,7 +414,8 @@ def render_verdict(verdict: Verdict) -> str:
         f"run={verdict['run_id']} workers={verdict['workers']} "
         f"slowest={verdict['slowest']} ci={verdict['ci']} "
         f"generation={verdict['generation']} began={verdict['began']} "
-        f"phases={verdict['phases']} steps={verdict['steps']}"
+        f"phases={verdict['phases']} steps={verdict['steps']} "
+        f"registry={verdict['registry']}"
     )
 
 

@@ -279,6 +279,37 @@ def _extract(api_root: pathlib.Path, commit: str, extractions: pathlib.Path) -> 
     return staging
 
 
+def extraction_commit(registry: pathlib.Path) -> str | None:
+    """The rolled commit an agent's registry was extracted from.
+
+    A serving node runner compares the ref with the code it RUNS, not with
+    the ref's first reading (MCPs board task 1fd01f09): a roll that lands
+    between the launcher's extraction and that reading would otherwise
+    leave a serve on the older code believing it ran the newer. The
+    launcher passes the extraction's registry as ``--config``, so the
+    commit is the name of the directory :func:`extract_rolled_tree` made,
+    and every launcher there has been passes the same layout.
+
+    Args:
+        registry: The registry directory the agent loaded.
+
+    Returns:
+        The commit, or None when the registry is not
+        ``<extractions>/<commit>/tools/fleet/registry`` under this machine's
+        :data:`fleet.core.scratch.EXTRACTIONS_DIR`, as a checkout's is.
+    """
+    layout = pathlib.PurePosixPath(REGISTRY_DIRECTORY).parts
+    if registry.parts[-len(layout) :] != layout:
+        return None
+    tree = registry.parents[len(layout) - 1]
+    if (
+        tree.parent != scratch.directory(scratch.EXTRACTIONS_DIR)
+        or commit_tree.COMMIT_PATTERN.fullmatch(tree.name) is None
+    ):
+        return None
+    return tree.name
+
+
 def rolled_state(checkout: pathlib.Path) -> str:
     """What :data:`ROLLED_REF` names now, as a serving agent compares it.
 
@@ -329,6 +360,7 @@ __all__ = [
     "TURN_LOCK",
     "RolledTree",
     "extract_rolled_tree",
+    "extraction_commit",
     "rolled_state",
     "staging_directory",
 ]

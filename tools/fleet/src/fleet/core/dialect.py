@@ -60,7 +60,7 @@ from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
 from fleet.core.linux_observe_sessions import OBSERVE_SESSIONS_PYTHON
 from fleet.core.linux_toolchain_probe import TOOLCHAIN_PROBE_BODY
-from fleet.core.linux_unit_end import unit_end_path, unit_end_script
+from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -74,10 +74,6 @@ from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: How a script file is run by path; the path is appended.
 SH_INVOCATION = ("/bin/sh",)
-
-#: The quoted heredoc's delimiter that carries the unit-end script inside the
-#: launch script; the unit-end script never holds a line equal to it.
-UNIT_END_DELIMITER = "FLEET_UNIT_END_SCRIPT"
 
 #: How a script's body is written on the far side.
 #:
@@ -436,65 +432,6 @@ def build_script(
     return PROLOGUE + "\n".join(lines) + "\n"
 
 
-def log_tail_script(target: str, lines: int) -> str:
-    """Print the last lines of the build's transcript, or nothing.
-
-    Args:
-        target: Absolute remote directory holding the export.
-        lines: How many lines from the end.
-
-    Returns:
-        The script's text; an absent transcript prints nothing.
-    """
-    log = names.log_path(target)
-    return f"{PROLOGUE}if [ -f '{log}' ]; then tail -n {lines} '{log}'; fi\n"
-
-
-def launch_script(*, target: str, run_id: str) -> str:
-    """Start the build as a transient system unit in dispatch's share, and prove it began.
-
-    The helper's ``start`` (:mod:`fleet.contracts.check_unit`) runs
-    ``systemd-run --collect --quiet`` and returns once systemd has accepted
-    and started the unit, exiting non-zero when either refuses, so the
-    ``launched`` line after it proves the build began. The lingering check
-    comes first and names the fix: the unit is given the account's runtime
-    directory and session bus, which the account's own manager keeps only
-    while it lingers, and a check that asks ``systemctl --user`` would
-    otherwise lose them with this ssh session.
-
-    The unit's ``ExecStopPost=`` runs the unit-end script, which records how
-    the unit ended whenever the build did not write its own status
-    (:mod:`fleet.core.linux_unit_end`, MCPs board task c8585623). The script
-    is written by a quoted heredoc, so nothing in it is expanded on the way
-    to the disk.
-
-    Args:
-        target: Absolute remote directory holding the staged tree.
-        run_id: The dispatch, which names its own unit.
-
-    Returns:
-        The script's text. It prints ``launched`` only once the build has
-        actually begun, and exits non-zero otherwise.
-    """
-    unit = names.task_name(run_id)
-    build = f"{target}/{names.BUILD_STEM}.sh"
-    ended = unit_end_path(target)
-    return (
-        f'{PROLOGUE}user="$(id -un)"\n'
-        f'if [ "$(loginctl show-user "$user" -p Linger --value)" != yes ]; then\n'
-        f"  printf '%s\\n' \"lingering is off for $user, so the runtime directory and bus "
-        f"a check is given would end with this ssh session; enable it once with: "
-        f'sudo loginctl enable-linger $user" >&2\n'
-        f"  exit 1\n"
-        f"fi\n"
-        f"cat > '{ended}' <<'{UNIT_END_DELIMITER}'\n"
-        f"{unit_end_script(target=target, unit=unit, prologue=PROLOGUE)}"
-        f"{UNIT_END_DELIMITER}\n"
-        f"{CHECK_UNIT} start '{unit}' '{target}' '{build}' '{ended}'\n"
-        f"printf 'launched\\n'\n"
-    )
-
-
 #: What the result script prints for a directory no launch wrote into.
 UNLAUNCHED_ANSWER = "unlaunched"
 
@@ -579,7 +516,6 @@ __all__ = [
     "PROLOGUE",
     "SH_INVOCATION",
     "TOOLCHAIN_PROBE_SCRIPT",
-    "UNIT_END_DELIMITER",
     "UNLAUNCHED_ANSWER",
     "WRITE_COMMAND",
     "build_script",
@@ -588,8 +524,6 @@ __all__ = [
     "echo_command",
     "extract_commands",
     "fleet_directory",
-    "launch_script",
-    "log_tail_script",
     "make_directory_script",
     "reset_directory_script",
     "result_script",
