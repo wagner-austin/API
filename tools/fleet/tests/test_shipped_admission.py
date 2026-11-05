@@ -125,6 +125,17 @@ BOUNDED_GRANTS = {
     "serendipity": ("MCPs/mcp-shared", 3),
 }
 
+#: The run MCPs/fleet-nixos's registry row names beside its worker_cores 8.
+FLAKE_CORES_MEASUREMENT = (
+    "Fleet job 46eb328f (MCPs 92c6776bc, lavender flushed, 2026-11-05) ran this check's cold "
+    "build in 305 s: its nix daemon and check unit took 1463.8 CPU-s of lavender's 8-core "
+    "dispatch share, beside 386.5 CPU-s of two checks the fleet placed into that share while it "
+    "was charged one core. Its one worker is the nix daemon, whose max-jobs is the node's "
+    "dispatch share and whose build gate fills it, so it is charged lavender's whole share, 8; "
+    "1463.8 CPU-s over the 300 s budget is 4.9 cores averaged, within 8 (MCPs board task "
+    "51e3eac5)."
+)
+
 #: The suites that need diphtheria's production stack or read what only it
 #: holds, each pinned there, so it checks them and nothing else.
 DIPHTHERIA_PINNED = (
@@ -411,9 +422,7 @@ def test_the_nixos_flake_declares_the_dispatch_share_its_nix_daemon_fills() -> N
     state = _idle(node)
 
     assert project["worker_cores"] == 8
-    measurement = project["worker_cores_measurement"]
-    assert measurement is not None
-    assert measurement.startswith("Fleet job 46eb328f (MCPs 92c6776bc, lavender flushed")
+    assert project["worker_cores_measurement"] == FLAKE_CORES_MEASUREMENT
     assert assess(node, state, project, carried) == {"workers": 1, "code": None, "reason": ""}
     state["live"] = LiveLoad(runs=1, workers=1, cores=8, ram_gb=16.0)
     other = workspace["projects"]["MCPs/mcp-shared"]
