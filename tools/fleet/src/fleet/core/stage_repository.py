@@ -125,22 +125,17 @@ def companion_repository_commands(
     is checked out there, and every ancestor the node's mirror holds is
     reachable from them.
 
-    OUT OF THE NODE'S MIRROR, BY HARD LINKS (MCPs board task 5280a25d).
-    Until then every launch sent each companion's whole history as one
-    bundle the node fetched into a fresh repository: on lacrymal on
-    2026-11-05 the MCPs companion's bundle was 266 MB and took 22.8 s to
-    write and API's 263 MB and 6.9 s, and packages/wiki-check carries 17
-    companions. The node now keeps a mirror of each companion's remote as
-    it does of each project's (:mod:`fleet.core.companion_stage`), which
-    receives only what it lacks, and ``git clone --local`` links that
-    mirror's objects into the companion instead of copying them. The clone
-    names its source as ``origin``; that section is removed, so the
-    companion carries no remote, as the bundle's fetch left it, and its
-    tracking ref is written to the commit itself, which ``git update-ref``
-    refuses when the mirror lacks it, ending the checked script there.
-
-    Automatic gc and maintenance are turned off before anything else writes
-    (:func:`_no_auto_gc_command`, :func:`_no_auto_maintenance_command`).
+    OUT OF THE NODE'S MIRROR (MCPs board task 5280a25d). Until then every
+    launch sent each companion's whole history as one bundle the node
+    fetched into a fresh repository: on lacrymal on 2026-11-05 the MCPs
+    companion's bundle was 266 MB and took 22.8 s to write and API's 263 MB
+    and 6.9 s, and packages/wiki-check carries 17 companions. The node now
+    keeps a mirror of each companion's remote as it does of each project's
+    (:mod:`fleet.core.companion_stage`), which receives only what it lacks,
+    and the companion is cloned from it by hard links
+    (:func:`clone_commands`). Its tracking ref is written to the commit
+    itself, which ``git update-ref`` refuses when the mirror lacks it,
+    ending the checked script there.
 
     Args:
         target: Absolute remote directory the companion is cloned into,
@@ -156,10 +151,7 @@ def companion_repository_commands(
     branch = ref.removeprefix("refs/heads/")
     tracking = f"refs/remotes/origin/{branch}"
     return (
-        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, target),
-        _no_auto_gc_command(target),
-        _no_auto_maintenance_command(target),
-        ("git", "-C", target, "config", "--remove-section", "remote.origin"),
+        *clone_commands(target, mirror),
         ("git", "-C", target, "update-ref", tracking, sha),
         ("git", "-C", target, "checkout", "--quiet", "-B", branch, tracking),
     )
@@ -250,8 +242,59 @@ def init_repository_commands(target: str, run_id: str) -> tuple[tuple[str, ...],
         ("git", "-C", target, "init", "--quiet"),
         _no_auto_gc_command(target),
         _no_auto_maintenance_command(target),
+        *index_commands(target, run_id),
+    )
+
+
+def index_commands(target: str, run_id: str) -> tuple[tuple[str, ...], ...]:
+    """The commands that index a staged tree, forced, and make it one commit.
+
+    The half of :func:`init_repository_commands` that a staged commit's
+    unpack runs as well, after :func:`clone_commands` and the extraction:
+    there every object the tree holds is already the node mirror's, linked
+    into the repository, so the add hashes each file and writes almost
+    nothing (MCPs board task 5280a25d).
+
+    Args:
+        target: Absolute remote directory holding the staged tree.
+        run_id: The dispatch, recorded in the message.
+
+    Returns:
+        The add and the commit.
+    """
+    return (
         ("git", "-C", target, "-c", UNCOMPRESSED_OBJECTS, "add", "--all", "--force"),
         _commit_command(target, f"fleet export {run_id}"),
+    )
+
+
+def clone_commands(target: str, mirror: str) -> tuple[tuple[str, ...], ...]:
+    """The commands that make an empty directory a repository holding the node mirror's objects.
+
+    BY HARD LINKS, NOT BY COPIES (MCPs board task 5280a25d). ``git clone
+    --local`` links the mirror's object files into the new repository, so a
+    companion is cloned without copying its history and a staged commit's
+    add finds every object it would have written already there: timed by
+    hand against the MCPs mirror at b96091cf9 on 2026-11-05, the add of the
+    extracted tree took 0.83 s on pendragon with them and 2.11 s without,
+    and 2.3 s on lenovold against 5.4 s, the committed tree the same. The
+    clone names its source as ``origin``; that section is removed, so the
+    repository names no remote, as before. Automatic gc and maintenance are
+    turned off before anything else writes (:func:`_no_auto_gc_command`,
+    :func:`_no_auto_maintenance_command`).
+
+    Args:
+        target: Absolute remote directory, empty, the repository is made in.
+        mirror: The node's mirror of the remote.
+
+    Returns:
+        The clone and the three settings after it.
+    """
+    return (
+        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, target),
+        _no_auto_gc_command(target),
+        _no_auto_maintenance_command(target),
+        ("git", "-C", target, "config", "--remove-section", "remote.origin"),
     )
 
 
@@ -259,6 +302,8 @@ __all__ = [
     "EXPORT_AUTHOR_EMAIL",
     "EXPORT_AUTHOR_NAME",
     "UNCOMPRESSED_OBJECTS",
+    "clone_commands",
     "companion_repository_commands",
+    "index_commands",
     "init_repository_commands",
 ]

@@ -26,8 +26,8 @@ sent nothing at all.
 THE TRANSPORT IS UNCHANGED. The bundle crosses over scp and its digest is
 compared before the node reads it (:func:`fleet.core.staging.send_verified`),
 as a companion's bundle is; the tree is unpacked beside its staging
-directory and committed as one commit
-(:func:`fleet.core.stage_repository.init_repository_commands`).
+directory into a repository cloned from the node's mirror by hard links,
+and committed as one commit (:func:`unpack_commands`).
 
 EVERY REF WRITE WAITS ON GIT'S OWN LOCKS (MCPs board task 695b0b02). Each
 export writes its run's bundle ref into the hub's one mirror and deletes it
@@ -338,15 +338,20 @@ def unpack_commands(
     Returns:
         The commands, in order, for :func:`fleet.core.dialect.checked_script`:
         the mirror made if absent and the bundle fetched into it, the
-        commit's tar written and unpacked, and the tree committed.
+        export made a repository holding the mirror's objects by hard links
+        (:func:`fleet.core.stage_repository.clone_commands`, MCPs board task
+        5280a25d), the commit's tar written and unpacked into it, and the
+        tree indexed and committed, its add finding nearly every object it
+        hashes already there.
     """
     tar = f"{staged}/{names.TREE_TAR_NAME}"
     pathspec = ("--", *scope) if scope else ()
     return (
         *fetch_commands(mirror=mirror, bundle=bundle, run_id=run_id),
+        *stage_repository.clone_commands(target, mirror),
         ("git", "-C", mirror, "archive", "--format=tar", "-o", tar, sha, *pathspec),
         *dialect.extract_commands(tar, target),
-        *stage_repository.init_repository_commands(target, run_id),
+        *stage_repository.index_commands(target, run_id),
     )
 
 
