@@ -30,6 +30,12 @@ live-coverage (board task 488e5f06) runs the shared check of kept JaCoCo live
 runs, which the recorder and observer gates both execute, in the same image:
 on colossus it passed with input-policy, 13 tests at lines 85/85 and branches
 60/60.
+
+manual-desktop (board task b2ee9cbe) runs the manual desktop image's
+configuration tests in the same image, starting real PulseAudio daemons, beside
+input-policy's: on colossus at osrs-lab e33ff2b it passed 9 tests, 4 of its
+own and 5 of input-policy's, in 30 s, at lines 37/37 and branches 26/26, all
+input-policy's, since the directory holds no main source.
 """
 
 from __future__ import annotations
@@ -47,6 +53,7 @@ DIRECTORIES: Final[tuple[str, ...]] = (
     "brain",
     "desktop-input",
     "live-coverage",
+    "manual-desktop",
     "observer",
     "observer-input-coverage",
     "recorder",

@@ -1530,6 +1530,15 @@ build's, run by its own `make check` in the same image. On colossus, over the
 sources osrs-lab 7558b0a committed, it passed with input-policy, 13 tests at
 lines 85/85 and branches 60/60, with the same tags and workers as the observer.
 
+**`osrs-lab/manual-desktop`** (board task b2ee9cbe, 2026-11-05) is the manual
+desktop image's own `make check`, run in the same image: its configuration
+tests start real PulseAudio daemons against the image's audio files, beside
+input-policy's. The directory holds no main source, so the `COVERAGE TOTAL` the
+verdict records is input-policy's. On colossus at osrs-lab e33ff2b, the commit
+whose `manual-desktop/Dockerfile` change made it needed, it passed 9 tests in
+30 s at lines 37/37 and branches 26/26, with the same tags and workers as the
+observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
