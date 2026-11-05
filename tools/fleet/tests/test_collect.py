@@ -479,6 +479,7 @@ class TestLiveRows:
         assert records.live_load(loaded.ledger, node="lavender", projects=projects) == {
             "runs": 0,
             "workers": 0,
+            "cores": 0,
             "ram_gb": 0.0,
         }
 

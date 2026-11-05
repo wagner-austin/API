@@ -401,8 +401,8 @@ class TestChecksAtOnce:
             "reason": (
                 "serendipity's CPUs carry 1 budgeted check(s) at once across its runners, and 1 "
                 "are live or launching on it now, and its 1 live fleet run(s) hold 2 worker(s) "
-                "and 2.2 GB. A check runs wider than its test workers, so a second would push "
-                "both past their budget; it takes the next job when one of them ends."
+                "on 2 core(s) and 2.2 GB. A check runs wider than its test workers, so a second "
+                "would push both past their budget; it takes the next job when one of them ends."
             ),
         }
 
