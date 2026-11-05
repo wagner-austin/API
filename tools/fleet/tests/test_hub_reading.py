@@ -31,13 +31,9 @@ FLAKE = "MCPs/fleet-nixos"
 #: The key the rolled row drops, one line of its file, as written.
 MEASUREMENT_KEY = '"worker_cores_measurement":'
 
-#: The sources ``git archive`` extracts beside the registry; any bytes do.
-ROLLED_SOURCES: dict[str, str] = {
-    "tools/fleet/src/fleet/cli/agent.py": "",
-    "libs/platform_core/src/platform_core/__init__.py": "",
-    "libs/monorepo_guards/src/monorepo_guards/__init__.py": "",
-    "tools/board-watch/src/board_watch/__init__.py": "",
-}
+#: Every file an extraction must hold to be read, empty; the registry's own
+#: required file is overwritten by the registry's real bytes below.
+ROLLED_SOURCES: dict[str, str] = dict.fromkeys(rolled.REQUIRED_FILES, "")
 
 
 def _rolled_registry_without_the_measurement() -> dict[str, str]:
