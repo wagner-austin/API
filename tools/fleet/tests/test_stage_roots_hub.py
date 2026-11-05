@@ -6,8 +6,8 @@ Measured 2026-10-18T18:11Z, the seven nodes held 106 run ids no retire would
 ever reach: refused while
 staging, orphaned when the hub moved, or left by a retire that failed. This
 case reads, from the hub, every enabled node's stage root over the hub's own
-ssh, the registry of the commit ``refs/fleet/rolled`` names and the runners'
-records in the hub's API checkout (:mod:`tests._hub_reading`), and fails on any
+ssh, the registry of the commit under test and the runners' records in the
+hub's API checkout (:mod:`tests._hub_reading`), and fails on any
 run's directory, staging directory or root script whose run is neither live
 (a held lease, a running ledger row) nor still owed a retire. A node that does
 not answer fails it too, since its stage root cannot be read.
