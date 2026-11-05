@@ -67,7 +67,8 @@ Runs:
   forward_benchmark, gemm_benchmark, gemm_probe, known_answer_probe,
   known_answer_registry, legacy_gemm_probe, probe_ladder, probe_trace,
   score_baseline, score_run, sdpa_benchmark, sdpa_probe, train_benchmark,
-  train_step_probe, triple_edit_benchmark}`
+  train_step_probe, triple_edit_benchmark, weight_space_lm_edit,
+  weight_space_policy_edit, weight_space_policy_train}`
 
 | Question | Authoritative record |
 |---|---|
