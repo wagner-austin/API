@@ -159,7 +159,8 @@ def assess(
     memory those workers may hold comes off its free memory, whether or not
     they have spawned yet (:class:`fleet.contracts.node.LiveLoad`), and what
     is left is granted. One grant is capped at :func:`job_ceiling`, so the
-    first job leaves room for a second instead of taking the whole node.
+    first job leaves room for a second instead of taking the whole node,
+    except on a node that carries one check at once, where no second comes.
 
     WHERE A SECOND CHECK DOES NOT FIT ITS CPUS, THE NODE SAYS SO (MCPs board
     task a85ef09e). A node whose budget declares ``checks_at_once`` takes no
@@ -354,6 +355,15 @@ def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
     half-width runs keep a node busier than one full-width one, and the cores
     pool in :func:`assess` still bounds the sum.
 
+    ALL OF THEM WHERE NO SECOND RUN CAN COME (MCPs board task b96f9da1). The
+    half is room left for a second run, and a node whose budget declares
+    ``checks_at_once`` of 1 refuses a second run while one is live, so there
+    the other half only sat idle. On 2026-11-05 serendipity, 8 cores with 2
+    reserved, ran MCPs/mcp-shared at 3 workers with a check phase of 100 to
+    143 s, beside nothing, at a load of 1.4. That day the same suite's check
+    phase took a median 72 s at 7 workers on pendragon and 67 s at 9 on
+    sedona. So such a node's ceiling is every worker its spare cores hold.
+
     Args:
         node: The node's declaration.
         project: The work being dispatched.
@@ -362,7 +372,8 @@ def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
         The ceiling, at least ``project['minimum_workers']``.
     """
     spare = node["logical_cores"] - node["budget"]["reserved_cores"]
-    return max(project["minimum_workers"], -(-spare // 2) // project["worker_cores"])
+    share = 1 if node["budget"]["checks_at_once"] == 1 else 2
+    return max(project["minimum_workers"], -(-spare // share) // project["worker_cores"])
 
 
 def _live_clause(state: NodeState) -> str:

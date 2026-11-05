@@ -411,6 +411,8 @@ class TestChecksAtOnce:
         }
 
     def test_a_node_under_its_check_count_is_weighed_on_its_pools(self) -> None:
+        """8 cores less 4 reserved leave 4, all of them the one check's
+        (board task b96f9da1); 11.6 - 4.0 GB at 1.1 GB a worker holds 6."""
         node = _node(host="serendipity", cores=8, reserved_cores=4, checks_at_once=1)
 
         verdict = assess(
@@ -420,7 +422,7 @@ class TestChecksAtOnce:
             LINUX_TAGS,
         )
 
-        assert verdict == {"workers": 2, "code": None, "reason": ""}
+        assert verdict == {"workers": 4, "code": None, "reason": ""}
 
     def test_a_node_with_no_check_count_takes_a_second_its_pool_holds(self) -> None:
         node = _node(host="serendipity", cores=8, reserved_cores=4)

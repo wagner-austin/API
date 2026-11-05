@@ -52,15 +52,16 @@ class TestPinnedChecksOnly:
             LINUX_TAGS,
         )
 
-        assert verdict == {"workers": 2, "code": None, "reason": ""}
+        # 8 cores less 4 reserved: all 4 are the one check's (board task b96f9da1).
+        assert verdict == {"workers": 4, "code": None, "reason": ""}
 
     def test_the_same_node_without_the_declaration_takes_either(self) -> None:
         node = _diphtheria(pinned_checks_only=False)
         state = _state(host="diphtheria")
         pinned = _project(minimum_workers=2, node="diphtheria")
 
-        assert assess(node, state, _project(minimum_workers=2), LINUX_TAGS)["workers"] == 2
-        assert assess(node, state, pinned, LINUX_TAGS)["workers"] == 2
+        assert assess(node, state, _project(minimum_workers=2), LINUX_TAGS)["workers"] == 4
+        assert assess(node, state, pinned, LINUX_TAGS)["workers"] == 4
 
     def test_a_project_pinned_elsewhere_is_refused_by_its_pin_first(self) -> None:
         verdict = assess(

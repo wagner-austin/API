@@ -60,8 +60,9 @@ class TestCpuPressure:
             LINUX_TAGS,
         )
 
+        # 8 cores less 2 reserved: all 6 are the one check's (board task b96f9da1).
         assert at["code"] is FleetErrorCode.NODE_OWNER_RESERVED
-        assert under == {"workers": 3, "code": None, "reason": ""}
+        assert under == {"workers": 6, "code": None, "reason": ""}
 
     def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
         node = _node(host="colossus", cores=12, reserved_cores=2)
@@ -147,8 +148,9 @@ class TestIoPressure:
             LINUX_TAGS,
         )
 
+        # 8 cores less 2 reserved: all 6 are the one check's (board task b96f9da1).
         assert at["code"] is FleetErrorCode.NODE_OWNER_RESERVED
-        assert under == {"workers": 3, "code": None, "reason": ""}
+        assert under == {"workers": 6, "code": None, "reason": ""}
 
     def test_saturated_cpus_are_named_before_a_saturated_disk(self) -> None:
         verdict = assess(
