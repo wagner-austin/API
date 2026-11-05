@@ -13,26 +13,29 @@ source_paths:
   - tools/fleet/tests/test_runner_placement_host.py
   - tools/fleet/registry/machines/lavender.json
   - tools/fleet/registry/projects/tools/fleet-execution-runners.json
+  - tools/fleet/runners.json
 source_git_blobs:
   "tools/fleet/src/fleet/contracts/runner_slice.py": 7bbc8575b2d86783b82c83623f683a0ad9b3bf8d
-  "tools/fleet/src/fleet/core/runner_job_scope_render.py": caef149218d487e076d6f84110e6ec5f3ef0e419
+  "tools/fleet/src/fleet/core/runner_job_scope_render.py": e6a2c892a049383e588ea8d47d828645c088f17e
   "tools/fleet/src/fleet/core/runner_dropped_check.py": ea59f5c2549941f7837dd8a99bb414cfd29df883
   "tools/fleet/src/fleet/core/runner_reap_dropped.py": 99720a7f2a335f205c722df15154ecba8f792da0
-  "tools/fleet/src/fleet/core/runner_reaper_render.py": 75ddd7944f569bf1a95d5d46d572eddd434489e8
-  "tools/fleet/tests/test_runner_placement_host.py": e59308c8c36a312274e53cbd0f298a9dd1ffbe40
-  "tools/fleet/registry/machines/lavender.json": 98edfe58d3da5c739440fbebc823a85fcb4e6337
+  "tools/fleet/src/fleet/core/runner_reaper_render.py": 227d7a140ce000cd24092278131aa38039c4ff89
+  "tools/fleet/tests/test_runner_placement_host.py": 04b55c10f12ad279b5d1ee39a9db6423fb98157d
+  "tools/fleet/registry/machines/lavender.json": fa509b236c620f5e39147cbf6bd3fd11c88c004f
   "tools/fleet/registry/projects/tools/fleet-execution-runners.json": baeefbb12b207d6e5b71acd6fc7f60f8c6f99858
+  "tools/fleet/runners.json": 7a4527ba0b4fcdc55554a6451a6fda8a481030f2
 provenance:
   - "2026-11-01 lavender pin review: the registry now declares Rust 1.98.1 and appends its measurement to the existing notes. The cited reimage/WSL history remains verbatim; board task c6bc5d05-22f5-4462-a1f7-eb40de1f28f1."
   - "2026-11-02 lavender pin review: the machine file's dispatch gained models null as its last key; the cited lines are unchanged; board task b9235198-f688-4eb2-8068-71377481e1d9."
-fact_checked: "2026-10-30"
+  - "2026-11-05 runner pin review: lavender was reinstalled with the fleet's NixOS on 2026-11-03, which the opening now says from the machine file's notes (now line 25), and it serves seven runner installs, not eight, per runners.json; the job scope and reaper renders lost their Ubuntu provision functions (API 04c8dcf69), which none of this page's claims rested on, and every locator moved with its file; board task 1b7a7624-e767-42b4-a1d9-888b87d6fd32."
+fact_checked: "2026-11-05"
 confidence: high
 hubs: [infrastructure]
 ---
 
 # Runner listeners sit outside their jobs' budget, and the hub ends a job GitHub dropped
 
-lavender runs eight self-hosted GitHub Actions runners whose jobs share one bounded systemd slice, `runners.slice`.[^ci-slice] They ran in its WSL guest, lavender-wsl, until lavender was reimaged to Ubuntu on 2026-10-19 and the guest went with the Windows install.[^reimage] Until MCPs board task 715b9ec5 the runner units sat in that slice too, `Runner.Listener` included, and the listener is the process that holds each job's lease with GitHub. On 2026-10-02 and 2026-10-16 the slice sat at its `MemoryHigh`, the listeners' calls to GitHub timed out, GitHub dropped the jobs, and their Workers ran on unseen for 1 h 45 min.[^why]
+lavender runs seven self-hosted GitHub Actions runner installs whose jobs share one bounded systemd slice, `runners.slice`.[^ci-slice] They ran in its WSL guest, lavender-wsl, until lavender was reimaged to Ubuntu on 2026-10-19 and the guest went with the Windows install, and since 2026-11-03 lavender runs the fleet's NixOS.[^reimage] Until MCPs board task 715b9ec5 the runner units sat in that slice too, `Runner.Listener` included, and the listener is the process that holds each job's lease with GitHub. On 2026-10-02 and 2026-10-16 the slice sat at its `MemoryHigh`, the listeners' calls to GitHub timed out, GitHub dropped the jobs, and their Workers ran on unseen for 1 h 45 min.[^why]
 
 ## Why no memory protection could have saved the listener
 
@@ -47,7 +50,7 @@ The kernel throttles every task that charges memory beneath a cgroup over its `m
 
 ## Proof the machine writes
 
-A note transcribing these readings was rejected as proof by two reviews of the task's closure. The proof is a fleet project, `tools/fleet-execution-runners`, pinned to lavender, whose placement cases run on the host as the fleet user.[^host-cases] Its disk, hygiene and audit cases are on [[fleet-runner-disk-hygiene]]. It was pinned to lavender-wsl until the reimage, and is pinned to lavender again since its eight runners were laid there.[^pin] One case requires every unit `runners.json` declares for lavender to be active in `/listeners.slice`, that slice at `memory.high` max, `runners.slice` at the roster's bound, and every live Worker in its own job scope. The other fills a slice of the fleet user's systemd manager past its high with swap denied, beside an unbounded sibling. It requires the probe inside to stall at least a second and the sibling at most a hundredth of that. Run before lavender-wsl-3 moved, the first case failed on that unit, which is the fault it exists to catch. Its run at 3e4066d4a on lavender-wsl (fleet job c43c18f2) read 8 of 8 units in `/listeners.slice` and 4 Workers each in its scope, and the probe inside a slice over its high stalled 7,630,156 µs against the sibling's 0.[^a3]
+A note transcribing these readings was rejected as proof by two reviews of the task's closure. The proof is a fleet project, `tools/fleet-execution-runners`, pinned to lavender, whose placement cases run on the host as the fleet user.[^host-cases] Its disk, hygiene and audit cases are on [[fleet-runner-disk-hygiene]]. It was pinned to lavender-wsl until the reimage, and is pinned to lavender again since its runners were laid there.[^pin] One case requires every unit `runners.json` declares for lavender to be active in `/listeners.slice`, that slice at `memory.high` max, `runners.slice` at the roster's bound, and every live Worker in its own job scope. The other fills a slice of the fleet user's systemd manager past its high with swap denied, beside an unbounded sibling. It requires the probe inside to stall at least a second and the sibling at most a hundredth of that. Run before lavender-wsl-3 moved, the first case failed on that unit, which is the fault it exists to catch. Its run at 3e4066d4a on lavender-wsl (fleet job c43c18f2) read 8 of 8 units in `/listeners.slice` and 4 Workers each in its scope, and the probe inside a slice over its high stalled 7,630,156 µs against the sibling's 0.[^a3]
 
 ## Ending a job GitHub dropped
 
@@ -57,17 +60,17 @@ Every hub tick runs a reap pass that reads the roster **at the rolled ref**, rea
 
 **Offline is not dropped.** The first rolled pass, at 18:26:33Z on 2026-10-17, counted `offline busy=true` as dropped and ended two Workers GitHub still held, each failing on GitHub within two seconds. A listener out of touch reconnects and its job outlives it, so a runner GitHub reads busy is never reaped.[^offline]
 
-[^ci-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:44` -- `CI_SLICE_NAME = "runners.slice"`.
-[^reimage]: `tools/fleet/registry/machines/lavender.json:24` -- the machine's notes: "replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist".
+[^ci-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:44` -- `CI_SLICE_NAME = "runners.slice"`; `tools/fleet/runners.json:11-61` -- lavender's `"installs": [`, seven entries.
+[^reimage]: `tools/fleet/registry/machines/lavender.json:25` -- the machine's notes: "Reinstalled with the fleet's NixOS by the netboot installer from MCPs fleet-mcp/nixos at a192b06c3271 and adopted at 100.85.53.111 on 2026-11-03T05:57:14.156Z", and of the reimage before: "replacing the Windows machine and its WSL guest lavender-wsl, which no longer exist".
 [^why]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:3-8` -- module docstring: "the slice sat at its ``MemoryHigh`` and every listener's calls to"
 [^low]: `tools/fleet/src/fleet/contracts/runner_slice.py:46-56` -- comment on `LISTENER_SLICE_NAME`: "the budget its jobs fill timed out its calls to GitHub (2026-10-02 and"
 [^listener-slice]: `tools/fleet/src/fleet/contracts/runner_slice.py:57-58` -- "This slice carries no bound. No dash, so it is no child of either."
 [^scope]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:18-37` -- numbered steps 1 to 3: "A refusal fails the job by name, before its first step, rather than running"
-[^move]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:105-112` -- `MOVE_WAIT_SECONDS` comment: "move to land. ``StartTransientUnit`` answers once the scope's start job is"
-[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:314-336` -- the reaper's place function: "# No Listener is a self-update under way, which a restart would cut short."
-[^watch]: `tools/fleet/src/fleet/core/runner_reaper_render.py:77-83` and `:133` -- module docstring: "A pass that only looked once missed the gap between two jobs, which lasts"
-[^hooks]: `tools/fleet/src/fleet/core/runner_reaper_render.py:85-91` and `:326-327` -- "THE JOB HOOKS FINISH HERE THE SAME WAY (MCPs board task 621902c3). A runner"
-[^host-cases]: `tools/fleet/tests/test_runner_placement_host.py:174-212` and `:288-343` -- two of its `host_runner_units` cases: "assert outside_stall * SIBLING_RATIO <= inside_stall"
+[^move]: `tools/fleet/src/fleet/core/runner_job_scope_render.py:100-107` -- `MOVE_WAIT_SECONDS` comment: "move to land. ``StartTransientUnit`` answers once the scope's start job is"
+[^place]: `tools/fleet/src/fleet/core/runner_reaper_render.py:313-335` -- the reaper's place function: "# No Listener is a self-update under way, which a restart would cut short."
+[^watch]: `tools/fleet/src/fleet/core/runner_reaper_render.py:77-83` and `:132` -- module docstring: "A pass that only looked once missed the gap between two jobs, which lasts"
+[^hooks]: `tools/fleet/src/fleet/core/runner_reaper_render.py:85-91` and `:325-326` -- "THE JOB HOOKS FINISH HERE THE SAME WAY (MCPs board task 621902c3). A runner"
+[^host-cases]: `tools/fleet/tests/test_runner_placement_host.py:175-213` and `:289-344` -- two of its `host_runner_units` cases: "assert outside_stall * SIBLING_RATIO <= inside_stall"
 [^pin]: `tools/fleet/registry/projects/tools/fleet-execution-runners.json:8` -- `"node": "lavender"`.
 [^a3]: [synthesis] -- the two `host reading:` lines of fleet job c43c18f2 (tools/fleet-execution-runners at 3e4066d4a, node lavender-wsl, 2 passed), in its log `/home/corvis/fleet/stage/logs/tools-fleet-execution-runners-lavender-wsl-1792267202.log` on lavender-wsl, a guest that no longer exists; the repo carries the cases that print them, not the figures.
 [^dropped]: `tools/fleet/src/fleet/core/runner_reap_dropped.py:3-8` -- module docstring: "the host alone cannot tell a long job from one GitHub let go of; on"
