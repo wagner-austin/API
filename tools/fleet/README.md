@@ -545,12 +545,25 @@ job's queue lease as each start did. It hands over only 10 s before a
 boundary and only while no settle is under way, once it has served
 `node_serve_seconds` (1200 in `registry/settings.json`, at most 1800 so a drain ends
 inside the launcher's 39-minute wall) or `refs/fleet/rolled`, read through
-git from its records directory, has moved, so a roll still takes effect at
-the next boundary; a serve past its time claims nothing more. The fires that
+git from its records directory, names another commit than the one its
+registry was extracted from, so a roll still takes effect at the next
+boundary; a serve past its time claims nothing more. **Nor does a serve the
+roll has moved past** (MCPs board task 1fd01f09, `fleet.cli.node_roll`):
+every claim reads the ref just before it asks the queue, and asks for
+nothing on a move, and again just after the queue hands over a job, and
+gives that job back unstaged (`FLEET_ROLL_MOVED`, through `dispatch_report`
+`lost`) on a move. The read after the claim comes after the job was queued,
+so a job queued once `make fleet-roll` returned runs the rolled registry's
+install steps; job 0fa14fab, claimed by pendragon 16 s before its boundary
+on the registry before roll 84bc5ff0b6a9, is the case. The first read that
+finds the move stops the serve's listing until its handover. The fires that
 arrive while it serves are skipped by `IgnoreNew` on purpose, and the node
 goes unwatched only for those 10 s and the next start's few, once a serve. A
 serve of zero seconds is one start's shape: its opening passes, no listing,
-no read of the roll, and a handover at the first boundary. A poll that finds
+no read of the roll but its claims', and a handover at the first boundary.
+A serve is started only from a rolled extraction: its `--config` must be
+`<extractions>/<commit>/tools/fleet/registry`, and a checkout's registry is
+refused before the queue is asked. A poll that finds
 a run still going writes nothing to the queue, and a watch holding no run
 waits on its condition with no call. A serve's log ends `<alias> served N s
 from <time>: F fire(s), P fill pass(es), Q poll(s), C run(s) closed, K still
@@ -922,7 +935,14 @@ the run printed neither. `ended` is when the check ended, UTC to the
 second: the time the node's result records, or when the runner stopped a
 run past its lease (MCPs board task c1d48330), so the row's `closed_at`
 minus it is how long a finished check waited to be closed, which no other
-record carried. The same line is the job's close `detail` on the
+record carried. The line ends `registry=<commit>`, the rolled commit whose
+registry gave the run its install steps (MCPs board task 1fd01f09,
+`fleet.core.run_registry`): the launch writes it to `registry-commit.txt`
+beside the run before it starts the unit, and the tail read prints it back
+as a `FLEET_REGISTRY:` line, so a run settled by a serve on a later roll
+still names the one it was launched on; `working-tree` is a `fleet-run`
+from a checkout, and `unread` a run launched before the record. The same
+line is the job's close `detail` on the
 queue, so a closure may quote it as its check evidence and the manager audit
 resolves it against the `fleet_dispatch_jobs` row it names.
 
