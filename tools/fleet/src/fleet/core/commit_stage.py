@@ -28,6 +28,24 @@ compared before the node reads it (:func:`fleet.core.staging.send_verified`),
 as a companion's bundle is; the tree is unpacked beside its staging
 directory and committed as one commit
 (:func:`fleet.core.stage_repository.init_repository_commands`).
+
+EVERY REF WRITE WAITS ON GIT'S OWN LOCKS (MCPs board task 695b0b02). Each
+export writes its run's bundle ref into the hub's one mirror and deletes it
+once the bundle is written, and every runner on the hub exports at once: a
+push gate queued 14 jobs of MCPs 340c7e9af within 0.13 s on 2026-11-05. A
+ref deletion takes the mirror's ``packed-refs.lock``, which git waits for
+only 1 s by default (``core.packedRefsTimeout``), so on lacrymal at load,
+where another export or git's own maintenance held it longer, fleet job
+2243695b was refused ``EXPORT_FAILED`` with git's ``Unable to create
+'.../packed-refs.lock': File exists`` and its bundle ref was left in the
+mirror. A turn of the fleet's own around the write would serialize the
+exports and still not the maintenance git starts after a fetch, so the
+waiting is git's: every command that writes a mirror's refs, the hub's and
+the node's alike, passes :data:`REF_LOCK_WAITS`, under which git waits
+:data:`REF_LOCK_TIMEOUT_MS` for whichever process holds the lock, whoever it
+is. ``tests/test_commit_stage_concurrent.py`` runs exports at once against a
+real mirror whose ``packed-refs.lock`` a real git transaction holds past
+git's default wait.
 """
 
 from __future__ import annotations
@@ -60,10 +78,22 @@ NODE_TIP_REF: Final = "refs/fleet/staged"
 #: the node fetches it into :data:`NODE_TIP_REF`.
 BUNDLE_REF_PREFIX: Final = "refs/fleet/bundle/"
 
-#: How long, in milliseconds, a fetch into the node's mirror waits for
-#: another run's fetch to give :data:`NODE_TIP_REF` back: several runs stage
-#: on one node at once, and git's own 100 ms would refuse the second.
+#: How long, in milliseconds, a command writing a mirror's refs waits for
+#: another git process to give a ref's lock or ``packed-refs.lock`` back:
+#: several runs stage on one node at once and export from one hub mirror at
+#: once, and git's own 100 ms for a ref and 1 s for ``packed-refs`` refused
+#: the second.
 REF_LOCK_TIMEOUT_MS: Final = 60_000
+
+#: The options every command writing a mirror's refs passes after ``git -C
+#: <mirror>``: git waits :data:`REF_LOCK_TIMEOUT_MS` for a ref's own lock and
+#: for ``packed-refs.lock``, which a ref deletion takes.
+REF_LOCK_WAITS: Final = (
+    "-c",
+    f"core.filesRefLockTimeout={REF_LOCK_TIMEOUT_MS}",
+    "-c",
+    f"core.packedRefsTimeout={REF_LOCK_TIMEOUT_MS}",
+)
 
 #: What the node's prepare script prints when its mirror already holds the commit.
 HELD_ANSWER: Final = "held"
@@ -196,10 +226,11 @@ def bundle_commit(
         AppError: ``EXPORT_FAILED`` when a git command exits non-zero.
     """
     ref = f"{BUNDLE_REF_PREFIX}{run_id}"
-    seconds = mirror_fetch.INIT_TIMEOUT_SECONDS
+    # A ref write may spend git's whole lock wait before it starts its own work.
+    seconds = REF_LOCK_TIMEOUT_MS // 1000 + mirror_fetch.INIT_TIMEOUT_SECONDS
     _git(
         mirror,
-        ("update-ref", ref, sha),
+        (*REF_LOCK_WAITS, "update-ref", ref, sha),
         verb=f"git update-ref {ref} in {mirror}",
         timeout_seconds=seconds,
     )
@@ -216,7 +247,7 @@ def bundle_commit(
     finally:
         _git(
             mirror,
-            ("update-ref", "-d", ref),
+            (*REF_LOCK_WAITS, "update-ref", "-d", ref),
             verb=f"git update-ref -d {ref} in {mirror}",
             timeout_seconds=seconds,
         )
@@ -260,8 +291,7 @@ def unpack_commands(
                 "git",
                 "-C",
                 mirror,
-                "-c",
-                f"core.filesRefLockTimeout={REF_LOCK_TIMEOUT_MS}",
+                *REF_LOCK_WAITS,
                 "fetch",
                 "--quiet",
                 "--no-tags",
@@ -381,6 +411,7 @@ __all__ = [
     "HELD_ANSWER",
     "NODE_TIP_REF",
     "REF_LOCK_TIMEOUT_MS",
+    "REF_LOCK_WAITS",
     "CommitExport",
     "NodeMirror",
     "StagedCommit",
