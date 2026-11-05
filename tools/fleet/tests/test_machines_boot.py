@@ -236,8 +236,11 @@ def test_diphtheria_s_adb_server_is_a_listener_started_by_hand() -> None:
 
 
 def test_diphtheria_declares_docker_its_tailnet_ingress_and_the_device_listeners() -> None:
+    # No containerd.service since the NixOS reinstall (MCPs board tasks
+    # ab48f939 and 223b03e1): the fleet's NixOS docker runs containerd as
+    # dockerd's own child, so the unit is not-found there and docker.service
+    # stands for the runtime.
     assert [_key(unit) for unit in _units("diphtheria")] == [
-        "systemd:containerd.service",
         "systemd:docker.service",
         "systemd:corvis-tailnet-ingress.service",
         "listener:127.0.0.1:5037",
