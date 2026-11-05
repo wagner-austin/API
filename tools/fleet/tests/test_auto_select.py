@@ -128,6 +128,7 @@ def _project() -> ProjectConfig:
         node=None,
         loopback_only=False,
         worker_cores=1,
+        worker_cores_measurement=None,
     )
 
 

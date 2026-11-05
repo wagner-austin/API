@@ -17,6 +17,7 @@ from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import (
     decode_project_config,
     decode_worker_cores,
+    decode_worker_cores_measurement,
     encode_project_config,
 )
 from fleet.core.capacity import assess, job_ceiling
@@ -24,6 +25,12 @@ from tests.test_capacity import LINUX_TAGS, _node, _project, _state
 
 #: What a declaration that is no whole number of at least one is refused with.
 REFUSED = r"project\.worker_cores must be a whole number of at least 1 or absent"
+
+#: What a count above one with no measurement is refused with.
+MEASUREMENT_MISSING = r"project\.worker_cores 8 must carry worker_cores_measurement"
+
+#: What a measurement beside one core a worker is refused with.
+MEASUREMENT_STRAY = r"project\.worker_cores_measurement is '.+' beside worker_cores 1"
 
 #: A live run of the flake check: one worker on 8 cores holding 16 GB.
 FLAKE_RUN = LiveLoad(runs=1, workers=1, cores=8, ram_gb=16.0)
@@ -40,9 +47,36 @@ class TestTheDeclaration:
             decode_worker_cores(value)
 
     def test_a_declaration_survives_encoding(self) -> None:
-        project = _project(worker_cores=8)
+        project = _project(worker_cores=8, worker_cores_measurement="fleet job 46eb328f")
 
         assert decode_project_config(encode_project_config(project)) == project
+        assert decode_project_config(encode_project_config(_project())) == _project()
+
+
+class TestTheMeasurement:
+    """A count above one carries the run that set it, in the registry beside it."""
+
+    def test_a_count_above_one_carries_its_measurement(self) -> None:
+        assert decode_worker_cores_measurement("fleet job 46eb328f", worker_cores=8) == (
+            "fleet job 46eb328f"
+        )
+
+    @pytest.mark.parametrize("value", [None, "", "  ", 8])
+    def test_a_count_above_one_without_text_is_refused(self, value: JSONValue) -> None:
+        with pytest.raises(JSONTypeError, match=MEASUREMENT_MISSING):
+            decode_worker_cores_measurement(value, worker_cores=8)
+
+    def test_one_core_carries_none_and_refuses_a_measurement(self) -> None:
+        assert decode_worker_cores_measurement(None, worker_cores=1) is None
+        with pytest.raises(JSONTypeError, match=MEASUREMENT_STRAY):
+            decode_worker_cores_measurement("fleet job 46eb328f", worker_cores=1)
+
+    def test_the_project_decoder_applies_it(self) -> None:
+        row = encode_project_config(_project(worker_cores=8, worker_cores_measurement="x"))
+        row["worker_cores_measurement"] = None
+
+        with pytest.raises(JSONTypeError, match=MEASUREMENT_MISSING):
+            decode_project_config(row)
 
 
 class TestTheCharge:

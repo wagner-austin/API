@@ -411,6 +411,9 @@ def test_the_nixos_flake_declares_the_dispatch_share_its_nix_daemon_fills() -> N
     state = _idle(node)
 
     assert project["worker_cores"] == 8
+    measurement = project["worker_cores_measurement"]
+    assert measurement is not None
+    assert measurement.startswith("Fleet job 46eb328f (MCPs 92c6776bc, lavender flushed")
     assert assess(node, state, project, carried) == {"workers": 1, "code": None, "reason": ""}
     state["live"] = LiveLoad(runs=1, workers=1, cores=8, ram_gb=16.0)
     other = workspace["projects"]["MCPs/mcp-shared"]

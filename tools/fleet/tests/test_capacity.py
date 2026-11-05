@@ -139,6 +139,7 @@ def _project(
     node: str | None = None,
     loopback_only: bool = False,
     worker_cores: int = 1,
+    worker_cores_measurement: str | None = None,
 ) -> ProjectConfig:
     """Build a project declaration.
 
@@ -149,6 +150,7 @@ def _project(
         node: The one node the project runs on, or None for any.
         loopback_only: Whether its check runs with only lo.
         worker_cores: The cores one worker occupies.
+        worker_cores_measurement: The run that set a count above one.
 
     Returns:
         The project.
@@ -164,6 +166,7 @@ def _project(
         node=node,
         loopback_only=loopback_only,
         worker_cores=worker_cores,
+        worker_cores_measurement=worker_cores_measurement,
     )
 
 

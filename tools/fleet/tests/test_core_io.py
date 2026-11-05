@@ -44,10 +44,11 @@ _PROJECTS = {
         node=None,
         loopback_only=False,
         worker_cores=worker_cores,
+        worker_cores_measurement=measurement,
     )
-    for project, worker_ram_gb, minimum_workers, worker_cores in (
-        ("services/Model-Trainer", 1.5, 2, 1),
-        ("MCPs/fleet-nixos", 16.0, 1, 8),
+    for project, worker_ram_gb, minimum_workers, worker_cores, measurement in (
+        ("services/Model-Trainer", 1.5, 2, 1, None),
+        ("MCPs/fleet-nixos", 16.0, 1, 8, "fleet job 46eb328f"),
     )
 }
 

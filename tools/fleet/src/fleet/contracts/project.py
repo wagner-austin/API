@@ -131,6 +131,12 @@ class ProjectConfig(TypedDict):
             (MCPs board task 51e3eac5). Optional, because it is the
             exception: absent reads as one, and anything but a whole number
             of at least one is refused.
+        worker_cores_measurement: The measurement that set ``worker_cores``
+            above one, written in the registry beside the value, so the
+            number a reader meets there carries the run it came from. None
+            exactly when ``worker_cores`` is one: a count above one without
+            it is refused, and one beside the default one is refused too,
+            since it would describe a declaration the project does not make.
     """
 
     worker_ram_gb: float
@@ -143,6 +149,7 @@ class ProjectConfig(TypedDict):
     node: str | None
     loopback_only: bool
     worker_cores: int
+    worker_cores_measurement: str | None
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -196,6 +203,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "node": project["node"],
         "loopback_only": project["loopback_only"],
         "worker_cores": project["worker_cores"],
+        "worker_cores_measurement": project["worker_cores_measurement"],
     }
 
 
@@ -273,6 +281,37 @@ def decode_worker_cores(value: JSONValue) -> int:
     return value
 
 
+def decode_worker_cores_measurement(value: JSONValue, *, worker_cores: int) -> str | None:
+    """Decode the measurement a project's ``worker_cores`` above one carries.
+
+    Args:
+        value: The key's value, or None when the key is absent.
+        worker_cores: The project's decoded ``worker_cores``.
+
+    Returns:
+        The measurement, or None for a project of one core a worker.
+
+    Raises:
+        JSONTypeError: When a count above one carries no non-empty text, or
+            a count of one carries any: the first is a number nobody can
+            trace to a run, the second describes a declaration the project
+            does not make.
+    """
+    if worker_cores == 1:
+        if value is not None:
+            raise JSONTypeError(
+                f"project.worker_cores_measurement is {value!r} beside worker_cores 1; it "
+                "records the run that set a count above one, so drop it or declare that count"
+            )
+        return None
+    if not isinstance(value, str) or not value.strip():
+        raise JSONTypeError(
+            f"project.worker_cores {worker_cores} must carry worker_cores_measurement, the "
+            f"measurement that set it, as non-empty text; got {value!r}"
+        )
+    return value
+
+
 def decode_project_config(value: JSONValue) -> ProjectConfig:
     """Decode and validate one project's declaration.
 
@@ -322,6 +361,7 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
             f"expected_minutes must be at least 1, got {expected_minutes}; it sizes the lease, "
             "and a zero produces one that has already expired when it is taken"
         )
+    worker_cores = decode_worker_cores(value.get("worker_cores"))
     return ProjectConfig(
         worker_ram_gb=worker_ram_gb,
         minimum_workers=minimum_workers,
@@ -336,7 +376,10 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         source=decode_project_source(value["source"], field="project.source"),
         node=decode_pinned_node(value.get("node")),
         loopback_only=decode_loopback_only(value.get("loopback_only")),
-        worker_cores=decode_worker_cores(value.get("worker_cores")),
+        worker_cores=worker_cores,
+        worker_cores_measurement=decode_worker_cores_measurement(
+            value.get("worker_cores_measurement"), worker_cores=worker_cores
+        ),
     )
 
 
@@ -347,6 +390,7 @@ __all__ = [
     "decode_pinned_node",
     "decode_project_config",
     "decode_worker_cores",
+    "decode_worker_cores_measurement",
     "encode_project_config",
     "lease_seconds",
 ]
