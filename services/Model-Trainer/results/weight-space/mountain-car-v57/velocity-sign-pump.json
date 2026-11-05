@@ -1,0 +1,14 @@
+{"program_id": "velocity-sign-pump",
+ "written_against": "sha256:b800b62057e499627d5fae8698814ef443b29db1ba498a50a8df343dd4f1dd62",
+ "ops": [
+  {"op": "set", "parameter": "hidden_in.weight", "axis": 0, "indices": [0], "values": [0.0, 200.0]},
+  {"op": "set", "parameter": "hidden_in.bias", "axis": 0, "indices": [0], "values": [0.0]},
+  {"op": "set", "parameter": "hidden_mid.weight", "axis": 0, "indices": [0],
+   "values": [5.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+  {"op": "set", "parameter": "hidden_mid.bias", "axis": 0, "indices": [0], "values": [0.0]},
+  {"op": "set", "parameter": "action_out.weight", "axis": 0, "indices": [0, 1, 2],
+   "values": [-1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+              1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]},
+  {"op": "set", "parameter": "action_out.bias", "axis": 0, "indices": [0, 1, 2], "values": [0.0, -1.0, 0.0]}
+ ]}
