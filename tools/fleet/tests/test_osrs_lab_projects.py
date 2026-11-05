@@ -36,6 +36,11 @@ configuration tests in the same image, starting real PulseAudio daemons, beside
 input-policy's: on colossus at osrs-lab e33ff2b it passed 9 tests, 4 of its
 own and 5 of input-policy's, in 30 s, at lines 37/37 and branches 26/26, all
 input-policy's, since the directory holds no main source.
+
+input-policy (board task b2ee9cbe) runs the input boundary policy's own make
+check in the same image since osrs-lab 6176e3d, whose packaged-classes.gradle
+the recorder and the observer's login plugin artifact apply: on colossus it
+passed 5 tests in 18 s at lines 37/37 and branches 26/26.
 """
 
 from __future__ import annotations
@@ -52,6 +57,7 @@ from tests._registry import shipped_document
 DIRECTORIES: Final[tuple[str, ...]] = (
     "brain",
     "desktop-input",
+    "input-policy",
     "live-coverage",
     "manual-desktop",
     "observer",

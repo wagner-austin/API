@@ -1539,6 +1539,14 @@ whose `manual-desktop/Dockerfile` change made it needed, it passed 9 tests in
 30 s at lines 37/37 and branches 26/26, with the same tags and workers as the
 observer.
 
+**`osrs-lab/input-policy`** (board task b2ee9cbe, 2026-11-05) is the input
+boundary policy's own `make check`, run in the same image since osrs-lab
+6176e3d: its tests at full coverage and its scan of every module's production
+sources. Its `packaged-classes.gradle` is the packaged-class gate the recorder
+and the observer's login plugin artifact apply. On colossus it passed 5 tests in
+18 s at lines 37/37 and branches 26/26, with the policy scan over 138 production
+sources, and the same tags and workers as the observer.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
