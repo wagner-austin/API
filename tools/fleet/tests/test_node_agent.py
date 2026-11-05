@@ -22,7 +22,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, narrow_json_to_s
 
 from fleet.cli import _config, node_agent, node_prepare
 from fleet.contracts.dispatch import decode_job
-from fleet.core import _test_hooks, dialect, mirror_fetch, names, records, staging
+from fleet.core import _test_hooks, commit_stage, dialect, mirror_fetch, names, records, staging
 from tests._node_agent_fixtures import (
     NOTHING_LAUNCHED,
     NPM_CI,
@@ -153,10 +153,19 @@ class TestClaiming:
         )
         assert [call[0] for call in runner.calls[probes + 2 : probes + 4]] == ["ssh", "ssh"]
         ref = f"refs/fleet/bundle/{DEMO_RUN_ID}"
-        assert runner.calls[probes + 4] == ("git", "-C", mirror, "update-ref", ref, DEFAULT_SHA)
+        waits = commit_stage.REF_LOCK_WAITS
+        assert runner.calls[probes + 4] == (
+            "git",
+            "-C",
+            mirror,
+            *waits,
+            "update-ref",
+            ref,
+            DEFAULT_SHA,
+        )
         assert runner.calls[probes + 5][3:6] == ("bundle", "create", "--quiet")
         assert runner.calls[probes + 5][-1] == ref
-        assert runner.calls[probes + 6] == ("git", "-C", mirror, "update-ref", "-d", ref)
+        assert runner.calls[probes + 6] == ("git", "-C", mirror, *waits, "update-ref", "-d", ref)
         assert not any(call[0] == "tar" for call in runner.calls)
 
     def test_the_build_script_carries_the_install_steps_and_the_node_cache(

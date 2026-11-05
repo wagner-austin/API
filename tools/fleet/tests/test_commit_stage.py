@@ -227,7 +227,15 @@ class TestTheBundleCarriesWhatTheNodeLacks:
             f"git bundle create {SHA} from {mirror}: fatal: Refusing to create empty bundle."
         )
         ref = "refs/fleet/bundle/run-1"
-        assert runner.calls[2] == ("git", "-C", str(mirror), "update-ref", "-d", ref)
+        assert runner.calls[2] == (
+            "git",
+            "-C",
+            str(mirror),
+            *commit_stage.REF_LOCK_WAITS,
+            "update-ref",
+            "-d",
+            ref,
+        )
 
     def test_a_ref_git_refuses_bundles_nothing(self, tmp_path: pathlib.Path) -> None:
         runner = FakeRun([failed(128, "fatal: cannot lock ref")])
