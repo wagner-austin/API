@@ -870,10 +870,14 @@ one) and the runner exports THAT commit:
    (`git init`, `git add --all --force`, one commit as `fleet`) because MCPs
    `packages/db`'s migrator admits test migrations against `HEAD`;
 4. every repository the project's `source` declares under `companions` is
-   exported BESIDE it, from its own mirror at the TIP of the declared `ref`,
-   into `<stage_root>/<directory>` — which is `../<directory>` from the
-   export root, the layout a workstation already has — and made a one-commit
-   git repository there;
+   staged BESIDE it, its declared `ref` fetched at its TIP into its own hub
+   mirror, eight companions at once, into `<stage_root>/<directory>` — which
+   is `../<directory>` from the export root, the layout a workstation
+   already has — as a clone with its history out of the node's own mirror of
+   that remote, which is sent only what it lacks as a commit is, and a
+   companion already clean at that commit is kept as it is
+   (`fleet.core.companion_stage`, MCPs board task 5280a25d: one wiki-check
+   launch carried 17 companions' whole histories, the MCPs one 266 MB);
 5. the build script points npm, poetry and Playwright at the current
    generation of the node's caches
    (`<stage_root>/cache/tools/<generation>/{npm,pypoetry,ms-playwright}`), keeps poetry's
@@ -887,13 +891,14 @@ else; every `check-fleet` job for it died in `make lint` before a single
 test. The node cannot go and get it: both repositories are private and a node
 holds no git credential, measured on sedona 2026-09-22 as `git ls-remote`
 exiting 128 with "could not read Username for 'https://github.com'". So a
-companion travels from the hub with the work, through the same mirror,
-archive and digest-verified transport as the project's own commit. It names a
+companion travels from the hub with the work, through the same mirrors,
+bundles and digest-verified transport as the project's own commit. It names a
 `ref` for checks that intentionally follow an upstream branch; the resolved
 commit is recorded on the feed, so a verdict can be read against the workspace it was
-measured with. The directory is REPLACED each run rather than unpacked over,
-and the archive stays in a `<directory>.stage` beside it, so what the recipe
-reads is the export of one commit and nothing else. Every project declares
+measured with. The directory is REPLACED each run unless its refs, its branch
+and an empty `git status --ignored` say it is already that commit's clean
+clone, and the bundle stays in a `<directory>.stage` beside it, so what the
+recipe reads is one commit's clone and nothing else. Every project declares
 `companions`. All current projects declare `[]`: slime now verifies a committed
 integrity lock offline instead of reading a second checkout (20e977b6).
 The companion transport remains available for projects that genuinely need it.
