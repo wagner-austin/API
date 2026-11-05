@@ -17,7 +17,16 @@ import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import _test_hooks, mirror_fetch
-from tests.conftest import DEMO_NOW, FakeClock, FakeRun, failed, ok, pin_clock, timed_out
+from tests.conftest import (
+    DEMO_NOW,
+    FakeClock,
+    FakeRun,
+    FakeSleep,
+    failed,
+    ok,
+    pin_clock,
+    timed_out,
+)
 
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
 REMOTE = "https://github.com/wagner-austin/API.git"
@@ -192,14 +201,25 @@ class TestALostFetch:
 
         assert [call[3] for call in runner.calls] == ["merge-base", "cat-file", "fetch", "fetch"]
         assert runner.timeouts[2:] == [mirror_fetch.FETCH_TIMEOUT_SECONDS] * 2
-        assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSE_SECONDS
+        # One second, not ten (MCPs board task 5280a25d): every job of a push
+        # gate waits in the mirror's turn behind this fetch.
+        assert clock.seconds == DEMO_NOW + 1
 
     def test_one_lost_every_time_is_refused_naming_each_attempt(
         self, tmp_path: pathlib.Path
     ) -> None:
         clock = pin_clock(DEMO_NOW)
+        sleep = _test_hooks.sleep
+        assert isinstance(sleep, FakeSleep)
         _test_hooks.run = FakeRun(
-            [*UNFETCHED, failed(128, TLS_LOST), failed(128, RESET), failed(1, "  ")]
+            [
+                *UNFETCHED,
+                failed(128, TLS_LOST),
+                failed(128, RESET),
+                failed(128, RESET),
+                failed(128, TLS_LOST),
+                failed(1, "  "),
+            ]
         )
 
         with pytest.raises(AppError) as raised:
@@ -207,10 +227,13 @@ class TestALostFetch:
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message == (
-            f"git fetch {REMOTE} {SHA} into {tmp_path}: no attempt of 3 within 900 s was done; "
-            f"attempt 1: {TLS_LOST}; attempt 2: {RESET}; attempt 3: (git wrote nothing to stderr)"
+            f"git fetch {REMOTE} {SHA} into {tmp_path}: no attempt of 5 within 900 s was done; "
+            f"attempt 1: {TLS_LOST}; attempt 2: {RESET}; attempt 3: {RESET}; "
+            f"attempt 4: {TLS_LOST}; attempt 5: (git wrote nothing to stderr)"
         )
-        assert clock.seconds == DEMO_NOW + 2 * mirror_fetch.FETCH_PAUSE_SECONDS
+        # The pauses double from one second and span 15 s of lost connections.
+        assert sleep.slept == [1, 2, 4, 8]
+        assert clock.seconds == DEMO_NOW + 15
 
     def test_a_remote_that_never_answers_spends_the_budget_and_no_more(
         self, tmp_path: pathlib.Path
@@ -225,7 +248,7 @@ class TestALostFetch:
         with pytest.raises(AppError) as raised:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
-        left = mirror_fetch.FETCH_BUDGET_SECONDS - 600 - mirror_fetch.FETCH_PAUSE_SECONDS
+        left = mirror_fetch.FETCH_BUDGET_SECONDS - 600 - mirror_fetch.FETCH_PAUSES_SECONDS[0]
         assert hanging.timeouts[2:] == [600, left]
         assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_BUDGET_SECONDS
         assert raised.value.message.endswith(
@@ -306,7 +329,7 @@ class TestARefusedCredential:
 
         assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
         assert len(runner.calls) == 4
-        assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSE_SECONDS
+        assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSES_SECONDS[0]
 
     def test_every_marker_is_one_git_was_measured_printing(self) -> None:
         """A marker no measured refusal carries would be a rule for words git
@@ -324,7 +347,7 @@ class TestARefusedCredential:
         credential."""
         pin_clock(DEMO_NOW)
         unnamed = "ERROR: Repository not found.\nfatal: Could not read from remote repository."
-        runner = FakeRun([*UNFETCHED] + [failed(128, unnamed)] * 3)
+        runner = FakeRun([*UNFETCHED] + [failed(128, unnamed)] * mirror_fetch.FETCH_ATTEMPTS)
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
@@ -400,7 +423,7 @@ class TestFetchRef:
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message.startswith(
-            f"git fetch {REMOTE} main into {tmp_path}: no attempt of 3 within 900 s was done; "
+            f"git fetch {REMOTE} main into {tmp_path}: no attempt of 5 within 900 s was done; "
             f"attempt 1: {RESET}; "
         )
 
