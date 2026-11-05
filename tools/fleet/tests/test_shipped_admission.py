@@ -113,18 +113,19 @@ from fleet.core.capacity import assess
 from fleet.core.workspace_files import read_workspace_document
 
 #: Each bounded node, a project it checks, and the workers it grants that
-#: project alone: half the cores its owner leaves, rounded up, with memory to
-#: spare at 24 GB free. diphtheria is weighed with a suite pinned to it,
-#: because it checks no other. serendipity leaves its owner only the
-#: operating system's 2 cores since MCPs board task e447de72 (the operator,
-#: 2026-10-19: "i dont uze amt kf rhe pcs perosnally rhwyre all workers"),
-#: so 6 cores are left to the fleet. lenovold keeps the same 2 of its 4, and
-#: MCPs/sms-gateway's declared minimum of 2 workers, all the cores left,
-#: outranks half of them (MCPs board task 6747753b).
+#: project alone: every core its owner leaves, since a node that carries one
+#: check at once has no second run to keep half for (MCPs board task
+#: b96f9da1), with memory to spare at 24 GB free. diphtheria is weighed with
+#: a suite pinned to it, because it checks no other, and leaves 4 of its 8.
+#: serendipity leaves its owner only the operating system's 2 cores since
+#: MCPs board task e447de72 (the operator, 2026-10-19: "i dont uze amt kf rhe
+#: pcs perosnally rhwyre all workers"), so 6 cores are left to the fleet.
+#: lenovold keeps the same 2 of its 4, which MCPs/sms-gateway's declared
+#: minimum of 2 workers takes whole (MCPs board task 6747753b).
 BOUNDED_GRANTS = {
-    "diphtheria": ("MCPs/doc-extract-api", 2),
+    "diphtheria": ("MCPs/doc-extract-api", 4),
     "lenovold": ("MCPs/sms-gateway", 2),
-    "serendipity": ("MCPs/mcp-shared", 3),
+    "serendipity": ("MCPs/mcp-shared", 6),
 }
 
 #: The run MCPs/fleet-nixos's registry row names beside its worker_cores 8.
@@ -269,11 +270,11 @@ def test_lenovold_refuses_the_suite_and_no_other_node_carrying_its_tags_does(
     }
     # serendipity leaves the fewest cores of the nodes that admit these
     # suites, 6, and ran each in at most 168 s of the budget; 3 is the
-    # smallest minimum lenovold's 2 cores refuse, and half of serendipity's 6
-    # grants it.
+    # smallest minimum lenovold's 2 cores refuse, and serendipity, which
+    # carries one check at once, grants all 6 (MCPs board task b96f9da1).
     serendipity = workspace["nodes"]["serendipity"]
     assert assess(serendipity, _idle(serendipity), project, node_tags(serendipity)) == {
-        "workers": 3,
+        "workers": 6,
         "code": None,
         "reason": "",
     }

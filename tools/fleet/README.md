@@ -1135,7 +1135,12 @@ owner leaves rounded up and never below the project's `minimum_workers`, so the
 first job leaves room for a second. On the fleet as declared on 2026-10-20 the
 ceiling was sedona and lacrymal 9, pendragon 7, loki 5, colossus and lavender
 4, serendipity 3 and diphtheria 2, unless a project's minimum is higher;
-loki left the roster on 2026-10-25 (board task e705f08c).
+loki left the roster on 2026-10-25 (board task e705f08c). A node whose budget
+declares `checks_at_once` of 1 refuses that second job, so since MCPs board task
+b96f9da1 its ceiling is every core its owner leaves: on the roster of
+2026-11-05, serendipity 6, diphtheria and demure 4, and lenovold 2. That day
+serendipity had run MCPs/mcp-shared at 3 workers, with check phases of 100 to
+143 s at a load of 1.4.
 
 **A node running several jobs is never offered one its own lease file would
 refuse.** The projects a runner hands `dispatch_claim` are the ones that fit by
