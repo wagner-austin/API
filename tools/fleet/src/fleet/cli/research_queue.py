@@ -129,6 +129,7 @@ def reconcile(
                 job_id=job["job_id"],
                 node=worker["node"],
                 run_id=run_id,
+                workers=None,
                 lease_seconds=QUEUE_LEASE_SECONDS,
                 identity=identity,
             )
@@ -234,6 +235,7 @@ def tick(
             tags=(),
             node=worker["node"],
             projects=("research/hpc3", "research/wrds"),
+            widths=(),
             lease_seconds=QUEUE_LEASE_SECONDS,
             identity=identity,
         )

@@ -54,6 +54,7 @@ def ask_queue(
         tags=tuple(sorted(ready["tags"])),
         node=alias,
         projects=ready["fits"],
+        widths=ready["widths"],
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )

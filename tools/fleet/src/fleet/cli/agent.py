@@ -212,6 +212,7 @@ def claim_pass(
         tags=(),
         node=node,
         projects=None,
+        widths=(),
         lease_seconds=hub_jobs.PRESTART_LEASE_SECONDS,
         identity=identity,
     )

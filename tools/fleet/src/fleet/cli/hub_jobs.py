@@ -76,6 +76,7 @@ def _start(
         job_id=job["job_id"],
         node=node,
         run_id=run_id,
+        workers=None,
         lease_seconds=CLAIM_LEASE_SECONDS,
         identity=identity,
     )

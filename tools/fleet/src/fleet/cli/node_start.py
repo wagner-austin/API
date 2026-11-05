@@ -70,6 +70,7 @@ def report_started(
             job_id=job["job_id"],
             node=alias,
             run_id=row["run_id"],
+            workers=row["workers"],
             lease_seconds=CLAIM_LEASE_SECONDS,
             identity=identity,
         )

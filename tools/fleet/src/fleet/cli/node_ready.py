@@ -32,6 +32,7 @@ from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.runner_tick import RunnerTick, TickLoad
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.toolchain import ToolReport
+from fleet.contracts.width_offer import WidthOffer
 from fleet.core import capacity, probe, records, run_lease, toolchain
 
 _log = get_logger(__name__)
@@ -48,11 +49,16 @@ class Ready(TypedDict):
             (:func:`fleet.core.capacity.fitting_projects`), which its claim
             names so the queue offers it nothing it would refuse. Never
             empty: a node that fits none claims nothing.
+        widths: The workers it would grant each of ``fits``, in the same
+            order, which its claim offers so the queue keeps a push gate's
+            check off a node and width measured to miss the gate's budget
+            (MCPs board task 1964fc15).
     """
 
     state: NodeState
     tags: frozenset[NodeTag]
     fits: tuple[str, ...]
+    widths: tuple[WidthOffer, ...]
 
 
 class Gate(TypedDict):
@@ -234,7 +240,8 @@ def _claimable(
     full = capacity.room_for_any(node, state, tuple(registered.values()), tags)
     if full is not None:
         return closed(alias, load, f"has room for nothing; claiming nothing: {full}", tags=tags)
-    roomy = capacity.fitting_projects(node, state, registered, tags)
+    offers = capacity.fitting_projects(node, state, registered, tags)
+    roomy = tuple(offer["project"] for offer in offers)
     held = run_lease.held_on_node(
         loaded.leases,
         node=alias,
@@ -285,7 +292,12 @@ def _claimable(
             tags=tags,
         )
     return Gate(
-        ready=Ready(state=state, tags=tags, fits=fits),
+        ready=Ready(
+            state=state,
+            tags=tags,
+            fits=fits,
+            widths=tuple(offer for offer in offers if offer["project"] in fits),
+        ),
         tick=RunnerTick(
             node=alias,
             tags=tuple(sorted(tags)),

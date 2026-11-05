@@ -265,6 +265,7 @@ def models_pass(
             tags=(),
             node=alias,
             projects=None,
+            widths=(),
             lease_seconds=MODEL_LEASE_SECONDS,
             identity=identity,
         )
@@ -276,6 +277,7 @@ def models_pass(
             job_id=job["job_id"],
             node=alias,
             run_id=model_unit(model["model_id"]),
+            workers=None,
             lease_seconds=MODEL_LEASE_SECONDS,
             identity=identity,
         )
