@@ -82,23 +82,17 @@ class TestAdmissibleWorkers:
         77.9 GB of wedged commit the same night. The memory-first rule gives
         6, which fits.
         """
-        workers = admissible_workers(
-            _budget(), logical_cores=20, free_ram_gb=11.4, worker_cores=1
-        )
+        workers = admissible_workers(_budget(), logical_cores=20, free_ram_gb=11.4, worker_cores=1)
 
         assert workers == 6
         assert workers * 1.1 <= 11.4 - 4.0
 
     def test_a_machine_whose_owner_is_using_all_the_memory_affords_nothing(self) -> None:
-        assert (
-            admissible_workers(_budget(), logical_cores=32, free_ram_gb=3.0, worker_cores=1) == 0
-        )
+        assert admissible_workers(_budget(), logical_cores=32, free_ram_gb=3.0, worker_cores=1) == 0
 
     def test_memory_exactly_at_the_reservation_affords_nothing(self) -> None:
         """The boundary falls to zero, not to one worker on borrowed memory."""
-        assert (
-            admissible_workers(_budget(), logical_cores=32, free_ram_gb=4.0, worker_cores=1) == 0
-        )
+        assert admissible_workers(_budget(), logical_cores=32, free_ram_gb=4.0, worker_cores=1) == 0
 
     def test_a_machine_whose_cores_are_all_reserved_affords_nothing(self) -> None:
         assert (

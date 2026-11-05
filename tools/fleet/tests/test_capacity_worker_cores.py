@@ -109,8 +109,9 @@ class TestTheQuota:
         )
 
         assert (verdict["workers"], verdict["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
-        assert "so 6 core(s) are left where the suite's minimum of 1 worker(s) occupies 8" in (
-            verdict["reason"]
+        assert (
+            "so 6 core(s) are left where the suite's minimum of 1 worker(s) occupies 8"
+            in (verdict["reason"])
         )
 
     def test_the_quota_s_cores_bound_the_workers_they_hold(self) -> None:

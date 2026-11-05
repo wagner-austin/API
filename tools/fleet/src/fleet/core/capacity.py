@@ -86,9 +86,7 @@ def _project_budget(node: NodeConfig, project: ProjectConfig) -> NodeBudget:
     return {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]}
 
 
-def _who_holds_it(
-    node: NodeConfig, state: NodeState, budget: NodeBudget, worker_cores: int
-) -> str:
+def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget, worker_cores: int) -> str:
     """Name what holds a node's room in a reservation refusal.
 
     Args:
