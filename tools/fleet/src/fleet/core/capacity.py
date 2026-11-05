@@ -86,13 +86,16 @@ def _project_budget(node: NodeConfig, project: ProjectConfig) -> NodeBudget:
     return {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]}
 
 
-def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str:
+def _who_holds_it(
+    node: NodeConfig, state: NodeState, budget: NodeBudget, worker_cores: int
+) -> str:
     """Name what holds a node's room in a reservation refusal.
 
     Args:
         node: The node's declaration.
         state: What the node reported.
         budget: The budget the project was weighed against.
+        worker_cores: The cores one of the project's workers occupies.
 
     Returns:
         The node's CI runners, with the slice's numbers, when its probe read
@@ -100,7 +103,10 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
         5d6e57e7); else the node's own fleet runs, when without their
         charge it would have room (MCPs board task 939ec5c7: on 2026-10-03
         lavender-wsl, with 18.8 GB free and two runs holding seven workers,
-        was said to have "somebody" on it); otherwise the owner.
+        was said to have "somebody" on it); else the owner's reserved
+        cores, when what they leave holds no worker of the project however
+        idle the node is (MCPs board task 51e3eac5: MCPs/fleet-nixos's
+        8-core worker on serendipity's 6 left of its 8); otherwise the owner.
     """
     ci_slice = state["ci_slice"]
     if ci_slice is not None and ci_slice["current_gb"] >= SLICE_AT_HIGH * ci_slice["high_gb"]:
@@ -109,7 +115,10 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
             f"its {ci_slice['high_gb']:.1f} GB memory.high, so the lane waits for a CI job to end"
         )
     unloaded = admissible_workers(
-        budget, logical_cores=node["logical_cores"], free_ram_gb=state["free_ram_gb"]
+        budget,
+        logical_cores=node["logical_cores"],
+        free_ram_gb=state["free_ram_gb"],
+        worker_cores=worker_cores,
     )
     if state["live"]["runs"] > 0 and unloaded > 0:
         return "its own fleet runs hold the rest, so it takes the next job when one of them ends"
@@ -117,6 +126,12 @@ def _who_holds_it(node: NodeConfig, state: NodeState, budget: NodeBudget) -> str
         return (
             "its reservations hold the rest (work the fleet does not run, declared in "
             "~/.fleet/reservations), so it takes the next job when they end"
+        )
+    share = node["logical_cores"] - budget["reserved_cores"]
+    if share < worker_cores:
+        return (
+            f"one worker of this project occupies {worker_cores} cores and its owner's "
+            f"reservation leaves {share}, so it never takes this project"
         )
     return "somebody is on this machine"
 
@@ -176,6 +191,14 @@ def assess(
     budget. The quota's whole CPUs, less the node's live workers, bound the
     grant, and a node where they fall under the project's minimum waits,
     after the I/O refusal, naming the quota.
+
+    A WORKER IS CHARGED THE CORES ITS PROJECT DECLARES (MCPs board task
+    51e3eac5). Each worker granted, and each worker of a live run, holds its
+    project's ``worker_cores`` of the cores pool and of the quota, one for a
+    test suite. MCPs/fleet-nixos's one worker is a nix daemon that fills the
+    node's dispatch share, and charged one core it left room the fleet gave
+    to two other checks during its cold run on lavender (fleet job
+    46eb328f), 386.5 CPU-s beside its own 1463.8 in 305 s of its 300.
 
     A NODE ON ITS BATTERY TAKES NO CHECK (MCPs board task 3268afdf), after the
     disk refusal and before every load refusal, since no load falling clears
@@ -265,31 +288,35 @@ def assess(
             ),
         )
     quota = state["check_cpu_quota"]
-    quota_room = None if quota is None else int(quota) - live["workers"]
-    if quota_room is not None and quota_room < project["minimum_workers"]:
+    worker_cores = project["worker_cores"]
+    quota_room = None if quota is None else int(quota) - live["cores"]
+    needed = project["minimum_workers"] * worker_cores
+    if quota_room is not None and quota_room < needed:
         return DispatchVerdict(
             workers=0,
             code=FleetErrorCode.NODE_OWNER_RESERVED,
             reason=(
                 f"{node['host']}'s checks are held to {quota:.2f} CPU(s) by the quota systemd "
-                f"keeps on their slice, so {quota_room} worker(s) fit where the suite declares a "
-                f"minimum of {project['minimum_workers']}{_live_clause(state)}. Whoever capped it "
-                "is using the machine, and a check placed here would run past its budget; it "
-                "takes the next job when the quota is lifted."
+                f"keeps on their slice, so {quota_room} core(s) are left where the suite's "
+                f"minimum of {project['minimum_workers']} worker(s) occupies {needed}"
+                f"{_live_clause(state)}. Whoever capped it is using the machine, and a check "
+                "placed here would run past its budget; it takes the next job when the quota is "
+                "lifted."
             ),
         )
     budget = _project_budget(node, project)
-    # A reservation's cores come off beside the live runs' workers (MCPs board
+    # A reservation's cores come off beside the live runs' cores (MCPs board
     # task 84a2b690): a clean-VM smoke on diphtheria held 4 of its 8 cores
     # while two checks placed beside it ran 334 s and 411 s of their 300.
     workers = min(
         admissible_workers(
             budget,
-            logical_cores=node["logical_cores"] - live["workers"] - state["reserved_cores"],
+            logical_cores=node["logical_cores"] - live["cores"] - state["reserved_cores"],
             free_ram_gb=state["free_ram_gb"] - live["ram_gb"],
+            worker_cores=worker_cores,
         ),
         job_ceiling(node, project),
-        *(() if quota_room is None else (quota_room,)),
+        *(() if quota_room is None else (quota_room // worker_cores,)),
     )
     if workers <= 0:
         return DispatchVerdict(
@@ -300,7 +327,7 @@ def assess(
                 f"of {node['budget']['reserved_ram_gb']:.1f} GB for whoever is using it, and "
                 f"{node['logical_cores']} cores against {node['budget']['reserved_cores']} "
                 f"reserved{_live_clause(state)}. Nothing is left for a dispatch; "
-                f"{_who_holds_it(node, state, budget)}."
+                f"{_who_holds_it(node, state, budget, worker_cores)}."
             ),
         )
     if workers < project["minimum_workers"]:
@@ -323,11 +350,11 @@ def assess(
 def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
     """The most workers one dispatch may be granted on a node.
 
-    Half the cores the node's owner leaves, rounded up, and never below the
-    project's own minimum: a suite spends real time in serial install and
-    build phases and xdist scales below linearly, so two half-width runs keep
-    a node busier than one full-width one, and the cores pool in
-    :func:`assess` still bounds the sum.
+    The workers half the cores the node's owner leaves, rounded up, hold, and
+    never below the project's own minimum: a suite spends real time in serial
+    install and build phases and xdist scales below linearly, so two
+    half-width runs keep a node busier than one full-width one, and the cores
+    pool in :func:`assess` still bounds the sum.
 
     Args:
         node: The node's declaration.
@@ -337,7 +364,7 @@ def job_ceiling(node: NodeConfig, project: ProjectConfig) -> int:
         The ceiling, at least ``project['minimum_workers']``.
     """
     spare = node["logical_cores"] - node["budget"]["reserved_cores"]
-    return max(project["minimum_workers"], -(-spare // 2))
+    return max(project["minimum_workers"], -(-spare // 2) // project["worker_cores"])
 
 
 def _live_clause(state: NodeState) -> str:
@@ -349,16 +376,16 @@ def _live_clause(state: NodeState) -> str:
     Returns:
         An empty string when no fleet run is live on the node and no
         reservation holds a core; otherwise ``, and its N live fleet run(s)
-        hold W worker(s) and X GB`` and ``, and its reservations hold C
-        core(s)``, each only when it holds something.
+        hold W worker(s) on K core(s) and X GB`` and ``, and its reservations
+        hold C core(s)``, each only when it holds something.
     """
     live = state["live"]
     runs = (
         ""
         if live["runs"] == 0
         else (
-            f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) and "
-            f"{live['ram_gb']:.1f} GB"
+            f", and its {live['runs']} live fleet run(s) hold {live['workers']} worker(s) on "
+            f"{live['cores']} core(s) and {live['ram_gb']:.1f} GB"
         )
     )
     held = (
@@ -443,6 +470,7 @@ def room_for_any(
         source=None,
         node=node["host"],
         loopback_only=False,
+        worker_cores=1,
     )
     verdict = assess(node, state, default_tenant, tags)
     if verdict["code"] is None:

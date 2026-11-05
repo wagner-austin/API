@@ -306,6 +306,7 @@ class TestTheNextTick:
                 runner="fleet-node-lavender",
                 project="libs/demo",
                 workers=2,
+                cores=2,
                 ram_gb=2.0,
                 until_unix=DEMO_NOW + claim_window.CLAIM_LEASE_SECONDS,
             ),
@@ -327,7 +328,7 @@ class TestTheNextTick:
         assert list(claims.iterdir()) == []
         assert host_claims.host_load(
             host_claims.live_claims(loaded.host_claims, alias="lavender")
-        ) == LiveLoad(runs=0, workers=0, ram_gb=0.0)
+        ) == LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0)
 
     def test_a_given_back_claim_abandons_the_lease_it_took_and_the_lane_is_claimed_again(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture

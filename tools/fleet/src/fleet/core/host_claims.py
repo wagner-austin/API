@@ -221,6 +221,7 @@ def host_load(claims: tuple[HostClaim, ...]) -> LiveLoad:
     return LiveLoad(
         runs=len(claims),
         workers=sum(claim["workers"] for claim in claims),
+        cores=sum(claim["cores"] for claim in claims),
         ram_gb=sum(claim["ram_gb"] for claim in claims),
     )
 

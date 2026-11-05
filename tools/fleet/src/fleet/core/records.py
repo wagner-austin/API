@@ -237,12 +237,14 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
     Args:
         path: The ledger file.
         node: The node's workspace name.
-        projects: Every registered project, for each run's ``worker_ram_gb``.
+        projects: Every registered project, for each run's ``worker_cores``
+            and ``worker_ram_gb``.
 
     Returns:
         How many dispatches on that node are CURRENTLY running -- see
         :func:`latest_rows` for why the distinction is load-bearing -- with
-        the workers they were granted and the memory those workers may hold.
+        the workers they were granted and the cores and memory those workers
+        may hold.
 
     Raises:
         AppError: With ``WORKSPACE_PROJECT_UNKNOWN`` when a live run's project
@@ -250,6 +252,7 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
             unknown, and guessing low is how a node gets overloaded.
     """
     live = [row for row in latest_rows(path) if row["node"] == node and is_live(row)]
+    cores = 0
     ram_gb = 0.0
     for row in live:
         project = projects.get(row["project"])
@@ -260,8 +263,11 @@ def live_load(path: pathlib.Path, *, node: str, projects: Mapping[str, ProjectCo
                 "no longer registers, so what its workers hold is unknown; register the project "
                 "again or let the run end before this node takes more work",
             )
+        cores += row["workers"] * project["worker_cores"]
         ram_gb += row["workers"] * project["worker_ram_gb"]
-    return LiveLoad(runs=len(live), workers=sum(row["workers"] for row in live), ram_gb=ram_gb)
+    return LiveLoad(
+        runs=len(live), workers=sum(row["workers"] for row in live), cores=cores, ram_gb=ram_gb
+    )
 
 
 def append_ledger(path: pathlib.Path, entry: LedgerEntry) -> None:

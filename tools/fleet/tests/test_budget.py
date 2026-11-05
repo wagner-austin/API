@@ -55,11 +55,24 @@ def _budget(
 class TestAdmissibleWorkers:
     def test_memory_divides_when_cores_are_plentiful(self) -> None:
         """20 GB free, 4 reserved, 1.1 per worker -> 14, not the 30 cores."""
-        assert admissible_workers(_budget(), logical_cores=32, free_ram_gb=20.0) == 14
+        assert (
+            admissible_workers(_budget(), logical_cores=32, free_ram_gb=20.0, worker_cores=1) == 14
+        )
 
     def test_cores_bound_when_memory_is_plentiful(self) -> None:
         """Memory would afford 87 workers; the machine has 8 cores minus 2."""
-        assert admissible_workers(_budget(), logical_cores=8, free_ram_gb=100.0) == 6
+        assert (
+            admissible_workers(_budget(), logical_cores=8, free_ram_gb=100.0, worker_cores=1) == 6
+        )
+
+    def test_a_worker_that_occupies_several_cores_divides_the_cores_left(self) -> None:
+        """10 cores minus 2 reserved hold one 8-core worker, and 9 minus 2 hold none."""
+        assert (
+            admissible_workers(_budget(), logical_cores=10, free_ram_gb=100.0, worker_cores=8) == 1
+        )
+        assert (
+            admissible_workers(_budget(), logical_cores=9, free_ram_gb=100.0, worker_cores=8) == 0
+        )
 
     def test_the_sedona_case_that_motivated_the_rule(self) -> None:
         """MEASURED 2026-09-04: 20 cores, 11.4 GB free, a torch suite.
@@ -69,30 +82,41 @@ class TestAdmissibleWorkers:
         77.9 GB of wedged commit the same night. The memory-first rule gives
         6, which fits.
         """
-        workers = admissible_workers(_budget(), logical_cores=20, free_ram_gb=11.4)
+        workers = admissible_workers(
+            _budget(), logical_cores=20, free_ram_gb=11.4, worker_cores=1
+        )
 
         assert workers == 6
         assert workers * 1.1 <= 11.4 - 4.0
 
     def test_a_machine_whose_owner_is_using_all_the_memory_affords_nothing(self) -> None:
-        assert admissible_workers(_budget(), logical_cores=32, free_ram_gb=3.0) == 0
+        assert (
+            admissible_workers(_budget(), logical_cores=32, free_ram_gb=3.0, worker_cores=1) == 0
+        )
 
     def test_memory_exactly_at_the_reservation_affords_nothing(self) -> None:
         """The boundary falls to zero, not to one worker on borrowed memory."""
-        assert admissible_workers(_budget(), logical_cores=32, free_ram_gb=4.0) == 0
+        assert (
+            admissible_workers(_budget(), logical_cores=32, free_ram_gb=4.0, worker_cores=1) == 0
+        )
 
     def test_a_machine_whose_cores_are_all_reserved_affords_nothing(self) -> None:
-        assert admissible_workers(_budget(reserved_cores=8), logical_cores=8, free_ram_gb=64.0) == 0
+        assert (
+            admissible_workers(
+                _budget(reserved_cores=8), logical_cores=8, free_ram_gb=64.0, worker_cores=1
+            )
+            == 0
+        )
 
     def test_a_project_with_a_cheap_worker_gets_more_of_the_same_machine(self) -> None:
         """The same node, two suites: what a worker costs is the variable."""
         node_cores, free = 32, 20.0
 
         heavy = admissible_workers(
-            _budget(worker_ram_gb=1.1), logical_cores=node_cores, free_ram_gb=free
+            _budget(worker_ram_gb=1.1), logical_cores=node_cores, free_ram_gb=free, worker_cores=1
         )
         light = admissible_workers(
-            _budget(worker_ram_gb=0.2), logical_cores=node_cores, free_ram_gb=free
+            _budget(worker_ram_gb=0.2), logical_cores=node_cores, free_ram_gb=free, worker_cores=1
         )
 
         assert heavy == 14

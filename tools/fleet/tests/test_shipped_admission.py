@@ -79,7 +79,17 @@ probe finds those each tick. It was pinned to loki from 2026-10-28 (MCPs
 board task 3d7a9b7d), loki then being the one dispatching NixOS worker with
 kvm; by 2026-11-03 three more qualified while every flake check still
 waited for loki, a laptop running them on battery. Every pool worker whose
-probe finds the tag takes it, and the stack hosts still refuse it unpinned.
+probe finds the tag and whose owner leaves it the 8 cores the flake's one
+worker occupies takes it (MCPs board task 51e3eac5), and the stack hosts
+still refuse it unpinned. The 8 is measured: the worker is a nix daemon whose
+max-jobs is the node's dispatch share, and in its flushed cold run on
+lavender (fleet job 46eb328f, 2026-11-05) it built through all 8 of that
+share, 1463.8 CPU-s of its own in 305 s, beside 386.5 CPU-s of two checks
+placed into the same share because it was charged one core. Its need, 1463.8
+CPU-s over the 300 s budget, is 4.9 cores averaged and the whole share at
+its peak, so it is charged the share lavender has, and no node it ran on
+(loki, lavender and lacrymal, every one of its 147 jobs to that day) leaves
+it fewer.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -156,7 +166,7 @@ def _idle(node: NodeConfig, *, free_ram_gb: float = 24.0) -> NodeState:
         host=node["host"],
         free_ram_gb=free_ram_gb,
         free_disk_gb=100.0,
-        live=LiveLoad(runs=0, workers=0, ram_gb=0.0),
+        live=LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0),
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,
@@ -193,14 +203,14 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
         "reason": "",
     }
 
-    state["live"] = LiveLoad(runs=1, workers=grant, ram_gb=1.0)
+    state["live"] = LiveLoad(runs=1, workers=grant, cores=grant, ram_gb=1.0)
     refused = assess(node, state, project, node_tags(node))
     assert refused["workers"] == 0
     assert refused["code"] == FleetErrorCode.NODE_OWNER_RESERVED
     assert "1 budgeted check(s) at once" in refused["reason"]
     assert "1 are live or launching" in refused["reason"]
 
-    state["live"] = LiveLoad(runs=0, workers=0, ram_gb=0.0)
+    state["live"] = LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0)
     assert assess(node, state, project, node_tags(node)) == {
         "workers": grant,
         "code": None,
@@ -367,9 +377,16 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
         for name, node in enabled.items()
     }
 
-    # Every pool worker whose toolchain probe found the tag takes it; the
-    # stack hosts still check only what is pinned to them.
-    assert {name for name, code in with_tag.items() if code is None} == pool
+    # Every pool worker whose toolchain probe found the tag takes it when its
+    # owner leaves the cores its one worker occupies; the stack hosts still
+    # check only what is pinned to them.
+    roomy = {
+        name
+        for name in pool
+        if enabled[name]["logical_cores"] - enabled[name]["budget"]["reserved_cores"]
+        >= project["worker_cores"]
+    }
+    assert {name for name, code in with_tag.items() if code is None} == roomy
     assert {name: code for name, code in with_tag.items() if name not in pool} == dict.fromkeys(
         set(enabled) - pool, FleetErrorCode.NODE_NOT_PINNED
     )
@@ -377,7 +394,29 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
     assert {name: code for name, code in without_tag.items() if name in pool} == dict.fromkeys(
         pool, FleetErrorCode.NODE_LACKS_TAG
     )
-    assert {"lacrymal", "lavender", "loki", "serendipity"} <= pool
+    # Every node it ever ran on keeps it (147 jobs to 2026-11-05: loki,
+    # lavender and lacrymal), and serendipity's 6 cores hold no worker.
+    assert {"lacrymal", "lavender", "loki"} <= roomy
+    assert "serendipity" in pool - roomy
+
+
+def test_the_nixos_flake_declares_the_dispatch_share_its_nix_daemon_fills() -> None:
+    """MCPs board task 51e3eac5: charged one core, its cold run 46eb328f on
+    lavender shared the node's 8-core share with two checks placed beside it.
+    Charged 8, lavender takes it idle and places nothing beside it."""
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/fleet-nixos"]
+    node = workspace["nodes"]["lavender"]
+    carried = node_tags(node) | {NodeTag.NIXOS_TEST}
+    state = _idle(node)
+
+    assert project["worker_cores"] == 8
+    assert assess(node, state, project, carried) == {"workers": 1, "code": None, "reason": ""}
+    state["live"] = LiveLoad(runs=1, workers=1, cores=8, ram_gb=16.0)
+    other = workspace["projects"]["MCPs/mcp-shared"]
+    beside = assess(node, state, other, node_tags(node) | frozenset(other["required_tags"]))
+    assert (beside["workers"], beside["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
+    assert "its 1 live fleet run(s) hold 1 worker(s) on 8 core(s) and 16.0 GB" in beside["reason"]
 
 
 def test_a_node_without_the_flake_check_s_memory_refuses_it_before_it_starts() -> None:
@@ -393,4 +432,11 @@ def test_a_node_without_the_flake_check_s_memory_refuses_it_before_it_starts() -
     refused = assess(node, _idle(node, free_ram_gb=13.0), project, carried)
     assert (refused["workers"], refused["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
     assert refused["reason"].startswith("serendipity has 13.0 GB free against a reservation")
-    assert assess(node, _idle(node), project, carried) == {"workers": 1, "code": None, "reason": ""}
+    # With memory to spare its owner's 2 reserved cores leave 6, fewer than
+    # the 8 the flake's one worker occupies (MCPs board task 51e3eac5).
+    roomy = assess(node, _idle(node), project, carried)
+    assert (roomy["workers"], roomy["code"]) == (0, FleetErrorCode.NODE_OWNER_RESERVED)
+    assert roomy["reason"].endswith(
+        "one worker of this project occupies 8 cores and its owner's reservation leaves 6, so "
+        "it never takes this project."
+    )

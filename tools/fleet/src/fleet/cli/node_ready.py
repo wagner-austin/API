@@ -111,6 +111,7 @@ def ready_state(
     live = LiveLoad(
         runs=recorded["runs"] + launching["runs"],
         workers=recorded["workers"] + launching["workers"],
+        cores=recorded["cores"] + launching["cores"],
         ram_gb=recorded["ram_gb"] + launching["ram_gb"],
     )
     # The probes' scripts are named for this runner's node, the writer

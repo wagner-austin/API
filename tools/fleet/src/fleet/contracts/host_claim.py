@@ -36,6 +36,7 @@ class HostClaim(TypedDict):
             its fits while the launch is under way, as it leaves out a
             project a lease holds.
         workers: The test workers it was granted.
+        cores: The cores those workers occupy (MCPs board task 51e3eac5).
         ram_gb: The memory those workers may hold.
         until_unix: When the claim stops counting whatever became of it: the
             queue job's own claim lease, so a runner that died mid-launch
@@ -46,6 +47,7 @@ class HostClaim(TypedDict):
     runner: str
     project: str
     workers: int
+    cores: int
     ram_gb: float
     until_unix: int
 
@@ -64,6 +66,7 @@ def encode_host_claim(claim: HostClaim) -> JSONObject:
         "runner": claim["runner"],
         "project": claim["project"],
         "workers": claim["workers"],
+        "cores": claim["cores"],
         "ram_gb": claim["ram_gb"],
         "until_unix": claim["until_unix"],
     }
@@ -81,22 +84,25 @@ def decode_host_claim(value: JSONValue) -> HostClaim:
     Raises:
         JSONTypeError: If the value is not an object, a field is missing or
             mistyped, or the grant is not positive. A claim of no workers
-            charges its host nothing while it holds a launch's project, so
-            it is refused rather than read as free room.
+            or no cores charges its host nothing while it holds a launch's
+            project, so it is refused rather than read as free room.
     """
     if not isinstance(value, dict):
         raise JSONTypeError(f"host claim must be a JSON object, got {type(value).__name__}")
     workers = require_int(value, "workers")
-    if workers <= 0:
+    cores = require_int(value, "cores")
+    if workers <= 0 or cores <= 0:
         raise JSONTypeError(
-            f"host claim grants {workers} workers; a claimed job holds at least one, and a "
-            "claim of none would charge its host nothing while its launch runs"
+            f"host claim grants {workers} workers on {cores} cores; a claimed job holds at "
+            "least one of each, and a claim of none would charge its host nothing while its "
+            "launch runs"
         )
     return HostClaim(
         job_id=require_str(value, "job_id"),
         runner=require_str(value, "runner"),
         project=require_str(value, "project"),
         workers=workers,
+        cores=cores,
         ram_gb=require_float(value, "ram_gb"),
         until_unix=require_int(value, "until_unix"),
     )

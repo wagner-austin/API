@@ -61,7 +61,9 @@ __all__ = ["_credentials_in_env", "_sourced_config"]
 LAVENDER = "fleet-node-lavender"
 
 #: What the launcher holds with no launch under way.
-NOTHING_LAUNCHING = Launching(load=LiveLoad(runs=0, workers=0, ram_gb=0.0), jobs=frozenset())
+NOTHING_LAUNCHING = Launching(
+    load=LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0), jobs=frozenset()
+)
 
 
 def _launcher(
@@ -162,6 +164,7 @@ class TestAClaimWhileItsJobLaunches:
             load=LiveLoad(
                 runs=1,
                 workers=row["workers"],
+                cores=row["workers"],
                 ram_gb=row["workers"]
                 * require_project(loaded.workspace, "libs/demo")["worker_ram_gb"],
             ),

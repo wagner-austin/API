@@ -179,12 +179,15 @@ class LiveLoad(TypedDict):
             ledger rather than from the process table -- a run is ours
             because we recorded it, not because a process looks like one.
         workers: The test workers those runs were granted, in total.
+        cores: The cores those workers occupy: each run's workers times its
+            project's ``worker_cores`` (MCPs board task 51e3eac5).
         ram_gb: The memory those workers may hold: each run's workers times
             its project's ``worker_ram_gb``.
     """
 
     runs: int
     workers: int
+    cores: int
     ram_gb: float
 
 

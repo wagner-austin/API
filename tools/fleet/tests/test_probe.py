@@ -60,7 +60,7 @@ class TestProbe:
             "free_ram_gb=27.395\nfree_disk_gb=860.123\nlogical_cores=16\nreserved_cores=4\n" + CALM
         )
 
-        held = LiveLoad(runs=2, workers=4, ram_gb=4.4)
+        held = LiveLoad(runs=2, workers=4, cores=4, ram_gb=4.4)
 
         state = probe.parse_probe("lavender", output, live=held)
 
@@ -353,7 +353,7 @@ class TestProbe:
             [ok(""), ok(f"free_ram_gb=26.394\nfree_disk_gb=687.729\nreserved_cores=4\n{CALM}")]
         )
         _test_hooks.run = runner
-        held = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+        held = LiveLoad(runs=1, workers=2, cores=2, ram_gb=2.2)
 
         state = probe.probe_node(_node(), live=held, writer="lavender-wsl")
 
@@ -374,7 +374,7 @@ class TestDescribeNode:
         free_ram_gb=27.4,
         free_disk_gb=860.0,
         ci_slice=None,
-        live=LiveLoad(runs=1, workers=6, ram_gb=6.6),
+        live=LiveLoad(runs=1, workers=6, cores=6, ram_gb=6.6),
         reserved_cores=0,
         action_cache=None,
         cpu_pressure_pct=0.0,

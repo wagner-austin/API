@@ -96,7 +96,7 @@ def _idle(node: NodeConfig) -> NodeState:
         host=node["host"],
         free_ram_gb=24.0,
         free_disk_gb=100.0,
-        live=LiveLoad(runs=0, workers=0, ram_gb=0.0),
+        live=LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0),
         ci_slice=None,
         reserved_cores=0,
         action_cache=None,

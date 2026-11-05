@@ -127,6 +127,7 @@ def _project() -> ProjectConfig:
         source=None,
         node=None,
         loopback_only=False,
+        worker_cores=1,
     )
 
 
@@ -259,7 +260,7 @@ class TestAttemptProbeReportsRatherThanRaises:
     def test_a_healthy_node_comes_back_with_its_state(self) -> None:
         _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK)])
 
-        held = LiveLoad(runs=3, workers=6, ram_gb=6.6)
+        held = LiveLoad(runs=3, workers=6, cores=6, ram_gb=6.6)
         outcome = probe.attempt_probe(_node("lavender"), live=held, writer="fleet-run")
 
         state = outcome["state"]

@@ -46,15 +46,15 @@ class TestReservedCores:
     def test_a_reservation_and_a_live_run_are_both_charged(self) -> None:
         """8 - 4 reserved - 2 live - 1 owner = 1 core, under the suite's minimum of 2."""
         workers, reason = _diphtheria(
-            reserved_cores=4, live=LiveLoad(runs=1, workers=2, ram_gb=0.6)
+            reserved_cores=4, live=LiveLoad(runs=1, workers=2, cores=2, ram_gb=0.6)
         )
 
         assert workers == 0
         assert reason == (
             "diphtheria affords 1 worker(s) for a suite that declares a minimum of 2: 8 cores "
             "against 1 reserved, 20.0 GB free, 0.3 GB per worker, 4.0 GB reserved for the "
-            "node's owner, and its 1 live fleet run(s) hold 2 worker(s) and 0.6 GB, and its "
-            "reservations hold 4 core(s). "
+            "node's owner, and its 1 live fleet run(s) hold 2 worker(s) on 2 core(s) and 0.6 GB, "
+            "and its reservations hold 4 core(s). "
             "Dispatching anyway would run a suite at a fraction of its workers until its own "
             "lease expired underneath it."
         )

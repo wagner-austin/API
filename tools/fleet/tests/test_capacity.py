@@ -138,6 +138,7 @@ def _project(
     required_tags: tuple[NodeTag, ...] = (),
     node: str | None = None,
     loopback_only: bool = False,
+    worker_cores: int = 1,
 ) -> ProjectConfig:
     """Build a project declaration.
 
@@ -147,6 +148,7 @@ def _project(
         required_tags: What the suite requires of a node.
         node: The one node the project runs on, or None for any.
         loopback_only: Whether its check runs with only lo.
+        worker_cores: The cores one worker occupies.
 
     Returns:
         The project.
@@ -161,6 +163,7 @@ def _project(
         source=None,
         node=node,
         loopback_only=loopback_only,
+        worker_cores=worker_cores,
     )
 
 
@@ -209,7 +212,7 @@ class TestAssess:
         15.5 GB, and the reason said somebody was on the machine. With those
         runs gone it would have room, so they are named; when even an idle
         node would have none, the owner still is."""
-        runs = LiveLoad(runs=2, workers=7, ram_gb=15.5)
+        runs = LiveLoad(runs=2, workers=7, cores=7, ram_gb=15.5)
         node = _node(reserved_cores=8, reserved_ram_gb=6.0)
 
         own = assess(node, _state(free_ram_gb=18.8, live=runs), _project(), LINUX_TAGS)
@@ -332,14 +335,14 @@ class TestLivePools:
     def test_a_second_job_fits_beside_a_live_one(self) -> None:
         """The first job's 7 workers and 7.7 GB come off; 7 cores and
         27.0 - 7.7 - 4.0 = 15.3 GB (13 workers) are left, so 7 again."""
-        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+        live = LiveLoad(runs=1, workers=7, cores=7, ram_gb=7.7)
 
         assert assess(_node(), _state(live=live), _project(), LINUX_TAGS)["workers"] == 7
 
     def test_live_memory_shrinks_the_grant(self) -> None:
         """16.0 - 7.7 - 4.0 = 4.3 GB: three 1.1 GB workers, under the 7
         cores still free."""
-        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+        live = LiveLoad(runs=1, workers=7, cores=7, ram_gb=7.7)
 
         verdict = assess(
             _node(), _state(free_ram_gb=16.0, live=live), _project(minimum_workers=2), LINUX_TAGS
@@ -349,7 +352,7 @@ class TestLivePools:
         assert verdict["workers"] == 3
 
     def test_a_short_grant_names_what_the_live_runs_hold(self) -> None:
-        live = LiveLoad(runs=1, workers=7, ram_gb=7.7)
+        live = LiveLoad(runs=1, workers=7, cores=7, ram_gb=7.7)
 
         verdict = assess(_node(), _state(free_ram_gb=16.0, live=live), _project(), LINUX_TAGS)
 
@@ -357,21 +360,21 @@ class TestLivePools:
         assert verdict["reason"] == (
             "lavender affords 3 worker(s) for a suite that declares a minimum of 4: 16 cores "
             "against 2 reserved, 16.0 GB free, 1.1 GB per worker, 4.0 GB reserved for the "
-            "node's owner, and its 1 live fleet run(s) hold 7 worker(s) and 7.7 GB. "
+            "node's owner, and its 1 live fleet run(s) hold 7 worker(s) on 7 core(s) and 7.7 GB. "
             "Dispatching anyway would run a suite at a fraction of its workers until its own "
             "lease expired underneath it."
         )
 
     def test_live_runs_holding_every_spare_core_leave_nothing(self) -> None:
-        live = LiveLoad(runs=2, workers=14, ram_gb=15.4)
+        live = LiveLoad(runs=2, workers=14, cores=14, ram_gb=15.4)
 
         verdict = assess(_node(), _state(free_ram_gb=60.0, live=live), _project(), LINUX_TAGS)
 
         assert verdict["code"] is FleetErrorCode.NODE_OWNER_RESERVED
         assert verdict["workers"] == 0
         assert (
-            "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) and "
-            "15.4 GB. Nothing is left for a dispatch" in verdict["reason"]
+            "16 cores against 2 reserved, and its 2 live fleet run(s) hold 14 worker(s) on "
+            "14 core(s) and 15.4 GB. Nothing is left for a dispatch" in verdict["reason"]
         )
 
 
@@ -383,7 +386,7 @@ class TestChecksAtOnce:
 
     def test_a_node_at_its_check_count_takes_no_second_however_roomy_its_pool(self) -> None:
         node = _node(host="serendipity", cores=8, reserved_cores=4, checks_at_once=1)
-        live = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+        live = LiveLoad(runs=1, workers=2, cores=2, ram_gb=2.2)
 
         verdict = assess(
             node,
@@ -417,7 +420,7 @@ class TestChecksAtOnce:
 
     def test_a_node_with_no_check_count_takes_a_second_its_pool_holds(self) -> None:
         node = _node(host="serendipity", cores=8, reserved_cores=4)
-        live = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+        live = LiveLoad(runs=1, workers=2, cores=2, ram_gb=2.2)
 
         verdict = assess(
             node,
@@ -460,12 +463,12 @@ class TestRoomForAny:
         assert line.startswith("NODE_OWNER_RESERVED: lavender has 2.2 GB free against a reserv")
 
     def test_live_runs_holding_the_node_are_named(self) -> None:
-        live = LiveLoad(runs=2, workers=14, ram_gb=15.4)
+        live = LiveLoad(runs=2, workers=14, cores=14, ram_gb=15.4)
 
         line = str(room_for_any(_node(), _state(live=live), (_project(),), frozenset()))
 
         assert line.startswith("NODE_OWNER_RESERVED: lavender has 27.0 GB free against a reserv")
-        assert "its 2 live fleet run(s) hold 14 worker(s) and 15.4 GB" in line
+        assert "its 2 live fleet run(s) hold 14 worker(s) on 14 core(s) and 15.4 GB" in line
 
     def test_a_full_disk_is_named(self) -> None:
         line = str(room_for_any(_node(), _state(free_disk_gb=3.0), (_project(),), frozenset()))

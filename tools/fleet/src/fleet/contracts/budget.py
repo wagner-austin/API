@@ -91,15 +91,17 @@ class NodeBudget(TypedDict):
     pinned_checks_only: bool
 
 
-def admissible_workers(budget: NodeBudget, *, logical_cores: int, free_ram_gb: float) -> int:
+def admissible_workers(
+    budget: NodeBudget, *, logical_cores: int, free_ram_gb: float, worker_cores: int
+) -> int:
     """How many test workers this node can hold right now.
 
     MEMORY DIVIDES, CORES BOUND. The count is what the free memory affords
-    after the owner's reservation, then clipped to the cores left after
-    theirs. Doing it the other way -- cores, clipped by memory -- reads the
-    same and is not: it makes the core count the number a caller sees when
-    memory is plentiful, and the whole point is that memory is the quantity
-    that ran out.
+    after the owner's reservation, then clipped to the workers the cores left
+    after theirs hold. Doing it the other way -- cores, clipped by memory --
+    reads the same and is not: it makes the core count the number a caller
+    sees when memory is plentiful, and the whole point is that memory is the
+    quantity that ran out.
 
     Returns zero rather than raising. Zero is a real answer that
     :mod:`fleet.core.capacity` turns into a refusal naming a node with room;
@@ -111,6 +113,8 @@ def admissible_workers(budget: NodeBudget, *, logical_cores: int, free_ram_gb: f
         budget: The node's declared caps.
         logical_cores: The node's total logical processors.
         free_ram_gb: Physical memory free on the node right now.
+        worker_cores: The cores one worker occupies, the project's
+            :attr:`~fleet.contracts.project.ProjectConfig.worker_cores`.
 
     Returns:
         Workers the node can take, at least zero.
@@ -119,7 +123,7 @@ def admissible_workers(budget: NodeBudget, *, logical_cores: int, free_ram_gb: f
     spare_cores = logical_cores - budget["reserved_cores"]
     if spare_ram <= 0.0 or spare_cores <= 0:
         return 0
-    return min(int(spare_ram / budget["worker_ram_gb"]), spare_cores)
+    return min(int(spare_ram / budget["worker_ram_gb"]), spare_cores // worker_cores)
 
 
 def encode_node_budget(budget: NodeBudget) -> JSONObject:

@@ -48,6 +48,7 @@ def _claim(job_id: str, *, until_unix: int, workers: int = 2) -> HostClaim:
         runner=ORDINARY,
         project="MCPs/sms-gateway",
         workers=workers,
+        cores=workers,
         ram_gb=workers * 1.1,
         until_unix=until_unix,
     )
@@ -115,6 +116,14 @@ class TestTheClaimContract:
         encoded["workers"] = 0
 
         with pytest.raises(JSONTypeError, match="host claim grants 0 workers"):
+            decode_host_claim(encoded)
+
+    def test_a_claim_of_no_cores_is_refused(self) -> None:
+        """Its workers would hold cores its host was never charged (MCPs board task 51e3eac5)."""
+        encoded = encode_host_claim(_claim("25d07c7c", until_unix=1791453435))
+        encoded["cores"] = 0
+
+        with pytest.raises(JSONTypeError, match="host claim grants 2 workers on 0 cores"):
             decode_host_claim(encoded)
 
 
@@ -262,7 +271,7 @@ class TestTheTurn:
 class TestTheClaims:
     def test_a_host_that_never_claimed_holds_none(self, tmp_path: pathlib.Path) -> None:
         assert host_claims.live_claims(tmp_path, alias=HOST) == ()
-        assert host_claims.host_load(()) == LiveLoad(runs=0, workers=0, ram_gb=0.0)
+        assert host_claims.host_load(()) == LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0)
 
     def test_every_runners_claims_are_read_and_summed(self, tmp_path: pathlib.Path) -> None:
         _test_hooks.now = FakeClock(at=1791449835).now
@@ -272,6 +281,7 @@ class TestTheClaims:
             runner=SECOND,
             project="MCPs/packages/wiki-check",
             workers=2,
+            cores=2,
             ram_gb=1.0,
             until_unix=1791453505,
         )
@@ -281,7 +291,9 @@ class TestTheClaims:
         live = host_claims.live_claims(tmp_path, alias=HOST)
 
         assert live == (first, second)
-        assert host_claims.host_load(live) == LiveLoad(runs=2, workers=4, ram_gb=2 * 1.1 + 1.0)
+        assert host_claims.host_load(live) == LiveLoad(
+            runs=2, workers=4, cores=4, ram_gb=2 * 1.1 + 1.0
+        )
         assert host_claims.live_claims(tmp_path, alias="sedona") == ()
 
     def test_a_lapsed_claim_is_removed_by_the_turn_that_finds_it(

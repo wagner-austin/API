@@ -129,11 +129,13 @@ class _InFlight(TypedDict):
     Attributes:
         project: Its project.
         workers: Its grant.
+        cores: The cores those workers occupy.
         ram_gb: What those workers may hold.
     """
 
     project: str
     workers: int
+    cores: int
     ram_gb: float
 
 
@@ -281,6 +283,7 @@ class Launcher:
             load=LiveLoad(
                 runs=len(flights),
                 workers=sum(flight["workers"] for flight in flights.values()),
+                cores=sum(flight["cores"] for flight in flights.values()),
                 ram_gb=sum(flight["ram_gb"] for flight in flights.values()),
             ),
             jobs=frozenset(flights),
@@ -305,6 +308,7 @@ class Launcher:
         flight = _InFlight(
             project=job["project"],
             workers=admitted["workers"],
+            cores=admitted["workers"] * admitted["plan"]["worker_cores"],
             ram_gb=admitted["workers"] * admitted["plan"]["worker_ram_gb"],
         )
         host_claims.record(
@@ -315,6 +319,7 @@ class Launcher:
                 runner=self._agent,
                 project=flight["project"],
                 workers=flight["workers"],
+                cores=flight["cores"],
                 ram_gb=flight["ram_gb"],
                 until_unix=_test_hooks.now() + CLAIM_LEASE_SECONDS,
             ),

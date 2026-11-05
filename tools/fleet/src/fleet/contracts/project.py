@@ -119,6 +119,18 @@ class ProjectConfig(TypedDict):
             namespace beside a container started and removed every 4 s (MCPs
             board task 649fcc7a). Optional, because it is the exception:
             absent reads as False, and any value but a boolean is refused.
+        worker_cores: The CPU cores one worker of this project occupies,
+            which :func:`fleet.core.capacity.assess` charges for each worker
+            granted against the node's cores and its checks' CPU quota, and
+            counts for each live run's workers after. One for a test suite,
+            whose worker is a process on a core. MCPs/fleet-nixos's one
+            worker is a nix daemon running as many builds as the node's
+            dispatch share has cores, which its build gate fills, so it
+            declares that share: charged one core, the fleet placed two other
+            checks into lavender's 8-core share during its cold run 46eb328f
+            (MCPs board task 51e3eac5). Optional, because it is the
+            exception: absent reads as one, and anything but a whole number
+            of at least one is refused.
     """
 
     worker_ram_gb: float
@@ -130,6 +142,7 @@ class ProjectConfig(TypedDict):
     source: ProjectSource | None
     node: str | None
     loopback_only: bool
+    worker_cores: int
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -182,6 +195,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "source": encode_project_source(project["source"]),
         "node": project["node"],
         "loopback_only": project["loopback_only"],
+        "worker_cores": project["worker_cores"],
     }
 
 
@@ -230,6 +244,31 @@ def decode_loopback_only(value: JSONValue) -> bool:
         raise JSONTypeError(
             f"project.loopback_only must be true, false or absent, got {value!r}; it decides "
             "whether the check runs in a network namespace holding only lo"
+        )
+    return value
+
+
+def decode_worker_cores(value: JSONValue) -> int:
+    """Decode a project's optional ``worker_cores``.
+
+    Args:
+        value: The key's value, or None when the key is absent.
+
+    Returns:
+        The cores one worker occupies, one when the key is absent.
+
+    Raises:
+        JSONTypeError: When the value is not a whole number of at least one:
+            a boolean, a fraction or a zero is a misspelt declaration, and
+            charging it would place work into cores the project already
+            holds.
+    """
+    if value is None:
+        return 1
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise JSONTypeError(
+            f"project.worker_cores must be a whole number of at least 1 or absent, got "
+            f"{value!r}; it is what each granted worker is charged against the node's cores"
         )
     return value
 
@@ -297,6 +336,7 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         source=decode_project_source(value["source"], field="project.source"),
         node=decode_pinned_node(value.get("node")),
         loopback_only=decode_loopback_only(value.get("loopback_only")),
+        worker_cores=decode_worker_cores(value.get("worker_cores")),
     )
 
 
@@ -306,6 +346,7 @@ __all__ = [
     "decode_loopback_only",
     "decode_pinned_node",
     "decode_project_config",
+    "decode_worker_cores",
     "encode_project_config",
     "lease_seconds",
 ]

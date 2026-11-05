@@ -41,9 +41,9 @@ class TestCheckQuota:
             "code": FleetErrorCode.NODE_OWNER_RESERVED,
             "reason": (
                 "loki's checks are held to 1.00 CPU(s) by the quota systemd keeps on their "
-                "slice, so 1 worker(s) fit where the suite declares a minimum of 4. Whoever "
-                "capped it is using the machine, and a check placed here would run past its "
-                "budget; it takes the next job when the quota is lifted."
+                "slice, so 1 core(s) are left where the suite's minimum of 4 worker(s) "
+                "occupies 4. Whoever capped it is using the machine, and a check placed here "
+                "would run past its budget; it takes the next job when the quota is lifted."
             ),
         }
 
@@ -63,7 +63,7 @@ class TestCheckQuota:
         assert verdict == {"workers": 3, "code": None, "reason": ""}
 
     def test_the_live_runs_share_the_quota(self) -> None:
-        live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
+        live = LiveLoad(runs=1, workers=4, cores=4, ram_gb=4.4)
 
         granted = assess(
             _loki(),
@@ -81,10 +81,10 @@ class TestCheckQuota:
         assert granted == {"workers": 2, "code": None, "reason": ""}
         assert refused["reason"] == (
             "loki's checks are held to 6.00 CPU(s) by the quota systemd keeps on their slice, "
-            "so 2 worker(s) fit where the suite declares a minimum of 4, and its 1 live fleet "
-            "run(s) hold 4 worker(s) and 4.4 GB. Whoever capped it is using the machine, and a "
-            "check placed here would run past its budget; it takes the next job when the quota "
-            "is lifted."
+            "so 2 core(s) are left where the suite's minimum of 4 worker(s) occupies 4, and its "
+            "1 live fleet run(s) hold 4 worker(s) on 4 core(s) and 4.4 GB. Whoever capped it is "
+            "using the machine, and a check placed here would run past its budget; it takes the "
+            "next job when the quota is lifted."
         )
 
     def test_a_saturated_disk_is_named_before_the_quota(self) -> None:

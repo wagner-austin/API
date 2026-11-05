@@ -1,13 +1,12 @@
-"""The append-only records, the ssh seam, and the hooks.
+"""The append-only records and the hooks.
 
-The node probe's tests are in ``test_probe.py``, split from here at the
-600-line ceiling.
+The node probe's tests are in ``test_probe.py`` and the ssh seam's in
+``test_core_remote.py``, each split from here at the 600-line ceiling.
 
-EVERY FAKE HERE IMPLEMENTS THE REAL PROTOCOL. `FakeRun` is given to
-``_test_hooks.run`` and satisfies ``RunProtocol``. The FILE hooks are not
-faked at all: the autouse reset in ``conftest`` leaves them on their real
-implementations, so these tests read and write exactly the way production
-does, against a real temporary directory. Nothing is patched.
+NOTHING HERE IS FAKED. The FILE hooks stay on their real implementations
+through the autouse reset in ``conftest``, so these tests read and write
+exactly the way production does, against a real temporary directory.
+Nothing is patched.
 
 The default hook implementations are exercised directly rather than left to
 coverage's mercy: they are the code that actually touches the disk and the
@@ -29,14 +28,14 @@ from fleet.contracts.feed import FeedEvent, decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.project import ProjectConfig
-from fleet.core import _test_hooks, records, remote
-from tests.conftest import FakeRun, failed, ok, timed_out
+from fleet.core import _test_hooks, records
 
-#: The one project the ledger rows below run, at a worker cost that sums exactly.
+#: The projects the ledger rows below run, at worker costs that sum exactly:
+#: a test suite's worker on one core, and a build daemon's on eight.
 _PROJECTS = {
-    "services/Model-Trainer": ProjectConfig(
-        worker_ram_gb=1.5,
-        minimum_workers=2,
+    project: ProjectConfig(
+        worker_ram_gb=worker_ram_gb,
+        minimum_workers=minimum_workers,
         expected_minutes=5,
         exclusive_resources=(),
         external_paths=(),
@@ -44,17 +43,31 @@ _PROJECTS = {
         source=None,
         node=None,
         loopback_only=False,
+        worker_cores=worker_cores,
+    )
+    for project, worker_ram_gb, minimum_workers, worker_cores in (
+        ("services/Model-Trainer", 1.5, 2, 1),
+        ("MCPs/fleet-nixos", 16.0, 1, 8),
     )
 }
 
 
-def _row(*, run_id: str = "run-1", node: str = "lavender", outcome: str = "running") -> LedgerEntry:
+def _row(
+    *,
+    run_id: str = "run-1",
+    node: str = "lavender",
+    outcome: str = "running",
+    project: str = "services/Model-Trainer",
+    workers: int = 6,
+) -> LedgerEntry:
     """Build a ledger row through its own decoder.
 
     Args:
         run_id: The dispatch.
         node: Its node.
         outcome: How it ended, or ``running``.
+        project: The project it ran.
+        workers: Its grant.
 
     Returns:
         The row.
@@ -64,14 +77,14 @@ def _row(*, run_id: str = "run-1", node: str = "lavender", outcome: str = "runni
             "run_id": run_id,
             "node": node,
             "host": node,
-            "project": "services/Model-Trainer",
+            "project": project,
             "agent": "opus-fleet-0904",
             "session_id": "acc774c0-3bc3-4cce-9dda-c7a12fb99519",
             "started_unix": 100,
             "ended_unix": 100,
             "outcome": outcome,
             "exit_code": -1,
-            "workers": 6,
+            "workers": workers,
             "detail": "",
         }
     )
@@ -385,13 +398,25 @@ class TestLedgerRecords:
         records.append_ledger(path, _row(run_id="d", node="loki", outcome="running"))
 
         assert records.live_load(path, node="lavender", projects=_PROJECTS) == LiveLoad(
-            runs=1, workers=6, ram_gb=9.0
+            runs=1, workers=6, cores=6, ram_gb=9.0
         )
         assert records.live_load(path, node="loki", projects=_PROJECTS) == LiveLoad(
-            runs=2, workers=12, ram_gb=18.0
+            runs=2, workers=12, cores=12, ram_gb=18.0
         )
         assert records.live_load(path, node="sedona", projects=_PROJECTS) == LiveLoad(
-            runs=0, workers=0, ram_gb=0.0
+            runs=0, workers=0, cores=0, ram_gb=0.0
+        )
+
+    def test_live_load_charges_each_run_its_project_s_cores_per_worker(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """6 suite workers on a core each, and one build daemon on 8 (MCPs board task 51e3eac5)."""
+        path = tmp_path / "ledger.jsonl"
+        records.append_ledger(path, _row(run_id="a"))
+        records.append_ledger(path, _row(run_id="b", project="MCPs/fleet-nixos", workers=1))
+
+        assert records.live_load(path, node="lavender", projects=_PROJECTS) == LiveLoad(
+            runs=2, workers=7, cores=14, ram_gb=25.0
         )
 
     def test_a_live_run_of_an_unregistered_project_is_refused(self, tmp_path: pathlib.Path) -> None:
@@ -430,171 +455,3 @@ class TestFeedRecords:
             records.read_feed(path)
 
         assert excinfo.value.code is FleetErrorCode.FEED_EVENT_UNPARSABLE
-
-
-class TestRemote:
-    def test_a_command_returns_its_stdout(self) -> None:
-        runner = FakeRun([ok("done")])
-        _test_hooks.run = runner
-
-        assert remote.run_ssh("lavender", ("echo", "hi")) == "done"
-        assert runner.calls[0][0] == "ssh"
-        assert "BatchMode=yes" in runner.calls[0]
-        assert runner.calls[0][-2:] == ("echo", "hi")
-
-    def test_every_ssh_carries_the_keepalive_and_a_deadline(self) -> None:
-        """The two bounds a dead or silent peer cannot escape (board tasks
-        35940277 and 41ac6ed2): ssh's own keepalive for a peer that went
-        away, and the seam's deadline for one that answers and never
-        finishes. Both the run and the send carry them."""
-        runner = FakeRun([ok(""), ok("")])
-        _test_hooks.run = runner
-
-        remote.run_ssh("pendragon", ("hostname",))
-        remote.send_script("pendragon", "/s/probe.sh", "date")
-
-        for call in runner.calls:
-            # Every `-o Key=Value` pair the invocation carries, by key.
-            settings = [call[index + 1] for index, word in enumerate(call) if word == "-o"]
-            options = dict(setting.split("=", 1) for setting in settings)
-            assert options["ServerAliveInterval"] == "15"
-            assert options["ServerAliveCountMax"] == "4"
-            assert options["ConnectTimeout"] == "10"
-        assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS] * 2 == [120, 120]
-
-    def test_a_copy_has_the_deadline_its_size_takes_at_the_floor_rate(self) -> None:
-        """A flat two minutes cut the hub's 240 MB companion bundle on loki,
-        which copies at about 2 MB/s (fleet job 851300a6, MCPs board task
-        bfe2b3da), so a copy's deadline grows with the file."""
-        runner = FakeRun([ok(""), ok("")])
-        _test_hooks.run = runner
-
-        remote.send_file("loki", pathlib.Path("/hub/a.tgz"), "/stage/a.tgz", size_bytes=13)
-        remote.send_file(
-            "loki", pathlib.Path("/hub/b.bundle"), "/stage/b.bundle", size_bytes=239_780_392
-        )
-
-        # 13 bytes take one second at the floor rate, the bundle 458 (457.3);
-        # at loki's measured rate the bundle copies in about 115 s of its 578.
-        assert runner.timeouts == [121, 578]
-        assert remote.send_deadline_seconds(0) == remote.SSH_TIMEOUT_SECONDS
-
-    def test_a_peer_that_stops_answering_is_unreachable_with_the_elapsed_seconds(self) -> None:
-        _test_hooks.run = FakeRun([timed_out(120)])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.run_ssh("pendragon", ("/bin/sh", "observe.sh"))
-
-        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
-        assert excinfo.value.message == (
-            "ssh to pendragon timed out while running `/bin/sh observe.sh`: timed out after 120 s"
-        )
-
-    def test_ssh_failing_to_reach_the_node_is_its_own_code(self) -> None:
-        """255 is ssh's own status, and the fix is the tailnet not the work."""
-        _test_hooks.run = FakeRun([failed(255, "Connection timed out")])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.run_ssh("pendragon", ("echo", "hi"))
-
-        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
-        assert "Connection timed out" in excinfo.value.message
-
-    def test_a_remote_command_failing_is_a_dispatch_failure(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "make: *** [check] Error 2")])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.run_ssh("lavender", ("make", "check"))
-
-        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
-        assert "Error 2" in excinfo.value.message
-
-    def test_a_failure_with_no_stderr_still_says_so(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "")])
-
-        with pytest.raises(AppError, match="<no stderr>"):
-            remote.run_ssh("lavender", ("make", "check"))
-
-    def test_a_script_body_is_streamed_over_stdin_through_mkdir_and_cat(self) -> None:
-        """Never an argument, so no shell between here and the disk sees it:
-        one argument for the remote login shell, the parent made in the same
-        round trip."""
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        remote.send_script("diphtheria", "/home/c/stage/probe.sh", "echo hi")
-
-        assert runner.stdin[0] == b"echo hi"
-        assert runner.calls[0][-1] == (
-            "mkdir -p \"$(dirname '/home/c/stage/probe.sh')\" && cat > '/home/c/stage/probe.sh'"
-        )
-
-    def test_an_unreachable_node_during_send_says_so(self) -> None:
-        _test_hooks.run = FakeRun([failed(255, "no route to host")])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.send_script("pendragon", "/s/probe.sh", "x")
-
-        assert excinfo.value.code is FleetErrorCode.NODE_UNREACHABLE
-
-    def test_a_root_file_is_streamed_into_install_as_root_s_alone(self) -> None:
-        """A registration token, so never an argument and never readable by
-        anyone but root: install writes it at 0600, its parents made."""
-        runner = FakeRun([ok("")])
-        _test_hooks.run = runner
-
-        remote.send_root_file("lavender", "/var/lib/tokens/RUNNER_TOKEN_API", "TOK\n")
-
-        assert runner.stdin[0] == b"TOK\n"
-        assert runner.calls[0][-1] == (
-            "sudo -n install -D -m 0600 /dev/stdin /var/lib/tokens/RUNNER_TOKEN_API"
-        )
-
-    def test_a_root_file_whose_write_fails_says_which_path(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "sudo: a password is required")])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.send_root_file("lavender", "/var/lib/tokens/T", "x")
-
-        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
-        assert "writing /var/lib/tokens/T as root" in excinfo.value.message
-        assert "a password is required" in excinfo.value.message
-
-    def test_a_root_file_path_a_shell_would_reinterpret_is_refused_before_any_call(self) -> None:
-        runner = FakeRun([])
-        _test_hooks.run = runner
-
-        with pytest.raises(ValueError, match="root file path '/var/lib/\\$x' contains '\\$'"):
-            remote.send_root_file("lavender", "/var/lib/$x", "x")
-
-        assert runner.calls == []
-
-    def test_a_write_that_fails_is_a_dispatch_failure(self) -> None:
-        _test_hooks.run = FakeRun([failed(1, "cat: /s/probe.sh: Permission denied")])
-
-        with pytest.raises(AppError) as excinfo:
-            remote.send_script("lavender", "/s/probe.sh", "x")
-
-        assert excinfo.value.code is FleetErrorCode.DISPATCH_FAILED
-        assert "Permission denied" in excinfo.value.message
-
-    def test_run_script_sends_then_runs_by_path_through_bin_sh(self) -> None:
-        """The bytes that run are the bytes that were sent."""
-        runner = FakeRun([ok(""), ok("output")])
-        _test_hooks.run = runner
-
-        assert remote.run_script("diphtheria", "/s/p.sh", "body") == "output"
-        assert runner.stdin[0] == b"body"
-        assert runner.calls[1][-2:] == ("/bin/sh", "/s/p.sh")
-
-    def test_a_root_payload_runs_under_sudo_bash_under_its_deadline(self) -> None:
-        """Only the run takes the caller's deadline; the send is a short
-        command like any other."""
-        runner = FakeRun([ok(""), ok("installed")])
-        _test_hooks.run = runner
-
-        output = remote.run_root_script("colossus", "/s/p.sh", "body", timeout_seconds=900)
-
-        assert output == "installed"
-        assert runner.calls[1][-len(remote.ROOT_BASH) - 1 :] == (*remote.ROOT_BASH, "/s/p.sh")
-        assert runner.timeouts == [remote.SSH_TIMEOUT_SECONDS, 900]

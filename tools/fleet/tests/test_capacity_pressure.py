@@ -65,7 +65,7 @@ class TestCpuPressure:
 
     def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
         node = _node(host="colossus", cores=12, reserved_cores=2)
-        live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
+        live = LiveLoad(runs=1, workers=4, cores=4, ram_gb=4.4)
 
         verdict = assess(
             node,
@@ -77,13 +77,13 @@ class TestCpuPressure:
         assert verdict["reason"] == (
             "colossus's CPUs are saturated: a runnable task waited for one through 55.0% of "
             "the last minute, at or over the 30% a check is placed under, and its 1 live fleet "
-            "run(s) hold 4 worker(s) and 4.4 GB. Free cores counted from its declaration do "
-            "not show work the fleet does not run, and a check placed here would run past its "
-            "budget; it takes the next job when the pressure falls."
+            "run(s) hold 4 worker(s) on 4 core(s) and 4.4 GB. Free cores counted from its "
+            "declaration do not show work the fleet does not run, and a check placed here would "
+            "run past its budget; it takes the next job when the pressure falls."
         )
 
     def test_a_node_at_its_check_count_is_refused_for_that_first(self) -> None:
-        live = LiveLoad(runs=1, workers=2, ram_gb=2.2)
+        live = LiveLoad(runs=1, workers=2, cores=2, ram_gb=2.2)
 
         verdict = assess(
             _diphtheria(),
@@ -162,7 +162,7 @@ class TestIoPressure:
 
     def test_the_refusal_names_the_live_runs_beside_the_pressure(self) -> None:
         node = _node(host="colossus", cores=12, reserved_cores=2)
-        live = LiveLoad(runs=1, workers=4, ram_gb=4.4)
+        live = LiveLoad(runs=1, workers=4, cores=4, ram_gb=4.4)
 
         verdict = assess(
             node,
@@ -174,8 +174,9 @@ class TestIoPressure:
         assert verdict["reason"] == (
             "colossus's disk is saturated: a task stalled on I/O through 65.0% of the last "
             "minute, at or over the 60% a check is placed under, and its 1 live fleet run(s) "
-            "hold 4 worker(s) and 4.4 GB. Its CPUs do not show it, and a check placed here "
-            "would run past its budget; it takes the next job when the pressure falls."
+            "hold 4 worker(s) on 4 core(s) and 4.4 GB. Its CPUs do not show it, and a check "
+            "placed here would run past its budget; it takes the next job when the pressure "
+            "falls."
         )
 
     def test_the_runner_claims_nothing_on_a_saturated_disk(self) -> None:

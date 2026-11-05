@@ -293,7 +293,7 @@ CALM = (
 PROBE_OK = f"free_ram_gb=27.0\nfree_disk_gb=860.0\nreserved_cores=0\n{CALM}"
 
 #: A node holding no live fleet run.
-IDLE = LiveLoad(runs=0, workers=0, ram_gb=0.0)
+IDLE = LiveLoad(runs=0, workers=0, cores=0, ram_gb=0.0)
 
 
 def stage_replies(archive_digest: str) -> list[_test_hooks.CommandResult]:

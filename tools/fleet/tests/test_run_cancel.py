@@ -66,6 +66,7 @@ def _plan() -> ProjectConfig:
         source=None,
         node=None,
         loopback_only=False,
+        worker_cores=1,
     )
 
 
