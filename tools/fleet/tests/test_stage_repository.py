@@ -10,7 +10,7 @@ import zipfile
 
 import pytest
 
-from fleet.core import names, stage_repository
+from fleet.core import stage_repository
 
 #: The loose-object directory ``git gc --auto`` samples to estimate how many
 #: loose objects a repository holds: past ``ceil(gc.auto / 256)`` objects in
@@ -47,32 +47,23 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
     )
 
 
-def test_a_companion_is_cloned_from_its_bundle_onto_its_branch() -> None:
-    """MCPs board task 2026dfbc: the bundle's ref is fetched into
-    ``origin/<branch>``, the branch is checked out there, and HEAD is proved
-    to be the commit the hub bundled; the fetch's own auto gc is off first
-    (MCPs board task 939ec5c7)."""
+def test_a_companion_is_cloned_out_of_the_node_s_mirror_onto_its_branch() -> None:
+    """MCPs board task 5280a25d: the clone links the node mirror's objects,
+    its auto gc is off before anything else writes (MCPs board task
+    939ec5c7), the clone's ``origin`` section goes, and ``origin/<branch>``
+    is written to the commit and checked out (MCPs board task 2026dfbc)."""
+    mirror = "/s/cache/mirrors/companion-wagner-austin-MCPs.git"
     commands = stage_repository.companion_repository_commands(
-        "/s/MCPs", "/s/MCPs.stage/tree.tgz", "a" * 40, "refs/heads/main"
+        "/s/MCPs", mirror, "a" * 40, "refs/heads/main"
     )
 
     assert commands == (
-        ("git", "-C", "/s/MCPs", "init", "--quiet"),
+        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, "/s/MCPs"),
         ("git", "-C", "/s/MCPs", "config", "gc.auto", "0"),
         ("git", "-C", "/s/MCPs", "config", "maintenance.auto", "false"),
-        (
-            "git",
-            "-C",
-            "/s/MCPs",
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            "/s/MCPs.stage/tree.tgz",
-            "+refs/fleet/companion:refs/remotes/origin/main",
-        ),
+        ("git", "-C", "/s/MCPs", "config", "--remove-section", "remote.origin"),
+        ("git", "-C", "/s/MCPs", "update-ref", "refs/remotes/origin/main", "a" * 40),
         ("git", "-C", "/s/MCPs", "checkout", "--quiet", "-B", "main", "refs/remotes/origin/main"),
-        ("git", "-C", "/s/MCPs", "merge-base", "--is-ancestor", "HEAD", "a" * 40),
-        ("git", "-C", "/s/MCPs", "merge-base", "--is-ancestor", "a" * 40, "HEAD"),
     )
 
 
@@ -95,14 +86,14 @@ def _git(*args: str) -> str:
     return ran.stdout.strip()
 
 
-def _bundled_companion(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str, str]:
-    """A two-commit repository bundled at its companion ref, as the hub does.
+def source_repository(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str, str]:
+    """A two-commit repository, the remote a companion is staged from.
 
     Args:
-        tmp_path: Where the repository and its bundle are made.
+        tmp_path: Where the repository is made, as ``source``.
 
     Returns:
-        The bundle, the first commit and the tip.
+        The repository, its first commit and its tip.
     """
     source = tmp_path / "source"
     (source / "packages" / "maketools").mkdir(parents=True)
@@ -114,35 +105,60 @@ def _bundled_companion(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str, str]:
     (source / "packages" / "maketools" / "run.py").write_bytes(b"print(2)\n")
     _git("-C", str(source), "commit", "--quiet", "--all", "--message", "tip")
     tip = _git("-C", str(source), "rev-parse", "HEAD")
-    _git("-C", str(source), "update-ref", "refs/fleet/companion", tip)
-    bundle = tmp_path / "MCPs.stage" / names.ARCHIVE_NAME
-    bundle.parent.mkdir()
-    _git("-C", str(source), "bundle", "create", "--quiet", str(bundle), "refs/fleet/companion")
-    return bundle, first, tip
+    return source, first, tip
+
+
+def _node_mirror(tmp_path: pathlib.Path, source: pathlib.Path, tip: str) -> pathlib.Path:
+    """A node's bare mirror of the source, holding its tip under the staged ref.
+
+    Args:
+        tmp_path: Where the mirror is made.
+        source: The repository it mirrors.
+        tip: The commit fetched into it.
+
+    Returns:
+        The mirror.
+    """
+    mirror = tmp_path / "cache" / "mirrors" / "companion-wagner-austin-MCPs.git"
+    _git("init", "--bare", "--quiet", str(mirror))
+    # Kept as a pack, as a node's first fetch of a real remote's history is.
+    _git("-C", str(mirror), "config", "fetch.unpackLimit", "1")
+    _git("-C", str(mirror), "fetch", "--quiet", str(source), f"+{tip}:refs/fleet/staged")
+    return mirror
 
 
 @pytest.mark.parametrize("ref", ["main", "refs/heads/main"])
 def test_a_staged_companion_is_its_ref_with_history_and_serves_origin_main(
     tmp_path: pathlib.Path, ref: str
 ) -> None:
-    """The commands run here for real against a bundle shaped like the hub's.
-    HEAD and ``origin/main`` are the bundled tip and its ancestor is
-    readable, which is what corvis-stick's HookCommands suite needed of MCPs
-    on serendipity (MCPs board task 2026dfbc). And MCPs board task a8ee9b21
-    still holds: published maketools reads ``git --git-dir=../MCPs/.git
-    archive origin/main``, and that call reads the staged file back."""
-    bundle, first, tip = _bundled_companion(tmp_path)
+    """The commands run here for real against a node mirror. HEAD and
+    ``origin/main`` are the tip and its ancestor is readable, which is what
+    corvis-stick's HookCommands suite needed of MCPs on serendipity (MCPs
+    board task 2026dfbc); the clone names no remote, as the bundle's fetch
+    left it; and its objects are the mirror's own files, linked rather than
+    copied (MCPs board task 5280a25d). And MCPs board task a8ee9b21 still
+    holds: published maketools reads ``git --git-dir=../MCPs/.git archive
+    origin/main``, and that call reads the staged file back."""
+    source, first, tip = source_repository(tmp_path)
+    mirror = _node_mirror(tmp_path, source, tip)
     target = tmp_path / "MCPs"
     target.mkdir()
     for command in stage_repository.companion_repository_commands(
-        target.as_posix(), bundle.as_posix(), tip, ref
+        target.as_posix(), mirror.as_posix(), tip, ref
     ):
         subprocess.run(command, check=True, capture_output=True, timeout=60)
 
     assert _git("-C", str(target), "rev-parse", "HEAD") == tip
+    assert _git("-C", str(target), "symbolic-ref", "HEAD") == "refs/heads/main"
     assert _git("-C", str(target), "rev-parse", "refs/remotes/origin/main") == tip
     assert _git("-C", str(target), "show", f"{first}:packages/maketools/run.py") == "print(1)"
     assert _git("-C", str(target), "config", "--local", "gc.auto") == "0"
+    assert _git("-C", str(target), "remote") == ""
+    assert _git("-C", str(target), "status", "--porcelain", "--ignored") == ""
+    packs = sorted((mirror / "objects" / "pack").glob("*.pack"))
+    linked = sorted((target / ".git" / "objects" / "pack").glob("*.pack"))
+    assert len(packs) == 1
+    assert [pack.stat().st_ino for pack in linked] == [pack.stat().st_ino for pack in packs]
     archived = subprocess.run(
         [
             "git",
@@ -162,23 +178,24 @@ def test_a_staged_companion_is_its_ref_with_history_and_serves_origin_main(
     assert content == b"print(2)\n"
 
 
-def test_a_bundle_whose_ref_is_not_the_bundled_commit_stops_the_stage(
+def test_a_commit_the_mirror_lacks_stops_the_stage_at_its_tracking_ref(
     tmp_path: pathlib.Path,
 ) -> None:
-    """The last two commands prove HEAD is the commit the hub resolved; asked
-    for the bundle's ancestor instead, the first of them exits non-zero, so
-    the checked script ends there and the run is not staged on a tree the
-    feed would misname."""
-    bundle, first, _tip = _bundled_companion(tmp_path)
+    """``git update-ref`` refuses a commit the clone does not hold, so the
+    checked script ends there and the run is not staged on a tree the feed
+    would misname."""
+    source, first, _tip = source_repository(tmp_path)
+    mirror = _node_mirror(tmp_path, source, first)
     target = tmp_path / "MCPs"
     target.mkdir()
-    *clone, head_in_sha, _sha_in_head = stage_repository.companion_repository_commands(
-        target.as_posix(), bundle.as_posix(), first, "main"
+    absent = "0123456789abcdef0123456789abcdef01234567"
+    *clone, tracking, _checkout = stage_repository.companion_repository_commands(
+        target.as_posix(), mirror.as_posix(), absent, "main"
     )
     for command in clone:
         subprocess.run(command, check=True, capture_output=True, timeout=60)
 
-    assert subprocess.run(head_in_sha, capture_output=True, timeout=60).returncode == 1
+    assert subprocess.run(tracking, capture_output=True, timeout=60).returncode != 0
 
 
 def test_a_staged_export_tracks_every_file_its_commit_tracks(tmp_path: pathlib.Path) -> None:

@@ -236,8 +236,8 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
 
     Named by the companion's own commit, in the launch attempt's own
     directory (:func:`attempt_directory`), which is where
-    :func:`fleet.cli.node_prepare.prepare` has
-    :func:`fleet.core.export.export_companions` write it.
+    :func:`fleet.core.export.export_companions` names it and
+    :func:`fleet.core.companion_stage.stage_companion` has it written.
 
     Args:
         config_path: The workspace document.

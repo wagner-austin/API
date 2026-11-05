@@ -17,6 +17,7 @@ from fleet.cli import _config, node_agent
 from fleet.contracts.source import ProjectCompanion
 from fleet.core import (
     _test_hooks,
+    commit_stage,
     dialect,
     mirror_fetch,
     names,
@@ -123,9 +124,7 @@ class BundlingRun(FakeRun):
         if tuple(argv[3:5]) == ("bundle", "create"):
             path = pathlib.Path(argv[-2])
             companion = b"# v2 git bundle\nworkspace-at-" + COMPANION_SHA.encode("ascii")
-            path.write_bytes(
-                companion if argv[-1] == mirror_fetch.COMPANION_REF else EXPORT_BUNDLE_BYTES
-            )
+            path.write_bytes(companion if argv[-1] == COMPANION_BUNDLE_REF else EXPORT_BUNDLE_BYTES)
             self.bundles.append(path)
         return super().__call__(
             argv,
@@ -136,18 +135,29 @@ class BundlingRun(FakeRun):
         )
 
 
+#: The node's mirror of the companion's remote on lavender.
+NODE_MIRROR = "/home/corvis/fleet/stage/cache/mirrors/companion-wagner-austin-MCPs.git"
+
+#: The hub's ref the companion's bundle is made of: the run's, and the directory's.
+COMPANION_BUNDLE_REF = f"refs/fleet/bundle/{DEMO_RUN_ID}-{COMPANION_DIRECTORY}"
+
+
 def _companion_commit_script() -> str:
-    """The script that clones lavender's staged companion from its bundle.
+    """The script that fetches lavender's companion bundle into its mirror and clones it.
 
     Returns:
         Its text, as the dialect renders it.
     """
     return dialect.checked_script(
-        stage_repository.companion_repository_commands(
-            "/home/corvis/fleet/stage/MCPs",
-            "/home/corvis/fleet/stage/MCPs.stage/tree.tgz",
-            COMPANION_SHA,
-            "main",
+        (
+            *commit_stage.fetch_commands(
+                mirror=NODE_MIRROR,
+                bundle="/home/corvis/fleet/stage/MCPs.stage/tree.tgz",
+                run_id=f"{DEMO_RUN_ID}-{COMPANION_DIRECTORY}",
+            ),
+            *stage_repository.companion_repository_commands(
+                "/home/corvis/fleet/stage/MCPs", NODE_MIRROR, COMPANION_SHA, "main"
+            ),
         )
     )
 
@@ -172,18 +182,18 @@ def _companion_replies(
         ok(""),  # the companion's mirror: git init --bare
         ok(""),  # the companion: git fetch the ref
         ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
-        ok(""),  # the companion: git bundle create
         *commit_stage_replies(export_digest),
         *registry_replies(registry),
-        ok(""),  # companion: send reset script
-        ok(""),  # companion: run reset
-        ok(""),  # companion: send mkdir script
-        ok(""),  # companion: run mkdir
-        ok(""),  # companion: send the base64 payload
-        ok(""),  # companion: send reassemble script
-        ok(companion_digest),  # companion: run reassemble
-        ok(""),  # companion: send the clone script
-        ok(""),  # companion: run the clone
+        ok(""),  # companion: send its prepare script
+        ok(""),  # companion: run it; the node has no mirror of the remote yet
+        ok(""),  # companion: git update-ref of its bundle ref, on the hub
+        ok(""),  # companion: git bundle create, the whole history
+        ok(""),  # companion: git update-ref -d of its bundle ref
+        ok(""),  # companion: scp the bundle
+        ok(""),  # companion: send the digest script
+        ok(companion_digest),  # companion: run it
+        ok(""),  # companion: send the fetch-and-clone script
+        ok(""),  # companion: run it
         ok(""),  # enclosure: send the companion-link script
         ok(""),  # enclosure: run it
         ok(""),  # launch: send the build script
@@ -204,10 +214,11 @@ class TestCompanions:
         self, config_path: pathlib.Path
     ) -> None:
         """The whole path, through the real prepare, the real export and the
-        real staging: the ref resolved to a commit, the ref bundled, and the
-        clone landed at ``<stage_root>/MCPs`` -- which is ``../MCPs`` from
-        the export root, the one spelling that answers on a node and on a
-        workstation alike."""
+        real staging: the ref resolved to a commit before the lease, bundled
+        only once the node has said its mirror lacks it (MCPs board task
+        5280a25d), and the clone landed at ``<stage_root>/MCPs`` -- which is
+        ``../MCPs`` from the export root, the one spelling that answers on a
+        node and on a workstation alike."""
         sourced = _companion_config(config_path)
         export_payload = prebuilt_export(sourced)
         companion_payload = prebuilt_companion(sourced)
@@ -244,8 +255,14 @@ class TestCompanions:
             f"+{COMPANION_REF}:refs/fleet/companion",
         )
         assert runner.calls[base + 2][3] == "rev-parse"
-        assert runner.calls[base + 3][3:5] == ("bundle", "create")
-        assert runner.calls[base + 3][-1] == "refs/fleet/companion"
+        # Nothing is bundled before the node is asked what it holds: the next
+        # call is the commit's stage, over ssh.
+        assert runner.calls[base + 3][0] == "ssh"
+        bundled = [call for call in runner.calls if call[3:5] == ("bundle", "create")]
+        assert [call[-1] for call in bundled] == [
+            f"refs/fleet/bundle/{DEMO_RUN_ID}",
+            COMPANION_BUNDLE_REF,
+        ]
         # Written in the launch attempt's own directory, so no other runner's
         # export of the same tip and no earlier attempt of the same job can
         # meet it, and gone with its directory once the launch ends.
@@ -253,7 +270,7 @@ class TestCompanions:
         bundle = (
             bundles / ATTEMPT_DIRECTORY / f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
         )
-        assert runner.calls[base + 3][-2] == str(bundle)
+        assert bundled[1][-2] == str(bundle)
         assert not bundle.parent.exists()
         sent = [body or b"" for body in runner.stdin]
         assert _companion_commit_script().encode() in sent
@@ -372,8 +389,8 @@ class TestCompanions:
         self, config_path: pathlib.Path
     ) -> None:
         """The reclaim path itself (board task 2e3e69cf, check review
-        d9dbf931): the companion is bundled, the export's payload send ends at
-        its deadline, the job is given back to be claimed again, and the
+        d9dbf931): the companion is resolved, the export's payload send ends
+        at its deadline, the job is given back to be claimed again, and the
         attempt's directory, made by the real seam, goes with the attempt."""
         sourced = _companion_config(config_path)
         bundled = BundlingRun(
@@ -384,7 +401,6 @@ class TestCompanions:
                 ok(""),  # the companion's mirror: git init --bare
                 ok(""),  # the companion: git fetch the ref
                 ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
-                ok(""),  # the companion: git bundle create, which BundlingRun writes
                 ok(""),  # stage: send the commit's prepare script
                 ok(""),  # stage: run it; the node's mirror does not exist yet
                 ok(""),  # the commit: git update-ref of the run's bundle ref
@@ -406,9 +422,9 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         assert queue.arguments[2]["action"] == "lost"
-        # The companion's bundle and the commit's, both in the attempt's directory.
-        assert len(bundled.bundles) == 2
-        assert {bundle.parent for bundle in bundled.bundles} == {bundled.bundles[0].parent}
+        # The commit's bundle alone, in the attempt's directory: the
+        # companion's is written only once the node is asked, after it.
+        assert len(bundled.bundles) == 1
         assert bundled.bundles[0].parent.name.startswith(f"{DEFAULT_JOB_ID}-")
         archives = _config.load_workspace({_config.CONFIG_FLAG: str(sourced)}).archives
         assert sorted(path.name for path in archives.glob(f"{DEFAULT_JOB_ID}-*")) == []
@@ -472,6 +488,6 @@ class TestCompanions:
         ]
         assert len(staged) == 2
         assert staged[1] == (
-            f"{len(companion_payload)} bytes, the MCPs companion at {COMPANION_SHA}, "
-            "to /home/corvis/fleet/stage/MCPs"
+            f"{len(companion_payload)} bytes, the MCPs companion at {COMPANION_SHA} "
+            "over an empty mirror, to /home/corvis/fleet/stage/MCPs"
         )

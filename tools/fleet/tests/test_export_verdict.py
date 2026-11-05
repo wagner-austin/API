@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import pathlib
 import socket
+import threading
+from collections.abc import Sequence
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
@@ -204,18 +206,15 @@ class TestCompanionMirrorKey:
 
 
 class TestExportingCompanions:
-    def test_a_companion_is_mirrored_fetched_and_bundled_at_its_tip(
+    def test_a_companion_is_mirrored_and_fetched_at_its_tip_and_bundled_nowhere(
         self, tmp_path: pathlib.Path
     ) -> None:
-        """The whole path one declaration takes on the hub, in order: the
-        mirror made, the ref's tip fetched and resolved, and the bundle of
-        the companion ref read back as the bytes a node is staged with (MCPs
-        board task 2026dfbc: the ref with its history, not an archive)."""
-        payload = b"# v2 git bundle\ncompanion"
+        """The whole path one declaration takes on the hub before the lease,
+        in order: the mirror made and the ref's tip fetched and resolved. Its
+        bundle is named in the job's directory and written only once the
+        node has said what its mirror lacks (MCPs board task 5280a25d)."""
         archives = tmp_path / "archives"
-        archives.mkdir()
-        (archives / f"companion-wagner-austin-MCPs-{SHA}.bundle").write_bytes(payload)
-        runner = FakeRun([ok(""), ok(""), ok(f"{SHA}\n"), ok("")])
+        runner = FakeRun([ok(""), ok(""), ok(f"{SHA}\n")])
         _test_hooks.run = runner
 
         exported = export.export_companions(
@@ -224,43 +223,64 @@ class TestExportingCompanions:
             (ProjectCompanion(remote=REMOTE, ref="main", directory="MCPs"),),
         )
 
+        mirror = tmp_path / "mirrors" / "companion-wagner-austin-MCPs.git"
         assert exported == (
             export.CompanionExport(
                 directory="MCPs",
                 ref="main",
                 sha=SHA,
-                path=archives / f"companion-wagner-austin-MCPs-{SHA}.bundle",
-                data=payload,
+                mirror=mirror,
+                key="companion-wagner-austin-MCPs",
+                bundle=archives / f"companion-wagner-austin-MCPs-{SHA}.bundle",
             ),
         )
         assert runner.calls[0][:2] == ("git", "init")
         assert runner.calls[1][3] == "fetch"
         assert runner.calls[2][3] == "rev-parse"
-        assert runner.calls[3] == (
-            "git",
-            "-C",
-            str(tmp_path / "mirrors" / "companion-wagner-austin-MCPs.git"),
-            "bundle",
-            "create",
-            "--quiet",
-            str(archives / f"companion-wagner-austin-MCPs-{SHA}.bundle"),
-            mirror_fetch.COMPANION_REF,
-        )
-        assert runner.timeouts[3] == export.ARCHIVE_TIMEOUT_SECONDS
+        assert len(runner.calls) == 3
+        assert not archives.exists()
 
-    def test_a_bundle_git_refuses_is_an_export_failure_in_gits_words(
+    def test_companions_are_fetched_at_once_and_answered_in_declared_order(
         self, tmp_path: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun([failed(128, "fatal: Refusing to create empty bundle.")])
-
-        with pytest.raises(AppError) as raised:
-            export.bundle_ref(tmp_path / "m.git", tmp_path / "out" / "c.bundle")
-
-        assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert raised.value.message == (
-            f"git bundle create {mirror_fetch.COMPANION_REF} from {tmp_path / 'm.git'}: "
-            "fatal: Refusing to create empty bundle."
+        """packages/wiki-check declares 17 companions, and one after another
+        their fetches kept lavender idle 51 s between job 30708103's claim
+        and its first phase (MCPs board task 5280a25d). Each fetch here waits
+        until all three are under way, so fetched one at a time the first
+        never returns and the barrier breaks."""
+        companions = tuple(
+            ProjectCompanion(
+                remote=f"https://github.com/wagner-austin/{name}.git", ref="main", directory=name
+            )
+            for name in ("wiki", "tech-wiki", "me-wiki")
         )
+        under_way = threading.Barrier(len(companions), timeout=10)
+        tips = {"wiki": "1" * 40, "tech-wiki": "2" * 40, "me-wiki": "3" * 40}
+
+        def hub_git(
+            argv: Sequence[str],
+            *,
+            timeout_seconds: int,
+            stdin_bytes: bytes | None = None,
+            unset_env: Sequence[str] = (),
+            set_env: Sequence[tuple[str, str]] = (),
+        ) -> _test_hooks.CommandResult:
+            name = pathlib.PurePath(argv[-1] if argv[1] == "init" else argv[2]).name
+            remote_name = name.removeprefix("companion-wagner-austin-").removesuffix(".git")
+            if "fetch" in argv:
+                under_way.wait()
+            return ok(f"{tips[remote_name]}\n" if "rev-parse" in argv else "")
+
+        _test_hooks.run = hub_git
+
+        exported = export.export_companions(tmp_path / "mirrors", tmp_path / "archives", companions)
+
+        assert [(row["directory"], row["sha"]) for row in exported] == [
+            ("wiki", "1" * 40),
+            ("tech-wiki", "2" * 40),
+            ("me-wiki", "3" * 40),
+        ]
+        assert len(companions) <= export.COMPANION_FETCHES
 
     def test_a_project_declaring_none_asks_git_nothing(self, tmp_path: pathlib.Path) -> None:
         runner = FakeRun([])

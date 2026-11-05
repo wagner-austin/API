@@ -98,14 +98,3 @@ def test_a_companion_sits_in_the_stage_root_and_an_export_in_its_run_s_enclosure
     assert names.dispatch_directory("/s", "r-1") == "/s/r-1/r-1"
     assert names.staging_directory(names.dispatch_directory("/s", "r-1")) == "/s/r-1/r-1.stage"
     assert names.recipe_directory("/fleet/stage/slime-17", "") == "/fleet/stage/slime-17"
-
-
-def test_a_companions_directory_is_emptied_before_it_is_written() -> None:
-    """Every run carrying one writes the same directory, and the script
-    removes it read-only-objects and all: a git repository this package made
-    there has read-only loose objects, which is what ``-f`` is for rather
-    than tidiness."""
-    script = dialect.reset_directory_script("/s/MCPs")
-
-    assert "/s/MCPs" in script
-    assert "rm -rf" in script

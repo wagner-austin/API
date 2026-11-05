@@ -1,4 +1,4 @@
-"""Two jobs bundling one companion tip at once each stage their own bytes
+"""Two jobs carrying one companion tip at once each name their own bundle file
 (MCPs board task f9ee56aa).
 
 Every runner on the hub bundled a companion into one file named by its
@@ -6,17 +6,18 @@ mirror key and tip, and ``git bundle create`` does not write one ref's bytes
 twice alike, so a second runner's bundle replaced the first's between that
 runner's digest and its copy: wiki-check job a520c74c on diphtheria was
 refused ``STAGE_DIGEST_MISMATCH`` at 06:57Z on 2026-10-15, its received digest
-the hub file's after lavender-wsl's runner rewrote it at 06:56:11Z. The case
-prepares two claimed jobs of one project carrying one companion in two
-threads, through the real prepare and the real export, with a git that writes
-different bytes on every bundle and holds each bundle until both are
-written, which is the interleaving that lost the run.
+the hub file's after lavender-wsl's runner rewrote it at 06:56:11Z. Since MCPs
+board task 5280a25d a companion's bundle is written only once the node has
+said what its mirror lacks (:mod:`fleet.core.companion_stage`), so the
+prepare writes none and names the file its stage writes. The case prepares
+two claimed jobs of one project carrying one companion in two threads,
+through the real prepare and the real export, with a git that answers each
+command and fails any bundle.
 """
 
 from __future__ import annotations
 
 import pathlib
-import threading
 from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor
 
@@ -26,7 +27,7 @@ from fleet.cli import _config, node_prepare
 from fleet.contracts.dispatch import DispatchJob, decode_job
 from fleet.contracts.source import ProjectCompanion
 from fleet.contracts.workspace import require_project
-from fleet.core import _test_hooks, export, staging
+from fleet.core import _test_hooks, export
 from tests._node_agent_fixtures import (
     COMPANION_DIRECTORY,
     COMPANION_REF,
@@ -47,59 +48,36 @@ FIRST_JOB = "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb"
 SECOND_JOB = "cccccccc-3333-4333-8333-cccccccccccc"
 
 
-class BundlingGit:
+def hub_git(
+    argv: Sequence[str],
+    *,
+    timeout_seconds: int,
+    stdin_bytes: bytes | None = None,
+    unset_env: Sequence[str] = (),
+    set_env: Sequence[tuple[str, str]] = (),
+) -> _test_hooks.CommandResult:
     """The hub's git for two concurrent prepares of one companion.
 
     Satisfies :class:`~fleet.core._test_hooks.RunProtocol`. Answered by
-    command rather than in order, because the two prepares interleave. Each
-    ``git bundle create`` writes bytes no other call writes, as git does, and
-    returns only once both have written, so each export reads its bundle back
-    after the other's write, which is when a shared file was replaced.
+    command rather than in order, because the two prepares interleave.
 
-    Attributes:
-        written: Each bundle path and the bytes written there, in write order.
+    Args:
+        argv: The command.
+        timeout_seconds: The deadline the caller chose.
+        stdin_bytes: Its standard input, or None.
+        unset_env: The variables the caller withheld from the child.
+        set_env: The variables the caller set in the child.
+
+    Returns:
+        The tip for ``rev-parse``, and success for every other command.
+
+    Raises:
+        AssertionError: For a ``git bundle create``, which no prepare runs.
     """
-
-    written: list[tuple[pathlib.Path, bytes]]
-
-    def __init__(self) -> None:
-        """Start with nothing written and both bundles awaited."""
-        self.written = []
-        self._lock = threading.Lock()
-        self._both_written = threading.Barrier(2, timeout=10)
-
-    def __call__(
-        self,
-        argv: Sequence[str],
-        *,
-        timeout_seconds: int,
-        stdin_bytes: bytes | None = None,
-        unset_env: Sequence[str] = (),
-        set_env: Sequence[tuple[str, str]] = (),
-    ) -> _test_hooks.CommandResult:
-        """Answer one git command.
-
-        Args:
-            argv: The command.
-            timeout_seconds: The deadline the caller chose.
-            stdin_bytes: Its standard input, or None.
-            unset_env: The variables the caller withheld from the child.
-            set_env: The variables the caller set in the child.
-
-        Returns:
-            The tip for ``rev-parse``, and success for every other command.
-        """
-        if "rev-parse" in argv:
-            return ok(f"{COMPANION_SHA}\n")
-        if tuple(argv[3:5]) == ("bundle", "create"):
-            path = pathlib.Path(argv[-2])
-            with self._lock:
-                payload = f"# v2 git bundle\nwrite {len(self.written)}".encode()
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_bytes(payload)
-                self.written.append((path, payload))
-            self._both_written.wait()
-        return ok("")
+    assert tuple(argv[3:5]) != ("bundle", "create"), f"a prepare bundled: {list(argv)}"
+    if "rev-parse" in argv:
+        return ok(f"{COMPANION_SHA}\n")
+    return ok("")
 
 
 def _job(job_id: str) -> DispatchJob:
@@ -115,8 +93,10 @@ def _job(job_id: str) -> DispatchJob:
     return decode_job(row, answer=dump_json_str({"claimed": row}))
 
 
-class TestTwoJobsBundlingOneCompanionTipAtOnce:
-    def test_each_stages_the_bytes_its_own_bundle_wrote(self, config_path: pathlib.Path) -> None:
+class TestTwoJobsCarryingOneCompanionTipAtOnce:
+    def test_each_names_a_bundle_in_its_own_attempt_and_writes_none(
+        self, config_path: pathlib.Path
+    ) -> None:
         sourced = write_registry(
             config_path,
             sourced_document(
@@ -132,8 +112,7 @@ class TestTwoJobsBundlingOneCompanionTipAtOnce:
         admitted = node_prepare.Admitted(
             plan=require_project(loaded.workspace, DEMO_PROJECT), workers=1
         )
-        git = BundlingGit()
-        _test_hooks.run = git
+        _test_hooks.run = hub_git
 
         def prepare(job_id: str) -> export.CompanionExport:
             prepared = node_prepare.prepare(
@@ -145,22 +124,19 @@ class TestTwoJobsBundlingOneCompanionTipAtOnce:
         with ThreadPoolExecutor(max_workers=2) as pool:
             first, second = pool.map(prepare, (FIRST_JOB, SECOND_JOB))
 
-        # What scp copies is what the node's digest is held to, for both runs.
-        for companion in (first, second):
-            assert staging.digest(companion["path"].read_bytes()) == staging.digest(
-                companion["data"]
-            )
-        assert first["data"] != second["data"]
-        assert sorted(git.written) == sorted(
-            [(first["path"], first["data"]), (second["path"], second["data"])]
-        )
         # Each in its launch attempt's own directory, named for its job
         # (board task 2e3e69cf), so neither job nor a later attempt of one
-        # can write where the other did.
+        # can write where the other did; nothing is there yet.
         name = f"companion-wagner-austin-MCPs-{COMPANION_SHA}.bundle"
         for companion, job_id in ((first, FIRST_JOB), (second, SECOND_JOB)):
-            assert (companion["path"].name, companion["path"].parent.parent) == (
+            assert (companion["bundle"].name, companion["bundle"].parent.parent) == (
                 name,
                 loaded.archives,
             )
-            assert companion["path"].parent.name.startswith(f"{job_id}-")
+            assert companion["bundle"].parent.name.startswith(f"{job_id}-")
+            assert not companion["bundle"].exists()
+            assert (companion["sha"], companion["key"]) == (
+                COMPANION_SHA,
+                "companion-wagner-austin-MCPs",
+            )
+        assert first["bundle"].parent != second["bundle"].parent
