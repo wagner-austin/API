@@ -175,6 +175,53 @@ Rule: `StateChangeVerifiedRule`, `libs/monorepo_guards/src/monorepo_guards/state
   session verbs and verifies none of them itself, is `session_job`); a function
   that does make the change and is renamed to escape the rule is a finding.
 
+## Tests that prove the task
+
+The operator, 2026-11-05, after asking why closures kept bouncing at the
+check review while `make check` stayed green: *"yes. lets do it. i want
+mutation across mcps and api. can we do that ? and we also want to validate
+our tests. and what if a test os wrong can rhe ai raise a claim ahainst the
+test? and we are validaitng peoperties instead of single examples. lets also
+updatw the code prompt and standards with our new code standards plz"*. His
+full words and the reasoning are the last section of MCPs `CODING_PROMPT.md`;
+these are the same six rules, graded against an API diff. Each names the
+board task that enforces it; until that task lands, the reviewer grades the
+rule by reading the diff.
+
+- **Every test is seen to fail first.** A diff that adds or changes a test
+  beside a change to `src` carries a test that fails against the parent
+  commit's `src`; one that passes there does not test the change.
+  Enforcement: `tools/fleet` runs the new tests at the parent and fails on any
+  that pass (board task 8c8dfa18).
+- **Changed code survives no mutant.** The `src` a commit changes is mutation
+  tested and every mutant fails a test; a survivor is killed by a test or,
+  when it changes nothing observable, removed by rewriting the code. An
+  ignore list, a pragma or a narrowed mutation scope is an exemption list.
+  Enforcement: the mutation step in every package's `make check`, piloted on
+  `libs/platform_core` and `tools/fleet` (board task e52e5148).
+- **Expected values come from outside the code under test**: worked by hand,
+  cited from a published source, read off real data, or computed by a simpler
+  reference; never pasted from the function's own output. The tell is a long
+  literal (a hash, a rendered block, a many-digit float) landing in a test in
+  the same commit as the code producing it, with no source named. A reviewer
+  decides this; no tool does.
+- **Properties beside examples.** Every encode and decode pair has a
+  round-trip property test over generated inputs, with the strategy built
+  once in a shared testing module; other invariants a diff adds get one too.
+  Examples stay for named edge cases. The Rust half already holds this
+  (`RustProptestRule`); the Python half's guard is board task 4b2348e2's,
+  starting in MCPs' shared library and filed onward from there.
+- **A wrong test is claimed, never weakened.** A diff that deletes a test,
+  loosens an assertion or adds a skip names an upheld test claim, judged on
+  the board by a session other than the claimant; until upheld the test
+  stands and the code changes. Moving or renaming a test with its assertions
+  intact is not a weakening. Enforcement: board tasks 14528e74 (the claim)
+  and 031b2072 (the commit guard, with its Python twin for this repo).
+- **A task that bounces gets its acceptance tests from someone else.** On a
+  task an audit has reopened twice, a session that never held it writes the
+  acceptance tests from the task's text, each failing while its criterion is
+  false. Enforcement: board task 9796227b.
+
 ## The harness a package must SHIP
 
 The section above is a description of the 48, not permission for the 49th to
