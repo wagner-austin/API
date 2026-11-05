@@ -30,6 +30,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import FakeQueue, tick_body
 from tests._registry import write_registry
+from tests._roll_reads import roll_read
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import CALM, DEMO_NOW, DEMO_PROJECT, FakeRun, ok
 
@@ -90,7 +91,7 @@ def _hold(
 
 
 def test_the_claim_names_the_projects_the_node_fits(sourced_config: pathlib.Path) -> None:
-    _test_hooks.run = FakeRun(PROBED)
+    _test_hooks.run = FakeRun([*PROBED, *roll_read(sourced_config)])
     endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
 
@@ -143,7 +144,7 @@ class TestWhatALeaseOnTheNodeHolds:
     ) -> None:
         _declare(sourced_config, demo_exclusive=(TESTDB,))
         _hold(sourced_config, node="lavender", project="libs/db", resources=(f"{TESTDB}@lavender",))
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun([*PROBED, *roll_read(sourced_config)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -168,7 +169,7 @@ class TestWhatALeaseOnTheNodeHolds:
             project="libs/db",
             resources=(f"{TESTDB}@diphtheria",),
         )
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun([*PROBED, *roll_read(sourced_config)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 

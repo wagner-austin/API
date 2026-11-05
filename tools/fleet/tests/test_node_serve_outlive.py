@@ -27,6 +27,7 @@ from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.cli import _config, node_serve, node_watch
 from fleet.cli.node_collected import Collected, CollectOutcome
+from fleet.cli.node_roll import RollGuard
 from fleet.core import _test_hooks
 from tests._node_agent_fixtures import (
     NPM_CI,
@@ -239,11 +240,13 @@ class TestAServeWhoseQueueListingFails:
         def collect() -> None:
             watch.hold(frozenset({DEMO_RUN_ID}))
 
+        roll = RollGuard(runs="roll-1", rolled=_rolled)
         steps = node_serve.ServeSteps(
             collect=collect,
             fill=_fills_nothing,
             queued=_malformed,
-            rolled=_rolled,
+            moved=roll.moved,
+            latched=roll.latched,
             launching=_none_launching,
             start_unreported=_none_unreported,
         )

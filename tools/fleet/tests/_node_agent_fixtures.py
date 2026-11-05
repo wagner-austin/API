@@ -38,6 +38,7 @@ from tests._queue_fakes import (
     queue_job,
 )
 from tests._registry import write_registry
+from tests._roll_reads import roll_read
 from tests._thread_fakes import in_order_executor
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import (
@@ -251,6 +252,38 @@ def prebuilt_companion(config_path: pathlib.Path) -> bytes:
     return payload
 
 
+def asked(config_path: pathlib.Path, *, fetch: bool = False) -> list[_test_hooks.CommandResult]:
+    """The calls of a claim on a ready node, up to the queue's answer.
+
+    Args:
+        config_path: The registry the runner loaded.
+        fetch: Whether the read fetches first: a tick after the first of a
+            case, the clock having moved past the fixture's stamp.
+
+    Returns:
+        The probes, then the read of the rolled ref before the queue is
+        asked (MCPs board task 1fd01f09).
+    """
+    return [*PROBED, *roll_read(config_path, fetch=fetch)]
+
+
+def handed_a_job(
+    config_path: pathlib.Path, *, fetch: bool = False
+) -> list[_test_hooks.CommandResult]:
+    """The calls of a claim the queue answered with a job, up to what it does with it.
+
+    Args:
+        config_path: The registry the runner loaded.
+        fetch: Whether the first read fetches, as :func:`asked` says.
+
+    Returns:
+        The probes, the read of the rolled ref before the queue is asked, and
+        the read once the queue handed over the job, inside the window the
+        first read stamped (MCPs board task 1fd01f09).
+    """
+    return [*asked(config_path, fetch=fetch), *roll_read(config_path)]
+
+
 def claim_replies(
     digest: str,
     *,
@@ -273,7 +306,7 @@ def claim_replies(
         One result per call.
     """
     return [
-        *PROBED,  # the probe, before any claim
+        *handed_a_job(registry),  # the probe and the two reads of the ref
         *launch_steps(digest, registry=registry, commit_present=commit_present),
         *after_launch,
         # The tick claims again after a launch (MCPs board task 48842bfd):

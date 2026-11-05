@@ -30,6 +30,7 @@ from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_agent
 from fleet.cli.node_launch import Launcher
+from fleet.cli.node_roll import RollGuard
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.core import _test_hooks, host_claims, leases, names, queue, records, staging
 from fleet.core.workspace_files import read_workspace_document
@@ -44,6 +45,7 @@ from tests._node_agent_fixtures import (
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job
 from tests._registry import write_registry
+from tests._roll_reads import ROLLED_COMMIT
 from tests._roster_fixtures import dispatch_of
 from tests.conftest import DEMO_RUN_ID, FakeRun
 
@@ -91,6 +93,7 @@ def _process(
         alias="lavender",
         node=loaded.workspace["nodes"]["lavender"],
         agent=agent,
+        registry_commit=ROLLED_COMMIT,
         hold=held.append,
     )
     return identity, launcher
@@ -114,6 +117,7 @@ def _claim(loaded: _config.LoadedWorkspace, identity: JSONObject, launcher: Laun
         alias="lavender",
         node=loaded.workspace["nodes"]["lavender"],
         launcher=launcher,
+        roll=RollGuard(runs=ROLLED_COMMIT, rolled=lambda: ROLLED_COMMIT),
     )
 
 

@@ -28,6 +28,7 @@ from tests._node_agent_fixtures import (
     prebuilt_export,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, ToolRefusal, queue_job
+from tests._roll_reads import roll_read
 from tests.conftest import DEMO_NOW, DEMO_RUN_ID, FakeRun, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -57,9 +58,16 @@ def _tick(
     payload = prebuilt_export(config_path)
     stop = (ok(""), ok("stopped"), *retire_replies())
     runner = FakeRun(
-        claim_replies(
-            staging.digest(payload), registry=config_path, commit_present=True, after_launch=stop
-        )
+        [
+            *claim_replies(
+                staging.digest(payload),
+                registry=config_path,
+                commit_present=True,
+                after_launch=stop,
+            ),
+            # The claim again reads the rolled ref before it asks.
+            *(roll_read(config_path) if claims_again else ()),
+        ]
     )
     _test_hooks.run = runner
     endpoint = FakeQueue(
@@ -97,7 +105,7 @@ def test_a_job_cancelled_while_it_launched_is_stopped_and_the_tick_succeeds(
     # launched (MCPs board task 48842bfd).
     assert len(runner.calls) == len(
         claim_replies("x", registry=sourced_config, commit_present=True)
-    ) + 2 + len(retire_replies())
+    ) + 2 + len(retire_replies()) + len(roll_read(sourced_config))
     loaded = _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)})
     last = records.read_ledger(loaded.ledger)[-1]
     assert (last["run_id"], last["outcome"]) == (DEMO_RUN_ID, "cancelled")

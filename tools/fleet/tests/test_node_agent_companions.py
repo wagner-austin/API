@@ -35,6 +35,7 @@ from tests._node_agent_fixtures import (
     NPM_CI,
     PROBED,
     _credentials_in_env,
+    handed_a_job,
     node_argv,
     prebuilt_companion,
     prebuilt_export,
@@ -165,7 +166,7 @@ def _companion_replies(
         One result per call, in order.
     """
     return [
-        *PROBED,
+        *handed_a_job(registry),  # the probe and the two reads of the ref
         ok(""),  # the project's mirror: git init --bare
         ok(""),  # the project's mirror: git cat-file -e, the commit is held
         ok(""),  # the companion's mirror: git init --bare
@@ -227,8 +228,9 @@ class TestCompanions:
         assert node_agent.main(node_argv(sourced)) == 0
 
         mirror = str(config_path.parent / "runs" / "mirrors" / "companion-wagner-austin-MCPs.git")
-        # After the pre-claim probes and the project's two mirror commands.
-        base = len(PROBED) + 2
+        # After the pre-claim probes, the two reads of the rolled ref and the
+        # project's two mirror commands.
+        base = len(handed_a_job(sourced)) + 2
         assert runner.calls[base] == ("git", "init", "--bare", "--quiet", mirror)
         assert runner.calls[base + 1] == (
             "git",
@@ -341,7 +343,7 @@ class TestCompanions:
         sourced = _companion_config(config_path)
         _test_hooks.run = FakeRun(
             [
-                *PROBED,
+                *handed_a_job(sourced),
                 ok(""),  # the project's mirror: git init --bare
                 ok(""),  # the project's mirror: git cat-file -e, the commit is held
                 ok(""),  # the companion's mirror: git init --bare
@@ -376,7 +378,7 @@ class TestCompanions:
         sourced = _companion_config(config_path)
         bundled = BundlingRun(
             [
-                *PROBED,
+                *handed_a_job(sourced),
                 ok(""),  # the project's mirror: git init --bare
                 ok(""),  # the project's mirror: git cat-file -e, the commit is held
                 ok(""),  # the companion's mirror: git init --bare

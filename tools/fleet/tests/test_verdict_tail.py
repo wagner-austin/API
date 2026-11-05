@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Final
 
-from fleet.core import dialect, verdict
+from fleet.core import run_registry, verdict
 
 #: One file's row of vitest's coverage table.
 ROW: Final = "  file-{index:04d}.ts     |     100 |      100 |     100 |     100 |"
@@ -76,7 +76,7 @@ def test_the_two_hundred_line_tail_it_replaces_read_neither_count() -> None:
 
 
 def test_the_linux_dialect_prints_that_many_lines() -> None:
-    script = dialect.log_tail_script("/s/run-1", verdict.LOG_TAIL_LINES)
+    script = run_registry.log_tail_script("/s/run-1", verdict.LOG_TAIL_LINES)
 
     assert f"tail -n {verdict.LOG_TAIL_LINES} '/s/run-1/" in script
     assert verdict.LOG_TAIL_LINES == 1500

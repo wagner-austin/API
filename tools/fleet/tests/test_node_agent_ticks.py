@@ -25,6 +25,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue, tick_body
+from tests._roll_reads import roll_read
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23, NO_PYTHON
 from tests.conftest import CALM, DEMO_PROJECT, PROBE_OK, FakeRun, failed, ok
 
@@ -185,7 +186,7 @@ class TestATickThatAsksTheQueue:
     ) -> None:
         endpoint, tick = _ticked(
             sourced_config,
-            list(PROBED),
+            [*PROBED, *roll_read(sourced_config)],
             [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})],
         )
 

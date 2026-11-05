@@ -33,6 +33,7 @@ from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, manifest, staging
 from fleet.core import _test_hooks_attempts as attempt_hooks
 from tests._registry import write_registry
+from tests._roll_reads import extracted_registry
 from tests._roster_fixtures import machine_document
 
 #: The host-case markers and the execution run (board task 465689f5), and
@@ -517,11 +518,13 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         tmp_path: pytest's per-test temporary directory.
 
     Returns:
-        The written registry directory, which ``--config`` names.
+        The written registry directory, which ``--config`` names, where a
+        rolled extraction of :data:`tests._roll_reads.ROLLED_COMMIT` lands.
     """
     pin_clock(DEMO_NOW)
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
-    return write_registry(tmp_path / "registry", workspace_document())
+    registry = extracted_registry(tmp_path / "scratch", now=DEMO_NOW)
+    return write_registry(registry, workspace_document())
 
 
 def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:

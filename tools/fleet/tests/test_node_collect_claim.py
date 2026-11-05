@@ -33,6 +33,7 @@ from tests._node_agent_fixtures import (
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
+    asked,
     claim_replies,
     launch,
     node_argv,
@@ -263,7 +264,7 @@ class TestTheNextTick:
         ran nothing, so it goes back through the queue's lost report, never a
         refusal; the queue requeues it the first time and fails it the
         second, and the log says which."""
-        _test_hooks.run = FakeRun(list(PROBED))
+        _test_hooks.run = FakeRun(asked(sourced_config))
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [ORPHANED]}),
@@ -309,7 +310,7 @@ class TestTheNextTick:
                 until_unix=DEMO_NOW + claim_window.CLAIM_LEASE_SECONDS,
             ),
         )
-        _test_hooks.run = FakeRun(list(PROBED))
+        _test_hooks.run = FakeRun(asked(sourced_config))
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [ORPHANED]}),
@@ -336,7 +337,7 @@ class TestTheNextTick:
         at 2026-10-30T23:39:57Z; the give-back abandons that lease, so the
         claim pass of the same tick asks for the lane it had excluded."""
         _plant_lease(sourced_config)
-        _test_hooks.run = FakeRun(list(PROBED))
+        _test_hooks.run = FakeRun(asked(sourced_config))
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": [ORPHANED]}),
@@ -467,7 +468,9 @@ class TestACancelBeforeTheStart:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("stopped"), *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
         cancelled = {**ORPHANED, "status": "cancelled"}
         endpoint = FakeQueue(
             [

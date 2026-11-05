@@ -25,6 +25,7 @@ from fleet.core import _test_hooks
 from tests._node_agent_fixtures import NPM_CI, _credentials_in_env, sourced_document
 from tests._queue_fakes import FakeQueue
 from tests._registry import shipped_document, write_registry
+from tests._roll_reads import roll_read
 from tests._roster_fixtures import dispatch_document, machine_document
 from tests._toolchain_fixtures import DIPHTHERIA_2026_09_23
 from tests.conftest import CALM, DEMO_PROJECT, FakeRun, ok
@@ -92,7 +93,15 @@ def _pendragon_config(config_path: pathlib.Path) -> pathlib.Path:
 def test_pendragon_without_ffmpeg_asks_the_queue_for_every_project_but_grandma_api(
     pendragon_config: pathlib.Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    runner = FakeRun([ok(""), ok(PENDRAGON_ROOM), ok(""), ok(DIPHTHERIA_2026_09_23)])
+    runner = FakeRun(
+        [
+            ok(""),
+            ok(PENDRAGON_ROOM),
+            ok(""),
+            ok(DIPHTHERIA_2026_09_23),
+            *roll_read(pendragon_config),
+        ]
+    )
     _test_hooks.run = runner
     endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
@@ -119,7 +128,9 @@ def test_the_same_pendragon_with_ffmpeg_found_also_asks_for_grandma_api(
     """The control: the only difference is the ffmpeg line, so it is what
     kept grandma-api out of the pass above."""
     found = DIPHTHERIA_2026_09_23 + "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"
-    _test_hooks.run = FakeRun([ok(""), ok(PENDRAGON_ROOM), ok(""), ok(found)])
+    _test_hooks.run = FakeRun(
+        [ok(""), ok(PENDRAGON_ROOM), ok(""), ok(found), *roll_read(pendragon_config)]
+    )
     endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
     _test_hooks.http_post = endpoint
 

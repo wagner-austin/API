@@ -28,6 +28,7 @@ from tests._node_agent_fixtures import (
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
+    asked,
     held_answer,
     launch,
     node_argv,
@@ -118,7 +119,7 @@ class TestPastItsLease:
                 ok(""),
                 ok(PASSING_TAIL),
                 *retire_replies(),
-                *PROBED,
+                *asked(sourced_config, fetch=True),
             ]
         )
         _test_hooks.run = runner
@@ -161,7 +162,7 @@ class TestPastItsLease:
         begins one second after it and not on it."""
         launch(sourced_config)
         pin_clock(PAST_THE_LEASE - 1)
-        _test_hooks.run = FakeRun([ok(""), ok(""), *PROBED])
+        _test_hooks.run = FakeRun([ok(""), ok(""), *asked(sourced_config, fetch=True)])
         endpoint = FakeQueue(
             [
                 held_answer(),
@@ -183,7 +184,9 @@ class TestCancelledUnderIt:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        runner = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
+        runner = FakeRun(
+            [ok(""), ok("stopped"), *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
         _test_hooks.run = runner
         endpoint = FakeQueue(
             [
@@ -225,7 +228,9 @@ class TestCancelledUnderIt:
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("stopped"), *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
         older = queue_job(status="cancelled", node="lavender", runId="libs-demo-1756000000")
         endpoint = FakeQueue(
             [
@@ -248,7 +253,9 @@ class TestCancelledUnderIt:
         """A further page is not asked for when nothing is left to find,
         however long the runner's cancelled history is."""
         launch(sourced_config)
-        _test_hooks.run = FakeRun([ok(""), ok("stopped"), *retire_replies(), *PROBED])
+        _test_hooks.run = FakeRun(
+            [ok(""), ok("stopped"), *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": []}),
@@ -296,7 +303,7 @@ class TestCancelledUnderIt:
     def test_a_tick_with_no_live_run_asks_the_queue_nothing_about_cancels(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun(list(PROBED))
+        _test_hooks.run = FakeRun(asked(sourced_config))
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 

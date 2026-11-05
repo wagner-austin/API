@@ -25,6 +25,7 @@ from tests._node_agent_fixtures import (
     PROBED,
     _credentials_in_env,
     _sourced_config,
+    asked,
     launch,
     node_argv,
 )
@@ -117,7 +118,11 @@ def _tick(
     Returns:
         The queue and the ssh runner, for assertions.
     """
-    replies = [ok(""), ok("stopped"), *retire_replies(), *PROBED] if stops else list(PROBED)
+    replies = (
+        [ok(""), ok("stopped"), *retire_replies(), *asked(config_path, fetch=True)]
+        if stops
+        else list(PROBED)
+    )
     # The claim is asked only once a stop gave the project's lease back; a run
     # left alone holds it (MCPs board task 48842bfd).
     claim = [dump_json_str({"claimed": None})] if stops else []

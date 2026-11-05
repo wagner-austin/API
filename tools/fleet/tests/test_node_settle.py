@@ -23,10 +23,10 @@ from fleet.core import _test_hooks
 from fleet.core.queue_transport import answering
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
-    PROBED,
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
+    asked,
     held_answer,
     launch,
     node_argv,
@@ -82,7 +82,9 @@ class TestACloseTheQueueDidNotAnswer:
             for record in caplog.records
         )
 
-        settling_node = FakeRun([*READ_AND_TAIL, *retire_replies(), *PROBED])
+        settling_node = FakeRun(
+            [*READ_AND_TAIL, *retire_replies(), *asked(sourced_config, fetch=True)]
+        )
         _test_hooks.run = settling_node
         answering_queue = FakeQueue(
             [
@@ -102,7 +104,7 @@ class TestACloseTheQueueDidNotAnswer:
         assert settled_line.endswith(
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
             "workers=7 slowest=unread ci=unread generation=unread began=unread phases=unread "
-            "steps=unread"
+            "steps=unread registry=unread"
         )
         retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
         assert [retire_path in " ".join(call) for call in settling_node.calls[:6]] == [
@@ -128,9 +130,9 @@ class TestASettleLogsEachFactOnce:
     @pytest.mark.parametrize(
         ("after_close", "followed"),
         [
-            ([*retire_replies(), *PROBED], "its row is finished and its directory retired"),
+            ([*retire_replies()], "its row is finished and its directory retired"),
             (
-                [UNANSWERED_RETIRE, *PROBED],
+                [UNANSWERED_RETIRE],
                 "its row is finished and the retire is owed until lavender answers",
             ),
         ],
@@ -143,7 +145,9 @@ class TestASettleLogsEachFactOnce:
         followed: str,
     ) -> None:
         launch(sourced_config)
-        _test_hooks.run = FakeRun([*READ_AND_TAIL, *after_close])
+        _test_hooks.run = FakeRun(
+            [*READ_AND_TAIL, *after_close, *asked(sourced_config, fetch=True)]
+        )
         answering_queue = FakeQueue(
             [
                 held_answer(taskId=VERDICT_TASK),
@@ -218,7 +222,7 @@ def _settle_killed(
             ok(""),
             ok(_killed_tail(ending)),
             *retire_replies(),
-            *PROBED,
+            *asked(sourced_config, fetch=True),
         ]
     )
     answering_queue = FakeQueue(
@@ -232,7 +236,8 @@ def _settle_killed(
 #: Where every verdict line here ends, before the unit's ending.
 VERDICT_END = (
     f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} workers=7 "
-    "slowest=unread ci=unread generation=unread began=unread phases=unread steps=unread"
+    "slowest=unread ci=unread generation=unread began=unread phases=unread steps=unread "
+    "registry=unread"
 )
 
 

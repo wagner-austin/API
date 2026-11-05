@@ -27,11 +27,13 @@ from tests._node_agent_fixtures import (
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
+    asked,
     held_answer,
     launch,
     node_argv,
 )
 from tests._queue_fakes import DEFAULT_JOB_ID, DEFAULT_SHA, FakeQueue, queue_job
+from tests._roll_reads import ROLLED_COMMIT
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, retire_replies
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -45,8 +47,18 @@ class TestCollecting:
         writer posts it to the task's thread addressed to the submitter
         (MCPs board task 2fecad69), so the runner posts nothing itself."""
         launch(sourced_config)
+        # The tail read prints the commit the launch recorded beside the run
+        # (MCPs board task 1fd01f09), and the line ends with it.
+        tail = f"{PASSING_TAIL}FLEET_REGISTRY: {ROLLED_COMMIT}\n"
         node = FakeRun(
-            [ok(""), ok("0 1757000060"), ok(""), ok(PASSING_TAIL), *retire_replies(), *PROBED]
+            [
+                ok(""),
+                ok("0 1757000060"),
+                ok(""),
+                ok(tail),
+                *retire_replies(),
+                *asked(sourced_config, fetch=True),
+            ]
         )
         _test_hooks.run = node
         endpoint = FakeQueue(
@@ -69,7 +81,7 @@ class TestCollecting:
             "budget=unread ended=2025-09-04T15:34:20Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
             "workers=7 slowest=unread ci=unread generation=unread began=unread phases=unread "
-            "steps=unread"
+            f"steps=unread registry={ROLLED_COMMIT}"
         )
         # Retired after the tail was read and the job closed (fleet.cli.node_settle):
         # the fifth and sixth calls send the retire to the stage root and run it.
@@ -132,7 +144,7 @@ class TestCollecting:
                 ok(""),
                 ok("3 failed, 100 passed\n"),
                 *retire_replies(),
-                *PROBED,
+                *asked(sourced_config, fetch=True),
             ]
         )
         endpoint = FakeQueue(
@@ -209,7 +221,7 @@ class TestCollecting:
     def test_a_job_whose_run_this_machine_never_had_is_left_alone(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun(asked(sourced_config))
         endpoint = FakeQueue(
             [
                 dump_json_str(
@@ -285,7 +297,7 @@ class TestAnnounceAndEntryPoints:
         assert endpoint.tools == []
 
     def test_the_console_entry_point_exits_zero(self, sourced_config: pathlib.Path) -> None:
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun(asked(sourced_config))
         _test_hooks.http_post = FakeQueue(
             [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})]
         )
@@ -302,7 +314,7 @@ class TestAnnounceAndEntryPoints:
     def test_running_as_a_module_actually_runs(self, sourced_config: pathlib.Path) -> None:
         """Without the ``if __name__`` block ``python -m`` imports the module,
         runs nothing and exits 0, which reads as a tick that found nothing."""
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun(asked(sourced_config))
         _test_hooks.http_post = FakeQueue(
             [dump_json_str({"jobs": []}), dump_json_str({"claimed": None})]
         )

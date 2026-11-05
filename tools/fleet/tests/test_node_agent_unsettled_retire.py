@@ -27,6 +27,8 @@ from tests._node_agent_fixtures import (
     PROBED,
     _credentials_in_env,
     _sourced_config,
+    asked,
+    handed_a_job,
     node_argv,
     prebuilt_export,
 )
@@ -112,7 +114,7 @@ class TestARunRefusedWhileStaging:
         prebuilt_export(sourced_config)
         _test_hooks.run = FakeRun(
             [
-                *PROBED,
+                *handed_a_job(sourced_config),
                 ok(""),  # git init --bare (the mirror is new)
                 ok(""),  # git cat-file -e: the sha is present
                 ok(""),  # stage: send the prepare script
@@ -135,7 +137,7 @@ class TestARunRefusedWhileStaging:
 
         assert _states(sourced_config) == [RetireState.OWED]
 
-        answered = FakeRun([*retire_replies(), *PROBED])
+        answered = FakeRun([*retire_replies(), *asked(sourced_config, fetch=True)])
         queue = _idle_start(sourced_config, answered)
 
         assert queue.tools == ["dispatch_list", "dispatch_claim"]
@@ -173,7 +175,7 @@ class TestALaunchWhoseRunnerEnded:
         assert _states(sourced_config) == [RetireState.OWED]
 
         clock.seconds = lease["expires_unix"] + 1
-        lapsed = FakeRun([*retire_replies(), *PROBED])
+        lapsed = FakeRun([*retire_replies(), *asked(sourced_config, fetch=True)])
         _idle_start(sourced_config, lapsed)
 
         assert _sent_retire(lapsed) == 2

@@ -23,7 +23,12 @@ from platform_core.json_utils import dump_json_str, narrow_json_to_str
 from fleet.cli import node_agent
 from fleet.contracts.source import InstallStep
 from fleet.core import _test_hooks, export
-from tests._node_agent_fixtures import PROBED, _credentials_in_env, node_argv, sourced_document
+from tests._node_agent_fixtures import (
+    _credentials_in_env,
+    handed_a_job,
+    node_argv,
+    sourced_document,
+)
 from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
 from tests._registry import write_registry
 from tests.conftest import FakeRun, failed, ok
@@ -130,7 +135,7 @@ class TestTheTickRefusesBeforeAnyLease:
         write_registry(config_path, sourced_document((step(*STEP),)))
         runner = FakeRun(
             [
-                *PROBED,
+                *handed_a_job(config_path),
                 ok(""),  # git init --bare
                 ok(""),  # cat-file -e <sha>^{commit}: held, no fetch
                 failed(128, "fatal: path 'scripts/testdb-setup.sh' does not exist"),

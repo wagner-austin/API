@@ -28,6 +28,7 @@ from tests._node_agent_fixtures import (
     node_argv,
 )
 from tests._queue_fakes import FakeQueue
+from tests._roll_reads import roll_read
 from tests._toolchain_fixtures import (
     CHROME_APT,
     CHROME_REASON,
@@ -98,6 +99,7 @@ class TestTheToolTagsAClaimCarries:
                 ok(PROBE_OK),
                 ok(""),
                 ok(DIPHTHERIA_2026_09_23 + "ffmpeg=yes=ffmpeg version 6.1.1-3ubuntu5\n"),
+                *roll_read(sourced_config),
             ]
         )
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
@@ -141,7 +143,15 @@ class TestTheToolTagsAClaimCarries:
             "go=yes=go version go1.27.1 linux/amd64\nchrome=yes=155.0.8059.39\n"
             "pdftotext=yes=pdftotext version 24.02.0\nnixos-test=yes=nix (Nix) 2.31.2\n"
         )
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(DIPHTHERIA_2026_09_23 + found)])
+        _test_hooks.run = FakeRun(
+            [
+                ok(""),
+                ok(PROBE_OK),
+                ok(""),
+                ok(DIPHTHERIA_2026_09_23 + found),
+                *roll_read(sourced_config),
+            ]
+        )
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -172,7 +182,7 @@ class TestTheToolTagsAClaimCarries:
     ) -> None:
         """linux alone, so the queue keeps an audio check for another node and
         offers this one the rest."""
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun([*PROBED, *roll_read(sourced_config)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -189,7 +199,15 @@ class TestTheToolTagsAClaimCarries:
         install with no file edited, and each difference from the registry is
         logged so the declaration can be corrected."""
         found = "cxx=yes=13.3.0\ngpu=yes=NVIDIA GeForce GTX 1630, 7.5\ntestdb=no=\n"
-        _test_hooks.run = FakeRun([ok(""), ok(PROBE_OK), ok(""), ok(DIPHTHERIA_2026_09_23 + found)])
+        _test_hooks.run = FakeRun(
+            [
+                ok(""),
+                ok(PROBE_OK),
+                ok(""),
+                ok(DIPHTHERIA_2026_09_23 + found),
+                *roll_read(sourced_config),
+            ]
+        )
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -214,7 +232,7 @@ class TestAToolchainThatCanBuild:
     def test_a_ready_node_says_what_it_was_judged_on_and_asks_the_queue(
         self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun([*PROBED, *roll_read(sourced_config)])
         endpoint = FakeQueue([dump_json_str({"jobs": []}), dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 

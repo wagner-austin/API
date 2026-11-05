@@ -24,6 +24,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.mcp_client import McpHttpResponse
 
 from fleet.cli import node_serve
+from fleet.cli.node_roll import RollGuard
 from fleet.cli.node_serve_claim import Claiming, answered, queued_here
 from fleet.core import _test_hooks, queue
 from fleet.core.queue_transport import answering
@@ -342,6 +343,7 @@ class TestAServeThroughAQueueOutage:
         )
         watch = ScriptedWatch([True])
 
+        roll = RollGuard(runs="roll-1", rolled=lambda: "roll-1")
         served = node_serve.serve_loop(
             watch,
             Future(),
@@ -353,7 +355,8 @@ class TestAServeThroughAQueueOutage:
                 collect=steps.collect,
                 fill=steps.fill,
                 queued=steps.queued,
-                rolled=lambda: "roll-1",
+                moved=roll.moved,
+                latched=roll.latched,
                 launching=lambda: 0,
                 start_unreported=steps.start_unreported,
             ),

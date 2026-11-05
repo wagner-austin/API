@@ -30,9 +30,9 @@ from fleet.core import _test_hooks, leases, records, run_lease
 from tests._node_agent_fixtures import (
     ATTEMPT_DIRECTORY,
     EXPORT_BUNDLE,
-    PROBED,
     _credentials_in_env,
     _sourced_config,
+    handed_a_job,
     node_argv,
     prebuilt_export,
     sourced_document,
@@ -46,30 +46,52 @@ __all__ = ["_credentials_in_env", "_sourced_config", "sourced_document"]
 #: can be asserted against the number the code actually carries.
 SSH_DEADLINE_SECONDS = 120
 
-#: Every command the tick runs up to and including the send that carries the
-#: payload, which is the one that fails here. The steps are the same ones
-#: :func:`tests._node_agent_fixtures.claim_replies` lists; this stops early
-#: rather than repeating the rest, because nothing after it should run.
-UP_TO_THE_PAYLOAD: tuple[_test_hooks.CommandResult, ...] = (
-    *PROBED,  # the probe, before any claim
-    ok(""),  # git init --bare (the mirror is new)
-    ok(""),  # git cat-file -e: the sha is present
-    ok(""),  # stage: send the prepare script
-    ok(""),  # stage: run it; the node's mirror does not exist yet
-    ok(""),  # the commit: git update-ref of the run's bundle ref
-    ok(""),  # the commit: git bundle create
-    ok(""),  # the commit: git update-ref -d of the run's bundle ref
-    timed_out(SSH_DEADLINE_SECONDS),  # stage: send the bundle, ended at its deadline
-)
 
-#: Every command the tick runs before it asks for the lease: the probe and
-#: ``prepare``'s mirror checks. A lease another run holds refuses the dispatch
-#: right after these, before any archive is built or anything is sent.
-UP_TO_THE_LEASE: tuple[_test_hooks.CommandResult, ...] = (
-    *PROBED,  # the probe, before any claim
-    ok(""),  # git init --bare (the mirror is new)
-    ok(""),  # git cat-file -e: the sha is present
-)
+def up_to_the_payload(config_path: pathlib.Path) -> list[_test_hooks.CommandResult]:
+    """Every command the tick runs up to and including the send that carries the payload.
+
+    That send is the one that fails here. The steps are the same ones
+    :func:`tests._node_agent_fixtures.claim_replies` lists; this stops early
+    rather than repeating the rest, because nothing after it should run.
+
+    Args:
+        config_path: The registry the runner loaded.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        *handed_a_job(config_path),  # the probe and the two reads of the ref
+        ok(""),  # git init --bare (the mirror is new)
+        ok(""),  # git cat-file -e: the sha is present
+        ok(""),  # stage: send the prepare script
+        ok(""),  # stage: run it; the node's mirror does not exist yet
+        ok(""),  # the commit: git update-ref of the run's bundle ref
+        ok(""),  # the commit: git bundle create
+        ok(""),  # the commit: git update-ref -d of the run's bundle ref
+        timed_out(SSH_DEADLINE_SECONDS),  # stage: send the bundle, ended at its deadline
+    ]
+
+
+def up_to_the_lease(config_path: pathlib.Path) -> list[_test_hooks.CommandResult]:
+    """Every command the tick runs before it asks for the lease.
+
+    The probe and ``prepare``'s mirror checks. A lease another run holds
+    refuses the dispatch right after these, before any archive is built or
+    anything is sent.
+
+    Args:
+        config_path: The registry the runner loaded.
+
+    Returns:
+        One result per call.
+    """
+    return [
+        *handed_a_job(config_path),  # the probe and the two reads of the ref
+        ok(""),  # git init --bare (the mirror is new)
+        ok(""),  # git cat-file -e: the sha is present
+    ]
+
 
 #: The run that already holds the demo project on lavender, a minute older.
 HOLDER_RUN_ID = f"libs-demo-lavender-{DEMO_NOW - 60}"
@@ -92,7 +114,7 @@ class TestAStagingFaultIsReported:
         # The bundle the faked ``git bundle create`` would have written, where
         # the tick reads it: the payload has to be real for staging to carry it.
         prebuilt_export(sourced_config)
-        _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
+        _test_hooks.run = FakeRun(up_to_the_payload(sourced_config))
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": []}),
@@ -129,7 +151,7 @@ class TestAStagingFaultIsReported:
         (MCPs reportDispatchRunLost), so a node that stays unreachable cannot
         loop one job; the runner logs what the queue did, not what it asked."""
         prebuilt_export(sourced_config)
-        _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
+        _test_hooks.run = FakeRun(up_to_the_payload(sourced_config))
         _test_hooks.http_post = FakeQueue(
             [
                 dump_json_str({"jobs": []}),
@@ -161,7 +183,7 @@ class TestAStagingFaultIsReported:
         node was unreachable, left the job queued for another claim.
         """
         prebuilt_export(sourced_config)
-        _test_hooks.run = FakeRun(list(UP_TO_THE_PAYLOAD))
+        _test_hooks.run = FakeRun(up_to_the_payload(sourced_config))
         _test_hooks.http_post = FakeQueue(
             [
                 dump_json_str({"jobs": []}),
@@ -260,7 +282,9 @@ class TestAnotherDispatchesLeaseStands:
             node_local=loaded.workspace["node_local_resources"],
             now_unix=DEMO_NOW - 60,
         )
-        _test_hooks.run = _LeasedMidTick(UP_TO_THE_LEASE, path=loaded.leases, holder=holder)
+        _test_hooks.run = _LeasedMidTick(
+            tuple(up_to_the_lease(sourced_config)), path=loaded.leases, holder=holder
+        )
         endpoint = FakeQueue(
             [
                 dump_json_str({"jobs": []}),

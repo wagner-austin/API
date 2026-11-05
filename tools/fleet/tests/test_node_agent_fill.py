@@ -29,6 +29,7 @@ from tests._node_agent_fixtures import (
     _credentials_in_env,
     _sourced_config,
     claim_replies,
+    handed_a_job,
     launch_steps,
     node_argv,
     prebuilt_export,
@@ -107,9 +108,9 @@ class TestARoomyNode:
         digest = staging.digest(prebuilt_export(two_projects))
         _other_export(two_projects)
         runs = [
-            *PROBED,
+            *handed_a_job(two_projects),
             *launch_steps(digest, registry=two_projects, commit_present=True),
-            *PROBED,
+            *handed_a_job(two_projects),
             *launch_steps(digest, registry=two_projects, commit_present=True),
             *PROBED,
         ]
@@ -183,7 +184,7 @@ class TestARefusedJobEndsTheTick:
         with caplog.at_level("INFO"):
             endpoint, runner = _tick(
                 two_projects,
-                list(PROBED),
+                handed_a_job(two_projects),
                 [
                     dump_json_str({"jobs": []}),
                     dump_json_str({"claimed": queue_job(status="claimed", requiredTags=["gpu"])}),
@@ -193,7 +194,7 @@ class TestARefusedJobEndsTheTick:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
         assert endpoint.arguments[2]["status"] == "refused"
-        assert len(runner.calls) == len(PROBED)
+        assert len(runner.calls) == len(handed_a_job(two_projects))
         assert len(endpoint.ticks) == 1
         assert [record.getMessage() for record in caplog.records][-2:] == [
             NOTHING_LAUNCHED,

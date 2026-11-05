@@ -32,6 +32,7 @@ from tests._node_agent_fixtures import (
     _credentials_in_env,
     _sourced_config,
     claim_replies,
+    handed_a_job,
     node_argv,
     prebuilt_export,
 )
@@ -129,13 +130,18 @@ class TestClaiming:
         assert claim["widths"] == [{"project": DEMO_PROJECT, "workers": rows[0]["workers"]}]
         assert started["workers"] == rows[0]["workers"]
         # The node's two probes, capacity then toolchain (two ssh calls each),
-        # BEFORE the claim, then the mirror and the commit probe, then the
-        # node's mirror asked what it holds, and the commit bundled less
-        # that under a ref of the run's own (MCPs board task 1e0ee821): no
-        # tar of any working tree anywhere, and no second probe.
+        # BEFORE the claim; the rolled ref read before the queue is asked and
+        # again once it handed over the job (MCPs board task 1fd01f09); then
+        # the mirror and the commit probe, then the node's mirror asked what
+        # it holds, and the commit bundled less that under a ref of the run's
+        # own (MCPs board task 1e0ee821): no tar of any working tree
+        # anywhere, and no second probe.
         mirror = _mirror(sourced_config)
         probes = len(PROBED)
         assert [call[0] for call in runner.calls[:probes]] == ["ssh"] * probes
+        read = ("rev-parse", "--verify", "refs/fleet/rolled^{commit}")
+        assert [call[3:] for call in runner.calls[probes + 1 : probes + 4 : 2]] == [read, read]
+        probes += 4
         assert runner.calls[probes] == ("git", "init", "--bare", "--quiet", mirror)
         assert runner.calls[probes + 1] == (
             "git",
@@ -191,7 +197,7 @@ class TestClaiming:
         runner = _claim_and_start(sourced_config, commit_present=False)
 
         mirror = _mirror(sourced_config)
-        assert runner.calls[len(PROBED) + 2] == (
+        assert runner.calls[len(PROBED) + 4 + 2] == (
             "git",
             "-C",
             mirror,
@@ -316,7 +322,7 @@ class TestRefusals:
     def test_an_unknown_project_is_refused_rather_than_crashing_the_loop(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun(handed_a_job(sourced_config))
 
         detail = self._refused_detail(
             sourced_config, queue_job(status="claimed", project="libs/absent")
@@ -327,7 +333,7 @@ class TestRefusals:
     def test_a_tag_the_registry_does_not_declare_is_refused_before_any_git_command(
         self, sourced_config: pathlib.Path
     ) -> None:
-        runner = FakeRun(PROBED)
+        runner = FakeRun(handed_a_job(sourced_config))
         _test_hooks.run = runner
 
         detail = self._refused_detail(
@@ -339,7 +345,8 @@ class TestRefusals:
             "registry/projects/libs/demo.json does not declare (it declares []); resubmit "
             "with the registry's tags"
         )
-        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
+        # Only the two reads of the rolled ref, no git command on the job.
+        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED) + ["git"] * 4
 
     def test_a_job_naming_fewer_tags_than_its_project_passes_the_gate(self) -> None:
         """What it needs is the declaration, which the claim's fits already
@@ -351,20 +358,20 @@ class TestRefusals:
 
     def test_a_project_with_no_remote_is_refused_by_name(self, config_path: pathlib.Path) -> None:
         """The shared fixture's project declares ``source: null``."""
-        runner = FakeRun(PROBED)
+        runner = FakeRun(handed_a_job(config_path))
         _test_hooks.run = runner
 
         detail = self._refused_detail(config_path, queue_job(status="claimed"))
 
         assert detail.startswith("PROJECT_REMOTE_MISSING: project 'libs/demo' declares no source")
-        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED)
+        assert [call[0] for call in runner.calls] == ["ssh"] * len(PROBED) + ["git"] * 4
 
     def test_a_sha_the_remote_lacks_is_refused_with_nothing_leased(
         self, sourced_config: pathlib.Path
     ) -> None:
         _test_hooks.run = FakeRun(
             [
-                *PROBED,
+                *handed_a_job(sourced_config),
                 ok(""),  # git init --bare
                 failed(128, "missing"),  # cat-file: absent
                 failed(128, f"fatal: couldn't find remote ref {DEFAULT_SHA}"),  # fetch
@@ -382,7 +389,7 @@ class TestRefusals:
     ) -> None:
         _test_hooks.run = FakeRun(
             [
-                *PROBED,
+                *handed_a_job(sourced_config),
                 ok(""),
                 failed(128, "missing"),
                 *[failed(128, "fatal: unable to access: could not resolve host")]
@@ -398,7 +405,7 @@ class TestRefusals:
     def test_a_node_lane_job_without_a_sha_is_a_contract_fault_not_a_refusal(
         self, sourced_config: pathlib.Path
     ) -> None:
-        _test_hooks.run = FakeRun(PROBED)
+        _test_hooks.run = FakeRun(handed_a_job(sourced_config))
         _test_hooks.http_post = FakeQueue(
             [
                 dump_json_str({"jobs": []}),

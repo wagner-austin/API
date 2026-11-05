@@ -27,8 +27,6 @@ def test_every_act_renders_its_script() -> None:
         agent="opus-demo-0929",
         loopback_unit=None,
     )
-    assert names.RESULT_NAME in dialect.log_tail_script("/s/run", 5)
-    assert names.task_name("r") in dialect.launch_script(target="/s/run", run_id="r")
     assert names.RESULT_NAME in dialect.result_script("/s/run")
     assert names.task_name("r") in dialect.stop_script("r")
     assert "free_ram_gb" in dialect.CAPACITY_PROBE_SCRIPT

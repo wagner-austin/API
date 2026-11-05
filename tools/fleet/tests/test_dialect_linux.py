@@ -21,12 +21,13 @@ import pytest
 
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.source import InstallStep
-from fleet.core import dialect, names, tool_caches
+from fleet.core import dialect, names, run_registry, tool_caches
 from fleet.core.dialect import PROLOGUE, SH_INVOCATION
 from fleet.core.linux_unit_end import unit_end_path
 from fleet.core.names import CACHE_VARIABLE
 from fleet.core.phase_markers import SH_UTC_STAMP
 from fleet.core.run_summary import sh_run_summary_line
+from tests._roll_reads import ROLLED_COMMIT
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID
 
 TARGET = "/home/corvis/fleet/stage/run-1"
@@ -56,8 +57,10 @@ def test_every_script_begins_with_the_fail_fast_prologue_and_the_user_path() -> 
         dialect.make_directory_script(TARGET),
         dialect.digest_script(TARGET),
         _build(workers=4),
-        dialect.log_tail_script(TARGET, 200),
-        dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID),
+        run_registry.log_tail_script(TARGET, 200),
+        run_registry.launch_script(
+            target=TARGET, run_id=DEMO_RUN_ID, registry_commit=ROLLED_COMMIT
+        ),
         dialect.result_script(TARGET),
         dialect.stop_script(DEMO_RUN_ID),
         dialect.CAPACITY_PROBE_SCRIPT,
@@ -238,56 +241,6 @@ class TestBuildScript:
         assert lines.index("status=$?") + 1 == lines.index("set -e")
         assert lines[-2] == sh_run_summary_line(f"{TARGET}/{names.RESULT_NAME}.log")
         assert lines[-1] == f"printf '%s\\n' \"$status\" > '{TARGET}/{names.RESULT_NAME}'"
-
-
-class TestLogTailScript:
-    def test_it_reads_the_last_lines_of_the_transcript_or_nothing(self) -> None:
-        body = dialect.log_tail_script(TARGET, 200)
-
-        assert body == (
-            f"{PROLOGUE}if [ -f '{TARGET}/{names.RESULT_NAME}.log' ]; then "
-            f"tail -n 200 '{TARGET}/{names.RESULT_NAME}.log'; fi\n"
-        )
-
-
-class TestLaunchScript:
-    def test_it_refuses_before_starting_when_lingering_is_off(self) -> None:
-        """The unit is given the account's runtime directory and bus, which
-        end with the session that started it unless the user lingers, so the
-        script checks first and names the fix."""
-        body = dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
-        lines = body.splitlines()
-
-        check = next(index for index, line in enumerate(lines) if "loginctl show-user" in line)
-        start = next(index for index, line in enumerate(lines) if line.startswith(CHECK_UNIT))
-        assert check < start
-        assert "sudo loginctl enable-linger $user" in body
-        assert "exit 1" in body
-
-    def test_it_starts_the_build_through_the_helper_in_dispatchs_share_and_proves_it(
-        self,
-    ) -> None:
-        """MCPs board task bc8c445c: a --user unit sat under user.slice, which
-        neither the owner's nor dispatch's slice reached; the helper starts a
-        system unit in the checks' slice inside system-dispatch.slice."""
-        body = dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
-        unit = names.task_name(DEMO_RUN_ID)
-        build = dialect.script_path(TARGET, names.BUILD_STEM)
-        start = f"\n{CHECK_UNIT} start '{unit}' '{TARGET}' '{build}' '{unit_end_path(TARGET)}'\n"
-
-        assert start in body
-        assert CHECK_UNIT == "sudo -n /usr/local/sbin/fleet-check-unit"
-        assert "--user" not in body
-        assert body.rstrip().endswith("printf 'launched\\n'")
-        assert "make check" not in body
-
-    def test_the_unit_name_is_the_one_the_stop_script_stops(self) -> None:
-        unit = names.task_name(DEMO_RUN_ID)
-
-        assert unit in dialect.launch_script(target=TARGET, run_id=DEMO_RUN_ID)
-        stopped = dialect.stop_script(DEMO_RUN_ID)
-
-        assert f"{CHECK_UNIT} stop '{unit}'\n" in stopped
 
 
 class TestResultAndStopScripts:

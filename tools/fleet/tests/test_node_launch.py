@@ -25,6 +25,7 @@ from platform_core.json_utils import dump_json_str, require_dict
 from fleet.cli import _config, node_agent, node_collect, node_watch
 from fleet.cli.node_launch import Launcher, Launching
 from fleet.cli.node_prepare import Admitted
+from fleet.cli.node_roll import RollGuard
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.node import LiveLoad
 from fleet.contracts.workspace import require_project
@@ -51,6 +52,7 @@ from tests._queue_fakes import (
     queue_job,
 )
 from tests._registry import write_registry
+from tests._roll_reads import ROLLED_COMMIT
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -84,6 +86,7 @@ def _launcher(
         alias="lavender",
         node=loaded.workspace["nodes"]["lavender"],
         agent=agent,
+        registry_commit=ROLLED_COMMIT,
         hold=held.append,
     )
     return loaded, launcher
@@ -107,6 +110,7 @@ def _fill(loaded: _config.LoadedWorkspace, launcher: Launcher) -> tuple[str, ...
         alias="lavender",
         node=loaded.workspace["nodes"]["lavender"],
         launcher=launcher,
+        roll=RollGuard(runs=ROLLED_COMMIT, rolled=lambda: ROLLED_COMMIT),
     )
 
 

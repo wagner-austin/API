@@ -7,8 +7,11 @@ clock whose sleeps move it, the passes and the queue listing recorded by
 hands over 10 s before the first fire boundary with no listing and no read
 of the roll; a longer one fills again when a job arrives or the watch
 settles a run, runs the passes at each boundary, and hands over once it has
-served its time or the roll has moved; a handover refused while a settle
-runs, or a pass that runs past the fire, moves it to the next boundary. The
+served its time or the roll has moved, reading the roll through the real
+guard (:class:`fleet.cli.node_roll.RollGuard`), and stops listing once a
+fill's claim found it moved (MCPs board task 1fd01f09); a handover refused
+while a settle runs, or a pass that runs past the fire, moves it to the next
+boundary. The
 end-to-end case runs :func:`fleet.cli.node_agent.main` with a 60-second
 serve against the node's and the queue's scripted answers, and the rest pin
 the workspace's two declarations and the schedule the boundaries come from.
@@ -25,6 +28,7 @@ from platform_core.errors import AppError, FleetErrorCode
 from platform_core.json_utils import JSONTypeError, dump_json_str
 
 from fleet.cli import node_agent, node_serve, node_serve_claim
+from fleet.cli.node_roll import RollGuard
 from fleet.contracts.workspace import (
     NATIVE_EVIDENCE_CEILING_SECONDS,
     NODE_POLL_CEILING_SECONDS,
@@ -40,10 +44,11 @@ from tests._node_agent_fixtures import (
     node_argv,
     sourced_document,
 )
-from tests._queue_fakes import DEFAULT_SHA, FakeQueue, queue_job
+from tests._queue_fakes import FakeQueue, queue_job
 from tests._registry import shipped_document, write_registry
-from tests._rolled_fetch_script import fetch_calls, fetch_replies
-from tests.conftest import DEMO_NOW, FakeClock, FakeRun, ok, pin_clock
+from tests._roll_reads import roll_read
+from tests._rolled_fetch_script import fetch_calls
+from tests.conftest import DEMO_NOW, FakeClock, FakeRun, pin_clock
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -107,6 +112,7 @@ class Steps:
 
     calls: list[str]
     clock: FakeClock
+    roll: RollGuard
 
     def __init__(
         self,
@@ -121,7 +127,8 @@ class Steps:
         Args:
             clock: The pinned clock.
             queued: The queued job ids at a moment, seconds after DEMO_NOW.
-            rolled: What the roll reads as, one per read.
+            rolled: What the roll reads as, one per read, to the real guard
+                of a serve running ``roll-1``.
             fill: What a fill pass does at a moment, beside being recorded.
         """
         self.calls = []
@@ -129,6 +136,7 @@ class Steps:
         self._queued = queued
         self._rolled = list(rolled)
         self._fill = fill
+        self.roll = RollGuard(runs="roll-1", rolled=self.rolled)
 
     def _at(self) -> int:
         """Seconds after DEMO_NOW.
@@ -191,7 +199,8 @@ class Steps:
             collect=self.collect,
             fill=self.fill,
             queued=self.queued,
-            rolled=self.rolled,
+            moved=self.roll.moved,
+            latched=self.roll.latched,
             launching=self.launching,
             start_unreported=self.start_unreported,
         )
@@ -355,14 +364,15 @@ class TestALongerServe:
                 return frozenset({"job-a"})
             return frozenset()
 
-        steps = Steps(clock, queued=arrivals, rolled=("roll-1", "roll-1"), fill=_fill_does_nothing)
+        steps = Steps(clock, queued=arrivals, rolled=("roll-1",), fill=_fill_does_nothing)
 
         served = _serve(steps, watch, serve_seconds=200)
 
         fills = [call for call in steps.calls if call.startswith("fill@")]
         assert fills == ["fill@0", "fill@30", "fill@60", "fill@100", "fill@150"]
+        # The roll is compared with the commit the serve runs, never with a
+        # first reading of it, so the boundary's read is the only one.
         assert [call for call in steps.calls if not call.startswith(("fill@", "queued@"))] == [
-            "rolled@0",
             "collect@0",
             "rolled@150",
             "collect@150",
@@ -373,9 +383,7 @@ class TestALongerServe:
 
     def test_hands_over_at_the_first_boundary_once_the_roll_has_moved(self) -> None:
         clock = pin_clock(DEMO_NOW)
-        steps = Steps(
-            clock, queued=_nothing_queued, rolled=("roll-1", "roll-2"), fill=_fill_does_nothing
-        )
+        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-2",), fill=_fill_does_nothing)
 
         served = _serve(steps, ScriptedWatch([True]), serve_seconds=NODE_SERVE_CEILING_SECONDS)
 
@@ -386,7 +394,7 @@ class TestALongerServe:
 
     def test_whose_watch_thread_ended_stops_at_once(self) -> None:
         clock = pin_clock(DEMO_NOW)
-        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-1",), fill=_fill_does_nothing)
+        steps = Steps(clock, queued=_nothing_queued, rolled=(), fill=_fill_does_nothing)
         ended: Future[None] = Future()
         ended.set_exception(AppError(FleetErrorCode.NODE_UNREACHABLE, "lavender went away"))
 
@@ -394,7 +402,72 @@ class TestALongerServe:
 
         assert served["reason"] == "its watch thread ended"
         assert served["handed_over"] == DEMO_NOW
-        assert steps.calls == ["rolled@0", "collect@0", "fill@0"]
+        assert steps.calls == ["collect@0", "fill@0"]
+
+
+class TestAServeWhoseClaimFoundTheRollMoved:
+    """MCPs board task 1fd01f09: pendragon's serve claimed job 0fa14fab 16 s
+    before its boundary, on the registry before the roll. A claim pass reads
+    the ref (:mod:`fleet.cli.node_roll`); once it finds it moved, the serve
+    lists and fills nothing more and hands over at the next boundary."""
+
+    def test_stops_polling_after_the_poll_whose_fill_found_it(self) -> None:
+        clock = pin_clock(DEMO_NOW)
+        watch = ScriptedWatch([True])
+
+        def arrivals(at: int) -> frozenset[str]:
+            return frozenset({"job-a"}) if at >= 30 else frozenset()
+
+        def claims(at: int) -> None:
+            if at == 30:
+                steps.roll.moved()
+
+        steps = Steps(clock, queued=arrivals, rolled=("roll-2",), fill=claims)
+
+        served = _serve(steps, watch, serve_seconds=NODE_SERVE_CEILING_SECONDS)
+
+        assert steps.calls[-3:] == ["queued@30", "fill@30", "rolled@30"]
+        assert served["reason"] == "refs/fleet/rolled moved from roll-1 to roll-2"
+        assert served["handed_over"] == FIRST_FIRE - node_serve.HANDOVER_SECONDS
+        assert served["fills"] == 2
+
+    def test_a_move_found_by_the_opening_fill_lists_nothing_at_all(self) -> None:
+        clock = pin_clock(DEMO_NOW)
+
+        def claims(at: int) -> None:
+            steps.roll.moved()
+
+        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-2",), fill=claims)
+
+        served = _serve(steps, ScriptedWatch([True]), serve_seconds=NODE_SERVE_CEILING_SECONDS)
+
+        assert steps.calls == ["collect@0", "fill@0", "rolled@0"]
+        assert served["handed_over"] == FIRST_FIRE - node_serve.HANDOVER_SECONDS
+
+    def test_a_move_found_at_a_boundarys_fill_hands_over_at_the_next(self) -> None:
+        """The boundary reads the ref unmoved and renews; the fill it runs
+        there reads it moved, and nothing is filled again."""
+        clock = pin_clock(DEMO_NOW)
+
+        def claims(at: int) -> None:
+            if at == 150:
+                steps.roll.moved()
+
+        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-1", "roll-2"), fill=claims)
+
+        served = _serve(steps, ScriptedWatch([True]), serve_seconds=NODE_SERVE_CEILING_SECONDS)
+
+        assert [call for call in steps.calls if not call.startswith("queued@")] == [
+            "collect@0",
+            "fill@0",
+            "rolled@150",
+            "collect@150",
+            "fill@150",
+            "rolled@150",
+        ]
+        assert served["reason"] == "refs/fleet/rolled moved from roll-1 to roll-2"
+        assert served["handed_over"] == SECOND_FIRE - node_serve.HANDOVER_SECONDS
+        assert served["fills"] == 2
 
 
 class TestTheQueuedJobsAServeWatches:
@@ -439,7 +512,7 @@ class TestAServingRunner:
         document["node_serve_seconds"] = 60
         write_registry(sourced_config, document)
         records = sourced_config.resolve().parent
-        node = FakeRun([*fetch_replies(records / "git"), ok(f"{DEFAULT_SHA}\n"), *PROBED])
+        node = FakeRun([*PROBED, *roll_read(sourced_config)])
         _test_hooks.run = node
         endpoint = FakeQueue(
             [
@@ -453,10 +526,12 @@ class TestAServingRunner:
         with caplog.at_level("INFO"):
             assert node_agent.main(node_argv(sourced_config)) == 0
 
-        # Fetched and read from the records directory, which is the
-        # document's own here, resolved as the workspace loader resolves it.
-        assert node.calls[:2] == fetch_calls(records)
-        assert node.calls[2] == (
+        # Read once, after the probe found the node ready and before the
+        # queue was asked, from the records directory, which is the
+        # document's own here, resolved as the workspace loader resolves it;
+        # the stamp the fixture left answers for the fetch.
+        assert node.calls[len(PROBED)] == fetch_calls(records)[0]
+        assert node.calls[len(PROBED) + 1] == (
             "git",
             "-C",
             str(records),
@@ -464,7 +539,7 @@ class TestAServingRunner:
             "--verify",
             "refs/fleet/rolled^{commit}",
         )
-        assert len(node.calls) == 3 + len(PROBED)
+        assert len(node.calls) == len(PROBED) + 2
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_list"]
         assert endpoint.arguments[2] == {
             "status": "queued",

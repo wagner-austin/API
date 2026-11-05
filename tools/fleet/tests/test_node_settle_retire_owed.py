@@ -21,10 +21,10 @@ from fleet.core import _test_hooks
 from fleet.core.queue_transport import answering
 from tests._node_agent_fixtures import (
     PASSING_TAIL,
-    PROBED,
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
+    asked,
     held_answer,
     launch,
     node_argv,
@@ -98,7 +98,7 @@ class TestARetireTheNodeDidNotAnswer:
                 ok(""),  # tail: send the script
                 ok(PASSING_TAIL),  # tail: run it
                 failed(255, BANNER_TIMEOUT),  # retire: send the script, missed
-                *PROBED,
+                *asked(sourced_config, fetch=True),
             ]
         )
         _test_hooks.run = missed
@@ -121,7 +121,9 @@ class TestARetireTheNodeDidNotAnswer:
         assert not any("fleet-cache-generations" in " ".join(call) for call in missed.calls)
         assert _retires(sourced_config) == [(DEMO_RUN_ID, "lavender", "owed")]
 
-        answered = FakeRun([*retire_replies(), *PROBED])
+        # The serve above handed over the moment it started, at the fetch's
+        # own instant, so this one's read is inside the window it stamped.
+        answered = FakeRun([*retire_replies(), *asked(sourced_config)])
         _test_hooks.run = answered
         later = _idle_queue()
         _test_hooks.http_post = answering(later)
@@ -136,12 +138,12 @@ class TestARetireTheNodeDidNotAnswer:
             (DEMO_RUN_ID, "lavender", "retired"),
         ]
 
-        after = FakeRun(list(PROBED))
+        after = FakeRun(asked(sourced_config))
         _test_hooks.run = after
         _test_hooks.http_post = answering(_idle_queue())
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
         assert _sent_retire(after) == 0
-        assert len(after.calls) == len(PROBED)
+        assert len(after.calls) == len(asked(sourced_config))
         assert len(_retires(sourced_config)) == 2
