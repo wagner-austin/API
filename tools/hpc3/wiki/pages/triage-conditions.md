@@ -7,7 +7,7 @@ source_paths:
   - "src/hpc3/cli/triage.py"
   - "src/hpc3/core/triage.py"
 source_git_blobs:
-  "src/hpc3/cli/triage.py": "7118b0b35b4a4805fd9e0bb8b41c68f9a9e60649"
+  "src/hpc3/cli/triage.py": "a6c3adb775f5f58d0f7cad82ceaabe3eae076f48"
   "src/hpc3/core/triage.py": "eba3d3849ff4cb9ce4448177af7a8c3789b4174b"
 provenance:
   - "261 of 621 pending GPU jobs on DependencyNeverSatisfied (squeue sample)"

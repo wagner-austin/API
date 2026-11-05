@@ -7,8 +7,8 @@ source_paths:
   - "src/hpc3/cli/image_build.py"
   - "src/hpc3/core/image_build.py"
 source_git_blobs:
-  "src/hpc3/cli/image_build.py": "b4afec06e96f198504ec9b764345ff3c69edb263"
-  "src/hpc3/core/image_build.py": "2b93eab7d3f31f62a523d8078b8ffc4c440d90a8"
+  "src/hpc3/cli/image_build.py": "217d177ab82ddb75d2504a762dee47fd6f5dd38f"
+  "src/hpc3/core/image_build.py": "55143e4d98a086254d42979a475d735ed6943666"
 provenance:
   - "image ebb61ed0 (the 23rd unledgered build)"
 fact_checked: 2026-10-08

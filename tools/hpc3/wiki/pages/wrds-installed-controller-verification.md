@@ -12,8 +12,8 @@ source_paths:
   - "artifacts/research-queue-fresh-20261029/provenance.json"
   - "artifacts/research-queue-fresh-20261029/crsp-schema-discovery.json"
 source_git_blobs:
-  "src/hpc3/cli/execution_inspect.py": "9687b9c7d4c20e71f26fef242421c779cac5527d"
-  "src/hpc3/core/execution_evidence.py": "bf31a1091302ae2786425afa629677fccf07f681"
+  "src/hpc3/cli/execution_inspect.py": "34bae47cd9986d76fd6fd73e944c239e2fdde156"
+  "src/hpc3/core/execution_evidence.py": "bc3a48cbbc9b172c73430261d422cd2d15d6fbb1"
   "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "artifacts/wrds-controller-verification-20261028/provenance.json": "b678f473462c24db2cbd1e510ffe6c034e36a9bb"
   "artifacts/research-queue-verification-20261028/provenance.json": "3a968954ceb6b17ac3798dbf0861b744fa098ea4"
@@ -42,6 +42,14 @@ one ledger entry for a policy/attempt identity. Completion additionally
 requires successful native accounting, verified result and RunRecord bytes,
 matching fingerprints, output timestamps inside the allocation and checksum
 success lines from the compute job.[^inspect][^measure]
+
+An explicit `--scope inputs` reading is narrower. It requires terminal native
+accounting, whatever the state, and verifies only the frozen runtime and input
+digests against the cluster files and the compute job's checksum success
+lines, so it also works after a failed allocation that reached its checksum
+gate. Its report kind is `HPC3_INPUT_EVIDENCE`, and it proves neither
+successful execution nor a result. Observing a failure does not require
+it.[^inspect][^measure]
 
 ## Measured installed runs
 
@@ -189,8 +197,8 @@ still refuse recovery. This corrects lookup scope without creating another
 ledger or permitting resubmission. The retained jobs and independent-review
 status belong to the API wiki's `wrds-baseline-readiness` page.[^inspect]
 
-[^inspect]: `src/hpc3/cli/execution_inspect.py:23` `main`.
-[^measure]: `src/hpc3/core/execution_evidence.py:77` `allocation_document` and `:154` `measure`.
+[^inspect]: `src/hpc3/cli/execution_inspect.py:35` `main`; the module docstring states the two scopes.
+[^measure]: `src/hpc3/core/execution_evidence.py:77` `allocation_document`, `:154` `measure_inputs` and `:189` `measure`, which calls `measure_inputs` for its runtime and checksum checks.
 [^query]: `src/hpc3/core/status.py:33` `sacct_commands`; the recipe constructor named in provenance sets `requeue=False`. Upstream semantics are archived in tech-wiki pages `slurm-accounting-allocation-and-requeue-records` and `slurm-batch-success-and-artifact-evidence`.
 [^live]: `artifacts/wrds-controller-verification-20261028/provenance.json`, fields `attempts`, `controller_build_hashes` and `interpretation`; program-authored board reports named in provenance.
 [^repair]: API commit bda8ca2af532d89b301b56cc0b55a4346bb6e421, `research_execution.py` function `_require_trial` and regression `test_reordered_json_preserves_raw_admission_and_executes`; source and fleet evidence are named in provenance. API wiki `wrds-equity-research-protocol` records the separate monthly study and holdout requirements.

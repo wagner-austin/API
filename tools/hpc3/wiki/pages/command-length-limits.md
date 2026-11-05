@@ -12,13 +12,13 @@ source_paths:
   - "src/hpc3/core/cancel.py"
   - "src/hpc3/cli/triage.py"
 source_git_blobs:
-  "src/hpc3/core/remote.py": "10c5e4e3a13c6f0004fd05cdb01d2ebbc251d8ea"
-  "src/hpc3/core/status.py": "c89b8061f970b1677c1eff9c76010912c2b80828"
+  "src/hpc3/core/remote.py": "80dd48cea51b34dbd3746ae7c304c36c6ce51de1"
+  "src/hpc3/core/status.py": "2076960193a9b3b1322908b13f8abaeeaad58fd7"
   "src/hpc3/core/squeue.py": "62002937c50a30b2a5032d082e3813d3a989b711"
   "src/hpc3/core/logs.py": "436b22a97e08bf32b046ea8e3b154796189ab614"
   "src/hpc3/core/campaign.py": "c9c4428b8cd03f5f218784bbed5ed41bb705f0fa"
   "src/hpc3/core/cancel.py": "340fa0dbeb4c7445755bc1d087e5999964604b0d"
-  "src/hpc3/cli/triage.py": "7118b0b35b4a4805fd9e0bb8b41c68f9a9e60649"
+  "src/hpc3/cli/triage.py": "a6c3adb775f5f58d0f7cad82ceaabe3eae076f48"
 provenance:
   - "campaign existence probe truncated mid-loop, vhsearch2-r0, 2026-09-02"
   - "hpc3-triage WinError 206 with runs/ledger.jsonl at 6645 rows, austinpc, 2026-09-05"

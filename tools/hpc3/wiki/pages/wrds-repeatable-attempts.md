@@ -5,6 +5,7 @@ hubs: [operations]
 related: ["[[one-ledger-per-repository]]", "[[wrds-filesystem-catalog]]", "[[node-local-scratch]]"]
 source_paths:
   - "artifacts/wrds-forced-kill-20261031/provenance.json"
+  - "artifacts/wrds-licensed-collection-20261031/evidence-corrections.json"
   - "src/hpc3/core/wrds_cleanup.py"
   - "src/hpc3/wrds/scratch.py"
   - "tests/test_wrds_cleanup.py"
@@ -27,17 +28,18 @@ source_paths:
   - "artifacts/wrds-crsp-14593-2019-2020-1028/provenance.json"
 source_git_blobs:
   "artifacts/wrds-forced-kill-20261031/provenance.json": "8325a595bcd3b5048f9050383347ff731d923a6f"
-  "src/hpc3/core/wrds_cleanup.py": "33ac7137ed84993cd4ff0d63324b19a51c111d60"
-  "src/hpc3/wrds/scratch.py": "d55ae075f3510696354c15e4282c11686ac70712"
-  "tests/test_wrds_cleanup.py": "c24870098fe9c6636bbcc9afdd619899bcc6c45e"
-  "tests/test_wrds_scratch.py": "73ed2f3795051cb668d5900017a98e799cb88cfa"
+  "artifacts/wrds-licensed-collection-20261031/evidence-corrections.json": "86bb76064249dfa52dc49b61f8c3c8fe0d4dab88"
+  "src/hpc3/core/wrds_cleanup.py": "8ab5d24dea2b97f1bdb9a6cd3a9c8e9b849370d1"
+  "src/hpc3/wrds/scratch.py": "9e1cf69c0cb34e1379bb99a11c2c006c926c751b"
+  "tests/test_wrds_cleanup.py": "bc5ae1b90621204b993869865be27637dd0b932a"
+  "tests/test_wrds_scratch.py": "6b88bd1e0ebfad5d3fd3544abbaa382f13d029cf"
   "src/hpc3/contracts/wrds_run.py": "00660ff78017fe0dd51c344ba8f3f0b51ae0b23f"
   "src/hpc3/core/wrds_jobs.py": "e79b573ab5a1f145599018c38c95fcde511d9d7b"
   "src/hpc3/core/wrds_results.py": "758c87f30dfd8cc00dc71e0c89b0e393af2f157a"
   "src/hpc3/core/wrds_scheduler.py": "4b558fcd7669735fbdebe6dbc735c527b1b1d50d"
   "src/hpc3/core/wrds_attempt_report.py": "97a16cbbd011b4311db2da780b5901791f00580e"
   "src/hpc3/cli/wrds.py": "2e1f0bae21fbb4157cb2bdbd8530d0ea58615e23"
-  "src/hpc3/wrds/worker.py": "e603488a92df6145d872ff728d632ed8bfda15fc"
+  "src/hpc3/wrds/worker.py": "4a7300e1f874f6fdf547d06fa537c3cc5d2fe480"
   "specs/cleargbm-paired-image.json": "abe322bc23bb1771d3c248b299de61f1248fdd71"
   "runs/bench-wrds-synthetic-a.json": "48a25a0e3b5624bf5dfc2a0fbe457d925b566d25"
   "runs/bench-wrds-synthetic-b.json": "d3df02db2cf4c5743ed9a4de8352dfb6491f1bcd"
@@ -103,13 +105,25 @@ can compare this with its collected manifest without trusting a cached local
 success label.[^report][^cli]
 
 Forced-termination storage checks use the same scheduler transport and worker
-bundle. `scratch` validates the failed subject's `opened.json`, requests its
-exact execution host, and persists a separate observer receipt. `scratch-report`
-reconciles that recorded job: accounting not yet available returns
-`accounting-pending`, without a report or another submission. Terminal evidence
-must match the subject, worker digest, original node and exact paths. The worker
+bundle. `scratch` requires a terminal subject. A failed storage probe must
+carry a validated `opened.json` naming its private path; a completed job
+instead supplies its authenticated completion attestation and names no
+private path. It then requests the subject's exact execution host and persists
+a separate observer receipt carrying the subject receipt's digest.
+`scratch-report` reconciles that recorded job: accounting not yet available
+returns `accounting-pending`, without a report or another submission. Terminal
+evidence must match the subject, worker digest and original node, and every
+listed scratch root must belong to the subject job; a failed probe's
+observation must also match its exact scratch and private paths. The worker
 lists names without reading plaintext; inaccessible storage raises an error
 instead of being recorded as absent.[^scratch]
+
+Completed-job scope was added on 2026-10-31 (API `8ed09d28a`). Its first
+maintained native reading: observer `40554707` ran on the original
+`wrds-sas31-w.wharton.private` node of completed extraction `40554174` and
+recorded no scratch root for that job at 2026-10-31T21:39:57Z. Like the
+forced-kill reading below, this is absence at one observation, not a
+cleanup deadline.[^scratch-completed]
 
 Native synthetic subject `40551337` reached authenticated private storage, then
 ended with Grid Engine failure 44 and exit 137 under its 30-second runtime cap.
@@ -121,9 +135,11 @@ receipt/reconciliation path and posted measured evidence as `load-report-4b7fe21
 This is eventual absence for one killed subject, not physical erasure or a
 cleanup deadline. Native final scoring on WRDS remains unverified.[^scratch-native]
 
+[^scratch-completed]: `artifacts/wrds-licensed-collection-20261031/evidence-corrections.json`, fields `cleanup_report_id`, `cleanup.observation`, `cleanup.observer_accounting`, `observer_submission` and `limits`; program-authored WRDS SCRATCH LOAD-REPORT `1a4e1d46-abbd-4fcf-a643-b871fa4bf985` on board task `a622165c-bb63-4714-933b-10d527f21478`. No licensed observations were used.
+
 [^scratch-native]: `artifacts/wrds-forced-kill-20261031/provenance.json`, `measurement`, `first_observation`, `preserved_failure` and `limits`; board report `c59b266b-9a99-4e43-aaa4-a6345ad91831` on task `4b7fe216-2670-4dbe-bee4-9970faec8258`, 2026-10-31T05:27:14Z. No licensed observations were used.
 
-[^scratch]: `src/hpc3/core/wrds_cleanup.py`, `submit` and `measure`; `src/hpc3/wrds/scratch.py`, `observe`; `tests/test_wrds_cleanup.py`, `test_delayed_accounting_reconciles_the_same_job_without_resubmitting` and failure cases; `tests/test_wrds_scratch.py`, actual directory and inaccessible-storage cases. Fleet job `50243676-55b0-4535-93b0-481b4e10d7ec` at API `b95578fa619c9176ae83ff4cd15429f96c500730` passed 2,134 tests with 100% statement and branch coverage on Lavender, 2026-10-31T05:24:02Z. This gate tests the control path; native measurements are separate evidence.
+[^scratch]: `src/hpc3/core/wrds_cleanup.py`, `_subject`, `submit`, `_check_observation` and `measure`; `src/hpc3/wrds/scratch.py`, `observe`; `tests/test_wrds_cleanup.py`, `test_delayed_accounting_reconciles_the_same_job_without_resubmitting`, `test_completed_job_observation_binds_attestation_and_lists_all_roots` and failure cases; `tests/test_wrds_scratch.py`, actual directory, `test_completed_job_scope_lists_real_roots_without_opening_them` and inaccessible-storage cases. The completed-job scope landed in API `8ed09d28a`, after the fleet job that follows. Fleet job `50243676-55b0-4535-93b0-481b4e10d7ec` at API `b95578fa619c9176ae83ff4cd15429f96c500730` passed 2,134 tests with 100% statement and branch coverage on Lavender, 2026-10-31T05:24:02Z. This gate tests the control path; native measurements are separate evidence.
 
 The synthetic fixture ran twice with the same worker, code, five-number
 input, runtime and seed. Jobs **40530016** and **40530018** ran on two
@@ -212,7 +228,7 @@ validation-controller runs and the subsequent repair are recorded in
 [^audit]: Board task eadd19d5-6d5e-4c05-a8fe-1867337fdbef, original audit rejection 2026-10-28T16:35:56.756Z, repaired closure 2026-10-28T19:37:41.061Z and VERIFIED 2026-10-28T19:52:23.242Z; extraction task 35895aac-1b12-4cf5-b868-516196914789 VERIFIED 2026-10-28T19:52:01.056Z. Native report by hpc-report-14d9e920 on task 14d9e920-dd4c-41f7-8460-ccf4623844c7.
 [^identity]: `src/hpc3/contracts/wrds_run.py:230` `decode_wrds_run` and `:345` `run_identity`.
 [^submit]: `src/hpc3/core/wrds_jobs.py:245` `submit`, `:220` `resume` and `:170` `record_event`.
-[^worker]: `src/hpc3/wrds/worker.py:92` `execute_run`.
+[^worker]: `src/hpc3/wrds/worker.py:93` `execute_run`.
 [^collect]: `src/hpc3/core/wrds_results.py:53` `verified_completion`, `:74` `attested_completion` and `:127` `collect`.
 [^status]: `src/hpc3/core/wrds_scheduler.py:181` `status` and `:113` `decode_accounting`.
 [^scheduler]: `src/hpc3/core/wrds_scheduler.py:25` `job_argv`.
