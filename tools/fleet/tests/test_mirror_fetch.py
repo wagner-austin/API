@@ -209,8 +209,8 @@ class TestALostFetch:
         self, tmp_path: pathlib.Path
     ) -> None:
         clock = pin_clock(DEMO_NOW)
-        sleep = _test_hooks.sleep
-        assert isinstance(sleep, FakeSleep)
+        sleep = FakeSleep(clock)
+        _test_hooks.sleep = sleep
         _test_hooks.run = FakeRun(
             [
                 *UNFETCHED,
