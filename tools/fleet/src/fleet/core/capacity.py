@@ -38,6 +38,7 @@ from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.node import NodeConfig, NodeState
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.tags import NodeTag, missing_tags
+from fleet.contracts.width_offer import WidthOffer
 from fleet.core.node_refusal import DispatchVerdict, machine_refusal, wrong_node
 
 #: How close to its ``memory.high`` a ``runners.slice`` must be to count as
@@ -454,7 +455,7 @@ def fitting_projects(
     state: NodeState,
     projects: Mapping[str, ProjectConfig],
     carried: frozenset[NodeTag],
-) -> tuple[str, ...]:
+) -> tuple[WidthOffer, ...]:
     """The registered projects a runner could launch on its node right now.
 
     What a node runner hands the queue with its claim (MCPs board task
@@ -470,15 +471,20 @@ def fitting_projects(
         projects: Every registered project, by name.
         carried: The tags the runner claims with.
 
+    Each comes with the workers :func:`assess` would grant it (MCPs board
+    task 1964fc15), which the claim offers so the queue keeps a push gate's
+    check off a node and width measured to miss the gate's budget.
+
     Returns:
-        The name of every project :func:`assess` accepts on this state, in
-        name order; empty when none fits.
+        Every project :func:`assess` accepts on this state, with its grant,
+        in name order; empty when none fits.
     """
-    return tuple(
-        name
-        for name, project in sorted(projects.items())
-        if assess(node, state, project, carried)["code"] is None
-    )
+    offers: list[WidthOffer] = []
+    for name, project in sorted(projects.items()):
+        verdict = assess(node, state, project, carried)
+        if verdict["code"] is None:
+            offers.append(WidthOffer(project=name, workers=verdict["workers"]))
+    return tuple(offers)
 
 
 def plan_dispatch(

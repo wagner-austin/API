@@ -41,6 +41,7 @@ from fleet.contracts.dispatch import (
     decode_trail_claims,
 )
 from fleet.contracts.tags import NodeTag, encode_tags
+from fleet.contracts.width_offer import WidthOffer, encode_width_offers
 from fleet.core import _test_hooks
 
 #: Environment variable holding fleet-mcp's ``x-api-key`` value.
@@ -125,6 +126,7 @@ def claim_next(
     tags: tuple[NodeTag, ...],
     node: str | None,
     projects: tuple[str, ...] | None,
+    widths: tuple[WidthOffer, ...],
     lease_seconds: int,
     identity: JSONObject,
 ) -> DispatchJob | None:
@@ -143,6 +145,11 @@ def claim_next(
         projects: Restrict to jobs of these projects, the ones the node can
             run right now (:func:`fleet.core.capacity.fitting_projects`), or
             None for a lane whose verbs are not sized by a node's capacity.
+        widths: The workers this node would grant each project it fits
+            (MCPs board task 1964fc15), with which the queue keeps a live
+            publish turn's check off a node and width measured to miss the
+            push gate's budget; empty, and not sent, for a runner whose
+            verbs no capacity check sizes.
         lease_seconds: How long the claim survives without a report. Always
             set, never omitted: an unbounded claim means a runner that dies
             holds the job forever, and this runner is scheduled rather than
@@ -165,6 +172,8 @@ def claim_next(
         arguments["node"] = node
     if projects is not None:
         arguments["projects"] = list(projects)
+    if widths:
+        arguments["widths"] = encode_width_offers(widths)
     return decode_claim(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_claim", arguments)
     )
@@ -176,6 +185,7 @@ def report_start(
     job_id: str,
     node: str,
     run_id: str,
+    workers: int | None,
     lease_seconds: int,
     identity: JSONObject,
 ) -> DispatchJob:
@@ -187,6 +197,10 @@ def report_start(
         node: The node this run committed to.
         run_id: The fleet ledger's run id, so the queue row and this
             machine's own records name the same run.
+        workers: The test workers the capacity check granted the run, which
+            the queue stores so its claim reads each node and width's
+            measured runs (MCPs board task 1964fc15); None, and not sent,
+            for a verb no capacity check sizes.
         lease_seconds: Renewed lease.
         identity: From :func:`identity_arguments`.
 
@@ -204,6 +218,8 @@ def report_start(
         "leaseSeconds": lease_seconds,
         **identity,
     }
+    if workers is not None:
+        arguments["workers"] = workers
     return decode_reported(
         call_mcp_tool(_test_hooks.http_post, credentials, "dispatch_report", arguments)
     )
