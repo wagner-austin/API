@@ -14,6 +14,7 @@ whether it then succeeds or is refused, and that it then did its work.
 
 from __future__ import annotations
 
+import os
 import pathlib
 import subprocess
 import threading
@@ -49,6 +50,7 @@ class MirrorLockHolder:
         """
         self._release = mirror.with_name(f"{mirror.name}.release")
         holding = 'echo held; while [ ! -e "$1" ]; do printf x >> "$2"; done; rm -f "$2"'
+        self._answers, holder_writes = os.pipe()
         self._process = subprocess.Popen(
             (
                 "flock",
@@ -60,18 +62,17 @@ class MirrorLockHolder:
                 str(self._release),
                 str(writing),
             ),
-            stdout=subprocess.PIPE,
-            text=True,
+            stdout=holder_writes,
         )
-        assert self._process.stdout is not None
-        assert self._process.stdout.readline() == "held\n"
+        os.close(holder_writes)
+        assert os.read(self._answers, 4096) == b"held\n"
 
     def release(self) -> None:
         """Let go of the lock and require the holder ended cleanly."""
         self._release.touch()
         assert self._process.wait(timeout=GIT_SECONDS) == 0
-        assert self._process.stdout is not None
-        self._process.stdout.close()
+        assert os.read(self._answers, 4096) == b""
+        os.close(self._answers)
 
 
 class Script:
