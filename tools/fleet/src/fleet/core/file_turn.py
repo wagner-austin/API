@@ -9,9 +9,21 @@ hub, and a file several of them read and rewrite needs a turn none of
 THE LOCK IS THE FILE'S EXCLUSIVE CREATION. Its text names the turn, so only
 the turn that created it removes it; a lock older than the turn's
 ``stale_seconds`` was left by a process that died inside its turn and is
-taken away; and a turn waits ``poll_seconds`` between looks at a lock another
-holds. The same on every filesystem the hub has: no ``fcntl``, nothing a
-test cannot make the filesystem do.
+taken away; and a turn looks again at a lock another holds after
+:data:`FIRST_LOOK_SECONDS`, each wait twice the last up to ``poll_seconds``.
+The same on every filesystem the hub has: no ``fcntl``, nothing a test cannot
+make the filesystem do.
+
+A TURN HELD FOR MILLISECONDS IS TAKEN IN MILLISECONDS (MCPs board task
+5280a25d). Until then every look was ``poll_seconds`` apart, one second for
+every turn the hub takes, while an append or a lease rewrite holds its lock
+for milliseconds: each turn a launch found held cost it a whole second, and
+on lacrymal between 18:54 and 18:57Z on 2026-11-05, as the push gate of MCPs
+de4907292 launched its jobs on every node at once, the node runners' logs
+name append, lease, claim and mirror fetch turns taken after 1 to 6 s, all
+of it between a job's claim and its first phase, which that task holds to
+10 s. The doubling keeps a turn held for minutes, a mirror's first fetch,
+looked at once every ``poll_seconds`` as before.
 
 A LOCK WHOSE HOLDER IS GONE IS TAKEN AWAY BEFORE ITS AGE BOUND (MCPs board
 task 86f70457). A mirror's fetch turn may last 1020 s, so a runner killed
@@ -45,6 +57,11 @@ HOLDER_PROBE_SECONDS: Final = 30
 #: The deadline of one probe, in seconds.
 PROBE_TIMEOUT_SECONDS: Final = 15
 
+#: How long a turn waits before its second look at a lock another holds;
+#: each wait after it is twice the one before, up to the turn's
+#: ``poll_seconds``.
+FIRST_LOOK_SECONDS: Final = 0.01
+
 #: The command that lists one process: it prints the pid when it runs and
 #: does not when it does not.
 _PROBE: Final = ("ps", "-p", "{pid}", "-o", "pid=")
@@ -61,7 +78,9 @@ class TurnBounds(TypedDict):
         waited_for: Who a wait was for, e.g. ``another process claiming for its host``.
         stale_seconds: How old a lock is when its holder is taken to have
             died inside its turn.
-        poll_seconds: How long a turn waits between looks at a held lock.
+        poll_seconds: The longest a turn waits between two looks at a held
+            lock, which its waits double up to from
+            :data:`FIRST_LOOK_SECONDS`.
     """
 
     what: str
@@ -113,6 +132,7 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
     _test_hooks.make_directory(lock.parent)
     token = f"{holder} pid {os.getpid()} on {_test_hooks.hostname()} turn {uuid.uuid4().hex}"
     asked = _test_hooks.now()
+    wait: float = FIRST_LOOK_SECONDS
     while not _created(lock, token=token):
         age = _age(lock)
         if age is not None and age >= bounds["stale_seconds"]:
@@ -128,7 +148,8 @@ def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
             continue
         if age is not None and age >= HOLDER_PROBE_SECONDS and _holder_gone(lock, holder, bounds):
             continue
-        _test_hooks.sleep(bounds["poll_seconds"])
+        _test_hooks.sleep(wait)
+        wait = min(wait * 2, bounds["poll_seconds"])
     waited = _test_hooks.now() - asked
     if waited > 0:
         _log.info(
@@ -285,4 +306,11 @@ def _give_back(lock: pathlib.Path, *, token: str, bounds: TurnBounds) -> None:
     lock.unlink()
 
 
-__all__ = ["HOLDER_PROBE_SECONDS", "PROBE_TIMEOUT_SECONDS", "TurnBounds", "held", "runs"]
+__all__ = [
+    "FIRST_LOOK_SECONDS",
+    "HOLDER_PROBE_SECONDS",
+    "PROBE_TIMEOUT_SECONDS",
+    "TurnBounds",
+    "held",
+    "runs",
+]

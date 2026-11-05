@@ -458,15 +458,14 @@ def stage_registry(
     payload = registry_payload(registry)
     _test_hooks.make_directory(local.parent)
     local.write_bytes(payload)
-    for name, directory in (
-        (names.REGISTRY_ARCHIVE_DIRECTORY, carried),
-        (names.REGISTRY_DIRECTORY, landed),
-    ):
-        remote.run_script(
-            host,
-            dialect.script_path(staged, names.make_directory_stem(name)),
-            dialect.make_directory_script(directory),
-        )
+    # Both directories in one script, one round trip (MCPs board task
+    # 5280a25d): every launch stages the registry between its claim and its
+    # first phase, and a script apiece cost two more ssh connections there.
+    remote.run_script(
+        host,
+        dialect.script_path(staged, names.make_directory_stem(names.REGISTRY_DIRECTORY)),
+        dialect.checked_script((("mkdir", "-p", carried, landed),)),
+    )
     send_verified(
         host,
         into=carried,

@@ -139,14 +139,14 @@ class NowProtocol(Protocol):
 
 
 class SleepProtocol(Protocol):
-    """Waits a whole number of seconds.
+    """Waits a number of seconds, a fraction of one for a file turn's first looks.
 
     A hook for the same reason the clock is one: ``--register`` waits for
     each runner to register by polling, and a test that could not control
     the wait could only run the poll in real time or not at all.
     """
 
-    def __call__(self, seconds: int) -> None:
+    def __call__(self, seconds: float) -> None:
         """Wait.
 
         Args:
@@ -393,7 +393,7 @@ def _default_now() -> int:
     return int(time.time())
 
 
-def _default_sleep(seconds: int) -> None:
+def _default_sleep(seconds: float) -> None:
     """Wait on the real clock.
 
     Args:

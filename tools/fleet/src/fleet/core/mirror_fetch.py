@@ -114,7 +114,9 @@ INIT_TIMEOUT_SECONDS: Final = 60
 #: export of MCPs 6f20029f0 for MCPs/execution-deploy took its turn after
 #: waiting 21 s, all of it between that job's claim and its lease, where the
 #: push gate holds the job to 150 s from claim to verdict. A look is one
-#: open of the lock file, as the hub's other turns take every second.
+#: open of the lock file, and since MCPs board task 5280a25d the first looks
+#: come 10 ms apart and double up to this second, as every turn's do
+#: (:data:`fleet.core.file_turn.FIRST_LOOK_SECONDS`).
 FETCH_TURN: Final = file_turn.TurnBounds(
     what="mirror fetch turn",
     waited_for="another export fetching into the same mirror",
@@ -320,6 +322,31 @@ def has_commit(mirror: pathlib.Path, sha: str) -> bool:
     return probe["returncode"] == 0
 
 
+def fetched(mirror: pathlib.Path, sha: str) -> bool:
+    """Whether a finished fetch brought the commit: :data:`FETCHED_REF` reaches it.
+
+    The probe a reader outside the mirror's turn can trust. A fetch of
+    fewer objects than git's ``fetch.unpackLimit`` writes each one loose as
+    it unpacks the pack, which lists a commit before its tree, so
+    :func:`has_commit` can find a commit whose tree is not written yet; git
+    moves a ref only once the fetch has written every object it names.
+
+    Args:
+        mirror: The mirror's path.
+        sha: The commit.
+
+    Returns:
+        True iff ``git merge-base --is-ancestor <sha> refs/fleet/fetched``
+        exits 0; a commit off that ref's history, or a mirror with no ref,
+        answers False and is asked about inside the turn.
+    """
+    probe = _test_hooks.run(
+        ("git", "-C", str(mirror), "merge-base", "--is-ancestor", sha, FETCHED_REF),
+        timeout_seconds=INIT_TIMEOUT_SECONDS,
+    )
+    return probe["returncode"] == 0
+
+
 def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
     """Fetch one commit from the remote into the mirror's :data:`FETCHED_REF`.
 
@@ -327,6 +354,17 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
     (a re-run, or two packages of one commit) costs no round trip. The probe
     and the fetch share one :data:`FETCH_TURN`, so a job that asks while
     another fetches the same commit waits for it and is then skipped.
+
+    AND A COMMIT A FINISHED FETCH BROUGHT TAKES NO TURN AT ALL (MCPs board task
+    5280a25d). Every job of a push gate exports one commit, and once the
+    first has fetched it every other found it held only after waiting its
+    turn behind the others' probes: on lacrymal at 18:55:00Z on 2026-11-05
+    the export of MCPs de4907292 took its turn after waiting 6 s, between its
+    job's claim and its first phase. So the mirror is asked first, outside
+    the turn, whether :data:`FETCHED_REF` reaches the commit
+    (:func:`fetched`), which a fetch moves only once it has written every
+    object; a commit it does not reach is asked about inside the turn as
+    before, where a fetch under way has ended.
 
     Args:
         mirror: The mirror's path, already initialised.
@@ -351,6 +389,8 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
             ),
         )
 
+    if fetched(mirror, sha):
+        return
     with file_turn.held(turn_lock(mirror), holder=f"the export of {sha}", bounds=FETCH_TURN):
         remove_dead_packs(mirror)
         if has_commit(mirror, sha):

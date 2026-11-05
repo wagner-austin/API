@@ -62,7 +62,8 @@ HOST_CLAIMS_DIRECTORY: Final = "host-claims"
 #: longest turn a live runner can take.
 TURN_STALE_SECONDS: Final = 5 * SSH_TIMEOUT_SECONDS
 
-#: How long a runner waits between looks at a lock another turn holds.
+#: The longest a runner waits between two looks at a lock another turn
+#: holds (:data:`fleet.core.file_turn.FIRST_LOOK_SECONDS` for its first).
 TURN_POLL_SECONDS: Final = 1
 
 #: The claim turn as :mod:`fleet.core.file_turn` holds it.
