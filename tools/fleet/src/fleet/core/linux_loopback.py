@@ -30,6 +30,7 @@ from fleet.core.names import (
     REGISTRY_VARIABLE,
     WORKSPACE_VARIABLE,
 )
+from fleet.core.tool_caches import PLAYWRIGHT_KEEP_BROWSERS
 
 #: Every variable a build exports for its install steps and recipe, in the
 #: order its export line names them. A loopback-only check's ``make check``
@@ -42,6 +43,7 @@ BUILD_EXPORTS: tuple[str, ...] = (
     POETRY_IN_PROJECT[0],
     POETRY_KEYRING_OFF[0],
     "PLAYWRIGHT_BROWSERS_PATH",
+    PLAYWRIGHT_KEEP_BROWSERS[0],
     "PYTEST_XDIST_AUTO_NUM_WORKERS",
     "CORVIS_TEST_MAX_WORKERS",
     AGENT_LABEL_VARIABLE,

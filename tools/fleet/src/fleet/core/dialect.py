@@ -74,7 +74,11 @@ from fleet.core.slice_load import (
     sh_slice_load_end_lines,
     sh_slice_load_start_lines,
 )
-from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
+from fleet.core.tool_caches import (
+    PLAYWRIGHT_KEEP_BROWSERS,
+    sh_build_lines,
+    tool_caches_directory,
+)
 from fleet.core.vm_tests import sh_vm_test_lines
 
 #: How a script file is run by path; the path is appended.
@@ -392,6 +396,7 @@ def build_script(
         f"{POETRY_IN_PROJECT[0]}='{POETRY_IN_PROJECT[1]}'",
         f"{POETRY_KEYRING_OFF[0]}='{POETRY_KEYRING_OFF[1]}'",
         'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright"',
+        f"{PLAYWRIGHT_KEEP_BROWSERS[0]}='{PLAYWRIGHT_KEEP_BROWSERS[1]}'",
         f"PYTEST_XDIST_AUTO_NUM_WORKERS='{workers}'",
         f"CORVIS_TEST_MAX_WORKERS='{workers}'",
         f"{AGENT_LABEL_VARIABLE}='{label}'",

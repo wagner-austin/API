@@ -27,10 +27,10 @@ the generations only ``playwright install`` bounded them, by removing each
 browser no live link names, and only when an install ran: measured
 2026-10-18, every node held 0.67 to 1.39 GB of them under ``<cache
 root>/ms-playwright``, serendipity two chromium revisions, 1200 and 1228. In
-a generation they go whole with it, and Playwright's own removal still runs
-inside one. Poetry's virtualenvs are in the project
-(:data:`~fleet.core.names.POETRY_IN_PROJECT`), so the retire removes them
-with the run.
+a generation they go whole with it, and Playwright's own removal does not
+run inside one (:data:`PLAYWRIGHT_KEEP_BROWSERS`). Poetry's virtualenvs are
+in the project (:data:`~fleet.core.names.POETRY_IN_PROJECT`), so the retire
+removes them with the run.
 """
 
 from __future__ import annotations
@@ -38,6 +38,19 @@ from __future__ import annotations
 from typing import Final
 
 from fleet.core import names
+
+#: The variable, and its value, that keep ``playwright install`` from
+#: removing the browsers it finds no live link for (MCPs board task
+#: b96f9da1). A run links its Playwright package into the cache's ``.links``
+#: and the retire removes the run, so every link but the installing run's
+#: names a package that is gone, and Playwright's removal took every other
+#: revision. On 2026-11-05 at 20:29:57Z an API clients/TankpitBot check on
+#: lavender installed chromium 1243 for Python Playwright 1.63, and the
+#: removal took 1228, which MCPs's Playwright 1.61 launches: fleet job
+#: fcc7c2e3, MCPs/mcp-shared at c55918964 on lavender, failed all 11 of its
+#: browser cases with "Executable doesn't exist". The generation is what
+#: bounds the browsers, as it bounds every cache here.
+PLAYWRIGHT_KEEP_BROWSERS: Final = ("PLAYWRIGHT_SKIP_BROWSER_GC", "1")
 
 #: How long a generation is the one builds start in.
 GENERATION_DAYS: Final = 14
@@ -169,6 +182,7 @@ def sh_build_lines(*, tools: str, marker: str, run_as: str, says_began: bool) ->
 __all__ = [
     "GENERATION_DAYS",
     "GENERATION_SECONDS",
+    "PLAYWRIGHT_KEEP_BROWSERS",
     "REMOVAL_GRACE_SECONDS",
     "SH_REMOVE_UNUSED",
     "SH_STAGE_GENERATIONS_IN_USE",

@@ -120,7 +120,7 @@ class TestBuildScript:
         assert f"CORVIS_FLEET_REGISTRY='{names.registry_directory(TARGET)}'\n" in body
         assert (
             "export npm_config_cache POETRY_CACHE_DIR POETRY_VIRTUALENVS_IN_PROJECT "
-            "POETRY_KEYRING_ENABLED PLAYWRIGHT_BROWSERS_PATH "
+            "POETRY_KEYRING_ENABLED PLAYWRIGHT_BROWSERS_PATH PLAYWRIGHT_SKIP_BROWSER_GC "
             "PYTEST_XDIST_AUTO_NUM_WORKERS CORVIS_TEST_MAX_WORKERS "
             "BOARD_AGENT_LABEL "
             "CORVIS_FLEET_CACHE CORVIS_FLEET_WORKSPACE CORVIS_FLEET_REGISTRY\n"
@@ -173,6 +173,9 @@ class TestBuildScript:
         assert 'POETRY_CACHE_DIR="$tool_cache/pypoetry"\n' in body
         assert "POETRY_VIRTUALENVS_IN_PROJECT='true'\n" in body
         assert 'PLAYWRIGHT_BROWSERS_PATH="$tool_cache/ms-playwright"\n' in body
+        # MCPs board task b96f9da1: an install keeps every other revision, which
+        # the generation bounds, rather than remove the ones whose runs are gone.
+        assert "PLAYWRIGHT_SKIP_BROWSER_GC='1'\n" in body
 
     def test_it_turns_poetry_s_keyring_off_before_any_install(self) -> None:
         """MCPs board task c837fd8d: left on, poetry blocks on the D-Bus
