@@ -27,6 +27,7 @@ from model_trainer.core.services.model.weight_space.mountain_car import (
     start_positions,
     step,
 )
+from tests._weight_space_support import floats, longs
 
 
 def _always(action: int) -> Callable[[torch.Tensor], torch.Tensor]:
@@ -69,9 +70,7 @@ def test_one_step_from_rest_matches_the_published_update() -> None:
     x = -0.5 + v = -0.499176843.
     """
     position, velocity = step(
-        torch.tensor([-0.5], dtype=torch.float64),
-        torch.tensor([0.0], dtype=torch.float64),
-        torch.tensor([2]),
+        floats([-0.5], torch.float64), floats([0.0], torch.float64), longs([2])
     )
     expected_v = 0.001 - 0.0025 * math.cos(-1.5)
     assert float(velocity[0].item()) == pytest.approx(expected_v, abs=1e-15)
@@ -80,30 +79,21 @@ def test_one_step_from_rest_matches_the_published_update() -> None:
 
 def test_the_left_wall_stops_a_car_moving_into_it() -> None:
     position, velocity = step(
-        torch.tensor([-1.19], dtype=torch.float64),
-        torch.tensor([-0.05], dtype=torch.float64),
-        torch.tensor([0]),
+        floats([-1.19], torch.float64), floats([-0.05], torch.float64), longs([0])
     )
     assert float(position[0].item()) == -1.2
     assert float(velocity[0].item()) == 0.0
 
 
 def test_speed_is_clipped_to_the_limit() -> None:
-    _, velocity = step(
-        torch.tensor([-0.5], dtype=torch.float64),
-        torch.tensor([0.0699], dtype=torch.float64),
-        torch.tensor([2]),
-    )
+    _, velocity = step(floats([-0.5], torch.float64), floats([0.0699], torch.float64), longs([2]))
     assert float(velocity[0].item()) == 0.07
 
 
 def test_the_observation_is_scaled_into_the_unit_interval() -> None:
-    observed = observe(
-        torch.tensor([-1.2, 0.6], dtype=torch.float64),
-        torch.tensor([-0.07, 0.035], dtype=torch.float64),
-    )
+    observed = observe(floats([-1.2, 0.6], torch.float64), floats([-0.07, 0.035], torch.float64))
     assert observed.dtype == torch.float32
-    assert torch.allclose(observed, torch.tensor([[-1.0, -1.0], [1.0, 0.5]]))
+    assert torch.allclose(observed, floats([[-1.0, -1.0], [1.0, 0.5]], torch.float32))
 
 
 def test_starts_are_repeatable_and_inside_the_published_range() -> None:

@@ -1,6 +1,6 @@
 """The control policy, its weights file, its text, and its training.
 
-The policy is a real ``torch.nn.Module`` throughout. Where an expected value
+The policy holds real ``torch.nn.Parameter`` tensors throughout. Where an expected value
 is a number, it is worked by hand: a policy whose weights are written by the
 test so its output is computable on paper, and a three-step return computed
 from its definition.
@@ -36,6 +36,7 @@ from model_trainer.core.services.model.weight_space.policy_training import (
     discounted_returns,
     train_policy,
 )
+from tests._weight_space_support import floats, longs
 
 
 def _hand_policy() -> ControlPolicy:
@@ -52,20 +53,35 @@ def _hand_policy() -> ControlPolicy:
     with torch.no_grad():
         for _, parameter in policy.named_parameters():
             parameter.zero_()
-        policy.hidden_in.weight[0, 1] = 1.0
-        policy.hidden_mid.weight[0, 0] = 1.0
-        policy.action_out.weight[0, 0] = -2.0
-        policy.action_out.weight[2, 0] = 2.0
+        policy.get_parameter("hidden_in.weight")[0, 1] = 1.0
+        policy.get_parameter("hidden_mid.weight")[0, 0] = 1.0
+        policy.get_parameter("action_out.weight")[0, 0] = -2.0
+        policy.get_parameter("action_out.weight")[2, 0] = 2.0
     return policy
 
 
 def test_the_hand_policy_scores_what_paper_says() -> None:
     """Velocity 0.5: tanh(tanh(0.5)) = 0.4329; scores (-0.8658, 0, 0.8658)."""
     policy = _hand_policy()
-    scores = policy.forward(torch.tensor([[0.3, 0.5]]))
+    scores = policy.forward(floats([[0.3, 0.5]], torch.float32))
     inner = math.tanh(math.tanh(0.5))
-    assert torch.allclose(scores, torch.tensor([[-2.0 * inner, 0.0, 2.0 * inner]]), atol=1e-6)
-    assert torch.equal(policy.greedy(torch.tensor([[0.3, 0.5], [0.3, -0.5]])), torch.tensor([2, 0]))
+    expected = floats([[-2.0 * inner, 0.0, 2.0 * inner]], torch.float32)
+    assert torch.allclose(scores, expected, atol=1e-6)
+    observations = floats([[0.3, 0.5], [0.3, -0.5]], torch.float32)
+    assert torch.equal(policy.greedy(observations), longs([2, 0]))
+
+
+def test_a_fresh_policy_is_initialised_as_linear_layers_are() -> None:
+    """Every entry within 1/sqrt(fan_in): 1/sqrt(2) for the first layer, 1/2 for width 4."""
+    torch.manual_seed(11)
+    policy = ControlPolicy(4)
+    first = policy.get_parameter("hidden_in.weight").detach()
+    later = policy.get_parameter("action_out.weight").detach()
+    assert tuple(first.shape) == (4, 2)
+    assert tuple(later.shape) == (3, 4)
+    assert float(first.abs().max().item()) <= 1.0 / math.sqrt(2.0)
+    assert float(later.abs().max().item()) <= 0.5
+    assert float(later.abs().max().item()) > 0.0
 
 
 def test_weights_survive_the_file_bit_for_bit() -> None:
@@ -131,10 +147,9 @@ def test_decoding_refuses_a_width_below_one_and_a_wrong_inventory() -> None:
 
 def test_a_discounted_return_sums_the_future_by_hand() -> None:
     """Rewards (1, 2, 4) at discount 0.5: G = (1 + 1 + 1, 2 + 2, 4) = (3, 4, 4)."""
-    rewards = torch.tensor([[1.0], [2.0], [4.0]], dtype=torch.float64)
-    assert torch.equal(
-        discounted_returns(rewards, 0.5), torch.tensor([[3.0], [4.0], [4.0]], dtype=torch.float64)
-    )
+    rewards = floats([[1.0], [2.0], [4.0]], torch.float64)
+    expected = floats([[3.0], [4.0], [4.0]], torch.float64)
+    assert torch.equal(discounted_returns(rewards, 0.5), expected)
 
 
 _TINY: TrainingConfig = {
@@ -155,7 +170,6 @@ def test_training_moves_the_weights_and_is_repeatable() -> None:
     trained_digest = weights_digest(parameter_digests(first["policy"]))
     assert trained_digest == weights_digest(parameter_digests(second["policy"]))
     assert trained_digest != weights_digest(parameter_digests(untrained))
-    assert not first["policy"].training
     assert 0 <= first["final_batch_successes"] <= _TINY["batch"]
 
 

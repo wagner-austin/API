@@ -34,6 +34,7 @@ from model_trainer.core.services.model.editing.verify import parameter_digests, 
 from model_trainer.core.services.model.known_answer_probe import probe_model_and_input
 from model_trainer.core.services.model.probe_shapes import PROBE_SHAPES
 from tests._qa_benchmark_support import Tokenizer, install_fakes, restore_fakes, values
+from tests._weight_space_support import run_as_module, run_entrypoint
 
 
 class _ContinuationTokenizer(Tokenizer):
@@ -206,9 +207,44 @@ def test_the_measuring_command_records_both_models(tmp_path: pathlib.Path) -> No
     )
     cloze = require_list(outcomes, "cloze")
     assert narrow_json_to_list(cloze[0])[0] == "i0"
-    continuation = narrow_json_to_dict(require_list(outcomes, "continuations")[0])
-    assert len(require_str(continuation, "control").split()) == 8
-    assert isinstance(continuation["edited_looped"], bool)
+    continuations = [narrow_json_to_dict(row) for row in require_list(outcomes, "continuations")]
+    assert len(continuations) == 2
+    assert len(require_str(continuations[0], "control").split()) == 8
+    assert (
+        float(sum(1 for row in continuations if row["control_looped"] is True))
+        == (named["control_looped"])
+    )
+    assert (
+        float(sum(1 for row in continuations if row["edited_looped"] is True))
+        == (named["edited_looped"])
+    )
+
+
+def test_both_commands_run_through_their_entry_points(tmp_path: pathlib.Path) -> None:
+    digest_args = ["--model", "gpt2", "--out", str(tmp_path / "entry-digest.json")]
+    assert run_entrypoint(digest_cli.entrypoint, digest_args) == 0
+    assert (
+        run_entrypoint(edit_cli.entrypoint, _argv(tmp_path, _program(tmp_path, _tiny_digest())))
+        == 0
+    )
+    assert (tmp_path / "out" / "record.json").exists()
+
+
+def test_both_commands_run_as_modules(tmp_path: pathlib.Path) -> None:
+    digest_out = tmp_path / "module-digest.json"
+    code = run_as_module(
+        "model_trainer.cli.weight_space_lm_digest", ["--model", "gpt2", "--out", str(digest_out)]
+    )
+    assert code == 0
+    assert (
+        require_str(
+            narrow_json_to_dict(load_json_str(digest_out.read_text("utf-8"))), "weights_digest"
+        )
+        == _tiny_digest()
+    )
+    argv = _argv(tmp_path, _program(tmp_path, _tiny_digest()))
+    assert run_as_module("model_trainer.cli.weight_space_lm_edit", argv) == 0
+    assert (tmp_path / "out" / "outcomes.json").exists()
 
 
 def test_a_program_read_from_other_weights_is_refused(tmp_path: pathlib.Path) -> None:

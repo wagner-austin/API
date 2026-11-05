@@ -26,8 +26,31 @@ from model_trainer.cli import weight_space_policy_edit as edit_cli
 from model_trainer.cli import weight_space_policy_train as train_cli
 from model_trainer.cli._weight_space_flags import require_float_flag, require_int_flag
 from tests._qa_benchmark_support import values
+from tests._weight_space_support import run_as_module, run_entrypoint
 
 _HIDDEN = 4
+
+
+def _train_argv(out_dir: pathlib.Path) -> list[str]:
+    """The training command's arguments for a tiny configuration.
+
+    Args:
+        out_dir: Where its files go.
+
+    Returns:
+        The arguments.
+    """
+    return [
+        "--seed", "3",
+        "--hidden", str(_HIDDEN),
+        "--iterations", "2",
+        "--batch", "4",
+        "--discount", "0.9",
+        "--learning-rate", "0.01",
+        "--episodes", "16",
+        "--eval-seed", "7",
+        "--out-dir", str(out_dir),
+    ]  # fmt: skip
 
 
 def _train(out_dir: pathlib.Path) -> None:
@@ -36,31 +59,7 @@ def _train(out_dir: pathlib.Path) -> None:
     Args:
         out_dir: Where its files go.
     """
-    assert (
-        train_cli.main(
-            [
-                "--seed",
-                "3",
-                "--hidden",
-                str(_HIDDEN),
-                "--iterations",
-                "2",
-                "--batch",
-                "4",
-                "--discount",
-                "0.9",
-                "--learning-rate",
-                "0.01",
-                "--episodes",
-                "16",
-                "--eval-seed",
-                "7",
-                "--out-dir",
-                str(out_dir),
-            ]
-        )
-        == 0
-    )
+    assert train_cli.main(_train_argv(out_dir)) == 0
 
 
 def _push_with_velocity(written_against: str) -> JSONObject:
@@ -158,23 +157,7 @@ def test_an_edit_is_measured_against_the_untouched_policy(tmp_path: pathlib.Path
     program = tmp_path / "edit.json"
     program.write_text(dump_json_str(_push_with_velocity(trained["payload_digest"])), "utf-8")
     out = tmp_path / "edited" / "record.json"
-    assert (
-        edit_cli.main(
-            [
-                "--policy",
-                str(tmp_path / "policy.json"),
-                "--program",
-                str(program),
-                "--episodes",
-                "16",
-                "--eval-seed",
-                "7",
-                "--out",
-                str(out),
-            ]
-        )
-        == 0
-    )
+    assert edit_cli.main(_edit_argv(tmp_path, program, out)) == 0
     record = decode_run_record(narrow_json_to_dict(load_json_str(out.read_text("utf-8"))))
     named = values(record["observations"])
     base = values(trained["observations"])
@@ -182,8 +165,58 @@ def test_an_edit_is_measured_against_the_untouched_policy(tmp_path: pathlib.Path
     assert named["base_successes"] == base["base_successes"]
     assert named["restored_successes"] == named["base_successes"]
     assert named["edited_successes"] == 16.0
-    assert named["elements_total"] == base["policy_parameters"]
-    assert 0.0 < named["fraction_changed"] <= 1.0
+    # Written: 2 + 1 into hidden_in, 4 + 1 into hidden_mid, 12 + 3 into
+    # action_out, every one a random draw replaced by a chosen value.
+    assert named["elements_changed"] == 23.0
+    assert named["elements_total"] == base["policy_parameters"] == 47.0
+    assert named["fraction_changed"] == 23.0 / 47.0
+
+
+def _edit_argv(tmp_path: pathlib.Path, program: pathlib.Path, out: pathlib.Path) -> list[str]:
+    """The edit command's arguments over the tiny training run's files.
+
+    Args:
+        tmp_path: The training run's directory.
+        program: The edit.
+        out: Where the record goes.
+
+    Returns:
+        The arguments.
+    """
+    return [
+        "--policy", str(tmp_path / "policy.json"),
+        "--program", str(program),
+        "--episodes", "16",
+        "--eval-seed", "7",
+        "--out", str(out),
+    ]  # fmt: skip
+
+
+def test_both_commands_run_through_their_entry_points_and_as_modules(
+    tmp_path: pathlib.Path,
+) -> None:
+    assert run_entrypoint(train_cli.entrypoint, _train_argv(tmp_path / "entry")) == 0
+    module_dir = tmp_path / "module"
+    assert (
+        run_as_module("model_trainer.cli.weight_space_policy_train", _train_argv(module_dir)) == 0
+    )
+    assert (module_dir / "policy.json").read_text("utf-8") == (
+        tmp_path / "entry" / "policy.json"
+    ).read_text("utf-8")
+    trained = decode_run_record(
+        narrow_json_to_dict(load_json_str((module_dir / "record.json").read_text("utf-8")))
+    )
+    program = tmp_path / "edit.json"
+    program.write_text(dump_json_str(_push_with_velocity(trained["payload_digest"])), "utf-8")
+    entry_out = tmp_path / "entry-edit.json"
+    assert run_entrypoint(edit_cli.entrypoint, _edit_argv(module_dir, program, entry_out)) == 0
+    module_out = tmp_path / "module-edit.json"
+    code = run_as_module(
+        "model_trainer.cli.weight_space_policy_edit", _edit_argv(module_dir, program, module_out)
+    )
+    assert code == 0
+    assert entry_out.is_file()
+    assert module_out.is_file()
 
 
 @pytest.mark.parametrize(

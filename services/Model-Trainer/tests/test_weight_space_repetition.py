@@ -28,6 +28,7 @@ from model_trainer.core.services.model.weight_space.repetition import (
     seq_rep,
 )
 from tests._qa_benchmark_support import Tokenizer
+from tests._weight_space_support import longs
 
 
 class _GenerateProto(Protocol):
@@ -124,7 +125,7 @@ def test_greedy_continuations_match_hugging_face_greedy_decoding() -> None:
     for prompt, continuation in zip(prompts, report["continuations"], strict=True):
         with torch.no_grad():
             reference = generate(
-                torch.tensor([list(prompt)], dtype=torch.long),
+                longs([list(prompt)]),
                 max_new_tokens=12,
                 do_sample=False,
                 pad_token_id=0,
