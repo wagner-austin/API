@@ -54,6 +54,11 @@ corpus_cache/
 # certificates in docs/RESEARCH.md and the api-codebase wiki, so the files
 # themselves must live where any checkout can verify them (2026-09-09).
 !results/cartridge/*.json
+# The weight-space RunRecords, the policy and the LLM-written programs they
+# measured, for the same reason: the api-codebase wiki quotes their digests,
+# and a program is only checkable beside the weights it was written against
+# (board task 7964f9f6, 2026-11-05).
+!results/weight-space/*/*.json
 
 # Allow type stubs under typings even if named like ignored dirs
 !typings/datasets/
