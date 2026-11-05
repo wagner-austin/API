@@ -402,8 +402,9 @@ class TestRefusals:
         _test_hooks.run = FakeRun(
             [
                 *handed_a_job(sourced_config),
-                ok(""),
-                failed(128, "missing"),
+                ok(""),  # git init --bare
+                failed(1, ""),  # merge-base --is-ancestor: the fetched ref does not reach it
+                failed(128, "missing"),  # cat-file: absent
                 *[failed(128, "fatal: unable to access: could not resolve host")]
                 * mirror_fetch.FETCH_ATTEMPTS,
             ]
