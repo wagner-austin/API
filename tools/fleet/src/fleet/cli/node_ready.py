@@ -86,7 +86,8 @@ def ready_state(
         launching: What this runner's launches under way were granted, which
             the room is charged with beside the ledger's live runs, since no
             ledger row names them yet (:mod:`fleet.cli.node_launch`).
-        launching_projects: Their projects, left out as a lease's are.
+        launching_projects: Their projects, whose declared resources are
+            reserved before the launch takes its lease.
 
     Returns:
         The gate. ``ready`` carries the node's measured state and claim tags
@@ -248,14 +249,27 @@ def _claimable(
             alias,
             ", ".join(held),
         )
-    launched_here = tuple(name for name in roomy if name in launching_projects)
+    node_local = loaded.workspace["node_local_resources"]
+    reserved = frozenset(
+        resource
+        for name in launching_projects
+        for resource in run_lease.held_names(registered[name], node=alias, node_local=node_local)
+    )
+    launched_here = tuple(
+        name
+        for name in roomy
+        if name in launching_projects
+        or reserved.intersection(
+            run_lease.held_names(registered[name], node=alias, node_local=node_local)
+        )
+    )
     if launched_here:
         _log.info(
             "%s leaves out what it is launching now, whose lease is not yet taken: %s",
             alias,
             ", ".join(launched_here),
         )
-    fits = tuple(name for name in roomy if name not in held and name not in launching_projects)
+    fits = tuple(name for name in roomy if name not in held and name not in launched_here)
     if roomy and not fits:
         return closed(
             alias,
