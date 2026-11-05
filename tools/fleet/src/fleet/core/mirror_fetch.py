@@ -13,7 +13,9 @@ days: on diphtheria ``gnutls_handshake() failed: The TLS connection was
 non-properly terminated`` (job 5aadc355, which passed as b083f28b at the
 same sha), on austinpc ``RPC failed; curl 56 Recv failure: Connection was
 reset`` four times in one afternoon, and once ``timed out after 600 s``. So
-each fetch is sent up to :data:`FETCH_ATTEMPTS` times, every attempt within
+each fetch is sent up to :data:`FETCH_ATTEMPTS` times, after the pauses of
+:data:`FETCH_PAUSES_SECONDS`, each lost attempt logged in git's words as it
+happens rather than only when the last one is refused, every attempt within
 one shared :data:`FETCH_BUDGET_SECONDS`, which bounds the export as a single
 fetch's deadline did: the claim path it runs in has a node runner's whole
 serve behind it, and a wait of three full deadlines would outlast it. A
@@ -84,17 +86,28 @@ FETCHED_REF: Final = "refs/fleet/fetched"
 #: hung remote before the tick's own bound does.
 FETCH_TIMEOUT_SECONDS: Final = 600
 
-#: How many times one fetch is sent before the job is refused.
-FETCH_ATTEMPTS: Final = 3
+#: The pause before each lost fetch is sent again, in seconds, doubling from
+#: one; no attempt is sent when no more than its pause is left of the budget.
+#:
+#: A SECOND, NOT TEN (MCPs board task 5280a25d). Every job of a push gate
+#: waits in the mirror's :data:`FETCH_TURN` for the first one's fetch, and a
+#: lost connection is over the moment git reports it: on lacrymal at
+#: 20:46:49Z on 2026-11-05 the exports of MCPs 141c8a42a for serendipity and
+#: lavender took the turn after waiting 31 and 32 s, and at 18:32Z two of
+#: 1b8c3a285's after 12 and 14 s, where one fetch of a commit a few past the
+#: mirror's took 3.2 s by hand. A pause of ten seconds after each of two lost
+#: attempts is that 31 s. The four pauses still span 15 s of a remote that
+#: keeps dropping connections, where the two pauses of ten spanned 20.
+FETCH_PAUSES_SECONDS: Final = (1, 2, 4, 8)
+
+#: How many times one fetch is sent before the job is refused: once, and
+#: again after each pause.
+FETCH_ATTEMPTS: Final = len(FETCH_PAUSES_SECONDS) + 1
 
 #: The time every attempt of one fetch shares, in seconds: a lost connection
-#: is sent again twice, a fetch that timed out at its full deadline once more
-#: with what is left.
+#: is sent again after each pause, a fetch that timed out at its full
+#: deadline once more with what is left.
 FETCH_BUDGET_SECONDS: Final = 900
-
-#: The pause before a lost fetch is sent again, in seconds; no attempt is
-#: sent when no more than this is left of the budget.
-FETCH_PAUSE_SECONDS: Final = 10
 
 #: The deadline of a git command that reads only the local mirror, in seconds.
 INIT_TIMEOUT_SECONDS: Final = 60
@@ -108,8 +121,8 @@ INIT_TIMEOUT_SECONDS: Final = 60
 #: LOOKED AT EVERY SECOND (MCPs board task 1e0ee821). Every job of one push
 #: gate exports the same commit, so all but the first wait here for the
 #: first one's fetch, then each finds the commit held in one probe. Looked
-#: at every :data:`FETCH_PAUSE_SECONDS`, the pause before a lost fetch is
-#: sent again, a waiter missed each release by up to ten seconds and then
+#: at every ten seconds, then the pause before a lost fetch was sent again,
+#: a waiter missed each release by up to ten seconds and then
 #: lost the turn to another waiter's probe: on lacrymal on 2026-11-04 the
 #: export of MCPs 6f20029f0 for MCPs/execution-deploy took its turn after
 #: waiting 21 s, all of it between that job's claim and its lease, where the
@@ -232,9 +245,13 @@ def _fetched(
         if any(marker in stderr for marker in NOT_ON_REMOTE_MARKERS):
             raise not_served(stderr)
         said.append(f"attempt {len(said) + 1}: {_words(stderr)}")
-        if len(said) == FETCH_ATTEMPTS or deadline - _test_hooks.now() <= FETCH_PAUSE_SECONDS:
+        if len(said) == FETCH_ATTEMPTS:
             break
-        _test_hooks.sleep(FETCH_PAUSE_SECONDS)
+        pause = FETCH_PAUSES_SECONDS[len(said) - 1]
+        if deadline - _test_hooks.now() <= pause:
+            break
+        _log.info("%s: %s; sent again in %d s", verb, said[-1], pause)
+        _test_hooks.sleep(pause)
     raise AppError(
         code=FleetErrorCode.EXPORT_FAILED,
         message=(
@@ -488,7 +505,7 @@ __all__ = [
     "FETCHED_REF",
     "FETCH_ATTEMPTS",
     "FETCH_BUDGET_SECONDS",
-    "FETCH_PAUSE_SECONDS",
+    "FETCH_PAUSES_SECONDS",
     "FETCH_TIMEOUT_SECONDS",
     "FETCH_TURN",
     "INIT_TIMEOUT_SECONDS",
