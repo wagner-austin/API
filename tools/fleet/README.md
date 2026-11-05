@@ -854,7 +854,9 @@ one) and the runner exports THAT commit:
    <remote> +<sha>:refs/fleet/fetched`, so the next fetch offers that ref's
    history and receives only new objects, inside the mirror's fetch turn,
    so a second export of one commit waits and then finds it held: MCPs board
-   task 86f70457) BEFORE any lease is taken, so a sha the remote has never seen is
+   task 86f70457; a commit that ref already reaches is exported with no turn
+   at all, since every job of a push gate exports one commit: MCPs board task
+   5280a25d) BEFORE any lease is taken, so a sha the remote has never seen is
    refused `SHA_NOT_ON_REMOTE` with nothing held, and a project with no
    `source` is refused `PROJECT_REMOTE_MISSING` by name; a fetch git loses
    (a reset connection, a TLS drop, a timeout) is sent again, up to three
