@@ -3,7 +3,8 @@
   "minimum_workers": 2,
   "expected_minutes": 20,
   "required_tags": [
-    "linux"
+    "linux",
+    "gpu"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/turkic_transliteration.git",
