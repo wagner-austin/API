@@ -60,7 +60,14 @@ inside their ``make check``, and on 2026-09-29 lavender-wsl, the second
 testdb node, failed them where ``docker run`` found neither (MCPs board task
 554bffc1): the tag means the node declares the version of the daemon its own
 account reaches, which its probe reads only while that daemon holds the
-network and the images. All four are :mod:`fleet.contracts.capability`.
+network and the images. ``netns`` because a Vitest browser run's chromium
+fails its queued requests with ERR_NETWORK_CHANGED when an address in its
+network namespace changes, as a container start's veth address did on
+colossus on 2026-11-05, stranding fiesta's and mcp-proxy's testers (MCPs
+board task 61983278): the five MCPs packages with browser suites run them
+in a namespace of their own nested in rootlesskit's, and the tag means the
+node declares the rootlesskit version its probe reads only when a check's
+unit made both. All five are :mod:`fleet.contracts.capability`.
 ``ffmpeg`` because API ``services/grandma-api``'s check converts real audio
 files through it, and it used to be a tool every build required, so a node
 without it claimed nothing at all: pendragon logged ``NODE_TOOL_MISSING`` for
@@ -129,7 +136,7 @@ class NodeTag(StrEnum):
 
     The dispatch queue's vocabulary CHECK (MCPs migrations 532, 563, 569,
     570, 571, 615, 622, 639, 648, 668, 707 and 722, narrowed by 873 and
-    widened by 902) admits exactly these thirteen words.
+    widened by 902 and 918) admits exactly these fourteen words.
     """
 
     LINUX = "linux"
@@ -145,6 +152,7 @@ class NodeTag(StrEnum):
     CHROME = "chrome"
     PDFTOTEXT = "pdftotext"
     NIXOS_TEST = "nixos-test"
+    NETNS = "netns"
 
 
 #: The tag each declared toolchain carries. A table rather than a lookup by
@@ -154,6 +162,7 @@ CAPABILITY_TAG: Final[dict[Capability, NodeTag]] = {
     Capability.CXX: NodeTag.CXX,
     Capability.DOCKER: NodeTag.DOCKER,
     Capability.STACK: NodeTag.STACK,
+    Capability.NETNS: NodeTag.NETNS,
 }
 
 #: The tag each detected tool carries, keyed by the line the toolchain probe
@@ -182,8 +191,8 @@ def node_tags(node: NodeConfig) -> frozenset[NodeTag]:
     Returns:
         ``linux``, plus ``gpu`` when the node declares a CUDA device,
         ``testdb`` when it declares the fleet test database, and ``rust``,
-        ``cxx``, ``docker`` or ``stack`` for each capability it declares a
-        version of.
+        ``cxx``, ``docker``, ``stack`` or ``netns`` for each capability it
+        declares a version of.
     """
     tags: set[NodeTag] = {NodeTag.LINUX}
     if node["gpu"] is not None:
@@ -238,7 +247,8 @@ def decode_node_tag(value: JSONValue, *, field: str) -> NodeTag:
         f"{field} must be one of {', '.join(NodeTag)}, got {value!r}; a tag names a fact "
         "the node contract carries (linux, a CUDA device nvidia-smi reports, the fleet test "
         "database, a Rust or C++ toolchain, the execution suite's rootless Docker daemon, "
-        "the corvis compose stack, or a tool, the hooks check's environment, Google "
+        "the corvis compose stack, a rootlesskit namespace a check can nest its own in, "
+        "or a tool, the hooks check's environment, Google "
         "Chrome or NixOS VM-test support its probe found), and one it does not carry "
         "could never be satisfied: no node runs windows or an elevated runner since board "
         "task e705f08c"

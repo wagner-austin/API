@@ -54,6 +54,7 @@ def _node(docker: str | None) -> NodeConfig:
         cxx=None,
         docker=docker,
         stack=None,
+        netns=None,
         budget={
             "reserved_cores": 8,
             "reserved_ram_gb": 6.0,

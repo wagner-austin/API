@@ -42,6 +42,7 @@ def _node() -> NodeConfig:
         cxx=None,
         docker=None,
         stack=None,
+        netns=None,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

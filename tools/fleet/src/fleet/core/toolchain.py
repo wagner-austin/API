@@ -49,7 +49,7 @@ def read_reports(output: str) -> tuple[ToolReport, ...]:
     Returns:
         One report per line naming a required tool, a tagged tool
         (``ffmpeg``), a package manager, a toolchain's probe line
-        (``cargo``, ``cxx``, ``docker``, ``stack``), the CUDA device or test
+        (``cargo``, ``cxx``, ``docker``, ``stack``, ``netns``), the CUDA device or test
         database line (``gpu``, ``testdb``, :mod:`fleet.contracts.detection`),
         in the order the node emitted them. Empty when no line did.
     """

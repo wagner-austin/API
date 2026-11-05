@@ -129,6 +129,13 @@ class NodeConfig(TypedDict):
             or None. Gives the ``stack`` tag the suites that start those
             images require; required and re-measured like ``rust`` (MCPs
             board task 554bffc1).
+        netns: The version ``rootlesskit --version`` printed inside a
+            check's unit, read only when that unit made a rootlesskit
+            slirp4netns namespace with a network namespace nested inside it
+            (:data:`fleet.contracts.capability.NETNS_PROGRAM`), or None.
+            Gives the ``netns`` tag the browser suites that run in a
+            namespace of their own require; required and re-measured like
+            ``rust`` (MCPs board task 61983278).
         budget: What share of this machine a dispatch may take.
         models: How the node serves catalog models
             (:mod:`fleet.contracts.model_host`, MCPs board task b9235198),
@@ -148,6 +155,7 @@ class NodeConfig(TypedDict):
     cxx: str | None
     docker: str | None
     stack: str | None
+    netns: str | None
     budget: NodeBudget
     models: NodeModels | None
 
@@ -327,6 +335,7 @@ def encode_node_config(node: NodeConfig) -> JSONObject:
         "cxx": node["cxx"],
         "docker": node["docker"],
         "stack": node["stack"],
+        "netns": node["netns"],
         "budget": encode_node_budget(node["budget"]),
         "models": encode_node_models(node["models"]),
     }
@@ -395,6 +404,7 @@ def decode_node_config(value: JSONValue, *, host: str, enabled: bool) -> NodeCon
         cxx=decode_capability(Capability.CXX, value["cxx"]),
         docker=decode_capability(Capability.DOCKER, value["docker"]),
         stack=decode_capability(Capability.STACK, value["stack"]),
+        netns=decode_capability(Capability.NETNS, value["netns"]),
         budget=decode_node_budget(require_dict(value, "budget")),
         models=decode_node_models(value["models"]),
     )
@@ -416,7 +426,9 @@ def declared_capability(node: NodeConfig, capability: Capability) -> str | None:
         return node["cxx"]
     if capability is Capability.DOCKER:
         return node["docker"]
-    return node["stack"]
+    if capability is Capability.STACK:
+        return node["stack"]
+    return node["netns"]
 
 
 def _positive_float(obj: JSONObject, key: str) -> float:

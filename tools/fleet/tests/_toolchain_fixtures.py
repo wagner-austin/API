@@ -191,6 +191,7 @@ def node(
     cxx: str | None = None,
     docker: str | None = None,
     stack: str | None = None,
+    netns: str | None = None,
 ) -> NodeConfig:
     """Build a node declaration.
 
@@ -200,6 +201,7 @@ def node(
         cxx: The C++ toolchain version it declares, or None.
         docker: The rootless execdocker daemon version it declares, or None.
         stack: The stack daemon version it declares, or None.
+        netns: The rootlesskit version its nested-namespace probe reads, or None.
 
     Returns:
         The node.
@@ -216,6 +218,7 @@ def node(
         cxx=cxx,
         docker=docker,
         stack=stack,
+        netns=netns,
         budget=NodeBudget(
             reserved_cores=2,
             reserved_ram_gb=4.0,

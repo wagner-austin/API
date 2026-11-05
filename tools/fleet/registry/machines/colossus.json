@@ -42,6 +42,7 @@
     "cxx": "15.3.0",
     "docker": "29.9.1",
     "stack": null,
+    "netns": "2.3.6",
     "models": {
       "servers": {
         "llama-server": "/home/corvis/build/llama.cpp-b11457/build/bin/llama-server",

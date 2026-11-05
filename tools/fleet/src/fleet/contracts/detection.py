@@ -15,7 +15,7 @@ and the runner claims with what it answered:
   exists under the node account's docker daemon, the line
   :data:`TESTDB_PROBE`, answered with its image. MCPs ``scripts/testdb-setup.sh``
   restarts it empty before each run, so existing is what a suite needs.
-* ``rust``, ``cxx``, ``docker``, ``stack``: the toolchain answered with a
+* ``rust``, ``cxx``, ``docker``, ``stack``, ``netns``: the toolchain answered with a
   version (:func:`fleet.contracts.capability.detected`).
 * ``ffmpeg`` and any other tagged tool: the executable was found
   (:func:`fleet.contracts.tags.tool_tags`).

@@ -41,6 +41,7 @@
     "cxx": null,
     "docker": null,
     "stack": null,
+    "netns": null,
     "models": null
   }
 }

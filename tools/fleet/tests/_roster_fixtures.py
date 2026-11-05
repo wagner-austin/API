@@ -27,6 +27,7 @@ def dispatch_document() -> JSONObject:
         "cxx": None,
         "docker": None,
         "stack": None,
+        "netns": None,
         "budget": {
             "reserved_cores": 2,
             "reserved_ram_gb": 4.0,
