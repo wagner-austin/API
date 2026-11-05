@@ -21,15 +21,17 @@ failure, a write that landed somewhere it was not aimed.
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 
 import torch
+from platform_core.json_utils import dump_json_str
 from typing_extensions import TypedDict
 
 from model_trainer.core.contracts.knowledge_edit import EditVerification
 from model_trainer.core.services.model.editing.rank_one import predicted_output_delta
+from model_trainer.core.services.model.editing.sites import ParameterHostProto
 from model_trainer.core.services.model.tensor_digest import describe_tensor
-from model_trainer.core.types import TracedLMModelProto
 
 
 class AlgebraCheck(TypedDict):
@@ -104,11 +106,11 @@ def verify_update_algebra(
     return AlgebraCheck(max_prediction_error=worst, key_output_error=key_error)
 
 
-def parameter_digests(model: TracedLMModelProto) -> dict[str, float]:
+def parameter_digests(model: ParameterHostProto) -> dict[str, float]:
     """Digest every parameter in a model, by name.
 
     Args:
-        model: The model to read.
+        model: The weights to read.
 
     Returns:
         One folded digest per parameter name.
@@ -118,20 +120,43 @@ def parameter_digests(model: TracedLMModelProto) -> dict[str, float]:
     }
 
 
+def weights_digest(digests: Mapping[str, float]) -> str:
+    """Fold every parameter's digest into one name for the whole set of weights.
+
+    The identity a weight program carries as ``written_against``: two models
+    agree on it exactly when they have the same parameter names holding the
+    same bytes. Names are sorted so the fold does not depend on the order a
+    module happens to register its parameters in.
+
+    Args:
+        digests: One digest per parameter name, as :func:`parameter_digests`
+            returns them.
+
+    Returns:
+        ``sha256:`` followed by the hex digest of the canonical JSON of the
+        sorted ``[name, digest]`` pairs.
+    """
+    canonical = dump_json_str([[name, digests[name]] for name in sorted(digests)])
+    return f"sha256:{hashlib.sha256(canonical.encode('utf-8')).hexdigest()}"
+
+
 def changed_parameters(
-    before: Mapping[str, float], after: Mapping[str, float], expected: str
+    before: Mapping[str, float], after: Mapping[str, float], expected: frozenset[str]
 ) -> tuple[str, ...]:
-    """Name the parameters whose digests moved, other than the edited one.
+    """Name the parameters whose digests moved, other than the edited ones.
 
     A name present in one mapping and absent from the other counts as
     changed. A model that gained or lost a parameter during an edit is a
     stronger finding than one whose values moved, and reporting it as
     "unchanged" because there is nothing to compare against would hide it.
 
+    A SET, not one name: a rank-one edit writes one matrix and a weight
+    program may write several, and both ask the same question of the rest.
+
     Args:
         before: Digests taken before the edit.
         after: Digests taken after it.
-        expected: The parameter the edit was aimed at, which is allowed to
+        expected: The parameters the edit was aimed at, which are allowed to
             differ.
 
     Returns:
@@ -139,7 +164,9 @@ def changed_parameters(
     """
     names = set(before) | set(after)
     return tuple(
-        sorted(name for name in names if name != expected and before.get(name) != after.get(name))
+        sorted(
+            name for name in names if name not in expected and before.get(name) != after.get(name)
+        )
     )
 
 
@@ -189,7 +216,9 @@ def verify_rank_one_edit(
         module=module,
         max_prediction_error=algebra["max_prediction_error"],
         key_output_error=algebra["key_output_error"],
-        other_parameters_changed=changed_parameters(digests_before, digests_after, module),
+        other_parameters_changed=changed_parameters(
+            digests_before, digests_after, frozenset((module,))
+        ),
     )
 
 
@@ -200,4 +229,5 @@ __all__ = [
     "parameter_digests",
     "verify_rank_one_edit",
     "verify_update_algebra",
+    "weights_digest",
 ]

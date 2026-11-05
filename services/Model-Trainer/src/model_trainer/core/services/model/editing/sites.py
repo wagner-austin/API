@@ -15,15 +15,44 @@ here catches anything.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import Protocol
+
 from platform_core.errors import AppError, ModelTrainerErrorCode
 
 from model_trainer.core.contracts.knowledge_edit import EditSite, resolve_edit_module
 from model_trainer.core.types import (
     EditableParameterProto,
     LMModelProto,
+    NamedParameter,
     TracedLMModelProto,
     TracedModuleProto,
 )
+
+
+class ParameterHostProto(Protocol):
+    """The two members a weight write needs from whatever holds the weights.
+
+    Narrower than :class:`~model_trainer.core.types.TracedLMModelProto` on
+    purpose, for the reason ``SwapTargetProto`` is narrow: a write into a
+    weight needs the inventory and the addressed lookup and nothing else.
+    Declaring only those lets a language model and a plain
+    ``torch.nn.Module`` policy go through the same snapshot, restore and
+    digest checks instead of each carrying its own copy of them.
+
+    ``named_parameters`` returns an ``Iterable`` because torch's own method
+    returns an iterator and the language-model protocol declares a sequence;
+    both are iterables, so both satisfy this.
+    """
+
+    def named_parameters(self) -> Iterable[tuple[str, NamedParameter]]:
+        """Yield every parameter with its dotted path."""
+        ...
+
+    def get_parameter(self, target: str) -> EditableParameterProto:
+        """Return the parameter at a dotted path, writable."""
+        ...
+
 
 #: The attribute a weight-bearing module keeps its matrix in.
 WEIGHT_ATTRIBUTE = "weight"
@@ -46,10 +75,36 @@ def weight_parameter_name(site: EditSite) -> str:
     return f"{resolve_edit_module(site)}.{WEIGHT_ATTRIBUTE}"
 
 
+def require_parameter(model: ParameterHostProto, parameter_name: str) -> EditableParameterProto:
+    """Return a parameter a write may change, refusing a name the model lacks.
+
+    Args:
+        model: The weights to resolve against.
+        parameter_name: Dotted parameter path.
+
+    Returns:
+        The parameter, writable, of whatever shape it has.
+
+    Raises:
+        AppError: With ``EDIT_MODULE_NOT_FOUND`` if the model has no parameter
+            of that name.
+    """
+    known = [name for name, _ in model.named_parameters()]
+    if parameter_name not in known:
+        raise AppError(
+            code=ModelTrainerErrorCode.EDIT_MODULE_NOT_FOUND,
+            message=(
+                f"no parameter named '{parameter_name}' in this model; "
+                f"the edit names a parameter this architecture does not have"
+            ),
+        )
+    return model.get_parameter(parameter_name)
+
+
 def require_editable_weight(
-    model: TracedLMModelProto, parameter_name: str
+    model: ParameterHostProto, parameter_name: str
 ) -> EditableParameterProto:
-    """Return the weight an edit writes into, refusing anything unusable.
+    """Return the weight a rank-one edit writes into, refusing anything unusable.
 
     Args:
         model: The model to resolve against.
@@ -63,16 +118,7 @@ def require_editable_weight(
             of that name, or ``EDIT_WEIGHT_NOT_MATRIX`` if it has one and it
             is not two dimensional.
     """
-    known = [name for name, _ in model.named_parameters()]
-    if parameter_name not in known:
-        raise AppError(
-            code=ModelTrainerErrorCode.EDIT_MODULE_NOT_FOUND,
-            message=(
-                f"no parameter named '{parameter_name}' in this model; "
-                f"the edit site names a module this architecture does not have"
-            ),
-        )
-    parameter = model.get_parameter(parameter_name)
+    parameter = require_parameter(model, parameter_name)
     if len(parameter.shape) != 2:
         raise AppError(
             code=ModelTrainerErrorCode.EDIT_WEIGHT_NOT_MATRIX,
@@ -148,8 +194,10 @@ def require_traceable_model(model: LMModelProto) -> TracedLMModelProto:
 
 __all__ = [
     "WEIGHT_ATTRIBUTE",
+    "ParameterHostProto",
     "require_edit_module",
     "require_editable_weight",
+    "require_parameter",
     "require_traceable_model",
     "weight_parameter_name",
 ]

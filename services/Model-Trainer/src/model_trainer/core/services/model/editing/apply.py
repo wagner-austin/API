@@ -27,11 +27,12 @@ from model_trainer.core.services.model.editing.rank_one import (
     orient_for_weight,
 )
 from model_trainer.core.services.model.editing.sites import (
+    ParameterHostProto,
     require_editable_weight,
+    require_parameter,
     weight_parameter_name,
 )
 from model_trainer.core.services.model.tensor_digest import describe_tensor
-from model_trainer.core.types import TracedLMModelProto
 
 
 class WeightSnapshot(TypedDict):
@@ -50,8 +51,8 @@ class WeightSnapshot(TypedDict):
     values: torch.Tensor
 
 
-def snapshot_weight(model: TracedLMModelProto, parameter_name: str) -> WeightSnapshot:
-    """Clone a parameter's current values.
+def snapshot_weight(model: ParameterHostProto, parameter_name: str) -> WeightSnapshot:
+    """Clone the matrix a rank-one edit is about to write into.
 
     Args:
         model: The model to read from.
@@ -64,7 +65,29 @@ def snapshot_weight(model: TracedLMModelProto, parameter_name: str) -> WeightSna
         AppError: With ``EDIT_MODULE_NOT_FOUND`` if the parameter does not
             exist, or ``EDIT_WEIGHT_NOT_MATRIX`` if it is not a matrix.
     """
-    parameter = require_editable_weight(model, parameter_name)
+    require_editable_weight(model, parameter_name)
+    return snapshot_parameter(model, parameter_name)
+
+
+def snapshot_parameter(model: ParameterHostProto, parameter_name: str) -> WeightSnapshot:
+    """Clone any parameter's current values, whatever its shape.
+
+    The form a weight program needs, since its writes reach biases and gains
+    as well as matrices; :func:`snapshot_weight` keeps the rank-one method's
+    matrix requirement on top of this.
+
+    Args:
+        model: The weights to read from.
+        parameter_name: Dotted parameter path.
+
+    Returns:
+        The snapshot.
+
+    Raises:
+        AppError: With ``EDIT_MODULE_NOT_FOUND`` if the parameter does not
+            exist.
+    """
+    parameter = require_parameter(model, parameter_name)
     return WeightSnapshot(
         parameter_name=parameter_name,
         values=parameter.detach().clone(),
@@ -73,7 +96,7 @@ def snapshot_weight(model: TracedLMModelProto, parameter_name: str) -> WeightSna
 
 def apply_rank_one_edit(
     *,
-    model: TracedLMModelProto,
+    model: ParameterHostProto,
     site: EditSite,
     item_id: str,
     left: torch.Tensor,
@@ -142,7 +165,7 @@ def euclidean_norm(tensor: torch.Tensor) -> float:
     return float(torch.sqrt(torch.sum(tensor * tensor)).item())
 
 
-def restore_weight(model: TracedLMModelProto, snapshot: WeightSnapshot) -> None:
+def restore_weight(model: ParameterHostProto, snapshot: WeightSnapshot) -> None:
     """Put a snapshot's values back, and confirm they arrived.
 
     Args:
@@ -150,13 +173,13 @@ def restore_weight(model: TracedLMModelProto, snapshot: WeightSnapshot) -> None:
         snapshot: The values to restore.
 
     Raises:
-        AppError: With ``EDIT_MODULE_NOT_FOUND`` or ``EDIT_WEIGHT_NOT_MATRIX``
-            if the parameter is no longer resolvable, with
-            ``EDIT_UPDATE_SHAPE_MISMATCH`` if the snapshot's shape no longer
-            matches the parameter's, or with ``EDIT_RESTORE_MISMATCH`` if the
-            parameter does not hold the snapshot's exact bytes afterwards.
+        AppError: With ``EDIT_MODULE_NOT_FOUND`` if the parameter is no longer
+            resolvable, with ``EDIT_UPDATE_SHAPE_MISMATCH`` if the snapshot's
+            shape no longer matches the parameter's, or with
+            ``EDIT_RESTORE_MISMATCH`` if the parameter does not hold the
+            snapshot's exact bytes afterwards.
     """
-    parameter = require_editable_weight(model, snapshot["parameter_name"])
+    parameter = require_parameter(model, snapshot["parameter_name"])
     if parameter.shape != snapshot["values"].shape:
         raise AppError(
             code=ModelTrainerErrorCode.EDIT_UPDATE_SHAPE_MISMATCH,
@@ -185,5 +208,6 @@ __all__ = [
     "apply_rank_one_edit",
     "euclidean_norm",
     "restore_weight",
+    "snapshot_parameter",
     "snapshot_weight",
 ]
