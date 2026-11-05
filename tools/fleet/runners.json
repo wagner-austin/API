@@ -94,7 +94,8 @@
           "ffmpeg",
           "go",
           "poppler-utils",
-          "inkscape"
+          "inkscape",
+          "pipx"
         ],
         "disk": {
           "ceiling_gb": 150,
