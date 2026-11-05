@@ -208,6 +208,6 @@ class TestTheReading:
             "budget=over:308s/300s ended=2026-10-30T02:40:00Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{RUN}.log run={RUN} workers=3 "
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
-            "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s "
+            "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread"
         )

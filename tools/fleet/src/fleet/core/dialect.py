@@ -75,6 +75,7 @@ from fleet.core.slice_load import (
     sh_slice_load_start_lines,
 )
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
+from fleet.core.vm_tests import sh_vm_test_lines
 
 #: How a script file is run by path; the path is appended.
 SH_INVOCATION = ("/bin/sh",)
@@ -431,6 +432,7 @@ def build_script(
     lines.extend(sh_slice_load_start_lines(MEASURED_SLICES))
     lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log))
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
+    lines.extend(sh_vm_test_lines(log))
     lines.append(sh_run_summary_line(log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"

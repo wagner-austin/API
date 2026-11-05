@@ -34,6 +34,7 @@ from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import SH_UTC_STAMP
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import MEASURED_SLICES, sh_slice_load_end_lines
+from fleet.core.vm_tests import sh_vm_test_lines
 from tests.conftest import DEMO_PROJECT
 
 TARGET = "/home/corvis/fleet/stage/slime-execution-1790600000"
@@ -194,7 +195,10 @@ class TestIsolatedText:
 
     def test_the_copy_is_removed_before_the_status_is_written_last(self) -> None:
         lines = _isolated().splitlines()
-        slice_load = sh_slice_load_end_lines(MEASURED_SLICES, names.log_path(TARGET))
+        slice_load = [
+            *sh_slice_load_end_lines(MEASURED_SLICES, names.log_path(TARGET)),
+            *sh_vm_test_lines(names.log_path(TARGET)),
+        ]
         loaded = len(slice_load)
 
         assert lines[-7 - loaded] == "set -e"

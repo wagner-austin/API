@@ -79,6 +79,7 @@ from fleet.core.slice_load import (
     sh_slice_load_start_lines,
 )
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
+from fleet.core.vm_tests import sh_vm_test_lines
 
 #: The user whose rootless daemon a docker project's build runs against.
 EXEC_USER = "execdocker"
@@ -219,6 +220,7 @@ def isolated_build_lines(
         )
     )
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
+    lines.extend(sh_vm_test_lines(log))
     lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")

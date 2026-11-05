@@ -356,7 +356,7 @@ class TestJudgeAndRender:
             f"FLEET-CHECK 3f2a9c1e {PROJECT} sha={SHA} node=lavender exit=0 banner=yes "
             "tests=771p/0f coverage=total=100.00% budget=unread ended=2026-10-04T20:33:28Z "
             "log=lavender:C:/fleet/stage/run-1/result.txt.log "
-            "run=run-1 workers=4 slowest=unread ci=unread dispatch=unread "
+            "run=run-1 workers=4 slowest=unread ci=unread dispatch=unread vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread"
         )
 
@@ -380,8 +380,8 @@ class TestJudgeAndRender:
         assert " exit=1 banner=no tests=885p/2f coverage=statements=99.71% branches=98.42% " in line
         assert line.endswith(
             "log=sedona:/srv/fleet/stage/run-2/result.txt.log run=run-2 workers=7 "
-            "slowest=unread ci=unread dispatch=unread generation=unread began=unread "
-            "phases=unread steps=unread registry=unread"
+            "slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
+            "began=unread phases=unread steps=unread registry=unread"
         )
         assert "\n" not in line
 
