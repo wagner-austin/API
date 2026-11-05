@@ -15,7 +15,7 @@ here catches anything.
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Sequence
 from typing import Protocol
 
 from platform_core.errors import AppError, ModelTrainerErrorCode
@@ -36,16 +36,16 @@ class ParameterHostProto(Protocol):
     Narrower than :class:`~model_trainer.core.types.TracedLMModelProto` on
     purpose, for the reason ``SwapTargetProto`` is narrow: a write into a
     weight needs the inventory and the addressed lookup and nothing else.
-    Declaring only those lets a language model and a plain
-    ``torch.nn.Module`` policy go through the same snapshot, restore and
-    digest checks instead of each carrying its own copy of them.
+    Declaring only those lets a language model and the weight-space control
+    policy go through the same snapshot, restore and digest checks instead of
+    each carrying its own copy of them.
 
-    ``named_parameters`` returns an ``Iterable`` because torch's own method
-    returns an iterator and the language-model protocol declares a sequence;
-    both are iterables, so both satisfy this.
+    ``named_parameters`` is a ``Sequence``, as
+    :class:`~model_trainer.core.types.LMModelProto` declares it, so every
+    language model this package types satisfies this unchanged.
     """
 
-    def named_parameters(self) -> Iterable[tuple[str, NamedParameter]]:
+    def named_parameters(self) -> Sequence[tuple[str, NamedParameter]]:
         """Yield every parameter with its dotted path."""
         ...
 
