@@ -203,8 +203,11 @@ rule by reading the diff.
   cited from a published source, read off real data, or computed by a simpler
   reference; never pasted from the function's own output. The tell is a long
   literal (a hash, a rendered block, a many-digit float) landing in a test in
-  the same commit as the code producing it, with no source named. A reviewer
-  decides this; no tool does.
+  the same commit as the code producing it, with no source named.
+  Enforcement: a guard fails `make lint` on such a literal whose line names
+  no source of the four kinds, so each states a claim the reviewer checks
+  (board task dae4fde5, in the shared guard libraries, its Python twin for
+  this repository).
 - **Properties beside examples.** Every encode and decode pair has a
   round-trip property test over generated inputs, with the strategy built
   once in a shared testing module; other invariants a diff adds get one too.
