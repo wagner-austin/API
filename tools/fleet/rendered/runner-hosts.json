@@ -11,7 +11,8 @@
       "ffmpeg",
       "go",
       "poppler-utils",
-      "inkscape"
+      "inkscape",
+      "pipx"
     ],
     "installs": [
       {
