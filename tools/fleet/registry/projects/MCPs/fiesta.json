@@ -3,7 +3,8 @@
   "minimum_workers": 2,
   "expected_minutes": 10,
   "required_tags": [
-    "cxx"
+    "cxx",
+    "netns"
   ],
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
