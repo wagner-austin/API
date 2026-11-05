@@ -235,11 +235,12 @@ def test_a_bounded_node_waits_for_the_whole_check_to_end(
 #: that carry its tags and refuse it because it is not pinned to them. demure
 #: carries no testdb tag, so MCPs/packages/db never reaches it, and no docker
 #: tag since MCPs board task ae130923 (it has no rootless execdocker lane), so
-#: neither does MCPs/execution-deploy.
+#: neither does MCPs/execution-deploy, and no netns tag since MCPs board task
+#: 61983278 (it has no rootlesskit), so neither does MCPs/mcp-shared.
 LENOVOLD_REFUSED = {
     "MCPs/execution-deploy": ("diphtheria",),
     "MCPs/execution-linux": ("demure", "diphtheria"),
-    "MCPs/mcp-shared": ("demure", "diphtheria"),
+    "MCPs/mcp-shared": ("diphtheria",),
     "MCPs/packages/db": ("diphtheria",),
 }
 
