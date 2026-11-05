@@ -27,7 +27,10 @@ THE TRANSPORT IS UNCHANGED. The bundle crosses over scp and its digest is
 compared before the node reads it (:func:`fleet.core.staging.send_verified`),
 as a companion's bundle is; the tree is unpacked beside its staging
 directory into a repository cloned from the node's mirror by hard links,
-and committed as one commit (:func:`unpack_commands`).
+and committed as one commit (:func:`unpack_commands`). The fetch into the
+node's mirror and the clone out of it each hold the mirror's lock, so no
+clone links a file another run's fetch, or git's maintenance after one, is
+writing (:func:`fleet.core.stage_repository.under_mirror_lock`).
 
 EVERY REF WRITE WAITS ON GIT'S OWN LOCKS (MCPs board task 695b0b02). Each
 export writes its run's bundle ref into the hub's one mirror and deletes it
@@ -51,6 +54,7 @@ git's default wait.
 from __future__ import annotations
 
 import pathlib
+import posixpath
 import re
 import shlex
 from typing import Final
@@ -292,23 +296,31 @@ def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tup
         run_id: What names the bundle's ref (:data:`BUNDLE_REF_PREFIX`).
 
     Returns:
-        No command when nothing was sent; else the mirror made if absent and
-        the bundle's ref fetched into :data:`NODE_TIP_REF`.
+        No command when nothing was sent; else the mirrors directory made, so
+        the mirror's lock file can be, the mirror made if absent, and the
+        bundle's ref fetched into :data:`NODE_TIP_REF` with the maintenance
+        it starts run inline, each holding the mirror's lock
+        (:func:`fleet.core.stage_repository.under_mirror_lock`).
     """
     if bundle is None:
         return ()
     return (
-        ("git", "init", "--bare", "--quiet", mirror),
-        (
-            "git",
-            "-C",
+        ("mkdir", "-p", posixpath.dirname(mirror)),
+        stage_repository.under_mirror_lock(mirror, ("git", "init", "--bare", "--quiet", mirror)),
+        stage_repository.under_mirror_lock(
             mirror,
-            *REF_LOCK_WAITS,
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            bundle,
-            f"+{BUNDLE_REF_PREFIX}{run_id}:{NODE_TIP_REF}",
+            (
+                "git",
+                "-C",
+                mirror,
+                *REF_LOCK_WAITS,
+                *stage_repository.INLINE_MAINTENANCE,
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                bundle,
+                f"+{BUNDLE_REF_PREFIX}{run_id}:{NODE_TIP_REF}",
+            ),
         ),
     )
 

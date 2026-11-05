@@ -9,6 +9,16 @@ the first failure, as it does :func:`fleet.core.dialect.extract_commands`.
 
 from __future__ import annotations
 
+from typing import Final
+
+#: The settings every write into a node's mirror runs under: the automatic
+#: maintenance git starts at the end of a fetch runs to its end inside that
+#: fetch, under its lock, rather than detached behind it
+#: (:func:`under_mirror_lock`). ``maintenance.autoDetach`` is read by git
+#: 2.47 and later, a NixOS node's, and ``gc.autoDetach`` by the
+#: ``git gc --auto`` an Ubuntu node's 2.43 runs instead.
+INLINE_MAINTENANCE: Final = ("-c", "gc.autoDetach=false", "-c", "maintenance.autoDetach=false")
+
 #: Who a project's staged tree's one commit is authored by, passed to ``git``
 #: with ``-c`` on the commit itself. A companion is cloned with its real
 #: commits (:func:`companion_repository_commands`) and gets none.
@@ -283,6 +293,9 @@ def clone_commands(target: str, mirror: str) -> tuple[tuple[str, ...], ...]:
     turned off before anything else writes (:func:`_no_auto_gc_command`,
     :func:`_no_auto_maintenance_command`).
 
+    The clone runs under the mirror's lock (:func:`under_mirror_lock`),
+    since it links the mirror's files one at a time.
+
     Args:
         target: Absolute remote directory, empty, the repository is made in.
         mirror: The node's mirror of the remote.
@@ -291,19 +304,71 @@ def clone_commands(target: str, mirror: str) -> tuple[tuple[str, ...], ...]:
         The clone and the three settings after it.
     """
     return (
-        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, target),
+        under_mirror_lock(
+            mirror, ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, target)
+        ),
         _no_auto_gc_command(target),
         _no_auto_maintenance_command(target),
         ("git", "-C", target, "config", "--remove-section", "remote.origin"),
     )
 
 
+def mirror_lock(mirror: str) -> str:
+    """The file a node's mirror is locked on, beside it in the mirrors directory.
+
+    Args:
+        mirror: The node's mirror.
+
+    Returns:
+        ``<mirror>.objects.lock``, which nothing git runs writes or reads.
+    """
+    return f"{mirror}.objects.lock"
+
+
+def under_mirror_lock(mirror: str, command: tuple[str, ...]) -> tuple[str, ...]:
+    """A command that writes a node's mirror or links its files, run holding the mirror's lock.
+
+    A CLONE OF A MIRROR NEVER RUNS BESIDE A WRITE INTO IT (MCPs board task
+    5280a25d). ``git clone --local`` lists the mirror's object directory and
+    links each file it listed, and refuses a file that changed in between:
+    on lavender at 20:48:59Z on 2026-11-05 packages/wiki-check's job
+    392cd878 was refused ``DISPATCH_FAILED`` on 'fatal: hardlink different
+    from source at .../chat/.git/objects/info/commit-graphs/tmp_graph_IWyF5I',
+    the commit graph that the automatic maintenance of a fetch into the chat
+    companion's mirror was writing, detached, while the clone ran. A fetch
+    of another run into the same mirror writes its pack and its loose
+    objects through temporary files the same way. Counted by hand on ziggurat
+    the same day, 16 of 30 clones of a mirror were refused so while another
+    process appended to a file in its pack directory.
+
+    So every write into a node's mirror and every clone out of it holds one
+    exclusive ``flock`` on :func:`mirror_lock`, which the kernel gives back
+    when its holder exits, however it exits; a write's automatic maintenance
+    runs inside it (:data:`INLINE_MAINTENANCE`). A clone holds it for
+    milliseconds, and a fetch for the transfer of a bundle that carries only
+    what the mirror lacks. What reads the mirror, ``git archive`` and the
+    probes, takes no lock: git's readers find a pack that maintenance
+    replaced.
+
+    Args:
+        mirror: The node's mirror.
+        command: The write or the clone, as an argument vector.
+
+    Returns:
+        The command under ``flock``, as an argument vector.
+    """
+    return ("flock", mirror_lock(mirror), *command)
+
+
 __all__ = [
     "EXPORT_AUTHOR_EMAIL",
     "EXPORT_AUTHOR_NAME",
+    "INLINE_MAINTENANCE",
     "UNCOMPRESSED_OBJECTS",
     "clone_commands",
     "companion_repository_commands",
     "index_commands",
     "init_repository_commands",
+    "mirror_lock",
+    "under_mirror_lock",
 ]
