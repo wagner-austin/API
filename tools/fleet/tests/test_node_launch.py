@@ -33,12 +33,14 @@ from fleet.core.queue_transport import answering
 from tests._holder_fakes import RecordingHolder
 from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
 from tests._node_agent_fixtures import (
+    NPM_CI,
     PROBED,
     VERDICT_TASK,
     _credentials_in_env,
     _sourced_config,
     launch_steps,
     prebuilt_export,
+    sourced_document,
 )
 from tests._queue_fakes import (
     DEFAULT_JOB_ID,
@@ -48,6 +50,7 @@ from tests._queue_fakes import (
     Unanswered,
     queue_job,
 )
+from tests._registry import write_registry
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
@@ -108,9 +111,23 @@ def _fill(loaded: _config.LoadedWorkspace, launcher: Launcher) -> tuple[str, ...
 
 
 class TestAClaimWhileItsJobLaunches:
+    @pytest.mark.parametrize("shared_resource", [False, True])
     def test_goes_on_charging_the_node_and_the_run_is_launched_once_let_go(
-        self, sourced_config: pathlib.Path, caplog: pytest.LogCaptureFixture
+        self,
+        sourced_config: pathlib.Path,
+        caplog: pytest.LogCaptureFixture,
+        shared_resource: bool,
     ) -> None:
+        if shared_resource:
+            document = sourced_document((NPM_CI,))
+            projects = document["projects"]
+            assert isinstance(projects, dict)
+            demo = projects["libs/demo"]
+            assert isinstance(demo, dict)
+            demo["exclusive_resources"] = ["corvis-fleet-testdb"]
+            projects["libs/other"] = {**demo}
+            document["node_local_resources"] = ["corvis-fleet-testdb"]
+            write_registry(sourced_config, document)
         digest = staging.digest(prebuilt_export(sourced_config))
         _test_hooks.executor = _test_hooks._default_executor
         release = threading.Event()
@@ -129,10 +146,12 @@ class TestAClaimWhileItsJobLaunches:
         loaded, launcher = _launcher(sourced_config, held)
 
         with caplog.at_level("INFO"), launcher:
-            claimed = _fill(loaded, launcher)
-            during = launcher.launching()
-            claimed_on_host = host_claims.live_claims(loaded.host_claims, alias="lavender")
-            release.set()
+            try:
+                claimed = _fill(loaded, launcher)
+                during = launcher.launching()
+                claimed_on_host = host_claims.live_claims(loaded.host_claims, alias="lavender")
+            finally:
+                release.set()
 
         assert claimed == (DEFAULT_JOB_ID,)
         row = records.read_ledger(loaded.ledger)[-1]
@@ -150,8 +169,10 @@ class TestAClaimWhileItsJobLaunches:
             (claim["job_id"], claim["runner"], claim["project"]) for claim in claimed_on_host
         ] == [(DEFAULT_JOB_ID, LAVENDER, "libs/demo")]
         assert claimed_on_host[0]["workers"] == row["workers"]
+        excluded = "libs/demo, libs/other" if shared_resource else "libs/demo"
         assert (
-            "lavender leaves out what it is launching now, whose lease is not yet taken: libs/demo"
+            "lavender leaves out what it is launching now, whose lease is not yet taken: "
+            + excluded
         ) in [record.getMessage() for record in caplog.records]
         assert held == [frozenset({DEMO_RUN_ID})]
         assert launcher.launching() == NOTHING_LAUNCHING
