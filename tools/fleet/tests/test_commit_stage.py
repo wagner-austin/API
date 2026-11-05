@@ -289,6 +289,34 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
         # A commit the mirror held was fetched into nothing: the tip stays.
         assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == second
 
+    def test_the_tree_s_objects_are_the_mirror_s_own_files_and_the_add_writes_none(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The export is cloned from the node's mirror by hard links before
+        the tree lands, so the add finds each blob it hashes already there
+        and writes it again nowhere (MCPs board task 5280a25d: 0.83 s for
+        MCPs' add on pendragon, against 2.11 s writing all of them). The
+        repository names no remote, and its one commit is the archive's."""
+        hub = tmp_path / "hub"
+        _commit(hub, {"src/a.py": "print(1)\n", "src/b.py": "print(2)\n"})
+        node = tmp_path / "node" / "repo.git"
+        node.parent.mkdir()
+
+        _node_mirror_at(hub, node, "run-1", None)
+
+        tree = node.parent / "run-1"
+        # A bundle is fetched as one pack, which the clone links.
+        packs = sorted((node / "objects" / "pack").glob("*.pack"))
+        linked = sorted((tree / ".git" / "objects" / "pack").glob("*.pack"))
+        assert len(packs) == 1
+        assert [pack.stat().st_ino for pack in linked] == [packs[0].stat().st_ino]
+        for path in ("src/a.py", "src/b.py"):
+            blob = _git(tree, "rev-parse", f"HEAD:{path}")
+            assert not (tree / ".git" / "objects" / blob[:2] / blob[2:]).exists()
+        assert _git(tree, "remote") == ""
+        assert _git(tree, "status", "--porcelain") == ""
+        assert _git(tree, "rev-parse", "HEAD^{tree}") == _git(hub, "rev-parse", "HEAD^{tree}")
+
     def test_a_bundle_whose_base_the_node_lacks_stops_before_any_tree(
         self, tmp_path: pathlib.Path
     ) -> None:
