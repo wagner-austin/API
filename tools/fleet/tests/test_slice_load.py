@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import pathlib
 import subprocess
+import time
 
 from fleet.contracts.check_unit import DISPATCH_SLICE_NAME
 from fleet.contracts.runner_slice import CI_SLICE_NAME
@@ -52,8 +53,18 @@ LAVENDER_TAIL = (
 RUN = "MCPs-execution-deploy-lavender-1793327005"
 
 
-def _run(tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]) -> str:
+def _run(
+    tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]
+) -> tuple[str, range]:
     """Run the start lines, change each stat file, run the end lines, and read the transcript.
+
+    THE WALL IS WHAT THE CLOCK SAID, NOT 0 (MCPs board task 5280a25d). The
+    lines read ``date +%s`` at the start and again at each slice's end, so a
+    run of a few milliseconds that crosses a second's boundary prints 1 s:
+    fleet job c79448c2 on colossus at API bb5b75ef1 failed the case that
+    expected 0 s on exactly that. The clock is read here, in whole seconds,
+    before the script starts and after it ends, and every wall the script's
+    own reads could have made lies between them.
 
     Args:
         tmp_path: The case's directory.
@@ -61,7 +72,8 @@ def _run(tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]
             start and at the end, None for no file.
 
     Returns:
-        What the lines appended to the transcript.
+        What the lines appended to the transcript, and every whole-second
+        wall a line of it can carry.
     """
     log = tmp_path / "check.log"
     log.write_text("", encoding="utf-8")
@@ -83,15 +95,30 @@ def _run(tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]
             *sh_slice_load_end_lines(tuple(slices), str(log)),
         ]
     )
+    started = int(time.time())
     subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30)
-    return log.read_text(encoding="utf-8")
+    return log.read_text(encoding="utf-8"), range(int(time.time()) - started + 1)
+
+
+def _used(name: str, cpu: int, wall: int) -> str:
+    """One slice's line as the end lines print it.
+
+    Args:
+        name: The slice's unit name.
+        cpu: Its CPU-seconds.
+        wall: The check's wall seconds.
+
+    Returns:
+        The line, with its newline.
+    """
+    return f"FLEET_SLICE_LOAD: {name} used {cpu} CPU-seconds in the {wall} s the check ran\n"
 
 
 class TestTheLinesOnTheNode:
     def test_each_slice_that_ran_through_the_check_prints_its_cpu_seconds_and_the_wall(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed = _run(
+        printed, walls = _run(
             tmp_path,
             {
                 "ci": ("usage_usec 1000000000\nuser_usec 7\n", "usage_usec 1412500000\n"),
@@ -99,32 +126,40 @@ class TestTheLinesOnTheNode:
             },
         )
 
-        assert printed == (
-            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 412 CPU-seconds in the 0 s the check ran\n"
-            f"FLEET_SLICE_LOAD: {DISPATCH_SLICE_NAME} used 1463 CPU-seconds in the 0 s the "
-            "check ran\n"
-        )
-        assert read_slice_load(printed, CI_SLICE) == "412s/0s"
-        assert read_slice_load(printed, DISPATCH_SLICE) == "1463s/0s"
+        # The CI slice's end is read first, so its wall is never the later.
+        read = [
+            (ci, dispatch)
+            for ci in walls
+            for dispatch in walls
+            if ci <= dispatch
+            and printed
+            == _used(CI_SLICE_NAME, 412, ci) + _used(DISPATCH_SLICE_NAME, 1463, dispatch)
+        ]
+        assert len(read) == 1
+        ci, dispatch = read[0]
+        assert read_slice_load(printed, CI_SLICE) == f"412s/{ci}s"
+        assert read_slice_load(printed, DISPATCH_SLICE) == f"1463s/{dispatch}s"
 
     def test_a_node_without_a_slice_says_so_for_that_slice_alone(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed = _run(
+        printed, walls = _run(
             tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")}
         )
 
-        assert printed == (
-            f"{slice_none_line(CI_SLICE)}\n"
-            f"FLEET_SLICE_LOAD: {DISPATCH_SLICE_NAME} used 0 CPU-seconds in the 0 s the check ran\n"
-        )
+        read = [
+            wall
+            for wall in walls
+            if printed == f"{slice_none_line(CI_SLICE)}\n" + _used(DISPATCH_SLICE_NAME, 0, wall)
+        ]
+        assert len(read) == 1
         assert read_slice_load(printed, CI_SLICE) == "none"
-        assert read_slice_load(printed, DISPATCH_SLICE) == "0s/0s"
+        assert read_slice_load(printed, DISPATCH_SLICE) == f"0s/{read[0]}s"
 
     def test_a_slice_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)})
+        printed, _ = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)})
 
         assert printed == f"{slice_none_line(CI_SLICE)}\n{slice_gone_line(DISPATCH_SLICE)}\n"
         assert read_slice_load(printed, DISPATCH_SLICE) == "gone"
