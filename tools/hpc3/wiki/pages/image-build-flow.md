@@ -15,6 +15,9 @@ source_paths:
   - "src/hpc3/core/image_capture.py"
   - "README.md"
   - "src/hpc3/core/register.py"
+  - "src/hpc3/core/bootstrap.py"
+  - "src/hpc3/contracts/cluster.py"
+  - "src/hpc3/contracts/job_rules.py"
 source_git_blobs:
   "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
   "src/hpc3/contracts/workspace.py": "ba27d634de77b9ca57d6ccec1dd7815bc95da0fc"
@@ -27,6 +30,9 @@ source_git_blobs:
   "src/hpc3/core/image_capture.py": "93694214e390085f1920ccd78d7aaa4fcb836bd5"
   "README.md": "6d14fcebcfb6a6eb102b927d5855953bcbb192b2"
   "src/hpc3/core/register.py": "f99301f3312238f4721ddfc81a316fb5cbd6dd8b"
+  "src/hpc3/core/bootstrap.py": "4b8e0a34981b22430f8465bdafe040a579db03b7"
+  "src/hpc3/contracts/cluster.py": "8991c80eff45921db9eefa13f8b593ef577a3807"
+  "src/hpc3/contracts/job_rules.py": "9e417bd97f7ea4a62543b8299217e7401e88d7f0"
 provenance:
   - "runs/hpc3*.json -- the six committed workspace documents; every project declares an image as of 2026-09-03"
   - "runs/ledger.jsonl -- image-build rows; earliest recorded build artifact is images/v23, while floor declares images/v4"
@@ -110,12 +116,13 @@ from an index, and a conda-installed package legitimately has no `WHEEL` file[^8
 not have an environment yet. Capture PROBES a live environment; a newcomer has
 nothing to probe, so this list used to begin one step after the beginning and
 that step was improvised every time. It creates the environment through
-`miniconda3` — the cluster's `python` modules are 2.7, 3.8, 3.10 and 3.14, none
-of which is the 3.11 everything here needs — and then refuses to return one
-whose interpreter belongs to another installation
-([[interpreter-availability]]).
+`miniconda3` — the cluster's `python` modules, read on 2026-09-03, were 2.7,
+3.8, 3.10 and 3.14, none of which is the 3.11 everything here needs — and then
+refuses to return one whose interpreter belongs to another installation
+([[interpreter-availability]]).[^bootstrap]
 
-An established project skips it. The four below are the recurring flow.
+An established project skips it: bootstrap refuses a path that already holds
+anything. The four below are the recurring flow.[^onboard]
 
 1. **`hpc3-image-capture`** reads a live environment and writes the spec. Do
    NOT hand-write one: pip-freeze-and-paste is unrepeatable and silently
@@ -186,7 +193,7 @@ answers while a project is being onboarded[^13].
 is no zero-count request, because two spellings of one state is how they
 drift apart. The partition must agree in both directions
 ([[submission-rules]]). What has changed is only that CPU-only no longer
-implies *unimaged*.
+implies *unimaged*.[^cpu-spelling][^1]
 
 ## What is still open
 
@@ -216,4 +223,7 @@ name is validated for well-formedness, so it can be wrong but not malformed[^12]
 [^12]: `src/hpc3/cli/image_capture.py` section `_environment_to_probe`, and its module docstring "TWO ROUTES".
 [^13]: `src/hpc3/cli/image_build.py` section `main`, where the registry lookup was removed because `check_name_agrees` runs first.
 [^14]: `runs/ledger.jsonl` image-build rows against the `image` each project declares in `runs/hpc3*.json` (see `provenance`).
+[^bootstrap]: `src/hpc3/core/bootstrap.py:56` `create_command` (`module load miniconda3/24.9.2 && conda create`) and `:81` `check_identity` (`ENV_INTERPRETER_BORROWED`); its module docstring "WHY CONDA AND NOT ``module load python``" records the reading. The module list is the dated `module -t avail python` reading in [[interpreter-availability]]'s provenance, not a current one.
+[^onboard]: `src/hpc3/core/bootstrap.py:108` `refuse_existing` (`BOOTSTRAP_ENV_EXISTS`); `README.md:421` § "HPC3 research runs", where onboarding "starts one step earlier".
+[^cpu-spelling]: `src/hpc3/contracts/cluster.py:56` `GpuRequest` and `:251` `decode_gpu_request`, which refuses a zero count and reads null as no GPU; `src/hpc3/contracts/job_rules.py:85` `_check_partition_carries_gpu`, the two-direction partition check.
 [^register]: `src/hpc3/core/register.py` § module docstring ("WHAT THIS WRITES, AND WHAT IT REFUSES TO", "WHY IT CANNOT RUN EARLY", "EVERY LOCAL PRECONDITION IS REPORTED AT ONCE") and § `require_registrable`; `README.md` § "Registering it"; API commit `521d3cc89` (2026-10-05).

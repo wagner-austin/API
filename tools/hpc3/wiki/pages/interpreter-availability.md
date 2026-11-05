@@ -10,6 +10,10 @@ source_paths:
   - "src/hpc3/core/interpreter.py"
   - "README.md"
   - "pyproject.toml"
+  - "src/hpc3/core/preflight.py"
+  - "src/hpc3/contracts/project.py"
+  - "src/hpc3/cli/image_capture.py"
+  - "specs/tankpit-image.json"
 source_git_blobs:
   "src/hpc3/clusters/hpc3.py": "ab26dc348ecfa27716bc6d0bf2f08e359c2676b6"
   "src/hpc3/core/bootstrap.py": "4b8e0a34981b22430f8465bdafe040a579db03b7"
@@ -17,6 +21,10 @@ source_git_blobs:
   "src/hpc3/core/interpreter.py": "44152c39c9674c78771a2f01288110c0438c5617"
   "README.md": "6d14fcebcfb6a6eb102b927d5855953bcbb192b2"
   "pyproject.toml": "2d3a65bb840d9ee22e500c4bc36e1516ae31779d"
+  "src/hpc3/core/preflight.py": "940f3f7520a93221b6718b3310e0eaa651f96465"
+  "src/hpc3/contracts/project.py": "15b3d07f26da9ce297998d980b67ce47103b466b"
+  "src/hpc3/cli/image_capture.py": "a1156a46c02c71fc42a56c885a1709eb28b9acc7"
+  "specs/tankpit-image.json": "c3a092ed8c92c034037ccd48cab524951d8d072e"
 provenance:
   - "module -t avail python on hpc3 login-i15, 2026-09-03: python/2.7.17, 3.8.0, 3.10.2, 3.14.3"
   - "/usr/bin/python3 -V on hpc3 login-i15, 2026-09-03: Python 3.9.25; which python3.11 finds nothing"
@@ -36,22 +44,22 @@ confidence: high
 
 # The interpreter every project needs is not in `module avail python`
 
-`module -t avail python` answers with four interpreters and **none of them is
-the one anything here runs on**:
+Read on 2026-09-03, `module -t avail python` answered with four interpreters
+and **none of them was the one anything here runs on**:[^1]
 
 ```
 python/2.7.17   python/3.8.0   python/3.10.2   python/3.14.3
 ```
 
-The system interpreter is `Python 3.9.25`, and `which python3.11` finds
+The system interpreter was `Python 3.9.25`, and `which python3.11` found
 nothing.[^1] Meanwhile every project in this monorepo declares `python = "^3.11"`
 — TankpitBot, RustedWarfareBot, Model-Trainer, `platform_core`, and
 `tools/hpc3` itself.[^2]
 
-So the interpreter this whole stack requires exists on that cluster in **no
-form the obvious command will show you**: not as a `python` module, not as a
-system binary. A new project's first act is therefore to discover that its
-first act cannot be `module load python`.
+So, at that reading, the interpreter this whole stack requires existed on that
+cluster in **no form the obvious command will show you**: not as a `python`
+module, not as a system binary. A new project's first act is therefore to
+discover that its first act cannot be `module load python`.[^1][^2]
 
 ## The answer is real, and it is filed under a different name
 
@@ -81,18 +89,17 @@ why `--python 3.11` cannot come from `module load python`.[^5]
 
 It is also why *every registered project ships an image* is load-bearing
 rather than stylistic. The image is where a pinned 3.11 comes from once the
-project is running; conda is where it comes from before the image exists.
+project is running; conda is where it comes from before the image exists.[^image-source][^9]
 
 ## The bootstrap left a dependency nobody declared
 
-`envs/tankpit` is not a conda environment. It is a **venv whose interpreter is
-a symlink into another project's environment**, which its own `pyvenv.cfg`
-records:
+`envs/tankpit` is not a conda environment.[^4] It is a **venv whose
+interpreter is a symlink into another project's environment**, which its own
+`pyvenv.cfg` recorded when read on 2026-09-03:[^pyvenv]
 
 ```
 home = /pub/wagnera3/envs/cleargbm/bin
-executable = /dfs6b/pub/wagnera3/envs/cleargbm/bin/python3.11
-command = /pub/wagnera3/envs/cleargbm/bin/python3.11 -m venv /pub/wagnera3/envs/tankpit
+version = 3.11.16
 ```
 
 `bin/python3.11` is a symlink to `envs/cleargbm/bin/python3.11`, and
@@ -107,7 +114,7 @@ every check the package had: `check_env_path` proved the directory exists,
 `verify_env_packages` proved the packages are pinned, and both kept passing
 right up until the day the other project is cleaned up. Since 2026-10-05 the
 probe also asks the interpreter where it came from, and refuses this edge —
-see below.
+see below.[^edge][^8][^10]
 
 ## Half of this is code now
 
@@ -142,7 +149,7 @@ this page. Bootstrap knows which door to open; nothing knows which doors exist.
 **The interpreter's version is reported but not yet held to anything.** The
 probe reads `sys.version_info` on every round trip, but no run document
 declares the version a project expects, so outside bootstrap (which compares it
-to `--python`) there is nothing to compare it against.
+to `--python`) there is nothing to compare it against.[^version]
 
 ## Existing environments are checked now, by one rule with two shapes
 
@@ -184,8 +191,13 @@ the tankpit image's `org.corvis.env-source` label names, so rebuilding it in
 place would leave that label pointing at something that never built anything.
 What changed is that it can no longer be used silently: `hpc3-image-capture
 --env-path /pub/wagnera3/envs/tankpit` now refuses before writing a spec, so a
-re-capture has to start from an environment `hpc3-bootstrap` built.
+re-capture has to start from an environment `hpc3-bootstrap` built.[^unrepaired][^13]
 
+[^image-source]: `src/hpc3/contracts/project.py:185` `_require_project_image`, which refuses a project with no image; footnote 12 records the eight registered images' `/opt/env` reporting 3.11 on 2026-10-05.
+[^pyvenv]: The frontmatter provenance reading of `/pub/wagnera3/envs/tankpit/pyvenv.cfg` on 2026-09-03, which recorded its `home` and `version`; the file's other lines were not recorded. A re-read over ssh at 2026-11-05T02:32Z did not reach the cluster, so this stays a dated observation.
+[^edge]: `src/hpc3/core/preflight.py:48` `check_env_path`, which still proves only that the directory exists; footnote 8 records the removed pin-only `verify_env_packages`.
+[^version]: `src/hpc3/core/interpreter.py:104` `split_identity` reads `major.minor` on every probe; `src/hpc3/core/bootstrap.py:81` `check_identity` is the one comparison (`BOOTSTRAP_PYTHON_MISMATCH`); `src/hpc3/contracts/project.py:35` `ProjectConfig` declares no interpreter version.
+[^unrepaired]: `specs/tankpit-image.json`, `labels`, `org.corvis.env-source` = `/pub/wagnera3/envs/tankpit`; `src/hpc3/cli/image_capture.py:280` `main`, which calls `probe_environment` before it writes the spec, so `ENV_INTERPRETER_BORROWED` stops it first.
 [^1]: `module -t avail python`, `/usr/bin/python3 -V` and `which python3.11`, run over SSH on hpc3 login-i15 at 2026-09-03 19:58 UTC. Output verbatim: `python/2.7.17`, `python/3.8.0`, `python/3.10.2`, `python/3.14.3`; `Python 3.9.25`; `no python3.11 in (/opt/rcic/bin:/usr/share/Modules/bin:/usr/local/bin:/usr/bin:...)`.
 [^2]: The `python = "^3.11"` line in each of `clients/TankpitBot/pyproject.toml`, `clients/RustedWarfareBot/pyproject.toml`, `services/Model-Trainer/pyproject.toml`, `libs/platform_core/pyproject.toml` and `tools/hpc3/pyproject.toml`, read 2026-09-03.
 [^3]: `module -t avail 2>&1 | grep -i -E "conda|mamba|miniforge|anaconda"` on hpc3 login-i15 at 2026-09-03 20:12 UTC, returning the eleven modules listed above. The same host's `module -t avail python` (footnote 1, fourteen minutes earlier) lists none of them, which is why searching by the obvious name answers "no 3.11".
