@@ -18,6 +18,7 @@ runner cannot read.
 
 from __future__ import annotations
 
+import math
 import pathlib
 import threading
 from concurrent.futures import Future
@@ -161,7 +162,7 @@ class SleepAfterTheSettle:
         self._clock = clock
         self._settled = settled
 
-    def __call__(self, seconds: int) -> None:
+    def __call__(self, seconds: float) -> None:
         """Wait for the settle when on the main thread, then advance the clock.
 
         Args:
@@ -169,7 +170,7 @@ class SleepAfterTheSettle:
         """
         if threading.current_thread() is threading.main_thread():
             await_event(self._settled, what="the watch to settle the run")
-        self._clock.seconds += seconds
+        self._clock.seconds += math.ceil(seconds)
 
 
 def _malformed() -> frozenset[str] | None:

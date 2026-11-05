@@ -168,7 +168,7 @@ def _companion_replies(
     return [
         *handed_a_job(registry),  # the probe and the two reads of the ref
         ok(""),  # the project's mirror: git init --bare
-        ok(""),  # the project's mirror: git cat-file -e, the commit is held
+        ok(""),  # the project's mirror: git merge-base, the fetched ref reaches it
         ok(""),  # the companion's mirror: git init --bare
         ok(""),  # the companion: git fetch the ref
         ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip
@@ -345,7 +345,7 @@ class TestCompanions:
             [
                 *handed_a_job(sourced),
                 ok(""),  # the project's mirror: git init --bare
-                ok(""),  # the project's mirror: git cat-file -e, the commit is held
+                ok(""),  # the project's mirror: git merge-base, the fetched ref reaches it
                 ok(""),  # the companion's mirror: git init --bare
                 *[failed(128, "fatal: unable to access: could not resolve host")]
                 * mirror_fetch.FETCH_ATTEMPTS,
@@ -380,7 +380,7 @@ class TestCompanions:
             [
                 *handed_a_job(sourced),
                 ok(""),  # the project's mirror: git init --bare
-                ok(""),  # the project's mirror: git cat-file -e, the commit is held
+                ok(""),  # the project's mirror: git merge-base, the fetched ref reaches it
                 ok(""),  # the companion's mirror: git init --bare
                 ok(""),  # the companion: git fetch the ref
                 ok(f"{COMPANION_SHA}\n"),  # the companion: git rev-parse the tip

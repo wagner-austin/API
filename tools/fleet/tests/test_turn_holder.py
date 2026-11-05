@@ -61,7 +61,7 @@ def _held(lock: pathlib.Path, *, pid: int, host: str, age: int) -> str:
     return text
 
 
-def _sleeping(steps: list[Callable[[], None]], slept: list[int]) -> _test_hooks.SleepProtocol:
+def _sleeping(steps: list[Callable[[], None]], slept: list[float]) -> _test_hooks.SleepProtocol:
     """A sleep that records each wait and runs the next step in it.
 
     Args:
@@ -72,7 +72,7 @@ def _sleeping(steps: list[Callable[[], None]], slept: list[int]) -> _test_hooks.
         The sleep.
     """
 
-    def sleep(seconds: int) -> None:
+    def sleep(seconds: float) -> None:
         slept.append(seconds)
         steps.pop(0)()
 
@@ -99,7 +99,7 @@ def test_a_holder_killed_inside_its_turn_is_taken_at_once(
     text = _held(
         lock, pid=gone, host=_test_hooks.hostname(), age=file_turn.HOLDER_PROBE_SECONDS + 5
     )
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([], slept)
 
     with caplog.at_level("INFO"), file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
@@ -117,13 +117,13 @@ def test_a_holder_that_still_runs_is_waited_for(tmp_path: pathlib.Path) -> None:
     _held(
         lock, pid=os.getpid(), host=_test_hooks.hostname(), age=file_turn.HOLDER_PROBE_SECONDS + 5
     )
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
 
     with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
         pass
 
-    assert slept == [LONG_TURN["poll_seconds"]]
+    assert slept == [file_turn.FIRST_LOOK_SECONDS]
 
 
 @pytest.mark.parametrize(
@@ -140,14 +140,14 @@ def test_is_not_probed_for_another_host_s_lock_or_a_young_one(
     _held(lock, pid=_gone_pid(), host=host or _test_hooks.hostname(), age=age)
     runner = FakeRun([])
     _test_hooks.run = runner
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
 
     with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
         pass
 
     assert runner.calls == []
-    assert slept == [LONG_TURN["poll_seconds"]]
+    assert slept == [file_turn.FIRST_LOOK_SECONDS]
 
 
 def test_a_lock_written_before_hosts_were_named_is_left_to_its_age_bound(
@@ -159,14 +159,14 @@ def test_a_lock_written_before_hosts_were_named_is_left_to_its_age_bound(
     os.utime(lock, (written, written))
     runner = FakeRun([])
     _test_hooks.run = runner
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
 
     with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
         pass
 
     assert runner.calls == []
-    assert slept == [LONG_TURN["poll_seconds"]]
+    assert slept == [file_turn.FIRST_LOOK_SECONDS]
 
 
 def test_a_lock_rewritten_while_its_holder_was_probed_is_left(tmp_path: pathlib.Path) -> None:
@@ -196,7 +196,7 @@ def test_a_lock_rewritten_while_its_holder_was_probed_is_left(tmp_path: pathlib.
         seen.append(lock.read_text(encoding="utf-8"))
         lock.unlink()
 
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([the_live_turn_ends], slept)
 
     with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):

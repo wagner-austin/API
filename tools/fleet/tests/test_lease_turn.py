@@ -19,7 +19,7 @@ import pytest
 from platform_core.json_utils import dump_json_str
 
 from fleet.contracts.lease import Lease, encode_lease
-from fleet.core import _test_hooks, leases
+from fleet.core import _test_hooks, file_turn, leases
 
 _NOW = 1_791_745_210
 
@@ -55,7 +55,7 @@ def _write(path: pathlib.Path, *held: Lease) -> None:
     path.write_text(dump_json_str([encode_lease(entry) for entry in held]), encoding="utf-8")
 
 
-def _sleeping(steps: list[Callable[[], None]], slept: list[int]) -> _test_hooks.SleepProtocol:
+def _sleeping(steps: list[Callable[[], None]], slept: list[float]) -> _test_hooks.SleepProtocol:
     """A sleep that records each wait and runs the next step in it.
 
     Args:
@@ -66,7 +66,7 @@ def _sleeping(steps: list[Callable[[], None]], slept: list[int]) -> _test_hooks.
         The sleep.
     """
 
-    def sleep(seconds: int) -> None:
+    def sleep(seconds: float) -> None:
         slept.append(seconds)
         steps.pop(0)()
 
@@ -90,7 +90,7 @@ def test_a_read_takes_no_turn_while_another_process_holds_one(tmp_path: pathlib.
     _test_hooks.write_text(path, dump_json_str([encode_lease(_lease("run-2"))]))
     lock = leases.lock_path(path)
     lock.write_text("fleet process 4242 pid 4242 turn writing", encoding="utf-8")
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([], slept)
 
     assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-2"]
@@ -109,7 +109,7 @@ def test_a_rewrite_waits_out_another_processs_turn_and_rewrites_what_it_left(
     lock = leases.lock_path(path)
     lock.write_text("fleet process 4242 pid 4242 turn writing", encoding="utf-8")
     clock = [int(time.time())]
-    slept: list[int] = []
+    slept: list[float] = []
 
     def the_other_process_finishes_its_rewrite() -> None:
         _write(path, _lease("run-6"), _lease("run-7"))
@@ -122,7 +122,7 @@ def test_a_rewrite_waits_out_another_processs_turn_and_rewrites_what_it_left(
         leases.release(path, run_id="run-6", now_unix=_NOW)
 
     assert [lease["run_id"] for lease in leases.read_leases(path)] == ["run-7"]
-    assert slept == [leases.LEASE_TURN["poll_seconds"]]
+    assert slept == [file_turn.FIRST_LOOK_SECONDS]
     assert (
         f"fleet process {os.getpid()} took its lease turn after waiting 1 s for another "
         "process rewriting the lease file"
@@ -153,7 +153,7 @@ def test_a_rewrite_reads_and_writes_in_one_turn_without_waiting_on_itself(
     one turn: a turn that waited on its own lock would sleep here."""
     path = tmp_path / "leases.json"
     _write(path, _lease("run-4"), _lease("run-5"))
-    slept: list[int] = []
+    slept: list[float] = []
     _test_hooks.sleep = _sleeping([], slept)
 
     said = leases.release_if_held(path, run_id="run-4", now_unix=_NOW)

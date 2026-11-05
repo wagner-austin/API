@@ -330,10 +330,12 @@ def launch_steps(
     Returns:
         One result per call.
     """
-    fetched = [ok("")] if commit_present else [failed(128, "missing"), ok("")]
+    fetched = [ok("")] if commit_present else [failed(1, ""), failed(128, "missing"), ok("")]
     return [
         ok(""),  # git init --bare (the mirror is new)
-        *fetched,  # git cat-file -e: present; or absent, then git fetch
+        # git merge-base --is-ancestor: the fetched ref reaches it; or not,
+        # then inside the turn git cat-file -e finds it absent, then git fetch
+        *fetched,
         *commit_stage_replies(digest),
         *registry_replies(registry),
         ok(""),  # launch: send the build script

@@ -119,16 +119,17 @@ class TestRequireSourceAndPrepare:
     def test_prepare_initialises_probes_and_fetches_in_that_order(
         self, tmp_path: pathlib.Path
     ) -> None:
-        runner = FakeRun([ok(""), failed(128, "missing"), ok("")])
+        runner = FakeRun([ok(""), failed(1, ""), failed(128, "missing"), ok("")])
         _test_hooks.run = runner
 
         mirror = export.prepare_mirror(tmp_path, remote=REMOTE, sha=SHA)
 
         assert mirror == tmp_path / "wagner-austin-MCPs.git"
         assert runner.calls[0][:2] == ("git", "init")
-        assert runner.calls[1][3] == "cat-file"
-        assert runner.calls[2][3] == "fetch"
-        assert len(runner.calls) == 3
+        assert runner.calls[1][3] == "merge-base"
+        assert runner.calls[2][3] == "cat-file"
+        assert runner.calls[3][3] == "fetch"
+        assert len(runner.calls) == 4
 
     def test_a_second_package_of_the_remote_reuses_the_mirror_and_its_commit(
         self, tmp_path: pathlib.Path
@@ -144,7 +145,15 @@ class TestRequireSourceAndPrepare:
 
         assert mirror == tmp_path / "wagner-austin-MCPs.git"
         assert runner.calls == [
-            ("git", "-C", str(mirror), "cat-file", "-e", f"{SHA}^{{commit}}"),
+            (
+                "git",
+                "-C",
+                str(mirror),
+                "merge-base",
+                "--is-ancestor",
+                SHA,
+                mirror_fetch.FETCHED_REF,
+            ),
         ]
 
 

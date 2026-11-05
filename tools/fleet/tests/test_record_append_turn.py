@@ -24,7 +24,7 @@ from platform_core.json_utils import InvalidJsonError, load_json_str
 from fleet.contracts.feed import decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.contracts.retire_record import RetireRecord, RetireState
-from fleet.core import _test_hooks, records
+from fleet.core import _test_hooks, file_turn, records
 
 _NOW = 1_791_971_310
 
@@ -133,9 +133,9 @@ def test_an_append_waits_out_another_process_appending_then_follows_its_whole_li
     path = tmp_path / "record.jsonl"
     lock = records.append_lock_path(path)
     lock.write_text("fleet process 4242 pid 4242 turn other", encoding="utf-8")
-    slept: list[int] = []
+    slept: list[float] = []
 
-    def sleep(seconds: int) -> None:
+    def sleep(seconds: float) -> None:
         # The other process ends its turn, and the next append is made in a
         # turn of its own while this one is still waiting to look again.
         slept.append(seconds)
@@ -149,7 +149,7 @@ def test_an_append_waits_out_another_process_appending_then_follows_its_whole_li
     APPENDERS[kind](path, "run-mine")
 
     assert {"slept": slept, "rows": _run_ids(path), "lock left": lock.exists()} == {
-        "slept": [records.APPEND_TURN["poll_seconds"]],
+        "slept": [file_turn.FIRST_LOOK_SECONDS],
         "rows": ["run-other", "run-mine"],
         "lock left": False,
     }
@@ -163,9 +163,9 @@ def test_a_lock_left_by_a_process_that_died_mid_append_is_taken_away(
     lock.write_text("fleet process 4242 pid 4242 turn dead", encoding="utf-8")
     created = int(os.stat(lock).st_mtime)
     _test_hooks.now = lambda: created + records.APPEND_TURN["stale_seconds"]
-    slept: list[int] = []
+    slept: list[float] = []
 
-    def sleep(seconds: int) -> None:
+    def sleep(seconds: float) -> None:
         slept.append(seconds)
 
     _test_hooks.sleep = sleep

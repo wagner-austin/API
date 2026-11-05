@@ -137,7 +137,7 @@ class TestTheTickRefusesBeforeAnyLease:
             [
                 *handed_a_job(config_path),
                 ok(""),  # git init --bare
-                ok(""),  # cat-file -e <sha>^{commit}: held, no fetch
+                ok(""),  # merge-base: the fetched ref reaches the sha, no fetch
                 failed(128, "fatal: path 'scripts/testdb-setup.sh' does not exist"),
             ]
         )

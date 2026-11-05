@@ -20,6 +20,7 @@ the case that never breaks.
 
 from __future__ import annotations
 
+import math
 import pathlib
 from collections.abc import Generator, Sequence
 
@@ -157,7 +158,7 @@ class FakeSleep:
     """
 
     clock: FakeClock
-    slept: list[int]
+    slept: list[float]
 
     def __init__(self, clock: FakeClock) -> None:
         """Bind the clock.
@@ -168,14 +169,15 @@ class FakeSleep:
         self.clock = clock
         self.slept = []
 
-    def __call__(self, seconds: int) -> None:
-        """Advance the clock by the wait.
+    def __call__(self, seconds: float) -> None:
+        """Advance the clock by the wait, in the whole seconds it counts.
 
         Args:
-            seconds: How long the caller asked to wait.
+            seconds: How long the caller asked to wait; a fraction of a
+                second, a file turn's first looks, moves the clock one.
         """
         self.slept.append(seconds)
-        self.clock.seconds += seconds
+        self.clock.seconds += math.ceil(seconds)
 
 
 class FakeTempRoot:
@@ -338,9 +340,7 @@ def registry_replies(registry: pathlib.Path) -> list[_test_hooks.CommandResult]:
         One result per call.
     """
     return [
-        ok(""),  # registry: send the archive directory's mkdir script
-        ok(""),  # registry: run it
-        ok(""),  # registry: send the registry directory's mkdir script
+        ok(""),  # registry: send the mkdir script of both its directories
         ok(""),  # registry: run it
         ok(""),  # registry: scp the archive
         ok(""),  # registry: send the digest script

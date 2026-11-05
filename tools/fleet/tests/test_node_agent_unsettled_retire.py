@@ -116,7 +116,7 @@ class TestARunRefusedWhileStaging:
             [
                 *handed_a_job(sourced_config),
                 ok(""),  # git init --bare (the mirror is new)
-                ok(""),  # git cat-file -e: the sha is present
+                ok(""),  # git merge-base: the fetched ref reaches the sha
                 ok(""),  # stage: send the prepare script
                 ok(""),  # stage: run it, so the run's directory is on the node
                 ok(""),  # the commit: git update-ref of the run's bundle ref

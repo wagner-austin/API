@@ -63,7 +63,7 @@ def up_to_the_payload(config_path: pathlib.Path) -> list[_test_hooks.CommandResu
     return [
         *handed_a_job(config_path),  # the probe and the two reads of the ref
         ok(""),  # git init --bare (the mirror is new)
-        ok(""),  # git cat-file -e: the sha is present
+        ok(""),  # git merge-base: the fetched ref reaches the sha
         ok(""),  # stage: send the prepare script
         ok(""),  # stage: run it; the node's mirror does not exist yet
         ok(""),  # the commit: git update-ref of the run's bundle ref
@@ -89,7 +89,7 @@ def up_to_the_lease(config_path: pathlib.Path) -> list[_test_hooks.CommandResult
     return [
         *handed_a_job(config_path),  # the probe and the two reads of the ref
         ok(""),  # git init --bare (the mirror is new)
-        ok(""),  # git cat-file -e: the sha is present
+        ok(""),  # git merge-base: the fetched ref reaches the sha
     ]
 
 

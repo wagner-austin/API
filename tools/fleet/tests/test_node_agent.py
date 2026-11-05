@@ -147,9 +147,10 @@ class TestClaiming:
             "git",
             "-C",
             mirror,
-            "cat-file",
-            "-e",
-            f"{DEFAULT_SHA}^{{commit}}",
+            "merge-base",
+            "--is-ancestor",
+            DEFAULT_SHA,
+            "refs/fleet/fetched",
         )
         assert [call[0] for call in runner.calls[probes + 2 : probes + 4]] == ["ssh", "ssh"]
         ref = f"refs/fleet/bundle/{DEMO_RUN_ID}"
@@ -206,7 +207,8 @@ class TestClaiming:
         runner = _claim_and_start(sourced_config, commit_present=False)
 
         mirror = _mirror(sourced_config)
-        assert runner.calls[len(PROBED) + 4 + 2] == (
+        # init, the probe outside the turn, the probe inside it, the fetch
+        assert runner.calls[len(PROBED) + 4 + 3] == (
             "git",
             "-C",
             mirror,
@@ -382,6 +384,7 @@ class TestRefusals:
             [
                 *handed_a_job(sourced_config),
                 ok(""),  # git init --bare
+                failed(1, ""),  # merge-base --is-ancestor: the fetched ref does not reach it
                 failed(128, "missing"),  # cat-file: absent
                 failed(128, f"fatal: couldn't find remote ref {DEFAULT_SHA}"),  # fetch
             ]

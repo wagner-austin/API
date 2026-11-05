@@ -54,6 +54,14 @@ KEY_REFUSED = (
 #: Every spelling of a refused credential the cases below drive.
 CREDENTIAL_REFUSALS = (NO_CREDENTIAL, TOKEN_REFUSED, KEY_REFUSED)
 
+#: The two answers a commit no fetch has brought draws before its fetch: the
+#: fetched ref does not reach it, asked outside the turn, and the mirror does
+#: not hold it, asked inside (MCPs board task 5280a25d).
+UNFETCHED = (failed(1, ""), failed(128, "missing"))
+
+#: The probe outside the turn, as git is asked it of the mirror ``tmp_path``.
+OUTSIDE = ("merge-base", "--is-ancestor", SHA, "refs/fleet/fetched")
+
 
 class _Hanging(FakeRun):
     """A remote that never answers: each fetch is ended at its deadline."""
@@ -64,7 +72,7 @@ class _Hanging(FakeRun):
         Args:
             clock: The pinned clock each timed-out fetch moves by its deadline.
         """
-        super().__init__([failed(128, "missing")])
+        super().__init__(list(UNFETCHED))
         self._clock = clock
 
     def __call__(
@@ -103,25 +111,45 @@ class _Hanging(FakeRun):
 
 
 class TestFetchCommit:
-    def test_a_commit_already_held_costs_no_fetch(self, tmp_path: pathlib.Path) -> None:
+    def test_a_commit_a_fetch_brought_costs_no_turn_and_no_fetch(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """One probe, outside the turn: the lock is never made, so no other
+        export's probe or fetch is waited for (MCPs board task 5280a25d)."""
         runner = FakeRun([ok("")])
         _test_hooks.run = runner
 
         mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
-        assert runner.calls == [("git", "-C", str(tmp_path), "cat-file", "-e", f"{SHA}^{{commit}}")]
+        assert runner.calls == [("git", "-C", str(tmp_path), *OUTSIDE)]
+        assert not mirror_fetch.turn_lock(tmp_path).exists()
+
+    def test_a_commit_the_fetched_ref_does_not_reach_is_asked_again_inside_the_turn(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A commit held off the ref's history, or found while another
+        export's fetch was writing it, is judged inside the turn."""
+        runner = FakeRun([failed(1, ""), ok("")])
+        _test_hooks.run = runner
+
+        mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
+
+        assert runner.calls == [
+            ("git", "-C", str(tmp_path), *OUTSIDE),
+            ("git", "-C", str(tmp_path), "cat-file", "-e", f"{SHA}^{{commit}}"),
+        ]
 
     def test_a_missing_commit_is_fetched_by_sha_into_the_mirror_s_ref_without_tags(
         self, tmp_path: pathlib.Path
     ) -> None:
         """Into a ref, so the next fetch offers its history and receives only
         what is new (MCPs board task 86f70457)."""
-        runner = FakeRun([failed(128, "missing"), ok("")])
+        runner = FakeRun([*UNFETCHED, ok("")])
         _test_hooks.run = runner
 
         mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
-        assert runner.calls[1] == (
+        assert runner.calls[2] == (
             "git",
             "-C",
             str(tmp_path),
@@ -134,6 +162,7 @@ class TestFetchCommit:
         )
         assert runner.timeouts == [
             mirror_fetch.INIT_TIMEOUT_SECONDS,
+            mirror_fetch.INIT_TIMEOUT_SECONDS,
             mirror_fetch.FETCH_TIMEOUT_SECONDS,
         ]
 
@@ -141,7 +170,7 @@ class TestFetchCommit:
     def test_every_spelling_of_an_unserved_object_is_sha_not_on_remote(
         self, tmp_path: pathlib.Path, marker: str
     ) -> None:
-        _test_hooks.run = FakeRun([failed(128, "missing"), failed(128, f"fatal: {marker}: {SHA}")])
+        _test_hooks.run = FakeRun([*UNFETCHED, failed(128, f"fatal: {marker}: {SHA}")])
 
         with pytest.raises(AppError) as raised:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
@@ -156,13 +185,13 @@ class TestALostFetch:
         self, tmp_path: pathlib.Path
     ) -> None:
         clock = pin_clock(DEMO_NOW)
-        runner = FakeRun([failed(128, "missing"), failed(128, TLS_LOST), ok("")])
+        runner = FakeRun([*UNFETCHED, failed(128, TLS_LOST), ok("")])
         _test_hooks.run = runner
 
         mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
-        assert [call[3] for call in runner.calls] == ["cat-file", "fetch", "fetch"]
-        assert runner.timeouts[1:] == [mirror_fetch.FETCH_TIMEOUT_SECONDS] * 2
+        assert [call[3] for call in runner.calls] == ["merge-base", "cat-file", "fetch", "fetch"]
+        assert runner.timeouts[2:] == [mirror_fetch.FETCH_TIMEOUT_SECONDS] * 2
         assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSE_SECONDS
 
     def test_one_lost_every_time_is_refused_naming_each_attempt(
@@ -170,7 +199,7 @@ class TestALostFetch:
     ) -> None:
         clock = pin_clock(DEMO_NOW)
         _test_hooks.run = FakeRun(
-            [failed(128, "missing"), failed(128, TLS_LOST), failed(128, RESET), failed(1, "  ")]
+            [*UNFETCHED, failed(128, TLS_LOST), failed(128, RESET), failed(1, "  ")]
         )
 
         with pytest.raises(AppError) as raised:
@@ -197,7 +226,7 @@ class TestALostFetch:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
         left = mirror_fetch.FETCH_BUDGET_SECONDS - 600 - mirror_fetch.FETCH_PAUSE_SECONDS
-        assert hanging.timeouts[1:] == [600, left]
+        assert hanging.timeouts[2:] == [600, left]
         assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_BUDGET_SECONDS
         assert raised.value.message.endswith(
             f"no attempt of 2 within 900 s was done; attempt 1: timed out after 600 s; "
@@ -208,16 +237,14 @@ class TestALostFetch:
         self, tmp_path: pathlib.Path
     ) -> None:
         pin_clock(DEMO_NOW)
-        runner = FakeRun(
-            [failed(128, "missing"), failed(128, RESET), failed(128, f"fatal: not our ref {SHA}")]
-        )
+        runner = FakeRun([*UNFETCHED, failed(128, RESET), failed(128, f"fatal: not our ref {SHA}")])
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
         assert raised.value.code is FleetErrorCode.SHA_NOT_ON_REMOTE
-        assert len(runner.calls) == 3
+        assert len(runner.calls) == 4
 
 
 class TestARefusedCredential:
@@ -230,7 +257,7 @@ class TestARefusedCredential:
         self, tmp_path: pathlib.Path, stderr: str
     ) -> None:
         clock = pin_clock(DEMO_NOW)
-        runner = FakeRun([failed(128, "missing"), failed(128, stderr)])
+        runner = FakeRun([*UNFETCHED, failed(128, stderr)])
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
@@ -243,7 +270,7 @@ class TestARefusedCredential:
             f"until that credential is renewed on the control host, and sending the "
             f"fetch again would send the same one. git said: {stderr.strip()[:300]}"
         )
-        assert [call[3] for call in runner.calls] == ["cat-file", "fetch"]
+        assert [call[3] for call in runner.calls] == ["merge-base", "cat-file", "fetch"]
         assert clock.seconds == DEMO_NOW
 
     @pytest.mark.parametrize("stderr", CREDENTIAL_REFUSALS)
@@ -271,14 +298,14 @@ class TestARefusedCredential:
         """A login that lapses between two attempts ends the fetch at the
         attempt that meets it, whatever the attempts before it said."""
         clock = pin_clock(DEMO_NOW)
-        runner = FakeRun([failed(128, "missing"), failed(128, RESET), failed(128, NO_CREDENTIAL)])
+        runner = FakeRun([*UNFETCHED, failed(128, RESET), failed(128, NO_CREDENTIAL)])
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
         assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
-        assert len(runner.calls) == 3
+        assert len(runner.calls) == 4
         assert clock.seconds == DEMO_NOW + mirror_fetch.FETCH_PAUSE_SECONDS
 
     def test_every_marker_is_one_git_was_measured_printing(self) -> None:
@@ -297,14 +324,14 @@ class TestARefusedCredential:
         credential."""
         pin_clock(DEMO_NOW)
         unnamed = "ERROR: Repository not found.\nfatal: Could not read from remote repository."
-        runner = FakeRun([failed(128, "missing")] + [failed(128, unnamed)] * 3)
+        runner = FakeRun([*UNFETCHED] + [failed(128, unnamed)] * 3)
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
             mirror_fetch.fetch_commit(tmp_path, REMOTE, SHA)
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
-        assert len(runner.calls) == 1 + mirror_fetch.FETCH_ATTEMPTS
+        assert len(runner.calls) == len(UNFETCHED) + mirror_fetch.FETCH_ATTEMPTS
 
 
 class TestFetchRef:

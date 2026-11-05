@@ -9,6 +9,7 @@ between a process's create and its look.
 
 from __future__ import annotations
 
+import math
 import os
 import pathlib
 import threading
@@ -20,7 +21,7 @@ from platform_core.json_utils import JSONTypeError, dump_json_str, load_json_str
 
 from fleet.contracts.host_claim import HostClaim, decode_host_claim, encode_host_claim
 from fleet.contracts.node import LiveLoad
-from fleet.core import _test_hooks, host_claims
+from fleet.core import _test_hooks, file_turn, host_claims
 from tests._thread_fakes import await_event
 
 #: The node every case claims on.
@@ -67,7 +68,7 @@ class FakeClock:
     """
 
     at: int
-    slept: list[int]
+    slept: list[float]
 
     def __init__(self, *, at: int, on_sleep: list[Callable[[], None]] | None = None) -> None:
         """Start the clock.
@@ -89,14 +90,14 @@ class FakeClock:
         """
         return self.at
 
-    def sleep(self, seconds: int) -> None:
-        """Move the clock and run the next step.
+    def sleep(self, seconds: float) -> None:
+        """Move the clock, in the whole seconds it counts, and run the next step.
 
         Args:
             seconds: How long the caller waits.
         """
         self.slept.append(seconds)
-        self.at += seconds
+        self.at += math.ceil(seconds)
         if self._on_sleep:
             self._on_sleep.pop(0)()
 
@@ -179,7 +180,7 @@ class TestTheTurn:
         other.join()
 
         assert order == [ORDINARY, SECOND]
-        assert clock.slept == [host_claims.TURN_POLL_SECONDS]
+        assert clock.slept == [file_turn.FIRST_LOOK_SECONDS]
         assert (
             f"{SECOND} took its claim turn after waiting 1 s for another process claiming for "
             "its host"
@@ -265,7 +266,7 @@ class TestTheTurn:
             held = lock.read_text(encoding="utf-8")
 
         assert held.startswith(f"{ORDINARY} pid ")
-        assert clock.slept == [host_claims.TURN_POLL_SECONDS]
+        assert clock.slept == [file_turn.FIRST_LOOK_SECONDS]
 
 
 class TestTheClaims:
