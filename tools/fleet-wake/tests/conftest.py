@@ -157,6 +157,9 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # The bridge reads the network as well as loopback, so its check
             # runs in the host's namespace.
             loopback_only=False,
+            # ONE CORE A WORKER, SPELLED OUT: a test suite's worker is a
+            # process on a core (MCPs board task 51e3eac5).
+            worker_cores=1,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
