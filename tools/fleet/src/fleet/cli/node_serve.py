@@ -31,7 +31,10 @@ and only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.clos
 and no claimed job is still being launched (:mod:`fleet.cli.node_launch`),
 once it has served the workspace's ``node_serve_seconds`` or
 ``refs/fleet/rolled`` has moved off the commit it runs, so a roll takes
-effect at the next boundary as it did before. The scheduler's fires that
+effect at the next boundary as it did before. From the moment a read finds
+the ref moved it claims nothing more (:mod:`fleet.cli.node_roll`, MCPs
+board task 1fd01f09), so nothing queued after a roll runs on the older
+registry while it waits for that boundary. The scheduler's fires that
 arrive while it serves are skipped by IgnoreNew, as intended, and the
 next fire after the handover starts the next serve: the node is unwatched
 only for those seconds and the next start's few, once a serve rather than
@@ -82,7 +85,6 @@ from platform_core.logging import get_logger
 from fleet.cli.node_serve_claim import Claiming
 from fleet.cli.node_watch import THREAD_PREFIX, RunWatch
 from fleet.core import _test_hooks
-from fleet.core.rolled import ROLLED_REF
 
 _log = get_logger(__name__)
 
@@ -131,8 +133,12 @@ class ServeSteps(TypedDict):
         queued: The ids of the queued jobs naming this node or no node, or
             None when the queue did not answer
             (:func:`fleet.cli.node_serve_claim.queued_here`).
-        rolled: What ``refs/fleet/rolled`` names now
-            (:func:`fleet.core.rolled.rolled_state`).
+        moved: Reads ``refs/fleet/rolled`` and says why the serve claims
+            nothing more once it names another commit than the one the
+            serve runs, or None (:meth:`fleet.cli.node_roll.RollGuard.moved`).
+        latched: The same answer from the reads already made, reading
+            nothing (:meth:`fleet.cli.node_roll.RollGuard.latched`), so a
+            claim pass that found the ref moved stops the polling at once.
         launching: How many claimed jobs are still being launched
             (:mod:`fleet.cli.node_launch`); a serve does not hand over while
             any is, since its process would outlive the fire boundary
@@ -148,7 +154,8 @@ class ServeSteps(TypedDict):
     collect: Callable[[], None]
     fill: Callable[[], None]
     queued: Callable[[], frozenset[str] | None]
-    rolled: Callable[[], str]
+    moved: Callable[[], str | None]
+    latched: Callable[[], str | None]
     launching: Callable[[], int]
     start_unreported: Callable[[], bool]
 
@@ -199,39 +206,38 @@ def next_fire(now: int) -> int:
     return (now // TICK_SECONDS + 1) * TICK_SECONDS
 
 
-def handover_policy(*, started: int, serve_seconds: int, rolled: Callable[[], str]) -> Handover:
+def handover_policy(
+    *, started: int, serve_seconds: int, moved: Callable[[], str | None]
+) -> Handover:
     """Decide, at a serve's start, how it will decide to hand over.
 
     A serve of ZERO seconds is due from its start: it runs the opening
     passes, claims nothing after them and hands over at the first boundary,
-    the shape of one scheduled start, so it never reads the roll, since
-    nothing it read could change when it hands over. Any longer serve reads
-    the roll now and hands over at the first boundary at which it has served
-    its time or the roll has moved, so a roll takes effect at the next
-    boundary, as it did when every start was a new process. A roll made in
-    the seconds between the launcher's extraction and this read keeps the
-    serve on the older code until its time is up.
+    the shape of one scheduled start, so the boundary never reads the roll;
+    its claim pass still does (:mod:`fleet.cli.node_roll`). Any longer serve
+    hands over at the first boundary at which it has served its time or the
+    ref names another commit than the one it runs, so a roll takes effect at
+    the next boundary, as it did when every start was a new process. The
+    comparison is with the commit the serve was extracted from, so a roll
+    made between the launcher's extraction and the serve's start hands it
+    over at its first boundary too (MCPs board task 1fd01f09).
 
     Args:
         started: When the serve started.
         serve_seconds: The workspace's ``node_serve_seconds``.
-        rolled: Reads what ``refs/fleet/rolled`` names now.
+        moved: Says why the ref no longer names the serve's commit, or None.
 
     Returns:
         The policy.
     """
     if serve_seconds == 0:
         return Handover(at_start="its node_serve_seconds is 0", due=lambda now: None)
-    at_start = rolled()
 
     def due(now: int) -> str | None:
         served = now - started
         if served >= serve_seconds:
             return f"served {served} s of its {serve_seconds} s"
-        current = rolled()
-        if current == at_start:
-            return None
-        return f"{ROLLED_REF} moved from {at_start} to {current}"
+        return moved()
 
     return Handover(at_start=None, due=due)
 
@@ -273,7 +279,7 @@ def serve_loop(
             ``QUEUE_UNANSWERED``. Not caught: the next start meets the same
             runs.
     """
-    policy = handover_policy(started=started, serve_seconds=serve_seconds, rolled=steps["rolled"])
+    policy = handover_policy(started=started, serve_seconds=serve_seconds, moved=steps["moved"])
     fire = next_fire(started)
     claiming = Claiming(
         alias=alias,
@@ -285,7 +291,7 @@ def serve_loop(
     )
     claiming.passes(fill=True)
     fires = 0
-    reason = policy["at_start"]
+    reason = policy["at_start"] or steps["latched"]()
     while True:
         now = _test_hooks.now()
         if watching.done():
@@ -302,6 +308,7 @@ def serve_loop(
             _test_hooks.sleep(min(poll_seconds, handover - now))
             if reason is None:
                 claiming.poll()
+                reason = steps["latched"]()
             continue
         if reason is None:
             reason = policy["due"](now)
@@ -322,6 +329,8 @@ def serve_loop(
         fire = next_fire(max(now, fire))
         fires += 1
         claiming.passes(fill=reason is None)
+        if reason is None:
+            reason = steps["latched"]()
 
 
 def serve_on(watch: Watched, watching: Future[None], *, poll_seconds: int) -> int:

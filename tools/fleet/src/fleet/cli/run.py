@@ -57,6 +57,8 @@ from fleet.core import (
     probe,
     recipe,
     records,
+    rolled,
+    run_registry,
 )
 
 _log = get_logger(__name__)
@@ -214,6 +216,21 @@ def _probe(loaded: _config.LoadedWorkspace, *, name: str, node: NodeConfig) -> N
     return probe.probe_node(node, live=live, writer=PROBE_WRITER)
 
 
+def registry_commit(registry: pathlib.Path) -> str:
+    """What a run of this command records as its registry's commit.
+
+    Args:
+        registry: The registry directory this command loaded.
+
+    Returns:
+        The rolled commit it was extracted from, or
+        :data:`fleet.core.run_registry.WORKING_TREE` for a checkout's,
+        which no commit names (MCPs board task 1fd01f09).
+    """
+    extracted = rolled.extraction_commit(registry)
+    return run_registry.WORKING_TREE if extracted is None else extracted
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Dispatch one project's build and print the run id.
 
@@ -266,6 +283,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         companions=(),
         recipe=recipe.working_tree_recipe(project, plan),
         registry=loaded.registry,
+        registry_commit=registry_commit(loaded.registry),
         scratch=loaded.archives,
     )
 

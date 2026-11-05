@@ -145,6 +145,7 @@ def launch_claimed(
     node: NodeConfig,
     prepared: Prepared,
     stage_tree: dispatch.TreeStager,
+    registry_commit: str,
 ) -> Launched:
     """Take the project's lease on this node and launch the job under it.
 
@@ -171,6 +172,7 @@ def launch_claimed(
         node: Its declaration.
         prepared: What :func:`fleet.cli.node_prepare.prepare` resolved for the job.
         stage_tree: Stages the job's commit once the lease is held.
+        registry_commit: The rolled commit ``loaded`` was extracted from.
 
     Returns:
         The running ledger row, or why nothing was launched.
@@ -205,6 +207,7 @@ def launch_claimed(
                 install=prepared["source"]["install"],
             ),
             registry=loaded.registry,
+            registry_commit=registry_commit,
             scratch=loaded.archives,
         )
     except AppError as refusal:
@@ -234,6 +237,7 @@ class Launcher:
         alias: str,
         node: NodeConfig,
         agent: str,
+        registry_commit: str,
         hold: Callable[[frozenset[str]], None],
     ) -> None:
         """Bind the launcher to its node and open its pool.
@@ -245,6 +249,9 @@ class Launcher:
             alias: This node's workspace name.
             node: Its declaration.
             agent: This runner's label.
+            registry_commit: The rolled commit ``loaded`` was extracted
+                from, which each launch records beside its run
+                (:mod:`fleet.core.run_registry`).
             hold: Given each run once its start is reported, so the serve's
                 watch (:mod:`fleet.cli.node_watch`) reads it.
         """
@@ -254,6 +261,7 @@ class Launcher:
         self._alias = alias
         self._node = node
         self._agent = agent
+        self._registry_commit = registry_commit
         self._hold = hold
         self._executor = _test_hooks.executor(workers=LAUNCH_WORKERS, name=f"fleet-launch-{alias}")
         self._changed = threading.Lock()
@@ -480,6 +488,7 @@ class Launcher:
                 node=self._node,
                 prepared=prepared,
                 stage_tree=stage_tree,
+                registry_commit=self._registry_commit,
             )
         finally:
             shutil.rmtree(prepared["bundles"])

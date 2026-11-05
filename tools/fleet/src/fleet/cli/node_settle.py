@@ -65,6 +65,7 @@ from fleet.core import (
     queue,
     remote,
     retire_owed,
+    run_registry,
     verdict,
 )
 
@@ -205,7 +206,8 @@ def read_tail(node: NodeConfig, *, run_id: str) -> remote.Answered:
         run_id: The run.
 
     Returns:
-        The last :data:`fleet.core.verdict.LOG_TAIL_LINES` lines, or why the
+        The last :data:`fleet.core.verdict.LOG_TAIL_LINES` lines and the
+        run's registry line (:mod:`fleet.core.run_registry`), or why the
         node did not answer.
 
     Raises:
@@ -216,7 +218,7 @@ def read_tail(node: NodeConfig, *, run_id: str) -> remote.Answered:
     return remote.read_script(
         node["host"],
         dialect.script_path(target, names.LOG_TAIL_STEM),
-        dialect.log_tail_script(target, verdict.LOG_TAIL_LINES),
+        run_registry.log_tail_script(target, verdict.LOG_TAIL_LINES),
     )
 
 

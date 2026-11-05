@@ -7,8 +7,9 @@ Usage:
 A run without ``--announce`` SERVES the node until it hands over before a
 fire boundary (:mod:`fleet.cli.node_serve`, MCPs board task 8993c306),
 reading ``refs/fleet/rolled`` from the git checkout its records directory
-is in when it starts and at each boundary, so it hands over once a roll
-moves the ref (:func:`fleet.core.rolled.rolled_state`).
+is in around every claim and at each boundary, and comparing it with the
+commit its registry was extracted from: once a roll moves the ref it claims
+nothing more and hands over (:mod:`fleet.cli.node_roll`).
 
 ONE RUNNER PER ENABLED NODE, ALL OF THEM ON THE HUB (MCPs board task
 fd5cabfa, A1 and A5). Until this command the queue had one runner, the hub's
@@ -93,13 +94,14 @@ from platform_core.logging import LogFormat, LogLevel, get_logger, setup_logging
 from platform_core.mcp_client import McpCredentials
 from platform_core.report_line import emit_error_line, emit_line
 
-from fleet.cli import _config, node_models, node_serve, node_serve_claim, node_watch
+from fleet.cli import _config, node_models, node_roll, node_serve, node_serve_claim, node_watch
 from fleet.cli.job_close import refuse
 from fleet.cli.node_claim import ask_queue
 from fleet.cli.node_collect import collect_pass
 from fleet.cli.node_launch import Launcher
 from fleet.cli.node_prepare import admit
 from fleet.cli.node_ready import ready_state
+from fleet.cli.node_roll import RollGuard
 from fleet.cli.node_settle import require_sha
 from fleet.contracts.node import NodeConfig
 from fleet.contracts.tags import node_tags
@@ -121,6 +123,7 @@ def claim_pass(
     alias: str,
     node: NodeConfig,
     launcher: Launcher,
+    roll: RollGuard,
 ) -> str | None:
     """Take one job for this node and hand its launch off, or report why it could not.
 
@@ -133,6 +136,9 @@ def claim_pass(
         launcher: The serve's launches, whose grants and projects the gate
             charges to the node and which the claimed job's launch joins
             (:mod:`fleet.cli.node_launch`, MCPs board task 8993c306).
+        roll: Whether ``refs/fleet/rolled`` still names the commit this
+            serve runs, read just before the queue is asked and again
+            just after it hands over a job (:mod:`fleet.cli.node_roll`).
 
     THE NODE IS ASKED BEFORE THE QUEUE IS. A runner that claimed first and
     probed second took the oldest job off the lane and refused it while a
@@ -161,10 +167,11 @@ def claim_pass(
 
     Returns:
         The job id of the job claimed and handed to its launch; None when
-        this node could take nothing, nothing in the lane matched it, or
-        the job it claimed was refused, here or by a launch that has
-        already finished, which :func:`fill_pass` reads as the end of the
-        pass.
+        this node could take nothing, the ref had moved before the queue
+        was asked, nothing in the lane matched it, the job it claimed was
+        given back because the ref had moved by then, or the job was
+        refused, here or by a launch that has already finished, which
+        :func:`fill_pass` reads as the end of the pass.
 
     Raises:
         AppError: Only from the queue calls themselves, or a launch that has
@@ -178,7 +185,7 @@ def claim_pass(
     runner = names.node_runner_label(alias)
     with host_claims.claim_turn(loaded.host_claims, alias=alias, runner=runner):
         return _claim_in_turn(
-            loaded, credentials, identity, alias=alias, node=node, launcher=launcher
+            loaded, credentials, identity, alias=alias, node=node, launcher=launcher, roll=roll
         )
 
 
@@ -190,6 +197,7 @@ def _claim_in_turn(
     alias: str,
     node: NodeConfig,
     launcher: Launcher,
+    roll: RollGuard,
 ) -> str | None:
     """The claim pass's gate and claim, run while this runner holds its host's turn.
 
@@ -204,6 +212,7 @@ def _claim_in_turn(
         alias: This node's workspace name.
         node: Its declaration.
         launcher: The serve's launches, which the claimed job's launch joins.
+        roll: Whether the ref still names the serve's commit.
 
     Returns:
         As :func:`claim_pass`.
@@ -223,8 +232,16 @@ def _claim_in_turn(
     if ready is None:
         tick_report.record_tick(credentials, gate["tick"], identity=identity)
         return None
+    moved = roll.moved()
+    if moved is not None:
+        node_roll.skip_claim(credentials, identity, gate["tick"], alias=alias, moved=moved)
+        return None
     job = ask_queue(credentials, identity, gate["tick"], ready, alias=alias)
     if job is None:
+        return None
+    moved = roll.moved()
+    if moved is not None:
+        node_roll.give_back(credentials, job, identity, alias=alias, moved=moved)
         return None
     sha = require_sha(job)
     try:
@@ -249,6 +266,7 @@ def fill_pass(
     alias: str,
     node: NodeConfig,
     launcher: Launcher,
+    roll: RollGuard,
 ) -> tuple[str, ...]:
     """Claim and launch until this node has no room or the lane nothing it fits.
 
@@ -278,6 +296,7 @@ def fill_pass(
         node: Its declaration.
         launcher: The serve's launches, which hand each run to the serve's
             watch once its start is reported.
+        roll: Whether the ref still names the serve's commit.
 
     Returns:
         The job ids this pass claimed and handed to a launch, in order.
@@ -290,7 +309,7 @@ def fill_pass(
     launched: list[str] = []
     while (
         job_id := claim_pass(
-            loaded, credentials, identity, alias=alias, node=node, launcher=launcher
+            loaded, credentials, identity, alias=alias, node=node, launcher=launcher, roll=roll
         )
     ) is not None:
         launched.append(job_id)
@@ -311,7 +330,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     Raises:
         ValueError: When a flag is unknown, repeated, missing its value, or
-            a required one is absent.
+            a required one is absent, or when a serve's ``--config`` is not
+            a rolled extraction's registry
+            (:func:`fleet.core.rolled.extraction_commit`): a serve compares
+            the ref with the commit it runs, and a checkout's registry is
+            no commit's.
         AppError: When the queue or the board cannot be reached or answered
             a shape this runner cannot read, when the node is not declared,
             or when this machine's records and the fleet disagree about a
@@ -342,6 +365,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             ),
         )
         return 0
+    runs = rolled.extraction_commit(loaded.registry)
+    if runs is None:
+        raise ValueError(
+            f"{_config.CONFIG_FLAG} {loaded.registry} is not a rolled extraction's registry: a "
+            f"serve claims only while {rolled.ROLLED_REF} names the commit it runs, so it is "
+            "started by fleet.cli.rolled, never from a checkout"
+        )
     credentials = queue.load_credentials()
 
     settle = functools.partial(
@@ -349,8 +379,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
     launcher = Launcher(
-        loaded, credentials, identity, alias=alias, node=node, agent=agent, hold=watch.hold
+        loaded,
+        credentials,
+        identity,
+        alias=alias,
+        node=node,
+        agent=agent,
+        registry_commit=runs,
+        hold=watch.hold,
     )
+    roll = RollGuard(runs=runs, rolled=lambda: rolled.rolled_state(loaded.directory))
 
     def collect() -> None:
         collect_pass(
@@ -367,13 +405,12 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     def fill() -> None:
         node_models.models_pass(credentials, identity, alias=alias, node=node)
-        fill_pass(loaded, credentials, identity, alias=alias, node=node, launcher=launcher)
+        fill_pass(
+            loaded, credentials, identity, alias=alias, node=node, launcher=launcher, roll=roll
+        )
 
     def queued() -> frozenset[str] | None:
         return node_serve_claim.queued_here(credentials, alias=alias)
-
-    def rolled_now() -> str:
-        return rolled.rolled_state(loaded.directory)
 
     def launching() -> int:
         return launcher.launching()["load"]["runs"]
@@ -389,7 +426,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 collect=collect,
                 fill=fill,
                 queued=queued,
-                rolled=rolled_now,
+                moved=roll.moved,
+                latched=roll.latched,
                 launching=launching,
                 start_unreported=launcher.take_unreported,
             ),
