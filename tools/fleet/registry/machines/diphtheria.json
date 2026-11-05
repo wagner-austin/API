@@ -27,11 +27,6 @@
     "units": [
       {
         "kind": "systemd",
-        "unit": "containerd.service",
-        "purpose": "the container runtime under docker"
-      },
-      {
-        "kind": "systemd",
         "unit": "docker.service",
         "purpose": "device forwarding containers; the Corvis stack and postgres run on demure"
       },
