@@ -16,6 +16,8 @@ the form the post's prompts show.
 
 from __future__ import annotations
 
+import math
+
 import torch
 from platform_core.json_utils import (
     JSONObject,
@@ -88,7 +90,7 @@ class ControlPolicy:
             ("hidden_mid", (hidden, hidden)),
             ("action_out", (hidden, 3)),
         ):
-            bound = 1.0 / float(fan_in) ** 0.5
+            bound = 1.0 / math.sqrt(float(fan_in))
             self.parameters_by_name[f"{layer}.weight"] = _uniform((fan_out, fan_in), bound)
             self.parameters_by_name[f"{layer}.bias"] = _uniform((fan_out,), bound)
 
