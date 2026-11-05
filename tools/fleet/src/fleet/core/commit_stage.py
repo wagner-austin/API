@@ -128,7 +128,8 @@ class NodeMirror(TypedDict):
     Attributes:
         tip: :data:`NODE_TIP_REF`'s commit, or None for a mirror that has
             never been fetched into or does not exist.
-        held: Whether the mirror already holds the commit being staged.
+        held: Whether the mirror's :data:`NODE_TIP_REF` already reaches the
+            commit being staged (:func:`mirror_probe_lines`).
     """
 
     tip: str | None
@@ -158,18 +159,41 @@ def prepare_script(*, target: str, staged: str, mirror: str, sha: str) -> str:
         sha: The commit.
 
     Returns:
-        The script's text. It prints :data:`NODE_TIP_REF`'s commit when the
-        mirror has one and :data:`HELD_ANSWER` when it holds ``sha``, and
+        The script's text. It prints what :func:`mirror_probe_lines` prints
+        once both directories exist.
+    """
+    return (
+        f"{dialect.PROLOGUE}mkdir -p {shlex.quote(target)} {shlex.quote(staged)}\n"
+        f"{mirror_probe_lines(mirror=mirror, sha=sha)}"
+    )
+
+
+def mirror_probe_lines(*, mirror: str, sha: str) -> str:
+    """The lines of a node script that say what the node's mirror holds.
+
+    HELD MEANS :data:`NODE_TIP_REF` REACHES THE COMMIT (MCPs board task
+    5280a25d), not that the object is there: two runs staging one remote on
+    a node at once fetch into one mirror, and a small fetch writes its
+    objects loose, the commit before its tree, while git moves the ref only
+    once every object is written. A commit off the ref's history is sent
+    again, which costs a bundle and never a tree missing its blobs.
+
+    Args:
+        mirror: The node's mirror of the remote.
+        sha: The commit.
+
+    Returns:
+        The lines. They print :data:`NODE_TIP_REF`'s commit when the mirror
+        has one and :data:`HELD_ANSWER` when that ref reaches ``sha``, and
         nothing about a mirror that does not exist yet.
     """
     quoted = shlex.quote(mirror)
     tip = shlex.quote(f"{NODE_TIP_REF}^{{commit}}")
-    commit = shlex.quote(f"{sha}^{{commit}}")
     return (
-        f"{dialect.PROLOGUE}mkdir -p {shlex.quote(target)} {shlex.quote(staged)}\n"
         f"if [ -d {quoted} ]; then\n"
         f"  git -C {quoted} rev-parse --verify --quiet {tip} || true\n"
-        f"  if git -C {quoted} cat-file -e {commit} 2>/dev/null; then echo {HELD_ANSWER}; fi\n"
+        f"  if git -C {quoted} merge-base --is-ancestor {shlex.quote(sha)} {NODE_TIP_REF}"
+        f" 2>/dev/null; then echo {HELD_ANSWER}; fi\n"
         "fi\n"
     )
 
@@ -254,6 +278,41 @@ def bundle_commit(
     return _test_hooks.read_bytes(destination)
 
 
+def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tuple[str, ...], ...]:
+    """The commands that fetch a verified bundle into the node's mirror.
+
+    Shared by a project's commit and a companion's
+    (:mod:`fleet.core.companion_stage`, MCPs board task 5280a25d), which
+    are staged out of the node's mirror alike.
+
+    Args:
+        mirror: The node's mirror.
+        bundle: The verified bundle on the node, or None when the mirror
+            already holds the commit and nothing was sent.
+        run_id: What names the bundle's ref (:data:`BUNDLE_REF_PREFIX`).
+
+    Returns:
+        No command when nothing was sent; else the mirror made if absent and
+        the bundle's ref fetched into :data:`NODE_TIP_REF`.
+    """
+    if bundle is None:
+        return ()
+    return (
+        ("git", "init", "--bare", "--quiet", mirror),
+        (
+            "git",
+            "-C",
+            mirror,
+            *REF_LOCK_WAITS,
+            "fetch",
+            "--quiet",
+            "--no-tags",
+            bundle,
+            f"+{BUNDLE_REF_PREFIX}{run_id}:{NODE_TIP_REF}",
+        ),
+    )
+
+
 def unpack_commands(
     *,
     mirror: str,
@@ -282,44 +341,34 @@ def unpack_commands(
         commit's tar written and unpacked, and the tree committed.
     """
     tar = f"{staged}/{names.TREE_TAR_NAME}"
-    fetch: tuple[tuple[str, ...], ...] = (
-        ()
-        if bundle is None
-        else (
-            ("git", "init", "--bare", "--quiet", mirror),
-            (
-                "git",
-                "-C",
-                mirror,
-                *REF_LOCK_WAITS,
-                "fetch",
-                "--quiet",
-                "--no-tags",
-                bundle,
-                f"+{BUNDLE_REF_PREFIX}{run_id}:{NODE_TIP_REF}",
-            ),
-        )
-    )
     pathspec = ("--", *scope) if scope else ()
     return (
-        *fetch,
+        *fetch_commands(mirror=mirror, bundle=bundle, run_id=run_id),
         ("git", "-C", mirror, "archive", "--format=tar", "-o", tar, sha, *pathspec),
         *dialect.extract_commands(tar, target),
         *stage_repository.init_repository_commands(target, run_id),
     )
 
 
-def _send_bundle(
-    host: str, *, staged: str, run_id: str, commit: CommitExport, base: str | None
+def send_bundle(
+    host: str,
+    *,
+    staged: str,
+    run_id: str,
+    commit: CommitExport,
+    base: str | None,
+    described_as: str,
 ) -> int:
     """Bundle the commit less the node mirror's tip and land it, verified.
 
     Args:
         host: SSH destination.
-        staged: The export's staging directory, where the bundle lands.
-        run_id: The dispatch, which names the bundle's ref.
+        staged: The staging directory the bundle lands in.
+        run_id: What names the bundle's ref: the dispatch for its commit,
+            the dispatch and directory for a companion.
         commit: The commit and the hub's mirror holding it.
         base: The node mirror's tip, or None.
+        described_as: What the bundle is, for a digest mismatch's message.
 
     Returns:
         The bundle's length in bytes.
@@ -342,7 +391,7 @@ def _send_bundle(
             into=staged,
             source=commit["bundle"],
             payload=payload,
-            described_as=f"the bundle of {sha}",
+            described_as=described_as,
         )
     finally:
         commit["bundle"].unlink(missing_ok=True)
@@ -379,7 +428,14 @@ def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExpor
     bundle = None if node["held"] else f"{staged}/{names.ARCHIVE_NAME}"
     sent = 0
     if bundle is not None:
-        sent = _send_bundle(host, staged=staged, run_id=run_id, commit=commit, base=node["tip"])
+        sent = send_bundle(
+            host,
+            staged=staged,
+            run_id=run_id,
+            commit=commit,
+            base=node["tip"],
+            described_as=f"the bundle of {sha}",
+        )
     remote.run_script(
         host,
         dialect.script_path(staged, names.UNPACK_STEM),
@@ -416,8 +472,11 @@ __all__ = [
     "NodeMirror",
     "StagedCommit",
     "bundle_commit",
+    "fetch_commands",
+    "mirror_probe_lines",
     "prepare_script",
     "read_node_mirror",
+    "send_bundle",
     "stage_commit",
     "unpack_commands",
 ]

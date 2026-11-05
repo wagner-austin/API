@@ -46,7 +46,6 @@ import tarfile
 from platform_core.errors import AppError, FleetErrorCode
 
 from fleet.core import _test_hooks, dialect, names, remote, stage_repository
-from fleet.core.export import CompanionExport
 
 #: Directory names never carried to a node.
 #:
@@ -204,122 +203,6 @@ def send_verified(
             f"{host} received {described_as} digesting {received or '<nothing>'} where "
             f"{expected} was sent; nothing has been unpacked",
         )
-
-
-def stage_companion(
-    host: str,
-    *,
-    stage_root: str,
-    directory: str,
-    ref: str,
-    sha: str,
-    source: pathlib.Path,
-    payload: bytes,
-) -> str:
-    """Put one companion repository in a node's stage root.
-
-    The directory is REPLACED rather than cloned over, and the bundle
-    never enters it: :func:`fleet.core.names.companion_directory` and
-    :data:`fleet.core.names.STAGE_SUFFIX` carry the reasons. What lands
-    is a clone of the declared ref's real commit with its history
-    (:func:`fleet.core.stage_repository.companion_repository_commands`, MCPs board
-    task 2026dfbc), so a check that reads HEAD, ``origin/<branch>`` or an
-    ancestor reads what a workstation's clone holds.
-
-    Args:
-        host: SSH destination.
-        stage_root: Absolute directory on the node holding staged trees.
-        directory: The companion's declared directory name.
-        ref: The companion's declared ref, whose branch is checked out.
-        sha: The commit the bundle's ref names.
-        source: The local bundle file.
-        payload: The bundle bytes.
-
-    Returns:
-        The absolute remote directory the companion was cloned into.
-
-    Raises:
-        AppError: As :func:`send_verified` describes, and from the transport
-            for any of the scripts around it.
-    """
-    tree = names.companion_directory(stage_root, directory)
-    staged = names.staging_directory(tree)
-    staged_stem = names.make_directory_stem(names.stage_name(directory))
-    remote.run_script(
-        host,
-        dialect.script_path(stage_root, names.reset_directory_stem(directory)),
-        dialect.reset_directory_script(tree),
-    )
-    remote.run_script(
-        host,
-        dialect.script_path(stage_root, staged_stem),
-        dialect.make_directory_script(staged),
-    )
-    send_verified(
-        host,
-        into=staged,
-        source=source,
-        payload=payload,
-        described_as=f"the {directory} companion at {sha}",
-    )
-    remote.run_script(
-        host,
-        dialect.script_path(staged, names.COMPANION_REPOSITORY_STEM),
-        dialect.checked_script(
-            stage_repository.companion_repository_commands(
-                tree, f"{staged}/{names.ARCHIVE_NAME}", sha, ref
-            )
-        ),
-    )
-    return tree
-
-
-def stage_companions(
-    host: str,
-    *,
-    stage_root: str,
-    companions: tuple[CompanionExport, ...],
-    workers: int,
-) -> tuple[str, ...]:
-    """Stage independent companions concurrently within the admitted allocation.
-
-    The dispatch already holds every companion directory's node-local lease.
-    Each transfer uses its own staging directory and verified bundle, and
-    each checkout is replaced before use. At most four transfers run at once,
-    never more than the job's worker allocation. All finish before a build
-    can launch; a failed transfer propagates after the pool has joined its
-    in-flight work, so the caller cannot release leases over active writers.
-
-    Args:
-        host: SSH destination.
-        stage_root: The node's declared stage directory.
-        companions: Distinct companion directories, in declaration order.
-        workers: Positive worker allocation granted to this dispatch.
-
-    Returns:
-        Completed checkout paths in declaration order.
-
-    Raises:
-        AppError: A companion's transfer, digest or checkout failure.
-    """
-    if not companions:
-        return ()
-
-    def stage_one(companion: CompanionExport) -> str:
-        return stage_companion(
-            host,
-            stage_root=stage_root,
-            directory=companion["directory"],
-            ref=companion["ref"],
-            sha=companion["sha"],
-            source=companion["path"],
-            payload=companion["data"],
-        )
-
-    with _test_hooks.executor(
-        workers=min(4, workers, len(companions)), name="fleet-companion-stage"
-    ) as pool:
-        return tuple(pool.map(stage_one, companions))
 
 
 def stage(
@@ -496,7 +379,7 @@ def link_companions(host: str, *, target: str, trees: tuple[str, ...]) -> None:
         host: SSH destination.
         target: The run's export directory, already staged.
         trees: The companions' trees on the node, from
-            :func:`stage_companions`.
+            :func:`fleet.core.companion_stage.stage_companions`.
 
     Raises:
         AppError: From the transport, or naming the ``ln`` that failed.
@@ -521,7 +404,5 @@ __all__ = [
     "registry_payload",
     "send_verified",
     "stage",
-    "stage_companion",
-    "stage_companions",
     "stage_registry",
 ]

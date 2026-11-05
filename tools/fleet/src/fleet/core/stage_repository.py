@@ -9,8 +9,6 @@ the first failure, as it does :func:`fleet.core.dialect.extract_commands`.
 
 from __future__ import annotations
 
-from fleet.core.mirror_fetch import COMPANION_REF
-
 #: Who a project's staged tree's one commit is authored by, passed to ``git``
 #: with ``-c`` on the commit itself. A companion is cloned with its real
 #: commits (:func:`companion_repository_commands`) and gets none.
@@ -103,9 +101,9 @@ def _commit_command(target: str, message: str) -> tuple[str, ...]:
 
 
 def companion_repository_commands(
-    target: str, bundle: str, sha: str, ref: str
+    target: str, mirror: str, sha: str, ref: str
 ) -> tuple[tuple[str, ...], ...]:
-    """The commands that clone a staged companion from its bundle.
+    """The commands that clone a staged companion out of the node's mirror of its remote.
 
     A companion exists to be read as a workspace, and the things that read
     it read git: slime's lift check compares its lifted files against
@@ -122,53 +120,48 @@ def companion_repository_commands(
     HookCommands suite reads ``packages/claude-hooks/registration.json`` at
     the MCPs commit its hooks pin names, and on serendipity that read
     'fatal: path ... exists on disk, but not in cd4d6aa2', a commit that is
-    an ancestor of MCPs main (job 972977be, 2026-09-30). The hub now sends
-    ``git bundle create`` of the companion ref
-    (:func:`fleet.core.export.bundle_ref`), and the node fetches it into
-    ``refs/remotes/origin/<branch>`` and checks ``<branch>`` out there, so
-    HEAD and ``origin/<branch>`` are the ref's real commit and every
-    ancestor the hub's mirror holds is reachable from them.
+    an ancestor of MCPs main (job 972977be, 2026-09-30). So the companion's
+    ``refs/remotes/origin/<branch>`` is the ref's real commit, ``<branch>``
+    is checked out there, and every ancestor the node's mirror holds is
+    reachable from them.
 
-    THE LAST TWO COMMANDS PROVE HEAD IS ``sha``: each is an ancestor of the
-    other only when they are the same commit. The bundle is the one the hub
-    wrote after resolving the ref to ``sha``, and its digest is checked
-    before this runs, so a mismatch is not expected; it would mean the
-    bundle named another commit, and the stage stops rather than checking a
-    tree the feed would then misreport.
+    OUT OF THE NODE'S MIRROR, BY HARD LINKS (MCPs board task 5280a25d).
+    Until then every launch sent each companion's whole history as one
+    bundle the node fetched into a fresh repository: on lacrymal on
+    2026-11-05 the MCPs companion's bundle was 266 MB and took 22.8 s to
+    write and API's 263 MB and 6.9 s, and packages/wiki-check carries 17
+    companions. The node now keeps a mirror of each companion's remote as
+    it does of each project's (:mod:`fleet.core.companion_stage`), which
+    receives only what it lacks, and ``git clone --local`` links that
+    mirror's objects into the companion instead of copying them. The clone
+    names its source as ``origin``; that section is removed, so the
+    companion carries no remote, as the bundle's fetch left it, and its
+    tracking ref is written to the commit itself, which ``git update-ref``
+    refuses when the mirror lacks it, ending the checked script there.
 
-    The fetch ends in ``git gc --auto`` like a commit does, so the clone
-    turns automatic gc off first (:func:`_no_auto_gc_command`).
+    Automatic gc and maintenance are turned off before anything else writes
+    (:func:`_no_auto_gc_command`, :func:`_no_auto_maintenance_command`).
 
     Args:
         target: Absolute remote directory the companion is cloned into,
             emptied and created just before.
-        bundle: Absolute path to the verified bundle on the node.
-        sha: The commit the hub resolved the ref to and bundled.
+        mirror: The node's mirror of the companion's remote, holding ``sha``.
+        sha: The commit the hub resolved the ref to.
         ref: The companion's declared ref, ``main`` or ``refs/heads/main``.
 
     Returns:
-        The seven commands, in order, for
+        The six commands, in order, for
         :func:`fleet.core.dialect.checked_script`.
     """
     branch = ref.removeprefix("refs/heads/")
     tracking = f"refs/remotes/origin/{branch}"
     return (
-        ("git", "-C", target, "init", "--quiet"),
+        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, target),
         _no_auto_gc_command(target),
         _no_auto_maintenance_command(target),
-        (
-            "git",
-            "-C",
-            target,
-            "fetch",
-            "--quiet",
-            "--no-tags",
-            bundle,
-            f"+{COMPANION_REF}:{tracking}",
-        ),
+        ("git", "-C", target, "config", "--remove-section", "remote.origin"),
+        ("git", "-C", target, "update-ref", tracking, sha),
         ("git", "-C", target, "checkout", "--quiet", "-B", branch, tracking),
-        ("git", "-C", target, "merge-base", "--is-ancestor", "HEAD", sha),
-        ("git", "-C", target, "merge-base", "--is-ancestor", sha, "HEAD"),
     )
 
 

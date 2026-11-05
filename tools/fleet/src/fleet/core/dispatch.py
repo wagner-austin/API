@@ -50,6 +50,7 @@ from fleet.contracts.project import MAKE_TARGET, ProjectConfig
 from fleet.core import (
     _test_hooks,
     commit_stage,
+    companion_stage,
     dialect,
     export,
     leases,
@@ -405,32 +406,31 @@ def launch(
     # so a verdict can be read against the workspace it was measured with --
     # a companion is the tip of a ref, so two runs of one sha can legitimately
     # measure different things, and the line is where that shows.
-    staged_companions = staging.stage_companions(
+    # Each companion's bundle, when one is sent, goes once the node has
+    # verified it (fleet.core.commit_stage.send_bundle); kept, the hub held
+    # 169 bundles in 14 GB on 2026-10-15 (MCPs board task f9ee56aa).
+    staged_companions = companion_stage.stage_companions(
         node["host"],
         stage_root=node["stage_root"],
+        run_id=run_id,
         companions=companions,
         workers=workers,
     )
-    for companion, beside in zip(companions, staged_companions, strict=True):
+    for staged_companion in staged_companions:
         run_lease.emit(
             loaded_feed,
             run_id=run_id,
             node=node_name,
             project=project,
             kind=FeedKind.STAGED,
-            detail=(
-                f"{len(companion['data'])} bytes, the {companion['directory']} companion "
-                f"at {companion['sha']}, to {beside}"
-            ),
+            detail=staged_companion["detail"],
             now_unix=_test_hooks.now(),
         )
-        # Verified on the node, so like the archive above it has no reader
-        # left; kept, the hub held 169 bundles in 14 GB on 2026-10-15 (MCPs
-        # board task f9ee56aa). Its directory is the launch attempt's own,
-        # which the node runner removes however the attempt ends (board
-        # task 2e3e69cf), so the memory a bundle holds is freed here.
-        companion["path"].unlink()
-    staging.link_companions(node["host"], target=target, trees=staged_companions)
+    staging.link_companions(
+        node["host"],
+        target=target,
+        trees=tuple(staged_companion["tree"] for staged_companion in staged_companions),
+    )
 
     remote.send_script(
         node["host"],

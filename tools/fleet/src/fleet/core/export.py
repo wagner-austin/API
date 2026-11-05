@@ -29,6 +29,7 @@ attempts a lost one is given before the job is refused, are
 from __future__ import annotations
 
 import pathlib
+from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
 from typing_extensions import TypedDict
@@ -114,41 +115,6 @@ def ensure_mirror(mirror: pathlib.Path) -> None:
         raise mirror_fetch.git_failure(
             FleetErrorCode.EXPORT_FAILED, f"git init --bare {mirror}", made["stderr"]
         )
-
-
-def bundle_ref(mirror: pathlib.Path, destination: pathlib.Path) -> bytes:
-    """Write ``git bundle create`` of the companion ref and read the bytes back.
-
-    The companion's payload since MCPs board task 2026dfbc: the ref with
-    its whole history, which the node clones from
-    (:func:`fleet.core.stage_repository.companion_repository_commands`), where an
-    archive gave it one synthetic commit. Measured on the hub for MCPs main:
-    61.8 MB in 2.2 s, against 38.1 MB and 3.0 s for the archive it replaces.
-
-    Args:
-        mirror: The companion's mirror, holding
-            :data:`fleet.core.mirror_fetch.COMPANION_REF`.
-        destination: Where the bundle is written; its directory is made.
-
-    Returns:
-        The bundle's bytes, which the node's digest is compared against.
-
-    Raises:
-        AppError: ``EXPORT_FAILED`` when ``git bundle create`` exits non-zero.
-    """
-    _test_hooks.make_directory(destination.parent)
-    ref = mirror_fetch.COMPANION_REF
-    bundled = _test_hooks.run(
-        ("git", "-C", str(mirror), "bundle", "create", "--quiet", str(destination), ref),
-        timeout_seconds=ARCHIVE_TIMEOUT_SECONDS,
-    )
-    if bundled["returncode"] != 0:
-        raise mirror_fetch.git_failure(
-            FleetErrorCode.EXPORT_FAILED,
-            f"git bundle create {ref} from {mirror}",
-            bundled["stderr"],
-        )
-    return _test_hooks.read_bytes(destination)
 
 
 def require_source(project: str, source: ProjectSource | None) -> ProjectSource:
@@ -276,27 +242,36 @@ class PreparedCompanion(TypedDict):
 
 
 class CompanionExport(TypedDict):
-    """One companion's bundle, ready to be staged beside an export.
+    """One companion, its ref resolved, ready to be staged beside an export.
 
-    Bytes and not a builder, unlike a project's payload: it is built where
-    the ref is resolved -- before any lease is taken, so a ref the remote
-    does not serve refuses with nothing held -- in the directory its caller
-    gives the claimed job alone (MCPs board task f9ee56aa).
+    Resolved where the job is prepared, before any lease is taken, so a ref
+    the remote does not serve refuses with nothing held. Its bundle is
+    written only once the node has said what its mirror of the remote
+    already holds (:mod:`fleet.core.companion_stage`, MCPs board task
+    5280a25d), into the directory its caller gives the claimed job alone
+    (MCPs board task f9ee56aa).
 
     Attributes:
         directory: The declared directory it lands in on the node.
         ref: The declared ref, whose branch the node checks out.
         sha: The commit its ref resolved to on this fetch.
-        path: The local file the bundle was written to, which scp copies.
-        data: The same bundle's bytes, which the node's digest is compared
-            against.
+        mirror: The hub's mirror of the companion's remote, holding ``sha``.
+        key: That mirror's key (:func:`companion_mirror_key`), which names
+            the node's mirror of the same remote.
+        bundle: The local file its bundle is written to, if one is sent.
     """
 
     directory: str
     ref: str
     sha: str
-    path: pathlib.Path
-    data: bytes
+    mirror: pathlib.Path
+    key: str
+    bundle: pathlib.Path
+
+
+#: How many companions' refs are fetched at once: packages/wiki-check
+#: declares 17, each a round trip to GitHub inside its own mirror's turn.
+COMPANION_FETCHES: Final = 8
 
 
 def export_companions(
@@ -304,7 +279,13 @@ def export_companions(
     archive_dir: pathlib.Path,
     companions: tuple[ProjectCompanion, ...],
 ) -> tuple[CompanionExport, ...]:
-    """Fetch and bundle every companion a project's export carries.
+    """Fetch every companion a project's export carries, :data:`COMPANION_FETCHES` at once.
+
+    AT ONCE, NOT ONE AFTER ANOTHER (MCPs board task 5280a25d). Each
+    companion is its own remote in its own mirror under its own turn, and
+    one after another the 17 of packages/wiki-check, each fetched and then
+    bundled whole, kept lavender idle from 18:35:02 to 18:35:53Z on
+    2026-11-05 between job 30708103's claim and its first phase.
 
     Args:
         mirrors_root: The mirrors directory under the workspace's records.
@@ -316,30 +297,29 @@ def export_companions(
         One export per companion, in the same order.
 
     Raises:
-        AppError: As :func:`prepare_companion` and :func:`bundle_ref`
-            describe.
+        AppError: As :func:`prepare_companion` describes, the first
+            companion's in declared order of those that failed, once every
+            fetch under way has ended.
     """
-    exported: list[CompanionExport] = []
-    for companion in companions:
+    if not companions:
+        return ()
+
+    def export_one(companion: ProjectCompanion) -> CompanionExport:
         prepared = prepare_companion(mirrors_root, companion)
         key = companion_mirror_key(companion["remote"])
-        path = archive_dir / f"{key}-{prepared['sha']}.bundle"
-        exported.append(
-            CompanionExport(
-                directory=companion["directory"],
-                ref=companion["ref"],
-                sha=prepared["sha"],
-                path=path,
-                # The WHOLE repository with its history, unscoped by any
-                # data path: the project's check reads the companion as a
-                # workspace (slime lints its lifted code against the
-                # committed MCPs workspace, corvis-stick reads MCPs at the
-                # commit its hooks pin names), and nothing here knows which
-                # parts or which past commits that check opens.
-                data=bundle_ref(prepared["mirror"], path),
-            )
+        return CompanionExport(
+            directory=companion["directory"],
+            ref=companion["ref"],
+            sha=prepared["sha"],
+            mirror=prepared["mirror"],
+            key=key,
+            bundle=archive_dir / f"{key}-{prepared['sha']}.bundle",
         )
-    return tuple(exported)
+
+    with _test_hooks.executor(
+        workers=min(COMPANION_FETCHES, len(companions)), name="fleet-companion-fetch"
+    ) as pool:
+        return tuple(pool.map(export_one, companions))
 
 
 def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -> PreparedCompanion:
@@ -368,10 +348,10 @@ def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -
 
 __all__ = [
     "ARCHIVE_TIMEOUT_SECONDS",
+    "COMPANION_FETCHES",
     "MIRRORS_DIRECTORY",
     "CompanionExport",
     "PreparedCompanion",
-    "bundle_ref",
     "companion_mirror_key",
     "ensure_mirror",
     "export_companions",

@@ -237,26 +237,6 @@ def make_directory_script(target: str) -> str:
     return checked_script((("mkdir", "-p", target),))
 
 
-def reset_directory_script(target: str) -> str:
-    """The script that empties a companion's directory and creates it.
-
-    For the companion trees, which land at a path derived from a declared
-    name rather than from a run id, so one node's directory is written by
-    every run that carries that companion. Extracting over what the last run
-    left would leave a file the workspace has since deleted sitting in a tree
-    that is then committed AS the workspace.
-
-    Args:
-        target: Absolute remote directory to replace.
-
-    Returns:
-        The script's text. ``rm -rf`` needs no guard for an absent path,
-        which is the first run on a node, and ``-f`` removes the read-only
-        loose objects of the git repository a previous run made there.
-    """
-    return checked_script((("rm", "-rf", target), ("mkdir", "-p", target)))
-
-
 def retire_script(
     *, stage_root: str, run_id: str, retained: str, scripts: tuple[str, ...], isolated: bool
 ) -> str:
@@ -503,7 +483,7 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
 
     THE TWO PATHS ARE SEPARATE so a payload can stay out of the tree it
     builds: each archive sits in the export's staging directory and unpacks
-    into the export. A companion is cloned from a bundle instead
+    into the export. A companion is cloned out of the node's mirror instead
     (:func:`fleet.core.stage_repository.companion_repository_commands`).
 
     Args:
@@ -531,7 +511,6 @@ __all__ = [
     "extract_commands",
     "fleet_directory",
     "make_directory_script",
-    "reset_directory_script",
     "result_script",
     "retire_script",
     "script_path",
