@@ -148,6 +148,21 @@ class TestTheQuota:
             in (verdict["reason"])
         )
 
+    def test_a_live_run_s_cores_come_off_the_quota(self) -> None:
+        """A quota of 10 CPUs less the flake's 8 leaves 2, though it holds one worker.
+
+        Audit a6179a34 measured this clause unguarded: with the quota room
+        charged live workers instead of live cores, nothing failed.
+        """
+        verdict = assess(
+            _node(cores=32),
+            _state(check_cpu_quota=10.0, free_ram_gb=60.0, live=FLAKE_RUN),
+            _project(minimum_workers=1),
+            LINUX_TAGS,
+        )
+
+        assert verdict == {"workers": 2, "code": None, "reason": ""}
+
     def test_the_quota_s_cores_bound_the_workers_they_hold(self) -> None:
         """32 cores leave 30 and a ceiling of 5 three-core workers; 7 CPUs hold 2."""
         verdict = assess(

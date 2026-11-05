@@ -87,9 +87,10 @@ lavender (fleet job 46eb328f, 2026-11-05) it built through all 8 of that
 share, 1463.8 CPU-s of its own in 305 s, beside 386.5 CPU-s of two checks
 placed into the same share because it was charged one core. Its need, 1463.8
 CPU-s over the 300 s budget, is 4.9 cores averaged and the whole share at
-its peak, so it is charged the share lavender has, and no node it ran on
-(loki, lavender and lacrymal, every one of its 147 jobs to that day) leaves
-it fewer.
+its peak, so it is charged the share lavender has. Every node it can still
+be placed on keeps it: its jobs finished on loki, lavender and lacrymal, and
+serendipity, which started one (fleet job d7e8bd84) under the 8 GB
+declaration, has held no worker of it since the declaration became 16 GB.
 
 Admission is exercised against the shipped registry, so removing a node's
 bound restores the second admission that was measured, and a node gaining or
@@ -103,6 +104,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import FleetErrorCode
 
+from fleet.contracts.budget import NodeBudget, admissible_workers
 from fleet.contracts.machine import MachineRole
 from fleet.contracts.node import LiveLoad, NodeConfig, NodeState
 from fleet.contracts.tags import NodeTag, missing_tags, node_tags
@@ -406,8 +408,9 @@ def test_any_pool_worker_whose_probe_found_nixos_test_checks_the_nixos_flake() -
     assert {name: code for name, code in without_tag.items() if name in pool} == dict.fromkeys(
         pool, FleetErrorCode.NODE_LACKS_TAG
     )
-    # Every node it ever ran on keeps it (147 jobs to 2026-11-05: loki,
-    # lavender and lacrymal), and serendipity's 6 cores hold no worker.
+    # Every node its jobs finished on keeps it (loki, lavender and lacrymal),
+    # and serendipity's 6 cores hold no worker, as its 15.4 GB already held
+    # none (test_serendipity_left_the_flake_s_placement_with_its_memory_not_its_cores).
     assert {"lacrymal", "lavender", "loki"} <= roomy
     assert "serendipity" in pool - roomy
 
@@ -453,3 +456,27 @@ def test_a_node_without_the_flake_check_s_memory_refuses_it_before_it_starts() -
         "one worker of this project occupies 8 cores and its owner's reservation leaves 6, so "
         "it never takes this project."
     )
+
+
+def test_serendipity_left_the_flake_s_placement_with_its_memory_not_its_cores() -> None:
+    """MCPs board task 51e3eac5's audit a6179a34: serendipity started the
+    flake check once (fleet job d7e8bd84, 2026-11-03), under its 8 GB
+    declaration. Since the declaration became 16 GB its whole 15.4 GB holds
+    no worker, even charged one core, so declaring the worker's 8 cores
+    drops no node the project could still be placed on."""
+    workspace = _shipped()
+    project = workspace["projects"]["MCPs/fleet-nixos"]
+    node = workspace["nodes"]["serendipity"]
+    budget: NodeBudget = {**node["budget"], "worker_ram_gb": project["worker_ram_gb"]}
+
+    assert node["ram_gb"] == 15.4
+    for worker_cores in (1, project["worker_cores"]):
+        assert (
+            admissible_workers(
+                budget,
+                logical_cores=node["logical_cores"],
+                free_ram_gb=node["ram_gb"],
+                worker_cores=worker_cores,
+            )
+            == 0
+        )
