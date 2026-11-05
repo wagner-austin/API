@@ -48,17 +48,28 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
 
 
 def test_a_companion_is_cloned_out_of_the_node_s_mirror_onto_its_branch() -> None:
-    """MCPs board task 5280a25d: the clone links the node mirror's objects,
-    its auto gc is off before anything else writes (MCPs board task
-    939ec5c7), the clone's ``origin`` section goes, and ``origin/<branch>``
-    is written to the commit and checked out (MCPs board task 2026dfbc)."""
+    """MCPs board task 5280a25d: the clone links the node mirror's objects
+    holding the mirror's lock, its auto gc is off before anything else
+    writes (MCPs board task 939ec5c7), the clone's ``origin`` section goes,
+    and ``origin/<branch>`` is written to the commit and checked out (MCPs
+    board task 2026dfbc)."""
     mirror = "/s/cache/mirrors/companion-wagner-austin-MCPs.git"
     commands = stage_repository.companion_repository_commands(
         "/s/MCPs", mirror, "a" * 40, "refs/heads/main"
     )
 
     assert commands == (
-        ("git", "clone", "--quiet", "--local", "--no-checkout", mirror, "/s/MCPs"),
+        (
+            "flock",
+            f"{mirror}.objects.lock",
+            "git",
+            "clone",
+            "--quiet",
+            "--local",
+            "--no-checkout",
+            mirror,
+            "/s/MCPs",
+        ),
         ("git", "-C", "/s/MCPs", "config", "gc.auto", "0"),
         ("git", "-C", "/s/MCPs", "config", "maintenance.auto", "false"),
         ("git", "-C", "/s/MCPs", "config", "--remove-section", "remote.origin"),
