@@ -64,10 +64,10 @@ class TrainingConfig(TypedDict):
 class TrainingOutcome(TypedDict):
     """A trained policy and what training saw.
 
-    Not a JSON contract: it holds the module.
+    Not a JSON contract: it holds the policy's tensors.
 
     Attributes:
-        policy: The trained policy, in evaluation mode.
+        policy: The trained policy.
         final_batch_successes: How many of the last batch's sampled episodes
             reached the flag.
     """
@@ -158,8 +158,9 @@ def train_policy(config: TrainingConfig) -> TrainingOutcome:
         raise ValueError(f"the learning rate must be positive, got {config['learning_rate']}")
     torch.manual_seed(config["seed"])
     policy = ControlPolicy(config["hidden"])
-    policy.train()
-    optimiser = torch.optim.Adam(policy.parameters(), lr=config["learning_rate"])
+    optimiser = torch.optim.Adam(
+        [parameter for _, parameter in policy.named_parameters()], lr=config["learning_rate"]
+    )
     generator = torch.Generator().manual_seed(config["seed"])
     successes = 0
     for iteration in range(config["iterations"]):
@@ -169,9 +170,8 @@ def train_policy(config: TrainingConfig) -> TrainingOutcome:
         advantage = (returns - returns.mean(dim=1, keepdim=True)) * live.to(torch.float64)
         loss = -(log_probs.to(torch.float64) * advantage).sum() / float(config["batch"])
         optimiser.zero_grad()
-        loss.backward()
+        torch.autograd.backward([loss])
         optimiser.step()
-    policy.eval()
     return TrainingOutcome(policy=policy, final_batch_successes=successes)
 
 

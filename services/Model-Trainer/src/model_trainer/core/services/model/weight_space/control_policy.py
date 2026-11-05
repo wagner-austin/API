@@ -41,29 +41,80 @@ POLICY_PARAMETERS: tuple[str, ...] = (
 )
 
 
-class ControlPolicy(torch.nn.Module):
+def _uniform(shape: tuple[int, ...], bound: float) -> torch.nn.Parameter:
+    """Draw a parameter uniformly from ``[-bound, bound)``, off the global generator.
+
+    Args:
+        shape: The parameter's shape.
+        bound: The half-width.
+
+    Returns:
+        The parameter, trainable.
+    """
+    return torch.nn.Parameter((torch.rand(shape) * 2.0 - 1.0) * bound)
+
+
+class ControlPolicy:
     """``2 -> hidden -> hidden -> 3`` with tanh, scoring the three actions.
 
+    THE SIX PARAMETERS ARE HELD BY NAME rather than inside ``torch.nn.Linear``
+    modules. A weight program addresses parameters by name, and the shared
+    snapshot and digest checks read a sequence of named parameters; holding
+    them here gives exactly that, and the layer arithmetic below is the one
+    line ``tanh(x @ W.T + b)`` that ``Linear`` would have run. Each layer is
+    initialised as ``Linear`` initialises it, every entry uniform in
+    ``[-1/sqrt(fan_in), 1/sqrt(fan_in))``.
+
     Attributes:
-        hidden_in: Observation to the first hidden layer.
-        hidden_mid: First hidden layer to the second.
-        action_out: Second hidden layer to one score per action.
+        hidden: Units per hidden layer.
+        parameters_by_name: The six parameters, keyed as
+            :data:`POLICY_PARAMETERS` names them, torch's ``[out, in]``
+            orientation for each weight.
     """
 
-    hidden_in: torch.nn.Linear
-    hidden_mid: torch.nn.Linear
-    action_out: torch.nn.Linear
+    hidden: int
+    parameters_by_name: dict[str, torch.nn.Parameter]
 
     def __init__(self, hidden: int) -> None:
-        """Build the layers with torch's default initialisation.
+        """Build the parameters, drawing from torch's global generator.
 
         Args:
             hidden: Units per hidden layer.
         """
-        super().__init__()
-        self.hidden_in = torch.nn.Linear(2, hidden)
-        self.hidden_mid = torch.nn.Linear(hidden, hidden)
-        self.action_out = torch.nn.Linear(hidden, 3)
+        self.hidden = hidden
+        self.parameters_by_name = {}
+        for layer, (fan_in, fan_out) in (
+            ("hidden_in", (2, hidden)),
+            ("hidden_mid", (hidden, hidden)),
+            ("action_out", (hidden, 3)),
+        ):
+            bound = 1.0 / float(fan_in) ** 0.5
+            self.parameters_by_name[f"{layer}.weight"] = _uniform((fan_out, fan_in), bound)
+            self.parameters_by_name[f"{layer}.bias"] = _uniform((fan_out,), bound)
+
+    def named_parameters(self) -> tuple[tuple[str, torch.nn.Parameter], ...]:
+        """Every parameter with its name, in :data:`POLICY_PARAMETERS` order.
+
+        Returns:
+            ``(name, parameter)`` pairs.
+        """
+        return tuple((name, self.parameters_by_name[name]) for name in POLICY_PARAMETERS)
+
+    def get_parameter(self, target: str) -> torch.nn.Parameter:
+        """Return one parameter by name.
+
+        Args:
+            target: A name from :data:`POLICY_PARAMETERS`.
+
+        Returns:
+            The parameter, writable.
+
+        Raises:
+            KeyError: If the name is not one of the six; the shared
+                :func:`~model_trainer.core.services.model.editing.sites.require_parameter`
+                checks the inventory first and refuses by error code.
+        """
+        return self.parameters_by_name[target]
 
     def forward(self, observation: torch.Tensor) -> torch.Tensor:
         """Score each action for each observation.
@@ -74,10 +125,10 @@ class ControlPolicy(torch.nn.Module):
         Returns:
             ``(episodes, 3)`` action scores.
         """
-        first = torch.tanh(self.hidden_in(observation))
-        second = torch.tanh(self.hidden_mid(first))
-        scores: torch.Tensor = self.action_out(second)
-        return scores
+        weights = self.parameters_by_name
+        first = torch.tanh(observation @ weights["hidden_in.weight"].T + weights["hidden_in.bias"])
+        second = torch.tanh(first @ weights["hidden_mid.weight"].T + weights["hidden_mid.bias"])
+        return second @ weights["action_out.weight"].T + weights["action_out.bias"]
 
     def greedy(self, observation: torch.Tensor) -> torch.Tensor:
         """Pick the highest-scoring action, which is how the policy is evaluated.
@@ -131,7 +182,7 @@ def policy_weights(policy: ControlPolicy) -> PolicyWeights:
             shape=tuple(int(size) for size in parameter.shape),
             values=tuple(float(values[index].item()) for index in range(values.numel())),
         )
-    return PolicyWeights(hidden=int(policy.hidden_in.out_features), parameters=parameters)
+    return PolicyWeights(hidden=policy.hidden, parameters=parameters)
 
 
 def load_policy(weights: PolicyWeights) -> ControlPolicy:
@@ -141,7 +192,7 @@ def load_policy(weights: PolicyWeights) -> ControlPolicy:
         weights: The weights.
 
     Returns:
-        The policy, in evaluation mode.
+        The policy.
 
     Raises:
         JSONTypeError: If a parameter's shape is not the one a policy of this
@@ -161,7 +212,6 @@ def load_policy(weights: PolicyWeights) -> ControlPolicy:
             filled[index] = value
         with torch.no_grad():
             parameter.copy_(filled.reshape(parameter.shape))
-    policy.eval()
     return policy
 
 
