@@ -596,3 +596,7 @@ Notes: MCPs 91afd89ed extended the served search case `execution/tests/served/re
 ## [2026-11-04] create | Battery refusal and the nixos-test tag
 Pages created: fleet-runner-battery-refusal-and-nixos-test-tag (hub infrastructure; index now 79 pages, infrastructure 8).
 Notes: Records why loki drained running NixOS VM checks off its charger and the two measured readings that replaced the pin: the linux probe's on_battery (a system battery discharging with no external supply online; lenovold's firmware conservation mode read Discharging on its charger at 2026-11-04T03:06Z and was refused until API e175d2a82 read the adapter beside it), the NODE_ON_BATTERY refusal, the runner's onBattery tick field kept 30 days by MCPs migration 903, and the nixos-test tool tag MCPs/fleet-nixos requires. MCPs board task 3268afdf-05b6-4757-b296-b698422f34fd.
+
+## [2026-11-05] create | Weight-space programming on our own models
+Pages created: model-trainer-weight-space-programming (hub services; index now 80 pages, services 22).
+Notes: Records Model-Trainer's weight-program harness and its two HPC3 runs. Job 58906732: an LLM-written edit took a MountainCar policy from 0 to 1,024 of 1,024 episodes. Job 58906742: an LLM-written ablation of GPT-2's induction heads raised greedy loops from 44 to 125 of 256 against the untouched control. The records, programs and reader briefs are committed under services/Model-Trainer/results/weight-space. Board task 7964f9f6-68d6-43c2-8565-bb8e387ca694.
