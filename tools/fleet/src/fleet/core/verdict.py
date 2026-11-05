@@ -28,10 +28,10 @@ from typing import Final
 from typing_extensions import TypedDict
 
 from fleet.core.build_steps import read_build_steps
-from fleet.core.ci_load import read_ci_load
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
 from fleet.core.run_registry import read_registry
 from fleet.core.run_summary import read_run_summary
+from fleet.core.slice_load import CI_SLICE, DISPATCH_SLICE, read_slice_load
 
 #: The line every package's ``make check`` prints last when it passed.
 CHECK_BANNER: Final = "=== ALL CHECKS PASSED ==="
@@ -161,8 +161,12 @@ class Verdict(TypedDict):
             time went, which the total alone does not say (MCPs board
             task 349e25ee).
         ci: The host's CI load over the check
-            (:func:`fleet.core.ci_load.read_ci_load`): what else the
+            (:func:`fleet.core.slice_load.read_slice_load`): what else the
             machine ran while the total was taken.
+        dispatch: The dispatch share's load over the check, read the same
+            way: the CPU-seconds the check, and on a NixOS node its nix
+            daemon's builds, took in the share it was placed in, beside
+            whatever else ran there (MCPs board task 51e3eac5).
         generation: The cache generation the build read, and
         began: whether this build began it, and
         phases: each phase's seconds, all three read off the build's last
@@ -197,6 +201,7 @@ class Verdict(TypedDict):
     workers: int
     slowest: str
     ci: str
+    dispatch: str
     generation: str
     began: str
     phases: str
@@ -379,7 +384,8 @@ def judge(
         run_id=run_id,
         workers=workers,
         slowest=read_slowest(tail),
-        ci=read_ci_load(tail),
+        ci=read_slice_load(tail, CI_SLICE),
+        dispatch=read_slice_load(tail, DISPATCH_SLICE),
         generation=summary["generation"],
         began=summary["began"],
         phases=summary["phases"],
@@ -398,7 +404,7 @@ def render_verdict(verdict: Verdict) -> str:
         ``FLEET-CHECK <job8> <project> sha=<sha> node=<node> exit=<n>
         banner=<yes|no> tests=<...> coverage=<...> budget=<...>
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
-        slowest=<...> ci=<...> generation=<...> began=<...> phases=<...>
+        slowest=<...> ci=<...> dispatch=<...> generation=<...> began=<...> phases=<...>
         steps=<...> registry=<commit>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
@@ -412,7 +418,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"coverage={verdict['coverage']} budget={verdict['budget']} "
         f"ended={verdict['ended']} log={verdict['node']}:{verdict['log_path']} "
         f"run={verdict['run_id']} workers={verdict['workers']} "
-        f"slowest={verdict['slowest']} ci={verdict['ci']} "
+        f"slowest={verdict['slowest']} ci={verdict['ci']} dispatch={verdict['dispatch']} "
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
         f"registry={verdict['registry']}"

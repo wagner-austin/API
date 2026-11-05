@@ -28,12 +28,12 @@ from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.toolchain import REQUIRED_PYTHON
 from fleet.core import dialect, names, recipe, tool_caches
-from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines
 from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_USER
 from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import SH_UTC_STAMP
 from fleet.core.run_summary import sh_run_summary_line
+from fleet.core.slice_load import MEASURED_SLICES, sh_slice_load_end_lines
 from tests.conftest import DEMO_PROJECT
 
 TARGET = "/home/corvis/fleet/stage/slime-execution-1790600000"
@@ -194,15 +194,15 @@ class TestIsolatedText:
 
     def test_the_copy_is_removed_before_the_status_is_written_last(self) -> None:
         lines = _isolated().splitlines()
-        ci_load = sh_ci_load_end_lines(CI_CPU_STAT, names.log_path(TARGET))
-        loaded = len(ci_load)
+        slice_load = sh_slice_load_end_lines(MEASURED_SLICES, names.log_path(TARGET))
+        loaded = len(slice_load)
 
         assert lines[-7 - loaded] == "set -e"
         assert lines[-5 - loaded].startswith(
             "printf 'fleet-phase %s ended %s after %s s, exit %s\\n' 'check'"
         )
         assert lines[-4 - loaded] == 'phases="${phases:+$phases,}check:${phase_seconds}s"'
-        assert lines[-3 - loaded : -3] == ci_load
+        assert lines[-3 - loaded : -3] == slice_load
         assert lines[-3:] == [
             sh_run_summary_line(names.log_path(TARGET)),
             'sudo -n rm -rf "$exec_root"',

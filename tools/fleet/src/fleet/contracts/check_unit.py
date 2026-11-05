@@ -58,7 +58,11 @@ CHECK_UNIT_HELPER: Final = "/usr/local/sbin/fleet-check-unit"
 #: How every script calls it: through sudo, never asking for a password.
 CHECK_UNIT: Final = f"sudo -n {CHECK_UNIT_HELPER}"
 
+#: Dispatch's share, under ``system.slice``, which holds every check's unit.
+DISPATCH_SLICE_NAME: Final = "system-dispatch.slice"
+
 __all__ = [
     "CHECK_UNIT",
     "CHECK_UNIT_HELPER",
+    "DISPATCH_SLICE_NAME",
 ]

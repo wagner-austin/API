@@ -1,10 +1,11 @@
-"""The CI load a check's build prints and the verdict reads (MCPs board task 349e25ee).
+"""The slice loads a check's build prints and the verdict reads.
 
-The lines run here under ``sh -eu``, as the builds run them, against a
-``cpu.stat`` this case writes in place of the CI slice's, between a start
-and an end that stand where the recipe's phase does. The tails are lavender's
-own: MCPs/execution-deploy's per-file lines from its 308 s run (fleet job
-5d96ec2e), colours and all.
+MCPs board tasks 349e25ee (the CI slice) and 51e3eac5 (the dispatch share).
+The lines run here under ``sh -eu``, as the builds run them, against
+``cpu.stat`` files this case writes in place of each slice's, between a
+start and an end that stand where the recipe's phase does. The tails are
+lavender's own: MCPs/execution-deploy's per-file lines from its 308 s run
+(fleet job 5d96ec2e), colours and all.
 """
 
 from __future__ import annotations
@@ -12,15 +13,20 @@ from __future__ import annotations
 import pathlib
 import subprocess
 
+from fleet.contracts.check_unit import DISPATCH_SLICE_NAME
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.core import verdict
-from fleet.core.ci_load import (
-    CI_CPU_STAT,
-    CI_LOAD_GONE,
-    CI_LOAD_NONE,
-    read_ci_load,
-    sh_ci_load_end_lines,
-    sh_ci_load_start_lines,
+from fleet.core.slice_load import (
+    CI_SLICE,
+    DISPATCH_SLICE,
+    MEASURED_SLICES,
+    SLICE_LOAD_MARKER,
+    MeasuredSlice,
+    read_slice_load,
+    sh_slice_load_end_lines,
+    sh_slice_load_start_lines,
+    slice_gone_line,
+    slice_none_line,
 )
 
 #: vitest's marks: a file passed, failed by a test, failed, and skipped.
@@ -46,69 +52,101 @@ LAVENDER_TAIL = (
 RUN = "MCPs-execution-deploy-lavender-1793327005"
 
 
-def _run(tmp_path: pathlib.Path, before: str | None, after: str | None) -> str:
-    """Run the start lines, change the stat file, run the end lines, and read the transcript.
+def _run(tmp_path: pathlib.Path, stats: dict[str, tuple[str | None, str | None]]) -> str:
+    """Run the start lines, change each stat file, run the end lines, and read the transcript.
 
     Args:
         tmp_path: The case's directory.
-        before: The stat file's text at the start, or None for no file.
-        after: Its text at the end, or None for no file.
+        stats: Each measured slice's field, with its stat file's text at the
+            start and at the end, None for no file.
 
     Returns:
         What the lines appended to the transcript.
     """
-    stat = tmp_path / "cpu.stat"
     log = tmp_path / "check.log"
     log.write_text("", encoding="utf-8")
-    if before is not None:
-        stat.write_text(before, encoding="utf-8")
-    change = f"rm -f '{stat}'" if after is None else f"printf '%s' '{after}' > '{stat}'"
+    slices: list[MeasuredSlice] = []
+    changes: list[str] = []
+    for measured in MEASURED_SLICES:
+        before, after = stats[measured["field"]]
+        stat = tmp_path / f"{measured['field']}.cpu.stat"
+        if before is not None:
+            stat.write_text(before, encoding="utf-8")
+        changes.append(f"rm -f '{stat}'" if after is None else f"printf '%s' '{after}' > '{stat}'")
+        slices.append(
+            MeasuredSlice(name=measured["name"], cpu_stat=str(stat), field=measured["field"])
+        )
     script = "\n".join(
-        [*sh_ci_load_start_lines(str(stat)), change, *sh_ci_load_end_lines(str(stat), str(log))]
+        [
+            *sh_slice_load_start_lines(tuple(slices)),
+            *changes,
+            *sh_slice_load_end_lines(tuple(slices), str(log)),
+        ]
     )
     subprocess.run(["sh", "-eu", "-c", script], check=True, timeout=30)
     return log.read_text(encoding="utf-8")
 
 
 class TestTheLinesOnTheNode:
-    def test_a_slice_that_ran_through_the_check_prints_its_cpu_seconds_and_the_wall(
+    def test_each_slice_that_ran_through_the_check_prints_its_cpu_seconds_and_the_wall(
         self, tmp_path: pathlib.Path
     ) -> None:
         printed = _run(
             tmp_path,
-            "usage_usec 1000000000\nuser_usec 7\n",
-            "usage_usec 1412500000\nuser_usec 9\n",
+            {
+                "ci": ("usage_usec 1000000000\nuser_usec 7\n", "usage_usec 1412500000\n"),
+                "dispatch": ("usage_usec 5000000\n", "usage_usec 1468800000\nuser_usec 1\n"),
+            },
         )
-        assert printed == (
-            f"FLEET_CI_LOAD: {CI_SLICE_NAME} used 412 CPU-seconds in the 0 s the check ran\n"
-        )
-        assert read_ci_load(printed) == "412s/0s"
 
-    def test_a_node_with_no_slice_says_so(self, tmp_path: pathlib.Path) -> None:
-        printed = _run(tmp_path, None, None)
-        assert printed == f"{CI_LOAD_NONE}\n"
-        assert read_ci_load(printed) == "none"
+        assert printed == (
+            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 412 CPU-seconds in the 0 s the check ran\n"
+            f"FLEET_SLICE_LOAD: {DISPATCH_SLICE_NAME} used 1463 CPU-seconds in the 0 s the "
+            "check ran\n"
+        )
+        assert read_slice_load(printed, CI_SLICE) == "412s/0s"
+        assert read_slice_load(printed, DISPATCH_SLICE) == "1463s/0s"
+
+    def test_a_node_without_a_slice_says_so_for_that_slice_alone(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        printed = _run(
+            tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 0\n", "usage_usec 0\n")}
+        )
+
+        assert printed == (
+            f"{slice_none_line(CI_SLICE)}\n"
+            f"FLEET_SLICE_LOAD: {DISPATCH_SLICE_NAME} used 0 CPU-seconds in the 0 s the check ran\n"
+        )
+        assert read_slice_load(printed, CI_SLICE) == "none"
+        assert read_slice_load(printed, DISPATCH_SLICE) == "0s/0s"
 
     def test_a_slice_gone_by_the_end_says_so_and_the_build_goes_on(
         self, tmp_path: pathlib.Path
     ) -> None:
-        printed = _run(tmp_path, "usage_usec 5\n", None)
-        assert printed == f"{CI_LOAD_GONE}\n"
-        assert read_ci_load(printed) == "gone"
+        printed = _run(tmp_path, {"ci": (None, None), "dispatch": ("usage_usec 5\n", None)})
 
-    def test_the_node_s_lines_read_the_ci_slice(self) -> None:
-        expected = f"/sys/fs/cgroup/{CI_SLICE_NAME}/cpu.stat"
-        assert expected == CI_CPU_STAT
+        assert printed == f"{slice_none_line(CI_SLICE)}\n{slice_gone_line(DISPATCH_SLICE)}\n"
+        assert read_slice_load(printed, DISPATCH_SLICE) == "gone"
+        assert read_slice_load(printed, CI_SLICE) == "none"
+
+    def test_the_node_s_lines_read_the_ci_slice_and_dispatch_s_share(self) -> None:
+        assert [measured["cpu_stat"] for measured in MEASURED_SLICES] == [
+            f"/sys/fs/cgroup/{CI_SLICE_NAME}/cpu.stat",
+            f"/sys/fs/cgroup/system.slice/{DISPATCH_SLICE_NAME}/cpu.stat",
+        ]
+        assert [measured["field"] for measured in MEASURED_SLICES] == ["ci", "dispatch"]
 
 
 class TestTheReading:
     def test_a_tail_without_the_line_is_unread_and_the_last_line_counts(self) -> None:
-        assert read_ci_load("make: *** [check] Error 2\n") == "unread"
+        assert read_slice_load("make: *** [check] Error 2\n", CI_SLICE) == "unread"
         two = (
-            f"FLEET_CI_LOAD: {CI_SLICE_NAME} used 1 CPU-seconds in the 2 s the check ran\n"
-            f"FLEET_CI_LOAD: {CI_SLICE_NAME} used 30 CPU-seconds in the 40 s the check ran\n"
+            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 1 CPU-seconds in the 2 s the check ran\n"
+            f"FLEET_SLICE_LOAD: {CI_SLICE_NAME} used 30 CPU-seconds in the 40 s the check ran\n"
         )
-        assert read_ci_load(two) == "30s/40s"
+        assert read_slice_load(two, CI_SLICE) == "30s/40s"
+        assert read_slice_load(two, DISPATCH_SLICE) == "unread"
 
     def test_the_slowest_files_are_read_through_the_colours_slowest_first(self) -> None:
         assert verdict.read_slowest(LAVENDER_TAIL) == (
@@ -145,10 +183,13 @@ class TestTheReading:
             f"{case}[grandma-api]:654s,{case}[turkic-api]:585s,{case}[transcript-api]:582s"
         )
 
-    def test_both_reach_the_line_a_closure_cites(self) -> None:
+    def test_every_reading_reaches_the_line_a_closure_cites(self) -> None:
         tail = (
             LAVENDER_TAIL
-            + f"FLEET_CI_LOAD: {CI_SLICE_NAME} used 2111 CPU-seconds in the 664 s the check ran\n"
+            + f"{SLICE_LOAD_MARKER}: {CI_SLICE_NAME} used 2111 CPU-seconds in the 664 s the "
+            + "check ran\n"
+            + f"{SLICE_LOAD_MARKER}: {DISPATCH_SLICE_NAME} used 940 CPU-seconds in the 664 s the "
+            + "check ran\n"
             + "CHECK OVER BUDGET: execution took 308s, over the 300s budget by 8s.\n"
         )
         judged = verdict.judge(
@@ -167,6 +208,6 @@ class TestTheReading:
             "budget=over:308s/300s ended=2026-10-30T02:40:00Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{RUN}.log run={RUN} workers=3 "
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
-            "tests/served/proxy.test.ts:7s ci=2111s/664s "
+            "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s "
             "generation=unread began=unread phases=unread steps=unread registry=unread"
         )

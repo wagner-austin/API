@@ -63,7 +63,6 @@ from fleet.contracts.project import MAKE_TARGET
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
-from fleet.core.ci_load import CI_CPU_STAT, sh_ci_load_end_lines, sh_ci_load_start_lines
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -74,6 +73,11 @@ from fleet.core.names import (
 from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import sh_phase_lines
 from fleet.core.run_summary import sh_run_summary_line
+from fleet.core.slice_load import (
+    MEASURED_SLICES,
+    sh_slice_load_end_lines,
+    sh_slice_load_start_lines,
+)
 from fleet.core.tool_caches import sh_build_lines, tool_caches_directory
 
 #: The user whose rootless daemon a docker project's build runs against.
@@ -206,7 +210,7 @@ def isolated_build_lines(
         lines.append("fi")
     recipe = names.recipe_directory("$exec_root", path)
     shared = f"flock --shared '{EXEC_LANE_LOCK}'"
-    lines.extend(sh_ci_load_start_lines(CI_CPU_STAT))
+    lines.extend(sh_slice_load_start_lines(MEASURED_SLICES))
     lines.extend(
         sh_phase_lines(
             phase=MAKE_TARGET,
@@ -214,7 +218,7 @@ def isolated_build_lines(
             log=log,
         )
     )
-    lines.extend(sh_ci_load_end_lines(CI_CPU_STAT, log))
+    lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
     lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")
