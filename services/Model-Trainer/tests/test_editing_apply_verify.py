@@ -470,7 +470,14 @@ def test_parameter_digests_covers_every_parameter_the_model_has() -> None:
 def test_changed_parameters_reports_additions_removals_and_moves() -> None:
     before = {"a": 1.0, "b": 2.0, "edited": 3.0, "gone": 4.0}
     after = {"a": 1.0, "b": 9.0, "edited": 99.0, "added": 5.0}
-    assert changed_parameters(before, after, "edited") == ("added", "b", "gone")
+    assert changed_parameters(before, after, frozenset(("edited",))) == ("added", "b", "gone")
+
+
+def test_changed_parameters_allows_every_name_in_the_expected_set() -> None:
+    """A weight program writes several parameters; none of them is a surprise."""
+    before = {"w1": 1.0, "b1": 2.0, "w2": 3.0}
+    after = {"w1": 7.0, "b1": 8.0, "w2": 4.0}
+    assert changed_parameters(before, after, frozenset(("w1", "b1"))) == ("w2",)
 
 
 def test_input_output_orientation_transposes_only_when_told_to() -> None:
