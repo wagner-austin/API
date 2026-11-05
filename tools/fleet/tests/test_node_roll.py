@@ -35,7 +35,7 @@ from tests._node_agent_fixtures import (
 from tests._queue_fakes import DEFAULT_JOB_ID, FakeQueue, queue_job, tick_body
 from tests._registry import write_registry
 from tests._roll_reads import NEXT_COMMIT, ROLLED_COMMIT, roll_read
-from tests.conftest import FakeRun, workspace_document
+from tests.conftest import FakeRun, FakeTempRoot, workspace_document
 
 __all__ = ["_credentials_in_env", "_sourced_config"]
 
@@ -76,6 +76,23 @@ class TestTheServesCommit:
     def test_is_the_extraction_its_registry_was_read_from(self, config_path: pathlib.Path) -> None:
         assert rolled.extraction_commit(config_path) == ROLLED_COMMIT
         assert run_cli.registry_commit(config_path) == ROLLED_COMMIT
+
+    def test_a_scratch_root_reached_through_a_link_still_names_the_commit(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """The loader resolves ``--config``; the scratch root is spelled as
+        declared, a link on some hosts (``/dev/shm`` to ``/run/shm``)."""
+        real = tmp_path / "run-shm"
+        registry = real / scratch.EXTRACTIONS_DIR / ROLLED_COMMIT / REGISTRY_DIRECTORY
+        registry.mkdir(parents=True)
+        linked = tmp_path / "dev-shm"
+        linked.symlink_to(real, target_is_directory=True)
+        _test_hooks.temp_root = FakeTempRoot(linked)
+
+        loaded = (linked / scratch.EXTRACTIONS_DIR / ROLLED_COMMIT / REGISTRY_DIRECTORY).resolve()
+
+        assert loaded == registry
+        assert rolled.extraction_commit(loaded) == ROLLED_COMMIT
 
     def test_a_checkout_s_registry_is_no_commit_s(self, tmp_path: pathlib.Path) -> None:
         checkout = tmp_path / "API" / pathlib.PurePosixPath(REGISTRY_DIRECTORY)
