@@ -2,7 +2,7 @@
   "worker_ram_gb": 16.0,
   "minimum_workers": 1,
   "worker_cores": 8,
-  "worker_cores_measurement": "Fleet job 46eb328f (MCPs 92c6776bc, lavender flushed, 2026-11-05) ran this check's cold build in 305 s: its nix daemon and check unit took 1463.8 CPU-s of lavender's 8-core dispatch share, beside 386.5 CPU-s of two checks the fleet placed into that share while it was charged one core. Its one worker is the nix daemon, whose max-jobs is the node's dispatch share and whose build gate fills it, so it is charged lavender's whole share, 8; 1463.8 CPU-s over the 300 s budget is 4.9 cores averaged, within 8 (MCPs board task 51e3eac5).",
+  "worker_cores_measurement": "Fleet job dd26deef (MCPs d1cb13fc3, registry b082d2681, lavender's nix store flushed, 2026-11-05) ran this check's cold build in 268 s with nothing else placed on lavender, and its verdict line records dispatch=1360s/268s: the CPU-seconds of lavender's 8-core dispatch share, which holds the check's unit and its nix daemon. That is 5.1 cores averaged over the run, within 8. Its one worker is the nix daemon, whose max-jobs is the node's dispatch share and whose build gate fills it, so it is charged lavender's whole share, 8. Charged one core, fleet job 46eb328f shared that share with two checks the fleet placed beside it, a sampled 386.5 CPU-s beside its own 1463.8, and took 306 s (MCPs board task 51e3eac5).",
   "expected_minutes": 120,
   "required_tags": [
     "linux",
