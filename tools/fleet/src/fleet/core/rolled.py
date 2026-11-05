@@ -290,6 +290,12 @@ def extraction_commit(registry: pathlib.Path) -> str | None:
     commit is the name of the directory :func:`extract_rolled_tree` made,
     and every launcher there has been passes the same layout.
 
+    BOTH SIDES ARE RESOLVED. The workspace loader resolves ``--config``
+    (:func:`fleet.cli._config.load_workspace`) and the scratch root is
+    spelled as declared, so on a host whose scratch root is reached through
+    a symbolic link (``/dev/shm`` is one to ``/run/shm`` on some Debian
+    releases) an unresolved comparison would refuse every serve there.
+
     Args:
         registry: The registry directory the agent loaded.
 
@@ -302,8 +308,9 @@ def extraction_commit(registry: pathlib.Path) -> str | None:
     if registry.parts[-len(layout) :] != layout:
         return None
     tree = registry.parents[len(layout) - 1]
+    extractions = scratch.directory(scratch.EXTRACTIONS_DIR).resolve()
     if (
-        tree.parent != scratch.directory(scratch.EXTRACTIONS_DIR)
+        tree.parent.resolve() != extractions
         or commit_tree.COMMIT_PATTERN.fullmatch(tree.name) is None
     ):
         return None
