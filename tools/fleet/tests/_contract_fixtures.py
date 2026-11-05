@@ -92,6 +92,7 @@ def node(
         cxx=None,
         docker=None,
         stack=None,
+        netns=None,
         budget=BUDGET,
         models=models,
     )

@@ -11,7 +11,8 @@ ask after the stack line, whatever the stack line found (MCPs board task
 939ec5c7), so each case's call log ends with that ask and the fake, holding
 no such container, answers ``testdb=no=``. The ``nixos-test`` line's one
 ``sh -c`` through the helper follows it (MCPs board task 3268afdf), and it
-asks no docker, so it logs the helper's line alone.
+asks no docker, so it logs the helper's line alone; so does the ``netns``
+line's after it (MCPs board task 61983278).
 
 Every docker ask goes through MCPs' fleet-check-unit's ``run``, where builds
 run (MCPs board tasks 28c43011 and bc8c445c): the fake ``sudo`` logs the
@@ -30,7 +31,7 @@ import subprocess
 
 import pytest
 
-from fleet.contracts.capability import STACK_IMAGES, STACK_NETWORK
+from fleet.contracts.capability import NETNS_PROGRAM, STACK_IMAGES, STACK_NETWORK
 from fleet.contracts.check_unit import CHECK_UNIT, CHECK_UNIT_HELPER
 from fleet.contracts.detection import TESTDB_CONTAINER
 from fleet.contracts.tagged_tools import NIXOS_TEST_PROGRAM
@@ -47,6 +48,10 @@ TESTDB_ASK = f"container inspect --format {{{{.Config.Image}}}} {TESTDB_CONTAINE
 #: the testdb line's (MCPs board task 3268afdf); it asks no docker, so the
 #: helper's line is the only one it logs.
 NIXOS_TEST_ASK = f"{UNIT} sh -c {NIXOS_TEST_PROGRAM}"
+
+#: The ``netns`` line's one ask through a unit, made on every run after the
+#: nixos-test line's (MCPs board task 61983278); it asks no docker either.
+NETNS_ASK = f"{UNIT} sh -c {NETNS_PROGRAM}"
 
 
 def test_the_stack_line_asks_for_the_network_every_image_and_the_version_inside_a_unit() -> None:
@@ -178,6 +183,7 @@ class TestTheStackLineUnderSh:
             *_in_unit("version --format {{.Server.Version}}"),
             *_in_unit(TESTDB_ASK),
             NIXOS_TEST_ASK,
+            NETNS_ASK,
         ]
 
     def test_a_daemon_without_the_network_answers_no_and_asks_for_no_image(
@@ -191,6 +197,7 @@ class TestTheStackLineUnderSh:
             *_in_unit(f"network inspect {STACK_NETWORK}"),
             *_in_unit(TESTDB_ASK),
             NIXOS_TEST_ASK,
+            NETNS_ASK,
         ]
         assert list(fields)[-2:] == ["apt-get", "pipx"]
 
@@ -203,6 +210,7 @@ class TestTheStackLineUnderSh:
             *_in_unit(f"image inspect {' '.join(STACK_IMAGES)}"),
             *_in_unit(TESTDB_ASK),
             NIXOS_TEST_ASK,
+            NETNS_ASK,
         ]
 
     def test_a_unit_that_cannot_reach_docker_answers_no_on_both_lines(
@@ -211,9 +219,15 @@ class TestTheStackLineUnderSh:
         """colossus, 2026-10-09: a login reached the daemon, the user manager's units did not."""
         fields = fields_of(_run_with_docker(tmp_path, 0, 0, unit_starts=False))
 
-        assert (fields["stack"], fields["testdb"], fields["nixos-test"]) == ("no=", "no=", "no=")
+        assert (fields["stack"], fields["testdb"], fields["nixos-test"], fields["netns"]) == (
+            "no=",
+            "no=",
+            "no=",
+            "no=",
+        )
         assert _calls(tmp_path) == [
             f"{UNIT} docker network inspect {STACK_NETWORK}",
             f"{UNIT} docker {TESTDB_ASK}",
             NIXOS_TEST_ASK,
+            NETNS_ASK,
         ]

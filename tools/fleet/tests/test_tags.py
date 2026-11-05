@@ -41,8 +41,9 @@ def _node(
     cxx: str | None = None,
     docker: str | None = None,
     stack: str | None = None,
+    netns: str | None = None,
 ) -> NodeConfig:
-    """Build a node declaration with the six fields tags derive from.
+    """Build a node declaration with the seven fields tags derive from.
 
     Args:
         gpu: Its CUDA device, or None for a CPU-only node.
@@ -51,6 +52,7 @@ def _node(
         cxx: The C++ toolchain version it declares, or None.
         docker: The rootless execdocker daemon version it declares, or None.
         stack: The stack daemon version it declares, or None.
+        netns: The rootlesskit version its nested-namespace probe reads, or None.
 
     Returns:
         The node.
@@ -67,6 +69,7 @@ def _node(
         cxx=cxx,
         docker=docker,
         stack=stack,
+        netns=netns,
         budget=NodeBudget(
             reserved_cores=4,
             reserved_ram_gb=4.0,
@@ -130,11 +133,26 @@ class TestNodeTags:
         assert missing_tags(node_tags(diphtheria), required) == ()
         assert missing_tags(node_tags(lavender_wsl), (NodeTag.TESTDB, NodeTag.CXX)) == ()
 
-    def test_the_vocabulary_is_linux_and_eleven_capabilities(self) -> None:
+    def test_a_node_declaring_rootlesskit_s_nested_namespace_carries_netns(self) -> None:
+        """colossus answered rootlesskit 2.3.6 inside its check unit on
+        2026-11-05 and carries it; demure, with no rootlesskit, declares none
+        and its browser suites wait for another node (MCPs board task
+        61983278)."""
+        colossus = _node(cxx="15.3.0", docker="29.9.1", netns="2.3.6")
+        demure = _node(cxx="13.3.0")
+        assert node_tags(colossus) == frozenset(
+            {NodeTag.LINUX, NodeTag.CXX, NodeTag.DOCKER, NodeTag.NETNS}
+        )
+        required = (NodeTag.CXX, NodeTag.NETNS)
+        assert missing_tags(node_tags(demure), required) == (NodeTag.NETNS,)
+        assert missing_tags(node_tags(colossus), required) == ()
+
+    def test_the_vocabulary_is_linux_and_thirteen_capabilities(self) -> None:
         """The dispatch queue's CHECK (MCPs migrations 532, 563, 569, 570, 571,
-        615, 622, 639, 648, 668, 707 and 722) admits these twelve words, so
-        the members' values are pinned in order, and neither ``windows`` nor
-        ``elevated`` is one of them (board task e705f08c)."""
+        615, 622, 639, 648, 668, 707 and 722, narrowed by 873 and widened by
+        902 and 918) admits these fourteen words, so the members' values are
+        pinned in order, and neither ``windows`` nor ``elevated`` is one of
+        them (board task e705f08c)."""
         assert [tag.value for tag in NodeTag] == [
             "linux",
             "gpu",
@@ -149,6 +167,7 @@ class TestNodeTags:
             "chrome",
             "pdftotext",
             "nixos-test",
+            "netns",
         ]
 
     def test_no_declaration_carries_a_tool_tag(self) -> None:
@@ -289,8 +308,9 @@ class TestDecodeNodeTag:
         with pytest.raises(
             JSONTypeError,
             match=r"^t must be one of linux, gpu, testdb, rust, cxx, docker, stack, ffmpeg, "
-            r"hooks, go, chrome, pdftotext, nixos-test, got 'podman'; .* a Rust or C\+\+ "
+            r"hooks, go, chrome, pdftotext, nixos-test, netns, got 'podman'; .* a Rust or C\+\+ "
             r"toolchain, the execution suite's rootless Docker daemon, the corvis compose stack, "
+            r"a rootlesskit namespace a check can nest its own in, "
             r"or a tool, the hooks check's environment, Google Chrome or NixOS VM-test support "
             r"its probe found\), and one it "
             r"does not carry could never be satisfied: no node runs windows or an elevated "

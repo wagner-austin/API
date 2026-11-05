@@ -387,6 +387,7 @@ class TestForRealUnderSh:
             "chrome",
             "pdftotext",
             "nixos-test",
+            "netns",
             "apt-get",
             "pipx",
         }

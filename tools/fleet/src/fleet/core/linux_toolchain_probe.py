@@ -10,6 +10,7 @@ probe's body without the dialect's prologue, which
 from __future__ import annotations
 
 from fleet.contracts.capability import (
+    NETNS_PROGRAM,
     RUST_CHECK_SUBCOMMANDS,
     RUST_CHECK_TOOLS,
     STACK_IMAGES,
@@ -133,6 +134,17 @@ from fleet.contracts.tagged_tools import (
 #: condition for the ``set -e`` reason above, so a node with nix and no kvm
 #: (colossus, 2026-11-03) answers ``nixos-test=no=``.
 #:
+#: THE ``netns`` LINE IS ASKED FROM INSIDE A CHECK'S UNIT too: whether an
+#: account may make a user and network namespace is decided by the account
+#: and the unit's sandbox a build runs in, not the probe's ssh login (MCPs
+#: board task 61983278). It answers the first line of
+#: :data:`fleet.contracts.capability.NETNS_PROGRAM` only when that made a
+#: rootlesskit slirp4netns namespace and a network namespace inside it, one
+#: ``if`` condition for the ``set -e`` reason above. Measured 2026-11-05:
+#: colossus, diphtheria, lacrymal, lavender, lenovold, loki, pendragon,
+#: sedona and serendipity answer ``rootlesskit version 2.3.6``; demure and
+#: emerald, with no rootlesskit, answer ``netns=no=``.
+#:
 #: THE ``cargo`` LINE answers cargo's version only when the Rust check's
 #: whole toolchain answers too (MCPs board task b1089284,
 #: :data:`fleet.contracts.capability.RUST_CHECK_SUBCOMMANDS` and
@@ -234,6 +246,11 @@ TOOLCHAIN_PROBE_BODY = (
     "  printf 'nixos-test=yes=%s\\n' \"$(printf '%s\\n' \"$n\" | head -n 1)\"\n"
     "else\n"
     "  printf 'nixos-test=no=\\n'\n"
+    "fi\n"
+    f"if r=\"$(unit sh -c '{NETNS_PROGRAM}' 2>/dev/null)\"; then\n"
+    "  printf 'netns=yes=%s\\n' \"$(printf '%s\\n' \"$r\" | head -n 1)\"\n"
+    "else\n"
+    "  printf 'netns=no=\\n'\n"
     "fi\n"
     "report apt-get apt-get\n"
     "report pipx pipx\n"

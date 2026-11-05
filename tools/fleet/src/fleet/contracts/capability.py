@@ -40,6 +40,17 @@ the whole tree and before any test runs:
   want of the image and the network. The version is the ServerVersion of
   the daemon the node's own account reaches, reported only when that daemon
   has the network and every one of the images.
+- ``netns`` (MCPs board task 61983278). A Vitest browser run's chromium
+  fails every request queued in its socket pool with ERR_NETWORK_CHANGED
+  when any address in its network namespace changes, and a container start
+  on the host adds a veth link-local address 1.66 to 4.4 seconds later: on
+  colossus on 2026-11-05 that stranded fiesta's and mcp-proxy's testers on
+  a static import, and inside ``rootlesskit --net=slirp4netns`` the same
+  start lost nothing. So mcp-shared, fiesta, mcp-proxy, coloring-book and
+  packages/stream-client run their browser suites in a namespace of their
+  own nested in rootlesskit's, and the probe answers rootlesskit's version
+  only when, inside a check's unit, ``rootlesskit --net=slirp4netns``
+  starts AND ``unshare --net`` creates a child inside it.
 
 A project that needs one requires the tag of the same name
 (:mod:`fleet.contracts.tags`), and a node carries it when its declaration
@@ -77,6 +88,7 @@ class Capability(StrEnum):
     CXX = "cxx"
     DOCKER = "docker"
     STACK = "stack"
+    NETNS = "netns"
 
 
 #: The network the stack's containers share, which the three suites'
@@ -106,13 +118,26 @@ RUST_CHECK_TOOLS: Final[tuple[str, ...]] = ("uv",)
 #: toolchain node-gyp finds is answered by ``g++ -dumpfullversion``; so is
 #: ``docker``, whose answer is the rootless execdocker daemon's, not whatever
 #: ``docker`` on the runner's PATH would reach; and so is ``stack``, whose
-#: answer is that PATH daemon's, and only when it holds the stack.
+#: answer is that PATH daemon's, and only when it holds the stack; and so is
+#: ``netns``, whose answer is ``rootlesskit --version``'s line, and only when
+#: the nested namespace :data:`NETNS_PROGRAM` asks for was made.
 PROBE_NAME: Final[dict[Capability, str]] = {
     Capability.RUST: "cargo",
     Capability.CXX: "cxx",
     Capability.DOCKER: "docker",
     Capability.STACK: "stack",
+    Capability.NETNS: "netns",
 }
+
+#: What the ``netns`` line runs inside a check's unit: a rootlesskit
+#: namespace on slirp4netns, a network namespace of its own made inside it,
+#: then rootlesskit's version. A node whose rootlesskit or slirp4netns is
+#: missing, or whose account may not make the namespaces, fails before the
+#: version and answers ``netns=no=``. Measured 2026-11-05 inside colossus's
+#: check unit as its build account: ``rootlesskit version 2.3.6``.
+NETNS_PROGRAM: Final = (
+    "rootlesskit --net=slirp4netns unshare --net true > /dev/null 2>&1 && rootlesskit --version"
+)
 
 #: Where a declared version is read, for the decode refusal.
 _SOURCE: Final[dict[Capability, str]] = {
@@ -124,6 +149,10 @@ _SOURCE: Final[dict[Capability, str]] = {
     Capability.STACK: (
         f"the node account's docker daemon reports as its ServerVersion while it holds "
         f"{STACK_NETWORK} and {', '.join(STACK_IMAGES)}, e.g. '29.8.1'"
+    ),
+    Capability.NETNS: (
+        "rootlesskit --version prints, read only when a check's unit made a rootlesskit "
+        "slirp4netns namespace with a network namespace nested inside it, e.g. '2.3.6'"
     ),
 }
 
@@ -142,11 +171,14 @@ def _version_in(capability: Capability, answer: str) -> str | None:
     Returns:
         The version, or None when the answer is not of the expected shape.
         cargo's is its SECOND word, because the last is its build date;
+        rootlesskit's is the third of exactly ``rootlesskit version <v>``;
         the ``cxx``, ``docker`` and ``stack`` lines carry the bare version.
     """
     words = answer.split()
     if capability is Capability.RUST:
         candidate = words[1] if len(words) >= 2 and words[0] == "cargo" else ""
+    elif capability is Capability.NETNS:
+        candidate = words[2] if words[:2] == ["rootlesskit", "version"] and len(words) == 3 else ""
     else:
         candidate = answer.strip()
     return candidate if VERSION.fullmatch(candidate) else None
@@ -244,6 +276,7 @@ def decode_capability(capability: Capability, value: JSONValue) -> str | None:
 
 
 __all__ = [
+    "NETNS_PROGRAM",
     "PROBE_NAME",
     "STACK_IMAGES",
     "STACK_NETWORK",

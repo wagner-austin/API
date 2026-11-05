@@ -18,6 +18,7 @@ import pytest
 from platform_core.json_utils import JSONTypeError
 
 from fleet.contracts.capability import (
+    NETNS_PROGRAM,
     PROBE_NAME,
     STACK_IMAGES,
     STACK_NETWORK,
@@ -46,6 +47,11 @@ RUST = Capability.RUST
 CXX = Capability.CXX
 DOCKER = Capability.DOCKER
 STACK = Capability.STACK
+NETNS = Capability.NETNS
+
+#: The netns line's answer inside colossus's check unit, 2026-11-05 (MCPs
+#: board task 61983278).
+COLOSSUS_2026_11_05_NETNS = "rootlesskit version 2.3.6"
 
 
 def _answered(name: str, present: bool, version: str) -> tuple[ToolReport, ...]:
@@ -72,8 +78,23 @@ class TestTheCapabilityTables:
             "cxx",
             "docker",
             "stack",
+            "netns",
         ]
-        assert PROBE_NAME == {RUST: "cargo", CXX: "cxx", DOCKER: "docker", STACK: "stack"}
+        assert PROBE_NAME == {
+            RUST: "cargo",
+            CXX: "cxx",
+            DOCKER: "docker",
+            STACK: "stack",
+            NETNS: "netns",
+        }
+
+    def test_the_netns_program_nests_a_network_namespace_in_rootlesskit_s(self) -> None:
+        """MCPs board task 61983278: the version is asked only after both
+        namespaces were made, so a node that cannot make them answers none."""
+        assert NETNS_PROGRAM == (
+            "rootlesskit --net=slirp4netns unshare --net true > /dev/null 2>&1"
+            " && rootlesskit --version"
+        )
 
     def test_the_stack_is_the_network_and_the_three_suites_images(self) -> None:
         """What doc-extract-api, transcriber-api and pg-backup-sidecar start
@@ -108,6 +129,20 @@ class TestMeasured:
         lavender-wsl's, whose daemon has no mcp-network."""
         assert measured(STACK, _answered("stack", True, "29.8.1")) == "29.8.1"
         assert measured(STACK, _answered("stack", False, "")) is None
+
+    def test_the_netns_line_reads_rootlesskit_s_third_word(self) -> None:
+        """MCPs board task 61983278: colossus's answer of 2026-11-05, and a
+        node whose check unit could not make the namespaces."""
+        assert measured(NETNS, _answered("netns", True, COLOSSUS_2026_11_05_NETNS)) == "2.3.6"
+        assert measured(NETNS, _answered("netns", False, "")) is None
+
+    @pytest.mark.parametrize(
+        "answer",
+        ["rootlesskit 2.3.6", "rootlesskit version", "rootlesskit version 2.3.6 extra"],
+    )
+    def test_a_netns_answer_of_another_shape_comes_back_verbatim(self, answer: str) -> None:
+        assert measured(NETNS, _answered("netns", True, answer)) == answer
+        assert not detected(NETNS, _answered("netns", True, answer))
 
     def test_an_absent_or_missing_line_measures_none(self) -> None:
         older = toolchain.read_reports(DIPHTHERIA_2026_09_23)
@@ -202,6 +237,15 @@ class TestDecodeCapability:
         ):
             decode_capability(CXX, "msvc")
 
+    def test_the_netns_refusal_names_the_nested_namespace_it_reads(self) -> None:
+        with pytest.raises(
+            JSONTypeError,
+            match=r"^netns must be null or the version rootlesskit --version prints, read only "
+            r"when a check's unit made a rootlesskit slirp4netns namespace with a network "
+            r"namespace nested inside it, e\.g\. '2\.3\.6', got 'rootlesskit version 2\.3\.6'",
+        ):
+            decode_capability(NETNS, COLOSSUS_2026_11_05_NETNS)
+
     def test_the_stack_refusal_names_the_network_and_every_image(self) -> None:
         with pytest.raises(
             JSONTypeError,
@@ -215,17 +259,26 @@ class TestDecodeCapability:
 
 class TestTheNodeContractCarriesBoth:
     def test_declared_toolchains_survive_encoding_and_read_back_by_capability(self) -> None:
-        declared = node("diphtheria", rust="1.98.1", cxx="13.3.0", docker="29.8.1", stack="29.8.2")
+        declared = node(
+            "diphtheria",
+            rust="1.98.1",
+            cxx="13.3.0",
+            docker="29.8.1",
+            stack="29.8.2",
+            netns="2.3.6",
+        )
         assert decode_like(encode_node_config(declared), declared) == declared
         assert declared_capability(declared, RUST) == "1.98.1"
         assert declared_capability(declared, CXX) == "13.3.0"
         assert declared_capability(declared, DOCKER) == "29.8.1"
         assert declared_capability(declared, STACK) == "29.8.2"
+        assert declared_capability(declared, NETNS) == "2.3.6"
         assert encode_node_config(node())["cxx"] is None
         assert encode_node_config(node())["docker"] is None
         assert encode_node_config(node())["stack"] is None
+        assert encode_node_config(node())["netns"] is None
 
-    @pytest.mark.parametrize("key", ["rust", "cxx", "docker", "stack"])
+    @pytest.mark.parametrize("key", ["rust", "cxx", "docker", "stack", "netns"])
     def test_an_absent_key_is_refused(self, key: str) -> None:
         encoded = encode_node_config(node())
         del encoded[key]
