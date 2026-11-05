@@ -222,6 +222,7 @@ class TestTheNextTick:
             "action": "start",
             "node": "lavender",
             "runId": DEMO_RUN_ID,
+            "workers": _ledger(sourced_config)[-1]["workers"],
             "leaseSeconds": node_collect.CLAIM_LEASE_SECONDS,
             "agent": "fleet-node-lavender",
             "sessionId": endpoint.arguments[1]["sessionId"],

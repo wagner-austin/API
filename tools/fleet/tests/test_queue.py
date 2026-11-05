@@ -17,6 +17,7 @@ from platform_core.mcp_testing import DECLARED_FLEET_URL, stack_endpoint_files
 
 from fleet.contracts.dispatch import ClosingStatus, DispatchLane
 from fleet.contracts.tags import NodeTag
+from fleet.contracts.width_offer import WidthOffer
 from fleet.core import _test_hooks, queue
 from tests._queue_fakes import (
     DEFAULT_SHA,
@@ -115,6 +116,7 @@ class TestClaim:
                 tags=(),
                 node=None,
                 projects=None,
+                widths=(),
                 lease_seconds=3600,
                 identity=RUNNER_IDENTITY,
             )
@@ -134,6 +136,7 @@ class TestClaim:
             tags=(NodeTag.LINUX, NodeTag.GPU),
             node=None,
             projects=None,
+            widths=(),
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
@@ -168,7 +171,8 @@ class TestClaim:
         }
 
     def test_a_node_scoped_runner_sends_its_node_and_the_projects_it_fits(self) -> None:
-        """MCPs board task 939ec5c7: the queue offers it only those projects."""
+        """MCPs board task 939ec5c7: the queue offers it only those projects.
+        MCPs board task 1964fc15: with the width it would grant each."""
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
         _test_hooks.http_post = endpoint
 
@@ -178,6 +182,10 @@ class TestClaim:
             tags=(NodeTag.LINUX,),
             node="lavender",
             projects=("libs/demo", "tools/fleet"),
+            widths=(
+                WidthOffer(project="libs/demo", workers=4),
+                WidthOffer(project="tools/fleet", workers=2),
+            ),
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
@@ -185,6 +193,10 @@ class TestClaim:
         assert endpoint.arguments[0]["node"] == "lavender"
         assert endpoint.arguments[0]["lane"] == "node"
         assert endpoint.arguments[0]["projects"] == ["libs/demo", "tools/fleet"]
+        assert endpoint.arguments[0]["widths"] == [
+            {"project": "libs/demo", "workers": 4},
+            {"project": "tools/fleet", "workers": 2},
+        ]
 
     def test_a_hub_runner_sends_the_hub_lane_and_no_tags(self) -> None:
         endpoint = FakeQueue([dump_json_str({"claimed": None})])
@@ -196,12 +208,14 @@ class TestClaim:
             tags=(),
             node=None,
             projects=None,
+            widths=(),
             lease_seconds=900,
             identity=RUNNER_IDENTITY,
         )
 
         assert endpoint.arguments[0]["lane"] == "hub"
         assert endpoint.arguments[0]["tags"] == []
+        assert "widths" not in endpoint.arguments[0]
 
 
 class TestReport:
@@ -216,6 +230,7 @@ class TestReport:
             job_id="aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa",
             node="lavender",
             run_id="libs-demo-lavender-1757000000",
+            workers=4,
             lease_seconds=3600,
             identity=RUNNER_IDENTITY,
         )
@@ -225,6 +240,8 @@ class TestReport:
         assert endpoint.arguments[0]["action"] == "start"
         assert endpoint.arguments[0]["runId"] == "libs-demo-lavender-1757000000"
         assert endpoint.arguments[0]["node"] == "lavender"
+        # MCPs board task 1964fc15: the grant the queue's claim fit reads.
+        assert endpoint.arguments[0]["workers"] == 4
 
     def test_close_sends_an_exit_code_when_there_is_one(self) -> None:
         endpoint = FakeQueue([dump_json_str({"job": queue_job(status="failed")})])

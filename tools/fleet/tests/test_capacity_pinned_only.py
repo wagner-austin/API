@@ -78,9 +78,9 @@ class TestPinnedChecksOnly:
             "MCPs/watcher": _project(minimum_workers=2),
         }
 
-        assert fitting_projects(_diphtheria(), _state(host="diphtheria"), projects, LINUX_TAGS) == (
-            "MCPs/doc-extract-api",
-        )
+        offers = fitting_projects(_diphtheria(), _state(host="diphtheria"), projects, LINUX_TAGS)
+
+        assert [offer["project"] for offer in offers] == ["MCPs/doc-extract-api"]
 
     def test_the_runner_still_claims_when_a_pinned_project_fits(self) -> None:
         pinned = _project(minimum_workers=1, node="diphtheria")

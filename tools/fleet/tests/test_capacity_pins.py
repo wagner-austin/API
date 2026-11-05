@@ -52,8 +52,22 @@ def test_a_runner_is_offered_a_pinned_project_only_on_its_node() -> None:
         _node(host="diphtheria"), _state(host="diphtheria"), projects, LINUX_TAGS
     )
 
-    assert on_colossus == ("MCPs/any", "MCPs/served")
-    assert elsewhere == ("MCPs/any",)
+    assert [offer["project"] for offer in on_colossus] == ["MCPs/any", "MCPs/served"]
+    assert [offer["project"] for offer in elsewhere] == ["MCPs/any"]
+
+
+def test_each_fitting_project_is_offered_with_the_grant_assess_makes() -> None:
+    """MCPs board task 1964fc15: the claim offers the queue each width."""
+    projects = {"MCPs/served": _project(node="colossus"), "MCPs/any": _project()}
+    node, state = _node(host="colossus"), _state(host="colossus")
+
+    offers = fitting_projects(node, state, projects, LINUX_TAGS)
+
+    assert offers == tuple(
+        {"project": name, "workers": assess(node, state, projects[name], LINUX_TAGS)["workers"]}
+        for name in ("MCPs/any", "MCPs/served")
+    )
+    assert all(offer["workers"] >= 1 for offer in offers)
 
 
 def test_a_fleet_without_the_pinned_node_answering_names_the_pin() -> None:

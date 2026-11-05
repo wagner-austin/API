@@ -121,6 +121,13 @@ class TestClaiming:
         assert started["action"] == "start"
         assert started["node"] == "lavender"
         assert started["runId"] == DEMO_RUN_ID
+        # The claim offered the grant its launch then took, and the start
+        # report carried it (MCPs board task 1964fc15).
+        rows = records.read_ledger(
+            _config.load_workspace({_config.CONFIG_FLAG: str(sourced_config)}).ledger
+        )
+        assert claim["widths"] == [{"project": DEMO_PROJECT, "workers": rows[0]["workers"]}]
+        assert started["workers"] == rows[0]["workers"]
         # The node's two probes, capacity then toolchain (two ssh calls each),
         # BEFORE the claim, then the mirror and the commit probe, then the
         # node's mirror asked what it holds, and the commit bundled less
