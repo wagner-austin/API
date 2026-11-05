@@ -20,7 +20,7 @@ import threading
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import dump_json_str, require_dict
 
 from fleet.cli import _config, node_agent, node_collect, node_watch
 from fleet.cli.node_launch import Launcher, Launching
@@ -120,10 +120,8 @@ class TestAClaimWhileItsJobLaunches:
     ) -> None:
         if shared_resource:
             document = sourced_document((NPM_CI,))
-            projects = document["projects"]
-            assert isinstance(projects, dict)
-            demo = projects["libs/demo"]
-            assert isinstance(demo, dict)
+            projects = require_dict(document, "projects")
+            demo = require_dict(projects, "libs/demo")
             demo["exclusive_resources"] = ["corvis-fleet-testdb"]
             projects["libs/other"] = {**demo}
             document["node_local_resources"] = ["corvis-fleet-testdb"]
