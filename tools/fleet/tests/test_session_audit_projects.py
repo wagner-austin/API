@@ -49,3 +49,17 @@ def test_one_linux_project_checks_the_session_audit_package() -> None:
     project = require_project(workspace, "MCPs/packages/session-audit-linux")
     assert project["required_tags"] == (NodeTag.LINUX, NodeTag.TESTDB, NodeTag.CXX)
     assert project["exclusive_resources"] == ("corvis-fleet-testdb",)
+
+
+def test_the_lane_needs_more_workers_than_lenovold_affords() -> None:
+    """Three workers, so lenovold's runner, which affords two, is never offered it.
+
+    MCPs board task f3dcc7b1: 9 of lenovold's 10 checks of the lane to
+    2026-11-06T23:56Z failed on the 300 s budget alone (301 to 362 s, every
+    case passing), one of them refusing board task 1c2aafcf's publish, while
+    four-worker-and-up nodes ran it in 104 to 220 s. API 76bcb74c1 kept
+    MCPs/packages/db off lenovold the same way.
+    """
+    workspace = decode_fleet_workspace(shipped_document())
+    project = require_project(workspace, "MCPs/packages/session-audit-linux")
+    assert project["minimum_workers"] == 3
