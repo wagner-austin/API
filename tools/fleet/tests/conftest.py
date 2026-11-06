@@ -441,6 +441,7 @@ def workspace_document() -> JSONObject:
         "native_evidence_seconds": 600,
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
+        "mirrors": "runs/mirrors",
     }
 
 

@@ -87,6 +87,7 @@ def _workspace_document() -> JSONObject:
         "ledger": "ledger.jsonl",
         "feed": "feed.jsonl",
         "leases": "leases.json",
+        "mirrors": "mirrors",
     }
 
 

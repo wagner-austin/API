@@ -97,6 +97,7 @@ def _workspace() -> FleetWorkspace:
         ledger="ledger.jsonl",
         feed="feed.jsonl",
         leases="leases.json",
+        mirrors="mirrors",
     )
 
 

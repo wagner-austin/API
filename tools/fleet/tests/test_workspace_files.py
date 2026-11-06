@@ -14,6 +14,7 @@ from typing import Final
 import pytest
 from platform_core.json_utils import JSONObject, JSONTypeError, require_dict
 
+from fleet.cli._config import LoadedWorkspace
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core.workspace_files import project_key, read_workspace_document
 from tests._registry import SHIPPED_REGISTRY, shipped_document, write_registry
@@ -71,7 +72,23 @@ def test_the_shipped_registry_assembles_into_a_workspace_that_decodes() -> None:
         "ledger",
         "feed",
         "leases",
+        "mirrors",
     }
+
+
+def test_the_shipped_mirrors_sit_on_the_hub_s_own_disk_and_not_with_its_records(
+    tmp_path: pathlib.Path,
+) -> None:
+    """The records resolve under ``runs/``, which the hub mounts from
+    emerald; a mirror there fetched each pushed commit onto emerald's disks
+    while every job of the gate waited (MCPs board task 5280a25d). So the
+    shipped mirrors are an absolute path the records directory cannot
+    reach, whichever directory ``--records-dir`` names."""
+    loaded = LoadedWorkspace(decode_fleet_workspace(shipped_document()), SHIPPED_REGISTRY, tmp_path)
+
+    assert loaded.mirrors.is_absolute()
+    assert loaded.mirrors == pathlib.Path("/home/corvis/.cache/fleet/mirrors")
+    assert not loaded.mirrors.is_relative_to(loaded.ledger.parent)
 
 
 def test_every_shipped_registry_file_is_at_most_six_hundred_lines() -> None:

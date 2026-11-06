@@ -73,6 +73,7 @@ def _document(
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
+        "mirrors": "runs/mirrors",
     }
 
 
