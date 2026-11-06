@@ -13,12 +13,13 @@ order over ssh is asserted with only the transport faked, as
 from __future__ import annotations
 
 import pathlib
+import stat
 import subprocess
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, commit_stage, dialect, names, remote, staging
+from fleet.core import _test_hooks, commit_stage, names, remote, staging
 from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok
 
@@ -103,7 +104,7 @@ def _node_mirror_at(hub: pathlib.Path, node: pathlib.Path, run_id: str, base: st
     head = _git(hub, "rev-parse", "HEAD")
     bundle = node.parent / f"{run_id}.bundle"
     commit_stage.bundle_commit(hub, sha=head, run_id=run_id, base=base, destination=bundle)
-    commands = commit_stage.unpack_commands(
+    script = commit_stage.unpack_script(
         mirror=str(node),
         bundle=str(bundle),
         run_id=run_id,
@@ -114,7 +115,7 @@ def _node_mirror_at(hub: pathlib.Path, node: pathlib.Path, run_id: str, base: st
     )
     (node.parent / f"{run_id}.stage").mkdir()
     (node.parent / run_id).mkdir()
-    _sh(dialect.checked_script(commands))
+    _sh(script)
 
 
 class TestTheNodeMirrorSaysWhatItHolds:
@@ -272,16 +273,14 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
         (held.parent / "run-3.stage").mkdir()
         held.mkdir()
         _sh(
-            dialect.checked_script(
-                commit_stage.unpack_commands(
-                    mirror=str(node),
-                    bundle=None,
-                    run_id="run-3",
-                    sha=first,
-                    scope=(".", ":(exclude)data"),
-                    staged=f"{held}.stage",
-                    target=str(held),
-                )
+            commit_stage.unpack_script(
+                mirror=str(node),
+                bundle=None,
+                run_id="run-3",
+                sha=first,
+                scope=(".", ":(exclude)data"),
+                staged=f"{held}.stage",
+                target=str(held),
             )
         )
         assert (held / "src" / "a.py").read_text(encoding="utf-8") == "print(1)\n"
@@ -316,6 +315,11 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
         assert _git(tree, "remote") == ""
         assert _git(tree, "status", "--porcelain") == ""
         assert _git(tree, "rev-parse", "HEAD^{tree}") == _git(hub, "rev-parse", "HEAD^{tree}")
+        # The tar was streamed through a named pipe and never written whole
+        # (MCPs board task 5280a25d: 1.17 s on colossus against 1.80 s).
+        staged = sorted((node.parent / "run-1.stage").iterdir())
+        assert [path.name for path in staged] == [names.TREE_FIFO_NAME]
+        assert stat.S_ISFIFO(staged[0].stat().st_mode)
 
     def test_a_bundle_whose_base_the_node_lacks_stops_before_any_tree(
         self, tmp_path: pathlib.Path
@@ -327,16 +331,14 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
         commit_stage.bundle_commit(hub, sha=second, run_id="run-1", base=first, destination=bundle)
         target = tmp_path / "run-1"
         target.mkdir()
-        script = dialect.checked_script(
-            commit_stage.unpack_commands(
-                mirror=str(tmp_path / "node.git"),
-                bundle=str(bundle),
-                run_id="run-1",
-                sha=second,
-                scope=(),
-                staged=str(tmp_path),
-                target=str(target),
-            )
+        script = commit_stage.unpack_script(
+            mirror=str(tmp_path / "node.git"),
+            bundle=str(bundle),
+            run_id="run-1",
+            sha=second,
+            scope=(),
+            staged=str(tmp_path),
+            target=str(target),
         )
 
         done = subprocess.run(
@@ -426,7 +428,7 @@ class TestStagingOneCommit:
         assert runner.calls[3] == ("git", "-C", hub, "cat-file", "-e", f"{TIP}^{{commit}}")
         assert runner.calls[4][-2:] == (f"refs/fleet/bundle/{DEMO_RUN_ID}", f"^{TIP}")
         assert runner.calls[6] == _scp(f"{staged_dir}/{names.ARCHIVE_NAME}", commit["bundle"])
-        unpack = commit_stage.unpack_commands(
+        unpack = commit_stage.unpack_script(
             mirror=self.MIRROR,
             bundle=f"{staged_dir}/{names.ARCHIVE_NAME}",
             run_id=DEMO_RUN_ID,
@@ -435,7 +437,7 @@ class TestStagingOneCommit:
             staged=staged_dir,
             target=self.TARGET,
         )
-        assert runner.stdin[9] == dialect.checked_script(unpack).encode("utf-8")
+        assert runner.stdin[9] == unpack.encode("utf-8")
         assert runner.timeouts[10] == remote.send_deadline_seconds(len(payload))
         assert not commit["bundle"].exists()
 

@@ -134,16 +134,14 @@ def test_a_clone_out_of_the_mirror_waits_while_a_write_into_it_holds_the_lock(
     (node.parent / "run-2.stage").mkdir()
     holder = MirrorLockHolder(node, node / "objects" / "pack" / "tmp_pack_live")
     script = Script(
-        dialect.checked_script(
-            commit_stage.unpack_commands(
-                mirror=str(node),
-                bundle=None,
-                run_id="run-2",
-                sha=sha,
-                scope=(),
-                staged=f"{target}.stage",
-                target=str(target),
-            )
+        commit_stage.unpack_script(
+            mirror=str(node),
+            bundle=None,
+            run_id="run-2",
+            sha=sha,
+            scope=(),
+            staged=f"{target}.stage",
+            target=str(target),
         )
     )
 
