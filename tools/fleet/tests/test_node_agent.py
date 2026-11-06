@@ -216,6 +216,7 @@ class TestClaiming:
             "--quiet",
             "--no-tags",
             "--force",
+            "--keep",
             REMOTE,
             f"+{DEFAULT_SHA}:refs/fleet/fetched",
         )

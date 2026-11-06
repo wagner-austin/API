@@ -14,12 +14,13 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Sequence
+from concurrent.futures import Executor
 
 from platform_core.mcp_client import McpHttpResponse
 
-from fleet.core import _test_hooks
+from fleet.core import _test_hooks, dispatch
 from tests._queue_fakes import FakeQueue
-from tests._thread_fakes import await_event
+from tests._thread_fakes import InOrderExecutor, await_event
 from tests.conftest import FakeRun
 
 #: The prefix of a launch thread's name (:class:`fleet.cli.node_launch.Launcher`).
@@ -27,12 +28,32 @@ LAUNCH_THREAD = "fleet-launch-"
 
 
 def on_a_launch_thread() -> bool:
-    """Whether the caller runs on one of a launcher's threads.
+    """Whether the caller runs on one of a launcher's threads, or stages for one.
 
     Returns:
-        True on a launch thread.
+        True on a launch thread or on the stage pool a launch opens
+        (:data:`fleet.core.dispatch.STAGE_POOL`).
     """
-    return threading.current_thread().name.startswith(LAUNCH_THREAD)
+    return threading.current_thread().name.startswith((LAUNCH_THREAD, dispatch.STAGE_POOL))
+
+
+def launches_beside_claims(*, workers: int, name: str) -> Executor:
+    """A real pool for the launcher, and every pool a launch opens in order.
+
+    Satisfies :class:`~fleet.core._test_hooks.ExecutorProtocol`. The launch
+    runs beside the claim, which is what these cases are about, while the
+    parts of its stage answer from one script in the order it lists them.
+
+    Args:
+        workers: How many the launcher's pool runs at once.
+        name: The pool's name.
+
+    Returns:
+        The executor.
+    """
+    if name.startswith(LAUNCH_THREAD):
+        return _test_hooks._default_executor(workers=workers, name=name)
+    return InOrderExecutor(name=name)
 
 
 class ThreadRoutedRun:
@@ -135,4 +156,10 @@ class ThreadRoutedQueue:
         return script(url, headers=headers, body=body, timeout_seconds=timeout_seconds)
 
 
-__all__ = ["LAUNCH_THREAD", "ThreadRoutedQueue", "ThreadRoutedRun", "on_a_launch_thread"]
+__all__ = [
+    "LAUNCH_THREAD",
+    "ThreadRoutedQueue",
+    "ThreadRoutedRun",
+    "launches_beside_claims",
+    "on_a_launch_thread",
+]

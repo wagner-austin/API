@@ -36,6 +36,7 @@ from fleet.core import _test_hooks_attempts as attempt_hooks
 from tests._registry import write_registry
 from tests._roll_reads import extracted_registry
 from tests._roster_fixtures import machine_document
+from tests._thread_fakes import in_order_executor
 
 #: The host-case markers and the execution run (board task 465689f5), and
 #: pytester, which test_host_execution runs that plugin's own sessions with.
@@ -508,11 +509,15 @@ def pin_clock(seconds: int) -> FakeClock:
 
 @pytest.fixture(name="config_path")
 def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Write a workspace document and pin the clock, which sleeps move.
+    """Write a workspace document, pin the clock, which sleeps move, and run each pool in order.
 
     A node runner's serve sleeps to its first fire boundary
     (:mod:`fleet.cli.node_serve`), so the sleep moves this clock rather than
-    waiting.
+    waiting. A dispatch stages its tree, registry and companions on a pool
+    (:data:`fleet.core.dispatch.STAGE_POOL`), and every dispatch case
+    scripts the node's answers in one order, so each pool runs its work in
+    the order it is handed (:func:`tests._thread_fakes.in_order_executor`);
+    a case about work running at once binds the real pool after this.
 
     Args:
         tmp_path: pytest's per-test temporary directory.
@@ -522,6 +527,7 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         rolled extraction of :data:`tests._roll_reads.ROLLED_COMMIT` lands.
     """
     pin_clock(DEMO_NOW)
+    _test_hooks.executor = in_order_executor
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     registry = extracted_registry(tmp_path / "scratch", now=DEMO_NOW)
     return write_registry(registry, workspace_document())

@@ -48,7 +48,7 @@ def _origin(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
 
 
 def _mirror(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Make a bare mirror that keeps every fetch as a pack.
+    """Make a bare mirror as the hub makes one, with git's own settings.
 
     Args:
         tmp_path: The case's directory.
@@ -58,8 +58,20 @@ def _mirror(tmp_path: pathlib.Path) -> pathlib.Path:
     """
     mirror = export.mirror_path(tmp_path / "mirrors", "wagner-austin-origin")
     export.ensure_mirror(mirror)
-    git(mirror, "config", "fetch.unpackLimit", "1")
     return mirror
+
+
+def _counted(mirror: pathlib.Path) -> dict[str, int]:
+    """The mirror's ``git count-objects -v``, each field a number.
+
+    Args:
+        mirror: The mirror.
+
+    Returns:
+        Loose objects as ``count``, packed ones as ``in-pack``, and so on.
+    """
+    lines = git(mirror, "count-objects", "-v").splitlines()
+    return {name: int(value) for name, value in (line.split(": ", 1) for line in lines)}
 
 
 def _in_pack(mirror: pathlib.Path) -> int:
@@ -71,8 +83,7 @@ def _in_pack(mirror: pathlib.Path) -> int:
     Returns:
         ``git count-objects -v``'s ``in-pack``.
     """
-    counted = dict(line.split(": ", 1) for line in git(mirror, "count-objects", "-v").splitlines())
-    return int(counted["in-pack"])
+    return _counted(mirror)["in-pack"]
 
 
 class TestTheRef:
@@ -99,6 +110,26 @@ class TestTheRef:
         assert git(mirror, "rev-parse", mirror_fetch.FETCHED_REF) == second
         assert _in_pack(mirror) == 6 + 3
         assert not is_held(mirror_fetch.turn_lock(mirror))
+
+    def test_a_small_fetch_lands_as_one_pack_and_no_loose_file(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """Both fetches are far under git's ``fetch.unpackLimit`` of 100
+        objects, which unpacked each object into a file of its own, a create
+        per object on the hub's NFS; each is kept as the one pack the remote
+        sent, which leaves no ``.keep`` file to bar git's repack."""
+        origin, first = _origin(tmp_path)
+        mirror = _mirror(tmp_path)
+        assert git(mirror, "config", "--default", "100", "--get", "fetch.unpackLimit") == "100"
+
+        mirror_fetch.fetch_commit(mirror, str(origin), first)
+        (origin / "b.txt").write_text("changed\n", encoding="utf-8")
+        git(origin, "commit", "--quiet", "--all", "-m", "second")
+        mirror_fetch.fetch_commit(mirror, str(origin), git(origin, "rev-parse", "HEAD"))
+
+        counted = _counted(mirror)
+        assert (counted["count"], counted["packs"], counted["in-pack"]) == (0, 2, 6 + 3)
+        assert sorted((mirror / "objects" / "pack").glob("*.keep")) == []
 
     def test_the_turn_is_held_beside_the_mirror(self, tmp_path: pathlib.Path) -> None:
         mirror = tmp_path / "mirrors" / "wagner-austin-MCPs.git"

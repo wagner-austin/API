@@ -35,7 +35,7 @@ from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.core import _test_hooks, host_claims, leases, names, queue, records, staging
 from fleet.core.workspace_files import read_workspace_document
 from tests._held_turns import is_held
-from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
+from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun, launches_beside_claims
 from tests._node_agent_fixtures import (
     PROBED,
     VERDICT_TASK,
@@ -153,7 +153,7 @@ class TestTwoProcessesOfOneHost:
     ) -> None:
         _one_check_at_once(sourced_config)
         digest = staging.digest(prebuilt_export(sourced_config))
-        _test_hooks.executor = _test_hooks._default_executor
+        _test_hooks.executor = launches_beside_claims
         release = threading.Event()
         _test_hooks.run = ThreadRoutedRun(
             claims=FakeRun([*PROBED, *PROBED, *PROBED, *PROBED]),

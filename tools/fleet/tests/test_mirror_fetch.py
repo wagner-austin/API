@@ -166,6 +166,7 @@ class TestFetchCommit:
             "--quiet",
             "--no-tags",
             "--force",
+            "--keep",
             REMOTE,
             f"+{SHA}:refs/fleet/fetched",
         )
@@ -377,6 +378,7 @@ class TestFetchRef:
                 "--quiet",
                 "--no-tags",
                 "--force",
+                "--keep",
                 REMOTE,
                 f"+main:{mirror_fetch.COMPANION_REF}",
             ),

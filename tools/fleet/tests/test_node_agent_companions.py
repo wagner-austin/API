@@ -251,6 +251,7 @@ class TestCompanions:
             "--quiet",
             "--no-tags",
             "--force",
+            "--keep",
             COMPANION_REMOTE,
             f"+{COMPANION_REF}:refs/fleet/companion",
         )

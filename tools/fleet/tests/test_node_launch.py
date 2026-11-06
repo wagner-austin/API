@@ -32,7 +32,7 @@ from fleet.contracts.workspace import require_project
 from fleet.core import _test_hooks, host_claims, names, queue, records, staging
 from fleet.core.queue_transport import answering
 from tests._holder_fakes import RecordingHolder
-from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
+from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun, launches_beside_claims
 from tests._node_agent_fixtures import (
     NPM_CI,
     PROBED,
@@ -133,7 +133,7 @@ class TestAClaimWhileItsJobLaunches:
             document["node_local_resources"] = ["corvis-fleet-testdb"]
             write_registry(sourced_config, document)
         digest = staging.digest(prebuilt_export(sourced_config))
-        _test_hooks.executor = _test_hooks._default_executor
+        _test_hooks.executor = launches_beside_claims
         release = threading.Event()
         _test_hooks.run = ThreadRoutedRun(
             claims=FakeRun([*PROBED, *PROBED]),
