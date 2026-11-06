@@ -19,7 +19,7 @@ import pathlib
 from platform_core import cli_args
 
 from fleet.contracts.workspace import FleetWorkspace, decode_fleet_workspace
-from fleet.core import export, host_claims, retire_owed, scratch
+from fleet.core import host_claims, retire_owed, scratch
 from fleet.core.workspace_files import read_workspace_document
 
 CONFIG_FLAG = "--config"
@@ -143,16 +143,25 @@ class LoadedWorkspace:
     def mirrors(self) -> pathlib.Path:
         """Directory holding one bare git mirror per exportable project.
 
-        Beside the ledger under ``runs/``, which the monorepo gitignores,
-        because a mirror is this machine's own cache of what the remotes
-        serve: history, not source, and never staged (the archive is read
-        out of it by ``git archive``, so the mirror itself is not in any
-        tree a dispatch carries).
+        A mirror is this machine's own cache of what the remotes serve:
+        history, not source, and never staged (the archive is read out of
+        it by ``git archive``, so the mirror itself is not in any tree a
+        dispatch carries).
+
+        DECLARED APART FROM THE RECORDS (MCPs board task 5280a25d). It sat
+        beside the ledger under ``runs/``, which the hub mounts from
+        emerald, so the first job of every push gate fetched the pushed
+        commit onto emerald's disks while every other job of the gate
+        waited its turn behind it: on 2026-11-06, with emerald's disks
+        saturated, that one fetch held the turn 20 s at 15:57Z and 8 s at
+        16:02Z, where the same fetch takes 0.86 s on the hub's own disk.
+        A cache rebuilt from the remotes is not a record the hub must keep
+        off its machines.
 
         Returns:
             The resolved directory.
         """
-        return self.ledger.parent / export.MIRRORS_DIRECTORY
+        return self._resolve(self.workspace["mirrors"])
 
     @property
     def host_claims(self) -> pathlib.Path:

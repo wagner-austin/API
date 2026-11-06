@@ -149,6 +149,14 @@ class FleetWorkspace(TypedDict):
             workspace can be moved without editing it.
         feed: Path to the append-only event stream subscribers tail.
         leases: Path to the live lease file. The only mutable one.
+        mirrors: Directory holding the hub's git mirror of each remote, a
+            cache rebuilt from the remotes and so declared apart from the
+            records, which the hub keeps on emerald's NFS export: every
+            fetch into a mirror there wrote its pack to emerald's disks
+            while each job of the gate waited for it (MCPs board task
+            5280a25d, 2026-11-06 on lacrymal, MCPs 74c1545d2 to
+            b833d06b7: 2.84 s, held 8 to 20 s while emerald was saturated,
+            against 0.86 s into the hub's own disk).
     """
 
     machines: dict[str, Machine]
@@ -163,6 +171,7 @@ class FleetWorkspace(TypedDict):
     ledger: str
     feed: str
     leases: str
+    mirrors: str
 
 
 def require_node(workspace: FleetWorkspace, name: str) -> NodeConfig:
@@ -242,6 +251,7 @@ def encode_fleet_workspace(workspace: FleetWorkspace) -> JSONObject:
         "ledger": workspace["ledger"],
         "feed": workspace["feed"],
         "leases": workspace["leases"],
+        "mirrors": workspace["mirrors"],
     }
 
 
@@ -539,6 +549,7 @@ def decode_fleet_workspace(value: JSONValue) -> FleetWorkspace:
         ledger=require_str(value, "ledger"),
         feed=require_str(value, "feed"),
         leases=require_str(value, "leases"),
+        mirrors=require_str(value, "mirrors"),
     )
 
 

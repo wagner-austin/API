@@ -37,10 +37,6 @@ from typing_extensions import TypedDict
 from fleet.contracts.source import PATH_PATTERN, InstallStep, ProjectCompanion, ProjectSource
 from fleet.core import _test_hooks, mirror_fetch
 
-#: The directory under the workspace's ``runs`` that holds one bare mirror
-#: per remote (:func:`remote_mirror_key`).
-MIRRORS_DIRECTORY = "mirrors"
-
 #: The deadline of a commit's or a companion's bundle, in seconds; a bundle
 #: of the largest repository's whole history, a node's first, is MCPs' 318
 #: MB pack (MCPs board task 1e0ee821), which git writes from its packs well
@@ -349,7 +345,6 @@ def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -
 __all__ = [
     "ARCHIVE_TIMEOUT_SECONDS",
     "COMPANION_FETCHES",
-    "MIRRORS_DIRECTORY",
     "CompanionExport",
     "PreparedCompanion",
     "companion_mirror_key",
