@@ -163,6 +163,9 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
             # process on a core (MCPs board task 51e3eac5).
             worker_cores=1,
             worker_cores_measurement=None,
+            # NO RELEASE ARCHIVE, SPELLED OUT: the bridge packages nothing a
+            # host runs (MCPs board task 0c8ace8d).
+            release_artifact=None,
         )
     )
     # Laid out as fleet's registry is (fleet.core.workspace_files, MCPs board
