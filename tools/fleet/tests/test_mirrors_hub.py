@@ -91,7 +91,7 @@ def test_every_mirror_holds_its_ref_and_no_dead_fetch_s_pack(
         old = [
             name
             for name, age in ages.items()
-            if age is not None and age >= mirror_fetch.FETCH_TURN["stale_seconds"]
+            if age is not None and age >= mirror_fetch.DEAD_PACK_SECONDS
         ]
         dead.extend(f"{mirror.name}: {name}" for name in old)
         readings.append(

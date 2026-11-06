@@ -4,9 +4,10 @@ Every node runner is its own process on the hub and all of them append to the
 same three files. On 2026-10-14 two finish rows appended at once left the
 ledger holding one row whole and fifteen bytes of the other, and every node
 runner stopped on ``InvalidJsonError`` for 36 minutes. Each case runs against a
-real record file and a real lock beside it: another process's turn is a lock
-file this process did not create, and its append is what the case's sleep does
-while this one waits.
+real record file and a real lock beside it: another process's turn is a real
+``flock`` on that lock through a descriptor the case opened
+(:class:`tests._held_turns.OtherTurn`), and its append is what that turn does
+before it lets go.
 """
 
 from __future__ import annotations
@@ -24,7 +25,8 @@ from platform_core.json_utils import InvalidJsonError, load_json_str
 from fleet.contracts.feed import decode_feed_event
 from fleet.contracts.ledger import LedgerEntry, decode_ledger_entry
 from fleet.contracts.retire_record import RetireRecord, RetireState
-from fleet.core import _test_hooks, file_turn, records
+from fleet.core import _test_hooks, records
+from tests._held_turns import OtherTurn, is_held
 
 _NOW = 1_791_971_310
 
@@ -103,7 +105,7 @@ def _run_ids(path: pathlib.Path) -> list[str]:
 
 
 @pytest.mark.parametrize("kind", sorted(APPENDERS))
-def test_an_append_writes_inside_its_turn_and_leaves_no_lock(
+def test_an_append_writes_inside_its_turn_and_lets_the_turn_go(
     kind: str, tmp_path: pathlib.Path
 ) -> None:
     path = tmp_path / "record.jsonl"
@@ -112,16 +114,16 @@ def test_an_append_writes_inside_its_turn_and_leaves_no_lock(
     write = _test_hooks.append_text
 
     def append_text(path: pathlib.Path, line: str) -> None:
-        held_while_writing.append(lock.exists())
+        held_while_writing.append(is_held(lock))
         write(path, line)
 
     _test_hooks.append_text = append_text
 
     APPENDERS[kind](path, "run-1")
 
-    assert {"held": held_while_writing, "lock left": lock.exists(), "rows": _run_ids(path)} == {
+    assert {"held": held_while_writing, "held after": is_held(lock), "rows": _run_ids(path)} == {
         "held": [True],
-        "lock left": False,
+        "held after": False,
         "rows": ["run-1"],
     }
 
@@ -130,52 +132,40 @@ def test_an_append_writes_inside_its_turn_and_leaves_no_lock(
 def test_an_append_waits_out_another_process_appending_then_follows_its_whole_line(
     kind: str, tmp_path: pathlib.Path
 ) -> None:
+    """The other process holds the turn and appends its line just before it
+    lets go; this append, asked for meanwhile, follows that whole line."""
     path = tmp_path / "record.jsonl"
-    lock = records.append_lock_path(path)
-    lock.write_text("fleet process 4242 pid 4242 turn other", encoding="utf-8")
-    slept: list[float] = []
+    theirs = tmp_path / "theirs.jsonl"
+    APPENDERS[kind](theirs, "run-other")
+    other = OtherTurn(records.append_lock_path(path))
 
-    def sleep(seconds: float) -> None:
-        # The other process ends its turn, and the next append is made in a
-        # turn of its own while this one is still waiting to look again.
-        slept.append(seconds)
-        lock.unlink()
-        APPENDERS[kind](path, "run-other")
+    def their_append() -> None:
+        with path.open("a", encoding="utf-8", newline="\n") as handle:
+            handle.write(theirs.read_text(encoding="utf-8"))
 
-    created = int(os.stat(lock).st_mtime)
-    _test_hooks.now = lambda: created
-    _test_hooks.sleep = sleep
+    ending = other.end_after(0.1, their_append)
 
     APPENDERS[kind](path, "run-mine")
+    ending.join()
 
-    assert {"slept": slept, "rows": _run_ids(path), "lock left": lock.exists()} == {
-        "slept": [file_turn.FIRST_LOOK_SECONDS],
-        "rows": ["run-other", "run-mine"],
-        "lock left": False,
-    }
+    assert _run_ids(path) == ["run-other", "run-mine"]
 
 
-def test_a_lock_left_by_a_process_that_died_mid_append_is_taken_away(
-    tmp_path: pathlib.Path,
-) -> None:
+def test_a_lock_file_left_by_earlier_turns_holds_nothing(tmp_path: pathlib.Path) -> None:
+    """The lock file stays after every turn, so a later append finds it
+    there, a day old, and takes the turn at once."""
     path = tmp_path / "ledger.jsonl"
     lock = records.append_lock_path(path)
-    lock.write_text("fleet process 4242 pid 4242 turn dead", encoding="utf-8")
-    created = int(os.stat(lock).st_mtime)
-    _test_hooks.now = lambda: created + records.APPEND_TURN["stale_seconds"]
-    slept: list[float] = []
-
-    def sleep(seconds: float) -> None:
-        slept.append(seconds)
-
-    _test_hooks.sleep = sleep
+    lock.touch()
+    day_ago = time.time() - 86_400
+    os.utime(lock, (day_ago, day_ago))
+    asked = time.monotonic()
 
     records.append_ledger(path, _row("run-after"))
 
-    assert {"slept": slept, "rows": _run_ids(path), "lock left": lock.exists()} == {
-        "slept": [],
+    assert {"rows": _run_ids(path), "quick": time.monotonic() - asked < 0.5} == {
         "rows": ["run-after"],
-        "lock left": False,
+        "quick": True,
     }
 
 
@@ -256,4 +246,4 @@ def test_a_torn_line_is_refused_naming_its_file_and_line(tmp_path: pathlib.Path)
 def test_the_lock_sits_beside_its_record() -> None:
     record = pathlib.Path("runs") / "ledger.jsonl"
 
-    assert records.append_lock_path(record) == pathlib.Path("runs") / "ledger.jsonl.lock"
+    assert records.append_lock_path(record) == pathlib.Path("runs") / "ledger.jsonl.turn"

@@ -31,6 +31,7 @@ from fleet.contracts.retire_record import (
     encode_retire_record,
 )
 from fleet.core import _test_hooks, dispatch, leases, records, remote, retire_owed
+from tests._held_turns import is_held
 from tests._toolchain_fixtures import node
 from tests.conftest import (
     DEMO_NOW,
@@ -223,7 +224,7 @@ class _InTurn(FakeRun):
         Returns:
             The next scripted result.
         """
-        self.held.append(self._lock.exists())
+        self.held.append(is_held(self._lock))
         return super().__call__(
             argv,
             timeout_seconds=timeout_seconds,
@@ -242,7 +243,7 @@ class TestOneRunsTurn:
     ) -> None:
         path = _path(tmp_path)
         retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
-        lock = path.parent / retire_owed.RETIRE_TURNS_DIRECTORY / f"{DEMO_RUN_ID}.lock"
+        lock = retire_owed.turn_path(path, DEMO_RUN_ID)
         settle = _InTurn(retire_replies()[:2], lock=lock)
         _test_hooks.run = settle
 
@@ -251,13 +252,31 @@ class TestOneRunsTurn:
         assert settle.held == [True, True]
         assert not lock.exists()
         retire_owed.owe(path, alias="lavender", run_id=OTHER_RUN_ID)
-        other = path.parent / retire_owed.RETIRE_TURNS_DIRECTORY / f"{OTHER_RUN_ID}.lock"
+        other = retire_owed.turn_path(path, OTHER_RUN_ID)
         stop = _InTurn(retire_replies()[:2], lock=other)
         _test_hooks.run = stop
 
         retire_owed.retire_or_raise(path, node(), alias="lavender", run_id=OTHER_RUN_ID)
 
         assert stop.held == [True, True]
+        assert not other.exists()
+
+    def test_a_turn_whose_retire_raised_removes_its_lock_file_too(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """One file per run would otherwise stay in the directory for every
+        run whose retire the node refused (MCPs board task 5280a25d)."""
+        path = _path(tmp_path)
+        retire_owed.owe(path, alias="lavender", run_id=DEMO_RUN_ID)
+        _test_hooks.run = FakeRun([ok(""), failed(1, HELD_OPEN)])
+
+        with pytest.raises(AppError, match="Device or resource busy"):
+            retire_owed.retire_or_raise(path, node(), alias="lavender", run_id=DEMO_RUN_ID)
+
+        assert retire_owed.turn_path(path, DEMO_RUN_ID) == (
+            tmp_path / "runs" / retire_owed.RETIRE_TURNS_DIRECTORY / f"{DEMO_RUN_ID}.turn"
+        )
+        assert not retire_owed.turn_path(path, DEMO_RUN_ID).exists()
 
     @pytest.mark.parametrize("ended", [RetireState.RETIRED, RetireState.FAILED])
     def test_a_run_another_turn_ended_is_not_sent_again(

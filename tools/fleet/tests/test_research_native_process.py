@@ -21,6 +21,7 @@ from fleet.cli import research_queue
 from fleet.contracts.dispatch import decode_job
 from fleet.contracts.research_worker import decode_worker, encode_worker
 from fleet.core import _test_hooks
+from tests._held_turns import is_held
 from tests._research_fixtures import research_job, worker
 from tests.test_research_hpc import _document, _row
 
@@ -92,7 +93,7 @@ def test_rendered_shell_and_native_cli_run_real_controller_children(
     else:
         assert result["returncode"] != 0
         assert "RESEARCH_CONTROLLER_PROCESS: exit 7" in result["stderr"]
-    assert not (directory / "poll.lock").exists()
+    assert not is_held(directory / "poll.turn")
     transcript = (directory / "controller.jsonl").read_text()
     assert [
         require_int(narrow_json_to_dict(load_json_str(line)), "exit")

@@ -1,27 +1,28 @@
-"""A mirror's fetch lands in a ref, one export at a time (MCPs board task 86f70457).
+"""A mirror's fetch lands in a ref, one export at a time (MCPs board tasks 86f70457 and 5280a25d).
 
 On diphtheria on 2026-10-22 six node runners each received MCPs' whole
 history, 133470 objects, for one commit, because the commit was fetched with
 no destination ref and the mirror never held one. The first cases here run
 real git against a real origin and a real bare mirror whose every fetch is
 kept as a pack, so the objects a fetch received are counted rather than
-inferred. The others hold the turn with a real lock file beside the mirror:
-another export's turn is a lock this process did not create, and what that
-export does is what the case's sleep does while this one waits.
+inferred. The others hold the turn with a real ``flock`` on the lock file
+beside the mirror (:class:`tests._held_turns.OtherTurn`): what that export
+does is what its turn does before it lets go.
 """
 
 from __future__ import annotations
 
 import os
 import pathlib
+import re
 import time
-from collections.abc import Callable
 
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, export, file_turn, mirror_fetch
+from fleet.core import _test_hooks, export, mirror_fetch
 from tests._git_fixtures import git
+from tests._held_turns import OtherTurn, is_held
 from tests.conftest import FakeRun, failed, ok
 
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
@@ -74,24 +75,6 @@ def _in_pack(mirror: pathlib.Path) -> int:
     return int(counted["in-pack"])
 
 
-def _sleeping(steps: list[Callable[[], None]], slept: list[float]) -> _test_hooks.SleepProtocol:
-    """A sleep that records each wait and runs the next step in it.
-
-    Args:
-        steps: Run in turn, one per sleep.
-        slept: Every wait asked for, appended in order.
-
-    Returns:
-        The sleep.
-    """
-
-    def sleep(seconds: float) -> None:
-        slept.append(seconds)
-        steps.pop(0)()
-
-    return sleep
-
-
 class TestTheRef:
     def test_a_later_commit_receives_only_what_the_fetched_one_lacks(
         self, tmp_path: pathlib.Path
@@ -115,28 +98,28 @@ class TestTheRef:
 
         assert git(mirror, "rev-parse", mirror_fetch.FETCHED_REF) == second
         assert _in_pack(mirror) == 6 + 3
-        assert not mirror_fetch.turn_lock(mirror).exists()
+        assert not is_held(mirror_fetch.turn_lock(mirror))
 
     def test_the_turn_is_held_beside_the_mirror(self, tmp_path: pathlib.Path) -> None:
         mirror = tmp_path / "mirrors" / "wagner-austin-MCPs.git"
 
         assert mirror_fetch.turn_lock(mirror) == (
-            tmp_path / "mirrors" / "wagner-austin-MCPs.git.fetch.lock"
-        )
-
-    def test_the_turn_outlasts_a_probe_and_the_whole_fetch_budget(self) -> None:
-        """A turn taken away while its fetch still runs would let a second
-        fetch write the one ref beside it."""
-        assert mirror_fetch.FETCH_TURN["stale_seconds"] > (
-            mirror_fetch.INIT_TIMEOUT_SECONDS + mirror_fetch.FETCH_BUDGET_SECONDS
+            tmp_path / "mirrors" / "wagner-austin-MCPs.git.fetch.turn"
         )
 
 
 class TestADeadFetchsPack:
+    def test_outlives_a_probe_and_the_whole_fetch_budget(self) -> None:
+        """A tmp_pack removed while its fetch still runs would break that
+        fetch, so none younger than a fetch can last is taken for dead."""
+        assert mirror_fetch.DEAD_PACK_SECONDS > (
+            mirror_fetch.INIT_TIMEOUT_SECONDS + mirror_fetch.FETCH_BUDGET_SECONDS
+        )
+
     def test_is_removed_inside_the_turn_and_a_young_one_is_kept(
         self, tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """A tmp_pack older than the turn's bound was left by a fetch that
+        """A tmp_pack older than DEAD_PACK_SECONDS was left by a fetch that
         died; a young one may be a detached git gc's, written outside the
         turn, and is not this export's to remove."""
         origin, first = _origin(tmp_path)
@@ -144,7 +127,7 @@ class TestADeadFetchsPack:
         packs = mirror / "objects" / "pack"
         dead = packs / "tmp_pack_dead01"
         dead.write_bytes(b"PACK half a fetch")
-        died = time.time() - mirror_fetch.FETCH_TURN["stale_seconds"] - 5
+        died = time.time() - mirror_fetch.DEAD_PACK_SECONDS - 5
         os.utime(dead, (died, died))
         young = packs / "tmp_pack_live01"
         young.write_bytes(b"PACK a gc's")
@@ -176,35 +159,31 @@ class TestTheTurn:
     ) -> None:
         """The six fetches of 2026-10-22, made one: the other export holds the
         turn and fetches the commit while this one waits, and this one then
-        probes, finds it and fetches nothing. It looks again after 10 ms,
-        not after the pause before a lost fetch is sent again, which cost an
-        export 21 s of lacrymal's push gate on 2026-11-04 (MCPs board task
-        1e0ee821), nor after the second every turn waited until MCPs board
-        task 5280a25d."""
+        probes, finds it and fetches nothing. It is woken as the other lets
+        go, not on a clock, which cost an export 21 s of lacrymal's push gate
+        on 2026-11-04 (MCPs board task 1e0ee821)."""
         origin, first = _origin(tmp_path)
         mirror = _mirror(tmp_path)
-        lock = mirror_fetch.turn_lock(mirror)
-        lock.write_text("the export of it pid 4242 turn fetching", encoding="utf-8")
-        clock = [int(time.time())]
-        slept: list[float] = []
+        other = OtherTurn(mirror_fetch.turn_lock(mirror))
+        ending = other.end_after(
+            0.1,
+            lambda: git(
+                mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other"
+            ),
+        )
 
-        def the_other_export_fetches_it() -> None:
-            git(mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other")
-            lock.unlink()
-            clock[0] += mirror_fetch.FETCH_TURN["poll_seconds"]
-
-        _test_hooks.now = lambda: clock[0]
-        _test_hooks.sleep = _sleeping([the_other_export_fetches_it], slept)
         with caplog.at_level("INFO"):
             mirror_fetch.fetch_commit(mirror, str(origin), first)
+        ending.join()
 
-        assert slept == [file_turn.FIRST_LOOK_SECONDS]
         assert _in_pack(mirror) == 6
-        assert not lock.exists()
-        assert (
-            f"the export of {first} took its mirror fetch turn after waiting 1 s for "
-            "another export fetching into the same mirror"
-        ) in [record.getMessage() for record in caplog.records]
+        said = [record.getMessage() for record in caplog.records]
+        assert len(said) == 1
+        assert re.fullmatch(
+            rf"the export of {first} took its mirror fetch turn after waiting \d+ ms for "
+            "another export fetching into the same mirror",
+            said[0],
+        ), said
 
     def test_a_commit_a_fetch_brought_is_exported_while_another_export_holds_the_turn(
         self, tmp_path: pathlib.Path
@@ -212,37 +191,18 @@ class TestTheTurn:
         """Every job of a push gate exports one commit, and once the first has
         fetched it the rest wait for no turn: on lacrymal at 18:55:00Z on
         2026-11-05 one waited 6 s behind the others (MCPs board task
-        5280a25d). The sleep has no step to run, so a wait fails the case."""
+        5280a25d). The turn stays held throughout, so a wait would hang the
+        case rather than pass it."""
         origin, first = _origin(tmp_path)
         mirror = _mirror(tmp_path)
         mirror_fetch.fetch_commit(mirror, str(origin), first)
-        lock = mirror_fetch.turn_lock(mirror)
-        lock.write_text("the export of it pid 4245 turn fetching", encoding="utf-8")
-        slept: list[float] = []
-        _test_hooks.sleep = _sleeping([], slept)
+        other = OtherTurn(mirror_fetch.turn_lock(mirror))
 
         mirror_fetch.fetch_commit(mirror, str(origin), first)
 
-        assert (slept, lock.read_text(encoding="utf-8"), _in_pack(mirror)) == (
-            [],
-            "the export of it pid 4245 turn fetching",
-            6,
-        )
-
-    def test_a_turn_left_by_an_export_that_died_inside_it_is_taken_away(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        origin, first = _origin(tmp_path)
-        mirror = _mirror(tmp_path)
-        lock = mirror_fetch.turn_lock(mirror)
-        lock.write_text("the export of it pid 4243 turn dead", encoding="utf-8")
-        died = time.time() - mirror_fetch.FETCH_TURN["stale_seconds"] - 5
-        os.utime(lock, (died, died))
-
-        mirror_fetch.fetch_commit(mirror, str(origin), first)
-
-        assert git(mirror, "rev-parse", mirror_fetch.FETCHED_REF) == first
-        assert not lock.exists()
+        held = is_held(mirror_fetch.turn_lock(mirror))
+        other.end_after(0).join()
+        assert (held, _in_pack(mirror)) == (True, 6)
 
     def test_a_refused_fetch_gives_the_turn_back(self, tmp_path: pathlib.Path) -> None:
         _test_hooks.run = FakeRun(
@@ -253,28 +213,22 @@ class TestTheTurn:
             mirror_fetch.fetch_commit(tmp_path, "https://github.com/wagner-austin/API.git", SHA)
 
         assert raised.value.code is FleetErrorCode.SHA_NOT_ON_REMOTE
-        assert not mirror_fetch.turn_lock(tmp_path).exists()
+        assert not is_held(mirror_fetch.turn_lock(tmp_path))
 
     def test_a_companion_s_fetch_waits_for_the_turn_too(self, tmp_path: pathlib.Path) -> None:
         """The companion's one ref is written by every job of its project, so
-        its fetch and its read of the ref share the mirror's turn."""
-        lock = mirror_fetch.turn_lock(tmp_path)
-        lock.write_text("the fetch of main pid 4244 turn fetching", encoding="utf-8")
+        its fetch and its read of the ref share the mirror's turn: nothing is
+        run while the other fetch holds it."""
         runner = FakeRun([ok(""), ok(f"{SHA}\n")])
         _test_hooks.run = runner
-        clock = [int(time.time())]
-        slept: list[float] = []
-
-        def the_other_fetch_ends() -> None:
-            assert runner.calls == []
-            lock.unlink()
-            clock[0] += mirror_fetch.FETCH_TURN["poll_seconds"]
-
-        _test_hooks.now = lambda: clock[0]
-        _test_hooks.sleep = _sleeping([the_other_fetch_ends], slept)
+        other = OtherTurn(mirror_fetch.turn_lock(tmp_path))
+        run_while_held: list[int] = []
+        ending = other.end_after(0.1, lambda: run_while_held.append(len(runner.calls)))
 
         companion = "https://github.com/wagner-austin/MCPs.git"
         assert mirror_fetch.fetch_ref(tmp_path, companion, "main") == SHA
-        assert slept == [file_turn.FIRST_LOOK_SECONDS]
+        ending.join()
+
+        assert run_while_held == [0]
         assert [call[3] for call in runner.calls] == ["fetch", "rev-parse"]
-        assert not lock.exists()
+        assert not is_held(mirror_fetch.turn_lock(tmp_path))

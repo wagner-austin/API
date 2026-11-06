@@ -14,6 +14,7 @@ from platform_core.json_utils import JSONObject, dump_json_str, load_json_str
 from fleet.cli import research, research_native, rolled, tick
 from fleet.contracts.research_worker import encode_worker
 from fleet.core import _test_hooks
+from tests._held_turns import is_held
 from tests._queue_fakes import QUEUE_CREDENTIALS, FakeEnv, FakeQueue
 from tests._research_fixtures import observation, research_job, worker
 from tests.conftest import FakeRun, ok
@@ -65,7 +66,7 @@ def test_native_cli_resolves_authorized_bytes_and_emits_only_metadata(
             pathlib.Path(sys.executable).read_bytes()
         ).hexdigest(),
     }
-    assert not (directory / "poll.lock").exists()
+    assert not is_held(directory / "poll.turn")
 
 
 @pytest.mark.parametrize("announce,active", [(True, False), (False, False), (False, True)])

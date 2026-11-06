@@ -107,7 +107,7 @@ class TestTheServesCommit:
         elsewhere = tmp_path / ROLLED_COMMIT / pathlib.PurePosixPath(REGISTRY_DIRECTORY)
         misnamed = (
             scratch.directory(scratch.EXTRACTIONS_DIR)
-            / "turn.lock"
+            / rolled.TURN_LOCK
             / pathlib.PurePosixPath(REGISTRY_DIRECTORY)
         )
 

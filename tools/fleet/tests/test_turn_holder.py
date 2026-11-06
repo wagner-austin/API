@@ -1,256 +1,157 @@
-"""A turn whose holder is gone is taken before its age bound (MCPs board task 86f70457).
+"""A holder lets go as it ends, and no live holder's turn is taken (MCPs tasks 86f70457, 5280a25d).
 
 On diphtheria on 2026-10-22 systemd stopped a node runner with SIGKILL 20 s
 after it took a mirror's fetch turn, and every export of that mirror waited
-out the turn's 1020 s bound. Each case holds a real lock file; the gone
-holder is a real process that has exited, asked about with the real probe,
-and the probe's other answers are scripted through the command hook.
+out the turn's 1020 s age bound; a probe of the holder's pid answered that
+until a turn became an exclusive ``flock``, which the kernel lets go when
+its holder's process ends. Each case holds a real ``flock`` on a real lock
+file; the killed holder is a real process, and no command is run for any
+holder (the command hook answers nothing).
 """
 
 from __future__ import annotations
 
 import os
 import pathlib
+import signal
 import subprocess
 import sys
+import threading
 import time
-import uuid
-from collections.abc import Callable, Sequence
 
 import pytest
 
 from fleet.core import _test_hooks, file_turn
-from tests.conftest import FakeRun, failed, ok
+from tests._held_turns import OtherTurn
+from tests.conftest import FakeRun
 
-#: A turn as long as a mirror's fetch, so only the probe can end a wait early.
-LONG_TURN = file_turn.TurnBounds(
-    what="long turn",
-    waited_for="another long turn",
-    stale_seconds=1020,
-    poll_seconds=10,
+TURN = file_turn.TurnBounds(what="long turn", waited_for="another long turn")
+
+#: A process that takes the turn's ``flock``, writes ``held`` to the pipe
+#: it was handed, and holds the turn for ten minutes.
+_HOLDER = (
+    "import fcntl, os, sys, time\n"
+    "descriptor = os.open(sys.argv[1], os.O_RDWR | os.O_CREAT, 0o644)\n"
+    "fcntl.flock(descriptor, fcntl.LOCK_EX)\n"
+    "os.write(int(sys.argv[2]), b'held')\n"
+    "time.sleep(600)\n"
 )
 
 
-def _gone_pid() -> int:
-    """The pid of a process that ran and has exited.
-
-    Returns:
-        Its pid, which nothing runs under for the length of a case.
-    """
-    finished = subprocess.Popen((sys.executable, "-c", "pass"))
-    assert finished.wait(timeout=60) == 0
-    return finished.pid
-
-
-def _held(lock: pathlib.Path, *, pid: int, host: str, age: int) -> str:
-    """Write a lock as another process's turn wrote it, aged.
-
-    Args:
-        lock: The lock file.
-        pid: The holder's pid.
-        host: The holder's host.
-        age: How long ago it was written, in seconds.
-
-    Returns:
-        Its text.
-    """
-    text = f"the export of it pid {pid} on {host} turn {uuid.uuid4().hex}"
-    lock.write_text(text, encoding="utf-8")
-    written = time.time() - age
-    os.utime(lock, (written, written))
-    return text
-
-
-def _sleeping(steps: list[Callable[[], None]], slept: list[float]) -> _test_hooks.SleepProtocol:
-    """A sleep that records each wait and runs the next step in it.
-
-    Args:
-        steps: Run in turn, one per sleep.
-        slept: Every wait asked for, appended in order.
-
-    Returns:
-        The sleep.
-    """
-
-    def sleep(seconds: float) -> None:
-        slept.append(seconds)
-        steps.pop(0)()
-
-    return sleep
-
-
-def test_a_lock_names_its_holder_s_pid_and_host(tmp_path: pathlib.Path) -> None:
-    lock = tmp_path / "turn.lock"
-
-    with file_turn.held(lock, holder="the export of it", bounds=LONG_TURN):
-        text = lock.read_text(encoding="utf-8")
-
-    assert text.startswith(f"the export of it pid {os.getpid()} on {_test_hooks.hostname()} turn ")
-    assert not lock.exists()
-
-
-def test_a_holder_killed_inside_its_turn_is_taken_at_once(
-    tmp_path: pathlib.Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    """The stall of 2026-10-22, made the filesystem's: the lock is past the
-    probe's threshold and far inside the age bound, and its pid has exited."""
-    lock = tmp_path / "turn.lock"
-    gone = _gone_pid()
-    text = _held(
-        lock, pid=gone, host=_test_hooks.hostname(), age=file_turn.HOLDER_PROBE_SECONDS + 5
+def test_a_holder_killed_inside_its_turn_lets_go_as_it_dies(tmp_path: pathlib.Path) -> None:
+    """The stall of 2026-10-22, made a real process's: it holds the turn,
+    a waiter is blocked behind it, and SIGKILL ends it. The waiter takes the
+    turn within a second of the kill, asking nothing about the holder."""
+    lock = tmp_path / "turn.turn"
+    said, told = os.pipe()
+    holder = subprocess.Popen(
+        (sys.executable, "-c", _HOLDER, str(lock), str(told)), pass_fds=(told,)
     )
-    slept: list[float] = []
-    _test_hooks.sleep = _sleeping([], slept)
+    os.close(told)
+    _test_hooks.run = FakeRun([])
+    taken: list[float] = []
 
-    with caplog.at_level("INFO"), file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
-        assert lock.read_text(encoding="utf-8") != text
+    def waiter() -> None:
+        with file_turn.held(lock, holder="the next export", bounds=TURN):
+            taken.append(time.monotonic())
 
-    assert slept == []
-    assert (
-        f"the next export took away a long turn whose holder, pid {gone} on "
-        f"{_test_hooks.hostname()}, no longer runs: {text!r}"
-    ) in [record.getMessage() for record in caplog.records]
+    try:
+        assert os.read(said, 4) == b"held"
+        waiting = threading.Thread(target=waiter)
+        waiting.start()
+        time.sleep(0.2)
+        assert taken == []
+        killed = time.monotonic()
+    finally:
+        os.kill(holder.pid, signal.SIGKILL)
+        os.close(said)
+    assert holder.wait(timeout=60) == -signal.SIGKILL
+    waiting.join(timeout=30)
 
-
-def test_a_holder_that_still_runs_is_waited_for(tmp_path: pathlib.Path) -> None:
-    lock = tmp_path / "turn.lock"
-    _held(
-        lock, pid=os.getpid(), host=_test_hooks.hostname(), age=file_turn.HOLDER_PROBE_SECONDS + 5
-    )
-    slept: list[float] = []
-    _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
-
-    with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
-        pass
-
-    assert slept == [file_turn.FIRST_LOOK_SECONDS]
+    assert len(taken) == 1
+    assert taken[0] - killed < 1.0, f"took the turn {taken[0] - killed:.3f} s after the kill"
 
 
-@pytest.mark.parametrize(
-    ("host", "age"),
-    [("elsewhere", file_turn.HOLDER_PROBE_SECONDS + 5), (None, 0)],
-    ids=["another host's lock", "a young lock"],
-)
-def test_is_not_probed_for_another_host_s_lock_or_a_young_one(
-    tmp_path: pathlib.Path, host: str | None, age: int
-) -> None:
-    """This machine cannot see another host's process, and a lock younger
-    than the threshold belongs to a turn that is nearly always about to end."""
-    lock = tmp_path / "turn.lock"
-    _held(lock, pid=_gone_pid(), host=host or _test_hooks.hostname(), age=age)
-    runner = FakeRun([])
-    _test_hooks.run = runner
-    slept: list[float] = []
-    _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
+def test_a_live_holder_of_a_day_old_lock_is_waited_for_to_its_end(tmp_path: pathlib.Path) -> None:
+    """No age bound: a lock file written a day ago, held now, is waited for
+    until its holder lets go, never taken away while it is held."""
+    lock = tmp_path / "turn.turn"
+    other = OtherTurn(lock)
+    day_ago = time.time() - 86_400
+    os.utime(lock, (day_ago, day_ago))
+    _test_hooks.run = FakeRun([])
+    asked = time.monotonic()
+    ending = other.end_after(0.3)
 
-    with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
-        pass
+    with file_turn.held(lock, holder="the next export", bounds=TURN):
+        waited = time.monotonic() - asked
+    ending.join()
 
-    assert runner.calls == []
-    assert slept == [file_turn.FIRST_LOOK_SECONDS]
+    assert waited >= 0.3, f"took the turn after {waited:.3f} s, inside its holder's"
 
 
-def test_a_lock_written_before_hosts_were_named_is_left_to_its_age_bound(
+def test_the_lock_file_stays_the_same_file_across_turns(tmp_path: pathlib.Path) -> None:
+    """Nothing is created or removed per turn: the second turn opens the
+    file the first made, which on the hub's NFS is what saves the server's
+    synchronous create and remove."""
+    lock = tmp_path / "turn.turn"
+
+    with file_turn.held(lock, holder="the first turn", bounds=TURN):
+        first = os.stat(lock).st_ino
+    with file_turn.held(lock, holder="the second turn", bounds=TURN):
+        second = os.stat(lock).st_ino
+
+    assert lock.exists()
+    assert first == second
+
+
+def test_a_waiter_whose_lock_its_holder_removed_takes_the_path_s_next_file(
     tmp_path: pathlib.Path,
 ) -> None:
-    lock = tmp_path / "turn.lock"
-    lock.write_text("the export of it pid 4242 turn fetching", encoding="utf-8")
-    written = time.time() - file_turn.HOLDER_PROBE_SECONDS - 5
-    os.utime(lock, (written, written))
-    runner = FakeRun([])
-    _test_hooks.run = runner
-    slept: list[float] = []
-    _test_hooks.sleep = _sleeping([lambda: lock.unlink()], slept)
+    """The holder removes the file inside its turn, as a retire turn does.
+    The waiter, woken holding a file no path names, takes a new one at the
+    path, which a later turn would see."""
+    lock = tmp_path / "turn.turn"
+    other = OtherTurn(lock)
+    removed = os.stat(lock).st_ino
+    ending = other.end_after(0.2, lock.unlink)
 
-    with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
-        pass
+    with file_turn.held(lock, holder="the next turn", bounds=TURN):
+        named = os.stat(lock).st_ino
+    ending.join()
 
-    assert runner.calls == []
-    assert slept == [file_turn.FIRST_LOOK_SECONDS]
+    assert named != removed
 
 
-def test_a_lock_rewritten_while_its_holder_was_probed_is_left(tmp_path: pathlib.Path) -> None:
-    """The gone holder's lock was taken away and a live turn created its own
-    while the probe ran, so the lock this turn read is not the lock there."""
-    lock = tmp_path / "turn.lock"
-    _held(
-        lock, pid=_gone_pid(), host=_test_hooks.hostname(), age=file_turn.HOLDER_PROBE_SECONDS + 5
-    )
-    later = f"a live export pid {os.getpid()} on {_test_hooks.hostname()} turn {uuid.uuid4().hex}"
+def test_a_waiter_whose_lock_was_replaced_takes_the_replacement(tmp_path: pathlib.Path) -> None:
+    """The holder removes the file and another file is made at the path
+    before the waiter wakes: the waiter takes the file the path names."""
+    lock = tmp_path / "turn.turn"
+    other = OtherTurn(lock)
+    replacement: list[int] = []
 
-    def probe(
-        argv: Sequence[str],
-        *,
-        timeout_seconds: int,
-        stdin_bytes: bytes | None = None,
-        unset_env: Sequence[str] = (),
-        set_env: Sequence[tuple[str, str]] = (),
-    ) -> _test_hooks.CommandResult:
-        lock.write_text(later, encoding="utf-8")
-        return failed(1, "")
-
-    _test_hooks.run = probe
-    seen: list[str] = []
-
-    def the_live_turn_ends() -> None:
-        seen.append(lock.read_text(encoding="utf-8"))
+    def replace() -> None:
         lock.unlink()
+        lock.touch()
+        replacement.append(os.stat(lock).st_ino)
 
-    slept: list[float] = []
-    _test_hooks.sleep = _sleeping([the_live_turn_ends], slept)
+    ending = other.end_after(0.2, replace)
 
-    with file_turn.held(lock, holder="the next export", bounds=LONG_TURN):
-        pass
+    with file_turn.held(lock, holder="the next turn", bounds=TURN):
+        named = os.stat(lock).st_ino
+    ending.join()
 
-    assert seen == [later]
-
-
-class TestRuns:
-    def test_asks_ps_for_the_pid(self) -> None:
-        runner = FakeRun([ok("   4242\n")])
-        _test_hooks.run = runner
-
-        assert file_turn.runs(4242) is True
-        assert runner.calls == [("ps", "-p", "4242", "-o", "pid=")]
-        assert runner.timeouts == [file_turn.PROBE_TIMEOUT_SECONDS]
-
-    @pytest.mark.parametrize(
-        ("answer", "running"),
-        [
-            (ok("   4242\n"), True),
-            (failed(1, ""), False),
-            (ok("  14242\n"), False),
-        ],
-        ids=["ps lists it", "ps lists none", "another pid"],
-    )
-    def test_reads_the_answer(self, answer: _test_hooks.CommandResult, running: bool) -> None:
-        _test_hooks.run = FakeRun([answer])
-
-        assert file_turn.runs(4242) is running
-
-    @pytest.mark.parametrize(
-        "answer",
-        [failed(127, "ps: not found"), failed(1, "ps: unknown option")],
-        ids=["no probe", "a probe that complained"],
-    )
-    def test_a_probe_that_cannot_answer_reads_as_running(
-        self, answer: _test_hooks.CommandResult, caplog: pytest.LogCaptureFixture
-    ) -> None:
-        """Running is the answer that changes nothing: the turn then waits
-        out its age bound, as it did before it could ask."""
-        _test_hooks.run = FakeRun([answer])
-
-        with caplog.at_level("INFO"):
-            assert file_turn.runs(4242) is True
-
-        assert any(
-            record.getMessage().startswith("could not ask whether pid 4242 runs")
-            for record in caplog.records
-        )
-
-    def test_this_process_runs_and_an_exited_one_does_not(self) -> None:
-        assert (file_turn.runs(os.getpid()), file_turn.runs(_gone_pid())) == (True, False)
+    assert replacement == [named]
 
 
-def test_a_lock_given_back_before_it_is_read_has_no_text(tmp_path: pathlib.Path) -> None:
-    assert file_turn._lock_text(tmp_path / "given-back.lock") is None
+def test_a_block_that_raises_gives_the_turn_back(tmp_path: pathlib.Path) -> None:
+    """The next turn takes the lock without waiting: :class:`OtherTurn`
+    asks for it without blocking and would raise were it still held."""
+    lock = tmp_path / "turn.turn"
+
+    with (
+        pytest.raises(RuntimeError, match="the turn's work failed"),
+        file_turn.held(lock, holder="the failing turn", bounds=TURN),
+    ):
+        raise RuntimeError("the turn's work failed")
+    OtherTurn(lock).end_after(0).join()

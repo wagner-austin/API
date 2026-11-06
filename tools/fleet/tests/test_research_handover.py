@@ -18,6 +18,7 @@ from platform_core.mcp_testing import FakeHttpPost, sent_arguments
 from fleet.cli import research_native
 from fleet.core import _test_hooks, research_handover
 from tests._handover_fixtures import TASK, freeze, pin, replies, reporting, setup
+from tests._held_turns import is_held
 
 
 def test_completed_handover_reports_both_identities_without_changing_inputs(
@@ -186,7 +187,7 @@ def test_native_cli_records_once_then_normal_poll_remeasures(
     assert (tmp_path / request["spec_sha256"] / "handover.sha256").read_text() == digest + "\n"
     with pytest.raises(ValueError, match="RESEARCH_HANDOVER_EXISTS"):
         research_native.main([*args, "--handover", digest])
-    assert not (tmp_path / request["spec_sha256"] / "poll.lock").exists()
+    assert not is_held(tmp_path / request["spec_sha256"] / "poll.turn")
 
 
 def test_report_failure_never_activates_handover(tmp_path: pathlib.Path) -> None:
@@ -221,4 +222,4 @@ def test_report_failure_never_activates_handover(tmp_path: pathlib.Path) -> None
             ]
         )
     assert not (tmp_path / request["spec_sha256"] / "handover.sha256").exists()
-    assert not (tmp_path / request["spec_sha256"] / "poll.lock").exists()
+    assert not is_held(tmp_path / request["spec_sha256"] / "poll.turn")
