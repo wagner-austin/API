@@ -9,8 +9,11 @@ Reading is :func:`read_threads`. The one write is :func:`deliver_wake`
 (board task 562cfa7a), which starts a turn in an existing thread only after
 re-reading it idle on the same connection, and only when no turn already
 carries the wake's key; the methods and fields it sends were read from the
-schema ``codex app-server generate-json-schema`` prints for the running
-daemon's release (0.166.0, measured 2026-11-03).
+schema ``codex app-server generate-json-schema`` prints for the release the
+session host's app-server runs (0.154.0, the pin MCPs
+scripts/host/session-host/codex-cli.sh installs, generated on ziggurat at
+2026-11-06T18:57:46Z and read at 19:01Z: all 24 of the methods and fields
+read_threads and deliver_wake send are in it; MCPs board task 59b6684d).
 """
 
 from __future__ import annotations
@@ -164,7 +167,9 @@ def runtime_connection(
                 connection.send(dump_json_str({"method": "initialized"}))
                 yield connection, deadline
         finally:
-            # Only the disposable proxy child is ours. Never stop the daemon.
+            # Only the disposable proxy child is ours. Never stop the
+            # app-server it relays to, the session host's declared
+            # corvis-codex-app-server.service (MCPs board task 59b6684d).
             if process.poll() is None:
                 process.kill()
             process.wait(timeout=5)

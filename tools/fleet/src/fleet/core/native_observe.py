@@ -30,7 +30,7 @@ NATIVE_TIMEOUT_SECONDS = 20
 
 
 def proxy_argv(host: str, user: str) -> list[str]:
-    """The command that attaches to a host's running Codex daemon over the existing SSH route.
+    """The command that attaches to a host's Codex app-server over the existing SSH route.
 
     Args:
         host: SSH alias from the fleet registry.
@@ -38,8 +38,10 @@ def proxy_argv(host: str, user: str) -> list[str]:
 
     Returns:
         ``ssh <options> <host> <codex> app-server proxy``: a disposable
-        child relaying stdio to the daemon's control socket, which starts
-        no daemon and opens no listener.
+        child relaying stdio to the app-server's control socket, which the
+        session host's declared user unit corvis-codex-app-server.service
+        serves (MCPs board task 59b6684d); it starts no server and opens no
+        listener.
     """
     return ["ssh", *SSH_OPTIONS, host, f"/home/{user}/.local/bin/codex", "app-server", "proxy"]
 
