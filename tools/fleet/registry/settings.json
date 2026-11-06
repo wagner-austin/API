@@ -33,5 +33,6 @@
   "native_evidence_seconds": 600,
   "ledger": "runs/ledger.jsonl",
   "feed": "runs/feed.jsonl",
-  "leases": "runs/leases.json"
+  "leases": "runs/leases.json",
+  "mirrors": "/home/corvis/.cache/fleet/mirrors"
 }
