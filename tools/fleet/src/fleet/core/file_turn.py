@@ -1,4 +1,4 @@
-"""A turn held across processes by creating one lock file exclusively.
+"""A turn held across processes and threads by an exclusive ``flock`` on a lock file.
 
 Lifted out of :mod:`fleet.core.host_claims` (MCPs board task a85ef09e), where
 it was written for a host's claim turn, when the lease file needed the same
@@ -6,40 +6,46 @@ thing (MCPs board task b1089284): every node runner is its own process on the
 hub, and a file several of them read and rewrite needs a turn none of
 ``threading``'s locks can give.
 
-THE LOCK IS THE FILE'S EXCLUSIVE CREATION. Its text names the turn, so only
-the turn that created it removes it; a lock older than the turn's
-``stale_seconds`` was left by a process that died inside its turn and is
-taken away; and a turn looks again at a lock another holds after
-:data:`FIRST_LOOK_SECONDS`, each wait twice the last up to ``poll_seconds``.
-The same on every filesystem the hub has: no ``fcntl``, nothing a test cannot
-make the filesystem do.
+THE TURN IS AN EXCLUSIVE ``flock`` ON A FILE THAT STAYS (MCPs board task
+5280a25d). Until then it was the lock file's exclusive creation, given back
+by removing it, and a waiter looked again on a clock. The hub's records,
+mirrors and their locks live on emerald's NFS export, where creating a file
+and removing it each wait for the server's disk: measured on lacrymal on
+2026-11-06, a turn of create, write, read and remove took a median 56 ms and
+up to 477 ms with nobody else waiting, against 2.9 ms to open the file, take
+its ``flock`` and close it, and as the push gates of MCPs 4a35dc099 and
+ad145c288 launched their jobs on every node at once (02:55Z and 03:33Z) the
+node runners logged lease turns taken after 15 s and append turns after 11 s,
+all of it between a job's claim and its first phase, which that task holds
+to 10 s.
 
-A TURN HELD FOR MILLISECONDS IS TAKEN IN MILLISECONDS (MCPs board task
-5280a25d). Until then every look was ``poll_seconds`` apart, one second for
-every turn the hub takes, while an append or a lease rewrite holds its lock
-for milliseconds: each turn a launch found held cost it a whole second, and
-on lacrymal between 18:54 and 18:57Z on 2026-11-05, as the push gate of MCPs
-de4907292 launched its jobs on every node at once, the node runners' logs
-name append, lease, claim and mirror fetch turns taken after 1 to 6 s, all
-of it between a job's claim and its first phase, which that task holds to
-10 s. The doubling keeps a turn held for minutes, a mirror's first fetch,
-looked at once every ``poll_seconds`` as before.
+A WAITER SLEEPS IN THE KERNEL, which wakes it when the holder lets go:
+measured 1.7 ms after the release on that mount, for a thread waiting behind
+another thread of its own process too, since a ``flock`` belongs to the open
+file and not to the process. Nothing looks again on a clock.
 
-A LOCK WHOSE HOLDER IS GONE IS TAKEN AWAY BEFORE ITS AGE BOUND (MCPs board
-task 86f70457). A mirror's fetch turn may last 1020 s, so a runner killed
-inside one held every export of that mirror for 17 minutes. The text names
-the holder's pid and host, and a turn waiting on a lock held past
-:data:`HOLDER_PROBE_SECONDS` asks this host whether that pid still runs
-(:func:`runs`); one this host wrote whose process is gone is taken at once.
+A HOLDER THAT ENDS LETS GO AS IT ENDS. The kernel releases a ``flock`` when
+the last descriptor of its open file closes, which a process's exit does,
+SIGKILL included, and an NFS server ends the locks of a client that stops
+renewing its lease. So no lock is aged, no holder's pid is asked about, and
+no turn is taken from a live holder: what a holder runs inside its turn is
+bounded by that work's own deadlines (MCPs board task 86f70457 is the stall
+of 2026-10-22 that the age bound and the pid probe answered until then).
+
+A HOLDER MAY REMOVE THE LOCK FILE INSIDE ITS TURN, as a run's retire turn
+does once it is over (:mod:`fleet.core.retire_owed`), so one file per run
+does not stay behind. A waiter woken holding the lock of a file no longer at
+its path holds nothing another turn can see, so it takes the path's file
+again (:func:`_still_at`).
 """
 
 from __future__ import annotations
 
 import contextlib
+import fcntl
 import os
 import pathlib
-import re
-import uuid
+import time
 from collections.abc import Generator
 from typing import Final, TypedDict
 
@@ -49,268 +55,125 @@ from fleet.core import _test_hooks
 
 _log = get_logger(__name__)
 
-#: How long a lock is held before a waiting turn asks whether its holder
-#: still runs. A lease, claim or record turn is done well inside this, so
-#: only a long turn, a mirror's fetch, is ever probed.
-HOLDER_PROBE_SECONDS: Final = 30
-
-#: The deadline of one probe, in seconds.
-PROBE_TIMEOUT_SECONDS: Final = 15
-
-#: How long a turn waits before its second look at a lock another holds;
-#: each wait after it is twice the one before, up to the turn's
-#: ``poll_seconds``.
-FIRST_LOOK_SECONDS: Final = 0.01
-
-#: The command that lists one process: it prints the pid when it runs and
-#: does not when it does not.
-_PROBE: Final = ("ps", "-p", "{pid}", "-o", "pid=")
-
-#: What a lock this module wrote says of its holder: the pid and the host.
-_HELD_BY: Final = re.compile(r" pid (?P<pid>\d+) on (?P<host>\S+) turn [0-9a-f]{32}$")
+#: The mode a lock file is made with when no turn has made it yet.
+LOCK_FILE_MODE: Final = 0o644
 
 
 class TurnBounds(TypedDict):
-    """What one kind of turn is called and how long it may be held.
+    """What one kind of turn is called in a log line.
 
     Attributes:
-        what: The turn's name in a log line, e.g. ``claim turn``.
+        what: The turn's name, e.g. ``claim turn``.
         waited_for: Who a wait was for, e.g. ``another process claiming for its host``.
-        stale_seconds: How old a lock is when its holder is taken to have
-            died inside its turn.
-        poll_seconds: The longest a turn waits between two looks at a held
-            lock, which its waits double up to from
-            :data:`FIRST_LOOK_SECONDS`.
     """
 
     what: str
     waited_for: str
-    stale_seconds: int
-    poll_seconds: int
 
 
 @contextlib.contextmanager
 def held(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> Generator[None, None, None]:
     """Hold the turn for the span of the ``with`` block.
 
-    Waits while another turn holds the lock, taking away a lock older than
-    the bounds allow, and gives the lock back on leaving the block however it
-    is left.
+    Waits in the kernel while another turn holds the lock, and gives it back
+    on leaving the block however it is left: closing the descriptor releases
+    its ``flock``.
 
     Args:
-        lock: The lock file.
-        holder: Who takes the turn, written into the lock so a reader of it
-            can name the holder.
-        bounds: The turn's name and its time bounds.
+        lock: The lock file, made when absent and never removed here.
+        holder: Who takes the turn, named in the line logged after a wait.
+        bounds: The turn's names.
 
     Yields:
         Nothing; the turn is held while the block runs.
 
     Raises:
-        OSError: When the lock can be neither created nor read for a reason
-            other than another turn holding it.
+        OSError: When the lock file can be neither opened nor locked.
     """
-    token = _take(lock, holder=holder, bounds=bounds)
+    descriptor = _take(lock, holder=holder, bounds=bounds)
     try:
         yield
     finally:
-        _give_back(lock, token=token, bounds=bounds)
+        os.close(descriptor)
 
 
-def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> str:
-    """Create the lock, waiting out or taking away the turn that holds it.
+def _take(lock: pathlib.Path, *, holder: str, bounds: TurnBounds) -> int:
+    """Lock the file at the path, waiting for the turn that holds it.
 
     Args:
         lock: The lock file.
         holder: Who takes the turn.
-        bounds: The turn's name and its time bounds.
+        bounds: The turn's names.
 
     Returns:
-        The text written into the lock, which only this turn's release
-        matches.
+        The descriptor whose ``flock`` is the turn.
     """
     _test_hooks.make_directory(lock.parent)
-    token = f"{holder} pid {os.getpid()} on {_test_hooks.hostname()} turn {uuid.uuid4().hex}"
-    asked = _test_hooks.now()
-    wait: float = FIRST_LOOK_SECONDS
-    while not _created(lock, token=token):
-        age = _age(lock)
-        if age is not None and age >= bounds["stale_seconds"]:
-            _log.info(
-                "%s took away a %s held for %d s, past the %d s a live runner's turn can last, "
-                "so its holder died inside it",
-                holder,
-                bounds["what"],
-                age,
-                bounds["stale_seconds"],
-            )
-            lock.unlink(missing_ok=True)
-            continue
-        if age is not None and age >= HOLDER_PROBE_SECONDS and _holder_gone(lock, holder, bounds):
-            continue
-        _test_hooks.sleep(wait)
-        wait = min(wait * 2, bounds["poll_seconds"])
-    waited = _test_hooks.now() - asked
-    if waited > 0:
+    asked = time.monotonic()
+    waited = False
+    while True:
+        descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, LOCK_FILE_MODE)
+        kept = False
+        try:
+            waited = _locked(descriptor) or waited
+            kept = _still_at(lock, descriptor)
+        finally:
+            if not kept:
+                os.close(descriptor)
+        if kept:
+            break
+    if waited:
         _log.info(
-            "%s took its %s after waiting %d s for %s",
+            "%s took its %s after waiting %d ms for %s",
             holder,
             bounds["what"],
-            waited,
+            round((time.monotonic() - asked) * 1000),
             bounds["waited_for"],
         )
-    return token
+    return descriptor
 
 
-def _lock_text(lock: pathlib.Path) -> str | None:
-    """What a lock says, read once.
+def _locked(descriptor: int) -> bool:
+    """Take the descriptor's exclusive ``flock``, sleeping while another holds it.
 
     Args:
-        lock: The lock file.
+        descriptor: An open descriptor of the lock file.
 
     Returns:
-        Its text, or None when it was given back since it was found.
+        Whether another turn held it when asked, so this one waited.
     """
     try:
-        return lock.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
-
-
-def runs(pid: int) -> bool:
-    """Whether a process with this pid runs on this machine.
-
-    Args:
-        pid: The process id.
-
-    Returns:
-        False only when the probe answered and did not list the pid; a
-        probe that failed, timed out or wrote to stderr answers True, so a
-        turn whose holder cannot be asked about waits out its age bound as
-        it did before the probe existed.
-    """
-    argv = tuple(part.format(pid=pid) for part in _PROBE)
-    probed = _test_hooks.run(argv, timeout_seconds=PROBE_TIMEOUT_SECONDS)
-    if probed["returncode"] not in (0, 1) or probed["stderr"].strip():
-        _log.info(
-            "could not ask whether pid %d runs: %s exited %d: %s",
-            pid,
-            argv[0],
-            probed["returncode"],
-            probed["stderr"].strip()[:300],
-        )
+        fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
         return True
-    return re.search(rf"(?<!\d){pid}(?!\d)", probed["stdout"]) is not None
+    return False
 
 
-def _holder_gone(lock: pathlib.Path, holder: str, bounds: TurnBounds) -> bool:
-    """Take away a lock whose holder no longer runs on this machine.
+def _still_at(lock: pathlib.Path, descriptor: int) -> bool:
+    """Whether the locked file is the one at the path now.
 
-    A turn killed inside its block never gives its lock back: on diphtheria
-    on 2026-10-22 systemd stopped a node runner with SIGKILL at 06:18:01Z,
-    20 s after it took a mirror's fetch turn, and every export of that
-    mirror then waited out the turn's 1020 s bound (MCPs board task
-    86f70457). The lock names its holder's pid and host, so a lock this host
-    wrote whose process is gone is taken away at once. A lock another host
-    wrote, or one written before the host was named, is left to the age
-    bound, since this machine cannot see that process.
+    A holder that removed the file inside its turn leaves every waiter
+    already woken on it, or opened before the removal, holding a file no
+    later turn opens.
 
     Args:
-        lock: The lock file.
-        holder: Who is waiting for the turn.
-        bounds: The turn's name and its time bounds.
+        lock: The lock file's path.
+        descriptor: The locked descriptor.
 
     Returns:
-        True when the lock was taken away.
+        True when the path names the locked file.
     """
-    text = _lock_text(lock)
-    held = _HELD_BY.search(text) if text is not None else None
-    if held is None:
-        return False
-    pid: str = held.group("pid")
-    host: str = held.group("host")
-    if host != _test_hooks.hostname() or runs(int(pid)) or _lock_text(lock) != text:
-        return False
-    _log.info(
-        "%s took away a %s whose holder, pid %s on %s, no longer runs: %r",
-        holder,
-        bounds["what"],
-        pid,
-        host,
-        text,
-    )
-    lock.unlink(missing_ok=True)
-    return True
-
-
-def _created(lock: pathlib.Path, *, token: str) -> bool:
-    """Create the lock exclusively and write the turn's text into it.
-
-    Args:
-        lock: The lock file.
-        token: The turn's text.
-
-    Returns:
-        True when this call created it; False when it already exists, which
-        is another turn holding it.
-    """
+    opened = os.fstat(descriptor)
     try:
-        descriptor = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-    except FileExistsError:
-        return False
-    with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-        handle.write(token)
-    return True
-
-
-def _age(lock: pathlib.Path) -> int | None:
-    """How long ago a held lock was created.
-
-    Args:
-        lock: The lock file.
-
-    Returns:
-        Its age in whole seconds, or None when it has been given back since
-        the create that found it.
-    """
-    now = _test_hooks.now()
-    try:
-        modified = os.stat(lock).st_mtime
+        named = os.stat(lock)
     except FileNotFoundError:
-        return None
-    return now - int(modified)
-
-
-def _give_back(lock: pathlib.Path, *, token: str, bounds: TurnBounds) -> None:
-    """Remove the lock if this turn still holds it.
-
-    A turn that ran past its stale bound may have been taken away and the
-    lock created again by another, so the lock is removed only when its text
-    is this turn's.
-
-    Args:
-        lock: The lock file.
-        token: This turn's text.
-        bounds: The turn's name and its time bounds.
-    """
-    held_now = _test_hooks.read_text(lock) if _test_hooks.file_exists(lock) else None
-    if held_now != token:
-        _log.info(
-            "a %s outlived the %d s bound and was taken away; the lock now reads %r and is "
-            "left to its holder",
-            bounds["what"],
-            bounds["stale_seconds"],
-            held_now,
-        )
-        return
-    lock.unlink()
+        return False
+    return (opened.st_dev, opened.st_ino) == (named.st_dev, named.st_ino)
 
 
 __all__ = [
-    "FIRST_LOOK_SECONDS",
-    "HOLDER_PROBE_SECONDS",
-    "PROBE_TIMEOUT_SECONDS",
+    "LOCK_FILE_MODE",
     "TurnBounds",
     "held",
-    "runs",
 ]

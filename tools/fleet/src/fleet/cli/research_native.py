@@ -66,13 +66,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     environment = parse_env_assignments(_test_hooks.read_text(env_file), source=str(env_file))
     directory = root / request["spec_sha256"]
     with file_turn.held(
-        directory / "poll.lock",
+        directory / "poll.turn",
         holder=f"research-{request['backend'].value}",
         bounds=file_turn.TurnBounds(
             what="native research poll",
             waited_for="prior controller poll",
-            stale_seconds=1200,
-            poll_seconds=1,
         ),
     ):
         marker = directory / "handover.sha256"

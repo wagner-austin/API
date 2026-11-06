@@ -28,11 +28,10 @@ turn that finds one past it removes it.
 THE CLAIM IS TAKEN IN TURN. Reading the host's load and claiming against it
 are two steps, and two processes between them would both read the same free
 room. So a claim pass runs inside :func:`claim_turn`, which holds
-``<records>/host-claims/<node>.lock``: the file's exclusive creation is the
-lock, its text names the turn so only its holder removes it, and a lock
-older than :data:`TURN_STALE_SECONDS` was left by a runner that died inside
-its turn and is taken away. Claims are read and written inside a turn. The
-lock itself is :mod:`fleet.core.file_turn`, which the lease file shares.
+``<records>/host-claims/<node>.turn``, whose exclusive ``flock`` is the
+turn and is let go when its holder's process ends, killed or not. Claims are
+read and written inside a turn. The lock itself is
+:mod:`fleet.core.file_turn`, which the lease file shares.
 """
 
 from __future__ import annotations
@@ -48,30 +47,19 @@ from platform_core.logging import get_logger
 from fleet.contracts.host_claim import HostClaim, decode_host_claim, encode_host_claim
 from fleet.contracts.node import LiveLoad
 from fleet.core import _test_hooks, file_turn
-from fleet.core.remote import SSH_TIMEOUT_SECONDS
 
 _log = get_logger(__name__)
 
 #: The directory beside the ledger that holds each host's claims and lock.
 HOST_CLAIMS_DIRECTORY: Final = "host-claims"
 
-#: How old a turn's lock is when its holder is taken to have died inside it.
-#: A turn runs the capacity and toolchain probes, each a staged script and
-#: its run over ssh at :data:`fleet.core.remote.SSH_TIMEOUT_SECONDS` apiece,
-#: and the queue's claim beside them, so five of those deadlines bound the
-#: longest turn a live runner can take.
-TURN_STALE_SECONDS: Final = 5 * SSH_TIMEOUT_SECONDS
-
-#: The longest a runner waits between two looks at a lock another turn
-#: holds (:data:`fleet.core.file_turn.FIRST_LOOK_SECONDS` for its first).
-TURN_POLL_SECONDS: Final = 1
-
-#: The claim turn as :mod:`fleet.core.file_turn` holds it.
+#: The claim turn as :mod:`fleet.core.file_turn` holds it. A turn runs the
+#: capacity and toolchain probes, each a staged script and its run over ssh
+#: under :data:`fleet.core.remote.SSH_TIMEOUT_SECONDS`, and the queue's claim
+#: beside them, whose deadlines bound it.
 CLAIM_TURN: Final = file_turn.TurnBounds(
     what="claim turn",
     waited_for="another process claiming for its host",
-    stale_seconds=TURN_STALE_SECONDS,
-    poll_seconds=TURN_POLL_SECONDS,
 )
 
 
@@ -96,31 +84,29 @@ def lock_path(directory: pathlib.Path, *, alias: str) -> pathlib.Path:
         alias: The node's workspace name.
 
     Returns:
-        The lock file.
+        The lock file, which stays (:mod:`fleet.core.file_turn`).
     """
-    return directory / f"{alias}.lock"
+    return directory / f"{alias}.turn"
 
 
 @contextlib.contextmanager
 def claim_turn(directory: pathlib.Path, *, alias: str, runner: str) -> Generator[None, None, None]:
     """Hold the host's claim turn for the span of the ``with`` block.
 
-    Waits while another turn holds the lock, taking away a lock older than
-    :data:`TURN_STALE_SECONDS`, and gives the lock back on leaving the block
-    however it is left.
+    Waits while another turn holds the lock, and gives the lock back on
+    leaving the block however it is left.
 
     Args:
         directory: The records' ``host-claims`` directory.
         alias: The node's workspace name.
-        runner: The label of the runner taking the turn, written into the
-            lock so a reader of it can name the holder.
+        runner: The label of the runner taking the turn, named in the line
+            logged after a wait.
 
     Yields:
         Nothing; the turn is held while the block runs.
 
     Raises:
-        OSError: When the lock can be neither created nor read for a reason
-            other than another turn holding it.
+        OSError: When the lock file can be neither opened nor locked.
     """
     with file_turn.held(lock_path(directory, alias=alias), holder=runner, bounds=CLAIM_TURN):
         yield
@@ -229,8 +215,6 @@ def host_load(claims: tuple[HostClaim, ...]) -> LiveLoad:
 
 __all__ = [
     "HOST_CLAIMS_DIRECTORY",
-    "TURN_POLL_SECONDS",
-    "TURN_STALE_SECONDS",
     "claim_turn",
     "claims_directory",
     "discharge",

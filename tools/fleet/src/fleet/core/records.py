@@ -51,13 +51,10 @@ from fleet.contracts.retire_record import RetireRecord, decode_retire_record, en
 from fleet.core import _test_hooks, file_turn, record_tail
 
 #: The turn one append to a record file is made in. Inside it a process
-#: appends one line to one local file and nothing else, so a lock half a
-#: minute old was left by a process that died holding it.
+#: appends one line to one file and nothing else.
 APPEND_TURN: Final = file_turn.TurnBounds(
     what="append turn",
     waited_for="another process appending to the same record",
-    stale_seconds=30,
-    poll_seconds=1,
 )
 
 
@@ -68,9 +65,9 @@ def append_lock_path(path: pathlib.Path) -> pathlib.Path:
         path: The record file.
 
     Returns:
-        The lock file beside it.
+        The lock file beside it, which stays (:mod:`fleet.core.file_turn`).
     """
-    return path.with_name(f"{path.name}.lock")
+    return path.with_name(f"{path.name}.turn")
 
 
 def _append_line(path: pathlib.Path, line: str) -> None:

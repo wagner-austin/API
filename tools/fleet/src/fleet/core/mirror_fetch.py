@@ -114,28 +114,24 @@ INIT_TIMEOUT_SECONDS: Final = 60
 
 #: A mirror's fetch turn as :mod:`fleet.core.file_turn` holds it. Inside it
 #: an export probes the mirror and fetches at most one commit, which ends
-#: within one probe's deadline and the fetch's budget, so a lock older than
-#: both with a probe's deadline to spare was left by a process that died
-#: inside its turn.
+#: within one probe's deadline and the fetch's budget.
 #:
-#: LOOKED AT EVERY SECOND (MCPs board task 1e0ee821). Every job of one push
-#: gate exports the same commit, so all but the first wait here for the
-#: first one's fetch, then each finds the commit held in one probe. Looked
-#: at every ten seconds, then the pause before a lost fetch was sent again,
-#: a waiter missed each release by up to ten seconds and then
-#: lost the turn to another waiter's probe: on lacrymal on 2026-11-04 the
-#: export of MCPs 6f20029f0 for MCPs/execution-deploy took its turn after
-#: waiting 21 s, all of it between that job's claim and its lease, where the
-#: push gate holds the job to 150 s from claim to verdict. A look is one
-#: open of the lock file, and since MCPs board task 5280a25d the first looks
-#: come 10 ms apart and double up to this second, as every turn's do
-#: (:data:`fleet.core.file_turn.FIRST_LOOK_SECONDS`).
+#: A WAITER IS WOKEN AS THE FETCH ENDS (MCPs board tasks 1e0ee821 and
+#: 5280a25d). Every job of one push gate exports the same commit, so all but
+#: the first wait here for the first one's fetch, then each finds the commit
+#: held in one probe. Looked at on a clock, a waiter missed each release by
+#: up to the clock's interval: on lacrymal on 2026-11-04 the export of MCPs
+#: 6f20029f0 for MCPs/execution-deploy took its turn after waiting 21 s, all
+#: of it between that job's claim and its lease, where the push gate holds
+#: the job to 150 s from claim to verdict. The kernel now wakes it.
 FETCH_TURN: Final = file_turn.TurnBounds(
     what="mirror fetch turn",
     waited_for="another export fetching into the same mirror",
-    stale_seconds=FETCH_BUDGET_SECONDS + 2 * INIT_TIMEOUT_SECONDS,
-    poll_seconds=1,
 )
+
+#: How old a ``tmp_pack`` file is when no fetch still writes it: one probe's
+#: deadline and the fetch's whole budget, with a probe's deadline to spare.
+DEAD_PACK_SECONDS: Final = FETCH_BUDGET_SECONDS + 2 * INIT_TIMEOUT_SECONDS
 
 #: What git says when the remote will not serve the object asked for: the
 #: three spellings across protocol versions and server settings. Any of
@@ -271,9 +267,10 @@ def turn_lock(mirror: pathlib.Path) -> pathlib.Path:
         mirror: The mirror's path.
 
     Returns:
-        ``<mirror>.fetch.lock`` in the mirrors directory.
+        ``<mirror>.fetch.turn`` in the mirrors directory, which stays
+        (:mod:`fleet.core.file_turn`).
     """
-    return mirror.with_name(f"{mirror.name}.fetch.lock")
+    return mirror.with_name(f"{mirror.name}.fetch.turn")
 
 
 def _age(path: pathlib.Path) -> int | None:
@@ -301,8 +298,8 @@ def remove_dead_packs(mirror: pathlib.Path) -> tuple[str, ...]:
     runner that died inside one, leaves the file for good: seven of them,
     671512 KiB, in diphtheria's MCPs mirror on 2026-10-22. Asked inside the mirror's
     :data:`FETCH_TURN`, where no other fetch writes, and only of files older
-    than the turn's stale bound, because ``git gc --auto`` detaches from the
-    fetch that starts it and writes young ``tmp_pack`` files of its own
+    than :data:`DEAD_PACK_SECONDS`, because ``git gc --auto`` detaches from
+    the fetch that starts it and writes young ``tmp_pack`` files of its own
     outside the turn.
 
     Args:
@@ -314,7 +311,7 @@ def remove_dead_packs(mirror: pathlib.Path) -> tuple[str, ...]:
     removed: list[str] = []
     for path in sorted((mirror / "objects" / "pack").glob("tmp_pack_*")):
         age = _age(path)
-        if age is not None and age >= FETCH_TURN["stale_seconds"]:
+        if age is not None and age >= DEAD_PACK_SECONDS:
             path.unlink(missing_ok=True)
             removed.append(path.name)
     if removed:
@@ -502,6 +499,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
 __all__ = [
     "COMPANION_REF",
     "CREDENTIAL_REFUSED_MARKERS",
+    "DEAD_PACK_SECONDS",
     "FETCHED_REF",
     "FETCH_ATTEMPTS",
     "FETCH_BUDGET_SECONDS",

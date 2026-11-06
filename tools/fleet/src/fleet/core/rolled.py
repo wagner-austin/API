@@ -106,18 +106,15 @@ REQUIRED_FILES: Final[tuple[str, ...]] = (
 RECORDS_DIR: Final = "tools/fleet"
 
 #: The lock file the extraction turn is held by, in the extractions
-#: directory beside the trees.
-TURN_LOCK: Final = "turn.lock"
+#: directory beside the trees, where it stays (:mod:`fleet.core.file_turn`).
+TURN_LOCK: Final = "extraction.turn"
 
 #: The turn a launch finds or makes its commit's tree in, and reaps in. The
 #: longest turn is an extraction, whose two steps each have
-#: :data:`fleet.core.commit_tree.TREE_STEP_TIMEOUT_SECONDS`, so a lock a
-#: minute older than both was left by a launch that died holding it.
+#: :data:`fleet.core.commit_tree.TREE_STEP_TIMEOUT_SECONDS`.
 EXTRACT_TURN: Final = file_turn.TurnBounds(
     what="extraction turn",
     waited_for="another launch finding, extracting or reaping the rolled tree",
-    stale_seconds=2 * commit_tree.TREE_STEP_TIMEOUT_SECONDS + 60,
-    poll_seconds=1,
 )
 
 #: Detail prefixes, one per way a tick can be refused.

@@ -30,13 +30,11 @@ def _reserve(directory: pathlib.Path) -> bool:
         True only for the writer that created intent; all later calls reconcile.
     """
     with file_turn.held(
-        directory / "submission.lock",
+        directory / "submission.turn",
         holder="research-wrds",
         bounds=file_turn.TurnBounds(
             what="WRDS submission intent",
             waited_for="another intent writer",
-            stale_seconds=30,
-            poll_seconds=1,
         ),
     ):
         intent = directory / "submission.intent"

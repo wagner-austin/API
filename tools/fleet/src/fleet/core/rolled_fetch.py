@@ -83,17 +83,15 @@ LOCATE_TIMEOUT_SECONDS: Final[int] = 30
 #: the ref, its refusal when it did not.
 STAMP_NAME: Final = "fleet-rolled-fetch"
 
-#: The lock :data:`FETCH_TURN` is held by, beside the stamp.
-LOCK_NAME: Final = "fleet-rolled-fetch.lock"
+#: The lock :data:`FETCH_TURN` is held by, beside the stamp, where it stays
+#: (:mod:`fleet.core.file_turn`).
+LOCK_NAME: Final = "fleet-rolled-fetch.turn"
 
 #: The turn a read fetches or reads the stamp in. Its longest turn is one
-#: fetch, so a lock a minute older than the fetch's deadline was left by a
-#: read that died holding it.
+#: fetch, under :data:`FETCH_TIMEOUT_SECONDS`.
 FETCH_TURN: Final = file_turn.TurnBounds(
     what="rolled-ref fetch turn",
     waited_for="another tick fetching refs/fleet/rolled",
-    stale_seconds=FETCH_TIMEOUT_SECONDS + 60,
-    poll_seconds=1,
 )
 
 #: The refusal when the git directory cannot be found.

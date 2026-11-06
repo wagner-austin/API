@@ -57,13 +57,10 @@ from fleet.contracts.lease import (
 from fleet.core import _test_hooks, file_turn
 
 #: The lease file's turn as :mod:`fleet.core.file_turn` holds it. Inside it a
-#: process reads or rewrites one small local file and nothing else, so a lock
-#: half a minute old was left by a process that died holding it.
+#: process reads and rewrites one small file and nothing else.
 LEASE_TURN: Final = file_turn.TurnBounds(
     what="lease turn",
     waited_for="another process rewriting the lease file",
-    stale_seconds=30,
-    poll_seconds=1,
 )
 
 #: The lease files this process holds the turn of, guarded by
@@ -86,9 +83,9 @@ def lock_path(path: pathlib.Path) -> pathlib.Path:
         path: The lease file.
 
     Returns:
-        The lock file beside it.
+        The lock file beside it, which stays (:mod:`fleet.core.file_turn`).
     """
-    return path.with_name(f"{path.name}.lock")
+    return path.with_name(f"{path.name}.turn")
 
 
 @contextlib.contextmanager

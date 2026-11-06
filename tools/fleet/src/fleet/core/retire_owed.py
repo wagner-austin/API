@@ -51,6 +51,7 @@ from __future__ import annotations
 import contextlib
 import os
 import pathlib
+from collections.abc import Generator
 from typing import Final
 
 from platform_core.errors import AppError, FleetErrorCode
@@ -66,7 +67,6 @@ from fleet.core import (
     leases,
     names,
     records,
-    remote,
     retire,
 )
 
@@ -81,13 +81,10 @@ RETIRE_TURNS_DIRECTORY: Final = "retire-turns"
 
 #: The turn one run's retire is sent and recorded in. Inside it a runner
 #: sends the retire script and runs it, two ssh calls of at most
-#: :data:`fleet.core.remote.SSH_TIMEOUT_SECONDS` each, so a lock older than
-#: three of them was left by a process that died holding it.
+#: :data:`fleet.core.remote.SSH_TIMEOUT_SECONDS` each.
 RETIRE_TURN: Final = file_turn.TurnBounds(
     what="retire turn",
     waited_for="another runner retiring the same run",
-    stale_seconds=3 * remote.SSH_TIMEOUT_SECONDS,
-    poll_seconds=1,
 )
 
 
@@ -128,7 +125,21 @@ def _latest_state(path: pathlib.Path, run_id: str) -> RetireState | None:
     return None if latest is None else latest["state"]
 
 
-def _turn(path: pathlib.Path, run_id: str) -> contextlib.AbstractContextManager[None]:
+def turn_path(path: pathlib.Path, run_id: str) -> pathlib.Path:
+    """Where one run's retire turn is held.
+
+    Args:
+        path: The retire record file.
+        run_id: The run.
+
+    Returns:
+        The lock file, in :data:`RETIRE_TURNS_DIRECTORY` beside the record.
+    """
+    return path.parent / RETIRE_TURNS_DIRECTORY / f"{run_id}.turn"
+
+
+@contextlib.contextmanager
+def _turn(path: pathlib.Path, run_id: str) -> Generator[None, None, None]:
     """One run's retire turn, held across this hub's runners and their threads.
 
     A settle closes its row and frees its lease before it retires, so a
@@ -139,18 +150,25 @@ def _turn(path: pathlib.Path, run_id: str) -> contextlib.AbstractContextManager[
     pendragon's watch and its own collect pass. Every retire is sent in its
     run's turn and first reads whether one is already recorded done.
 
+    The lock file is removed inside the turn as it ends, however the block
+    ended, so the directory holds a file only for a turn under way rather
+    than one for every run the hub has retired (MCPs board task 5280a25d);
+    a turn waiting on the removed file takes the path's next one
+    (:mod:`fleet.core.file_turn`) and reads what this one recorded.
+
     Args:
         path: The retire record file.
         run_id: The run.
 
-    Returns:
-        The turn, held for the span of a ``with`` block.
+    Yields:
+        Nothing; the turn is held while the block runs.
     """
-    return file_turn.held(
-        path.parent / RETIRE_TURNS_DIRECTORY / f"{run_id}.lock",
-        holder=f"fleet process {os.getpid()}",
-        bounds=RETIRE_TURN,
-    )
+    lock = turn_path(path, run_id)
+    with file_turn.held(lock, holder=f"fleet process {os.getpid()}", bounds=RETIRE_TURN):
+        try:
+            yield
+        finally:
+            lock.unlink(missing_ok=True)
 
 
 def _record(
@@ -429,4 +447,5 @@ __all__ = [
     "retire_or_owe",
     "retire_or_raise",
     "retire_owed",
+    "turn_path",
 ]
