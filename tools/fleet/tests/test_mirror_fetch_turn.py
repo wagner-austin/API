@@ -198,7 +198,15 @@ class TestTheTurn:
         other = OtherTurn(mirror_fetch.turn_lock(mirror))
 
         def the_other_export_fetches_it() -> None:
-            git(mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other")
+            git(
+                mirror,
+                "fetch",
+                "--quiet",
+                "--no-tags",
+                mirror_fetch.KEEP_PACK,
+                str(origin),
+                f"+{first}:refs/other",
+            )
 
         ending = other.end_after(0.1, the_other_export_fetches_it)
 

@@ -95,7 +95,7 @@ def _registry(tmp_path: pathlib.Path) -> pathlib.Path:
         The registry directory.
     """
     registry = tmp_path / "registry"
-    registry.mkdir()
+    registry.mkdir(parents=True)
     (registry / "settings.json").write_text("{}\n", encoding="utf-8")
     return registry
 
