@@ -165,12 +165,11 @@ class TestTheTurn:
         origin, first = _origin(tmp_path)
         mirror = _mirror(tmp_path)
         other = OtherTurn(mirror_fetch.turn_lock(mirror))
-        ending = other.end_after(
-            0.1,
-            lambda: git(
-                mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other"
-            ),
-        )
+
+        def the_other_export_fetches_it() -> None:
+            git(mirror, "fetch", "--quiet", "--no-tags", str(origin), f"+{first}:refs/other")
+
+        ending = other.end_after(0.1, the_other_export_fetches_it)
 
         with caplog.at_level("INFO"):
             mirror_fetch.fetch_commit(mirror, str(origin), first)
