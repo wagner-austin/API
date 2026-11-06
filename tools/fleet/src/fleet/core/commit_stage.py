@@ -82,6 +82,14 @@ NODE_TIP_REF: Final = "refs/fleet/staged"
 #: the node fetches it into :data:`NODE_TIP_REF`.
 BUNDLE_REF_PREFIX: Final = "refs/fleet/bundle/"
 
+#: The node mirror's ref that names the last base branch tip fetched into
+#: it, which keeps that tip's history reachable (MCPs board task a48b5236).
+NODE_BASE_REF: Final = "refs/fleet/base"
+
+#: The prefix of the ref the hub writes for one run's base branch tip, which
+#: rides in the commit's bundle and lands in :data:`NODE_BASE_REF`.
+BASE_BUNDLE_REF_PREFIX: Final = "refs/fleet/bundle-base/"
+
 #: How long, in milliseconds, a command writing a mirror's refs waits for
 #: another git process to give a ref's lock or ``packed-refs.lock`` back:
 #: several runs stage on one node at once and export from one hub mirror at
@@ -117,6 +125,10 @@ class CommitExport(TypedDict):
         sha: The commit.
         scope: The archive's pathspec, empty for the whole commit.
         bundle: The local file the bundle is written to, removed once sent.
+        base_branch: The branch the project's commits are measured against
+            and its tip, staged beside the commit
+            (:func:`fleet.core.stage_repository.base_branch_commands`); None
+            for a project declaring none, and for every companion.
     """
 
     mirror: pathlib.Path
@@ -124,6 +136,7 @@ class CommitExport(TypedDict):
     sha: str
     scope: tuple[str, ...]
     bundle: pathlib.Path
+    base_branch: stage_repository.BaseBranch | None
 
 
 class NodeMirror(TypedDict):
@@ -153,7 +166,7 @@ class StagedCommit(TypedDict):
     detail: str
 
 
-def prepare_script(*, target: str, staged: str, mirror: str, sha: str) -> str:
+def prepare_script(*, target: str, staged: str, mirror: str, sha: str, base_tip: str | None) -> str:
     """Make the export's directories and say what the node's mirror holds.
 
     Args:
@@ -161,6 +174,8 @@ def prepare_script(*, target: str, staged: str, mirror: str, sha: str) -> str:
         staged: Its staging directory.
         mirror: The node's mirror of the commit's remote.
         sha: The commit.
+        base_tip: The project's base branch tip, which the mirror must hold
+            too, or None.
 
     Returns:
         The script's text. It prints what :func:`mirror_probe_lines` prints
@@ -168,11 +183,11 @@ def prepare_script(*, target: str, staged: str, mirror: str, sha: str) -> str:
     """
     return (
         f"{dialect.PROLOGUE}mkdir -p {shlex.quote(target)} {shlex.quote(staged)}\n"
-        f"{mirror_probe_lines(mirror=mirror, sha=sha)}"
+        f"{mirror_probe_lines(mirror=mirror, sha=sha, base_tip=base_tip)}"
     )
 
 
-def mirror_probe_lines(*, mirror: str, sha: str) -> str:
+def mirror_probe_lines(*, mirror: str, sha: str, base_tip: str | None) -> str:
     """The lines of a node script that say what the node's mirror holds.
 
     HELD MEANS :data:`NODE_TIP_REF` REACHES THE COMMIT (MCPs board task
@@ -180,24 +195,33 @@ def mirror_probe_lines(*, mirror: str, sha: str) -> str:
     a node at once fetch into one mirror, and a small fetch writes its
     objects loose, the commit before its tree, while git moves the ref only
     once every object is written. A commit off the ref's history is sent
-    again, which costs a bundle and never a tree missing its blobs.
+    again, which costs a bundle and never a tree missing its blobs. A base
+    branch tip is held the same way, reached by :data:`NODE_TIP_REF` or by
+    :data:`NODE_BASE_REF` (MCPs board task a48b5236).
 
     Args:
         mirror: The node's mirror of the remote.
         sha: The commit.
+        base_tip: The base branch tip the mirror must reach as well, or None.
 
     Returns:
         The lines. They print :data:`NODE_TIP_REF`'s commit when the mirror
-        has one and :data:`HELD_ANSWER` when that ref reaches ``sha``, and
-        nothing about a mirror that does not exist yet.
+        has one and :data:`HELD_ANSWER` when the mirror reaches ``sha`` and
+        ``base_tip``, and nothing about a mirror that does not exist yet.
     """
     quoted = shlex.quote(mirror)
     tip = shlex.quote(f"{NODE_TIP_REF}^{{commit}}")
+    reaches = f"git -C {quoted} merge-base --is-ancestor {shlex.quote(sha)} {NODE_TIP_REF}"
+    if base_tip is not None:
+        base = shlex.quote(base_tip)
+        reaches += (
+            f" 2>/dev/null && {{ git -C {quoted} merge-base --is-ancestor {base} {NODE_TIP_REF}"
+            f" 2>/dev/null || git -C {quoted} merge-base --is-ancestor {base} {NODE_BASE_REF}; }}"
+        )
     return (
         f"if [ -d {quoted} ]; then\n"
         f"  git -C {quoted} rev-parse --verify --quiet {tip} || true\n"
-        f"  if git -C {quoted} merge-base --is-ancestor {shlex.quote(sha)} {NODE_TIP_REF}"
-        f" 2>/dev/null; then echo {HELD_ANSWER}; fi\n"
+        f"  if {reaches} 2>/dev/null; then echo {HELD_ANSWER}; fi\n"
         "fi\n"
     )
 
@@ -234,7 +258,13 @@ def _git(mirror: pathlib.Path, args: tuple[str, ...], *, verb: str, timeout_seco
 
 
 def bundle_commit(
-    mirror: pathlib.Path, *, sha: str, run_id: str, base: str | None, destination: pathlib.Path
+    mirror: pathlib.Path,
+    *,
+    sha: str,
+    run_id: str,
+    base: str | None,
+    base_tip: str | None,
+    destination: pathlib.Path,
 ) -> bytes:
     """Write the bundle of a commit less what the node's mirror holds, and read it back.
 
@@ -245,6 +275,9 @@ def bundle_commit(
         base: The node mirror's tip, left out of the bundle with its history
             when the hub's mirror holds it; a base the hub's mirror lacks, or
             none, sends the commit's whole history.
+        base_tip: The project's base branch tip, bundled beside the commit
+            under :data:`BASE_BUNDLE_REF_PREFIX` (MCPs board task a48b5236),
+            or None.
         destination: Where the bundle is written; its directory is made.
 
     Returns:
@@ -253,36 +286,44 @@ def bundle_commit(
     Raises:
         AppError: ``EXPORT_FAILED`` when a git command exits non-zero.
     """
-    ref = f"{BUNDLE_REF_PREFIX}{run_id}"
+    refs = ((f"{BUNDLE_REF_PREFIX}{run_id}", sha),)
+    if base_tip is not None:
+        refs += ((f"{BASE_BUNDLE_REF_PREFIX}{run_id}", base_tip),)
     # A ref write may spend git's whole lock wait before it starts its own work.
     seconds = REF_LOCK_TIMEOUT_MS // 1000 + mirror_fetch.INIT_TIMEOUT_SECONDS
-    _git(
-        mirror,
-        (*REF_LOCK_WAITS, "update-ref", ref, sha),
-        verb=f"git update-ref {ref} in {mirror}",
-        timeout_seconds=seconds,
-    )
+    written: list[str] = []
     try:
+        for ref, commit in refs:
+            _git(
+                mirror,
+                (*REF_LOCK_WAITS, "update-ref", ref, commit),
+                verb=f"git update-ref {ref} in {mirror}",
+                timeout_seconds=seconds,
+            )
+            written.append(ref)
         known = base is not None and mirror_fetch.has_commit(mirror, base)
         excluded = (f"^{base}",) if known else ()
         _test_hooks.make_directory(destination.parent)
         _git(
             mirror,
-            ("bundle", "create", "--quiet", str(destination), ref, *excluded),
+            ("bundle", "create", "--quiet", str(destination), *written, *excluded),
             verb=f"git bundle create {sha} from {mirror}",
             timeout_seconds=export.ARCHIVE_TIMEOUT_SECONDS,
         )
     finally:
-        _git(
-            mirror,
-            (*REF_LOCK_WAITS, "update-ref", "-d", ref),
-            verb=f"git update-ref -d {ref} in {mirror}",
-            timeout_seconds=seconds,
-        )
+        for ref in written:
+            _git(
+                mirror,
+                (*REF_LOCK_WAITS, "update-ref", "-d", ref),
+                verb=f"git update-ref -d {ref} in {mirror}",
+                timeout_seconds=seconds,
+            )
     return _test_hooks.read_bytes(destination)
 
 
-def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tuple[str, ...], ...]:
+def fetch_commands(
+    *, mirror: str, bundle: str | None, run_id: str, base_branch: bool
+) -> tuple[tuple[str, ...], ...]:
     """The commands that fetch a verified bundle into the node's mirror.
 
     Shared by a project's commit and a companion's
@@ -294,6 +335,8 @@ def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tup
         bundle: The verified bundle on the node, or None when the mirror
             already holds the commit and nothing was sent.
         run_id: What names the bundle's ref (:data:`BUNDLE_REF_PREFIX`).
+        base_branch: Whether the bundle carries a base branch tip too,
+            fetched into :data:`NODE_BASE_REF`.
 
     Returns:
         No command when nothing was sent; else the mirrors directory made, so
@@ -304,6 +347,7 @@ def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tup
     """
     if bundle is None:
         return ()
+    based = (f"+{BASE_BUNDLE_REF_PREFIX}{run_id}:{NODE_BASE_REF}",) if base_branch else ()
     return (
         ("mkdir", "-p", posixpath.dirname(mirror)),
         stage_repository.under_mirror_lock(mirror, ("git", "init", "--bare", "--quiet", mirror)),
@@ -320,6 +364,7 @@ def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tup
                 "--no-tags",
                 bundle,
                 f"+{BUNDLE_REF_PREFIX}{run_id}:{NODE_TIP_REF}",
+                *based,
             ),
         ),
     )
@@ -334,6 +379,7 @@ def unpack_script(
     scope: tuple[str, ...],
     staged: str,
     target: str,
+    base_branch: stage_repository.BaseBranch | None,
 ) -> str:
     """The script that puts a commit's tree in the export from the node's mirror.
 
@@ -347,13 +393,17 @@ def unpack_script(
         staged: The export's staging directory, where the tar's named pipe
             is made.
         target: The export's directory.
+        base_branch: The project's base branch and its tip, or None.
 
     Returns:
         The script, ending at its first failure: the mirror made if absent
         and the bundle fetched into it, the export made a repository holding
         the mirror's objects by hard links
         (:func:`fleet.core.stage_repository.clone_commands`, MCPs board task
-        5280a25d), the commit's tar streamed into it through
+        5280a25d), placed on the commit's history beside its base branch
+        when it declares one
+        (:func:`fleet.core.stage_repository.base_branch_commands`), the
+        commit's tar streamed into it through
         :data:`fleet.core.names.TREE_FIFO_NAME` and never written whole
         (:func:`fleet.core.dialect.fed_lines`), and the tree indexed and
         committed, its add finding nearly every object it hashes already
@@ -361,11 +411,22 @@ def unpack_script(
     """
     fifo = f"{staged}/{names.TREE_FIFO_NAME}"
     pathspec = ("--", *scope) if scope else ()
+    placed = (
+        stage_repository.base_branch_commands(target, sha, base_branch)
+        if base_branch is not None
+        else ()
+    )
     return (
         dialect.checked_script(
             (
-                *fetch_commands(mirror=mirror, bundle=bundle, run_id=run_id),
+                *fetch_commands(
+                    mirror=mirror,
+                    bundle=bundle,
+                    run_id=run_id,
+                    base_branch=base_branch is not None,
+                ),
                 *stage_repository.clone_commands(target, mirror),
+                *placed,
             )
         )
         + dialect.fed_lines(
@@ -411,6 +472,7 @@ def send_bundle(
             sha=sha,
             run_id=run_id,
             base=base,
+            base_tip=base_tip(commit),
             destination=commit["bundle"],
         )
         staging.send_verified(
@@ -423,6 +485,19 @@ def send_bundle(
     finally:
         commit["bundle"].unlink(missing_ok=True)
     return len(payload)
+
+
+def base_tip(commit: CommitExport) -> str | None:
+    """The base branch tip a commit is staged beside.
+
+    Args:
+        commit: The commit.
+
+    Returns:
+        The tip, or None for a commit staged with no base branch.
+    """
+    branch = commit["base_branch"]
+    return None if branch is None else branch["sha"]
 
 
 def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExport) -> StagedCommit:
@@ -449,7 +524,9 @@ def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExpor
     said = remote.run_script(
         host,
         dialect.script_path(stage_root, names.make_directory_stem(run_id)),
-        prepare_script(target=target, staged=staged, mirror=mirror, sha=sha),
+        prepare_script(
+            target=target, staged=staged, mirror=mirror, sha=sha, base_tip=base_tip(commit)
+        ),
     )
     node = read_node_mirror(said)
     bundle = None if node["held"] else f"{staged}/{names.ARCHIVE_NAME}"
@@ -474,6 +551,7 @@ def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExpor
             scope=commit["scope"],
             staged=staged,
             target=target,
+            base_branch=commit["base_branch"],
         ),
         timeout_seconds=remote.send_deadline_seconds(sent),
     )
@@ -482,20 +560,25 @@ def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExpor
         if bundle is None
         else f"over {node['tip'] or 'an empty mirror'}"
     )
+    branch = commit["base_branch"]
+    beside = "" if branch is None else f", beside {branch['ref']} at {branch['sha']}"
     return StagedCommit(
-        target=target, detail=f"{sent} bytes, git bundle of {sha} {over}, to {target}"
+        target=target, detail=f"{sent} bytes, git bundle of {sha} {over}{beside}, to {target}"
     )
 
 
 __all__ = [
+    "BASE_BUNDLE_REF_PREFIX",
     "BUNDLE_REF_PREFIX",
     "HELD_ANSWER",
+    "NODE_BASE_REF",
     "NODE_TIP_REF",
     "REF_LOCK_TIMEOUT_MS",
     "REF_LOCK_WAITS",
     "CommitExport",
     "NodeMirror",
     "StagedCommit",
+    "base_tip",
     "bundle_commit",
     "fetch_commands",
     "mirror_probe_lines",

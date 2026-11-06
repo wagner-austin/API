@@ -41,9 +41,22 @@ def test_a_staged_tree_is_initialised_kept_from_auto_gc_indexed_and_committed() 
             f"user.email={stage_repository.EXPORT_AUTHOR_EMAIL}",
             "commit",
             "--quiet",
+            "--allow-empty",
             "--message",
             "fleet export MCPs-packages-db-1790400000",
         ),
+    )
+
+
+def test_a_tree_with_a_base_branch_is_put_on_its_commit_beside_the_branch_tip() -> None:
+    """The branch is written where a checkout's remote-tracking ref is, and
+    HEAD is the commit itself, so the staged commit is its child (MCPs board
+    task a48b5236)."""
+    branch = stage_repository.BaseBranch(ref="refs/heads/main", sha="b" * 40)
+
+    assert stage_repository.base_branch_commands("/s/run", "c" * 40, branch) == (
+        ("git", "-C", "/s/run", "update-ref", "refs/remotes/origin/main", "b" * 40),
+        ("git", "-C", "/s/run", "update-ref", "HEAD", "c" * 40),
     )
 
 

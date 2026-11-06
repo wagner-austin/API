@@ -19,7 +19,7 @@ import subprocess
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, commit_stage, names, remote, staging
+from fleet.core import _test_hooks, commit_stage, names, remote, stage_repository, staging
 from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok
 
@@ -103,7 +103,9 @@ def _node_mirror_at(hub: pathlib.Path, node: pathlib.Path, run_id: str, base: st
     """
     head = _git(hub, "rev-parse", "HEAD")
     bundle = node.parent / f"{run_id}.bundle"
-    commit_stage.bundle_commit(hub, sha=head, run_id=run_id, base=base, destination=bundle)
+    commit_stage.bundle_commit(
+        hub, sha=head, run_id=run_id, base=base, base_tip=None, destination=bundle
+    )
     script = commit_stage.unpack_script(
         mirror=str(node),
         bundle=str(bundle),
@@ -112,6 +114,7 @@ def _node_mirror_at(hub: pathlib.Path, node: pathlib.Path, run_id: str, base: st
         scope=(),
         staged=str(node.parent / f"{run_id}.stage"),
         target=str(node.parent / run_id),
+        base_branch=None,
     )
     (node.parent / f"{run_id}.stage").mkdir()
     (node.parent / run_id).mkdir()
@@ -129,6 +132,7 @@ class TestTheNodeMirrorSaysWhatItHolds:
                 staged=f"{target}.stage",
                 mirror=str(tmp_path / "mirrors" / "repo.git"),
                 sha=SHA,
+                base_tip=None,
             )
         )
 
@@ -149,7 +153,11 @@ class TestTheNodeMirrorSaysWhatItHolds:
 
         def asked(sha: str) -> commit_stage.NodeMirror:
             script = commit_stage.prepare_script(
-                target=str(tmp_path / "t"), staged=str(tmp_path / "s"), mirror=str(node), sha=sha
+                target=str(tmp_path / "t"),
+                staged=str(tmp_path / "s"),
+                mirror=str(node),
+                sha=sha,
+                base_tip=None,
             )
             return commit_stage.read_node_mirror(_sh(script))
 
@@ -175,9 +183,11 @@ class TestTheBundleCarriesWhatTheNodeLacks:
         whole = tmp_path / "whole.bundle"
 
         sent = commit_stage.bundle_commit(
-            hub, sha=second, run_id="run-2", base=first, destination=delta
+            hub, sha=second, run_id="run-2", base=first, base_tip=None, destination=delta
         )
-        commit_stage.bundle_commit(hub, sha=second, run_id="run-3", base=None, destination=whole)
+        commit_stage.bundle_commit(
+            hub, sha=second, run_id="run-3", base=None, base_tip=None, destination=whole
+        )
 
         assert sent == delta.read_bytes()
         # The node's mirror holds the base, so the bundle verifies there; an
@@ -209,7 +219,9 @@ class TestTheBundleCarriesWhatTheNodeLacks:
 
         for base in (None, TIP):
             bundle = tmp_path / f"{base}.bundle"
-            commit_stage.bundle_commit(hub, sha=sha, run_id="run-1", base=base, destination=bundle)
+            commit_stage.bundle_commit(
+                hub, sha=sha, run_id="run-1", base=base, base_tip=None, destination=bundle
+            )
 
             _git(empty, "bundle", "verify", "--quiet", str(bundle))
 
@@ -220,7 +232,12 @@ class TestTheBundleCarriesWhatTheNodeLacks:
 
         with pytest.raises(AppError) as raised:
             commit_stage.bundle_commit(
-                mirror, sha=SHA, run_id="run-1", base=None, destination=tmp_path / "b.bundle"
+                mirror,
+                sha=SHA,
+                run_id="run-1",
+                base=None,
+                base_tip=None,
+                destination=tmp_path / "b.bundle",
             )
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
@@ -245,7 +262,12 @@ class TestTheBundleCarriesWhatTheNodeLacks:
         refusal = r"^git update-ref refs/fleet/bundle/run-1 in .*lock ref$"
         with pytest.raises(AppError, match=refusal):
             commit_stage.bundle_commit(
-                tmp_path, sha=SHA, run_id="run-1", base=None, destination=tmp_path / "b.bundle"
+                tmp_path,
+                sha=SHA,
+                run_id="run-1",
+                base=None,
+                base_tip=None,
+                destination=tmp_path / "b.bundle",
             )
 
         assert len(runner.calls) == 1
@@ -281,6 +303,7 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
                 scope=(".", ":(exclude)data"),
                 staged=f"{held}.stage",
                 target=str(held),
+                base_branch=None,
             )
         )
         assert (held / "src" / "a.py").read_text(encoding="utf-8") == "print(1)\n"
@@ -328,7 +351,9 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
         first = _commit(hub, {"a.txt": "one\n"})
         second = _commit(hub, {"a.txt": "two\n"})
         bundle = tmp_path / "b.bundle"
-        commit_stage.bundle_commit(hub, sha=second, run_id="run-1", base=first, destination=bundle)
+        commit_stage.bundle_commit(
+            hub, sha=second, run_id="run-1", base=first, base_tip=None, destination=bundle
+        )
         target = tmp_path / "run-1"
         target.mkdir()
         script = commit_stage.unpack_script(
@@ -339,6 +364,7 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
             scope=(),
             staged=str(tmp_path),
             target=str(target),
+            base_branch=None,
         )
 
         done = subprocess.run(
@@ -366,12 +392,15 @@ def _scp(remote_path: str, source: pathlib.Path) -> tuple[str, ...]:
     return ("scp", "-q", *SSH_OPTIONS, str(source), f"lavender:{remote_path}")
 
 
-def _export(tmp_path: pathlib.Path, payload: bytes) -> commit_stage.CommitExport:
+def export_of(
+    tmp_path: pathlib.Path, payload: bytes, *, base_branch: stage_repository.BaseBranch | None
+) -> commit_stage.CommitExport:
     """A commit to stage, its bundle already where the faked git would write it.
 
     Args:
         tmp_path: The test's directory.
         payload: The bundle's bytes.
+        base_branch: The project's base branch, or None.
 
     Returns:
         The export.
@@ -380,7 +409,12 @@ def _export(tmp_path: pathlib.Path, payload: bytes) -> commit_stage.CommitExport
     bundle.parent.mkdir()
     bundle.write_bytes(payload)
     return commit_stage.CommitExport(
-        mirror=tmp_path / "hub.git", key="wagner-austin-MCPs", sha=SHA, scope=(), bundle=bundle
+        mirror=tmp_path / "hub.git",
+        key="wagner-austin-MCPs",
+        sha=SHA,
+        scope=(),
+        bundle=bundle,
+        base_branch=base_branch,
     )
 
 
@@ -392,7 +426,7 @@ class TestStagingOneCommit:
         self, tmp_path: pathlib.Path
     ) -> None:
         payload = b"# v2 git bundle\nbundle"
-        commit = _export(tmp_path, payload)
+        commit = export_of(tmp_path, payload, base_branch=None)
         runner = FakeRun(
             [
                 ok(""),
@@ -421,7 +455,7 @@ class TestStagingOneCommit:
         )
         assert runner.calls[1][-1] == f"{STAGE_ROOT}/mkdir-{DEMO_RUN_ID}.sh"
         prepared = commit_stage.prepare_script(
-            target=self.TARGET, staged=staged_dir, mirror=self.MIRROR, sha=SHA
+            target=self.TARGET, staged=staged_dir, mirror=self.MIRROR, sha=SHA, base_tip=None
         )
         assert runner.stdin[0] == prepared.encode("utf-8")
         hub = str(tmp_path / "hub.git")
@@ -436,13 +470,14 @@ class TestStagingOneCommit:
             scope=(),
             staged=staged_dir,
             target=self.TARGET,
+            base_branch=None,
         )
         assert runner.stdin[9] == unpack.encode("utf-8")
         assert runner.timeouts[10] == remote.send_deadline_seconds(len(payload))
         assert not commit["bundle"].exists()
 
     def test_a_commit_the_node_s_mirror_holds_is_sent_nothing(self, tmp_path: pathlib.Path) -> None:
-        commit = _export(tmp_path, b"unsent")
+        commit = export_of(tmp_path, b"unsent", base_branch=None)
         runner = FakeRun([ok(""), ok(f"{TIP}\nheld\n"), ok(""), ok("")])
         _test_hooks.run = runner
 
@@ -462,7 +497,7 @@ class TestStagingOneCommit:
     def test_a_mismatched_digest_unpacks_nothing_and_leaves_no_bundle(
         self, tmp_path: pathlib.Path
     ) -> None:
-        commit = _export(tmp_path, b"# v2 git bundle\nbundle")
+        commit = export_of(tmp_path, b"# v2 git bundle\nbundle", base_branch=None)
         runner = FakeRun([ok(""), ok(""), ok(""), ok(""), ok(""), ok(""), ok(""), ok("0" * 64)])
         _test_hooks.run = runner
 

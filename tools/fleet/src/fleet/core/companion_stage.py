@@ -91,7 +91,7 @@ def prepare_script(*, tree: str, staged: str, mirror: str, sha: str, ref: str) -
         "fi\n"
         f"rm -rf {quoted}\n"
         f"mkdir -p {quoted} {shlex.quote(staged)}\n"
-        f"{commit_stage.mirror_probe_lines(mirror=mirror, sha=sha)}"
+        f"{commit_stage.mirror_probe_lines(mirror=mirror, sha=sha, base_tip=None)}"
     )
 
 
@@ -145,6 +145,7 @@ def stage_companion(
                 sha=sha,
                 scope=(),
                 bundle=companion["bundle"],
+                base_branch=None,
             ),
             base=node["tip"],
             described_as=f"the {directory} companion at {sha}",
@@ -154,7 +155,9 @@ def stage_companion(
         dialect.script_path(staged, names.COMPANION_REPOSITORY_STEM),
         dialect.checked_script(
             (
-                *commit_stage.fetch_commands(mirror=mirror, bundle=bundle, run_id=bundle_id),
+                *commit_stage.fetch_commands(
+                    mirror=mirror, bundle=bundle, run_id=bundle_id, base_branch=False
+                ),
                 *stage_repository.companion_repository_commands(
                     tree, mirror, sha, companion["ref"]
                 ),

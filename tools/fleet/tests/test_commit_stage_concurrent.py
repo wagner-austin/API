@@ -139,6 +139,7 @@ def test_exports_waiting_on_a_held_packed_refs_lock_all_succeed(tmp_path: pathli
                 sha=sha,
                 run_id=f"run-{index}",
                 base=None,
+                base_tip=None,
                 destination=tmp_path / "bundles" / f"run-{index}.bundle",
             )
         except AppError as refused:

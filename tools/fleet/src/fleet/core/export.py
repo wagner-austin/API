@@ -338,7 +338,9 @@ def prepare_companion(mirrors_root: pathlib.Path, companion: ProjectCompanion) -
     """
     mirror = mirror_path(mirrors_root, companion_mirror_key(companion["remote"]))
     ensure_mirror(mirror)
-    sha = mirror_fetch.fetch_ref(mirror, companion["remote"], companion["ref"])
+    sha = mirror_fetch.fetch_ref(
+        mirror, companion["remote"], companion["ref"], declared_as="a companion ref"
+    )
     return PreparedCompanion(mirror=mirror, sha=sha)
 
 

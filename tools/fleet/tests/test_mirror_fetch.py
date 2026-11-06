@@ -31,6 +31,9 @@ from tests.conftest import (
 SHA = "4e3c6bc1d9f0a7b2c3e4f5061728394a5b6c7d8e"
 REMOTE = "https://github.com/wagner-austin/API.git"
 
+#: What a companion's ref is declared as, in a ref fetch's refusal.
+COMPANION = "a companion ref"
+
 #: What diphtheria's git said for job 5aadc355 on 2026-10-18.
 TLS_LOST = (
     "fatal: unable to access 'https://github.com/wagner-austin/API.git/': "
@@ -306,7 +309,7 @@ class TestARefusedCredential:
         _test_hooks.run = runner
 
         with pytest.raises(AppError) as raised:
-            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main")
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION)
 
         assert raised.value.code is FleetErrorCode.REMOTE_CREDENTIAL_REJECTED
         assert raised.value.message.startswith(
@@ -368,7 +371,7 @@ class TestFetchRef:
         runner = FakeRun([ok(""), ok(f"{SHA}\n")])
         _test_hooks.run = runner
 
-        assert mirror_fetch.fetch_ref(tmp_path, REMOTE, "main") == SHA
+        assert mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION) == SHA
         assert runner.calls == [
             (
                 "git",
@@ -399,19 +402,35 @@ class TestFetchRef:
         _test_hooks.run = FakeRun([failed(128, f"fatal: {marker} main")])
 
         with pytest.raises(AppError) as raised:
-            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main")
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION)
 
         assert raised.value.code is FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE
         assert raised.value.message.startswith(f"{REMOTE} does not serve 'main'")
         assert "which the registry declares as a companion ref" in raised.value.message
         assert f"git said: fatal: {marker} main" in raised.value.message
 
+    def test_a_base_branch_the_remote_lacks_is_refused_naming_what_declares_it(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """A project's base branch is fetched as a companion's ref is (MCPs
+        board task a48b5236), and its refusal names the line to correct."""
+        _test_hooks.run = FakeRun([failed(128, f"fatal: {mirror_fetch.NOT_ON_REMOTE_MARKERS[0]}")])
+
+        with pytest.raises(AppError) as raised:
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "trunk", declared_as="a project's base branch")
+
+        assert raised.value.code is FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE
+        assert raised.value.message.startswith(
+            f"{REMOTE} does not serve 'trunk', which the registry declares as a project's "
+            "base branch; every job of the project carrying it fails here"
+        )
+
     def test_a_lost_fetch_is_sent_again_as_a_commit_s_is(self, tmp_path: pathlib.Path) -> None:
         pin_clock(DEMO_NOW)
         runner = FakeRun([failed(128, RESET), ok(""), ok(f"{SHA}\n")])
         _test_hooks.run = runner
 
-        assert mirror_fetch.fetch_ref(tmp_path, REMOTE, "main") == SHA
+        assert mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION) == SHA
         assert [call[3] for call in runner.calls] == ["fetch", "fetch", "rev-parse"]
 
     def test_one_lost_every_time_is_refused_naming_each_attempt(
@@ -421,7 +440,7 @@ class TestFetchRef:
         _test_hooks.run = FakeRun([failed(128, RESET)] * mirror_fetch.FETCH_ATTEMPTS)
 
         with pytest.raises(AppError) as raised:
-            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main")
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION)
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message.startswith(
@@ -438,7 +457,7 @@ class TestFetchRef:
         _test_hooks.run = FakeRun([ok(""), failed(128, "fatal: not a valid object name")])
 
         with pytest.raises(AppError) as raised:
-            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main")
+            mirror_fetch.fetch_ref(tmp_path, REMOTE, "main", declared_as=COMPANION)
 
         assert raised.value.code is FleetErrorCode.EXPORT_FAILED
         assert raised.value.message == (

@@ -319,6 +319,50 @@ class TestProjectSource:
         assert decode_project_source(None, field="source") is None
         assert encode_project_source(None) is None
 
+    def test_a_base_branch_survives_encoding_and_an_absent_one_stays_absent(self) -> None:
+        """MCPs board task a48b5236: a project whose check asks what its
+        commit changes against a branch declares that branch; every other
+        project leaves the key out and is staged as before."""
+        based = _source(install=())
+        based["base_branch"] = "main"
+
+        encoded = encode_project_source(based)
+
+        assert encoded == {
+            "remote": HTTPS,
+            "path": "packages/wiki-search",
+            "install": [],
+            "companions": [],
+            "base_branch": "main",
+        }
+        assert decode_project_source(encoded, field="source") == based
+        plain = decode_project_source(encode_project_source(_source()), field="source")
+        assert plain is not None
+        assert "base_branch" not in plain
+
+    @pytest.mark.parametrize(
+        ("branch", "refusal"),
+        [
+            ("", r"^source\.base_branch must be a ref whose slash-joined segments"),
+            ("../main", r"^source\.base_branch must be a ref whose slash-joined segments"),
+            ("main branch", r"^source\.base_branch must be a ref whose slash-joined segments"),
+            (7, r"^Field 'base_branch' must be a string, got int$"),
+        ],
+    )
+    def test_a_base_branch_outside_the_ref_grammar_is_refused_by_field(
+        self, branch: JSONValue, refusal: str
+    ) -> None:
+        declared: JSONObject = {
+            "remote": HTTPS,
+            "path": "",
+            "install": [],
+            "companions": [],
+            "base_branch": branch,
+        }
+
+        with pytest.raises(JSONTypeError, match=refusal):
+            decode_project_source(declared, field="source")
+
     def test_a_non_object_is_refused(self) -> None:
         with pytest.raises(JSONTypeError, match="source must be an object or null, got list"):
             decode_project_source([HTTPS], field="source")

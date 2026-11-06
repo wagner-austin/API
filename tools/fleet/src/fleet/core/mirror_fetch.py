@@ -441,19 +441,22 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
         )
 
 
-def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
+def fetch_ref(mirror: pathlib.Path, remote: str, ref: str, *, declared_as: str) -> str:
     """Fetch a ref's tip into the mirror and answer the commit it names.
 
     Never skipped the way :func:`fetch_commit` is: a sha the mirror holds is
     that sha forever, while a ref's tip is a moving answer and the question
-    a companion asks is what it points at NOW. The fetch and the read of the
+    a companion asks, or a project's base branch (MCPs board task
+    a48b5236), is what it points at NOW. The fetch and the read of the
     ref share one :data:`FETCH_TURN`, as :func:`fetch_commit`'s do, so two
     jobs never write the one ref at once.
 
     Args:
-        mirror: The companion's mirror, already initialised.
-        remote: The companion's declared remote.
+        mirror: The mirror, already initialised.
+        remote: The declared remote.
         ref: The declared ref, ``main`` or ``refs/heads/main``.
+        declared_as: What the registry declares the ref as, for the
+            refusal: ``a companion ref`` or ``a project's base branch``.
 
     Returns:
         The forty-hex commit the ref names.
@@ -473,8 +476,8 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
         return AppError(
             code=FleetErrorCode.COMPANION_REF_NOT_ON_REMOTE,
             message=(
-                f"{remote} does not serve {ref!r}, which the registry declares as a "
-                f"companion ref; every job of the project carrying it fails here until "
+                f"{remote} does not serve {ref!r}, which the registry declares as "
+                f"{declared_as}; every job of the project carrying it fails here until "
                 f"that line names a ref the remote has. git said: {stderr.strip()[:300]}"
             ),
         )

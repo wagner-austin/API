@@ -128,6 +128,7 @@ class TestStagingACompanion:
                         mirror=MIRROR,
                         bundle=f"{STAGED}/{names.ARCHIVE_NAME}",
                         run_id=f"{DEMO_RUN_ID}-MCPs",
+                        base_branch=False,
                     ),
                     *stage_repository.companion_repository_commands(
                         TREE, MIRROR, COMPANION_SHA, "main"

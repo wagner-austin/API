@@ -68,7 +68,7 @@ the transcript reads ``install``, ``workspace-build`` and
 from __future__ import annotations
 
 import re
-from typing import Final
+from typing import Final, NotRequired
 
 from platform_core.json_utils import JSONObject, JSONTypeError, JSONValue, require_str
 from typing_extensions import TypedDict
@@ -159,12 +159,24 @@ class ProjectSource(TypedDict):
         companions: The other repositories exported beside this one before
             the install steps run. Empty for a project whose check reads
             only its own tree, which is every project but ``slime``.
+        base_branch: The branch the project's commits are measured against,
+            ``main`` or ``refs/heads/main``, in
+            :data:`COMPANION_REF_PATTERN`. Declared by a project whose check
+            asks what its commit changes against that branch (MCPs board
+            task a48b5236, the mutation step of the MCPs TypeScript
+            packages): the hub resolves its tip with the commit and the
+            staged repository holds the commit's history and
+            ``refs/remotes/origin/<branch>``
+            (:func:`fleet.core.stage_repository.base_branch_commands`).
+            Absent for a project whose check reads only its own tree, which
+            is staged as one root commit.
     """
 
     remote: str
     path: str
     install: tuple[InstallStep, ...]
     companions: tuple[ProjectCompanion, ...]
+    base_branch: NotRequired[str]
 
 
 def decode_remote(value: str, *, field: str) -> str:
@@ -433,12 +445,17 @@ def decode_project_source(value: JSONValue, *, field: str) -> ProjectSource | No
         return None
     if not isinstance(value, dict):
         raise JSONTypeError(f"{field} must be an object or null, got {type(value).__name__}")
-    return ProjectSource(
+    source = ProjectSource(
         remote=decode_remote(require_str(value, "remote"), field=f"{field}.remote"),
         path=decode_path(require_str(value, "path"), field=f"{field}.path"),
         install=decode_install(value.get("install"), field=f"{field}.install"),
         companions=decode_companions(value.get("companions"), field=f"{field}.companions"),
     )
+    if "base_branch" in value:
+        source["base_branch"] = decode_companion_ref(
+            require_str(value, "base_branch"), field=f"{field}.base_branch"
+        )
+    return source
 
 
 def encode_project_source(source: ProjectSource | None) -> JSONValue:
@@ -471,6 +488,8 @@ def encode_project_source(source: ProjectSource | None) -> JSONValue:
         "install": steps,
         "companions": companions,
     }
+    if "base_branch" in source:
+        encoded["base_branch"] = source["base_branch"]
     return encoded
 
 

@@ -264,7 +264,10 @@ class TestTheTurn:
         ending = other.end_after(0.1, lambda: run_while_held.append(len(runner.calls)))
 
         companion = "https://github.com/wagner-austin/MCPs.git"
-        assert mirror_fetch.fetch_ref(tmp_path, companion, "main") == SHA
+        assert (
+            mirror_fetch.fetch_ref(tmp_path, companion, "main", declared_as="a companion ref")
+            == SHA
+        )
         ending.join()
 
         assert run_while_held == [0]

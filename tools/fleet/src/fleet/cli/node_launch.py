@@ -483,6 +483,7 @@ class Launcher:
                 sha=sha,
                 scope=prepared["scope"],
                 bundle=prepared["bundles"] / f"{key}-{sha}.bundle",
+                base_branch=prepared["base_branch"],
             )
         )
         try:

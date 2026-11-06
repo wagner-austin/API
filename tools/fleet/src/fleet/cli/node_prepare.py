@@ -24,7 +24,14 @@ from fleet.contracts.node import NodeConfig
 from fleet.contracts.project import ProjectConfig
 from fleet.contracts.source import ProjectSource
 from fleet.contracts.workspace import require_project
-from fleet.core import _test_hooks_attempts, archive_scope, capacity, export
+from fleet.core import (
+    _test_hooks_attempts,
+    archive_scope,
+    capacity,
+    export,
+    mirror_fetch,
+    stage_repository,
+)
 
 
 def tags_refusal(job: DispatchJob, declared: tuple[str, ...]) -> str | None:
@@ -125,6 +132,9 @@ class Prepared(TypedDict):
             does not own (:func:`fleet.core.archive_scope.archive_pathspec`).
             Empty for a repository that declares none.
         workers: Test workers the capacity check granted on this node.
+        base_branch: The project's declared base branch and the tip the
+            hub's mirror fetched for it, staged beside the commit; None for
+            a project declaring none (MCPs board task a48b5236).
     """
 
     plan: ProjectConfig
@@ -134,6 +144,7 @@ class Prepared(TypedDict):
     companions: tuple[export.CompanionExport, ...]
     scope: tuple[str, ...]
     workers: int
+    base_branch: stage_repository.BaseBranch | None
 
 
 def prepare(
@@ -175,6 +186,19 @@ def prepare(
     source = export.require_source(job["project"], plan["source"])
     mirror = export.prepare_mirror(loaded.mirrors, remote=source["remote"], sha=sha)
     export.require_install_paths(mirror, sha, source["install"])
+    base_branch = (
+        stage_repository.BaseBranch(
+            ref=source["base_branch"],
+            sha=mirror_fetch.fetch_ref(
+                mirror,
+                source["remote"],
+                source["base_branch"],
+                declared_as="a project's base branch",
+            ),
+        )
+        if "base_branch" in source
+        else None
+    )
     # One directory per launch attempt. Every runner on the hub writes here,
     # git bundle create never writes one ref's bytes twice alike, and two
     # runners bundling one companion tip into one file swapped each other's
@@ -202,6 +226,7 @@ def prepare(
             loaded.workspace["data_paths"], remote=source["remote"], project_path=source["path"]
         ),
         workers=workers,
+        base_branch=base_branch,
     )
 
 

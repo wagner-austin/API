@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from typing import Final
 
+from typing_extensions import TypedDict
+
 #: The settings every write into a node's mirror runs under: the automatic
 #: maintenance git starts at the end of a fetch runs to its end inside that
 #: fetch, under its lock, rather than detached behind it
@@ -88,6 +90,10 @@ def _no_auto_maintenance_command(target: str) -> tuple[str, ...]:
 def _commit_command(target: str, message: str) -> tuple[str, ...]:
     """The one commit of a staged tree, under the export identity.
 
+    ``--allow-empty`` because a tree staged on its commit's history
+    (:func:`base_branch_commands`) is committed on top of that commit, and a
+    commit exported whole leaves the index equal to its parent's tree.
+
     Args:
         target: Absolute remote directory holding the repository.
         message: The commit message (a sha or a run id in words).
@@ -105,8 +111,57 @@ def _commit_command(target: str, message: str) -> tuple[str, ...]:
         f"user.email={EXPORT_AUTHOR_EMAIL}",
         "commit",
         "--quiet",
+        "--allow-empty",
         "--message",
         message,
+    )
+
+
+class BaseBranch(TypedDict):
+    """The branch a project's commits are measured against, resolved on the hub.
+
+    Attributes:
+        ref: The declared branch, ``main`` or ``refs/heads/main``.
+        sha: Its tip when the hub prepared the job
+            (:func:`fleet.core.mirror_fetch.fetch_ref`).
+    """
+
+    ref: str
+    sha: str
+
+
+def base_branch_commands(
+    target: str, sha: str, base_branch: BaseBranch
+) -> tuple[tuple[str, ...], ...]:
+    """The commands that put a staged tree on its commit's history, beside its base branch.
+
+    A STAGED TREE COULD NOT SAY WHAT ITS COMMIT CHANGED (MCPs board task
+    a48b5236). Its one commit was a root commit of the extracted tree, in a
+    repository with no ref to the queued commit and no branch, so a check
+    asking which files the commit changes against ``origin/main`` (the
+    mutation step every MCPs TypeScript package runs on the files it
+    changes) had nothing to ask. The repository is cloned from the node's
+    mirror, which holds the commit's whole history and, for a project
+    declaring a base branch, that branch's tip (both fetched from one
+    bundle); so ``HEAD`` is set to the commit before the tree is indexed,
+    making the staged commit its child, and ``refs/remotes/origin/<branch>``
+    names the tip, as a checkout's does. ``git merge-base HEAD origin/main``
+    then reads in a stage what it reads on a workstation, and ``git
+    update-ref`` refuses either commit the mirror lacks, ending the script.
+
+    Args:
+        target: Absolute remote directory holding the cloned repository,
+            before its tree is indexed.
+        sha: The queued commit.
+        base_branch: The branch and the tip the hub resolved.
+
+    Returns:
+        The two ref writes, in order.
+    """
+    branch = base_branch["ref"].removeprefix("refs/heads/")
+    return (
+        ("git", "-C", target, "update-ref", f"refs/remotes/origin/{branch}", base_branch["sha"]),
+        ("git", "-C", target, "update-ref", "HEAD", sha),
     )
 
 
@@ -365,6 +420,8 @@ __all__ = [
     "EXPORT_AUTHOR_NAME",
     "INLINE_MAINTENANCE",
     "UNCOMPRESSED_OBJECTS",
+    "BaseBranch",
+    "base_branch_commands",
     "clone_commands",
     "companion_repository_commands",
     "index_commands",

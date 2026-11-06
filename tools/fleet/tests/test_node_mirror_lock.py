@@ -142,6 +142,7 @@ def test_a_clone_out_of_the_mirror_waits_while_a_write_into_it_holds_the_lock(
             scope=(),
             staged=f"{target}.stage",
             target=str(target),
+            base_branch=None,
         )
     )
 
@@ -188,11 +189,15 @@ def test_a_fetch_into_the_mirror_waits_while_a_clone_holds_the_lock(
     hub, node, first = _staged_mirror(tmp_path)
     second = _commit(hub, {"src/a.py": "print(2)\n"})
     bundle = tmp_path / "run-2.bundle"
-    commit_stage.bundle_commit(hub, sha=second, run_id="run-2", base=first, destination=bundle)
+    commit_stage.bundle_commit(
+        hub, sha=second, run_id="run-2", base=first, base_tip=None, destination=bundle
+    )
     holder = MirrorLockHolder(node, tmp_path / "beside")
     script = Script(
         dialect.checked_script(
-            commit_stage.fetch_commands(mirror=str(node), bundle=str(bundle), run_id="run-2")
+            commit_stage.fetch_commands(
+                mirror=str(node), bundle=str(bundle), run_id="run-2", base_branch=False
+            )
         )
     )
 
@@ -224,11 +229,15 @@ def test_the_maintenance_a_fetch_starts_has_ended_when_the_fetch_has(
     _git(node, "config", "gc.autoPackLimit", "1")
     second = _commit(hub, {"src/a.py": "print(2)\n"})
     bundle = tmp_path / "run-2.bundle"
-    commit_stage.bundle_commit(hub, sha=second, run_id="run-2", base=first, destination=bundle)
+    commit_stage.bundle_commit(
+        hub, sha=second, run_id="run-2", base=first, base_tip=None, destination=bundle
+    )
 
     done = Script(
         dialect.checked_script(
-            commit_stage.fetch_commands(mirror=str(node), bundle=str(bundle), run_id="run-2")
+            commit_stage.fetch_commands(
+                mirror=str(node), bundle=str(bundle), run_id="run-2", base_branch=False
+            )
         )
     ).finished()
 

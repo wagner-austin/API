@@ -154,6 +154,7 @@ def _companion_commit_script() -> str:
                 mirror=NODE_MIRROR,
                 bundle="/home/corvis/fleet/stage/MCPs.stage/tree.tgz",
                 run_id=f"{DEMO_RUN_ID}-{COMPANION_DIRECTORY}",
+                base_branch=False,
             ),
             *stage_repository.companion_repository_commands(
                 "/home/corvis/fleet/stage/MCPs", NODE_MIRROR, COMPANION_SHA, "main"
