@@ -19,7 +19,15 @@ import subprocess
 import pytest
 from platform_core.errors import AppError, FleetErrorCode
 
-from fleet.core import _test_hooks, commit_stage, names, remote, stage_repository, staging
+from fleet.core import (
+    _test_hooks,
+    commit_stage,
+    names,
+    node_mirror_probe,
+    remote,
+    stage_repository,
+    staging,
+)
 from fleet.core.ssh_options import SSH_OPTIONS
 from tests.conftest import DEMO_RUN_ID, FakeRun, failed, ok
 
@@ -32,6 +40,10 @@ TIP = "9f1c0b7a2d3e4f5061728394a5b6c7d8e9f01234"
 
 #: The deadline for the real git and sh these tests run over tiny trees.
 GIT_SECONDS = 60
+
+#: A node mirror that holds neither the commit nor a base tip, so a bundle
+#: carries the commit.
+NOTHING_HELD = node_mirror_probe.NodeMirror(tip=None, held=False, base_held=False)
 
 
 def _git(repo: pathlib.Path, *args: str) -> str:
@@ -115,59 +127,11 @@ def _node_mirror_at(hub: pathlib.Path, node: pathlib.Path, run_id: str, base: st
         staged=str(node.parent / f"{run_id}.stage"),
         target=str(node.parent / run_id),
         base_branch=None,
+        node=NOTHING_HELD,
     )
     (node.parent / f"{run_id}.stage").mkdir()
     (node.parent / run_id).mkdir()
     _sh(script)
-
-
-class TestTheNodeMirrorSaysWhatItHolds:
-    def test_a_node_without_the_mirror_gets_its_directories_and_says_nothing(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        target = tmp_path / "run" / "run"
-        said = _sh(
-            commit_stage.prepare_script(
-                target=str(target),
-                staged=f"{target}.stage",
-                mirror=str(tmp_path / "mirrors" / "repo.git"),
-                sha=SHA,
-                base_tip=None,
-            )
-        )
-
-        assert said == ""
-        assert target.is_dir()
-        assert pathlib.Path(f"{target}.stage").is_dir()
-        assert commit_stage.read_node_mirror(said) == commit_stage.NodeMirror(tip=None, held=False)
-
-    def test_a_mirror_names_its_tip_and_whether_it_holds_the_commit(
-        self, tmp_path: pathlib.Path
-    ) -> None:
-        hub = tmp_path / "hub"
-        first = _commit(hub, {"a.txt": "one\n"})
-        node = tmp_path / "node" / "repo.git"
-        node.parent.mkdir()
-        _node_mirror_at(hub, node, "run-1", None)
-        second = _commit(hub, {"a.txt": "two\n"})
-
-        def asked(sha: str) -> commit_stage.NodeMirror:
-            script = commit_stage.prepare_script(
-                target=str(tmp_path / "t"),
-                staged=str(tmp_path / "s"),
-                mirror=str(node),
-                sha=sha,
-                base_tip=None,
-            )
-            return commit_stage.read_node_mirror(_sh(script))
-
-        assert asked(first) == commit_stage.NodeMirror(tip=first, held=True)
-        assert asked(second) == commit_stage.NodeMirror(tip=first, held=False)
-
-    def test_words_that_are_no_commit_are_no_tip(self) -> None:
-        said = "fatal: something\nheld\n"
-
-        assert commit_stage.read_node_mirror(said) == commit_stage.NodeMirror(tip=None, held=True)
 
 
 class TestTheBundleCarriesWhatTheNodeLacks:
@@ -288,7 +252,7 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
 
         assert (node.parent / "run-1" / "src" / "a.py").read_text(encoding="utf-8") == "print(1)\n"
         assert (node.parent / "run-2" / "src" / "a.py").read_text(encoding="utf-8") == "print(2)\n"
-        assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == second
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == second
         # Each tree is a repository of one commit under the export identity.
         assert _git(node.parent / "run-2", "log", "--format=%ae") == "fleet@corvis.invalid"
         held = node.parent / "run-3"
@@ -304,12 +268,13 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
                 staged=f"{held}.stage",
                 target=str(held),
                 base_branch=None,
+                node=node_mirror_probe.NodeMirror(tip=second, held=True, base_held=False),
             )
         )
         assert (held / "src" / "a.py").read_text(encoding="utf-8") == "print(1)\n"
         assert not (held / "data").exists()
         # A commit the mirror held was fetched into nothing: the tip stays.
-        assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == second
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == second
 
     def test_the_tree_s_objects_are_the_mirror_s_own_files_and_the_add_writes_none(
         self, tmp_path: pathlib.Path
@@ -365,6 +330,7 @@ class TestTheNodeUnpacksTheCommitFromItsMirror:
             staged=str(tmp_path),
             target=str(target),
             base_branch=None,
+            node=NOTHING_HELD,
         )
 
         done = subprocess.run(
@@ -454,7 +420,7 @@ class TestStagingOneCommit:
             detail=f"{len(payload)} bytes, git bundle of {SHA} over {TIP}, to {self.TARGET}",
         )
         assert runner.calls[1][-1] == f"{STAGE_ROOT}/mkdir-{DEMO_RUN_ID}.sh"
-        prepared = commit_stage.prepare_script(
+        prepared = node_mirror_probe.prepare_script(
             target=self.TARGET, staged=staged_dir, mirror=self.MIRROR, sha=SHA, base_tip=None
         )
         assert runner.stdin[0] == prepared.encode("utf-8")
@@ -471,6 +437,7 @@ class TestStagingOneCommit:
             staged=staged_dir,
             target=self.TARGET,
             base_branch=None,
+            node=node_mirror_probe.NodeMirror(tip=TIP, held=False, base_held=False),
         )
         assert runner.stdin[9] == unpack.encode("utf-8")
         assert runner.timeouts[10] == remote.send_deadline_seconds(len(payload))

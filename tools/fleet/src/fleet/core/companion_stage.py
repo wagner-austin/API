@@ -13,7 +13,7 @@ SO A COMPANION TRAVELS AS A COMMIT DOES (:mod:`fleet.core.commit_stage`).
 The node keeps a bare mirror of each companion remote beside the mirrors of
 its projects' (:func:`fleet.core.names.node_mirror`, keyed by
 :func:`fleet.core.export.companion_mirror_key`), the hub bundles the
-companion's commit less what that mirror's :data:`fleet.core.commit_stage.NODE_TIP_REF`
+companion's commit less what that mirror's :data:`fleet.core.node_mirror_probe.NODE_TIP_REF`
 reaches, a commit it already reaches is sent nothing at all, and the
 companion is cloned out of the mirror by hard links
 (:func:`fleet.core.stage_repository.companion_repository_commands`).
@@ -34,7 +34,15 @@ from typing import Final
 
 from typing_extensions import TypedDict
 
-from fleet.core import _test_hooks, commit_stage, dialect, names, remote, stage_repository
+from fleet.core import (
+    _test_hooks,
+    commit_stage,
+    dialect,
+    names,
+    node_mirror_probe,
+    remote,
+    stage_repository,
+)
 from fleet.core.export import CompanionExport
 
 #: What the companion's prepare script prints when its tree is kept.
@@ -72,7 +80,7 @@ def prepare_script(*, tree: str, staged: str, mirror: str, sha: str, ref: str) -
         the tree is kept; else it empties the tree, ``rm -rf`` needing no
         guard for an absent path and ``-f`` removing the read-only objects
         of the repository a previous run made there, makes both directories
-        and prints what :func:`fleet.core.commit_stage.mirror_probe_lines`
+        and prints what :func:`fleet.core.node_mirror_probe.mirror_probe_lines`
         prints.
     """
     branch = ref.removeprefix("refs/heads/")
@@ -91,7 +99,7 @@ def prepare_script(*, tree: str, staged: str, mirror: str, sha: str, ref: str) -
         "fi\n"
         f"rm -rf {quoted}\n"
         f"mkdir -p {quoted} {shlex.quote(staged)}\n"
-        f"{commit_stage.mirror_probe_lines(mirror=mirror, sha=sha, base_tip=None)}"
+        f"{node_mirror_probe.mirror_probe_lines(mirror=mirror, sha=sha, base_tip=None)}"
     )
 
 
@@ -130,7 +138,7 @@ def stage_companion(
             tree=tree,
             detail=f"0 bytes, the {directory} companion at {sha} kept clean at {tree}",
         )
-    node = commit_stage.read_node_mirror(said)
+    node = node_mirror_probe.read_node_mirror(said)
     bundle = None if node["held"] else f"{staged}/{names.ARCHIVE_NAME}"
     bundle_id = f"{run_id}-{directory}"
     sent = 0
@@ -147,7 +155,7 @@ def stage_companion(
                 bundle=companion["bundle"],
                 base_branch=None,
             ),
-            base=node["tip"],
+            node=node,
             described_as=f"the {directory} companion at {sha}",
         )
     remote.run_script(
@@ -156,7 +164,11 @@ def stage_companion(
         dialect.checked_script(
             (
                 *commit_stage.fetch_commands(
-                    mirror=mirror, bundle=bundle, run_id=bundle_id, base_branch=False
+                    mirror=mirror,
+                    bundle=bundle,
+                    run_id=bundle_id,
+                    commit=True,
+                    base_branch=False,
                 ),
                 *stage_repository.companion_repository_commands(
                     tree, mirror, sha, companion["ref"]

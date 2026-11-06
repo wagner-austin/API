@@ -4,11 +4,12 @@ A staged tree was one root commit in a repository with no branch, so a check
 asking which files its commit changes against ``origin/main`` (the MCPs
 TypeScript packages' mutation step) had nothing to ask. A project declaring
 ``base_branch`` now has the branch's tip resolved on the hub, carried in the
-commit's bundle and written as ``refs/remotes/origin/<branch>`` in the stage,
-whose own commit is the queued commit's child. The git half is real, as in
-``tests/test_commit_stage.py``: a hub repository whose main moved on after a
-feature branch left it, the bundle written by real ``git bundle create``, and
-the node's scripts run by real ``/bin/sh``.
+commit's bundle when the node lacks it and written as
+``refs/remotes/origin/<branch>`` in the stage, whose own commit is the queued
+commit's child. The git half is real, as in ``tests/test_commit_stage.py``: a
+hub repository whose main moved on after a feature branch left it, bundles
+written by real ``git bundle create``, and the node's scripts run by real
+``/bin/sh``.
 """
 
 from __future__ import annotations
@@ -30,6 +31,7 @@ from fleet.core import (
     dialect,
     mirror_fetch,
     names,
+    node_mirror_probe,
     stage_repository,
     staging,
 )
@@ -37,7 +39,16 @@ from tests._node_agent_fixtures import NPM_CI, REMOTE, _credentials_in_env
 from tests._queue_fakes import DEFAULT_SHA, queue_job
 from tests._registry import write_registry
 from tests.conftest import DEMO_PROJECT, DEMO_RUN_ID, FakeRun, failed, ok, workspace_document
-from tests.test_commit_stage import SHA, STAGE_ROOT, TIP, _commit, _git, _sh, export_of
+from tests.test_commit_stage import (
+    NOTHING_HELD,
+    SHA,
+    STAGE_ROOT,
+    TIP,
+    _commit,
+    _git,
+    _sh,
+    export_of,
+)
 
 __all__ = ["_credentials_in_env"]
 
@@ -80,7 +91,12 @@ def _based_document() -> JSONObject:
 
 
 def _unpack(
-    node: pathlib.Path, run_id: str, sha: str, branch: stage_repository.BaseBranch, bundle: str
+    node: pathlib.Path,
+    run_id: str,
+    sha: str,
+    branch: stage_repository.BaseBranch,
+    probed: node_mirror_probe.NodeMirror,
+    bundle: str,
 ) -> pathlib.Path:
     """Unpack one bundle into a run's export, as a node does.
 
@@ -89,6 +105,7 @@ def _unpack(
         run_id: The run.
         sha: The queued commit.
         branch: Its base branch and tip.
+        probed: What the node's mirror held before the bundle was made.
         bundle: The verified bundle on the node.
 
     Returns:
@@ -107,6 +124,7 @@ def _unpack(
             staged=f"{target}.stage",
             target=str(target),
             base_branch=branch,
+            node=probed,
         )
     )
     return target
@@ -121,21 +139,20 @@ class TestAStageBesideItsBaseBranch:
         node = tmp_path / "node" / "repo.git"
         node.parent.mkdir()
         bundle = tmp_path / "run-1.bundle"
+        branch = stage_repository.BaseBranch(ref="main", sha=tip)
 
         commit_stage.bundle_commit(
             hub, sha=feature, run_id="run-1", base=None, base_tip=tip, destination=bundle
         )
-        tree = _unpack(
-            node, "run-1", feature, stage_repository.BaseBranch(ref="main", sha=tip), str(bundle)
-        )
+        tree = _unpack(node, "run-1", feature, branch, NOTHING_HELD, str(bundle))
 
         assert _git(hub, "bundle", "list-heads", str(bundle)).splitlines() == [
             f"{feature} refs/fleet/bundle/run-1",
             f"{tip} refs/fleet/bundle-base/run-1",
         ]
         assert _git(hub, "for-each-ref", "refs/fleet/") == ""
-        assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == feature
-        assert _git(node, "rev-parse", commit_stage.NODE_BASE_REF) == tip
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == feature
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_BASE_REF) == tip
         assert _git(tree, "rev-parse", "refs/remotes/origin/main") == tip
         assert _git(tree, "rev-parse", "HEAD^") == feature
         committed = _git(hub, "rev-parse", f"{feature}^{{tree}}")
@@ -145,11 +162,14 @@ class TestAStageBesideItsBaseBranch:
         assert _git(tree, "diff", "--name-only", base, "HEAD") == "src/a.ts"
         assert _git(tree, "status", "--porcelain") == ""
 
-    def test_a_tip_the_node_already_reaches_is_held_and_one_it_lacks_is_not(
+    def test_a_node_holding_the_commit_is_sent_and_fetches_the_tip_alone(
         self, tmp_path: pathlib.Path
     ) -> None:
+        """git bundle create leaves out a ref its exclusions reach, so the
+        commit the node's tip already reaches is not bundled and not
+        fetched; the stage still sits on it beside the tip."""
         hub = tmp_path / "hub"
-        _fork, feature, tip = _diverged(hub)
+        fork, feature, tip = _diverged(hub)
         node = tmp_path / "node" / "repo.git"
         node.parent.mkdir()
         alone = tmp_path / "alone.bundle"
@@ -159,29 +179,35 @@ class TestAStageBesideItsBaseBranch:
         _sh(
             dialect.checked_script(
                 commit_stage.fetch_commands(
-                    mirror=str(node), bundle=str(alone), run_id="run-1", base_branch=False
+                    mirror=str(node),
+                    bundle=str(alone),
+                    run_id="run-1",
+                    commit=True,
+                    base_branch=False,
                 )
             )
         )
+        probed = node_mirror_probe.NodeMirror(tip=feature, held=True, base_held=False)
+        tip_only = tmp_path / "tip.bundle"
 
-        def asked(base_tip: str | None) -> commit_stage.NodeMirror:
-            script = commit_stage.prepare_script(
-                target=str(tmp_path / "t"),
-                staged=str(tmp_path / "s"),
-                mirror=str(node),
-                sha=feature,
-                base_tip=base_tip,
-            )
-            return commit_stage.read_node_mirror(_sh(script))
-
-        assert asked(None) == commit_stage.NodeMirror(tip=feature, held=True)
-        assert asked(tip) == commit_stage.NodeMirror(tip=feature, held=False)
-        both = tmp_path / "both.bundle"
         commit_stage.bundle_commit(
-            hub, sha=feature, run_id="run-2", base=feature, base_tip=tip, destination=both
+            hub, sha=None, run_id="run-2", base=feature, base_tip=tip, destination=tip_only
         )
-        _unpack(node, "run-2", feature, stage_repository.BaseBranch(ref="main", sha=tip), str(both))
-        assert asked(tip) == commit_stage.NodeMirror(tip=feature, held=True)
+        tree = _unpack(
+            node,
+            "run-2",
+            feature,
+            stage_repository.BaseBranch(ref="main", sha=tip),
+            probed,
+            str(tip_only),
+        )
+
+        assert _git(hub, "bundle", "list-heads", str(tip_only)) == (
+            f"{tip} refs/fleet/bundle-base/run-2"
+        )
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == feature
+        assert _git(node, "rev-parse", node_mirror_probe.NODE_BASE_REF) == tip
+        assert _git(tree, "merge-base", "HEAD", "refs/remotes/origin/main") == fork
 
     def test_a_base_ref_git_refuses_removes_the_commit_s_ref_and_bundles_nothing(
         self, tmp_path: pathlib.Path
@@ -215,8 +241,30 @@ class TestAStageBesideItsBaseBranch:
 class TestStagingOneCommitBesideItsBaseBranch:
     TARGET = f"{STAGE_ROOT}/{DEMO_RUN_ID}/{DEMO_RUN_ID}"
     MIRROR = f"{STAGE_ROOT}/cache/mirrors/wagner-austin-MCPs.git"
+    STAGED = f"{TARGET}.stage"
 
-    def test_the_probe_bundle_and_unpack_each_carry_the_branch(
+    def _unpack_of(self, node: node_mirror_probe.NodeMirror) -> bytes:
+        """The unpack script the stage of :data:`SHA` beside :data:`BASE` sends.
+
+        Args:
+            node: What the probe said.
+
+        Returns:
+            Its bytes.
+        """
+        return commit_stage.unpack_script(
+            mirror=self.MIRROR,
+            bundle=f"{self.STAGED}/{names.ARCHIVE_NAME}",
+            run_id=DEMO_RUN_ID,
+            sha=SHA,
+            scope=(),
+            staged=self.STAGED,
+            target=self.TARGET,
+            base_branch=stage_repository.BaseBranch(ref="main", sha=BASE),
+            node=node,
+        ).encode("utf-8")
+
+    def test_a_node_lacking_both_is_sent_both_and_fetches_both(
         self, tmp_path: pathlib.Path
     ) -> None:
         payload = b"# v2 git bundle\nbundle"
@@ -231,32 +279,65 @@ class TestStagingOneCommitBesideItsBaseBranch:
             "lavender", stage_root=STAGE_ROOT, run_id=DEMO_RUN_ID, commit=commit
         )
 
-        staged_dir = f"{self.TARGET}.stage"
         assert staged["detail"] == (
             f"{len(payload)} bytes, git bundle of {SHA} over {TIP}, beside main at {BASE}, "
             f"to {self.TARGET}"
         )
-        prepared = commit_stage.prepare_script(
-            target=self.TARGET, staged=staged_dir, mirror=self.MIRROR, sha=SHA, base_tip=BASE
+        prepared = node_mirror_probe.prepare_script(
+            target=self.TARGET, staged=self.STAGED, mirror=self.MIRROR, sha=SHA, base_tip=BASE
         )
         assert runner.stdin[0] == prepared.encode("utf-8")
         created = [call for call in runner.calls if call[3:5] == ("bundle", "create")]
         assert [call[-3:] for call in created] == [
             (f"refs/fleet/bundle/{DEMO_RUN_ID}", f"refs/fleet/bundle-base/{DEMO_RUN_ID}", f"^{TIP}")
         ]
-        unpack = commit_stage.unpack_script(
-            mirror=self.MIRROR,
-            bundle=f"{staged_dir}/{names.ARCHIVE_NAME}",
-            run_id=DEMO_RUN_ID,
-            sha=SHA,
-            scope=(),
-            staged=staged_dir,
-            target=self.TARGET,
-            base_branch=branch,
+        unpack = self._unpack_of(node_mirror_probe.NodeMirror(tip=TIP, held=False, base_held=False))
+        assert runner.stdin[11] == unpack
+        assert f"update-ref refs/remotes/origin/main {BASE}".encode() in unpack
+        assert f"+refs/fleet/bundle/{DEMO_RUN_ID}:refs/fleet/staged".encode() in unpack
+        assert f"+refs/fleet/bundle-base/{DEMO_RUN_ID}:refs/fleet/base".encode() in unpack
+
+    def test_a_node_holding_the_commit_is_sent_the_tip_alone(self, tmp_path: pathlib.Path) -> None:
+        payload = b"# v2 git bundle\ntip"
+        commit = export_of(
+            tmp_path, payload, base_branch=stage_repository.BaseBranch(ref="main", sha=BASE)
         )
-        assert runner.stdin[11] == unpack.encode("utf-8")
-        assert f"update-ref refs/remotes/origin/main {BASE}" in unpack
-        assert f"+refs/fleet/bundle-base/{DEMO_RUN_ID}:refs/fleet/base" in unpack
+        held = f"{TIP}\n{node_mirror_probe.HELD_ANSWER}\n"
+        runner = FakeRun(
+            [ok(""), ok(held)] + [ok("")] * 6 + [ok(staging.digest(payload))] + [ok("")] * 2
+        )
+        _test_hooks.run = runner
+
+        commit_stage.stage_commit(
+            "lavender", stage_root=STAGE_ROOT, run_id=DEMO_RUN_ID, commit=commit
+        )
+
+        created = [call for call in runner.calls if call[3:5] == ("bundle", "create")]
+        assert [call[-2:] for call in created] == [
+            (f"refs/fleet/bundle-base/{DEMO_RUN_ID}", f"^{TIP}")
+        ]
+        unpack = self._unpack_of(node_mirror_probe.NodeMirror(tip=TIP, held=True, base_held=False))
+        assert runner.stdin[9] == unpack
+        assert f"refs/fleet/bundle/{DEMO_RUN_ID}:".encode() not in unpack
+
+    def test_a_node_holding_both_is_sent_nothing(self, tmp_path: pathlib.Path) -> None:
+        commit = export_of(
+            tmp_path, b"unsent", base_branch=stage_repository.BaseBranch(ref="main", sha=BASE)
+        )
+        held = f"{TIP}\n{node_mirror_probe.HELD_ANSWER}\n{node_mirror_probe.BASE_HELD_ANSWER}\n"
+        runner = FakeRun([ok(""), ok(held), ok(""), ok("")])
+        _test_hooks.run = runner
+
+        staged = commit_stage.stage_commit(
+            "lavender", stage_root=STAGE_ROOT, run_id=DEMO_RUN_ID, commit=commit
+        )
+
+        assert staged["detail"] == (
+            f"0 bytes, git bundle of {SHA} already in the node's mirror, beside main at {BASE}, "
+            f"to {self.TARGET}"
+        )
+        assert [call[0] for call in runner.calls] == ["ssh"] * 4
+        assert commit["bundle"].exists()
 
 
 class TestPrepareResolvesTheBaseBranch:

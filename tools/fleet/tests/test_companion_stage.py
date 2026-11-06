@@ -21,6 +21,7 @@ from fleet.core import (
     dialect,
     export,
     names,
+    node_mirror_probe,
     stage_repository,
     staging,
 )
@@ -128,6 +129,7 @@ class TestStagingACompanion:
                         mirror=MIRROR,
                         bundle=f"{STAGED}/{names.ARCHIVE_NAME}",
                         run_id=f"{DEMO_RUN_ID}-MCPs",
+                        commit=True,
                         base_branch=False,
                     ),
                     *stage_repository.companion_repository_commands(
@@ -163,7 +165,7 @@ class TestStagingACompanion:
         self, tmp_path: pathlib.Path
     ) -> None:
         companion = _companion(tmp_path)
-        held = ok(f"{COMPANION_SHA}\n{commit_stage.HELD_ANSWER}\n")
+        held = ok(f"{COMPANION_SHA}\n{node_mirror_probe.HELD_ANSWER}\n")
         runner = FakeRun([ok(""), held, ok(""), ok("")])
         _test_hooks.run = runner
 
@@ -228,5 +230,5 @@ class TestThePrepareScript:
         refs = f"refs/heads/main {COMPANION_SHA}\nrefs/remotes/origin/main {COMPANION_SHA}"
         assert refs in script
         assert script.endswith(
-            commit_stage.mirror_probe_lines(mirror=MIRROR, sha=COMPANION_SHA, base_tip=None)
+            node_mirror_probe.mirror_probe_lines(mirror=MIRROR, sha=COMPANION_SHA, base_tip=None)
         )

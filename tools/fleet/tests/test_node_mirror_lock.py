@@ -20,7 +20,7 @@ import subprocess
 import threading
 import time
 
-from fleet.core import commit_stage, dialect, stage_repository
+from fleet.core import commit_stage, dialect, node_mirror_probe, stage_repository
 from tests.test_commit_stage import GIT_SECONDS, _commit, _git, _node_mirror_at
 
 #: How long a holder keeps the lock while the script waits, in seconds: a
@@ -143,6 +143,7 @@ def test_a_clone_out_of_the_mirror_waits_while_a_write_into_it_holds_the_lock(
             staged=f"{target}.stage",
             target=str(target),
             base_branch=None,
+            node=node_mirror_probe.NodeMirror(tip=sha, held=True, base_held=False),
         )
     )
 
@@ -196,21 +197,21 @@ def test_a_fetch_into_the_mirror_waits_while_a_clone_holds_the_lock(
     script = Script(
         dialect.checked_script(
             commit_stage.fetch_commands(
-                mirror=str(node), bundle=str(bundle), run_id="run-2", base_branch=False
+                mirror=str(node), bundle=str(bundle), run_id="run-2", commit=True, base_branch=False
             )
         )
     )
 
     time.sleep(HELD_SECONDS)
     waited = script.waiting()
-    tip_while_held = _git(node, "rev-parse", commit_stage.NODE_TIP_REF)
+    tip_while_held = _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF)
     holder.release()
     done = script.finished()
 
     assert waited
     assert tip_while_held == first
     assert done.returncode == 0, done.stderr
-    assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == second
+    assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == second
 
 
 def test_the_maintenance_a_fetch_starts_has_ended_when_the_fetch_has(
@@ -236,7 +237,7 @@ def test_the_maintenance_a_fetch_starts_has_ended_when_the_fetch_has(
     done = Script(
         dialect.checked_script(
             commit_stage.fetch_commands(
-                mirror=str(node), bundle=str(bundle), run_id="run-2", base_branch=False
+                mirror=str(node), bundle=str(bundle), run_id="run-2", commit=True, base_branch=False
             )
         )
     ).finished()
@@ -244,4 +245,4 @@ def test_the_maintenance_a_fetch_starts_has_ended_when_the_fetch_has(
     assert done.returncode == 0, done.stderr
     assert len(list((node / "objects" / "pack").glob("*.pack"))) == 1
     assert not (node / "gc.pid").exists()
-    assert _git(node, "rev-parse", commit_stage.NODE_TIP_REF) == second
+    assert _git(node, "rev-parse", node_mirror_probe.NODE_TIP_REF) == second

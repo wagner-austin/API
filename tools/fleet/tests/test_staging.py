@@ -272,7 +272,7 @@ class TestStage:
                 f"git -C {target} config maintenance.auto false\n"
                 f"git -C {target} -c core.looseCompression=0 add --all --force\n"
                 f"git -C {target} -c user.name=fleet -c user.email=fleet@corvis.invalid "
-                f"commit --quiet --message 'fleet export {DEMO_RUN_ID}'\n"
+                f"commit --quiet --allow-empty --message 'fleet export {DEMO_RUN_ID}'\n"
             ).encode()
         )
         assert not any("powershell" in argument for call in runner.calls for argument in call)
