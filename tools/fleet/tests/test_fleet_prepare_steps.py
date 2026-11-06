@@ -85,7 +85,8 @@ def test_every_mcps_workspace_install_goes_through_fleet_prepare() -> None:
     # 72 since the served lane follows control onto Lacrymal (MCPs board task 927bbd25).
     # 73 since media-review-mcp joined (MCPs board task c33e4c11).
     # 74 since the CI contracts joined (MCPs board task cf418418).
-    assert len(prepared) == 74
+    # 75 since mediawiki-mcp joined (MCPs board task 9a49a297).
+    assert len(prepared) == 75
     assert prepared["MCPs/scripts/ci-contracts"] == (
         InstallStep(phase="install", argv=(*PREPARE, "install")),
         InstallStep(
