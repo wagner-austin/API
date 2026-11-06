@@ -11,6 +11,12 @@ leave the one before it half-done:
   capacity check subtracts live rows from a node's free memory. A ledger that
   only recorded finished work would let the next dispatch onto a node the
   first had already filled.
+* The stage's three parts run AT ONCE, on :data:`STAGE_POOL`: the tree, the
+  fleet registry beside it and the companions, none of which reads or
+  writes another's directory (MCPs board task 5280a25d). One after another,
+  the registry's seven ssh connections, 0.88 s timed from lacrymal against
+  colossus on 2026-11-06, came after the 3.05 s the node spent unpacking
+  the commit, all of it between a gate job's claim and its first phase.
 
 WHY THE SUITE IS DETACHED FROM THE CONNECTION AND NOT RUN AS AN SSH CHILD.
 sshd sends the session's process group SIGHUP when the connection ends, so a
@@ -38,7 +44,7 @@ a success: :func:`finish` for a run that launched, and
 from __future__ import annotations
 
 import pathlib
-from typing import Protocol
+from typing import Final, Protocol
 
 from typing_extensions import TypedDict
 
@@ -63,6 +69,12 @@ from fleet.core import (
     staging,
 )
 from fleet.core.recipe import Recipe, loopback_unit
+
+#: The name of the pool a launch stages its tree, registry and companions on.
+STAGE_POOL: Final = "fleet-stage"
+
+#: How many parts of a stage run at once: all three.
+STAGE_PARTS: Final = 3
 
 
 def started_row(
@@ -175,7 +187,10 @@ class TreeStager(Protocol):
             run_id: The dispatch, which names its directory and scratch files.
 
         Returns:
-            Where it landed, and the feed's words for it.
+            Where it landed, which is always
+            :func:`fleet.core.names.dispatch_directory`: :func:`launch`
+            stages the registry beside that directory while the tree lands
+            (:data:`STAGE_POOL`). And the feed's words for it.
         """
         ...
 
@@ -381,10 +396,30 @@ def launch(
     run_id = lease["run_id"]
     node_name = lease["node"]
     project = lease["project"]
-    staged = stage_tree(node["host"], stage_root=node["stage_root"], run_id=run_id)
+    host = node["host"]
+    # Every part is joined before any result is read, so a failed part is
+    # raised only once no other still writes on the node; the tree's
+    # failure first, then the registry's, then a companion's.
+    with _test_hooks.executor(workers=STAGE_PARTS, name=STAGE_POOL) as pool:
+        tree = pool.submit(stage_tree, host, stage_root=node["stage_root"], run_id=run_id)
+        landed = pool.submit(
+            staging.stage_registry,
+            host,
+            target=names.dispatch_directory(node["stage_root"], run_id),
+            registry=registry,
+            local=scratch / f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz",
+        )
+        beside = pool.submit(
+            companion_stage.stage_companions,
+            host,
+            stage_root=node["stage_root"],
+            run_id=run_id,
+            companions=companions,
+            workers=workers,
+        )
+    staged = tree.result()
+    landed.result()
     target = staged["target"]
-    local = scratch / f"{run_id}-{names.REGISTRY_DIRECTORY}.tar.gz"
-    staging.stage_registry(node["host"], target=target, registry=registry, local=local)
     run_lease.emit(
         loaded_feed,
         run_id=run_id,
@@ -400,22 +435,16 @@ def launch(
         detail=staged["detail"],
         now_unix=_test_hooks.now(),
     )
-    # BEFORE the build script is sent, because the install steps are part of
-    # that script and a project whose install reads its companion would find
-    # nothing there. Each one is its own feed line naming the commit it is,
-    # so a verdict can be read against the workspace it was measured with --
-    # a companion is the tip of a ref, so two runs of one sha can legitimately
-    # measure different things, and the line is where that shows.
-    # Each companion's bundle, when one is sent, goes once the node has
+    # Staged BEFORE the build script is sent, because the install steps are
+    # part of that script and a project whose install reads its companion
+    # would find nothing there. Each one is its own feed line naming the
+    # commit it is, so a verdict can be read against the workspace it was
+    # measured with -- a companion is the tip of a ref, so two runs of one sha
+    # can legitimately measure different things, and the line is where that
+    # shows. Each companion's bundle, when one is sent, goes once the node has
     # verified it (fleet.core.commit_stage.send_bundle); kept, the hub held
     # 169 bundles in 14 GB on 2026-10-15 (MCPs board task f9ee56aa).
-    staged_companions = companion_stage.stage_companions(
-        node["host"],
-        stage_root=node["stage_root"],
-        run_id=run_id,
-        companions=companions,
-        workers=workers,
-    )
+    staged_companions = beside.result()
     for staged_companion in staged_companions:
         run_lease.emit(
             loaded_feed,
@@ -541,6 +570,8 @@ _OUTCOME_EVENT: dict[LedgerOutcome, FeedKind] = {
 
 
 __all__ = [
+    "STAGE_PARTS",
+    "STAGE_POOL",
     "StagedTree",
     "TreeStager",
     "closed_row",

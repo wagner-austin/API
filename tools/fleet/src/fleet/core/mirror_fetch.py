@@ -81,6 +81,19 @@ COMPANION_REF: Final = "refs/fleet/companion"
 #: then, it costs only what this ref's history lacks.
 FETCHED_REF: Final = "refs/fleet/fetched"
 
+#: The fetch option that keeps what the remote sends as the one pack it was.
+#:
+#: ONE FILE, NOT ONE PER OBJECT (MCPs board task 5280a25d). Below git's
+#: ``fetch.unpackLimit`` of 100 objects a fetch unpacks the pack into a loose
+#: file per object, and a hub mirror is on emerald's NFS, where each file's
+#: create waits for the server: on lacrymal on 2026-11-06 a 52-object fetch
+#: into a bare repository under ``runs/`` took 5.3 and 5.8 s unpacked and
+#: 0.68 and 0.75 s kept, and the push gate of MCPs e128535ae wrote 12 loose
+#: objects into the MCPs mirror over 0.8 s while every other job of that
+#: gate waited in the mirror's :data:`FETCH_TURN`. A kept pack leaves no
+#: ``.keep`` file, so git's own repack still gathers the packs.
+KEEP_PACK: Final = "--keep"
+
 #: One fetch attempt's deadline, in seconds. A first fetch of a large
 #: repository over the operator's uplink is minutes; ten holds it and ends a
 #: hung remote before the tick's own bound does.
@@ -339,11 +352,11 @@ def has_commit(mirror: pathlib.Path, sha: str) -> bool:
 def fetched(mirror: pathlib.Path, sha: str) -> bool:
     """Whether a finished fetch brought the commit: :data:`FETCHED_REF` reaches it.
 
-    The probe a reader outside the mirror's turn can trust. A fetch of
-    fewer objects than git's ``fetch.unpackLimit`` writes each one loose as
-    it unpacks the pack, which lists a commit before its tree, so
-    :func:`has_commit` can find a commit whose tree is not written yet; git
-    moves a ref only once the fetch has written every object it names.
+    The probe a reader outside the mirror's turn can trust: git moves a ref
+    only once the fetch has written every object it names, while
+    :func:`has_commit` answers for the commit alone, and a fetch unpacked
+    into loose objects, as every small one was before :data:`KEEP_PACK`,
+    writes a commit before its tree.
 
     Args:
         mirror: The mirror's path.
@@ -418,6 +431,7 @@ def fetch_commit(mirror: pathlib.Path, remote: str, sha: str) -> None:
                 "--quiet",
                 "--no-tags",
                 "--force",
+                KEEP_PACK,
                 remote,
                 f"+{sha}:{FETCHED_REF}",
             ),
@@ -476,6 +490,7 @@ def fetch_ref(mirror: pathlib.Path, remote: str, ref: str) -> str:
                 "--quiet",
                 "--no-tags",
                 "--force",
+                KEEP_PACK,
                 remote,
                 f"+{ref}:{COMPANION_REF}",
             ),
@@ -507,6 +522,7 @@ __all__ = [
     "FETCH_TIMEOUT_SECONDS",
     "FETCH_TURN",
     "INIT_TIMEOUT_SECONDS",
+    "KEEP_PACK",
     "NOT_ON_REMOTE_MARKERS",
     "fetch_commit",
     "fetch_ref",
