@@ -137,6 +137,7 @@ def write_fleet_workspace(tmp_path: pathlib.Path, *, project: str) -> pathlib.Pa
         "ledger": "runs/ledger.jsonl",
         "feed": "runs/feed.jsonl",
         "leases": "runs/leases.json",
+        "mirrors": "runs/mirrors",
     }
     entry = encode_project_config(
         ProjectConfig(
