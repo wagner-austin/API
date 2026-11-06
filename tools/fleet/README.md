@@ -1064,7 +1064,8 @@ c858b46b's sms-gateway check ran 321 s of its 300 s budget. Now every claim
 under way is written to `runs/host-claims/<node>/<job>.json` until its
 launch ends (`fleet.core.host_claims`), every runner of the host charges all
 of them, and a claim pass runs inside the host's claim turn
-(`runs/host-claims/<node>.lock`), so two processes claiming for one host,
+(an exclusive `flock` on `runs/host-claims/<node>.turn`, as every hub turn
+is, `fleet.core.file_turn`), so two processes claiming for one host,
 one runner's overlapping ticks included, claim one at a time and never both
 read the room one claim is about to take. The pool alone was
 still too generous there: fleet job 25d07c7c's sms-gateway check, granted
