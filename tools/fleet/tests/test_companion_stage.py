@@ -227,4 +227,6 @@ class TestThePrepareScript:
         assert kept < removed < made
         refs = f"refs/heads/main {COMPANION_SHA}\nrefs/remotes/origin/main {COMPANION_SHA}"
         assert refs in script
-        assert script.endswith(commit_stage.mirror_probe_lines(mirror=MIRROR, sha=COMPANION_SHA))
+        assert script.endswith(
+            commit_stage.mirror_probe_lines(mirror=MIRROR, sha=COMPANION_SHA, base_tip=None)
+        )

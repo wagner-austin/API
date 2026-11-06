@@ -18,7 +18,7 @@ from collections.abc import Sequence
 
 import pytest
 from platform_core.errors import AppError
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONObject, dump_json_str
 
 from fleet.cli import _config, node_prepare
 from fleet.contracts.dispatch import decode_job
@@ -60,6 +60,23 @@ def _diverged(hub: pathlib.Path) -> tuple[str, str, str]:
     _git(hub, "checkout", "--quiet", "main")
     tip = _commit(hub, {"src/b.ts": "export const b = 2;\n"})
     return fork, feature, tip
+
+
+def _based_document() -> JSONObject:
+    """The shared workspace with the demo project sourced and declaring main as its base branch.
+
+    Returns:
+        The document.
+    """
+    document = workspace_document()
+    projects = document["projects"]
+    assert isinstance(projects, dict)
+    project = projects[DEMO_PROJECT]
+    assert isinstance(project, dict)
+    source = ProjectSource(remote=REMOTE, path=DEMO_PROJECT, install=(NPM_CI,), companions=())
+    source["base_branch"] = "main"
+    project["source"] = encode_project_source(source)
+    return document
 
 
 def _unpack(
@@ -246,16 +263,8 @@ class TestPrepareResolvesTheBaseBranch:
     def test_the_hub_fetches_the_branch_into_the_project_s_mirror_and_names_its_tip(
         self, config_path: pathlib.Path
     ) -> None:
-        document = workspace_document()
-        projects = document["projects"]
-        assert isinstance(projects, dict)
-        project = projects[DEMO_PROJECT]
-        assert isinstance(project, dict)
-        source = ProjectSource(remote=REMOTE, path=DEMO_PROJECT, install=(NPM_CI,), companions=())
-        source["base_branch"] = "main"
-        project["source"] = encode_project_source(source)
         loaded = _config.load_workspace(
-            {_config.CONFIG_FLAG: str(write_registry(config_path, document))}
+            {_config.CONFIG_FLAG: str(write_registry(config_path, _based_document()))}
         )
         admitted = node_prepare.Admitted(
             plan=require_project(loaded.workspace, DEMO_PROJECT), workers=1

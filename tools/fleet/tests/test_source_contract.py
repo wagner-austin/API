@@ -336,9 +336,13 @@ class TestProjectSource:
             "base_branch": "main",
         }
         assert decode_project_source(encoded, field="source") == based
-        plain = decode_project_source(encode_project_source(_source()), field="source")
-        assert plain is not None
-        assert "base_branch" not in plain
+        assert encode_project_source(_source(install=())) == {
+            "remote": HTTPS,
+            "path": "packages/wiki-search",
+            "install": [],
+            "companions": [],
+        }
+        assert decode_project_source(encode_project_source(_source()), field="source") == _source()
 
     @pytest.mark.parametrize(
         ("branch", "refusal"),

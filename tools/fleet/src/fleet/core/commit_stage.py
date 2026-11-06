@@ -286,7 +286,7 @@ def bundle_commit(
     Raises:
         AppError: ``EXPORT_FAILED`` when a git command exits non-zero.
     """
-    refs = ((f"{BUNDLE_REF_PREFIX}{run_id}", sha),)
+    refs: tuple[tuple[str, str], ...] = ((f"{BUNDLE_REF_PREFIX}{run_id}", sha),)
     if base_tip is not None:
         refs += ((f"{BASE_BUNDLE_REF_PREFIX}{run_id}", base_tip),)
     # A ref write may spend git's whole lock wait before it starts its own work.
