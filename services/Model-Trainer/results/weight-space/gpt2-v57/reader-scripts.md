@@ -1,10 +1,10 @@
 # The GPT-2 reader's analysis scripts, verbatim
 
-The fresh session that wrote induction-value-ablation-7heads.json kept these in its reader/ directory, as its brief asked. They are reproduced here unchanged, one fenced block each, so the claim that it read weight products and ran no forward pass can be checked line by line. Paths in them point at the scratch directory the session ran in.
+The fresh session that wrote induction-value-ablation-7heads.json kept these in its reader/ directory, as its brief asked. They are reproduced here unchanged, one fenced block each, so the claim that it read weight products and ran no forward pass can be checked line by line. Paths in them point at the scratch directory the session ran in. The fences are tagged text rather than python because ruff format, which this package's make lint runs, rewrites python-tagged code blocks in markdown, and a reformatted script would no longer be the one the session wrote.
 
 ## gpt2_weights.py
 
-```python
+```text
 """Load GPT-2 small's raw weights from model.safetensors with numpy only.
 
 Usage inside Python:
@@ -45,7 +45,7 @@ def load(path: str = PATH) -> dict:
 
 ## _paths.py
 
-```python
+```text
 """Under python3 -I neither the script dir nor user site-packages is on sys.path."""
 import sys
 
@@ -58,7 +58,7 @@ for p in (READER, SITE):
 
 ## heads.py
 
-```python
+```text
 """Per-head weight-only analysis: OV copying score, positional prev-token score.
 
 No forward pass: each quantity is a product of weight matrices applied to
@@ -123,7 +123,7 @@ if __name__ == "__main__":
 
 ## compose.py
 
-```python
+```text
 """Previous-token heads from positional QK, and K-composition (Elhage et al.)
 of every later head with them. Weight products only."""
 import sys
@@ -202,7 +202,7 @@ np.save("kcomp_scores.npy", kc)
 
 ## compose2.py
 
-```python
+```text
 """K-composition of each layer-5..11 head with every head of layers 0..4
 (full table), to find which upstream heads the induction candidates read
 on the key side. Also a softer positional prev-token score."""
@@ -261,7 +261,7 @@ for (l, h), m, sc in rows[:16]:
 
 ## induct.py
 
-```python
+```text
 """Token-space induction matching test, weight products only.
 
 For a later head B and a previous-token head A: the key at position j holds
@@ -309,7 +309,7 @@ for (l, h), (z, top, a) in rows[:25]:
 
 ## negheads.py
 
-```python
+```text
 """Look for negative-copying (copy-suppression) heads in layers 8-11 with
 several weight-only views:
   ov_z      : z of own-token logit in ln(E_t) OV (E*g_f)^T (as heads.py)
@@ -353,7 +353,7 @@ for l in range(8, 12):
 
 ## qcomp.py
 
-```python
+```text
 """Where do the induction heads' outputs go? Q- and V-composition of every
 layer 8-11 head with the union of the induction heads' OV, relative to the
 same score against the other heads of layers 5-7 (weight products only)."""
@@ -390,7 +390,7 @@ for l in range(8, 12):
 
 ## write_program.py
 
-```python
+```text
 """Write gpt2-program.json and check it applies cleanly to the loaded weights
 (the check edits arrays only; nothing is evaluated on any input)."""
 import json
