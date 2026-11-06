@@ -194,10 +194,13 @@ class TestARollBetweenTheAskAndTheAnswer:
         with caplog.at_level("INFO"):
             endpoint, _ = self._given_back(sourced_config)
 
-        # No listing between the boundaries and no claim after the give-back.
+        # No listing after the give-back and no claim: it holds no run, so it
+        # hands over at once (MCPs board task 007bfc7e), not at the boundary.
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_report"]
         handed_over = caplog.records[-1].getMessage()
-        assert handed_over.endswith(f"before the 2025-09-04T15:36:00+00:00 fire: {MOVED}")
+        assert handed_over.endswith(
+            f"before the 2025-09-04T15:36:00+00:00 fire: {MOVED}, nothing left to settle"
+        )
 
 
 class TestALaunchRecordsTheServesCommit:
