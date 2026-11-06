@@ -37,3 +37,27 @@ SHELL := /bin/sh
 .SHELLFLAGS := -eu -c
 PYTHON := python3
 endif
+
+# check-fleet: this package's HEAD checked on a fleet node, the verdict
+# waited for and printed (MCPs board task 4412816f). A session host runs no
+# make check, and API had no way to put one of its own packages on the
+# queue but a hand-pushed staging ref and a raw dispatch_submit. The target
+# runs the ONE check-fleet, MCPs' maketools, from the MCPs clone beside this
+# repository's (this file's directory is two below the root, and the clone
+# one above it), which keys an API package by its bare path as the
+# registry here does and reads the stack's address and keys from that MCPs
+# clone; nothing of it is copied into tools/maketools. A tree with no MCPs
+# clone beside it is refused when the target runs, never when make parses
+# this file, so a fleet node's export of API parses as before.
+# `make check-fleet TASK=<uuid>` addresses the verdict to that task.
+MCPS_MAKETOOLS_RUN := $(dir $(lastword $(MAKEFILE_LIST)))../../../MCPs/packages/maketools/scripts/run.py
+
+.PHONY: check-fleet
+check-fleet:
+	$(if $(wildcard $(MCPS_MAKETOOLS_RUN)),,$(error MAKETOOLS_LAUNCHER_MISSING: check-fleet runs MCPs' maketools from $(MCPS_MAKETOOLS_RUN), and no MCPs clone sits beside this one))
+	$(PYTHON) -u $(MCPS_MAKETOOLS_RUN) check-fleet
+
+# Every Makefile includes this file first, so the target above would be each
+# package's default goal; clearing it hands that back to the Makefile's own
+# first target, as before the target was added.
+.DEFAULT_GOAL :=
