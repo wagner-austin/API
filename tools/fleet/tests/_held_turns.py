@@ -60,12 +60,13 @@ class OtherTurn:
         self._descriptor = os.open(lock, os.O_RDWR | os.O_CREAT, file_turn.LOCK_FILE_MODE)
         fcntl.flock(self._descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
-    def end_after(self, seconds: float, work: Callable[[], None] = _nothing) -> threading.Thread:
+    def end_after(self, seconds: float, work: Callable[[], object] = _nothing) -> threading.Thread:
         """Do the turn's work and let it go after a span, on a thread of its own.
 
         Args:
             seconds: How long the turn is held from now.
-            work: What the turn does just before it lets go.
+            work: What the turn does just before it lets go; what it returns
+                is not read.
 
         Returns:
             The started thread, for the case to join.
