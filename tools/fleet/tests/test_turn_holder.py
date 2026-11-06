@@ -22,7 +22,7 @@ import time
 import pytest
 
 from fleet.core import _test_hooks, file_turn
-from tests._held_turns import OtherTurn
+from tests._held_turns import OtherTurn, is_held
 from tests.conftest import FakeRun
 
 TURN = file_turn.TurnBounds(what="long turn", waited_for="another long turn")
@@ -110,17 +110,18 @@ def test_a_waiter_whose_lock_its_holder_removed_takes_the_path_s_next_file(
 ) -> None:
     """The holder removes the file inside its turn, as a retire turn does.
     The waiter, woken holding a file no path names, takes a new one at the
-    path, which a later turn would see."""
+    path, which a later turn would see held. Inode numbers cannot tell the
+    two files apart: the removed file's number is free again once both its
+    descriptors close, and the new file may be given it."""
     lock = tmp_path / "turn.turn"
     other = OtherTurn(lock)
-    removed = os.stat(lock).st_ino
     ending = other.end_after(0.2, lock.unlink)
 
     with file_turn.held(lock, holder="the next turn", bounds=TURN):
-        named = os.stat(lock).st_ino
+        seen = is_held(lock)
     ending.join()
 
-    assert named != removed
+    assert seen is True
 
 
 def test_a_waiter_whose_lock_was_replaced_takes_the_replacement(tmp_path: pathlib.Path) -> None:

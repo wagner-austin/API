@@ -18,6 +18,7 @@ import pytest
 
 from fleet.core import _test_hooks, commit_tree, rolled, rolled_fetch, scratch
 from tests._git_fixtures import committed_repository, git, rolled_at_home
+from tests._held_turns import is_held
 from tests._rolled_fetch_script import FETCH_TIMEOUTS, fetch_calls, fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
@@ -181,11 +182,15 @@ class TestScriptedExtraction:
         assert runner.timeouts == [30, 60, 120, 120, 120]
         assert runner.set_env == [(), (), (), (), ()]
         # Renamed into place whole, without the tarball, and touched now;
-        # the turn's lock is given back.
+        # the turn's lock file stays beside it, given back.
         assert not staging_of(scratch_root).exists()
         assert not (destination / commit_tree.TARBALL_NAME).exists()
         assert int(destination.stat().st_mtime) == DEMO_NOW
-        assert sorted(path.name for path in (scratch_root / "fleet-rolled").iterdir()) == [COMMIT]
+        assert sorted(path.name for path in (scratch_root / "fleet-rolled").iterdir()) == [
+            COMMIT,
+            rolled.TURN_LOCK,
+        ]
+        assert not is_held(scratch_root / "fleet-rolled" / rolled.TURN_LOCK)
 
     def test_a_later_launch_reuses_the_tree_and_runs_only_the_fetch_and_the_ref_read(
         self, tmp_path: pathlib.Path
@@ -368,7 +373,9 @@ class TestReaping:
             f"fleet-rolled/{EARLIER}.pid-7",
             "fleet-archives/dead-run.tgz",
         )
-        assert sorted(path.name for path in extractions.iterdir()) == [COMMIT, "f" * 40]
+        assert sorted(path.name for path in extractions.iterdir()) == sorted(
+            [COMMIT, rolled.TURN_LOCK, "f" * 40]
+        )
         assert sorted(path.name for path in archives.iterdir()) == ["live-run.tgz"]
 
     def test_a_refused_launch_still_reaps(self, tmp_path: pathlib.Path) -> None:

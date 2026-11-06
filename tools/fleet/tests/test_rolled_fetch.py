@@ -17,6 +17,7 @@ import pathlib
 
 from fleet.core import _test_hooks, rolled, rolled_fetch
 from tests._git_fixtures import committed_repository, git
+from tests._held_turns import is_held
 from tests._rolled_fetch_script import FETCH_TIMEOUTS, fetch_calls, fetch_replies
 from tests.conftest import DEMO_NOW, FakeClock, FakeRun, FakeTempRoot, failed, ok
 
@@ -73,8 +74,12 @@ class TestScriptedFetch:
         stamp = stamp_of(git_directory)
         assert stamp.read_text(encoding="utf-8") == ""
         assert int(stamp.stat().st_mtime) == DEMO_NOW
-        # The turn's lock is given back.
-        assert sorted(path.name for path in git_directory.iterdir()) == ["fleet-rolled-fetch"]
+        # The turn's lock file stays beside the stamp, given back.
+        assert sorted(path.name for path in git_directory.iterdir()) == [
+            "fleet-rolled-fetch",
+            rolled_fetch.LOCK_NAME,
+        ]
+        assert not is_held(git_directory / rolled_fetch.LOCK_NAME)
 
     def test_a_fresh_stamp_answers_without_asking_the_home(self, tmp_path: pathlib.Path) -> None:
         """The reads of one boundary share one fetch."""

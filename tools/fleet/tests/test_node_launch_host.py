@@ -34,6 +34,7 @@ from fleet.cli.node_roll import RollGuard
 from fleet.contracts.ledger import LedgerEntry, LedgerOutcome
 from fleet.core import _test_hooks, host_claims, leases, names, queue, records, staging
 from fleet.core.workspace_files import read_workspace_document
+from tests._held_turns import is_held
 from tests._launch_fakes import ThreadRoutedQueue, ThreadRoutedRun
 from tests._node_agent_fixtures import (
     PROBED,
@@ -202,4 +203,4 @@ class TestTwoProcessesOfOneHost:
         assert verdicts[2] == "asked for 1 fitting project(s); nothing in the node lane matched"
         assert [tick["claiming"] for tick in second_ticks] == [False, False, True]
         assert host_claims.live_claims(loaded.host_claims, alias="lavender") == ()
-        assert not host_claims.lock_path(loaded.host_claims, alias="lavender").exists()
+        assert not is_held(host_claims.lock_path(loaded.host_claims, alias="lavender"))
