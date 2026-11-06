@@ -3,8 +3,11 @@
 MCPs board task 562cfa7a, acceptance A1: a thread that is busy or waiting is
 left alone, a key a turn already carries is found rather than started again,
 and a transport failure is reported as a value so the caller keeps the wake
-pending. The server speaks the subset of the Codex 0.166.0 protocol the wake
-uses; the client, its process and its socket pair are the production ones.
+pending. The server speaks the subset of the Codex protocol the wake uses,
+read from 0.166.0's schema; every method and field the wake sends is also in
+the schema of 0.154.0, the release the session host's app-server runs (MCPs
+board task 59b6684d). The client, its process and its socket pair are the
+production ones.
 """
 
 from __future__ import annotations
