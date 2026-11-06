@@ -29,6 +29,7 @@ from typing_extensions import TypedDict
 
 from fleet.core.build_steps import read_build_steps
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
+from fleet.core.release_artifact import read_artifact
 from fleet.core.run_registry import read_registry
 from fleet.core.run_summary import read_run_summary
 from fleet.core.slice_load import CI_SLICE, DISPATCH_SLICE, read_slice_load
@@ -189,6 +190,13 @@ class Verdict(TypedDict):
             ``fleet-run`` from a checkout, or ``unread`` for a run launched
             before the record. A serve on an older roll ran job 0fa14fab's
             install steps and nothing said so (MCPs board task 1fd01f09).
+        artifact: The release archive the recipe built, by content
+            (:func:`fleet.core.release_artifact.read_artifact`):
+            ``<path>:<entries>:<digest>``, ``none`` for a project that
+            declares none, an error code with the path for one the recipe
+            did not leave readable, or ``unread``. Which commit built a
+            deployed jar was otherwise a session's rebuild (MCPs board task
+            0c8ace8d).
     """
 
     job_id: str
@@ -213,6 +221,7 @@ class Verdict(TypedDict):
     phases: str
     steps: str
     registry: str
+    artifact: str
 
 
 def read_slowest(tail: str) -> str:
@@ -398,6 +407,7 @@ def judge(
         phases=summary["phases"],
         steps=read_build_steps(ANSI.sub("", tail)),
         registry=read_registry(tail),
+        artifact=read_artifact(tail),
     )
 
 
@@ -413,7 +423,7 @@ def render_verdict(verdict: Verdict) -> str:
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
         slowest=<...> ci=<...> dispatch=<...> vmtests=<...> generation=<...> began=<...>
         phases=<...>
-        steps=<...> registry=<commit>``,
+        steps=<...> registry=<commit> artifact=<...>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
         field the readers in MCPs' maketools and session-audit match, each
@@ -430,7 +440,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"vmtests={verdict['vmtests']} "
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
-        f"registry={verdict['registry']}"
+        f"registry={verdict['registry']} artifact={verdict['artifact']}"
     )
 
 

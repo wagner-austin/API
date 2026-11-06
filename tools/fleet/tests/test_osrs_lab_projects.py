@@ -49,6 +49,7 @@ from typing import Final
 
 import pytest
 
+from fleet.contracts.release_artifact import ArtifactKind, ReleaseArtifact
 from fleet.contracts.source import ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace, require_project
@@ -97,3 +98,20 @@ def test_each_osrs_lab_build_holds_the_four_cores_and_six_gb_it_was_measured_in(
 
     assert project["minimum_workers"] == 4
     assert project["worker_ram_gb"] * project["minimum_workers"] == 6.0
+
+
+@pytest.mark.parametrize("directory", DIRECTORIES)
+def test_only_the_release_gate_declares_the_jar_it_packs(directory: str) -> None:
+    """recorder-release's packaging gate leaves the recorder jar loki runs.
+
+    Its verdict names that jar by its entries (board task 0c8ace8d); every
+    other build releases nothing.
+    """
+    project = require_project(decode_fleet_workspace(shipped_document()), f"osrs-lab/{directory}")
+
+    expected = (
+        ReleaseArtifact(path="recorder/build/libs/osrs-recorder.jar", kind=ArtifactKind.ZIP)
+        if directory == "recorder-release"
+        else None
+    )
+    assert project["release_artifact"] == expected

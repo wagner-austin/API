@@ -473,6 +473,7 @@ def launch(
             isolated_docker=recipe["isolated_docker"],
             agent=lease["agent"],
             loopback_unit=loopback_unit(recipe, run_id),
+            artifact=recipe["artifact"],
         ),
     )
     remote.run_script(

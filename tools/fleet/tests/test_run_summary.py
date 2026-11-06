@@ -106,7 +106,7 @@ def test_the_verdict_carries_the_three_fields_last() -> None:
 
     assert verdict.render_verdict(judged).endswith(
         " ci=unread dispatch=unread vmtests=unread generation=1793525277 began=yes"
-        " phases=deps:7s,deps:46s,check:214s steps=unread registry=unread"
+        " phases=deps:7s,deps:46s,check:214s steps=unread registry=unread artifact=unread"
     )
 
 

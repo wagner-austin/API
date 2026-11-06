@@ -168,6 +168,7 @@ def _project(
         loopback_only=loopback_only,
         worker_cores=worker_cores,
         worker_cores_measurement=worker_cores_measurement,
+        release_artifact=None,
     )
 
 

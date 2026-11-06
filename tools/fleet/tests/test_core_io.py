@@ -45,6 +45,7 @@ _PROJECTS = {
         loopback_only=False,
         worker_cores=worker_cores,
         worker_cores_measurement=measurement,
+        release_artifact=None,
     )
     for project, worker_ram_gb, minimum_workers, worker_cores, measurement in (
         ("services/Model-Trainer", 1.5, 2, 1, None),

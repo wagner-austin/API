@@ -11,5 +11,9 @@
     "path": "recorder-release",
     "install": [],
     "companions": []
+  },
+  "release_artifact": {
+    "path": "recorder/build/libs/osrs-recorder.jar",
+    "kind": "zip"
   }
 }

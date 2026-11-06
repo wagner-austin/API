@@ -88,6 +88,7 @@ def _build(loopback_unit: str | None) -> str:
         isolated_docker=False,
         agent="opus-mcps-1024-a771",
         loopback_unit=loopback_unit,
+        artifact=None,
     )
 
 

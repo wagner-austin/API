@@ -177,4 +177,6 @@ class TestTheVerdictNamesTheCommit:
         )
 
         assert judged["registry"] == ROLLED_COMMIT
-        assert verdict.render_verdict(judged).endswith(f" steps=unread registry={ROLLED_COMMIT}")
+        assert verdict.render_verdict(judged).endswith(
+            f" steps=unread registry={ROLLED_COMMIT} artifact=unread"
+        )

@@ -104,7 +104,7 @@ class TestACloseTheQueueDidNotAnswer:
         assert settled_line.endswith(
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
             "workers=7 slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
-            "began=unread phases=unread steps=unread registry=unread"
+            "began=unread phases=unread steps=unread registry=unread artifact=unread"
         )
         retire_path = f"/home/corvis/fleet/stage/retire-{DEMO_RUN_ID}.sh"
         assert [retire_path in " ".join(call) for call in settling_node.calls[:6]] == [
@@ -237,7 +237,7 @@ def _settle_killed(
 VERDICT_END = (
     f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} workers=7 "
     "slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread began=unread "
-    "phases=unread steps=unread registry=unread"
+    "phases=unread steps=unread registry=unread artifact=unread"
 )
 
 

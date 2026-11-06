@@ -105,6 +105,7 @@ def _build(
         isolated_docker=False,
         agent="opus-demo-0929",
         loopback_unit=loopback_unit,
+        artifact=None,
     )
 
 
@@ -145,6 +146,7 @@ class TestBuildScript:
                 isolated_docker=False,
                 agent="Opus Demo",
                 loopback_unit=None,
+                artifact=None,
             )
 
     def test_a_root_project_runs_its_recipe_at_the_export_root(self) -> None:

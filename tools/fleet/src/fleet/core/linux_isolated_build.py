@@ -60,6 +60,7 @@ from __future__ import annotations
 import shlex
 
 from fleet.contracts.project import MAKE_TARGET
+from fleet.contracts.release_artifact import ReleaseArtifact
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
@@ -72,6 +73,7 @@ from fleet.core.names import (
 )
 from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.release_artifact import sh_artifact_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import (
     MEASURED_SLICES,
@@ -135,6 +137,7 @@ def isolated_build_lines(
     workers: int,
     install: tuple[InstallStep, ...],
     agent: str,
+    artifact: ReleaseArtifact | None,
 ) -> list[str]:
     """The build's lines after the prologue, running every step as execdocker.
 
@@ -152,6 +155,9 @@ def isolated_build_lines(
             grammar, carried into the cleared environment as
             ``BOARD_AGENT_LABEL``: MCPs' disposable deploy takes a fleet hold,
             which refuses to run unattributed (MCPs board task 6c4516af A4).
+        artifact: The project's declared release archive, read as execdocker
+            from the copy once the recipe ends and before the copy is removed
+            (:mod:`fleet.core.release_artifact`), or None.
 
     Returns:
         The lines, in order. The last writes the recipe's exit status to the
@@ -226,6 +232,11 @@ def isolated_build_lines(
     )
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
     lines.extend(sh_vm_test_lines(log))
+    lines.extend(
+        sh_artifact_lines(
+            log=log, root="$exec_root", artifact=artifact, run_as=f"sudo -n -u {EXEC_USER} "
+        )
+    )
     lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")

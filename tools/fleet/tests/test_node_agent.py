@@ -192,6 +192,7 @@ class TestClaiming:
             isolated_docker=False,
             agent="opus-dispatch-0905",
             loopback_unit=None,
+            artifact=None,
         )
         assert runner.stdin[-3 - len(PROBED)] == expected.encode("utf-8")
         # The claimed job's submitter, exported so a hold the suite takes is

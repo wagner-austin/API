@@ -69,6 +69,7 @@ def _project(*, minimum_workers: int = 4, expected_minutes: int = 5) -> ProjectC
         loopback_only=False,
         worker_cores=1,
         worker_cores_measurement=None,
+        release_artifact=None,
     )
 
 

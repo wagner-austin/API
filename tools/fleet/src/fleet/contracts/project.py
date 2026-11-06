@@ -26,6 +26,11 @@ from platform_core.json_utils import (
 )
 from typing_extensions import TypedDict
 
+from fleet.contracts.release_artifact import (
+    ReleaseArtifact,
+    decode_release_artifact,
+    encode_release_artifact,
+)
 from fleet.contracts.resources import decode_names, encode_names
 from fleet.contracts.source import ProjectSource, decode_project_source, encode_project_source
 from fleet.contracts.tags import NodeTag, decode_required_tags, encode_tags
@@ -137,6 +142,11 @@ class ProjectConfig(TypedDict):
             exactly when ``worker_cores`` is one: a count above one without
             it is refused, and one beside the default one is refused too,
             since it would describe a declaration the project does not make.
+        release_artifact: The archive the project's recipe leaves behind as
+            its release, which the build reads into the verdict's
+            ``artifact=`` once the recipe ends
+            (:mod:`fleet.contracts.release_artifact`), or None for a project
+            that releases none. Optional: absent reads as None.
     """
 
     worker_ram_gb: float
@@ -150,6 +160,7 @@ class ProjectConfig(TypedDict):
     loopback_only: bool
     worker_cores: int
     worker_cores_measurement: str | None
+    release_artifact: ReleaseArtifact | None
 
 
 def lease_seconds(project: ProjectConfig, *, slack: float) -> int:
@@ -204,6 +215,7 @@ def encode_project_config(project: ProjectConfig) -> JSONObject:
         "loopback_only": project["loopback_only"],
         "worker_cores": project["worker_cores"],
         "worker_cores_measurement": project["worker_cores_measurement"],
+        "release_artifact": encode_release_artifact(project["release_artifact"]),
     }
 
 
@@ -380,6 +392,7 @@ def decode_project_config(value: JSONValue) -> ProjectConfig:
         worker_cores_measurement=decode_worker_cores_measurement(
             value.get("worker_cores_measurement"), worker_cores=worker_cores
         ),
+        release_artifact=decode_release_artifact(value.get("release_artifact")),
     )
 
 

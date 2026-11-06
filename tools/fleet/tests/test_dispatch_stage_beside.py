@@ -146,7 +146,9 @@ def _launch(tmp_path: pathlib.Path, stage_tree: dispatch.TreeStager) -> None:
         workers=4,
         stage_tree=stage_tree,
         companions=(),
-        recipe=Recipe(path="execution", install=(), isolated_docker=False, loopback_only=False),
+        recipe=Recipe(
+            path="execution", install=(), isolated_docker=False, loopback_only=False, artifact=None
+        ),
         registry=_registry(tmp_path),
         registry_commit="7973682" + "0" * 33,
         scratch=tmp_path / "archives",

@@ -50,6 +50,7 @@ import shlex
 from fleet.contracts.action_cache import STATUS_FRESH_MINUTES, STATUS_PATH
 from fleet.contracts.check_unit import CHECK_UNIT
 from fleet.contracts.project import MAKE_TARGET
+from fleet.contracts.release_artifact import ReleaseArtifact
 from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
 from fleet.core import names
@@ -68,6 +69,7 @@ from fleet.core.names import (
     WORKSPACE_VARIABLE,
 )
 from fleet.core.phase_markers import sh_phase_lines
+from fleet.core.release_artifact import sh_artifact_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import (
     MEASURED_SLICES,
@@ -371,6 +373,7 @@ def build_script(
     isolated_docker: bool,
     agent: str,
     loopback_unit: str | None,
+    artifact: ReleaseArtifact | None,
 ) -> str:
     """Ready the tree, run the recipe in the project, write its status last.
 
@@ -407,6 +410,9 @@ def build_script(
             through ``fleet-check-unit loopback`` in a network namespace
             holding only lo (:mod:`fleet.contracts.check_unit`); None for
             every other project.
+        artifact: The project's declared release archive, read into the
+            transcript once the recipe ends (:mod:`fleet.core.release_artifact`),
+            or None, which prints that none applies.
 
     Returns:
         The script's text. Its last act writes the recipe's exit status to
@@ -427,7 +433,12 @@ def build_script(
     label = require_agent_label(agent)
     if isolated_docker:
         lines = isolated_build_lines(
-            target=target, path=path, workers=workers, install=install, agent=label
+            target=target,
+            path=path,
+            workers=workers,
+            install=install,
+            agent=label,
+            artifact=artifact,
         )
         return PROLOGUE + "\n".join(lines) + "\n"
     log = names.log_path(target)
@@ -467,6 +478,7 @@ def build_script(
     lines.extend(sh_phase_lines(phase=MAKE_TARGET, command=recipe_command(loopback_unit), log=log))
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
     lines.extend(sh_vm_test_lines(log))
+    lines.extend(sh_artifact_lines(log=log, root=target, artifact=artifact, run_as=""))
     lines.append(sh_run_summary_line(log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"

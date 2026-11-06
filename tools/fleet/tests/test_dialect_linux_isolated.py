@@ -32,6 +32,7 @@ from fleet.core.dialect import PROLOGUE
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, EXEC_LANE_LOCK, EXEC_USER
 from fleet.core.node_programs import EXEC_PATH
 from fleet.core.phase_markers import SH_UTC_STAMP
+from fleet.core.release_artifact import sh_artifact_lines
 from fleet.core.run_summary import sh_run_summary_line
 from fleet.core.slice_load import MEASURED_SLICES, sh_slice_load_end_lines
 from fleet.core.vm_tests import sh_vm_test_lines
@@ -65,6 +66,7 @@ def _isolated(
         isolated_docker=True,
         agent="opus-demo-0929",
         loopback_unit=None,
+        artifact=None,
     )
 
 
@@ -89,6 +91,7 @@ def _plan(required_tags: tuple[NodeTag, ...]) -> ProjectConfig:
         loopback_only=False,
         worker_cores=1,
         worker_cores_measurement=None,
+        release_artifact=None,
     )
 
 
@@ -199,6 +202,12 @@ class TestIsolatedText:
         slice_load = [
             *sh_slice_load_end_lines(MEASURED_SLICES, names.log_path(TARGET)),
             *sh_vm_test_lines(names.log_path(TARGET)),
+            *sh_artifact_lines(
+                log=names.log_path(TARGET),
+                root="$exec_root",
+                artifact=None,
+                run_as=f"sudo -n -u {EXEC_USER} ",
+            ),
         ]
         loaded = len(slice_load)
 
@@ -236,6 +245,7 @@ def test_a_docker_project_that_declares_loopback_only_is_refused_by_name() -> No
             isolated_docker=True,
             agent="opus-demo-0929",
             loopback_unit="fleet-slime-lavender-1792900000",
+            artifact=None,
         )
 
 
@@ -257,6 +267,7 @@ def test_the_recipe_is_isolated_exactly_when_the_project_declares_docker(
         install=(NPM_CI,),
         isolated_docker=isolated,
         loopback_only=False,
+        artifact=None,
     )
     assert recipe.working_tree_recipe("libs/x", _plan(tags))["isolated_docker"] is isolated
 

@@ -26,6 +26,7 @@ def test_every_act_renders_its_script() -> None:
         isolated_docker=False,
         agent="opus-demo-0929",
         loopback_unit=None,
+        artifact=None,
     )
     assert names.RESULT_NAME in dialect.result_script("/s/run")
     assert names.task_name("r") in dialect.stop_script("r")

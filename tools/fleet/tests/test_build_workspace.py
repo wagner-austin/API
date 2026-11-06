@@ -43,6 +43,7 @@ def test_preparation_and_recipe_receive_the_same_workspace(
         isolated_docker=False,
         agent="gpt6-deploy-1005",
         loopback_unit=None,
+        artifact=None,
     )
     result = subprocess.run(["/bin/sh"], input=body, text=True, capture_output=True, check=True)
     assert result.returncode == 0
@@ -50,3 +51,4 @@ def test_preparation_and_recipe_receive_the_same_workspace(
     lines = (tmp_path / "result.txt.log").read_text(encoding="utf-8").splitlines()
     assert lines.count(workspace or ".") == 2
     assert lines.count(str(workers)) == 4
+    assert "FLEET_ARTIFACT: none" in lines

@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing_extensions import TypedDict
 
 from fleet.contracts.project import ProjectConfig
+from fleet.contracts.release_artifact import ReleaseArtifact
 from fleet.contracts.source import InstallStep
 from fleet.contracts.tags import NodeTag
 from fleet.core import names
@@ -34,17 +35,22 @@ class Recipe(TypedDict):
             its ``make check`` runs in a network namespace holding only lo
             once its install steps have run in the host's
             (:mod:`fleet.contracts.check_unit`).
+        artifact: The archive the project declares as its release, which the
+            build reads once the recipe ends (:mod:`fleet.core.release_artifact`),
+            or None.
     """
 
     path: str
     install: tuple[InstallStep, ...]
     isolated_docker: bool
     loopback_only: bool
+    artifact: ReleaseArtifact | None
 
 
 def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ...]) -> Recipe:
-    """The recipe for one project, isolated when it declares the docker tag
-    and in a loopback-only network when it declares ``loopback_only``.
+    """The recipe for one project, isolated when it declares the docker tag,
+    in a loopback-only network when it declares ``loopback_only``, and read
+    for its release archive when it declares one.
 
     The one place each declaration becomes what the build does, so the
     queue's lane and the working-tree lane cannot disagree about which builds
@@ -64,6 +70,7 @@ def recipe_for(plan: ProjectConfig, *, path: str, install: tuple[InstallStep, ..
         install=install,
         isolated_docker=NodeTag.DOCKER in plan["required_tags"],
         loopback_only=plan["loopback_only"],
+        artifact=plan["release_artifact"],
     )
 
 

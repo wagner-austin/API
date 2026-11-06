@@ -387,7 +387,8 @@ class TestJudgeAndRender:
             "tests=771p/0f coverage=total=100.00% budget=unread ended=2026-10-04T20:33:28Z "
             "log=lavender:C:/fleet/stage/run-1/result.txt.log "
             "run=run-1 workers=4 slowest=unread ci=unread dispatch=unread vmtests=unread "
-            "generation=unread began=unread phases=unread steps=unread registry=unread"
+            "generation=unread began=unread phases=unread steps=unread registry=unread "
+            "artifact=unread"
         )
 
     def test_a_red_run_says_no_banner_and_carries_the_failed_count(self) -> None:
@@ -411,7 +412,7 @@ class TestJudgeAndRender:
         assert line.endswith(
             "log=sedona:/srv/fleet/stage/run-2/result.txt.log run=run-2 workers=7 "
             "slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
-            "began=unread phases=unread steps=unread registry=unread"
+            "began=unread phases=unread steps=unread registry=unread artifact=unread"
         )
         assert "\n" not in line
 
