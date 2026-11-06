@@ -157,7 +157,11 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     assert machines["lacrymal"]["duties"] == ["control", "sessions"]
     assert machines["diphtheria"]["role"] == "worker"
     assert machines["diphtheria"]["duties"] == ["devices"]
-    assert machines["diphtheria"]["standby"] == ["sessions"]
+    # The sessions duty is lacrymal's alone since MCPs board task f70a739b:
+    # the lease never handed back from the standby, so while diphtheria held
+    # it the room gates on lacrymal started no supervisor pass.
+    assert machines["lacrymal"]["standby"] == []
+    assert machines["diphtheria"]["standby"] == []
     # The session host is armable since its NixOS configuration is the
     # flake's (MCPs board task 59b6684d); its install wipes every session.
     assert machines["ziggurat"]["role"] == "session-host"
