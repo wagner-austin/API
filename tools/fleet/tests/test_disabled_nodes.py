@@ -29,7 +29,6 @@ from fleet.cli import _config, nodes, run
 from fleet.core import _test_hooks, staging
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document, machine_of, machines_of
-from tests._thread_fakes import in_order_executor
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -46,12 +45,10 @@ from tests.conftest import (
 
 @pytest.fixture(name="mixed_config")
 def _mixed_config(tmp_path: pathlib.Path) -> pathlib.Path:
-    """A workspace with one enabled node and one deliberately disabled, its pools run in order.
+    """A workspace with one enabled node and one deliberately disabled.
 
     ``asleep`` sorts BEFORE ``lavender``, so a run that probed it would do so
-    first -- which is how the old single-node fixtures hid this entirely. The
-    stage's parts answer from one script in the order they are listed
-    (:func:`tests._thread_fakes.in_order_executor`).
+    first -- which is how the old single-node fixtures hid this entirely.
 
     Args:
         tmp_path: pytest's per-test temporary directory.
@@ -60,7 +57,6 @@ def _mixed_config(tmp_path: pathlib.Path) -> pathlib.Path:
         Path to the written document.
     """
     _test_hooks.now = FakeClock(DEMO_NOW)
-    _test_hooks.executor = in_order_executor
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     document = workspace_document()
     machines_of(document)["asleep"] = machine_document(enabled=False)

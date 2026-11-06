@@ -509,15 +509,11 @@ def pin_clock(seconds: int) -> FakeClock:
 
 @pytest.fixture(name="config_path")
 def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
-    """Write a workspace document, pin the clock, which sleeps move, and run each pool in order.
+    """Write a workspace document and pin the clock, which sleeps move.
 
     A node runner's serve sleeps to its first fire boundary
     (:mod:`fleet.cli.node_serve`), so the sleep moves this clock rather than
-    waiting. A dispatch stages its tree, registry and companions on a pool
-    (:data:`fleet.core.dispatch.STAGE_POOL`), and every dispatch case
-    scripts the node's answers in one order, so each pool runs its work in
-    the order it is handed (:func:`tests._thread_fakes.in_order_executor`);
-    a case about work running at once binds the real pool after this.
+    waiting.
 
     Args:
         tmp_path: pytest's per-test temporary directory.
@@ -527,7 +523,6 @@ def _config_path(tmp_path: pathlib.Path) -> pathlib.Path:
         rolled extraction of :data:`tests._roll_reads.ROLLED_COMMIT` lands.
     """
     pin_clock(DEMO_NOW)
-    _test_hooks.executor = in_order_executor
     _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
     registry = extracted_registry(tmp_path / "scratch", now=DEMO_NOW)
     return write_registry(registry, workspace_document())
@@ -560,8 +555,15 @@ def prebuilt_archive(config_path: pathlib.Path, repo: pathlib.Path) -> bytes:
 
 @pytest.fixture(name="reset_hooks", autouse=True)
 def _reset_hooks() -> Generator[None, None, None]:
-    """Put every hook back to its real implementation around each test."""
+    """Put every hook back to its real implementation around each test, every pool in order.
+
+    A dispatch case scripts the node's answers in one order, which the
+    stage pool (:data:`fleet.core.dispatch.STAGE_POOL`) would interleave, as
+    it did in fleet job 5d6301f9 and API 2f3b7b916's CI run (MCPs board task
+    5280a25d); a case about work running at once binds the real pool itself.
+    """
     _restore()
+    _test_hooks.executor = in_order_executor
     yield None
     _restore()
 

@@ -23,6 +23,12 @@ from tests.test_stage_repository import _git, source_repository
 HOST = "stage-test"
 
 
+@pytest.fixture(name="real_pool", autouse=True)
+def _real_pool() -> None:
+    """Stage on the real pool, whose overlap each case is about."""
+    _test_hooks.executor = _test_hooks._default_executor
+
+
 class LocalTransport:
     """Route the real remote scripts to local processes with bounded overlap.
 

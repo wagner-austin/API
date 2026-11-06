@@ -272,6 +272,7 @@ class TestExportingCompanions:
             return ok(f"{tips[remote_name]}\n" if "rev-parse" in argv else "")
 
         _test_hooks.run = hub_git
+        _test_hooks.executor = _test_hooks._default_executor
 
         exported = export.export_companions(tmp_path / "mirrors", tmp_path / "archives", companions)
 

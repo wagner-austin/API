@@ -36,7 +36,6 @@ from fleet.core import _test_hooks, probe, staging
 from fleet.core.node_choice import Unassessed, first_fit
 from tests._registry import write_registry
 from tests._roster_fixtures import machine_document, machines_of
-from tests._thread_fakes import in_order_executor
 from tests.conftest import (
     DEMO_NOW,
     DEMO_PROJECT,
@@ -295,9 +294,7 @@ class TestAnAsleepNodeDoesNotBlockADispatch:
 
         ``asleep`` sorts before ``lavender``, so the unreachable node is
         probed first. Probing it second would pass even under the old code,
-        which is exactly why the single-node fixtures never caught this. The
-        stage's parts answer from one script in the order they are listed
-        (:func:`tests._thread_fakes.in_order_executor`).
+        which is exactly why the single-node fixtures never caught this.
 
         Args:
             tmp_path: pytest's per-test temporary directory.
@@ -306,7 +303,6 @@ class TestAnAsleepNodeDoesNotBlockADispatch:
             Path to the written document.
         """
         _test_hooks.now = FakeClock(DEMO_NOW)
-        _test_hooks.executor = in_order_executor
         _test_hooks.temp_root = FakeTempRoot(tmp_path / "scratch")
         document = workspace_document()
         machines_of(document)["asleep"] = machine_document()
