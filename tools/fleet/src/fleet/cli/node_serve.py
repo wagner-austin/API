@@ -26,15 +26,22 @@ node's probe, its tags, its leases and its owner reservation, unchanged. At
 every fire boundary it runs the collect pass again, which renews each
 running job's queue lease as each start did.
 
-WHEN IT HANDS OVER. Only :data:`HANDOVER_SECONDS` before a fire boundary,
-and only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.close_if_idle`)
+WHEN IT HANDS OVER. :data:`HANDOVER_SECONDS` before a fire boundary, and
+only while no settle is under way (:meth:`fleet.cli.node_watch.RunWatch.close_if_idle`)
 and no claimed job is still being launched (:mod:`fleet.cli.node_launch`),
 once it has served the workspace's ``node_serve_seconds`` or
-``refs/fleet/rolled`` has moved off the commit it runs, so a roll takes
-effect at the next boundary as it did before. From the moment a read finds
-the ref moved it claims nothing more (:mod:`fleet.cli.node_roll`, MCPs
-board task 1fd01f09), so nothing queued after a roll runs on the older
-registry while it waits for that boundary. The scheduler's fires that
+``refs/fleet/rolled`` has moved off the commit it runs. From the moment a
+read finds the ref moved it claims nothing more (:mod:`fleet.cli.node_roll`,
+MCPs board task 1fd01f09), so nothing queued after a roll runs on the older
+registry. A serve a claim pass found rolled hands over sooner still: at the
+first poll at which it holds no running run and launches none (MCPs board
+task 007bfc7e). Waiting for the boundary blacked out claiming on every
+node for up to 170 s after each roll: on 2026-11-06 the roll from 870a207
+to dbf5c71 left all seven gate checks of MCPs d1f64219f queued from
+23:10:50 to 23:11:56Z while no node claimed anything, and lavender alone
+handed over nine times for rolls that day. The fleet-node row follows
+itself in MCPs ``scripts/fleet/hub-jobs.json``, so the hub runner starts the
+next serve, on the rolled commit, the poll after this one exits. The scheduler's fires that
 arrive while it serves are skipped by IgnoreNew, as intended, and the
 next fire after the handover starts the next serve: the node is unwatched
 only for those seconds and the next start's few, once a serve rather than
@@ -119,6 +126,14 @@ class Watched(Protocol):
 
         Returns:
             Whether it is now closed.
+        """
+
+    def still_watched(self) -> int:
+        """How many held runs are still running.
+
+        Returns:
+            Their count; a serve the roll has moved hands over before its
+            boundary only once it is 0.
         """
 
 
@@ -291,7 +306,8 @@ def serve_loop(
     )
     claiming.passes(fill=True)
     fires = 0
-    reason = policy["at_start"] or steps["latched"]()
+    rolled = steps["latched"]()
+    reason = policy["at_start"] or rolled
     while True:
         now = _test_hooks.now()
         if watching.done():
@@ -303,12 +319,31 @@ def serve_loop(
                 fills=claiming.fills,
                 reason="its watch thread ended",
             )
+        # MCPs board task 007bfc7e: a serve a claim found rolled claims
+        # nothing more, so it hands over at the first poll with nothing to
+        # settle or launch rather than at the boundary, and the hub runner
+        # starts the next serve on the rolled commit the poll after it exits.
+        if (
+            rolled is not None
+            and steps["launching"]() == 0
+            and watch.still_watched() == 0
+            and watch.close_if_idle()
+        ):
+            return Served(
+                started=started,
+                handed_over=now,
+                fire=fire,
+                fires=fires,
+                fills=claiming.fills,
+                reason=f"{rolled}, nothing left to settle",
+            )
         handover = fire - HANDOVER_SECONDS
         if now < handover:
             _test_hooks.sleep(min(poll_seconds, handover - now))
             if reason is None:
                 claiming.poll()
-                reason = steps["latched"]()
+                rolled = steps["latched"]()
+                reason = rolled
             continue
         if reason is None:
             reason = policy["due"](now)
@@ -330,7 +365,8 @@ def serve_loop(
         fires += 1
         claiming.passes(fill=reason is None)
         if reason is None:
-            reason = steps["latched"]()
+            rolled = steps["latched"]()
+            reason = rolled
 
 
 def serve_on(watch: Watched, watching: Future[None], *, poll_seconds: int) -> int:

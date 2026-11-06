@@ -8,10 +8,10 @@ hands over 10 s before the first fire boundary with no listing and no read
 of the roll; a longer one fills again when a job arrives or the watch
 settles a run, runs the passes at each boundary, and hands over once it has
 served its time or the roll has moved, reading the roll through the real
-guard (:class:`fleet.cli.node_roll.RollGuard`), and stops listing once a
-fill's claim found it moved (MCPs board task 1fd01f09); a handover refused
-while a settle runs, or a pass that runs past the fire, moves it to the next
-boundary. The
+guard (:class:`fleet.cli.node_roll.RollGuard`); a handover refused while a
+settle runs, or a pass that runs past the fire, moves it to the next
+boundary. A serve whose claim found the roll moved is
+``test_node_serve_roll.py``'s. The
 end-to-end case runs :func:`fleet.cli.node_agent.main` with a 60-second
 serve against the node's and the queue's scripted answers, and the rest pin
 the workspace's two declarations and the schedule the boundaries come from.
@@ -73,16 +73,27 @@ class ScriptedWatch:
     settled: int
     asked: int
 
-    def __init__(self, idle: Sequence[bool]) -> None:
+    def __init__(self, idle: Sequence[bool], running: Sequence[int] = ()) -> None:
         """Bind the answers to the handovers asked for.
 
         Args:
             idle: One per handover asked for, in order: True when the watch
                 was idle and is now closed.
+            running: One per count of running runs asked for, in order; none
+                once they are spent.
         """
         self.settled = 0
         self.asked = 0
         self._idle = list(idle)
+        self._running = list(running)
+
+    def still_watched(self) -> int:
+        """The next scripted count of running runs.
+
+        Returns:
+            It, or 0 once the script is spent.
+        """
+        return self._running.pop(0) if self._running else 0
 
     def closed(self) -> int:
         """How many runs the watch has settled.
@@ -403,71 +414,6 @@ class TestALongerServe:
         assert served["reason"] == "its watch thread ended"
         assert served["handed_over"] == DEMO_NOW
         assert steps.calls == ["collect@0", "fill@0"]
-
-
-class TestAServeWhoseClaimFoundTheRollMoved:
-    """MCPs board task 1fd01f09: pendragon's serve claimed job 0fa14fab 16 s
-    before its boundary, on the registry before the roll. A claim pass reads
-    the ref (:mod:`fleet.cli.node_roll`); once it finds it moved, the serve
-    lists and fills nothing more and hands over at the next boundary."""
-
-    def test_stops_polling_after_the_poll_whose_fill_found_it(self) -> None:
-        clock = pin_clock(DEMO_NOW)
-        watch = ScriptedWatch([True])
-
-        def arrivals(at: int) -> frozenset[str]:
-            return frozenset({"job-a"}) if at >= 30 else frozenset()
-
-        def claims(at: int) -> None:
-            if at == 30:
-                steps.roll.moved()
-
-        steps = Steps(clock, queued=arrivals, rolled=("roll-2",), fill=claims)
-
-        served = _serve(steps, watch, serve_seconds=NODE_SERVE_CEILING_SECONDS)
-
-        assert steps.calls[-3:] == ["queued@30", "fill@30", "rolled@30"]
-        assert served["reason"] == "refs/fleet/rolled moved from roll-1 to roll-2"
-        assert served["handed_over"] == FIRST_FIRE - node_serve.HANDOVER_SECONDS
-        assert served["fills"] == 2
-
-    def test_a_move_found_by_the_opening_fill_lists_nothing_at_all(self) -> None:
-        clock = pin_clock(DEMO_NOW)
-
-        def claims(at: int) -> None:
-            steps.roll.moved()
-
-        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-2",), fill=claims)
-
-        served = _serve(steps, ScriptedWatch([True]), serve_seconds=NODE_SERVE_CEILING_SECONDS)
-
-        assert steps.calls == ["collect@0", "fill@0", "rolled@0"]
-        assert served["handed_over"] == FIRST_FIRE - node_serve.HANDOVER_SECONDS
-
-    def test_a_move_found_at_a_boundarys_fill_hands_over_at_the_next(self) -> None:
-        """The boundary reads the ref unmoved and renews; the fill it runs
-        there reads it moved, and nothing is filled again."""
-        clock = pin_clock(DEMO_NOW)
-
-        def claims(at: int) -> None:
-            if at == 150:
-                steps.roll.moved()
-
-        steps = Steps(clock, queued=_nothing_queued, rolled=("roll-1", "roll-2"), fill=claims)
-
-        served = _serve(steps, ScriptedWatch([True]), serve_seconds=NODE_SERVE_CEILING_SECONDS)
-
-        assert [call for call in steps.calls if not call.startswith("queued@")] == [
-            "collect@0",
-            "fill@0",
-            "rolled@150",
-            "collect@150",
-            "fill@150",
-            "rolled@150",
-        ]
-        assert served["reason"] == "refs/fleet/rolled moved from roll-1 to roll-2"
-        assert served["handed_over"] == SECOND_FIRE - node_serve.HANDOVER_SECONDS
-        assert served["fills"] == 2
 
 
 class TestTheQueuedJobsAServeWatches:
