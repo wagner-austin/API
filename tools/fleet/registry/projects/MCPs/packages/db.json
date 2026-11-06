@@ -46,6 +46,7 @@
         ]
       }
     ],
-    "companions": []
+    "companions": [],
+    "base_branch": "main"
   }
 }
