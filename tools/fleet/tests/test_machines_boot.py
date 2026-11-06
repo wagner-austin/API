@@ -162,6 +162,10 @@ def test_measured_boot_macs_stay_pinned_and_the_netboot_holder_declares_none() -
     # it the room gates on lacrymal started no supervisor pass.
     assert machines["lacrymal"]["standby"] == []
     assert machines["diphtheria"]["standby"] == []
+    # With the standby went the key only a reaching machine carries (MCPs
+    # board task b4497859): fleet-mcp's decodeReachKey refuses one on a
+    # worker that holds no reaching duty.
+    assert machines["diphtheria"]["reachKey"] is None
     # The session host is armable since its NixOS configuration is the
     # flake's (MCPs board task 59b6684d); its install wipes every session.
     assert machines["ziggurat"]["role"] == "session-host"
