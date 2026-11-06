@@ -27,7 +27,7 @@ THE TRANSPORT IS UNCHANGED. The bundle crosses over scp and its digest is
 compared before the node reads it (:func:`fleet.core.staging.send_verified`),
 as a companion's bundle is; the tree is unpacked beside its staging
 directory into a repository cloned from the node's mirror by hard links,
-and committed as one commit (:func:`unpack_commands`). The fetch into the
+and committed as one commit (:func:`unpack_script`). The fetch into the
 node's mirror and the clone out of it each hold the mirror's lock, so no
 clone links a file another run's fetch, or git's maintenance after one, is
 writing (:func:`fleet.core.stage_repository.under_mirror_lock`).
@@ -325,7 +325,7 @@ def fetch_commands(*, mirror: str, bundle: str | None, run_id: str) -> tuple[tup
     )
 
 
-def unpack_commands(
+def unpack_script(
     *,
     mirror: str,
     bundle: str | None,
@@ -334,8 +334,8 @@ def unpack_commands(
     scope: tuple[str, ...],
     staged: str,
     target: str,
-) -> tuple[tuple[str, ...], ...]:
-    """The commands that put a commit's tree in the export from the node's mirror.
+) -> str:
+    """The script that puts a commit's tree in the export from the node's mirror.
 
     Args:
         mirror: The node's mirror.
@@ -344,26 +344,36 @@ def unpack_commands(
         run_id: The dispatch, whose bundle ref is fetched.
         sha: The commit.
         scope: The archive's pathspec, empty for the whole commit.
-        staged: The export's staging directory, where the tar is written.
+        staged: The export's staging directory, where the tar's named pipe
+            is made.
         target: The export's directory.
 
     Returns:
-        The commands, in order, for :func:`fleet.core.dialect.checked_script`:
-        the mirror made if absent and the bundle fetched into it, the
-        export made a repository holding the mirror's objects by hard links
+        The script, ending at its first failure: the mirror made if absent
+        and the bundle fetched into it, the export made a repository holding
+        the mirror's objects by hard links
         (:func:`fleet.core.stage_repository.clone_commands`, MCPs board task
-        5280a25d), the commit's tar written and unpacked into it, and the
-        tree indexed and committed, its add finding nearly every object it
-        hashes already there.
+        5280a25d), the commit's tar streamed into it through
+        :data:`fleet.core.names.TREE_FIFO_NAME` and never written whole
+        (:func:`fleet.core.dialect.fed_lines`), and the tree indexed and
+        committed, its add finding nearly every object it hashes already
+        there.
     """
-    tar = f"{staged}/{names.TREE_TAR_NAME}"
+    fifo = f"{staged}/{names.TREE_FIFO_NAME}"
     pathspec = ("--", *scope) if scope else ()
     return (
-        *fetch_commands(mirror=mirror, bundle=bundle, run_id=run_id),
-        *stage_repository.clone_commands(target, mirror),
-        ("git", "-C", mirror, "archive", "--format=tar", "-o", tar, sha, *pathspec),
-        *dialect.extract_commands(tar, target),
-        *stage_repository.index_commands(target, run_id),
+        dialect.checked_script(
+            (
+                *fetch_commands(mirror=mirror, bundle=bundle, run_id=run_id),
+                *stage_repository.clone_commands(target, mirror),
+            )
+        )
+        + dialect.fed_lines(
+            source=("git", "-C", mirror, "archive", "--format=tar", sha, *pathspec),
+            sink=("tar", "-xmf", fifo, "-C", target),
+            fifo=fifo,
+        )
+        + dialect.checked_lines(stage_repository.index_commands(target, run_id))
     )
 
 
@@ -456,16 +466,14 @@ def stage_commit(host: str, *, stage_root: str, run_id: str, commit: CommitExpor
     remote.run_script(
         host,
         dialect.script_path(staged, names.UNPACK_STEM),
-        dialect.checked_script(
-            unpack_commands(
-                mirror=mirror,
-                bundle=bundle,
-                run_id=run_id,
-                sha=sha,
-                scope=commit["scope"],
-                staged=staged,
-                target=target,
-            )
+        unpack_script(
+            mirror=mirror,
+            bundle=bundle,
+            run_id=run_id,
+            sha=sha,
+            scope=commit["scope"],
+            staged=staged,
+            target=target,
         ),
         timeout_seconds=remote.send_deadline_seconds(sent),
     )
@@ -495,5 +503,5 @@ __all__ = [
     "read_node_mirror",
     "send_bundle",
     "stage_commit",
-    "unpack_commands",
+    "unpack_script",
 ]

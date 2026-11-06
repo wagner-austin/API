@@ -66,9 +66,10 @@ INIT_REPOSITORY_STEM = "init-repo"
 #: unpacks the commit from there (:mod:`fleet.core.commit_stage`).
 UNPACK_STEM = "unpack"
 
-#: Where the node's mirror writes the commit's tar before it is unpacked,
-#: in the export's staging directory beside :data:`ARCHIVE_NAME`.
-TREE_TAR_NAME = "tree.tar"
+#: The named pipe the node's mirror streams the commit's tar through into
+#: the export (:func:`fleet.core.dialect.fed_lines`), in the export's
+#: staging directory beside :data:`ARCHIVE_NAME`.
+TREE_FIFO_NAME = "tree.fifo"
 
 #: The directory under a cache root that holds the node's bare mirror of
 #: each remote it has been staged from (:func:`node_mirror`).
@@ -564,7 +565,7 @@ __all__ = [
     "RESULT_NAME",
     "STAGE_SUFFIX",
     "TOOL_CACHES_DIRECTORY",
-    "TREE_TAR_NAME",
+    "TREE_FIFO_NAME",
     "UNINSTALL_STEM",
     "UNPACK_STEM",
     "cache_root",

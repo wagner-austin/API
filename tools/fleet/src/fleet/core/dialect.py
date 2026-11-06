@@ -225,8 +225,57 @@ def checked_script(commands: tuple[tuple[str, ...], ...]) -> str:
     Returns:
         The script's text.
     """
+    return PROLOGUE + checked_lines(commands)
+
+
+def checked_lines(commands: tuple[tuple[str, ...], ...]) -> str:
+    """Render commands as the lines of a script :data:`PROLOGUE` began.
+
+    Args:
+        commands: Commands in order, each an argument vector, each word
+            quoted by :func:`shlex.quote`.
+
+    Returns:
+        One line per command.
+    """
     lines = (" ".join(shlex.quote(word) for word in command) for command in commands)
-    return PROLOGUE + "".join(f"{line}\n" for line in lines)
+    return "".join(f"{line}\n" for line in lines)
+
+
+def fed_lines(*, source: tuple[str, ...], sink: tuple[str, ...], fifo: str) -> str:
+    """Lines that feed one command's output to another through a named pipe, failing as either does.
+
+    A PIPE WITH BOTH STATUSES, IN ANY ``sh`` (MCPs board task 5280a25d). A
+    commit's tree used to be written to a tar file and then extracted from
+    it: on colossus on 2026-11-06 ``git archive`` to a file took 1.18 s and
+    the extract 0.62 s, against 1.17 s streamed, every gate job paying it
+    between its claim and its first phase. ``source | sink`` would end the
+    script on the sink's status alone, and GNU tar exits 0 on a stream that
+    stops between two members, so an archive that died there would leave
+    half a tree that the add then committed. ``set -o pipefail`` is not in
+    the dash 0.5.12 of the Ubuntu runners the package's CI uses. So the sink
+    reads ``fifo`` in the background, the source writes into it, and the
+    script waits for the sink: under :data:`PROLOGUE`'s ``set -e`` a source
+    that fails ends it on the source's status and a sink that fails on the
+    sink's. The shell opens ``fifo`` for the source before the source runs,
+    so a source that fails at once still closes it and the sink ends.
+
+    Args:
+        source: The command that writes the stream, an argument vector.
+        sink: The command that reads it from ``fifo``, an argument vector
+            that names ``fifo`` as its input.
+        fifo: Where the named pipe is made, which must not exist yet.
+
+    Returns:
+        The lines, each word quoted by :func:`shlex.quote`.
+    """
+    quoted = shlex.quote(fifo)
+    return (
+        f"mkfifo {quoted}\n"
+        f"{checked_lines((sink,)).rstrip()} &\n"
+        f"{checked_lines((source,)).rstrip()} > {quoted}\n"
+        'wait "$!"\n'
+    )
 
 
 def make_directory_script(target: str) -> str:
@@ -481,8 +530,10 @@ def extract_commands(archive: str, destination: str) -> tuple[tuple[str, ...], .
     """The command that unpacks a verified archive, whatever compressed it.
 
     No ``-z``: GNU tar reads the compression off the file's first bytes, so a
-    working tree's gzip (:func:`fleet.core.staging.archive`) and a commit's
-    plain tar (:func:`fleet.core.commit_stage.unpack_commands`) both unpack.
+    working tree's gzip (:func:`fleet.core.staging.archive`) and the
+    registry's (:func:`fleet.core.staging.registry_payload`) both unpack. A
+    commit's tree is streamed into its export instead
+    (:func:`fleet.core.commit_stage.unpack_script`).
     ``-m`` gives files the node's clock: a fast sender's makes targets look
     newer than their sources, and a build that does nothing reads as passed.
 
@@ -510,10 +561,12 @@ __all__ = [
     "UNLAUNCHED_ANSWER",
     "WRITE_COMMAND",
     "build_script",
+    "checked_lines",
     "checked_script",
     "digest_script",
     "echo_command",
     "extract_commands",
+    "fed_lines",
     "fleet_directory",
     "make_directory_script",
     "result_script",
