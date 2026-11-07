@@ -485,6 +485,49 @@ class MaketoolsErrorCode(ErrorCodeBase):
     ALIGN = "MAKETOOLS_ALIGN"
 
 
+class MutationErrorCode(ErrorCodeBase):
+    """What the mutation step of ``tools/maketools`` refuses (MCPs board task e52e5148).
+
+    The values are MCPs' own (``mcp_shared_py.mutation.context`` and
+    mcp-shared's ``src/mutation/step.ts``), so a reader of any of the three
+    steps' logs reads one vocabulary. Each refusal stops the step before a
+    verdict: none of them is a surviving mutant, which the step reports as a
+    failed run instead.
+    """
+
+    # ``refs/remotes/origin/main`` names no commit, so nothing says what the
+    # checked commit adds. A fleet check stages it when the project's
+    # registry entry declares ``base_branch``; a checkout has it after a fetch.
+    BASE_UNAVAILABLE = "MUTATION_BASE_UNAVAILABLE"
+
+    # A git question the step needs answered failed after the base resolved.
+    GIT_FAILED = "MUTATION_GIT_FAILED"
+
+    # A changed source file differs from ``HEAD``: the step mutates files in
+    # place and puts ``HEAD``'s bytes back, so it runs over committed work only.
+    TREE_DIRTY = "MUTATION_TREE_DIRTY"
+
+    # cosmic-ray failed to enumerate or apply a mutant, or its worker ended
+    # other than normally, so the mutant was judged by nothing.
+    COSMIC_RAY_FAILED = "MUTATION_COSMIC_RAY_FAILED"
+
+    # coverage could not report the suite's per-test contexts, so nothing
+    # says which tests run a changed line.
+    COVERAGE_UNAVAILABLE = "MUTATION_COVERAGE_UNAVAILABLE"
+
+    # A set of tests failed with no mutant applied, which would read every
+    # mutant they run as killed.
+    BASELINE_FAILED = "MUTATION_BASELINE_FAILED"
+
+    # cosmic-ray left a mutated file differing from ``HEAD``; the step put
+    # ``HEAD``'s bytes back before refusing.
+    TREE_NOT_RESTORED = "MUTATION_TREE_NOT_RESTORED"
+
+    # The span file check-budget reads holds a line that is not
+    # ``<whole seconds> <epoch seconds it ended> <bounded span name>``.
+    SPAN_UNREADABLE = "MUTATION_SPAN_UNREADABLE"
+
+
 __all__ = [
     "BoardBridgeErrorCode",
     "BoardWatchErrorCode",
@@ -494,5 +537,6 @@ __all__ = [
     "LockWakeErrorCode",
     "MaketoolsErrorCode",
     "McpClientErrorCode",
+    "MutationErrorCode",
     "SessionLabelErrorCode",
 ]
