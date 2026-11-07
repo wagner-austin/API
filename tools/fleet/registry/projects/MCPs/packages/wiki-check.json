@@ -104,16 +104,6 @@
         "directory": "irvine-civic-wiki"
       },
       {
-        "remote": "https://github.com/wagner-austin/bookshelf.git",
-        "ref": "main",
-        "directory": "bookshelf"
-      },
-      {
-        "remote": "https://github.com/wagner-austin/chau.git",
-        "ref": "main",
-        "directory": "chau"
-      },
-      {
         "remote": "https://github.com/wagner-austin/markets-wiki.git",
         "ref": "main",
         "directory": "markets-wiki"

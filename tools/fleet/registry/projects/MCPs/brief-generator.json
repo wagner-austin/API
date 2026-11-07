@@ -60,16 +60,6 @@
         "remote": "https://github.com/wagner-austin/irvine-civic-wiki.git",
         "ref": "master",
         "directory": "irvine-civic-wiki"
-      },
-      {
-        "remote": "https://github.com/wagner-austin/bookshelf.git",
-        "ref": "main",
-        "directory": "bookshelf"
-      },
-      {
-        "remote": "https://github.com/wagner-austin/chau.git",
-        "ref": "main",
-        "directory": "chau"
       }
     ]
   }

@@ -158,11 +158,14 @@ def test_a_test_database_step_names_its_container_and_its_phase() -> None:
 
 
 def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
-    """MCPs fleet-prepare's peer-wikis phase copies three companions from
-    beside the export into the places docker-compose mounts them (MCPs board
+    """MCPs fleet-prepare's peer-wikis phase moves the civic wiki's companion
+    from beside the export into the place docker-compose mounts it (MCPs board
     task b1089284). It must run after install and workspace-build, which store
-    the tree's untracked files, and its row must declare the three, or the
-    phase refuses FLEET_COMPANION_MISSING on the node."""
+    the tree's untracked files, and its row must declare that companion, or the
+    phase refuses FLEET_COMPANION_MISSING on the node. The bookshelf and chau
+    companions it also placed left with those wikis' deregistration (MCPs board
+    task 6ba9c531): one still declared would land beside the export, where
+    wiki-check's guard reads its wiki as unregistered (fleet job b8d91553)."""
     workspace = decode_fleet_workspace(shipped_document())
     placing = {
         name: project["source"]
@@ -174,9 +177,9 @@ def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
     assert sorted(placing) == ["MCPs/brief-generator", "MCPs/packages/wiki-check"]
     for source in placing.values():
         assert source["install"][-1]["phase"] == "peer-wikis"
-        assert {"irvine-civic-wiki", "bookshelf", "chau"} <= {
-            companion["directory"] for companion in source["companions"]
-        }
+        directories = {companion["directory"] for companion in source["companions"]}
+        assert "irvine-civic-wiki" in directories
+        assert not {"bookshelf", "chau"} & directories
 
 
 def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None:
