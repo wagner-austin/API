@@ -6,6 +6,7 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "tools/fleet",
+    "base_branch": "main",
     "install": [],
     "companions": []
   }

@@ -6,6 +6,7 @@
   "source": {
     "remote": "https://github.com/wagner-austin/API.git",
     "path": "libs/platform_core",
+    "base_branch": "main",
     "install": [],
     "companions": []
   }
