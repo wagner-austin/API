@@ -13,7 +13,9 @@ failing inside make.
 
 from __future__ import annotations
 
-from fleet.contracts.source import InstallStep, ProjectSource
+from collections.abc import Mapping
+
+from fleet.contracts.source import InstallStep, ProjectCompanion, ProjectSource
 from fleet.contracts.tags import NodeTag
 from fleet.contracts.workspace import decode_fleet_workspace
 from fleet.core import export
@@ -180,6 +182,54 @@ def test_a_peer_wikis_step_runs_last_beside_the_companions_it_places() -> None:
         directories = {companion["directory"] for companion in source["companions"]}
         assert "irvine-civic-wiki" in directories
         assert not {"bookshelf", "chau"} & directories
+
+
+#: The repositories of the wikis MCPs deregistered on 2026-11-06 (MCPs board
+#: task d549ae86), named without their ``.git`` suffix.
+DEREGISTERED_WIKI_REPOSITORIES = ("wagner-austin/bookshelf", "wagner-austin/chau")
+
+
+def _deregistered_wiki_companions(
+    companions: Mapping[str, tuple[ProjectCompanion, ...]],
+) -> list[str]:
+    """Each MCPs project companion whose remote is a deregistered wiki's repository.
+
+    Args:
+        companions: Each project's companions, by project name.
+
+    Returns:
+        ``<project>: <remote>`` for every such companion, sorted.
+    """
+    return sorted(
+        f"{name}: {companion['remote']}"
+        for name, declared in companions.items()
+        if name.startswith("MCPs/")
+        for companion in declared
+        if companion["remote"].removesuffix(".git").endswith(DEREGISTERED_WIKI_REPOSITORIES)
+    )
+
+
+def test_no_mcps_project_brings_a_deregistered_wikis_companion() -> None:
+    """No MCPs row, placing or not, exports bookshelf or chau beside itself
+    (MCPs board task a422ac68). A companion lands at ``../<directory>`` beside
+    the export whatever its row's install steps are, and wiki-check's guard
+    reads a wiki there that the registry no longer holds as unregistered."""
+    workspace = decode_fleet_workspace(shipped_document())
+    companions = {
+        name: project["source"]["companions"]
+        for name, project in workspace["projects"].items()
+        if project["source"] is not None
+    }
+
+    assert _deregistered_wiki_companions(companions) == []
+    # The negative: a row with no peer-wikis step, given a chau companion.
+    assert companions["MCPs/mcp-shared"] == ()
+    planted = ProjectCompanion(
+        remote="https://github.com/wagner-austin/chau.git", ref="main", directory="chau"
+    )
+    assert _deregistered_wiki_companions({**companions, "MCPs/mcp-shared": (planted,)}) == [
+        "MCPs/mcp-shared: https://github.com/wagner-austin/chau.git"
+    ]
 
 
 def test_a_served_lane_step_runs_last_and_only_for_the_served_projects() -> None:
