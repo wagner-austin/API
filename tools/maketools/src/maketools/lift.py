@@ -263,8 +263,13 @@ def refresh_lifts(package_root: Path, mcps: Path, revision: str) -> LiftLock:
     lock = read_lift_lock(package_root)
     commit = upstream_commit(mcps, revision)
     blobs = [(entry, upstream_blob(mcps, commit, entry["source"])) for entry in lock["entries"]]
+    # A newly lifted file may open a directory this package does not have
+    # yet (MCPs board task e52e5148 lifted the mutation step's modules into
+    # src/maketools/mutation/), so each file's directory is made first.
     for entry, blob in blobs:
-        (package_root / entry["path"]).write_bytes(blob)
+        lifted = package_root / entry["path"]
+        lifted.parent.mkdir(parents=True, exist_ok=True)
+        lifted.write_bytes(blob)
     refreshed = LiftLock(
         remote=lock["remote"],
         revision=commit,

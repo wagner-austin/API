@@ -15,7 +15,7 @@ failure whose cause is invisible in the failing test.
 
 from __future__ import annotations
 
-from collections.abc import Generator, Mapping, Sequence
+from collections.abc import Callable, Generator, Mapping, Sequence
 from pathlib import Path
 from typing import TypedDict
 
@@ -46,6 +46,22 @@ class InheritingCall(TypedDict):
     cwd: Path
     env: dict[str, str]
     new_session: bool
+    timeout_seconds: int
+
+
+class AnsweringCall(TypedDict):
+    """One recorded :func:`maketools._test_hooks.run_answering` call.
+
+    Attributes:
+        argv: The command.
+        cwd: Its directory.
+        env: Its environment.
+        timeout_seconds: The wall the caller bounded it with.
+    """
+
+    argv: tuple[str, ...]
+    cwd: Path
+    env: dict[str, str]
     timeout_seconds: int
 
 
@@ -160,6 +176,32 @@ class World:
         self.drawn = 27777
         self.draws: list[tuple[int, int]] = []
         self.tracked: list[Path] = []
+        self.answering_calls: list[AnsweringCall] = []
+        self.answer: Callable[[tuple[str, ...]], CommandResult] = self.unscripted
+
+    def unscripted(self, argv: tuple[str, ...]) -> CommandResult:
+        """Refuse a ``run_answering`` command no test scripted.
+
+        Args:
+            argv: The command.
+
+        Raises:
+            AssertionError: Always, naming it.
+        """
+        raise AssertionError(f"no scripted answer for {argv}")
+
+    def run_answering(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str],
+        timeout_seconds: int,
+    ) -> CommandResult:
+        self.answering_calls.append(
+            AnsweringCall(argv=tuple(argv), cwd=cwd, env=dict(env), timeout_seconds=timeout_seconds)
+        )
+        return self.answer(tuple(argv))
 
     def run_inheriting(
         self,
@@ -242,6 +284,7 @@ class World:
         """Point every hook at this world."""
         _test_hooks.run_inheriting = self.run_inheriting
         _test_hooks.run_capturing = self.run_capturing
+        _test_hooks.run_answering = self.run_answering
         _test_hooks.now = self.now
         _test_hooks.sleep = self.sleep
         _test_hooks.write_line = self.write_line
@@ -262,6 +305,7 @@ def restore_defaults() -> None:
     """Point every hook back at its real implementation."""
     _test_hooks.run_inheriting = _test_hooks._default_run_inheriting
     _test_hooks.run_capturing = _test_hooks._default_run_capturing
+    _test_hooks.run_answering = _test_hooks._default_run_answering
     _test_hooks.run_concurrently = _test_hooks._default_run_concurrently
     _test_hooks.now = _test_hooks._default_now
     _test_hooks.sleep = _test_hooks._default_sleep

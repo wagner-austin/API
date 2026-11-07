@@ -27,6 +27,7 @@ from typing import Final, Protocol
 
 from maketools.commands import (
     CommandResult,
+    RunAnsweringProtocol,
     RunCapturingProtocol,
     RunConcurrentlyProtocol,
     RunInheritingProtocol,
@@ -277,6 +278,42 @@ def _default_run_capturing(argv: Sequence[str], *, cwd: Path) -> CommandResult:
     )
 
 
+def _default_run_answering(
+    argv: Sequence[str],
+    *,
+    cwd: Path,
+    env: Mapping[str, str],
+    timeout_seconds: int,
+) -> CommandResult:
+    """Run a child in a named environment and collect its output.
+
+    Args:
+        argv: Executable and arguments.
+        cwd: The working directory.
+        env: The child's complete environment.
+        timeout_seconds: Wall-clock bound on the child.
+
+    Returns:
+        Exit status and streams.
+
+    Raises:
+        subprocess.TimeoutExpired: When the child outlives the bound.
+    """
+    completed = subprocess.run(
+        list(argv),
+        cwd=cwd,
+        env=dict(env),
+        check=False,
+        capture_output=True,
+        timeout=timeout_seconds,
+    )
+    return CommandResult(
+        returncode=completed.returncode,
+        stdout=completed.stdout.decode("utf-8", errors="replace"),
+        stderr=completed.stderr.decode("utf-8", errors="replace"),
+    )
+
+
 def _default_now() -> float:
     """Read the real wall clock.
 
@@ -429,6 +466,7 @@ def _default_tracked_files(repo_root: Path, pathspec: str) -> Sequence[Path]:
 
 run_inheriting: RunInheritingProtocol = _default_run_inheriting
 run_capturing: RunCapturingProtocol = _default_run_capturing
+run_answering: RunAnsweringProtocol = _default_run_answering
 _default_run_concurrently: RunConcurrentlyProtocol = run_children_concurrently
 run_concurrently: RunConcurrentlyProtocol = _default_run_concurrently
 now: NowProtocol = _default_now
@@ -460,6 +498,7 @@ __all__ = [
     "ProcessTableProtocol",
     "RemoveFileProtocol",
     "RemoveTreeProtocol",
+    "RunAnsweringProtocol",
     "RunCapturingProtocol",
     "RunConcurrentlyProtocol",
     "RunInheritingProtocol",
@@ -476,6 +515,7 @@ __all__ = [
     "process_table",
     "remove_file",
     "remove_tree",
+    "run_answering",
     "run_capturing",
     "run_concurrently",
     "run_inheriting",

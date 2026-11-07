@@ -104,6 +104,21 @@ def test_test_hub_offline_refuses_the_hub_to_the_suite(world: World, cwd: Path) 
     assert call["env"]["HOME"] == str((cwd / "runs").resolve() / ".home-deadbeef")
 
 
+def test_test_mutation_records_contexts_and_runs_the_step(world: World, cwd: Path) -> None:
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    world.answer = lambda argv: ok("abc123\n" if argv[1] == "merge-base" else "")
+    assert dispatch(["test", "--mutation", "--no-sweep", "-k", "x"]) == 0
+    assert world.inheriting_calls[0]["argv"][-3:] == ("--cov-context=test", "-k", "x")
+    assert [call["argv"][:2] for call in world.answering_calls] == [
+        ("git", "rev-parse"),
+        ("git", "merge-base"),
+        ("git", "diff"),
+    ]
+    assert dispatch(["test", "--no-sweep"]) == 0
+    assert "--cov-context=test" not in world.inheriting_calls[1]["argv"]
+    assert len(world.answering_calls) == 3
+
+
 def test_test_serial_and_venv_runner_flags(world: World, cwd: Path) -> None:
     (cwd / ".venv" / "bin").mkdir(parents=True)
     (cwd / ".venv" / "bin" / "python").write_bytes(b"")

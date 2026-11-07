@@ -62,6 +62,16 @@ WHAT THIS ADDS OVER THE INLINE RECIPE
    resolve a hub id from the empty cache alone and raise, so such a test
    fails by name. Opt-in, because Model-Trainer's suite loads
    ``sshleifer/tiny-gpt2`` from the hub by design.
+
+8. MUTATION TESTING, when the recipe asks (``--mutation``, MCPs board task
+   e52e5148). The suite runs with ``--cov-context=test``, so its coverage
+   file records which test ran each line, and once it passes
+   :mod:`maketools.mutation` mutates the src lines the commit adds against
+   ``origin/main`` with cosmic-ray, runs each mutant by the tests that ran
+   its line, and fails naming every mutant they leave alive. It runs
+   before the run's coverage file is removed, which it reads. Opt-in per
+   package, because each package that asks carries cosmic-ray as a dev
+   dependency and its own changes must then leave no mutant alive.
 """
 
 from __future__ import annotations
@@ -75,6 +85,7 @@ from platform_core.error_codes_tooling import MaketoolsErrorCode
 from platform_core.errors import AppError
 
 from maketools import _test_hooks, reap
+from maketools.mutation.launch import mutate_after_suite
 from maketools.venvs import venv_executable
 
 
@@ -110,6 +121,13 @@ HOME_PREFIX: Final[str] = ".home-"
 
 #: What refuses the Hugging Face hub to a run that asks, item 7 above.
 HUB_OFFLINE: Final[tuple[str, str]] = ("HF_HUB_OFFLINE", "1")
+
+#: The prefix of the mutation step's scratch directory, item 8 above,
+#: followed by the same token as the run's coverage files.
+MUTATION_PREFIX: Final[str] = ".mutation-"
+
+#: What makes coverage record which test ran each line, item 8 above.
+TEST_CONTEXTS: Final[str] = "--cov-context=test"
 
 #: The question that names the venv interpreter Poetry runs a project in.
 POETRY_EXECUTABLE_ARGV: Final[Sequence[str]] = ("poetry", "env", "info", "--executable")
@@ -159,23 +177,23 @@ def pytest_argv(project: Path, runner: Runner) -> list[str]:
     return list(PYTEST_ARGV)
 
 
-def own_home_pytest_argv(project: Path, runner: Runner) -> list[str]:
-    """How pytest is reached when the suite runs under a ``HOME`` of its own.
+def package_python(project: Path, runner: Runner) -> str:
+    """The interpreter of the project's own environment.
 
     Args:
         project: The package directory.
-        runner: As :func:`pytest_argv`; ``poetry`` is asked for its venv's
-            interpreter while ``HOME`` is still the user's.
+        runner: ``venv`` for the project's own ``.venv``; ``poetry`` asks
+            Poetry, which must happen while ``HOME`` is still the user's.
 
     Returns:
-        The leading argv, through the venv's interpreter.
+        The interpreter's path.
 
     Raises:
         AppError: ``MAKETOOLS_ARTIFACT_MISSING`` when Poetry names no
             interpreter for the project.
     """
     if runner is Runner.VENV:
-        return pytest_argv(project, runner)
+        return str(venv_executable(project, "python"))
     answer = _test_hooks.run_capturing(POETRY_EXECUTABLE_ARGV, cwd=project)
     executable = answer["stdout"].strip()
     if answer["returncode"] != 0 or not executable:
@@ -183,7 +201,7 @@ def own_home_pytest_argv(project: Path, runner: Runner) -> list[str]:
             MaketoolsErrorCode.ARTIFACT_MISSING,
             f"poetry names no venv interpreter for {project}: {answer['stderr'].strip()}",
         )
-    return [executable, "-m", "pytest"]
+    return executable
 
 
 def home_writes(home: Path) -> list[Path]:
@@ -240,6 +258,7 @@ def run_tests(
     runner: Runner = Runner.POETRY,
     own_home: bool = False,
     hub_offline: bool = False,
+    mutation: bool = False,
 ) -> int:
     """Run the project's suite under the launcher's protections.
 
@@ -253,15 +272,21 @@ def run_tests(
             file left there (item 6 above).
         hub_offline: Refuse the Hugging Face hub to the suite (item 7
             above).
+        mutation: Mutation test the commit's added src lines after a
+            passing suite (item 8 above).
 
     Returns:
         pytest's exit status, 1 when it passed but left a file under its own
-        ``HOME``, or 1 when the launcher refused to start it.
+        ``HOME``, the mutation step's code after a passing suite that asked
+        for it, or 1 when the launcher refused to start it.
     """
     _test_hooks.write_line("run-tests: the suite runs in its own session and is reaped on exit")
     if sweep:
         reap.sweep_stale(project)
-    leading = own_home_pytest_argv(project, runner) if own_home else pytest_argv(project, runner)
+    # The interpreter is named before HOME moves (item 6) and once for both
+    # items that need it: the own-HOME suite and the mutation step.
+    python = package_python(project, runner) if own_home or mutation else ""
+    leading = [python, "-m", "pytest"] if own_home else pytest_argv(project, runner)
     runs = project / RUNS_DIRECTORY
     runs.mkdir(exist_ok=True)
     run_token = _test_hooks.token()
@@ -286,6 +311,7 @@ def run_tests(
         *parallel,
         "-v",
         *coverage_arguments(project),
+        *([TEST_CONTEXTS] if mutation else []),
         *pytest_arguments,
     ]
     try:
@@ -299,7 +325,12 @@ def run_tests(
         written = home_writes(home) if own_home else []
         for path in written:
             _test_hooks.write_error(f"run-tests: the suite wrote {path} under its own HOME, {home}")
-        return 1 if written and code == 0 else code
+        if written and code == 0:
+            return 1
+        if mutation and code == 0:
+            scratch = runs.resolve() / (MUTATION_PREFIX + run_token)
+            return mutate_after_suite(project, python, environment, scratch)
+        return code
     finally:
         remove_run_files(runs, token)
         _test_hooks.remove_tree(caches)
@@ -317,16 +348,18 @@ __all__ = [
     "COVERAGE_ROOTS",
     "HOME_PREFIX",
     "HUB_OFFLINE",
+    "MUTATION_PREFIX",
     "NO_WORKER_RESTART",
     "PARALLEL_ARGV",
     "POETRY_EXECUTABLE_ARGV",
     "PYTEST_ARGV",
     "RUNS_DIRECTORY",
+    "TEST_CONTEXTS",
     "THREAD_CAPS",
     "Runner",
     "coverage_arguments",
     "home_writes",
-    "own_home_pytest_argv",
+    "package_python",
     "pytest_argv",
     "remove_run_files",
     "run_tests",

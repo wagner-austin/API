@@ -10,9 +10,11 @@ from platform_core.errors import AppError
 from maketools.commands import CommandResult
 from maketools.test_run import (
     HUB_OFFLINE,
+    MUTATION_PREFIX,
     NO_WORKER_RESTART,
     POETRY_EXECUTABLE_ARGV,
     PYTEST_ARGV,
+    TEST_CONTEXTS,
     Runner,
     coverage_arguments,
     remove_run_files,
@@ -178,3 +180,74 @@ def test_an_own_home_venv_run_asks_poetry_nothing(world: World, tmp_path: Path) 
     )
     assert world.captured == []
     assert world.inheriting_calls[0]["env"]["HOME"] == str(_own_home(tmp_path))
+
+
+def _no_change(argv: tuple[str, ...]) -> CommandResult:
+    """Answer git as a commit that adds no source line.
+
+    Args:
+        argv: The command.
+
+    Returns:
+        The merge base for ``merge-base``, and nothing for the rest.
+    """
+    return ok("abc123\n" if argv[1] == "merge-base" else "")
+
+
+def test_a_mutation_run_records_test_contexts_and_runs_the_step_after_a_passing_suite(
+    world: World, tmp_path: Path
+) -> None:
+    (tmp_path / "src").mkdir()
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    world.answer = _no_change
+    assert run_tests(tmp_path, ["-k", "x"], sweep=False, mutation=True) == 0
+    argv = world.inheriting_calls[0]["argv"]
+    assert argv[: len(PYTEST_ARGV)] == tuple(PYTEST_ARGV)
+    assert argv[-4:] == ("--cov=src", TEST_CONTEXTS, "-k", "x")
+    assert TEST_CONTEXTS == "--cov-context=test"
+    assert world.captured == [tuple(POETRY_EXECUTABLE_ARGV)]
+    runs = (tmp_path / "runs").resolve()
+    scratch = runs / (MUTATION_PREFIX + "deadbeef")
+    assert scratch.is_dir()
+    assert world.removed_trees == [scratch, runs / ".caches-deadbeef"]
+    step_env = world.answering_calls[0]["env"]
+    assert step_env["COVERAGE_FILE"] == str(runs / ".coverage-deadbeef")
+    assert world.lines[-2].startswith("mutation: not applicable: 0 lines added")
+
+
+def test_a_failing_suite_or_a_home_write_runs_no_mutant(world: World, tmp_path: Path) -> None:
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    world.inheriting_code = 1
+    assert run_tests(tmp_path, [], sweep=False, mutation=True) == 1
+    world.inheriting_code = 0
+    home = _own_home(tmp_path)
+    home.mkdir(parents=True)
+    (home / ".netrc").write_bytes(b"")
+    assert run_tests(tmp_path, [], sweep=False, own_home=True, mutation=True) == 1
+    assert world.answering_calls == []
+
+
+def test_an_own_home_mutation_run_asks_poetry_for_its_interpreter_once(
+    world: World, tmp_path: Path
+) -> None:
+    world.capturing_answers[tuple(POETRY_EXECUTABLE_ARGV)] = ok("/v/bin/python\n")
+    world.answer = _no_change
+    assert run_tests(tmp_path, [], sweep=False, own_home=True, mutation=True) == 0
+    assert world.captured == [tuple(POETRY_EXECUTABLE_ARGV)]
+    assert world.inheriting_calls[0]["argv"][:3] == ("/v/bin/python", "-m", "pytest")
+
+
+def test_a_refusal_of_the_step_propagates_after_the_runs_files_are_removed(
+    world: World, tmp_path: Path
+) -> None:
+    (tmp_path / ".venv" / "bin").mkdir(parents=True)
+    (tmp_path / ".venv" / "bin" / "python").write_bytes(b"")
+    world.answer = lambda argv: failed(128, "")
+    runs = (tmp_path / "runs").resolve()
+    runs.mkdir()
+    (runs / ".coverage-deadbeef").write_bytes(b"")
+    with pytest.raises(AppError, match="names no commit here"):
+        run_tests(tmp_path, [], sweep=False, runner=Runner.VENV, mutation=True)
+    assert world.captured == []
+    assert world.removed_files == [runs / ".coverage-deadbeef"]
+    assert world.answering_calls[0]["argv"][0] == "git"

@@ -1,11 +1,21 @@
 {
   "remote": "https://github.com/wagner-austin/MCPs.git",
-  "revision": "5fbdb13100cbbfc9186c92d536d46a78a61b50ed",
+  "revision": "ef2ebdad5861c8a6c9525c945fe4bb4c5169e96a",
   "entries": [
     {
       "path": "src/maketools/check_budget.py",
       "source": "packages/maketools/src/maketools/check_budget.py",
-      "sha256": "8dbeea4c82c85295723eed0f566d7d1082524a11de4605e1c26bf4fc3f24d12f"
+      "sha256": "0e9fd7487e299b6b09212c0273073bc71d73d355b7c87082cea281b19de8092a"
+    },
+    {
+      "path": "src/maketools/mutation/changes.py",
+      "source": "mcp-shared-py/src/mcp_shared_py/mutation/changes.py",
+      "sha256": "4163be97dea022d2f7d34f9cfcf2969d09cc8a6916abc366e698145bd16460d9"
+    },
+    {
+      "path": "src/maketools/mutation/sites.py",
+      "source": "mcp-shared-py/src/mcp_shared_py/mutation/sites.py",
+      "sha256": "78b565309a8f08f1bcb3b1e9dd34382b5d9fc732d80512e132e1d081ff5f580f"
     }
   ]
 }

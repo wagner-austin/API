@@ -88,6 +88,34 @@ def test_run_capturing_collects_both_streams_and_the_status(tmp_path: Path) -> N
     assert result == {"returncode": 3, "stdout": "out", "stderr": "err"}
 
 
+def test_run_answering_collects_the_status_in_the_named_environment_and_cwd(
+    tmp_path: Path,
+) -> None:
+    script = (
+        "import os, pathlib, sys; sys.stdout.write(os.environ['MAKETOOLS_PROBE'] + "
+        "pathlib.Path.cwd().name); sys.stderr.write('err'); sys.exit(4)"
+    )
+    (tmp_path / "here").mkdir()
+    result = _test_hooks._default_run_answering(
+        [sys.executable, "-c", script],
+        cwd=tmp_path / "here",
+        env={"MAKETOOLS_PROBE": "probe-"},
+        timeout_seconds=PROBE_WALL_SECONDS,
+    )
+    assert result == {"returncode": 4, "stdout": "probe-here", "stderr": "err"}
+
+
+def test_run_answering_fells_a_child_that_outlives_its_wall(tmp_path: Path) -> None:
+    """The mutation step's wall bites on a real child that really sleeps."""
+    with pytest.raises(subprocess.TimeoutExpired):
+        _test_hooks._default_run_answering(
+            [sys.executable, "-c", "import time; time.sleep(30)"],
+            cwd=tmp_path,
+            env=_test_hooks.environ(),
+            timeout_seconds=1,
+        )
+
+
 def test_the_clock_sleep_pid_and_token_answer() -> None:
     before = _test_hooks.now()
     _test_hooks.sleep(0.01)

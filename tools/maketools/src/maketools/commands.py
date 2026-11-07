@@ -143,9 +143,46 @@ class RunCapturingProtocol(Protocol):
         ...
 
 
+class RunAnsweringProtocol(Protocol):
+    """Runs a command in a named environment, under a named wall, and collects its output.
+
+    :class:`RunCapturingProtocol` asks short questions in this process's own
+    environment under a fixed two-minute wall. The mutation step's commands
+    are neither: a mutant's tests run in the suite's environment (its
+    coverage file, thread caps and caches), and a set of tests or a
+    cosmic-ray run takes as long as the tests do.
+    """
+
+    def __call__(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path,
+        env: Mapping[str, str],
+        timeout_seconds: int,
+    ) -> CommandResult:
+        """Run it to completion.
+
+        Args:
+            argv: Executable and arguments, never a shell string.
+            cwd: The working directory.
+            env: The child's complete environment.
+            timeout_seconds: Wall-clock bound on the child, named by the
+                caller for the reason :class:`RunInheritingProtocol` gives.
+
+        Returns:
+            Exit status and captured streams.
+
+        Raises:
+            subprocess.TimeoutExpired: When the child outlives the bound.
+        """
+        ...
+
+
 __all__ = [
     "CommandResult",
     "ConcurrentOutcome",
+    "RunAnsweringProtocol",
     "RunCapturingProtocol",
     "RunConcurrentlyProtocol",
     "RunInheritingProtocol",

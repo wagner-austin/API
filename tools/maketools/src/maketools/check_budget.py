@@ -13,9 +13,8 @@ Makefile (:mod:`maketools.check_clock`) to the moment its test step
 returned, LESS the time spent queued on the lock: the queue is somebody
 else's run, and a budget that charged it would fail the second session to
 start a check for the first session's suite. A repository with no check
-lock (board task 1b152218: MCPs' own scripts/ps-harness aside, the API
-repository, corvis-stick and chat) has no queue to subtract, so its
-``check:`` recipe runs ``check-budget``, which runs ``make``
+lock (board task 1b152218: the API repository, corvis-stick and chat) has
+no queue to subtract, so its ``check:`` recipe runs ``check-budget``, which runs ``make``
 :data:`UNBUDGETED_TARGET` (the old check's prerequisites, renamed) and
 charges the whole of it. Both arrive at :func:`budgeted_exit_code` and print
 through :func:`verdict_lines`, so the limit, the exit code and the words a
@@ -59,10 +58,12 @@ class CheckSpend(NamedTuple):
 
     Attributes:
         before_lock: From make reading the Makefile to the lock being asked
-            for: lint, and the migration ``make test`` runs first.
+            for: the setup lint and test share, and the migration ``make
+            test`` runs first.
         queued: Waiting for another session's run of the same package.
             Reported, never charged.
-        suite: The test step, run under the lock.
+        suite: The group run under the lock: the test step and, in a
+            check, the read-only lint beside it.
     """
 
     before_lock: timedelta
@@ -92,10 +93,10 @@ class CheckSpend(NamedTuple):
         """The spans as the verdict prints them.
 
         Returns:
-            Lint and setup, suite and queue, each in whole seconds.
+            Setup, suite and queue, each in whole seconds.
         """
         return (
-            f"lint and setup {int(self.before_lock.total_seconds())}s, "
+            f"setup {int(self.before_lock.total_seconds())}s, "
             f"suite {int(self.suite.total_seconds())}s, "
             f"queued {int(self.queued.total_seconds())}s (not counted)"
         )

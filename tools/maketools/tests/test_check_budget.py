@@ -40,7 +40,7 @@ def test_a_locked_check_is_charged_everything_but_its_queue() -> None:
     )
     assert spent.charged == timedelta(seconds=280)
     assert not spent.over_budget
-    assert spent.split == "lint and setup 40s, suite 240s, queued 900s (not counted)"
+    assert spent.split == "setup 40s, suite 240s, queued 900s (not counted)"
 
 
 def test_exactly_the_budget_is_within_it_and_one_second_more_is_not() -> None:

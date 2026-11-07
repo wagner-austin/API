@@ -174,6 +174,15 @@ def test_a_refresh_writes_each_file_from_the_commit_and_re_pins_the_lock(
     assert drifted_lifts(package, refreshed) == []
 
 
+def test_a_refresh_makes_the_directory_a_newly_lifted_file_opens(tmp_path: Path) -> None:
+    mcps, commit = _upstream(tmp_path, RULE)
+    package = tmp_path / "package"
+    package.mkdir()
+    (package / LIFT_LOCK_NAME).write_text(encode_lift_lock(_lock("0" * 64)), encoding="utf-8")
+    assert refresh_lifts(package, mcps, "HEAD") == _lock(pinned_digest(RULE), revision=commit)
+    assert (package / "src" / "maketools" / "check_budget.py").read_bytes() == RULE
+
+
 def test_a_refresh_from_a_revision_mcps_lacks_is_refused_by_code_and_writes_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

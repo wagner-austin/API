@@ -27,24 +27,9 @@ from maketools.makefile_budget_rule import lint_budgets
 from maketools.makefile_grammar import lint_grammar, render_violation
 from maketools.makefile_poetry_cache_rule import lint_poetry_caches
 from maketools.reap import DEFAULT_OLDER_THAN_MINUTES, sweep_stale
-from maketools.test_run import Runner, run_tests
+from maketools.test_command import command_test
 from maketools.venv_check import check_venv
 from maketools.venvs import native_wheel, poetry_build, uv_venv_check, venv_embed, venv_exec
-
-#: The flag that skips the pre-run sweep; for debugging only.
-NO_SWEEP_FLAG: Final[str] = "--no-sweep"
-
-#: The flag that runs a suite without xdist.
-SERIAL_FLAG: Final[str] = "--serial"
-
-#: The flag that names how pytest is reached.
-RUNNER_FLAG: Final[str] = "--runner"
-
-#: The flag that runs a suite under a HOME of its own (test_run item 6).
-OWN_HOME_FLAG: Final[str] = "--own-home"
-
-#: The flag that refuses the Hugging Face hub to a suite (test_run item 7).
-HUB_OFFLINE_FLAG: Final[str] = "--hub-offline"
 
 #: The flag that sets the sweep's minimum age.
 OLDER_THAN_FLAG: Final[str] = "--older-than-minutes"
@@ -83,58 +68,6 @@ def command_guard(arguments: Sequence[str]) -> int:
     """
     require_no_arguments("guard", arguments)
     return run_guard(Path.cwd())
-
-
-def command_test(arguments: Sequence[str]) -> int:
-    """``test [--no-sweep] [--serial] [--own-home] [--hub-offline] [--runner poetry|venv] [...]``.
-
-    Args:
-        arguments: The launcher's flags first, then anything for pytest.
-
-    Returns:
-        pytest's exit status.
-
-    Raises:
-        AppError: ``MAKETOOLS_USAGE`` on an unknown runner.
-    """
-    switches = (NO_SWEEP_FLAG, SERIAL_FLAG, OWN_HOME_FLAG, HUB_OFFLINE_FLAG)
-    given: set[str] = set()
-    runner = Runner.POETRY
-    remaining = list(arguments)
-    while remaining and remaining[0] in (*switches, RUNNER_FLAG):
-        flag = remaining.pop(0)
-        if flag == RUNNER_FLAG:
-            runner = require_runner(remaining.pop(0) if remaining else "")
-        else:
-            given.add(flag)
-    return run_tests(
-        Path.cwd(),
-        remaining,
-        sweep=NO_SWEEP_FLAG not in given,
-        serial=SERIAL_FLAG in given,
-        runner=runner,
-        own_home=OWN_HOME_FLAG in given,
-        hub_offline=HUB_OFFLINE_FLAG in given,
-    )
-
-
-def require_runner(value: str) -> Runner:
-    """Narrow a ``--runner`` value.
-
-    Args:
-        value: The text after the flag.
-
-    Returns:
-        The runner.
-
-    Raises:
-        AppError: ``MAKETOOLS_USAGE`` when it is neither runner.
-    """
-    if value == Runner.POETRY:
-        return Runner.POETRY
-    if value == Runner.VENV:
-        return Runner.VENV
-    raise AppError(MaketoolsErrorCode.USAGE, f"{RUNNER_FLAG} must be poetry or venv, got {value!r}")
 
 
 def command_reap_stale(arguments: Sequence[str]) -> int:
@@ -564,14 +497,9 @@ __all__ = [
     "COMMANDS",
     "CRATE_FLAG",
     "GIT_COMMIT_FLAG",
-    "HUB_OFFLINE_FLAG",
-    "NO_SWEEP_FLAG",
     "OLDER_THAN_FLAG",
-    "OWN_HOME_FLAG",
     "PACKAGE_FLAG",
     "PROGRESS_FLAG",
-    "RUNNER_FLAG",
-    "SERIAL_FLAG",
     "command_check_budget",
     "command_compose_down",
     "command_compose_up",
@@ -586,7 +514,6 @@ __all__ = [
     "command_poetry_build",
     "command_reap_stale",
     "command_require_tool",
-    "command_test",
     "command_uv_venv_check",
     "command_venv_check",
     "command_venv_embed",
@@ -596,5 +523,4 @@ __all__ = [
     "repository_root",
     "require_integer",
     "require_no_arguments",
-    "require_runner",
 ]
