@@ -519,9 +519,19 @@ class MutationErrorCode(ErrorCodeBase):
     # mutant they run as killed.
     BASELINE_FAILED = "MUTATION_BASELINE_FAILED"
 
+    # The package's prepare command, which derives files from its sources,
+    # failed over the restored sources. API's packages name none today; the
+    # code is here because the lifted core can raise it.
+    PREPARE_FAILED = "MUTATION_PREPARE_FAILED"
+
     # cosmic-ray left a mutated file differing from ``HEAD``; the step put
     # ``HEAD``'s bytes back before refusing.
     TREE_NOT_RESTORED = "MUTATION_TREE_NOT_RESTORED"
+
+    # The step's time could not be recorded where its check reads it. MCPs'
+    # boundary raises it when maketools' record-span fails; it is here so
+    # every code the lifted core names has a member of the same value.
+    SPAN_UNRECORDED = "MUTATION_SPAN_UNRECORDED"
 
     # The span file check-budget reads holds a line that is not
     # ``<whole seconds> <epoch seconds it ended> <bounded span name>``.
