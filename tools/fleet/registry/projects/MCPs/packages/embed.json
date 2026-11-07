@@ -8,6 +8,7 @@
   "source": {
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "packages/embed",
+    "base_branch": "main",
     "install": [
       {
         "phase": "install",
