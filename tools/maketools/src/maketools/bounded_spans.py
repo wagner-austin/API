@@ -39,7 +39,8 @@ from maketools.check_budget import OVER_BUDGET_EXIT_CODE, budgeted_exit_code
 #: means one thing in both repositories.
 SPANS_ENVIRONMENT_KEY: Final[str] = "CORVIS_CHECK_SPANS"
 
-#: The mutation step's span (:mod:`maketools.mutation.step`).
+#: The mutation step's span, which :func:`maketools.mutation.launch.span_sink`
+#: writes when the lifted step reports its time.
 MUTATION_SPAN: Final[str] = "mutation testing"
 
 #: Its bound, in seconds: MCPs' ``check_spans.MUTATION_BOUND_SECONDS``.

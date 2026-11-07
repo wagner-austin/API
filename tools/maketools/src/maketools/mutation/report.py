@@ -1,25 +1,25 @@
-"""The verdict the step reads from its mutants, and the lines it prints (MCPs task e52e5148).
+"""The verdict the step reads from its mutants, and the lines it prints (board task fec5851c).
 
 THE RULE IT ENFORCES is the coding prompt's: the source a commit changes is
 mutation tested and no mutant survives; a surviving mutant is killed by a
 test or, when it changes nothing observable, removed by rewriting the code;
 there is no ignore list. Two outcomes fail the step: a mutant the tests ran
-and passed, and one no test runs at all. The lines are the ones MCPs' steps
-print (``mcp_shared_py.mutation.report`` and mcp-shared's
-``src/mutation/report.ts``), so a reader of any of them reads one format:
-``<words> <file>:<line>:<column> <mutator> -> <the mutated line as JSON>``,
-columns counted from one.
+and passed, and one no test runs at all. The lines read as mcp-shared's
+TypeScript step prints them (``mcp-shared/src/mutation/report.ts``), so a
+reader of either step reads one format: ``<words> <file>:<line>:<column>
+<mutator> -> <the mutated line as JSON>``, columns counted from one. The
+JSON is written by the package's own encoder, handed in as ``quote``
+(board task e52e5148: this module is lifted into API).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
-from typing import Final, NamedTuple
-
-from platform_core.json_utils import dump_json_str
+from typing import NamedTuple
 
 #: The prefix cosmic-ray's own operators carry, dropped from a printed name.
-_CORE_PREFIX: Final[str] = "core/"
+_CORE_PREFIX = "core/"
 
 
 class Uncaught(StrEnum):
@@ -71,11 +71,12 @@ class Tally(NamedTuple):
     declarations: int
 
 
-def mutant_line(mutant: UncaughtMutant) -> str:
+def mutant_line(mutant: UncaughtMutant, quote: Callable[[str], str]) -> str:
     """The line that names one uncaught mutant: its file, line and change.
 
     Args:
         mutant: The mutant.
+        quote: Encode a string as JSON.
 
     Returns:
         ``<words> <file>:<line>:<column> <operator> -> <mutated line as JSON>``,
@@ -83,7 +84,7 @@ def mutant_line(mutant: UncaughtMutant) -> str:
     """
     operator = mutant.operator.removeprefix(_CORE_PREFIX)
     place = f"{mutant.path}:{mutant.line}:{mutant.column + 1}"
-    return f"{mutant.why} {place} {operator} -> {dump_json_str(mutant.mutated)}"
+    return f"{mutant.why} {place} {operator} -> {quote(mutant.mutated)}"
 
 
 def _position(mutant: UncaughtMutant) -> tuple[str, int, int]:
@@ -98,12 +99,15 @@ def _position(mutant: UncaughtMutant) -> tuple[str, int, int]:
     return (mutant.path, mutant.line, mutant.column)
 
 
-def render_verdict(tally: Tally, uncaught: list[UncaughtMutant]) -> list[str]:
+def render_verdict(
+    tally: Tally, uncaught: list[UncaughtMutant], quote: Callable[[str], str]
+) -> list[str]:
     """The lines the step prints for its run.
 
     Args:
         tally: How the mutants were run.
         uncaught: The mutants that fail the step.
+        quote: Encode a string as JSON, for each mutated line.
 
     Returns:
         One line saying how the mutants were run, one per uncaught mutant
@@ -125,7 +129,7 @@ def render_verdict(tally: Tally, uncaught: list[UncaughtMutant]) -> list[str]:
     if ordered:
         return [
             ran,
-            *map(mutant_line, ordered),
+            *(mutant_line(mutant, quote) for mutant in ordered),
             f"mutation: FAILED: {len(ordered)} of {scope}. Kill each with a test, or rewrite "
             "the code so the mutation cannot change what it does.",
         ]

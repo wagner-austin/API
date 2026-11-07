@@ -133,7 +133,12 @@ def test_this_package_s_own_lifts_hold_their_pins() -> None:
     assert [entry["path"] for entry in lock["entries"]] == [
         "src/maketools/check_budget.py",
         "src/maketools/mutation/changes.py",
+        "src/maketools/mutation/context.py",
+        "src/maketools/mutation/cosmic.py",
+        "src/maketools/mutation/report.py",
         "src/maketools/mutation/sites.py",
+        "src/maketools/mutation/step.py",
+        "src/maketools/mutation/trials.py",
     ]
     assert drifted_lifts(PACKAGE_ROOT, lock) == []
 
@@ -144,7 +149,7 @@ def test_lift_check_passes_this_package_and_says_how_many_it_read(
     monkeypatch.chdir(PACKAGE_ROOT)
     assert dispatch(["lift-check"]) == 0
     (line,) = world.lines
-    assert line.startswith("lift-check: 3 of 3 lifted file(s) hold their pinned bytes from MCPs ")
+    assert line.startswith("lift-check: 8 of 8 lifted file(s) hold their pinned bytes from MCPs ")
 
 
 def test_lift_check_fails_a_drifted_package_naming_each_file(

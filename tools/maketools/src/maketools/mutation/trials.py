@@ -1,42 +1,37 @@
-"""Running a mutant's tests: unmutated first, then under the mutant (MCPs task e52e5148).
+"""Running a mutant's tests: unmutated first, then under the mutant (board task fec5851c).
 
 Every run is the package's own pytest with its own configuration, given
-four things a mutant needs, as MCPs' step gives them: ``-x``, since one
-failure kills it; no cache provider, so no run writes ``.pytest_cache``; a
-base temporary directory in the step's scratch directory; and ``-W
-error::SyntaxWarning``, so a mutant the interpreter refuses (``x is ""``,
-which CPython warns of and which no test could tell from ``x == ""``) fails
-to import instead of surviving. A run of named tests adds ``-n 0``: a few
-tests in one process start faster than xdist's workers.
+four things a mutant needs: ``-x``, since one failure kills it; no cache
+provider, so no run writes ``.pytest_cache``; a base temporary directory in
+the step's scratch directory; and ``-W error::SyntaxWarning``, so a mutant
+the interpreter refuses (``x is ""``, which CPython warns of and which no
+test could tell from ``x == ""``) fails to import instead of surviving. A
+run of named tests adds ``-n 0``: a few tests in one process start faster
+than xdist's workers.
 
-A mutant's run is bounded by coreutils ``timeout`` inside the command
-cosmic-ray runs, since cosmic-ray splits that command with ``shlex`` and
-runs it as given; a run past it counts as killed, as a hung mutant is.
+The command is a shell script because a package's ``--prepare`` command
+runs before pytest, in the same run; cosmic-ray splits the line it is given
+with ``shlex``, so every argument is quoted by :func:`shlex.join`.
 """
 
 from __future__ import annotations
 
 import math
 import shlex
-from typing import Final
 
-from platform_core.error_codes_tooling import MutationErrorCode
-from platform_core.errors import AppError
-
-from maketools import _test_hooks
-from maketools.bounded_spans import SPANS_ENVIRONMENT_KEY
-from maketools.mutation.context import MutationRun, run_command, run_or_refuse, tail
-from maketools.mutation.cosmic import (
-    RunOutcome,
-    Site,
-    WorkerOutcome,
-    command,
-    decode_result,
-    mutated_line,
+from .context import (
+    JsonT,
+    MutationErrorCode,
+    MutationStepError,
+    StepContext,
+    run_or_refuse,
+    tail,
 )
+from .cosmic import RunOutcome, Site, WorkerOutcome, command, decode_result, mutated_line
 
-#: Seconds ``timeout`` waits after its signal before it kills the run.
-KILL_AFTER_SECONDS: Final[int] = 10
+#: The variable naming the check lock's span file. The tests the step runs
+#: are not the step, so they run without it, and none can record into it.
+SPANS_VARIABLE = "CORVIS_CHECK_SPANS"
 
 
 def survived(worker: WorkerOutcome, tests: RunOutcome | None) -> bool | None:
@@ -57,52 +52,56 @@ def survived(worker: WorkerOutcome, tests: RunOutcome | None) -> bool | None:
     return endings.get((worker, tests))
 
 
-def run_environment(run: MutationRun) -> dict[str, str]:
-    """The environment every test run gets: the suite's, less the span file, writing no bytecode.
+def run_environment(context: StepContext[JsonT]) -> dict[str, str]:
+    """The environment every test run gets: the step's, less the span file, writing no bytecode.
 
     NO RUN WRITES BYTECODE, the unmutated ones included. A ``.pyc`` is
     trusted while its source's mtime, to the second, and size are unchanged,
-    and a mutant often keeps the size (``1`` to ``2``, ``-`` to ``%``): MCPs
-    fleet job ad971633 reported a mutant surviving a test that kills it,
-    because a baseline had written the restored source's bytecode and the
-    next same-size mutant, written within the same second, ran that cached
-    original instead.
+    and a mutant often keeps the size (``1`` to ``2``, ``-`` to ``%``).
+    cosmic-ray already runs a mutant's tests without writing any; a baseline
+    that wrote the restored sources' bytecode let the next same-size mutant,
+    written within the same second, run that cached original instead:
+    fleet job ad971633 reported ``rsplit("|", 2)`` surviving a test that
+    kills it when run by hand.
 
     Args:
-        run: The step's run.
+        context: The run.
 
     Returns:
-        A copy of the suite's environment without
-        :data:`maketools.bounded_spans.SPANS_ENVIRONMENT_KEY` and with
-        ``PYTHONDONTWRITEBYTECODE`` set.
+        A copy of the step's environment without :data:`SPANS_VARIABLE` and
+        with ``PYTHONDONTWRITEBYTECODE`` set.
     """
-    environment = {**run.environment, "PYTHONDONTWRITEBYTECODE": "1"}
-    environment.pop(SPANS_ENVIRONMENT_KEY, None)
+    environment = {**context.environment, "PYTHONDONTWRITEBYTECODE": "1"}
+    environment.pop(SPANS_VARIABLE, None)
     return environment
 
 
-def pytest_argv(run: MutationRun, tests: tuple[str, ...]) -> list[str]:
-    """The command that runs one set of tests.
+def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...]) -> str:
+    """The shell script that runs one set of tests.
 
     Args:
-        run: The step's run.
+        context: The run.
         tests: The tests' node ids, or empty for the whole suite.
 
     Returns:
-        The package's pytest, through its own interpreter.
+        ``exec`` of pytest, after the package's prepare command when it has
+        one.
     """
-    argv = [run.python, "-W", "error::SyntaxWarning", "-m", "pytest", "-x", "-q"]
-    argv += ["-p", "no:cacheprovider", f"--basetemp={run.run_dir / 'pytest'}"]
+    pytest = [context.python, "-W", "error::SyntaxWarning", "-m", "pytest", "-x", "-q"]
+    pytest += ["-p", "no:cacheprovider", f"--basetemp={context.run_dir / 'pytest'}"]
     if tests:
-        argv += ["-n", "0", *tests]
-    return argv
+        pytest += ["-n", "0", *tests]
+    script = f"exec {shlex.join(pytest)}"
+    if context.prepare:
+        return f"{context.prepare} && {script}"
+    return script
 
 
 def mutant_timeout(baseline_seconds: float) -> int:
     """How long a mutant's run may take before it counts as killed.
 
     Three times the unmutated run, rounded up, plus 30 seconds for a node
-    busier than it was then: MCPs' bound, so one mutant reads alike in both.
+    busier than it was then.
 
     Args:
         baseline_seconds: The unmutated run's wall time.
@@ -113,35 +112,38 @@ def mutant_timeout(baseline_seconds: float) -> int:
     return math.ceil(baseline_seconds * 3) + 30
 
 
-def run_baseline(run: MutationRun, tests: tuple[str, ...]) -> int:
+def run_baseline(context: StepContext[JsonT], tests: tuple[str, ...]) -> int:
     """Run a set of tests unmutated, which must pass, and time it.
 
     Args:
-        run: The step's run.
+        context: The run.
         tests: The tests' node ids, or empty for the whole suite.
 
     Returns:
         The timeout of a mutant these tests run.
 
     Raises:
-        AppError: ``MUTATION_BASELINE_FAILED`` when they fail unmutated,
-            since every mutant would then read as killed.
+        MutationStepError: ``MUTATION_BASELINE_FAILED`` when they fail
+            unmutated, since every mutant would then read as killed.
     """
-    started = _test_hooks.now()
-    result = run_command(run, pytest_argv(run, tests), run_environment(run))
-    if result["returncode"]:
+    started = context.hooks.now()
+    argv = ["sh", "-c", pytest_script(context, tests)]
+    ran = context.hooks.run(argv, run_environment(context))
+    if ran.exit_code:
         named = " ".join(tests) or "the whole suite"
-        raise AppError(
-            MutationErrorCode.BASELINE_FAILED, f"{named} failed unmutated, {tail(result)}"
+        raise MutationStepError(
+            MutationErrorCode.BASELINE_FAILED, f"{named} failed unmutated, {tail(ran)}"
         )
-    return mutant_timeout(_test_hooks.now() - started)
+    return mutant_timeout(context.hooks.now() - started)
 
 
-def run_mutant(run: MutationRun, site: Site, tests: tuple[str, ...], timeout: int) -> str | None:
+def run_mutant(
+    context: StepContext[JsonT], site: Site, tests: tuple[str, ...], timeout: int
+) -> str | None:
     """Apply one mutant, run its tests under a timeout, and restore the file.
 
     Args:
-        run: The step's run.
+        context: The run.
         site: The mutant.
         tests: Its tests' node ids, or empty for the whole suite.
         timeout: Seconds before its run is killed.
@@ -150,18 +152,21 @@ def run_mutant(run: MutationRun, site: Site, tests: tuple[str, ...], timeout: in
         The line the mutant put in place when it survived, else None.
 
     Raises:
-        AppError: ``MUTATION_COSMIC_RAY_FAILED`` when cosmic-ray fails, its
-            worker does not end normally, or the tests could not be started.
+        MutationStepError: ``MUTATION_COSMIC_RAY_FAILED`` when cosmic-ray
+            fails, its worker does not end normally, or the tests could not
+            be started.
     """
-    bounded = ["timeout", f"--kill-after={KILL_AFTER_SECONDS}", str(timeout)]
-    tests_command = shlex.join([*bounded, *pytest_argv(run, tests)])
-    argv = [command(run.python), "mutate-and-test", site.path, site.operator]
+    tests_command = shlex.join(
+        ["timeout", "--kill-after=10", str(timeout), "sh", "-c", pytest_script(context, tests)]
+    )
+    argv = [command(context.python), "mutate-and-test", site.path, site.operator]
     argv += [str(site.occurrence), tests_command]
     failed = MutationErrorCode.COSMIC_RAY_FAILED
-    result = decode_result(run_or_refuse(run, argv, run_environment(run), failed))
+    printed = run_or_refuse(context, argv, run_environment(context), failed)
+    result = decode_result(printed, context.codec)
     alive = survived(result.worker, result.tests)
     if alive is None:
-        raise AppError(
+        raise MutationStepError(
             failed,
             f"{site.path}:{site.line} {site.operator} ended {result.worker}, "
             f"tests {result.tests}: {result.output}",
@@ -170,9 +175,9 @@ def run_mutant(run: MutationRun, site: Site, tests: tuple[str, ...], timeout: in
 
 
 __all__ = [
-    "KILL_AFTER_SECONDS",
+    "SPANS_VARIABLE",
     "mutant_timeout",
-    "pytest_argv",
+    "pytest_script",
     "run_baseline",
     "run_environment",
     "run_mutant",

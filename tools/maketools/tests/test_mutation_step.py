@@ -1,428 +1,392 @@
-"""Tests for :mod:`maketools.mutation.step` (MCPs board task e52e5148).
+"""Tests for :mod:`maketools.mutation.step`, lifted from MCPs (MCPs task e52e5148).
 
-Each command the step runs is answered by the ``world`` fixture's
-``run_answering``, scripted per case by what git, cosmic-ray and coverage
-print; the sources are real files, since the step reads them for their
-annotations and statements. ``test_mutation_real.py`` runs the same step
-against real git, coverage, pytest and cosmic-ray.
+MCPs' own cases for the module (``mcp-shared-py/tests/test_mutation_step.py``),
+bound to API's boundary: the JSON is read with API's codec, fixtures are
+written with ``platform_core.json_utils``, and the step's span lands in the
+world's list where MCPs records it through maketools' ``record-span``.
+Through :mod:`tests._mutation_world`. The scenario is one commit adding a
+module whose mutants take every path: a module constant run only at import
+(the whole suite), a comparison the tests keep alive, one on a continued
+line they kill with the same tests, a function no test calls, and an
+annotation that is not code; a second changed file holds a mutant on a line
+the commit did not add. The JSON is the shape cosmic-ray and coverage print
+(``test_mutation_cosmic.py``, and ``test_mutation_real.py`` for the real
+programs).
 """
 
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 
 import pytest
-from platform_core.error_codes_tooling import MutationErrorCode
-from platform_core.errors import AppError
 from platform_core.json_utils import dump_json_str
 
-from maketools.commands import CommandResult
-from maketools.mutation.changes import BASE_REF
-from maketools.mutation.cosmic import Site
+from maketools.mutation.context import MutationErrorCode, MutationStepError, Ran
 from maketools.mutation.step import (
-    changed_sources,
     differing_from_head,
-    enumerate_sites,
     read_contexts,
     run_mutation_step,
     selection,
-    verify_restored,
 )
-from tests._mutation_run import COSMIC_RAY, PYTHON, mutation_run
-from tests.conftest import World, failed, ok
+from tests._mutation_world import (
+    COSMIC_RAY,
+    ENVIRONMENT,
+    PACKAGE,
+    PYTHON,
+    RUN_DIR,
+    RUN_ENVIRONMENT,
+    World,
+    failed,
+    ok,
+)
 
-SOURCE = "\n".join(
+MODULE = "\n".join(
     [
-        "def at_least(value: int | None, floor: int) -> bool:",  # 1
-        "    return value >= floor",  # 2
-        "OLD = 1 + 1",  # 3
-        "LIMIT = 3 * 1",  # 4
-        "def never() -> int:",  # 5
-        "    return 2 - 1",  # 6
+        "LIMIT = 3",  # 1
+        "",
+        "",
+        "def check(value: int) -> bool:",  # 4
+        "    return value >= LIMIT and (",  # 5
+        "        value < 9)",  # 6
+        "",
+        "",
+        "def unused(x: int) -> int:",  # 9
+        "    return x + 1",  # 10
         "",
     ]
 )
+OLD = "def f(a: int) -> int:\n    b = a\n    return b * 2\n\nX = 1\n"
 
-DIFF = """\
-diff --git a/src/p.py b/src/p.py
---- a/src/p.py
-+++ b/src/p.py
-@@ -0,0 +1,2 @@
-+def at_least(value: int | None, floor: int) -> bool:
-+    return value >= floor
-@@ -1,0 +4,3 @@
-+LIMIT = 3 * 1
-+def never() -> int:
-+    return 2 - 1
-"""
+DIFF = (
+    "diff --git a/src/p/m.py b/src/p/m.py\nnew file mode 100644\n--- /dev/null\n"
+    "+++ b/src/p/m.py\n@@ -0,0 +1,6 @@\n+LIMIT = 3\n+\n+\n+def check\n+    return\n+    value\n"
+    "@@ -0,0 +9,2 @@\n+def unused\n+    return\n"
+    "diff --git a/src/p/old.py b/src/p/old.py\n--- a/src/p/old.py\n+++ b/src/p/old.py\n"
+    "@@ -4,0 +5 @@\n+X = 1\n"
+)
 
-ABOVE = "tests/t.py::test_above"
-BELOW = "tests/t.py::test_below"
+STATIC = ("src/p/m.py", "core/NumberReplacer", 0, 1, 8)
+ANNOTATION = ("src/p/m.py", "core/ReplaceBinaryOperator_Add_Sub", 1, 4, 17)
+KEPT = ("src/p/m.py", "core/ReplaceComparisonOperator_GtE_Gt", 0, 5, 17)
+CONTINUED = ("src/p/m.py", "core/ReplaceComparisonOperator_Lt_LtE", 0, 6, 14)
+UNRUN = ("src/p/m.py", "core/ReplaceBinaryOperator_Add_Sub", 0, 10, 13)
+NOT_ADDED = ("src/p/old.py", "core/NumberReplacer", 0, 3, 15)
 
-#: Each place cosmic-ray can mutate in :data:`SOURCE`: an annotation, the
-#: comparison twice, an unchanged line, a line run at import and a line no
-#: test runs.
-SITES = [
-    Site("src/p.py", 1, 24, "core/ReplaceBinaryOperator_BitOr_Add", 0),
-    Site("src/p.py", 2, 17, "core/ReplaceComparisonOperator_GtE_Gt", 0),
-    Site("src/p.py", 2, 17, "core/ReplaceComparisonOperator_GtE_Lt", 0),
-    Site("src/p.py", 3, 8, "core/ReplaceBinaryOperator_Add_Sub", 0),
-    Site("src/p.py", 4, 10, "core/ReplaceBinaryOperator_Mul_Add", 0),
-    Site("src/p.py", 6, 13, "core/ReplaceBinaryOperator_Sub_Add", 0),
-]
 
-CONTEXTS = {
-    "src/p.py": {
-        "contexts": {
-            "1": [""],
-            "2": [f"{BELOW}|run", f"{ABOVE}|run", f"{ABOVE}|setup"],
-            "3": [""],
-            "4": [""],
-            "5": [""],
-        }
+def _dump_line(site: tuple[str, str, int, int, int]) -> str:
+    path, operator, occurrence, line, column = site
+    mutation: dict[str, object] = {
+        "module_path": path,
+        "operator_name": operator,
+        "occurrence": occurrence,
+        "start_pos": [line, column],
+        "end_pos": [line, column + 1],
+        "operator_args": {},
+        "definition_name": "x",
     }
-}
+    work_item: dict[str, object] = {"job_id": "j", "mutations": [mutation]}
+    dumped: list[object] = [work_item, None]
+    return dump_json_str(dumped, compact=False)
 
 
-def _dump(sites: list[Site]) -> str:
-    """What ``cosmic-ray dump`` prints for these mutants before a run.
+DUMP = "\n".join(map(_dump_line, [UNRUN, STATIC, ANNOTATION, KEPT, CONTINUED, NOT_ADDED]))
 
-    Args:
-        sites: The mutants.
-
-    Returns:
-        One JSON array per line.
-    """
-    lines: list[str] = []
-    for site in sites:
-        mutation = {
-            "module_path": site.path,
-            "operator_name": site.operator,
-            "occurrence": site.occurrence,
-            "start_pos": [site.line, site.column],
-            "end_pos": [site.line, site.column + 1],
-            "operator_args": {},
-        }
-        lines.append(dump_json_str([{"job_id": "j", "mutations": [mutation]}, None]) + "\n")
-    return "".join(lines)
+TESTS = ["tests/test_m.py::test_check|run", "tests/test_m.py::test_edge|run"]
+CONTEXTS = {"1": [""], "4": [""], "5": [*TESTS, "tests/test_m.py::test_check|setup"], "9": [""]}
 
 
-def _outcome(tests: str, diff: str) -> str:
-    """What ``cosmic-ray mutate-and-test`` prints for a mutant its worker ran.
+def _coverage(contexts: dict[str, list[str]]) -> str:
+    """The report ``coverage json --show-contexts`` writes for the scenario.
 
     Args:
-        tests: ``survived`` or ``killed``.
-        diff: The mutation.
+        contexts: Each recorded line of ``src/p/m.py`` to its contexts.
 
     Returns:
-        The JSON.
+        The JSON text.
     """
-    result = {"worker_outcome": "normal", "output": "", "test_outcome": tests, "diff": diff}
-    return dump_json_str(result)
+    measured: dict[str, object] = {
+        "executed_lines": sorted(map(int, contexts)),
+        "contexts": contexts,
+    }
+    files: dict[str, object] = {"src/p/m.py": measured}
+    meta: dict[str, object] = {"show_contexts": True}
+    report: dict[str, object] = {"meta": meta, "files": files}
+    return dump_json_str(report, compact=False)
+
+
+def _result(outcome: str, mutated: str) -> str:
+    diff = f"--- mutation diff ---\n--- a/src/p/m.py\n+++ b/src/p/m.py\n@@ -5 +5 @@\n-x\n+{mutated}"
+    result: dict[str, object] = {
+        "worker_outcome": "normal",
+        "output": "",
+        "test_outcome": outcome,
+        "diff": diff,
+    }
+    return dump_json_str(result, compact=False)
 
 
 class Commands:
-    """The answers of every command the step runs, for one package.
+    """The scenario's answers, with the git status each call reads."""
 
-    Attributes:
-        world: The bound world, whose clock a set of tests moves.
-        status: What ``git status`` prints, in call order; the last repeats.
-        baselines: The tests of each unmutated run, in order.
-        mutated: Each mutant's operator, in the order it was run.
-        diff: What ``git diff`` prints.
-        base: What ``git rev-parse`` answers.
-        coverage: What ``coverage json`` writes, or None to fail.
-    """
+    def __init__(self, world_files: dict[Path, str]) -> None:
+        self.files = world_files
+        self.contexts = {**CONTEXTS}
+        self.statuses = ["", ""]
+        self.endings: dict[str, Ran] = {}
+        self.survivors = {"core/ReplaceComparisonOperator_GtE_Gt"}
 
-    def __init__(self, world: World) -> None:
-        """Answer as a package whose commit adds :data:`DIFF`.
-
-        Args:
-            world: The bound world.
-        """
-        self.world = world
-        self.status = [""]
-        self.baselines: list[tuple[str, ...]] = []
-        self.mutated: list[str] = []
-        self.diff = DIFF
-        self.base = ok("0123abcd\n")
-        self.coverage: dict[str, dict[str, dict[str, list[str]]]] | None = CONTEXTS
-        world.answer = self.answer
-
-    def answer(self, argv: tuple[str, ...]) -> CommandResult:
-        """Answer one command.
-
-        Args:
-            argv: The command.
-
-        Returns:
-            What it printed.
-        """
-        if argv[0] == "git":
-            return self.git(argv[1:])
-        return self.tool(argv)
-
-    def git(self, arguments: tuple[str, ...]) -> CommandResult:
-        """Answer one git command.
-
-        Args:
-            arguments: Its arguments.
-
-        Returns:
-            What it printed.
-        """
-        match arguments:
-            case ("rev-parse", *_):
-                return self.base
-            case ("merge-base", "HEAD", ref) if ref == BASE_REF:
-                return ok("abc123\n")
-            case ("diff", *_):
-                return ok(self.diff)
-            case ("status", *_):
-                return ok(self.status.pop(0) if len(self.status) > 1 else self.status[0])
-            case ("restore", *_):
-                return ok("")
-        raise AssertionError(f"unscripted git {arguments}")
-
-    def tool(self, argv: tuple[str, ...]) -> CommandResult:
-        """Answer one cosmic-ray, coverage or pytest command.
-
-        Args:
-            argv: The command.
-
-        Returns:
-            What it printed.
-        """
-        match argv:
-            case (program, "init", *_) if program == COSMIC_RAY:
-                return ok("")
-            case (program, "dump", _) if program == COSMIC_RAY:
-                return ok(_dump(SITES))
-            case (program, "-m", "coverage", *rest) if program == PYTHON:
-                if self.coverage is None:
-                    return failed(1, "No data to report.")
-                Path(rest[-1]).write_text(dump_json_str({"files": self.coverage}), "utf-8")
-                return ok("")
-            case (program, "-W", *rest) if program == PYTHON:
-                self.world.now_value += 2.0
-                self.baselines.append(tuple(rest[rest.index("0") + 1 :]) if "-n" in rest else ())
-                return ok("")
-            case (program, "mutate-and-test", _, operator, _, _) if program == COSMIC_RAY:
-                self.mutated.append(operator)
-                if operator.endswith("GtE_Gt"):
-                    diff = "--- a/src/p.py\n+++ b/src/p.py\n@@ -2 +2 @@\n+    return value > floor"
-                    return ok(_outcome("survived", diff))
-                return ok(_outcome("killed", "+x"))
-        raise AssertionError(f"unscripted command {argv}")
+    def __call__(self, argv: list[str]) -> Ran:
+        key = " ".join(argv[:3])
+        if key in self.endings:
+            return self.endings[key]
+        if argv[:2] == ["git", "merge-base"]:
+            return ok("base123\n")
+        if argv[:2] == ["git", "diff"]:
+            return ok(DIFF)
+        if argv[:2] == ["git", "status"]:
+            return ok(self.statuses.pop(0))
+        if argv[:2] == [COSMIC_RAY, "dump"]:
+            return ok(DUMP)
+        if argv[:3] == [PYTHON, "-m", "coverage"]:
+            self.files[RUN_DIR / "coverage.json"] = _coverage(self.contexts)
+        if argv[:2] == [COSMIC_RAY, "mutate-and-test"]:
+            alive = argv[3] in self.survivors
+            return ok(_result("survived" if alive else "killed", "    return value > LIMIT and ("))
+        return ok()
 
 
-@pytest.fixture()
-def package(tmp_path: Path) -> Path:
-    """A package holding :data:`SOURCE`, with a scratch directory beside it.
-
-    Returns:
-        The package directory.
-    """
-    (tmp_path / "pkg" / "src").mkdir(parents=True)
-    (tmp_path / "pkg" / "src" / "p.py").write_text(SOURCE, encoding="utf-8")
-    (tmp_path / "run").mkdir()
-    return tmp_path / "pkg"
+def _world(times: list[float]) -> tuple[World, Commands]:
+    files: dict[Path, str] = {}
+    commands = Commands(files)
+    world = World(commands, times)
+    world.files = files
+    files[PACKAGE / "src/p/m.py"] = MODULE
+    files[PACKAGE / "src/p/old.py"] = OLD
+    return world, commands
 
 
-def test_the_base_must_name_a_commit_and_says_where_one_comes_from(world: World) -> None:
-    commands = Commands(world)
-    commands.base = failed(1, "")
-    with pytest.raises(AppError) as refused:
-        changed_sources(mutation_run())
-    assert refused.value.code is MutationErrorCode.BASE_UNAVAILABLE
-    assert refused.value.message.startswith(
-        f"{BASE_REF} names no commit here (git rev-parse exited 1)"
-    )
-    assert "declares base_branch main" in refused.value.message
+TIMES = [1000.0, 1001.0, 1051.0, 1060.0, 1062.5, 3200.4]
+PYTEST = (
+    f"exec {PYTHON} -W error::SyntaxWarning -m pytest -x -q -p no:cacheprovider "
+    "--basetemp=/scratch/run/pytest"
+)
+NAMED = f"{PYTEST} -n 0 tests/test_m.py::test_check tests/test_m.py::test_edge"
 
 
-def test_the_changed_sources_are_the_lines_added_since_the_merge_base(world: World) -> None:
-    Commands(world)
-    added = {"src/p.py": frozenset({1, 2, 4, 5, 6})}
-    assert changed_sources(mutation_run()) == ("abc123", added)
-    assert [call["argv"][:2] for call in world.answering_calls] == [
-        ("git", "rev-parse"),
-        ("git", "merge-base"),
-        ("git", "diff"),
+def _mutant(site: tuple[str, str, int, int, int], timeout: int, script: str) -> list[str]:
+    path, operator, occurrence, _, _ = site
+    tests = shlex.join(["timeout", "--kill-after=10", str(timeout), "sh", "-c", script])
+    return [COSMIC_RAY, "mutate-and-test", path, operator, str(occurrence), tests]
+
+
+def test_a_commit_is_mutated_judged_and_reported_in_one_run() -> None:
+    world, _ = _world([*TIMES])
+    assert run_mutation_step(world.context("python gen.py")) == 1
+    assert world.argvs() == [
+        ["git", "rev-parse", "--verify", "--quiet", "refs/remotes/origin/main^{commit}"],
+        ["git", "merge-base", "HEAD", "refs/remotes/origin/main"],
+        [
+            "git",
+            "diff",
+            "--unified=0",
+            "--relative",
+            "--diff-filter=ACMR",
+            "--no-color",
+            "--no-ext-diff",
+            "--src-prefix=a/",
+            "--dst-prefix=b/",
+            "base123",
+            "HEAD",
+            "--",
+            "src",
+        ],
+        [
+            "git",
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            "src/p/m.py",
+            "src/p/old.py",
+        ],
+        [COSMIC_RAY, "init", "/scratch/run/cosmic-ray.toml", "/scratch/run/session.sqlite"],
+        [COSMIC_RAY, "dump", "/scratch/run/session.sqlite"],
+        [
+            PYTHON,
+            "-m",
+            "coverage",
+            "json",
+            "--show-contexts",
+            "--include=src/p/m.py,src/p/old.py",
+            "-o",
+            "/scratch/run/coverage.json",
+        ],
+        ["sh", "-c", f"python gen.py && {PYTEST}"],
+        _mutant(STATIC, 180, f"python gen.py && {PYTEST}"),
+        ["sh", "-c", f"python gen.py && {NAMED}"],
+        _mutant(KEPT, 38, f"python gen.py && {NAMED}"),
+        _mutant(CONTINUED, 38, f"python gen.py && {NAMED}"),
+        [
+            "git",
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            "src/p/m.py",
+            "src/p/old.py",
+        ],
+        ["sh", "-c", "python gen.py"],
     ]
-    assert world.answering_calls[2]["argv"][-4:] == ("abc123", "HEAD", "--", "src")
-
-
-def test_a_git_failure_after_the_base_is_refused(world: World) -> None:
-    world.answer = lambda argv: ok("x\n") if argv[1] == "rev-parse" else failed(128, "fatal")
-    with pytest.raises(AppError) as refused:
-        changed_sources(mutation_run())
-    assert refused.value.code is MutationErrorCode.GIT_FAILED
-    assert refused.value.message == f"git merge-base HEAD {BASE_REF} exited 128: fatal"
-
-
-def test_differing_files_are_named_as_git_names_them(world: World) -> None:
-    commands = Commands(world)
-    commands.status = [" M tools/pkg/src/p.py\nM  tools/pkg/src/q.py\n"]
-    files = ["src/p.py", "src/q.py"]
-    named = ["tools/pkg/src/p.py", "tools/pkg/src/q.py"]
-    assert differing_from_head(mutation_run(), files) == named
-    assert world.answering_calls[0]["argv"] == (
-        "git",
-        "status",
-        "--porcelain",
-        "--untracked-files=no",
-        "--",
-        *files,
+    assert world.spans == [2200]
+    assert world.lines == [
+        "mutation: 4 mutant(s): 2 run by the tests covering their line, 1 by the whole suite "
+        "(lines run only at import), 1 by no test; 1 more in annotations and parameter "
+        "markers are not code",
+        'MUTANT SURVIVED src/p/m.py:5:18 ReplaceComparisonOperator_GtE_Gt -> "return value > '
+        'LIMIT and ("',
+        "MUTANT SURVIVED, NO TEST RAN IT src/p/m.py:10:14 ReplaceBinaryOperator_Add_Sub -> "
+        '"return x + 1"',
+        "mutation: FAILED: 2 of 4 mutant(s) made in 2 src file(s) changed against origin/main "
+        "(merge base base123) survived. Kill each with a test, or rewrite the code so the "
+        "mutation cannot change what it does.",
+    ]
+    assert world.files[RUN_DIR / "cosmic-ray.toml"].startswith(
+        '[cosmic-ray]\nmodule-path = ["src/p/m.py", "src/p/old.py"]\n'
     )
 
 
-def test_a_tree_cosmic_ray_restored_is_left_alone(world: World) -> None:
-    Commands(world)
-    verify_restored(mutation_run(), ["src/p.py"])
-    assert [call["argv"][1] for call in world.answering_calls] == ["status"]
+def test_each_command_gets_the_environment_its_kind_needs() -> None:
+    world, _ = _world([*TIMES])
+    run_mutation_step(world.context())
+    tests_runs = [env for argv, env in world.calls if argv[0] in {"sh", COSMIC_RAY}]
+    tool_runs = [env for argv, env in world.calls if argv[0] in {"git", PYTHON}]
+    assert all(env == RUN_ENVIRONMENT for env in tests_runs[2:])
+    assert all(env == ENVIRONMENT for env in tests_runs[:2] + tool_runs)
+    assert len(tests_runs) == 7
+    assert len(tool_runs) == 6
 
 
-def test_a_tree_left_mutated_is_put_back_and_refused(world: World) -> None:
-    commands = Commands(world)
-    commands.status = [" M tools/pkg/src/p.py\n"]
-    with pytest.raises(AppError) as refused:
-        verify_restored(mutation_run(), ["src/p.py"])
-    assert refused.value.code is MutationErrorCode.TREE_NOT_RESTORED
-    assert refused.value.message.startswith("cosmic-ray left tools/pkg/src/p.py differing")
-    assert world.answering_calls[-1]["argv"] == (
+def test_a_run_whose_mutants_are_all_killed_passes() -> None:
+    world, commands = _world([*TIMES])
+    commands.survivors = set()
+    commands.contexts["10"] = TESTS
+    assert run_mutation_step(world.context()) == 0
+    assert world.lines == [
+        "mutation: 4 mutant(s): 3 run by the tests covering their line, 1 by the whole suite "
+        "(lines run only at import), 0 by no test; 1 more in annotations and parameter "
+        "markers are not code",
+        "mutation: passed: 0 of 4 mutant(s) made in 2 src file(s) changed against origin/main "
+        "(merge base base123) survived",
+    ]
+    assert world.lines[-1] == (
+        "mutation: passed: 0 of 4 mutant(s) made in 2 src file(s) changed against origin/main "
+        "(merge base base123) survived"
+    )
+    assert "[cosmic-ray]" in world.files[RUN_DIR / "cosmic-ray.toml"]
+
+
+def test_a_commit_adding_no_source_line_makes_no_mutant_and_records_no_span() -> None:
+    world = World(lambda argv: ok("base9\n" if argv[1] == "merge-base" else ""), [5.0])
+    assert run_mutation_step(world.context()) == 0
+    assert world.lines == [
+        "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
+        "base9), so 0 mutants were made"
+    ]
+    assert len(world.calls) == 3
+    assert world.spans == []
+
+
+def test_a_tree_without_origin_main_is_refused_rather_than_read_as_no_change() -> None:
+    world = World(lambda argv: failed(1, ""), [5.0])
+    with pytest.raises(MutationStepError) as raised:
+        run_mutation_step(world.context())
+    assert str(raised.value).startswith(
+        "MUTATION_BASE_UNAVAILABLE: refs/remotes/origin/main names no commit here (git "
+        "rev-parse exited 1), so nothing says what this commit changes against main."
+    )
+    assert len(world.calls) == 1
+
+
+def test_a_changed_file_differing_from_head_is_refused_before_anything_is_mutated() -> None:
+    world, commands = _world([*TIMES])
+    commands.statuses = [" M src/p/m.py\n"]
+    with pytest.raises(MutationStepError) as raised:
+        run_mutation_step(world.context())
+    assert str(raised.value) == (
+        "MUTATION_TREE_DIRTY: src/p/m.py differ from HEAD; the step mutates files in place and "
+        "puts HEAD's bytes back, so it runs only over committed work"
+    )
+    assert len(world.calls) == 4
+
+
+def test_a_file_left_mutated_is_restored_from_head_and_refused() -> None:
+    world, commands = _world([*TIMES])
+    commands.statuses = ["", " M src/p/m.py\n M src/p/old.py\n"]
+    with pytest.raises(MutationStepError) as raised:
+        run_mutation_step(world.context())
+    assert str(raised.value) == (
+        "MUTATION_TREE_NOT_RESTORED: cosmic-ray left src/p/m.py, src/p/old.py differing from "
+        "HEAD after mutating in place; HEAD's bytes were put back"
+    )
+    assert world.argvs()[-1] == [
         "git",
         "restore",
         "--source=HEAD",
         "--worktree",
         "--",
-        "src/p.py",
-    )
-
-
-def test_the_sites_are_enumerated_from_a_session_of_the_changed_files(
-    world: World, tmp_path: Path
-) -> None:
-    Commands(world)
-    run = mutation_run(run_dir=tmp_path)
-    assert enumerate_sites(run, ["src/p.py"]) == SITES
-    assert (tmp_path / "cosmic-ray.toml").read_text(encoding="utf-8").splitlines()[1] == (
-        'module-path = ["src/p.py"]'
-    )
-    session = str(tmp_path / "session.sqlite")
-    assert [call["argv"] for call in world.answering_calls] == [
-        (COSMIC_RAY, "init", str(tmp_path / "cosmic-ray.toml"), session),
-        (COSMIC_RAY, "dump", session),
+        "src/p/m.py",
+        "src/p/old.py",
     ]
 
 
-def test_cosmic_ray_failing_to_enumerate_is_refused(world: World, tmp_path: Path) -> None:
-    world.answer = lambda argv: failed(2, "no such module")
-    with pytest.raises(AppError) as refused:
-        enumerate_sites(mutation_run(run_dir=tmp_path), ["src/p.py"])
-    assert refused.value.code is MutationErrorCode.COSMIC_RAY_FAILED
+@pytest.mark.parametrize(
+    ("key", "code"),
+    [
+        (f"{PYTHON} -m coverage", MutationErrorCode.COVERAGE_UNAVAILABLE),
+        (f"{COSMIC_RAY} init /scratch/run/cosmic-ray.toml", MutationErrorCode.COSMIC_RAY_FAILED),
+        ("sh -c python gen.py", MutationErrorCode.PREPARE_FAILED),
+    ],
+)
+def test_a_failing_tool_is_refused_with_its_code(key: str, code: MutationErrorCode) -> None:
+    world, commands = _world([*TIMES])
+    commands.endings[key] = failed(1, "broken")
+    with pytest.raises(MutationStepError) as raised:
+        run_mutation_step(world.context("python gen.py"))
+    assert raised.value.code == code
+    assert str(raised.value).endswith("exited 1: broken")
 
 
-def test_the_contexts_are_read_per_file_and_line(world: World, tmp_path: Path) -> None:
-    Commands(world)
-    contexts = read_contexts(mutation_run(run_dir=tmp_path), ["src/p.py", "src/q.py"])
-    assert contexts == {
-        "src/p.py": {
+def test_git_status_names_each_differing_file_after_its_two_status_letters() -> None:
+    world = World(lambda argv: ok(" M src/a.py\nMM src/b c.py\n"), [])
+    assert differing_from_head(world.context(), ["src/a.py"]) == ["src/a.py", "src/b c.py"]
+
+
+def test_coverage_contexts_decode_per_file_per_line() -> None:
+    world = World(lambda argv: ok(), [])
+    world.files[RUN_DIR / "coverage.json"] = _coverage(CONTEXTS)
+    assert read_contexts(world.context(), ["src/p/m.py"]) == {
+        "src/p/m.py": {
             1: frozenset({""}),
-            2: frozenset({f"{BELOW}|run", f"{ABOVE}|run", f"{ABOVE}|setup"}),
-            3: frozenset({""}),
             4: frozenset({""}),
-            5: frozenset({""}),
+            5: frozenset({*TESTS, "tests/test_m.py::test_check|setup"}),
+            9: frozenset({""}),
         }
     }
-    report = str(tmp_path / "coverage.json")
-    assert world.answering_calls[0]["argv"] == (
-        PYTHON,
-        "-m",
-        "coverage",
-        "json",
-        "--show-contexts",
-        "--include=src/p.py,src/q.py",
-        "-o",
-        report,
-    )
 
 
-def test_a_suite_run_without_coverage_is_refused(world: World, tmp_path: Path) -> None:
-    Commands(world).coverage = None
-    with pytest.raises(AppError) as refused:
-        read_contexts(mutation_run(run_dir=tmp_path), ["src/p.py"])
-    assert refused.value.code is MutationErrorCode.COVERAGE_UNAVAILABLE
-    assert refused.value.message.endswith("exited 1: No data to report.")
-
-
-def test_a_lines_tests_are_its_contexts_test_ids_once_each_sorted() -> None:
-    assert selection(None) is None
-    assert selection(frozenset({""})) == ()
-    assert selection(frozenset({f"{BELOW}|run", f"{ABOVE}|run", f"{ABOVE}|setup", ""})) == (
-        ABOVE,
-        BELOW,
-    )
-    assert selection(frozenset({"tests/t.py::test_x[a|b]|run"})) == ("tests/t.py::test_x[a|b]",)
-
-
-def test_a_commit_adding_no_source_line_mutates_nothing_and_says_so(world: World) -> None:
-    Commands(world).diff = ""
-    assert run_mutation_step(mutation_run()) == 0
-    assert world.lines == [
-        "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
-        "abc123), so 0 mutants were made"
-    ]
-
-
-def test_uncommitted_changes_to_a_changed_file_are_refused_before_any_mutant(
-    world: World, package: Path
+@pytest.mark.parametrize(
+    ("contexts", "tests"),
+    [
+        (None, None),
+        (frozenset({""}), ()),
+        (
+            frozenset({"", "tests/a.py::t|run", "tests/a.py::t|setup", "tests/a.py::u[x|y]|run"}),
+            ("tests/a.py::t", "tests/a.py::u[x|y]"),
+        ),
+    ],
+)
+def test_a_lines_tests_are_its_context_names_less_phase_and_import(
+    contexts: frozenset[str] | None, tests: tuple[str, ...] | None
 ) -> None:
-    Commands(world).status = [" M tools/pkg/src/p.py\n"]
-    with pytest.raises(AppError) as refused:
-        run_mutation_step(mutation_run(package_dir=package))
-    assert refused.value.code is MutationErrorCode.TREE_DIRTY
-    assert refused.value.message.startswith("tools/pkg/src/p.py differ from HEAD")
-    assert all(call["argv"][0] == "git" for call in world.answering_calls)
-
-
-def test_a_full_run_fails_naming_the_survivor_and_the_line_no_test_runs(
-    world: World, package: Path
-) -> None:
-    commands = Commands(world)
-    run = mutation_run(package_dir=package, run_dir=package.parent / "run")
-    assert run_mutation_step(run) == 1
-    assert commands.baselines == [(ABOVE, BELOW), ()]
-    assert commands.mutated == [
-        "core/ReplaceComparisonOperator_GtE_Gt",
-        "core/ReplaceComparisonOperator_GtE_Lt",
-        "core/ReplaceBinaryOperator_Mul_Add",
-    ]
-    assert world.lines == [
-        "mutation: 4 mutant(s): 2 run by the tests covering their line, 1 by the whole suite "
-        "(lines run only at import), 1 by no test; 1 more in annotations and parameter markers "
-        "are not code",
-        'MUTANT SURVIVED src/p.py:2:18 ReplaceComparisonOperator_GtE_Gt -> "return value > floor"',
-        'MUTANT SURVIVED, NO TEST RAN IT src/p.py:6:14 ReplaceBinaryOperator_Sub_Add -> "return 2 '
-        '- 1"',
-        "mutation: FAILED: 2 of 4 mutant(s) made in 1 src file(s) changed against origin/main "
-        "(merge base abc123) survived. Kill each with a test, or rewrite the code so the "
-        "mutation cannot change what it does.",
-    ]
-    assert world.answering_calls[-1]["argv"][:2] == ("git", "status")
-
-
-def test_a_full_run_whose_tests_kill_every_mutant_passes(world: World, package: Path) -> None:
-    commands = Commands(world)
-    commands.coverage = {
-        "src/p.py": {"contexts": {**CONTEXTS["src/p.py"]["contexts"], "6": [f"{ABOVE}|run"]}}
-    }
-    world.answer = lambda argv: (
-        ok(_outcome("killed", "+x")) if argv[1] == "mutate-and-test" else commands.answer(argv)
-    )
-    run = mutation_run(package_dir=package, run_dir=package.parent / "run")
-    assert run_mutation_step(run) == 0
-    assert world.lines[-1] == (
-        "mutation: passed: 0 of 4 mutant(s) made in 1 src file(s) changed against origin/main "
-        "(merge base abc123) survived"
-    )
+    assert selection(contexts) == tests

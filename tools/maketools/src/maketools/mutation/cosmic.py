@@ -1,46 +1,33 @@
-"""cosmic-ray, as the step drives it, and what it answers (MCPs board task e52e5148).
+"""cosmic-ray, as the step drives it, and what it answers (board task fec5851c).
 
-WHY COSMIC-RAY. MCPs measured both candidates on mcp-shared-py on 2026-11-07
-(board task fec5851c): mutmut 3.8.1 copies the package into ``mutants/`` and
-rewrites every function into trampolines, so its own clean run failed that
-suite's contract-hash test and five more; cosmic-ray 8.7.0 mutates the file
-in place and runs whatever test command it is given, so a package's own
-pytest configuration runs unmodified. The API step uses the same tool so a
-reader of either repository reads one format.
+WHY COSMIC-RAY. Measured on mcp-shared-py on 2026-11-07, as the task asked:
+mutmut 3.8.1 copies the package into ``mutants/`` and rewrites every function
+into trampolines, so its own clean run failed the suite's contract-hash test
+and five more; cosmic-ray 8.7.0 mutates the file in place and runs whatever
+test command it is given, so the package's own pytest configuration runs
+unmodified. It ships no type information, so it is driven through its
+command line and its JSON is decoded here, once, into this step's types,
+through the package's :class:`~.context.JsonCodec` (board task e52e5148:
+this module is lifted into API, which reads JSON another way).
 
 HOW. ``cosmic-ray init`` enumerates every mutant of the changed files into a
 session; ``cosmic-ray dump`` prints them as JSON lines; ``cosmic-ray
 mutate-and-test`` applies one, runs the command the step chose for it,
 restores the file and prints the outcome as JSON. Its ``pragma`` filter is
 never run, so no comment in the source hides a mutant: there is no ignore
-list. cosmic-ray ships no type information, so it is driven through its
-command line and its JSON is decoded here, once, through
-:mod:`platform_core.json_utils`, this repository's one JSON reader.
+list.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import NamedTuple
 
-from platform_core.error_codes_tooling import MutationErrorCode
-from platform_core.errors import AppError
-from platform_core.json_utils import (
-    dump_json_str,
-    load_json_str,
-    narrow_json_to_dict,
-    narrow_json_to_int,
-    narrow_json_to_list,
-    optional_str,
-    require_dict,
-    require_int,
-    require_list,
-    require_str,
-)
+from .context import JsonCodec, JsonT
 
 #: The name cosmic-ray installs its command under, beside the interpreter.
-COSMIC_RAY: Final[str] = "cosmic-ray"
+COSMIC_RAY = "cosmic-ray"
 
 
 class Site(NamedTuple):
@@ -107,7 +94,7 @@ def command(python: str) -> str:
     return str(Path(python).with_name(COSMIC_RAY))
 
 
-def session_config(paths: list[str]) -> str:
+def session_config(paths: list[str], codec: JsonCodec[JsonT]) -> str:
     """The configuration ``cosmic-ray init`` enumerates mutants from.
 
     Only the module paths matter to ``init``; the test command and timeout
@@ -115,6 +102,7 @@ def session_config(paths: list[str]) -> str:
 
     Args:
         paths: The files to mutate, relative to the package.
+        codec: How JSON is written; a JSON array of strings is a TOML one.
 
     Returns:
         The TOML text.
@@ -122,7 +110,7 @@ def session_config(paths: list[str]) -> str:
     return "\n".join(
         [
             "[cosmic-ray]",
-            f"module-path = {dump_json_str(paths)}",
+            f"module-path = {codec.dumps(paths)}",
             "timeout = 1.0",
             "excluded-modules = []",
             'test-command = "false"',
@@ -134,78 +122,66 @@ def session_config(paths: list[str]) -> str:
     )
 
 
-def decode_site(line: str) -> Site:
-    """Decode one line of ``cosmic-ray dump`` into the mutant it holds.
-
-    Args:
-        line: A JSON array: a work item and its result, null before the
-            session ran.
-
-    Returns:
-        The mutant.
-
-    Raises:
-        AppError: ``MUTATION_COSMIC_RAY_FAILED`` when the work item holds
-            other than one mutation, or the mutation carries operator
-            arguments, which ``mutate-and-test`` cannot pass on.
-        JSONTypeError: When the line is not the shape ``init`` writes.
-    """
-    item = narrow_json_to_dict(narrow_json_to_list(load_json_str(line))[0])
-    mutations = require_list(item, "mutations")
-    if len(mutations) != 1:
-        raise AppError(
-            MutationErrorCode.COSMIC_RAY_FAILED,
-            f"cosmic-ray dump line {line!r} holds {len(mutations)} mutations, not one",
-        )
-    mutation = narrow_json_to_dict(mutations[0])
-    if require_dict(mutation, "operator_args"):
-        raise AppError(
-            MutationErrorCode.COSMIC_RAY_FAILED,
-            f"cosmic-ray dump line {line!r} carries operator arguments mutate-and-test cannot pass",
-        )
-    start = require_list(mutation, "start_pos")
-    return Site(
-        path=require_str(mutation, "module_path"),
-        line=narrow_json_to_int(start[0]),
-        column=narrow_json_to_int(start[1]),
-        operator=require_str(mutation, "operator_name"),
-        occurrence=require_int(mutation, "occurrence"),
-    )
-
-
-def decode_sites(dump: str) -> list[Site]:
+def decode_sites(dump: str, codec: JsonCodec[JsonT]) -> list[Site]:
     """Decode ``cosmic-ray dump``'s lines into the mutants they hold.
 
     Args:
-        dump: One JSON array per line.
+        dump: One JSON array per line: a work item and its result, null
+            before the session ran.
+        codec: How JSON is read.
 
     Returns:
         Every mutant, in the dump's order.
+
+    Raises:
+        ValueError: When a work item holds other than one mutation, or one
+            carries operator arguments, which ``mutate-and-test`` cannot
+            pass on; the codec's own error when a line is not the shape
+            ``init`` writes.
     """
-    return [decode_site(line) for line in dump.splitlines()]
+    sites: list[Site] = []
+    for number, line in enumerate(dump.splitlines(), start=1):
+        field = f"cosmic-ray dump line {number}"
+        item = codec.mapping(codec.sequence(codec.loads(line), field)[0], f"{field} work item")
+        (raw,) = codec.sequence(item["mutations"], f"{field} mutations")
+        mutation = codec.mapping(raw, f"{field} mutation")
+        start = codec.sequence(mutation["start_pos"], f"{field} start_pos")
+        if codec.mapping(mutation["operator_args"], f"{field} operator_args"):
+            raise ValueError(f"{field} carries operator arguments mutate-and-test cannot pass")
+        sites.append(
+            Site(
+                path=codec.text(mutation["module_path"], f"{field} module_path"),
+                line=codec.integer(start[0], f"{field} start line"),
+                column=codec.integer(start[1], f"{field} start column"),
+                operator=codec.text(mutation["operator_name"], f"{field} operator_name"),
+                occurrence=codec.integer(mutation["occurrence"], f"{field} occurrence"),
+            )
+        )
+    return sites
 
 
-def decode_result(text: str) -> MutantResult:
+def decode_result(text: str, codec: JsonCodec[JsonT]) -> MutantResult:
     """Decode the JSON ``cosmic-ray mutate-and-test`` prints.
 
     Args:
         text: Its standard output.
+        codec: How JSON is read.
 
     Returns:
         The outcome.
 
     Raises:
-        JSONTypeError: When it is not the shape cosmic-ray's ``WorkResult``
-            serialises to.
-        ValueError: When an outcome is not one cosmic-ray 8.7.0 names.
+        ValueError: When an outcome is not one :class:`WorkerOutcome` or
+            :class:`RunOutcome` names; the codec's own error when the text
+            is not the shape cosmic-ray's ``WorkResult`` serialises to.
     """
-    result = narrow_json_to_dict(load_json_str(text))
-    tests = optional_str(result, "test_outcome")
+    result = codec.mapping(codec.loads(text), "mutate-and-test result")
+    tests = codec.optional_text(result["test_outcome"], "test_outcome")
     return MutantResult(
-        worker=WorkerOutcome(require_str(result, "worker_outcome")),
+        worker=WorkerOutcome(codec.text(result["worker_outcome"], "worker_outcome")),
         tests=None if tests is None else RunOutcome(tests),
-        diff=optional_str(result, "diff") or "",
-        output=optional_str(result, "output") or "",
+        diff=codec.optional_text(result["diff"], "diff") or "",
+        output=codec.optional_text(result["output"], "output") or "",
     )
 
 
@@ -232,7 +208,6 @@ __all__ = [
     "WorkerOutcome",
     "command",
     "decode_result",
-    "decode_site",
     "decode_sites",
     "mutated_line",
     "session_config",

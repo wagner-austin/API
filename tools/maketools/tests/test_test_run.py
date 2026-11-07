@@ -216,9 +216,8 @@ def test_a_mutation_run_records_test_contexts_and_runs_the_step_after_a_passing_
     assert [line for line in world.lines if line.startswith("mutation: ")] == [
         "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
         "abc123), so 0 mutants were made",
-        f"mutation: 0s; no check-budget named a span file in {SPANS_ENVIRONMENT_KEY}, so this "
-        "run's time is held to no bound",
     ]
+    assert SPANS_ENVIRONMENT_KEY not in world.answering_calls[0]["env"]
 
 
 def test_a_failing_suite_or_a_home_write_runs_no_mutant(world: World, tmp_path: Path) -> None:
