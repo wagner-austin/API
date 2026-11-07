@@ -23,10 +23,17 @@ lint:
 # adds a pre-run sweep and, on Windows, a kill-on-close job object so a run
 # that dies cannot strand its xdist workers; its module header carries the
 # 2026-08-19 incident that motivated both.
+#
+# --mutation (MCPs board task e52e5148): after a passing suite the launcher
+# mutates the src lines this commit adds against origin/main with
+# cosmic-ray, runs each mutant by the tests that ran its line, and fails
+# naming every mutant they leave alive. Its time is held to its own bound,
+# not the five minutes; the fleet stages origin/main because this
+# package's registry entry declares base_branch main.
 test:
 	poetry lock
 	poetry sync --no-cache --with dev
-	$(PYTHON) ../../tools/maketools/scripts/run.py test
+	$(PYTHON) ../../tools/maketools/scripts/run.py test --mutation
 
 check:
 	$(PYTHON) ../../tools/maketools/scripts/run.py check-budget
