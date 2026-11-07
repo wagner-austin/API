@@ -20,7 +20,7 @@ import shlex
 from pathlib import Path
 
 import pytest
-from platform_core.json_utils import dump_json_str
+from platform_core.json_utils import JSONValue, dump_json_str
 
 from maketools.mutation.context import MutationErrorCode, MutationStepError, Ran
 from maketools.mutation.step import (
@@ -76,7 +76,7 @@ NOT_ADDED = ("src/p/old.py", "core/NumberReplacer", 0, 3, 15)
 
 def _dump_line(site: tuple[str, str, int, int, int]) -> str:
     path, operator, occurrence, line, column = site
-    mutation: dict[str, object] = {
+    mutation: dict[str, JSONValue] = {
         "module_path": path,
         "operator_name": operator,
         "occurrence": occurrence,
@@ -85,8 +85,8 @@ def _dump_line(site: tuple[str, str, int, int, int]) -> str:
         "operator_args": {},
         "definition_name": "x",
     }
-    work_item: dict[str, object] = {"job_id": "j", "mutations": [mutation]}
-    dumped: list[object] = [work_item, None]
+    work_item: dict[str, JSONValue] = {"job_id": "j", "mutations": [mutation]}
+    dumped: list[JSONValue] = [work_item, None]
     return dump_json_str(dumped, compact=False)
 
 
@@ -105,19 +105,21 @@ def _coverage(contexts: dict[str, list[str]]) -> str:
     Returns:
         The JSON text.
     """
-    measured: dict[str, object] = {
-        "executed_lines": sorted(map(int, contexts)),
-        "contexts": contexts,
-    }
-    files: dict[str, object] = {"src/p/m.py": measured}
-    meta: dict[str, object] = {"show_contexts": True}
-    report: dict[str, object] = {"meta": meta, "files": files}
+    executed: list[JSONValue] = [*sorted(map(int, contexts))]
+    named: dict[str, JSONValue] = {}
+    for line, names in contexts.items():
+        recorded: list[JSONValue] = [*names]
+        named[line] = recorded
+    measured: dict[str, JSONValue] = {"executed_lines": executed, "contexts": named}
+    files: dict[str, JSONValue] = {"src/p/m.py": measured}
+    meta: dict[str, JSONValue] = {"show_contexts": True}
+    report: dict[str, JSONValue] = {"meta": meta, "files": files}
     return dump_json_str(report, compact=False)
 
 
 def _result(outcome: str, mutated: str) -> str:
     diff = f"--- mutation diff ---\n--- a/src/p/m.py\n+++ b/src/p/m.py\n@@ -5 +5 @@\n-x\n+{mutated}"
-    result: dict[str, object] = {
+    result: dict[str, JSONValue] = {
         "worker_outcome": "normal",
         "output": "",
         "test_outcome": outcome,

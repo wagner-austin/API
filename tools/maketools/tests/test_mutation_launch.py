@@ -19,7 +19,7 @@ from platform_core.json_utils import JSONTypeError
 
 from maketools.bounded_spans import SPANS_ENVIRONMENT_KEY, read_spans
 from maketools.commands import CommandResult
-from maketools.mutation.context import MutationErrorCode, MutationStepError, Ran
+from maketools.mutation.context import MutationErrorCode, Ran
 from maketools.mutation.launch import (
     API_CODEC,
     CHILD_WALL_SECONDS,
@@ -67,7 +67,7 @@ def test_the_codec_reads_with_platform_core_and_names_the_field_it_refuses() -> 
     assert optional_text("y", "f") == "y"
     with pytest.raises(JSONTypeError, match=r"^files: Expected JSON object, got list$") as one:
         mapping([], "files")
-    assert isinstance(one.value.__cause__, JSONTypeError)
+    assert str(one.value.__cause__) == "Expected JSON object, got list"
     with pytest.raises(JSONTypeError, match=r"^start_pos: Expected JSON array, got dict$"):
         sequence({}, "start_pos")
     with pytest.raises(JSONTypeError, match=r"^operator_name: Expected JSON string, got int$"):
@@ -177,5 +177,5 @@ def test_a_refusal_becomes_an_app_error_and_still_removes_the_scratch_directory(
         mutate_after_suite(tmp_path, "/py", {}, scratch)
     assert refused.value.code is error_codes_tooling.MutationErrorCode.BASE_UNAVAILABLE
     assert refused.value.message.startswith("refs/remotes/origin/main names no commit here")
-    assert isinstance(refused.value.__cause__, MutationStepError)
+    assert str(refused.value.__cause__) == f"MUTATION_BASE_UNAVAILABLE: {refused.value.message}"
     assert world.removed_trees == [scratch]
