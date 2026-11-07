@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from platform_core.errors import AppError
 
+from maketools.bounded_spans import SPANS_ENVIRONMENT_KEY
 from maketools.commands import CommandResult
 from maketools.test_run import (
     HUB_OFFLINE,
@@ -212,7 +213,12 @@ def test_a_mutation_run_records_test_contexts_and_runs_the_step_after_a_passing_
     assert world.removed_trees == [scratch, runs / ".caches-deadbeef"]
     step_env = world.answering_calls[0]["env"]
     assert step_env["COVERAGE_FILE"] == str(runs / ".coverage-deadbeef")
-    assert world.lines[-2].startswith("mutation: not applicable: 0 lines added")
+    assert [line for line in world.lines if line.startswith("mutation: ")] == [
+        "mutation: not applicable: 0 lines added to src files against origin/main (merge base "
+        "abc123), so 0 mutants were made",
+        f"mutation: 0s; no check-budget named a span file in {SPANS_ENVIRONMENT_KEY}, so this "
+        "run's time is held to no bound",
+    ]
 
 
 def test_a_failing_suite_or_a_home_write_runs_no_mutant(world: World, tmp_path: Path) -> None:
