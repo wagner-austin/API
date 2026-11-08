@@ -334,8 +334,8 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
         for (name, _), blob in zip(machine_paths, blobs[len(files) :], strict=True)
     )
     projects: list[DeclaredProject] = []
-    for (key, _), blob in zip(files, blobs[: len(files)], strict=True):
-        project = decode_project_config(load_json_str(blob))
+    for index, (key, _) in enumerate(files):
+        project = decode_project_config(load_json_str(blobs[index]))
         source = project["source"]
         projects.append(
             DeclaredProject(
