@@ -91,7 +91,13 @@ def registered_codex(board: McpCredentials, machine: str, identity: JSONObject) 
             if harness == "codex" and declared:
                 targets.add(session)
         page = require_dict(document, "pagination")
-        if require_int(page, "offset") != offset or require_int(page, "limit") != 200:
+        # The board sizes a page to its list budget by whole rows (MCPs board
+        # task d2c66a85): a page of rows longer than the budget allows is
+        # served short, its limit the rows served and its nextOffset the
+        # first row left out. Before that, one machine's 200 rows answered
+        # 141,366 characters against 48,000 and every hub tick was refused.
+        served = require_int(page, "limit")
+        if require_int(page, "offset") != offset or (served != 200 and served != len(rows)):
             raise ValueError("CODEX_OBSERVE_PAGE: ledger returned another page window")
         if not require_bool(page, "hasMore"):
             return tuple(sorted(targets))
