@@ -236,6 +236,7 @@ class TestTheReading:
             tail=tail,
             ended_unix=1793328000,
             log_path=f"/home/corvis/fleet/stage/logs/{RUN}.log",
+            results_path=f"/home/corvis/fleet/stage/logs/{RUN}.results",
             run_id=RUN,
             workers=3,
         )
@@ -245,5 +246,5 @@ class TestTheReading:
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
             "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread "
-            "artifact=unread"
+            f"artifact=unread results=lavender:/home/corvis/fleet/stage/logs/{RUN}.results"
         )

@@ -172,11 +172,13 @@ class TestTheVerdictNamesTheCommit:
             tail=f"=== ALL CHECKS PASSED ===\nFLEET_REGISTRY: {ROLLED_COMMIT}\n",
             ended_unix=1793403600,
             log_path="/home/corvis/fleet/stage/run-1/result.txt.log",
+            results_path="/home/corvis/fleet/stage/logs/run-1.results",
             run_id="run-1",
             workers=4,
         )
 
         assert judged["registry"] == ROLLED_COMMIT
         assert verdict.render_verdict(judged).endswith(
-            f" steps=unread registry={ROLLED_COMMIT} artifact=unread"
+            f" steps=unread registry={ROLLED_COMMIT} artifact=unread "
+            "results=pendragon:/home/corvis/fleet/stage/logs/run-1.results"
         )

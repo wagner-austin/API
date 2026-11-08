@@ -283,6 +283,28 @@ class TestTheShScriptRunsForReal:
         assert (tmp_path / "cache" / "MCPs" / "scripts" / "release-kinds.json").is_file()
         assert (tmp_path / "MCPs" / "wiki").is_dir()
 
+    def test_the_check_s_results_are_kept_beside_the_transcript_once_however_often_retired(
+        self, tmp_path: pathlib.Path
+    ) -> None:
+        """MCPs reads a run's cases from its JUnit XML (board task 25ab85cf),
+        so the copy the build made beside the transcript outlives the tree."""
+        target = self.lay_out(tmp_path, transcript=True)
+        results = target / "check-results"
+        results.mkdir()
+        (results / "pkg.vitest.junit.xml").write_text("<testsuites/>\n", encoding="utf-8")
+
+        self.retire(tmp_path)
+        self.retire(tmp_path)
+
+        kept = tmp_path / "logs" / f"{DEMO_RUN_ID}.results"
+        assert [entry.name for entry in kept.iterdir()] == ["pkg.vitest.junit.xml"]
+        assert (kept / "pkg.vitest.junit.xml").read_text(encoding="utf-8") == "<testsuites/>\n"
+        assert sorted(entry.name for entry in (tmp_path / "logs").iterdir()) == [
+            f"{DEMO_RUN_ID}.log",
+            f"{DEMO_RUN_ID}.results",
+        ]
+        assert self.outside_modes(tmp_path) == [0o555, 0o555]
+
     def test_a_run_that_wrote_no_transcript_is_retired_all_the_same_and_twice(
         self, tmp_path: pathlib.Path
     ) -> None:

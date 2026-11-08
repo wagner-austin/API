@@ -68,6 +68,7 @@ from fleet.core import (
     run_registry,
     verdict,
 )
+from fleet.core.check_results import retained_results_path
 
 
 def settle(
@@ -142,6 +143,7 @@ def settle(
         tail=tail,
         ended_unix=ended_unix,
         log_path=names.retained_log_path(node["stage_root"], row["run_id"]),
+        results_path=retained_results_path(node["stage_root"], row["run_id"]),
         run_id=row["run_id"],
         workers=row["workers"],
     )

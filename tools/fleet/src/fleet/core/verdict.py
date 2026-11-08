@@ -197,6 +197,12 @@ class Verdict(TypedDict):
             did not leave readable, or ``unread``. Which commit built a
             deployed jar was otherwise a session's rebuild (MCPs board task
             0c8ace8d).
+        results_path: Where the node keeps the check's structured results,
+            its runners' JUnit XML and mypy JSON
+            (:func:`fleet.core.check_results.retained_results_path`), which
+            MCPs reads a run's cases and findings from instead of the
+            transcript's text (MCPs board task 25ab85cf); absent on the node
+            when the recipe wrote none.
     """
 
     job_id: str
@@ -222,6 +228,7 @@ class Verdict(TypedDict):
     steps: str
     registry: str
     artifact: str
+    results_path: str
 
 
 def read_slowest(tail: str) -> str:
@@ -362,6 +369,7 @@ def judge(
     tail: str,
     ended_unix: int,
     log_path: str,
+    results_path: str,
     run_id: str,
     workers: int,
 ) -> Verdict:
@@ -376,6 +384,7 @@ def judge(
         tail: The transcript's last lines, as the node printed them.
         ended_unix: When the check ended, whole seconds since the epoch.
         log_path: The transcript's absolute path on the node.
+        results_path: Where the node keeps the check's structured results.
         run_id: The fleet ledger's run id.
         workers: The test workers its ledger row records it was granted.
 
@@ -408,6 +417,7 @@ def judge(
         steps=read_build_steps(ANSI.sub("", tail)),
         registry=read_registry(tail),
         artifact=read_artifact(tail),
+        results_path=results_path,
     )
 
 
@@ -423,7 +433,8 @@ def render_verdict(verdict: Verdict) -> str:
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
         slowest=<...> ci=<...> dispatch=<...> vmtests=<...> generation=<...> began=<...>
         phases=<...>
-        steps=<...> registry=<commit> artifact=<...>``,
+        steps=<...> registry=<commit> artifact=<...>
+        results=<node>:<path>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
         field the readers in MCPs' maketools and session-audit match, each
@@ -440,7 +451,8 @@ def render_verdict(verdict: Verdict) -> str:
         f"vmtests={verdict['vmtests']} "
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
-        f"registry={verdict['registry']} artifact={verdict['artifact']}"
+        f"registry={verdict['registry']} artifact={verdict['artifact']} "
+        f"results={verdict['node']}:{verdict['results_path']}"
     )
 
 

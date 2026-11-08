@@ -128,6 +128,7 @@ class TestTheReading:
             tail=tail,
             ended_unix=1793887550,
             log_path=f"/home/corvis/fleet/stage/logs/{run}.log",
+            results_path=f"/home/corvis/fleet/stage/logs/{run}.results",
             run_id=run,
             workers=1,
         )

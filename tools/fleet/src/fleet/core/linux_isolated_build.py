@@ -64,6 +64,7 @@ from fleet.contracts.release_artifact import ReleaseArtifact
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
+from fleet.core.check_results import sh_results_lines
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -157,7 +158,9 @@ def isolated_build_lines(
             which refuses to run unattributed (MCPs board task 6c4516af A4).
         artifact: The project's declared release archive, read as execdocker
             from the copy once the recipe ends and before the copy is removed
-            (:mod:`fleet.core.release_artifact`), or None.
+            (:mod:`fleet.core.release_artifact`), or None. The recipe's check
+            results are copied out of the copy then too, and given to the
+            runner's user (:mod:`fleet.core.check_results`).
 
     Returns:
         The lines, in order. The last writes the recipe's exit status to the
@@ -237,6 +240,7 @@ def isolated_build_lines(
             log=log, root="$exec_root", artifact=artifact, run_as=f"sudo -n -u {EXEC_USER} "
         )
     )
+    lines.extend(sh_results_lines(recipe=recipe, target=target, isolated=True))
     lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")

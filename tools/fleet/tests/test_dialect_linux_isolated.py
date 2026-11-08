@@ -208,6 +208,12 @@ class TestIsolatedText:
                 artifact=None,
                 run_as=f"sudo -n -u {EXEC_USER} ",
             ),
+            # The check's results leave the copy before it is removed, given
+            # to the runner's user (MCPs board task 25ab85cf).
+            f'if sudo -n test -d "$exec_root/{DEMO_PROJECT}/.check-results"; then '
+            f'sudo -n cp -R "$exec_root/{DEMO_PROJECT}/.check-results" '
+            f'"{TARGET}/check-results"; sudo -n chown -R "$(id -u):$(id -g)" '
+            f'"{TARGET}/check-results"; fi',
         ]
         loaded = len(slice_load)
 

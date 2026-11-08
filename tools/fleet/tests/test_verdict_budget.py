@@ -65,6 +65,7 @@ class TestTheBudgetOnTheLine:
             tail=OVER_TAIL,
             ended_unix=1791168490,
             log_path="C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log",
+            results_path="C:/fleet/stage/logs/services-grandma-api-loki-1791168143.results",
             run_id="services-grandma-api-loki-1791168143",
             workers=2,
         )
@@ -77,5 +78,6 @@ class TestTheBudgetOnTheLine:
             "log=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.log "
             "run=services-grandma-api-loki-1791168143 workers=2 slowest=unread ci=unread "
             "dispatch=unread vmtests=unread generation=unread began=unread phases=unread "
-            "steps=unread registry=unread artifact=unread"
+            "steps=unread registry=unread artifact=unread "
+            "results=loki:C:/fleet/stage/logs/services-grandma-api-loki-1791168143.results"
         )

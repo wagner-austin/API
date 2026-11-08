@@ -55,6 +55,7 @@ from fleet.contracts.runner_slice import CI_SLICE_NAME
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE, require_agent_label
+from fleet.core.check_results import retained_results_path, sh_results_lines, sh_retire_lines
 from fleet.core.linux_capacity_probe import CAPACITY_PROBE_BODY
 from fleet.core.linux_isolated_build import EXEC_HOME_LINE, exec_root, isolated_build_lines
 from fleet.core.linux_loopback import BUILD_EXPORTS, recipe_command
@@ -309,7 +310,8 @@ def retire_script(
         run_id: The dispatch; its enclosure (:func:`fleet.core.names.run_enclosure`)
             goes whole, named by the run so no path can make it the stage root.
         retained: Where its transcript is kept, under the stage root's logs
-            directory, which is created if absent.
+            directory, which is created if absent; its check results go
+            beside it (:func:`fleet.core.check_results.sh_retire_lines`).
         scripts: The scripts it left under the stage root, this one included.
         isolated: Whether the node runs docker projects' builds as
             execdocker; the run's copy in that user's home then goes too, as
@@ -331,11 +333,14 @@ def retire_script(
         companion is untouched. Every step tolerates what an earlier attempt
         already did, so a retire that failed part way succeeds when rerun.
     """
-    log = shlex.quote(names.log_path(names.dispatch_directory(stage_root, run_id)))
+    target = names.dispatch_directory(stage_root, run_id)
+    log = shlex.quote(names.log_path(target))
     enclosure = shlex.quote(names.run_enclosure(stage_root, run_id))
+    results = retained_results_path(stage_root, run_id)
     lines = [
         f"mkdir -p {shlex.quote(posixpath.dirname(retained))}",
         f"if [ -e {log} ]; then mv -f {log} {shlex.quote(retained)}; fi",
+        *sh_retire_lines(target=target, retained=results),
         f"if [ -d {enclosure} ]; then "
         f"find {enclosure} -type d ! -perm -u=w -exec chmod u+w {{}} +; fi",
         f"rm -rf {enclosure}",
@@ -412,7 +417,8 @@ def build_script(
             every other project.
         artifact: The project's declared release archive, read into the
             transcript once the recipe ends (:mod:`fleet.core.release_artifact`),
-            or None, which prints that none applies.
+            or None, which prints that none applies. The recipe's check
+            results are then copied beside it (:mod:`fleet.core.check_results`).
 
     Returns:
         The script's text. Its last act writes the recipe's exit status to
@@ -479,6 +485,8 @@ def build_script(
     lines.extend(sh_slice_load_end_lines(MEASURED_SLICES, log))
     lines.extend(sh_vm_test_lines(log))
     lines.extend(sh_artifact_lines(log=log, root=target, artifact=artifact, run_as=""))
+    recipe = names.recipe_directory(target, path)
+    lines.extend(sh_results_lines(recipe=recipe, target=target, isolated=False))
     lines.append(sh_run_summary_line(log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"

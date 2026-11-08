@@ -191,6 +191,7 @@ class TestTheReading:
             tail=f"FLEET_ARTIFACT: {JAR['path']} 2 {DIGEST}\n",
             ended_unix=1793990000,
             log_path=f"/home/corvis/fleet/stage/logs/{run}.log",
+            results_path=f"/home/corvis/fleet/stage/logs/{run}.results",
             run_id=run,
             workers=4,
         )
@@ -198,6 +199,7 @@ class TestTheReading:
         assert judged["artifact"] == f"{JAR['path']}:2:{DIGEST}"
         assert verdict.render_verdict(judged).endswith(
             f" registry=unread artifact={JAR['path']}:2:{DIGEST}"
+            f" results=colossus:/home/corvis/fleet/stage/logs/{run}.results"
         )
 
 
