@@ -2,7 +2,8 @@
 
 The copy the build makes is ``sh`` lines, so they are run for real under
 this host's bash against a real recipe directory, the way a node runs them;
-the isolated variant needs root on the node and is held to its exact text.
+the isolated variant needs root on the node and is held to its exact text,
+never run here (a run as root left files the suite could not remove).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from fleet.core.check_results import (
     RUN_RESULTS_NAME,
     retained_results_path,
     run_results_path,
+    sh_isolated_results_lines,
     sh_results_lines,
     sh_retire_lines,
 )
@@ -61,10 +63,7 @@ def test_a_build_copies_the_recipe_s_results_beside_its_transcript(
     (written / "db.vitest.junit.xml").write_text("<testsuites/>\n", encoding="utf-8")
     (written / "db.mypy.json").write_text("\n", encoding="utf-8")
 
-    ran = run_lines(
-        sh_results_lines(recipe=recipe.as_posix(), target=target.as_posix(), isolated=False),
-        tmp_path,
-    )
+    ran = run_lines(sh_results_lines(recipe=recipe.as_posix(), target=target.as_posix()), tmp_path)
 
     assert ran.returncode == 0, ran.stderr
     kept = target / "check-results"
@@ -76,19 +75,15 @@ def test_a_recipe_that_wrote_no_results_leaves_nothing_to_keep(tmp_path: pathlib
     target = tmp_path / "run-1"
     (target / "packages" / "db").mkdir(parents=True)
 
-    ran = run_lines(
-        sh_results_lines(
-            recipe=(target / "packages" / "db").as_posix(), target=target.as_posix(), isolated=False
-        ),
-        tmp_path,
-    )
+    recipe = (target / "packages" / "db").as_posix()
+    ran = run_lines(sh_results_lines(recipe=recipe, target=target.as_posix()), tmp_path)
 
     assert ran.returncode == 0, ran.stderr
     assert sorted(entry.name for entry in target.iterdir()) == ["packages"]
 
 
 def test_an_isolated_build_copies_as_root_and_gives_the_copy_to_the_runner() -> None:
-    assert sh_results_lines(recipe="$exec_root/p", target="/s/run-1", isolated=True) == [
+    assert sh_isolated_results_lines(recipe="$exec_root/p", target="/s/run-1") == [
         'if sudo -n test -d "$exec_root/p/.check-results"; then '
         'sudo -n cp -R "$exec_root/p/.check-results" "/s/run-1/check-results"; '
         'sudo -n chown -R "$(id -u):$(id -g)" "/s/run-1/check-results"; fi'

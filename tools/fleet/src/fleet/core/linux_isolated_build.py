@@ -64,7 +64,7 @@ from fleet.contracts.release_artifact import ReleaseArtifact
 from fleet.contracts.source import InstallStep
 from fleet.core import names
 from fleet.core.agent_label import AGENT_LABEL_VARIABLE
-from fleet.core.check_results import sh_results_lines
+from fleet.core.check_results import sh_isolated_results_lines
 from fleet.core.names import (
     CACHE_VARIABLE,
     POETRY_IN_PROJECT,
@@ -240,7 +240,7 @@ def isolated_build_lines(
             log=log, root="$exec_root", artifact=artifact, run_as=f"sudo -n -u {EXEC_USER} "
         )
     )
-    lines.extend(sh_results_lines(recipe=recipe, target=target, isolated=True))
+    lines.extend(sh_isolated_results_lines(recipe=recipe, target=target))
     lines.append(sh_run_summary_line(log))
     lines.append('sudo -n rm -rf "$exec_root"')
     lines.append(f"printf '%s\\n' \"$status\" > '{result}'")

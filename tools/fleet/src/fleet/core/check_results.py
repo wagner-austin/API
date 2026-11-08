@@ -13,7 +13,8 @@ package, so this is the one deliberate copy).
 
 WHAT THE RUN DOES WITH THEM. Once the recipe has ended, and before the tree
 it ran in is removed, the build copies that directory to
-:func:`run_results_path` beside the transcript (:func:`sh_results_lines`).
+:func:`run_results_path` beside the transcript (:func:`sh_results_lines`,
+:func:`sh_isolated_results_lines` from an isolated build's copy).
 The retire moves it to :func:`retained_results_path`, next to the retained
 transcript under the stage root's logs directory (:func:`sh_retire_lines`),
 and the verdict line names that path as ``results=<node>:<path>``
@@ -62,26 +63,45 @@ def retained_results_path(stage_root: str, run_id: str) -> str:
     return f"{stage_root}/{LOGS_DIRECTORY}/{run_id}.results"
 
 
-def sh_results_lines(*, recipe: str, target: str, isolated: bool) -> list[str]:
-    """The ``sh`` lines that copy the recipe's results beside the transcript.
+def sh_results_lines(*, recipe: str, target: str) -> list[str]:
+    """The ``sh`` lines that copy the recipe's results beside the transcript, as the runner.
 
     Args:
-        recipe: The directory the recipe ran in, double-quoted where it is
-            used, so a shell variable in it (``$exec_root``) expands.
+        recipe: The directory the recipe ran in.
         target: The dispatch's absolute remote directory.
-        isolated: Whether the recipe ran as execdocker in its own copy, whose
-            files only root may read and the runner must own once copied.
 
     Returns:
-        One line copying the directory when the recipe wrote it, and, for an
-        isolated build, giving the copy to the runner's own user, so its
-        retire can move it.
+        One line copying the directory when the recipe wrote it.
     """
     source = f'"{recipe}/{RECIPE_RESULTS_NAME}"'
     kept = f'"{run_results_path(target)}"'
-    run_as = "sudo -n " if isolated else ""
-    owned = f'; sudo -n chown -R "$(id -u):$(id -g)" {kept}' if isolated else ""
-    return [f"if {run_as}test -d {source}; then {run_as}cp -R {source} {kept}{owned}; fi"]
+    return [f"if test -d {source}; then cp -R {source} {kept}; fi"]
+
+
+def sh_isolated_results_lines(*, recipe: str, target: str) -> list[str]:
+    """The same copy out of an isolated build's copy, whose files only root may read.
+
+    A function of its own rather than a flag of :func:`sh_results_lines`:
+    the runner's copy is run for real by the suite, and a mutant that
+    flipped such a flag made that run copy as root on a node whose runner
+    may ``sudo``, leaving files the suite's own cleanup could not remove
+    (fleet job a810c1fb on lavender, 2026-11-08).
+
+    Args:
+        recipe: The directory the recipe ran in, double-quoted where it is
+            used, so the shell variable in it (``$exec_root``) expands.
+        target: The dispatch's absolute remote directory.
+
+    Returns:
+        One line copying the directory as root when the recipe wrote it and
+        giving the copy to the runner's own user, so its retire can move it.
+    """
+    source = f'"{recipe}/{RECIPE_RESULTS_NAME}"'
+    kept = f'"{run_results_path(target)}"'
+    return [
+        f"if sudo -n test -d {source}; then sudo -n cp -R {source} {kept}; "
+        f'sudo -n chown -R "$(id -u):$(id -g)" {kept}; fi'
+    ]
 
 
 def sh_retire_lines(*, target: str, retained: str) -> list[str]:
@@ -105,6 +125,7 @@ __all__ = [
     "RUN_RESULTS_NAME",
     "retained_results_path",
     "run_results_path",
+    "sh_isolated_results_lines",
     "sh_results_lines",
     "sh_retire_lines",
 ]

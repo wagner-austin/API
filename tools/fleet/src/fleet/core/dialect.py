@@ -486,7 +486,7 @@ def build_script(
     lines.extend(sh_vm_test_lines(log))
     lines.extend(sh_artifact_lines(log=log, root=target, artifact=artifact, run_as=""))
     recipe = names.recipe_directory(target, path)
-    lines.extend(sh_results_lines(recipe=recipe, target=target, isolated=False))
+    lines.extend(sh_results_lines(recipe=recipe, target=target))
     lines.append(sh_run_summary_line(log))
     lines.append(written)
     return PROLOGUE + "\n".join(lines) + "\n"
