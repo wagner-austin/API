@@ -186,6 +186,28 @@ def read_contexts(
     return contexts
 
 
+def node_id(context: str) -> str:
+    """The pytest node id a coverage context names.
+
+    A context is ``<test id>|<phase>``. Under pytest-xdist's ``loadgroup``
+    distribution a test marked ``xdist_group(name=...)`` carries
+    ``@<name>`` after its id, which pytest cannot select by: fleet job
+    0ab3cfd3 (board task 52017b1e) refused its baseline with ``not found``
+    for ``tests/test_fleet_proof_routing.py::...@fleet-lock``. The suffix
+    is dropped only after the id's last parameter bracket and test name, so
+    an ``@`` inside a parametrize id is kept.
+
+    Args:
+        context: One context name.
+
+    Returns:
+        The node id pytest selects the test by.
+    """
+    test = context.rsplit("|", 1)[0]
+    head, at, group = test.rpartition("@")
+    return head if at and not any(mark in group for mark in ("]", ":", "/")) else test
+
+
 def selection(contexts: frozenset[str] | None) -> tuple[str, ...] | None:
     """The tests a mutant runs, from its line's coverage contexts.
 
@@ -196,11 +218,11 @@ def selection(contexts: frozenset[str] | None) -> tuple[str, ...] | None:
     Returns:
         None when no test runs the line; the empty tuple for a line run
         only outside a test, which the whole suite runs; else the node ids
-        of the tests that ran it, sorted.
+        of the tests that ran it (:func:`node_id`), sorted.
     """
     if contexts is None:
         return None
-    return tuple(sorted({name.rsplit("|", 1)[0] for name in contexts if name}))
+    return tuple(sorted({node_id(name) for name in contexts if name}))
 
 
 def _judge(
@@ -401,6 +423,7 @@ __all__ = [
     "changed_sources",
     "differing_from_head",
     "enumerate_sites",
+    "node_id",
     "read_contexts",
     "run_in_scratch",
     "run_mutation_step",

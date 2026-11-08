@@ -386,6 +386,19 @@ def test_coverage_contexts_decode_per_file_per_line() -> None:
             frozenset({"", "tests/a.py::t|run", "tests/a.py::t|setup", "tests/a.py::u[x|y]|run"}),
             ("tests/a.py::t", "tests/a.py::u[x|y]"),
         ),
+        # MCPs board task 52017b1e, fleet job 0ab3cfd3: an xdist_group's
+        # ``@<group>`` suffix is dropped, an ``@`` inside a parameter is
+        # kept, and a group suffix after a parameter goes.
+        (
+            frozenset(
+                {
+                    "tests/b.py::t@fleet-lock|run",
+                    "tests/b.py::u[a@b]|run",
+                    "tests/b.py::v[c@d]@fleet-lock|call",
+                }
+            ),
+            ("tests/b.py::t", "tests/b.py::u[a@b]", "tests/b.py::v[c@d]"),
+        ),
     ],
 )
 def test_a_lines_tests_are_its_context_names_less_phase_and_import(
