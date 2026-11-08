@@ -132,9 +132,17 @@
           "labels": ["mcps-fleet-ci"]
         }
       ],
-      "assets": [],
+      "assets": [
+        {
+          "path": "/opt/google/chrome/chrome",
+          "sha256": null,
+          "writable": false,
+          "reason": "Preserve the fleet worker's Chrome capability when provisioning the managed relay runner",
+          "manual": false
+        }
+      ],
       "base": {
-        "nix_packages": ["git"],
+        "nix_packages": ["git", "ffmpeg", "go", "poppler-utils"],
         "disk": {
           "ceiling_gb": 180,
           "baseline_gb": 96,
