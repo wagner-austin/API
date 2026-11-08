@@ -414,8 +414,8 @@ class TestJudgeAndRender:
         assert line.endswith(
             "log=sedona:/srv/fleet/stage/run-2/result.txt.log run=run-2 workers=7 "
             "slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
-            "began=unread phases=unread steps=unread registry=unread artifact=unread mutation=unread "
-            "results=sedona:/srv/fleet/stage/logs/run-2.results"
+            "began=unread phases=unread steps=unread registry=unread artifact=unread "
+            "mutation=unread results=sedona:/srv/fleet/stage/logs/run-2.results"
         )
         assert "\n" not in line
 

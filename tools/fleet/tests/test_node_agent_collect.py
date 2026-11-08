@@ -81,8 +81,8 @@ class TestCollecting:
             "budget=unread ended=2025-09-04T15:34:20Z "
             f"log=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.log run={DEMO_RUN_ID} "
             "workers=7 slowest=unread ci=unread dispatch=unread vmtests=unread generation=unread "
-            f"began=unread phases=unread steps=unread registry={ROLLED_COMMIT} artifact=unread mutation=unread "
-            f"results=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.results"
+            f"began=unread phases=unread steps=unread registry={ROLLED_COMMIT} artifact=unread "
+            f"mutation=unread results=lavender:/home/corvis/fleet/stage/logs/{DEMO_RUN_ID}.results"
         )
         # Retired after the tail was read and the job closed (fleet.cli.node_settle):
         # the fifth and sixth calls send the retire to the stage root and run it.

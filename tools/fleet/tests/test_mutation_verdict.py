@@ -17,7 +17,8 @@ from fleet.core.mutation_verdict import read_mutation, read_outcome, read_span
 #: percent coverage and the step found 8 of 453 mutants surviving.
 FAILED_TAIL = (
     "stryker: 18:43:59 (713756) INFO MutationTestExecutor Done in 13 minutes and 19 seconds.\n"
-    'MUTANT SURVIVED src/agent-tasks/definition-references.ts:65:7 ConditionalExpression -> "true"\n'
+    "MUTANT SURVIVED src/agent-tasks/definition-references.ts:65:7 "
+    'ConditionalExpression -> "true"\n'
     'MUTANT SURVIVED src/types/agent-task-definition.ts:64:50 ArrowFunction -> "() => undefined"\n'
     "mutation: FAILED: 8 of 453 mutant(s) made in 18 src file(s) changed against origin/main "
     "(merge base 603a6306cac7020691024f8d486748d5c024ad79) survived. Kill each with a test, or "
@@ -85,7 +86,7 @@ BASELINE_FAILED_TAIL = (
 #: any step ran.
 TEST_DIFF_TAIL = (
     '+     "mutation: FAILED: 8 of 15 mutant(s) made in 3 src file(s) changed against origin/main '
-    '(merge base 02b866a00d3470b1700300eff855d3d96341c64a) survived. Kill each with a test, or '
+    "(merge base 02b866a00d3470b1700300eff855d3d96341c64a) survived. Kill each with a test, or "
     'rewrite the code so the mutation cannot change what it does.",\n'
     "CHECK BUDGET: packages/db took 86s of 300s (setup 0s, suite 85s, queued 0s (not counted)).\n"
 )
@@ -107,7 +108,7 @@ def test_a_step_that_raised_reads_its_code_with_the_span_it_recorded() -> None:
     assert read_mutation(STRYKER_FAILED_TAIL) == "error:MUTATION_STRYKER_FAILED,355s/900s"
 
 
-def test_a_python_step_s_error_is_read_through_its_module_path_and_a_missing_span_is_unread() -> None:
+def test_a_python_step_s_error_is_read_through_its_module_path_without_a_span() -> None:
     assert read_mutation(BASELINE_FAILED_TAIL) == "error:MUTATION_BASELINE_FAILED,unread"
 
 
