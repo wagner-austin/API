@@ -118,6 +118,8 @@ def test_a_summary_inside_a_test_s_diff_is_not_the_step_s_outcome() -> None:
 
 
 def test_a_tail_with_neither_line_reads_unread() -> None:
+    assert read_outcome("=== ALL CHECKS PASSED ===\n") == "unread"
+    assert read_span("=== ALL CHECKS PASSED ===\n") == "unread"
     assert read_mutation("=== ALL CHECKS PASSED ===\n") == "unread"
 
 

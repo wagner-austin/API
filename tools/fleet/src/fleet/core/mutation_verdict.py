@@ -75,12 +75,55 @@ def _last(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
     return last
 
 
-def read_outcome(tail: str) -> str:
-    """Read how the mutation step ended off a transcript tail.
+def _outcome(tail: str) -> str:
+    """How the mutation step ended, or the empty string when the tail does not say.
 
     The outcome is the LAST of the step's summary, not-applicable and error
     lines in the tail, so a check that ran the step twice is judged by the
-    run that ended it.
+    run that ended it. The summary's word is lower-cased rather than
+    compared, since ``FAILED`` and ``passed`` are its only two values.
+
+    Args:
+        tail: The transcript's last lines, colours stripped.
+
+    Returns:
+        ``passed:<survived>/<made>``, ``failed:<survived>/<made>``,
+        ``not-applicable`` or ``error:<code>``, else ``""``.
+    """
+    found: list[tuple[int, str]] = []
+    summary = _last(SUMMARY, tail)
+    if summary is not None:
+        word = f"{summary.group(1)}".lower()
+        found.append((summary.start(), f"{word}:{summary.group(2)}/{summary.group(3)}"))
+    empty = _last(NOT_APPLICABLE, tail)
+    if empty is not None:
+        found.append((empty.start(), "not-applicable"))
+    refusal = _last(REFUSAL, tail)
+    if refusal is not None:
+        found.append((refusal.start(), f"error:{refusal.group(1)}"))
+    if not found:
+        return ""
+    return max(found)[1]
+
+
+def _span(tail: str) -> str:
+    """The step's span, or the empty string when no budget line names it.
+
+    Args:
+        tail: The transcript's last lines, colours stripped.
+
+    Returns:
+        ``<seconds>s/<bound>s`` from the last check budget line naming the
+        span, else ``""``.
+    """
+    span = _last(SPAN, tail)
+    if span is None:
+        return ""
+    return f"{span.group(1)}s/{span.group(2)}s"
+
+
+def read_outcome(tail: str) -> str:
+    """Read how the mutation step ended off a transcript tail.
 
     Args:
         tail: The transcript's last lines, colours stripped.
@@ -91,20 +134,7 @@ def read_outcome(tail: str) -> str:
         ``error:<code>`` for a step that raised its named error, else
         :data:`UNREAD`.
     """
-    found: list[tuple[int, str]] = []
-    summary = _last(SUMMARY, tail)
-    if summary is not None:
-        word = "passed" if f"{summary.group(1)}" == "passed" else "failed"
-        found.append((summary.start(), f"{word}:{summary.group(2)}/{summary.group(3)}"))
-    empty = _last(NOT_APPLICABLE, tail)
-    if empty is not None:
-        found.append((empty.start(), "not-applicable"))
-    refusal = _last(REFUSAL, tail)
-    if refusal is not None:
-        found.append((refusal.start(), f"error:{refusal.group(1)}"))
-    if not found:
-        return UNREAD
-    return max(found)[1]
+    return _outcome(tail) or UNREAD
 
 
 def read_span(tail: str) -> str:
@@ -117,14 +147,17 @@ def read_span(tail: str) -> str:
         ``<seconds>s/<bound>s`` from the last check budget line naming the
         span, else :data:`UNREAD`.
     """
-    span = _last(SPAN, tail)
-    if span is None:
-        return UNREAD
-    return f"{span.group(1)}s/{span.group(2)}s"
+    return _span(tail) or UNREAD
 
 
 def read_mutation(tail: str) -> str:
     """Read the mutation step's outcome and span off a transcript tail.
+
+    An absent part is the empty string until it is written, so the test of
+    whether the tail held either is a truth test and not a comparison with
+    :data:`UNREAD` (fleet job 5f5e38ba: ``==`` there could be mutated to
+    ``>=`` or ``is`` with no reading changed, ``unread`` sorting after every
+    outcome and span and being one interned string).
 
     Args:
         tail: The transcript's last lines, colours stripped.
@@ -136,11 +169,11 @@ def read_mutation(tail: str) -> str:
         holds neither, which is every check of a package with no mutation
         step.
     """
-    outcome = read_outcome(tail)
-    span = read_span(tail)
-    if outcome == UNREAD and span == UNREAD:
+    outcome = _outcome(tail)
+    span = _span(tail)
+    if not (outcome or span):
         return UNREAD
-    return f"{outcome},{span}"
+    return f"{outcome or UNREAD},{span or UNREAD}"
 
 
 __all__ = [
