@@ -114,6 +114,7 @@ def post_health(journal: pathlib.Path, credentials: McpCredentials, task_id: str
         task_id=task_id,
         kind="note",
         body=post_body(health["events"]),
+        notify=(),
     )
     write_offset(_test_hooks.write_text, marks, health["next_offset"])
     kinds = ", ".join(event["kind"] for event in health["events"])
