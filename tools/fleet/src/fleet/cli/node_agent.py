@@ -374,9 +374,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         )
     credentials = queue.load_credentials()
 
-    settle = functools.partial(
-        node_watch.collect_ended, loaded, credentials, identity, agent=agent
-    )
+    settle = functools.partial(node_watch.collect_ended, loaded, credentials, identity, agent=agent)
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
     launcher = Launcher(
         loaded,
