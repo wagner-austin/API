@@ -408,7 +408,10 @@
     "localBin": "/home/gharunner/.local/bin",
     "tokenDirectory": "/var/lib/fleet-runner-tokens",
     "packages": [
-      "git"
+      "git",
+      "ffmpeg",
+      "go",
+      "poppler-utils"
     ],
     "installs": [
       {
@@ -571,7 +574,9 @@
       "fleet-ci-cpuset.service",
       "ci-clean.service"
     ],
-    "assets": [],
+    "assets": [
+      "/opt/google/chrome/chrome"
+    ],
     "manualAssets": []
   }
 }
