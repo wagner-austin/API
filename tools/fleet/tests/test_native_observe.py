@@ -158,12 +158,40 @@ def test_a_machine_whose_rows_exceed_one_budgeted_page_is_read_whole() -> None:
     ]
 
 
+def test_a_full_page_then_a_sized_one_reach_offsets_past_two_hundred() -> None:
+    # Offsets past 256 are new int objects on every parse, so the window is
+    # compared by value: a full 200-row page, a sized 100-row page, then the
+    # last page at offset 300.
+    rows = [
+        identity_row(sessionId=f"00000000-0000-4000-8000-{n:012x}", harness="claude-code")
+        for n in range(300)
+    ]
+    board = FakeQueue(
+        [
+            inventory(*rows[:200], more=True),
+            sized(*rows[200:], offset=200, total=301),
+            inventory(identity_row(), offset=300),
+        ]
+    )
+    _test_hooks.http_post = board
+    assert native_observe.registered_codex(BOARD, MACHINE, IDENTITY) == (SESSION,)
+    assert [arguments["offset"] for arguments in board.arguments] == [0, 200, 300]
+
+
 @pytest.mark.parametrize(
     "reply",
     [
         inventory(identity_row(machine="linux:another")),
         inventory(offset=1),
+        inventory(offset=-1),
         dump_json_str({"rows": [], "pagination": {"offset": 0, "limit": 1, "hasMore": False}}),
+        # A page wider than the 200 asked is not the window asked for.
+        dump_json_str(
+            {
+                "rows": [identity_row()],
+                "pagination": {"offset": 0, "limit": 201, "hasMore": True, "nextOffset": 1},
+            }
+        ),
         # A short page whose limit is not the rows it carries is not a
         # budgeted page: the window it names and the rows disagree.
         dump_json_str(
