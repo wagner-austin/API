@@ -57,6 +57,7 @@ from fleet.contracts.machine import Machine, decode_machine
 from fleet.contracts.project import decode_project_config
 from fleet.contracts.tags import NodeTag, encode_tags
 from fleet.core import _test_hooks, commit_tree, names, rolled
+from fleet.core.checkout import repository_name
 from fleet.core.workspace_files import (
     JSON_SUFFIX,
     MACHINES_DIRECTORY,
@@ -89,6 +90,18 @@ READ_FAILED_CODE: Final = "FLEET_REGISTRY_READ_FAILED"
 BATCH_UNREADABLE_CODE: Final = "FLEET_REGISTRY_BATCH_UNREADABLE"
 
 
+class DeclaredSource(TypedDict):
+    """Source coordinates from a rolled project declaration, independent of its key.
+
+    Attributes:
+        repository: Repository identity of the declared source remote.
+        directory: Exact source path, empty for the repository root.
+    """
+
+    repository: str
+    directory: str
+
+
 class DeclaredProject(TypedDict):
     """One project as the rolled registry declares it.
 
@@ -96,11 +109,13 @@ class DeclaredProject(TypedDict):
         project: Its key, the file's path under ``projects`` without the suffix.
         required_tags: The tags its file names, decoded by the project contract.
         dispatch_nodes: Enabled, unheld dispatching lanes; probes decide capacity.
+        source: Explicit source coordinates, or None when no source is declared.
     """
 
     project: str
     required_tags: tuple[NodeTag, ...]
     dispatch_nodes: tuple[str, ...]
+    source: DeclaredSource | None
 
 
 class RegistryRead(TypedDict):
@@ -318,21 +333,29 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
         decode_machine(name, load_json_str(blob))
         for (name, _), blob in zip(machine_paths, blobs[len(files) :], strict=True)
     )
-    projects = tuple(
-        DeclaredProject(
-            project=key,
-            required_tags=decode_project_config(load_json_str(blob))["required_tags"],
-            dispatch_nodes=dispatch_nodes(machines),
+    projects: list[DeclaredProject] = []
+    for (key, _), blob in zip(files, blobs[: len(files)], strict=True):
+        project = decode_project_config(load_json_str(blob))
+        source = project["source"]
+        projects.append(
+            DeclaredProject(
+                project=key,
+                required_tags=project["required_tags"],
+                dispatch_nodes=dispatch_nodes(machines),
+                source=None
+                if source is None
+                else DeclaredSource(
+                    repository=repository_name(source["remote"]), directory=source["path"]
+                ),
+            )
         )
-        for (key, _), blob in zip(files, blobs[: len(files)], strict=True)
-    )
     runners = declared_runners(machines)
     if not runners:
         return (
             f"{NO_RUNNER_CODE}: {MACHINES_PATH} at {commit} declares no node runner; "
             "nothing was published, since the queue would retire every runner"
         )
-    return RegistryRead(commit=commit, projects=projects, runners=runners, checked_at=checked_at)
+    return RegistryRead(commit=commit, projects=tuple(projects), runners=runners, checked_at=checked_at)
 
 
 def publish_registry(
@@ -363,6 +386,12 @@ def publish_registry(
                 "project": project["project"],
                 "requiredTags": encode_tags(project["required_tags"]),
                 "dispatchNodes": list(project["dispatch_nodes"]),
+                "source": None
+                if project["source"] is None
+                else {
+                    "repository": project["source"]["repository"],
+                    "directory": project["source"]["directory"],
+                },
             }
             for project in read["projects"]
         ],
@@ -392,6 +421,7 @@ __all__ = [
     "PUBLISH_TOOL",
     "READ_FAILED_CODE",
     "DeclaredProject",
+    "DeclaredSource",
     "RegistryPublication",
     "RegistryRead",
     "declared_files",
