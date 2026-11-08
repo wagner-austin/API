@@ -355,7 +355,9 @@ def read_declared(checkout: pathlib.Path) -> RegistryRead | str:
             f"{NO_RUNNER_CODE}: {MACHINES_PATH} at {commit} declares no node runner; "
             "nothing was published, since the queue would retire every runner"
         )
-    return RegistryRead(commit=commit, projects=tuple(projects), runners=runners, checked_at=checked_at)
+    return RegistryRead(
+        commit=commit, projects=tuple(projects), runners=runners, checked_at=checked_at
+    )
 
 
 def publish_registry(
