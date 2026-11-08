@@ -409,9 +409,11 @@ def post_verdict(
 ) -> str:
     """Post the verdict of a check that names no task, where its submitter reads it.
 
-    A board-level note in :data:`VERDICT_ROOM` that opens with the
-    submitter's label, so it lands in their feed as a mention (MCPs board
-    task fd5cabfa, A3). A job that names a task is not posted here: the
+    A board-level note in :data:`VERDICT_ROOM` addressed to the submitter
+    by its notify list, so it lands in their feed as addressed to them (MCPs
+    board task fd5cabfa, A3; by record rather than an ``@label`` in the
+    words since MCPs board task 52017b1e, whose board refuses a label no
+    session has written under). A job that names a task is not posted here: the
     queue's close writer puts its outcome on that task's thread, addressed
     to the submitter, in the transaction that closes it (MCPs board task
     2fecad69), for every terminal status and not only a suite that ran.
@@ -432,7 +434,8 @@ def post_verdict(
     arguments: JSONObject = {
         "kind": "note",
         "room": VERDICT_ROOM,
-        "body": f"@{submitted_by} {line}",
+        "body": line,
+        "notify": [submitted_by],
         **identity,
     }
     return call_mcp_tool(_test_hooks.http_post, credentials, "task_post", arguments)

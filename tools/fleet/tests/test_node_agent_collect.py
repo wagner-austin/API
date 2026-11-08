@@ -164,7 +164,11 @@ class TestCollecting:
         assert "taskId" not in posted
         assert posted["room"] == "fleet"
         body = narrow_json_to_str(posted["body"])
-        assert body.startswith("@opus-dispatch-0905 FLEET-CHECK ")
+        # MCPs board task 52017b1e: the submitter is the note's recipient by
+        # its notify list, and no word of the note addresses anyone.
+        assert body.startswith("FLEET-CHECK ")
+        assert "@" not in body
+        assert posted["notify"] == ["opus-dispatch-0905"]
         assert "exit=2 banner=no tests=100p/3f coverage=unread" in body
         assert endpoint.arguments[2]["status"] == "failed"
         assert endpoint.arguments[2]["exitCode"] == 2
