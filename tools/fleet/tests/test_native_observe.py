@@ -113,12 +113,72 @@ def test_pages_inventory_filters_and_deduplicates_registered_targets() -> None:
     ]
 
 
+def sized(*rows: JSONObject, offset: int, total: int) -> str:
+    """A page the board served short of the 200 asked, sized to its list budget.
+
+    Its limit is the rows served and its nextOffset the first row left out,
+    as MCPs task_sessions_list answers a page past its budget (board task
+    d2c66a85).
+    """
+    return dump_json_str(
+        {
+            "rows": list(rows),
+            "pagination": {
+                "total": total,
+                "offset": offset,
+                "limit": len(rows),
+                "hasMore": True,
+                "nextOffset": offset + len(rows),
+            },
+        }
+    )
+
+
+def test_a_machine_whose_rows_exceed_one_budgeted_page_is_read_whole() -> None:
+    # 2026-11-08: one machine's 200 json rows answered 141,366 characters
+    # against the 48,000-character list budget, so the board now serves the
+    # rows that fit and the arm reads on from where the page stopped.
+    other = "22222222-2222-4222-8222-222222222222"
+    claude = [
+        identity_row(sessionId=f"00000000-0000-4000-8000-{n:012x}", harness="claude-code")
+        for n in range(3)
+    ]
+    board = FakeQueue(
+        [
+            sized(identity_row(), *claude[:2], offset=0, total=5),
+            sized(claude[2], offset=3, total=5),
+            inventory(identity_row(sessionId=other), offset=4),
+        ]
+    )
+    _test_hooks.http_post = board
+    assert native_observe.registered_codex(BOARD, MACHINE, IDENTITY) == (SESSION, other)
+    assert board.arguments == [
+        {**IDENTITY, "machine": MACHINE, "format": "json", "limit": 200, "offset": offset}
+        for offset in (0, 3, 4)
+    ]
+
+
 @pytest.mark.parametrize(
     "reply",
     [
         inventory(identity_row(machine="linux:another")),
         inventory(offset=1),
         dump_json_str({"rows": [], "pagination": {"offset": 0, "limit": 1, "hasMore": False}}),
+        # A short page whose limit is not the rows it carries is not a
+        # budgeted page: the window it names and the rows disagree.
+        dump_json_str(
+            {
+                "rows": [identity_row()],
+                "pagination": {"offset": 0, "limit": 2, "hasMore": True, "nextOffset": 1},
+            }
+        ),
+        # A budgeted page can never be empty while rows remain.
+        dump_json_str(
+            {
+                "rows": [],
+                "pagination": {"offset": 0, "limit": 0, "hasMore": True, "nextOffset": 0},
+            }
+        ),
         inventory(more=True),
         dump_json_str(
             {
@@ -193,6 +253,44 @@ def test_existing_observer_submits_native_evidence_with_bounded_expiry(failure: 
             }
         ],
     }
+
+
+def test_a_machine_past_one_budgeted_page_still_has_its_pass_recorded() -> None:
+    # MCPs board task d2c66a85: from 02:12Z on 2026-11-08 every hub tick was
+    # refused at ziggurat's oversized ledger page and no pass was recorded.
+    # The board now serves the rows that fit; the pass reads on and records.
+    claude = identity_row(sessionId="33333333-3333-4333-8333-333333333333", harness="claude-code")
+    _test_hooks.run = FakeRun([ok(""), ok(document(hostname="ziggurat"))])
+    _test_hooks.now = lambda: 1000
+    board = FakeQueue(
+        [
+            sized(claude, offset=0, total=2),
+            inventory(identity_row(), offset=1),
+            "observed native evidence",
+        ]
+    )
+    _test_hooks.http_post = board
+    _test_hooks_native.read = Runtime(({"id": SESSION, "status": {"type": "notLoaded"}},))
+    result = observe.observe_node(BOARD, node("ziggurat", "session-host"), IDENTITY, EVIDENCE)
+    assert result == {
+        "node": "ziggurat",
+        "recorded": True,
+        "detail": "native evidence for 1 Codex session(s) read at "
+        "1970-01-01T00:16:40+00:00 lasts 450 s; observed native evidence",
+    }
+    assert board.tools == ["task_sessions_list", "task_sessions_list", "task_session_observe"]
+    observed = board.arguments[2]
+    assert observed["machine"] == MACHINE
+    assert observed["nativeObservations"] == [
+        {
+            "sessionId": SESSION,
+            "harness": "codex",
+            "status": "not-loaded",
+            "detail": None,
+            "observedAt": "1970-01-01T00:16:40+00:00",
+            "expiresAt": "1970-01-01T00:24:10+00:00",
+        }
+    ]
 
 
 def test_incomplete_runtime_batch_does_not_guess_idle() -> None:
