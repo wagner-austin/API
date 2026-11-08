@@ -150,7 +150,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
             "c91c08f, failure -- 61 jobs -- 1 failed: coloring-book (step: Set up job)"
         ) in body
         assert "NOT RUN" not in body
-        assert body.endswith(f"@{AGENT} your push has its CI verdict")
+        assert body.endswith(f"{AGENT}: your push has its CI verdict")
         assert '"state":"covered"' in position_path(enrolment).read_text(encoding="utf-8")
 
     def test_an_evicted_run_is_covered_beside_a_sibling_workflow_that_ran(
@@ -209,7 +209,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
         assert "  Check (live upstreams) success -- 1 jobs" in body
         assert f"checked by run {RED_RUN} at c91c08f, failure -- 67 jobs" in body
         assert "NOT RUN" not in body
-        assert body.endswith(f"@{AGENT} your push has its CI verdict")
+        assert body.endswith(f"{AGENT}: your push has its CI verdict")
 
     def test_a_sibling_cancelled_after_its_jobs_began_is_still_not_run(
         self, tmp_path: pathlib.Path, emitted: list[str], frozen_clock: int
@@ -262,7 +262,7 @@ class TestASupersededPushIsAnnouncedWithItsCover:
         assert "  Check (live upstreams) cancelled -- 2 of 2 jobs completed, 0 NOT RUN" in body
         assert f"NOT RUN: CI cancelled work for {SHA}" in body
         assert body.endswith(
-            f"@{AGENT} 1 of your pushed sha(s) were not run by CI in full (NOT RUN), "
+            f"{AGENT}: 1 of your pushed sha(s) were not run by CI in full (NOT RUN), "
             "so they have no CI verdict"
         )
 

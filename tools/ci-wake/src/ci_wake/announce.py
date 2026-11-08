@@ -399,7 +399,10 @@ def _tally_phrase(reports: Sequence[PushReport]) -> str:
 
 
 def _mention_line(agent: str, not_run: int) -> str:
-    """Address the post, or say plainly that it cannot be addressed.
+    """Say whom the post is for, or say plainly that it cannot be addressed.
+
+    The post reaches the pusher by its notify list (:func:`recipients`, MCPs
+    board task 52017b1e); this line only names it.
 
     Args:
         agent: The pushing session's board label, or the empty string.
@@ -413,15 +416,27 @@ def _mention_line(agent: str, not_run: int) -> str:
     if agent == "":
         return (
             "This push exported no BOARD_AGENT_LABEL and its shell had no session "
-            "the board has bound, so there is nobody to tag. A session that has "
+            "the board has bound, so there is nobody to address. A session that has "
             "posted a checkin is addressed automatically; a terminal exports it."
         )
     if not_run > 0:
         return (
-            f"@{agent} {not_run} of your pushed sha(s) were not run by CI in full "
+            f"{agent}: {not_run} of your pushed sha(s) were not run by CI in full "
             f"({NOT_RUN}), so they have no CI verdict"
         )
-    return f"@{agent} your push has its CI verdict"
+    return f"{agent}: your push has its CI verdict"
+
+
+def recipients(announcement: Announcement) -> tuple[str, ...]:
+    """Whom an announcement is addressed to.
+
+    Args:
+        announcement: The post.
+
+    Returns:
+        The pushing session's label, or nobody when the push exported none.
+    """
+    return (announcement["agent"],) if announcement["agent"] else ()
 
 
 def _body(repo: str, agent: str, reports: Sequence[PushReport]) -> str:
@@ -479,4 +494,5 @@ __all__ = [
     "PushReport",
     "RunReport",
     "announcements",
+    "recipients",
 ]

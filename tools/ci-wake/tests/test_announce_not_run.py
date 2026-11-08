@@ -42,7 +42,7 @@ class TestAnEvictedRun:
         )
 
         assert body.splitlines()[-1] == (
-            f"@{AGENT} 1 of your pushed sha(s) were not run by CI in full (NOT RUN), "
+            f"{AGENT}: 1 of your pushed sha(s) were not run by CI in full (NOT RUN), "
             "so they have no CI verdict"
         )
         assert "has its CI verdict" not in body
@@ -82,13 +82,13 @@ class TestAGroupWithBoth:
 
         assert f"NOT RUN: CI cancelled work for {SHA}" in body
         assert f"NOT RUN: CI cancelled work for {OTHER_SHA}" not in body
-        assert body.splitlines()[-1].startswith(f"@{AGENT} 1 of your pushed sha(s) were not run")
+        assert body.splitlines()[-1].startswith(f"{AGENT}: 1 of your pushed sha(s) were not run")
 
     def test_a_group_with_nothing_cancelled_keeps_its_verdict_line(self) -> None:
         body = only_body([make_report(runs=((make_run(conclusion="failure"), make_tally()),))])
 
         assert NOT_RUN not in body
-        assert body.splitlines()[-1] == f"@{AGENT} your push has its CI verdict"
+        assert body.splitlines()[-1] == f"{AGENT}: your push has its CI verdict"
 
     def test_an_unaddressed_cancelled_push_still_carries_the_words_and_the_sha(self) -> None:
         posts = announcements(

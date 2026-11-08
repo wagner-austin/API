@@ -131,7 +131,8 @@ def test_remote_delivery_retries_refused_post_then_acknowledges_only_once(
     assert main(argv) == 0
     notes = notes_sent(poster)
     assert len(notes) == 1
-    assert f"@{AGENT}" in require_str(notes[0], "body")
+    assert f"{AGENT}: your push" in require_str(notes[0], "body")
+    assert notes[0]["notify"] == [AGENT]
     assert read_announced(position_path(local)) == frozenset({attempt_key(REPO, SHA)})
     assert read_remote_attempts("ziggurat", local) == (expected,)
     assert remote.read_text(encoding="utf-8") == remote_text

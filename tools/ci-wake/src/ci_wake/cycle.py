@@ -38,7 +38,7 @@ from board_watch.config import load_credentials
 from platform_core.board import post_to_task, register_service_session
 
 from ci_wake import _test_hooks
-from ci_wake.announce import CoverReport, PushReport, RunReport, announcements
+from ci_wake.announce import CoverReport, PushReport, RunReport, announcements, recipients
 from ci_wake.coverage import BranchRun, branch_of, branch_runs, find_cover
 from ci_wake.enrolment import PushAttempt, attempt_key, latest_attempts, read_attempts
 from ci_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
@@ -274,9 +274,10 @@ def run_cycle(enrolment: pathlib.Path, *, source_host: str = "") -> None:
                 task_id=task_id,
                 kind="note",
                 body=announcement["body"],
+                notify=recipients(announcement),
             )
             _test_hooks.emit(
-                f"posted {announcement['repo']}: tagged @{announcement['agent']}"
+                f"posted {announcement['repo']}: addressed to {announcement['agent']}"
                 if announcement["agent"] != ""
                 else f"posted {announcement['repo']}: unaddressed, no BOARD_AGENT_LABEL"
             )

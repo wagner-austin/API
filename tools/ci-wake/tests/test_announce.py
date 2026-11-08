@@ -9,7 +9,7 @@ every announcement less true than it was.
 
 from __future__ import annotations
 
-from ci_wake.announce import FAILED_CAP, LINE_CAP, MARKER, announcements
+from ci_wake.announce import FAILED_CAP, LINE_CAP, MARKER, announcements, recipients
 from tests.conftest import (
     AGENT,
     OTHER_SHA,
@@ -434,21 +434,26 @@ class TestStalled:
 
 
 class TestAddressing:
-    def test_a_push_with_a_label_is_mentioned(self) -> None:
-        body = only_body([make_report(runs=((make_run(), make_tally()),))])
+    def test_a_push_with_a_label_is_addressed_by_record(self) -> None:
+        """MCPs board task 52017b1e: the pusher is the post's recipient; the
+        body names it and addresses nobody with an @."""
+        [announcement] = announcements([make_report(runs=((make_run(), make_tally()),))])
 
-        assert body.rstrip().endswith(f"@{AGENT} your push has its CI verdict")
+        assert announcement["body"].rstrip().endswith(f"{AGENT}: your push has its CI verdict")
+        assert "@" not in announcement["body"]
+        assert recipients(announcement) == (AGENT,)
 
     def test_a_push_without_one_says_so_rather_than_tagging_nobody(self) -> None:
         """A human pushing from a terminal has no board label. Their verdict
         is posted board-level and the post says how to be addressed next
         time."""
-        body = only_body(
+        [announcement] = announcements(
             [make_report(attempt=make_attempt(agent=""), runs=((make_run(), make_tally()),))]
         )
 
-        assert "exported no BOARD_AGENT_LABEL" in body
-        assert "@" not in body.splitlines()[-1]
+        assert "exported no BOARD_AGENT_LABEL" in announcement["body"]
+        assert "@" not in announcement["body"].splitlines()[-1]
+        assert recipients(announcement) == ()
 
 
 class TestGrouping:

@@ -415,11 +415,14 @@ class TestAVerdictIsAnnounced:
                 jobs_argv(REPO, RUN_ID): _jobs_reply(),
             }
         )
-        _test_hooks.http_post = announcing_poster()
+        poster = announcing_poster()
+        _test_hooks.http_post = poster
 
         run_cycle(enrolment)
 
-        assert f"posted {REPO}: tagged @{AGENT}" in emitted
+        assert f"posted {REPO}: addressed to {AGENT}" in emitted
+        # MCPs board task 52017b1e: the pusher is the note's recipient by record.
+        assert notes_sent(poster)[0]["notify"] == [AGENT]
 
 
 class TestSilenceIsAnnounced:
@@ -542,7 +545,8 @@ class TestReEnrolment:
         run_cycle(enrolment)
 
         assert gh.calls.count(runs_argv(REPO, SHA)) == 1
-        assert "@opus-second-0909" in str(notes_sent(poster)[0]["body"])
+        assert "opus-second-0909: your push" in str(notes_sent(poster)[0]["body"])
+        assert notes_sent(poster)[0]["notify"] == ["opus-second-0909"]
         assert emitted[-1] == (
             "cycle: 1 enrolled, 1 outstanding, 1 announced, 0 closed unannounced as never "
             "landed, positions recorded"
