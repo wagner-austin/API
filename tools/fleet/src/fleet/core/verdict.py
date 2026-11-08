@@ -29,6 +29,7 @@ from typing_extensions import TypedDict
 
 from fleet.core.build_steps import read_build_steps
 from fleet.core.linux_unit_end import UNIT_ENDED_LINE
+from fleet.core.mutation_verdict import read_mutation
 from fleet.core.release_artifact import read_artifact
 from fleet.core.run_registry import read_registry
 from fleet.core.run_summary import read_run_summary
@@ -197,6 +198,12 @@ class Verdict(TypedDict):
             did not leave readable, or ``unread``. Which commit built a
             deployed jar was otherwise a session's rebuild (MCPs board task
             0c8ace8d).
+        mutation: How the package's mutation step ended and its span
+            against its own bound
+            (:func:`fleet.core.mutation_verdict.read_mutation`), for
+            example ``failed:8/453,801s/900s``: a check whose suite passed
+            and whose step found surviving mutants otherwise read like any
+            other red check (MCPs board task 637f648f).
         results_path: Where the node keeps the check's structured results,
             its runners' JUnit XML and mypy JSON
             (:func:`fleet.core.check_results.retained_results_path`), which
@@ -228,6 +235,7 @@ class Verdict(TypedDict):
     steps: str
     registry: str
     artifact: str
+    mutation: str
     results_path: str
 
 
@@ -417,6 +425,7 @@ def judge(
         steps=read_build_steps(ANSI.sub("", tail)),
         registry=read_registry(tail),
         artifact=read_artifact(tail),
+        mutation=read_mutation(ANSI.sub("", tail)),
         results_path=results_path,
     )
 
@@ -433,7 +442,7 @@ def render_verdict(verdict: Verdict) -> str:
         ended=<time> log=<node>:<path> run=<run id> workers=<n>
         slowest=<...> ci=<...> dispatch=<...> vmtests=<...> generation=<...> began=<...>
         phases=<...>
-        steps=<...> registry=<commit> artifact=<...>
+        steps=<...> registry=<commit> artifact=<...> mutation=<...>
         results=<node>:<path>``,
         one line, so a closure can quote it and a reader can grep a thread
         for the prefix. ``workers`` and every field after it come after every
@@ -452,6 +461,7 @@ def render_verdict(verdict: Verdict) -> str:
         f"generation={verdict['generation']} began={verdict['began']} "
         f"phases={verdict['phases']} steps={verdict['steps']} "
         f"registry={verdict['registry']} artifact={verdict['artifact']} "
+        f"mutation={verdict['mutation']} "
         f"results={verdict['node']}:{verdict['results_path']}"
     )
 

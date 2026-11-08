@@ -246,5 +246,5 @@ class TestTheReading:
             "slowest=tests/passkey-twin.test.ts:139s,tests/cascade-dependencies.test.ts:56s,"
             "tests/served/proxy.test.ts:7s ci=2111s/664s dispatch=940s/664s vmtests=unread "
             "generation=unread began=unread phases=unread steps=unread registry=unread "
-            f"artifact=unread results=lavender:/home/corvis/fleet/stage/logs/{RUN}.results"
+            f"artifact=unread mutation=unread results=lavender:/home/corvis/fleet/stage/logs/{RUN}.results"
         )
