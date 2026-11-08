@@ -86,7 +86,7 @@ def test_the_real_declarations_add_up_for_every_node() -> None:
     runners = _runners()
 
     assert budget_gaps(workspace, runners) == ()
-    assert [host["name"] for host in runners["hosts"]] == ["lavender"]
+    assert [host["name"] for host in runners["hosts"]] == ["lavender", "sedona"]
     assert slice_cap_gb("lavender", runners) == 18
 
 

@@ -100,7 +100,7 @@ def test_the_execution_directory_runs_isolated_on_a_rootless_daemon() -> None:
 def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
     """tools/fleet-execution-runners reads lavender's live runner units.
 
-    It is pinned to the node its recipe names to the cases, the one host
+    It is pinned to the node its recipe names to the cases, one of the hosts
     ``runners.json`` declares, and it requires no ``docker`` tag: that would
     isolate it as execdocker, while its full-slice case runs under the fleet
     user's own systemd manager (MCPs board task 715b9ec5). It ran pinned to
@@ -122,7 +122,8 @@ def test_the_runner_host_s_cases_run_on_its_node_as_the_fleet_user() -> None:
     given = f"{RUNNER_HOST_OPTION}="
     named = [word.removeprefix(given) for word in recipe.split() if word.startswith(given)]
     declared = [each["name"] for each in load_runner_spec(str(PACKAGE / "runners.json"))["hosts"]]
-    assert (named, declared) == (["lavender"], ["lavender"])
+    assert (named, declared) == (["lavender"], ["lavender", "sedona"])
+    assert set(named) <= set(declared)
 
 
 def test_the_hub_s_cases_run_on_the_hub_as_the_fleet_user() -> None:

@@ -333,10 +333,20 @@ class TestRunnerSpec:
             "wagner-austin/tree-bot": 1,
             "wagner-austin/chat": 1,
         }
-        assert len(spec["hosts"]) == 1
+        assert [host["name"] for host in spec["hosts"]] == ["lavender", "sedona"]
         assert {label for install in lavender["installs"] for label in install["labels"]} == {
-            "lavender"
+            "lavender",
+            "mcps-fleet-ci",
         }
+        assert spec["hosts"][1]["installs"] == [
+            {
+                "repo": "wagner-austin/MCPs",
+                "runner_name": "sedona",
+                "service": "actions.runner.wagner-austin-MCPs.sedona.service",
+                "workdir": "/home/gharunner/actions-runner-mcps-1/_work",
+                "labels": ["mcps-fleet-ci"],
+            }
+        ]
         # Every asset is one the provision places. The one placed by hand,
         # RustedWarfareBot's licensed game jar, had no reader once its CI left
         # lavender (board task 4f228608) and was dropped (MCPs board task
@@ -366,7 +376,10 @@ class TestRunnerSpec:
         machines = set(decode_fleet_workspace(shipped_document())["machines"])
         linux_installed = {tool["name"] for tool in TAGGED_TOOLS if "apt-get" in tool["install"]}
         assert linux_installed == {*nix_package, "chrome"}
-        assert [host["name"] for host in spec["hosts"] if host["name"] in machines] == ["lavender"]
+        assert [host["name"] for host in spec["hosts"] if host["name"] in machines] == [
+            "lavender",
+            "sedona",
+        ]
         for host in spec["hosts"]:
             assert set(nix_package.values()) <= set(host["base"]["nix_packages"]), host["name"]
             assert CHROME_LINUX_PATH in {asset["path"] for asset in host["assets"]}, host["name"]
