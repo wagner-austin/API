@@ -145,7 +145,9 @@ class TestEncodeBoardPost:
         }
 
     def test_the_kind_is_carried_rather_than_fixed(self) -> None:
-        arguments = encode_board_post(IDENTITY, task_id=TASK_ID, kind="checkin", body="x", notify=())
+        arguments = encode_board_post(
+            IDENTITY, task_id=TASK_ID, kind="checkin", body="x", notify=()
+        )
 
         assert arguments["kind"] == "checkin"
         assert arguments["notify"] == []
