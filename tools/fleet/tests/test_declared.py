@@ -167,7 +167,9 @@ class TestReadDeclared:
         assert read["projects"] == (
             declared.DeclaredProject(
                 source=None,
-                project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity"),
+                project="MCPs",
+                required_tags=(),
+                dispatch_nodes=("sedona", "serendipity"),
             ),
             declared.DeclaredProject(
                 source=None,
@@ -200,7 +202,9 @@ class TestReadDeclared:
             projects=(
                 declared.DeclaredProject(
                     source=None,
-                    project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity"),
+                    project="MCPs",
+                    required_tags=(),
+                    dispatch_nodes=("sedona", "serendipity"),
                 ),
                 declared.DeclaredProject(
                     source=None,
@@ -275,7 +279,9 @@ class TestReadDeclared:
             projects=(
                 declared.DeclaredProject(
                     source=None,
-                    project="MCPs", required_tags=(), dispatch_nodes=("sedona",),
+                    project="MCPs",
+                    required_tags=(),
+                    dispatch_nodes=("sedona",),
                 ),
             ),
             runners=("fleet-node-sedona",),
@@ -352,7 +358,9 @@ class TestPublishRegistry:
         projects=(
             declared.DeclaredProject(
                 source=None,
-                project="MCPs", required_tags=(), dispatch_nodes=("lavender", "sedona"),
+                project="MCPs",
+                required_tags=(),
+                dispatch_nodes=("lavender", "sedona"),
             ),
             declared.DeclaredProject(
                 source=None,
