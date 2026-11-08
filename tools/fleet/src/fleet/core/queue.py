@@ -387,10 +387,9 @@ def observe_sessions(
     return call_mcp_tool(_test_hooks.http_post, credentials, "task_session_observe", arguments)
 
 
-#: The room a verdict lands in when the job names no task: the fleet's own,
-#: where the runners live, addressed to the submitting label so it reaches
-#: that session's feed as a mention.
-VERDICT_ROOM: Final = "fleet"
+#: The fleet's own room, where each runner registers with its check-in. A
+#: job's outcome is the queue's close to post (MCPs board task 52017b1e).
+RUNNER_ROOM: Final = "fleet"
 
 #: What a runner tells the ledger it is, on its registering check-in.
 RUNNER_HARNESS: Final = "fleet-agent"
@@ -398,47 +397,6 @@ RUNNER_HARNESS: Final = "fleet-agent"
 #: The flag that makes a runner's tick post its registering check-in and
 #: claim nothing, on the hub runner and on every node runner alike.
 ANNOUNCE_FLAG: Final = "--announce"
-
-
-def post_verdict(
-    credentials: McpCredentials,
-    *,
-    submitted_by: str,
-    line: str,
-    identity: JSONObject,
-) -> str:
-    """Post the verdict of a check that names no task, where its submitter reads it.
-
-    A board-level note in :data:`VERDICT_ROOM` addressed to the submitter
-    by its notify list, so it lands in their feed as addressed to them (MCPs
-    board task fd5cabfa, A3; by record rather than an ``@label`` in the
-    words since MCPs board task 52017b1e, whose board refuses a label no
-    session has written under). A job that names a task is not posted here: the
-    queue's close writer puts its outcome on that task's thread, addressed
-    to the submitter, in the transaction that closes it (MCPs board task
-    2fecad69), for every terminal status and not only a suite that ran.
-
-    Args:
-        credentials: The board's endpoint and headers.
-        submitted_by: The label that enqueued the job.
-        line: The verdict line (:func:`fleet.core.verdict.render_verdict`).
-        identity: From :func:`identity_arguments`, the runner's own.
-
-    Returns:
-        The tool's rendered answer.
-
-    Raises:
-        AppError: Any transport or contract failure from the underlying call,
-            including the board refusing a runner it has never ledgered.
-    """
-    arguments: JSONObject = {
-        "kind": "note",
-        "room": VERDICT_ROOM,
-        "body": line,
-        "notify": [submitted_by],
-        **identity,
-    }
-    return call_mcp_tool(_test_hooks.http_post, credentials, "task_post", arguments)
 
 
 def announce(
@@ -471,7 +429,7 @@ def announce(
         "kind": "checkin",
         "harness": RUNNER_HARNESS,
         "machine": machine,
-        "room": VERDICT_ROOM,
+        "room": RUNNER_ROOM,
         "body": body,
         **identity,
     }
@@ -482,16 +440,15 @@ __all__ = [
     "ANNOUNCE_FLAG",
     "API_KEY_VARIABLE",
     "RUNNER_HARNESS",
+    "RUNNER_ROOM",
     "TENANT_ID_VARIABLE",
     "URL_VARIABLE",
-    "VERDICT_ROOM",
     "announce",
     "claim_next",
     "get_job",
     "identity_arguments",
     "load_credentials",
     "observe_sessions",
-    "post_verdict",
     "report_close",
     "report_progress",
     "report_start",

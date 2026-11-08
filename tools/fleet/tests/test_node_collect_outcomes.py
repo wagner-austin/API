@@ -90,9 +90,7 @@ def _collect(
     endpoint = FakeQueue([dump_json_str({"job": queue_job(status="running")})])
     _test_hooks.http_post = endpoint
     job = decode_listing(listing)[0]
-    collected = node_collect.collect_one_job(
-        loaded, queue.load_credentials(), queue.load_credentials(), job, {}
-    )
+    collected = node_collect.collect_one_job(loaded, queue.load_credentials(), job, {})
     return collected, endpoint
 
 
@@ -192,7 +190,6 @@ class TestTheCollectPass:
         node_collect.collect_pass(
             loaded,
             queue.load_credentials(),
-            queue.load_credentials(),
             {},
             agent=LAVENDER,
             alias="lavender",
@@ -225,7 +222,6 @@ class TestTheCollectPass:
 
         node_collect.collect_pass(
             loaded,
-            queue.load_credentials(),
             queue.load_credentials(),
             {},
             agent=LAVENDER,

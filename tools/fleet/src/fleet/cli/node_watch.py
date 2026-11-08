@@ -154,7 +154,6 @@ def live_among(loaded: _config.LoadedWorkspace, run_ids: frozenset[str]) -> froz
 def collect_ended(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
-    board: McpCredentials,
     identity: JSONObject,
     *,
     agent: str,
@@ -165,7 +164,6 @@ def collect_ended(
     Args:
         loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
         identity: This runner's identity arguments.
         agent: This runner's label.
         run_id: The run whose result the node has written, or whose renewal
@@ -184,7 +182,7 @@ def collect_ended(
     """
     for job in queue_listing.held_by(credentials, agent=agent):
         if job["run_id"] == run_id and job["status"] is DispatchStatus.RUNNING:
-            return collect_one_job(loaded, credentials, board, job, identity)
+            return collect_one_job(loaded, credentials, job, identity)
     return Collected(
         outcome=CollectOutcome.NOT_HELD,
         line=f"{run_id}: no running job of {agent} names it now; the next fire's collect reads it",

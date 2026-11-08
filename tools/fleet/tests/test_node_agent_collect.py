@@ -2,10 +2,10 @@
 and its entry points (MCPs board task fd5cabfa, A3).
 
 A later tick finds the job it launched among ``held_by``, reads the result
-and the transcript's tail off the node, composes the verdict line, posts it
-to the submitter's feed when the job names no task, and closes the job on
-both sides; the queue's close posts a task-naming job's outcome to its
-thread (MCPs board task 2fecad69). The claim half is
+and the transcript's tail off the node, composes the verdict line and closes
+the job on both sides with it; the queue's close posts every job's outcome,
+on its task's thread or in the fleet room, addressed to the submitter (MCPs
+board tasks 2fecad69 and 52017b1e). The claim half is
 ``test_node_agent.py``; the fixtures both use are ``_node_agent_fixtures.py``.
 """
 
@@ -134,7 +134,7 @@ class TestCollecting:
         ledger = (sourced_config.parent / "runs" / "ledger.jsonl").read_text(encoding="utf-8")
         assert "passed" in ledger
 
-    def test_a_job_with_no_task_is_addressed_to_the_submitter_in_the_fleet_room(
+    def test_a_job_with_no_task_is_closed_with_its_verdict_and_the_runner_posts_nothing(
         self, sourced_config: pathlib.Path
     ) -> None:
         launch(sourced_config)
@@ -151,7 +151,6 @@ class TestCollecting:
         endpoint = FakeQueue(
             [
                 held_answer(),
-                "posted",
                 dump_json_str({"job": queue_job(status="failed")}),
                 dump_json_str({"claimed": None}),
             ]
@@ -160,18 +159,17 @@ class TestCollecting:
 
         assert node_agent.main(node_argv(sourced_config)) == 0
 
-        posted = endpoint.arguments[1]
-        assert "taskId" not in posted
-        assert posted["room"] == "fleet"
-        body = narrow_json_to_str(posted["body"])
-        # MCPs board task 52017b1e: the submitter is the note's recipient by
-        # its notify list, and no word of the note addresses anyone.
-        assert body.startswith("FLEET-CHECK ")
-        assert "@" not in body
-        assert posted["notify"] == ["opus-dispatch-0905"]
-        assert "exit=2 banner=no tests=100p/3f coverage=unread" in body
-        assert endpoint.arguments[2]["status"] == "failed"
-        assert endpoint.arguments[2]["exitCode"] == 2
+        # MCPs board task 52017b1e: the queue's close posts the outcome in the
+        # fleet room, addressed to the submitter by the job's own row, so the
+        # runner calls no board tool and the verdict travels as the detail.
+        assert "task_post" not in endpoint.tools
+        closed = endpoint.arguments[1]
+        assert closed["action"] == "close"
+        assert closed["status"] == "failed"
+        assert closed["exitCode"] == 2
+        detail = narrow_json_to_str(closed["detail"])
+        assert detail.startswith("FLEET-CHECK ")
+        assert "exit=2 banner=no tests=100p/3f coverage=unread" in detail
 
     def test_a_suite_still_running_has_its_lease_renewed(
         self, sourced_config: pathlib.Path

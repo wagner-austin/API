@@ -269,7 +269,7 @@ class TestCollectEnded:
         _test_hooks.http_post = endpoint
 
         collected = node_watch.collect_ended(
-            loaded, credentials, credentials, {}, agent="fleet-node-lavender", run_id=DEMO_RUN_ID
+            loaded, credentials, {}, agent="fleet-node-lavender", run_id=DEMO_RUN_ID
         )
 
         assert collected["outcome"] is CollectOutcome.SETTLED
@@ -291,7 +291,7 @@ class TestCollectEnded:
         _test_hooks.http_post = endpoint
 
         collected = node_watch.collect_ended(
-            loaded, credentials, credentials, {}, agent="fleet-node-lavender", run_id=DEMO_RUN_ID
+            loaded, credentials, {}, agent="fleet-node-lavender", run_id=DEMO_RUN_ID
         )
 
         assert collected == Collected(

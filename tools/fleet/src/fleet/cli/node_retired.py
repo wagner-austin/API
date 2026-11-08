@@ -62,7 +62,6 @@ def is_retired(loaded: _config.LoadedWorkspace, row: LedgerEntry) -> bool:
 def settle_retired(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
-    board: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
     *,
@@ -75,7 +74,6 @@ def settle_retired(
     Args:
         loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
         job: The queue job this runner holds.
         identity: This runner's identity arguments.
         row: The run's live ledger row, whose project :func:`is_retired`.
@@ -102,7 +100,6 @@ def settle_retired(
         return settle(
             loaded,
             credentials,
-            board,
             job,
             identity,
             row=row,

@@ -286,7 +286,6 @@ class TestTheCollectPass:
             node_collect.collect_pass(
                 loaded,
                 credentials,
-                credentials,
                 {},
                 agent=LAVENDER,
                 alias="lavender",

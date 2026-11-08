@@ -51,9 +51,9 @@ detached, and reports the run started. The
 serve's watch, or a later serve's collect pass, collects it
 (:mod:`fleet.cli.node_watch`, :mod:`fleet.cli.node_collect`): reads the result,
 reads the tail of the transcript, composes the verdict
-(:mod:`fleet.core.verdict`), posts it to the submitter's feed when the job
-names no task (the queue's close posts a task's row, MCPs board task
-2fecad69), and closes the job on both sides; or stops the build, when
+(:mod:`fleet.core.verdict`) and closes the job on both sides with it, the
+queue's close posting the outcome addressed to the submitter (MCPs board
+tasks 2fecad69 and 52017b1e); or stops the build, when
 it runs past its lease or its queue job was cancelled under it.
 
 THE IDENTITY IS DERIVED, NOT CONFIGURED. The label is ``fleet-node-<alias>``
@@ -375,7 +375,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     credentials = queue.load_credentials()
 
     settle = functools.partial(
-        node_watch.collect_ended, loaded, credentials, board, identity, agent=agent
+        node_watch.collect_ended, loaded, credentials, identity, agent=agent
     )
     watch = node_watch.RunWatch(loaded, alias=alias, node=node, settle=settle)
     launcher = Launcher(
@@ -394,7 +394,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         collect_pass(
             loaded,
             credentials,
-            board,
             identity,
             agent=agent,
             alias=alias,

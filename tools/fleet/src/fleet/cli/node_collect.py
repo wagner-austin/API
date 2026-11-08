@@ -5,10 +5,10 @@ ceiling; the claim half stays there. Each tick asks the queue what this
 runner holds and settles every run it launched in one of four ways:
 
 * FINISHED. The node wrote a result: read the transcript's tail, compose the
-  verdict (:mod:`fleet.core.verdict`), post it to the submitter's feed when
-  the job names no task, and close the job on both sides, the queue's side
-  first (:mod:`fleet.cli.node_settle`); the queue's close posts a
-  task-naming job's outcome to its thread (MCPs board task 2fecad69).
+  verdict (:mod:`fleet.core.verdict`) and close the job on both sides with
+  it, the queue's side first (:mod:`fleet.cli.node_settle`); the queue's
+  close posts every job's outcome, on its task's thread or in the fleet
+  room, addressed to the submitter (MCPs board tasks 2fecad69 and 52017b1e).
 * STILL RUNNING, INSIDE ITS LEASE. Renew the queue claim, once it was last
   set 70 s or more ago (:mod:`fleet.cli.node_collected`), and leave it.
 * LAUNCHED UNDER ANOTHER STAGE ROOT (MCPs board task f02b144e). Give it
@@ -123,7 +123,6 @@ class Reconciled(TypedDict):
 def collect_one_job(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
-    board: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
 ) -> Collected:
@@ -132,7 +131,6 @@ def collect_one_job(
     Args:
         loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
         job: The queue job this runner holds.
         identity: This runner's identity arguments.
 
@@ -186,7 +184,7 @@ def collect_one_job(
         # A roll may remove the project of a run still held (MCPs board task 4ec65b8f).
         if node_retired.is_retired(loaded, row):
             return node_retired.settle_retired(
-                loaded, credentials, board, job, identity, row=row, node=node, result=result
+                loaded, credentials, job, identity, row=row, node=node, result=result
             )
         plan = require_project(loaded.workspace, row["project"])
         if result is None:
@@ -202,7 +200,6 @@ def collect_one_job(
                 return settle(
                     loaded,
                     credentials,
-                    board,
                     job,
                     identity,
                     row=row,
@@ -237,7 +234,6 @@ def collect_one_job(
         return settle(
             loaded,
             credentials,
-            board,
             job,
             identity,
             row=row,
@@ -501,7 +497,6 @@ def stop_cancelled_run(
 def collect_pass(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
-    board: McpCredentials,
     identity: JSONObject,
     *,
     agent: str,
@@ -516,7 +511,6 @@ def collect_pass(
     Args:
         loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers.
         identity: This runner's identity arguments.
         agent: This runner's label.
         alias: This node's workspace name.
@@ -551,7 +545,7 @@ def collect_pass(
     for job in held:
         # Live is claimed or running; a claimed one no launch carries is an earlier tick's.
         if job["status"] is DispatchStatus.RUNNING:
-            collected = collect_one_job(loaded, credentials, board, job, identity)
+            collected = collect_one_job(loaded, credentials, job, identity)
             _log.info("%s", collected["line"])
             if collected["outcome"] is CollectOutcome.UNREACHABLE:
                 holder.owe(frozenset({job["run_id"]}))

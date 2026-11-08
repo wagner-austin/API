@@ -80,7 +80,6 @@ class TestARunTheRollMoved:
             node_collect.collect_pass(
                 loaded,
                 queue.load_credentials(),
-                queue.load_credentials(),
                 {},
                 agent=LAVENDER,
                 alias="lavender",

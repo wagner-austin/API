@@ -11,16 +11,19 @@ the job running on the queue with no live row behind it, which every later
 collect pass leaves alone, so the waiting session waited out the claim's
 hour-long lease; and a retire done before a refused call cannot be done
 again, since the result it reads goes with the directory. Now every queue
-and board call comes first: a refusal anywhere in them leaves the row live
+call comes first: a refusal anywhere in them leaves the row live
 and the directory where it was, so the next poll settles the run again from
 the start, as if it had just ended. The verdict names the transcript where
 the retire will keep it (:func:`fleet.core.names.retained_log_path`, the
 path :func:`fleet.core.retire_owed.retire_or_raise` returns).
 
-What a refusal can still repeat: a task-less job's verdict, posted to its
-submitter's feed before the close, is posted again when the close is refused
-and the settle runs again. A second line is visible and harmless; a verdict
-posted only after a close that then failed would be one nobody ever saw.
+THE RUNNER POSTS NO VERDICT (MCPs board task 52017b1e). The queue's close
+posts every job's outcome, the verdict line its detail, on the job's task
+thread or in the fleet room, addressed to the submitter by the job's own
+row. Until 2026-11-08 this settle posted a task-less job's verdict itself,
+addressed to the submitter by label; from 03:50Z that day the board refused
+a CI submitter's label it had never seen, before the close, and every
+node's serving loop failed on it each tick until the roll was moved back.
 
 After the close, the ledger row is finished (this machine's files) and the
 directory retired (the node). A RETIRE THE NODE DID NOT ANSWER IS OWED, NOT
@@ -62,7 +65,6 @@ from fleet.core import (
     dispatch,
     linux_unit_end,
     names,
-    queue,
     remote,
     retire_owed,
     run_registry,
@@ -74,7 +76,6 @@ from fleet.core.check_results import retained_results_path
 def settle(
     loaded: _config.LoadedWorkspace,
     credentials: McpCredentials,
-    board: McpCredentials,
     job: DispatchJob,
     identity: JSONObject,
     *,
@@ -85,15 +86,14 @@ def settle(
     detail: str,
     stopped: str | None,
 ) -> Collected:
-    """Read a run's tail and judge it, post a task-less run's verdict, close its
-    queue job (or give it back when its unit was ended for memory), then
-    finish its row, retire its directory and remove the node's cache
-    generations no run reads.
+    """Read a run's tail and judge it, close its queue job with the verdict
+    (or give it back when its unit was ended for memory), then finish its
+    row, retire its directory and remove the node's cache generations no run
+    reads.
 
     Args:
         loaded: The workspace and its resolved record paths.
         credentials: The queue's endpoint and headers.
-        board: The board's endpoint and headers, for the verdict.
         job: The queue job this runner holds.
         identity: This runner's identity arguments.
         row: The run's live ledger row.
@@ -116,11 +116,11 @@ def settle(
 
     Raises:
         AppError: ``QUEUE_ANSWER_MALFORMED`` when the job carries no sha;
-            ``QUEUE_UNANSWERED`` when the board or the queue did not answer,
-            with nothing on this machine or the node changed;
+            ``QUEUE_UNANSWERED`` when the queue did not answer, with
+            nothing on this machine or the node changed;
             ``DISPATCH_FAILED`` when the node answered the retire and it
             failed there, with the row and the job already closed; or a
-            node, board or queue failure. Not caught. A node that did not
+            node or queue failure. Not caught. A node that did not
             answer the retire raises nothing: the retire is owed.
     """
     sha = require_sha(job)
@@ -154,16 +154,12 @@ def settle(
     unit_end = verdict.read_unit_end(tail)
     ended = rendered if unit_end is None else f"{rendered} {unit_end}"
     line = ended if stopped is None else f"{ended} stopped: {stopped}"
-    # A job naming a task gets its row from the queue's close below, on the
-    # task's thread and addressed to the submitter (MCPs board task
-    # 2fecad69); only a task-less job's verdict is this runner's to post.
-    if job["task_id"] is None:
-        queue.post_verdict(
-            board,
-            submitted_by=job["submitted_by"],
-            line=line,
-            identity=identity,
-        )
+    # The queue's close below posts every outcome, the verdict line its
+    # detail: on the job's task thread, or in the fleet room for a job that
+    # names none, addressed to the submitter by the job's own row (MCPs board
+    # tasks 2fecad69 and 52017b1e). A runner posts no verdict of its own: on
+    # 2026-11-08 one addressed by label stopped every node's serving loop at
+    # a CI submitter the board had never seen.
     # A check yields memory to the stack, so a unit the kernel or
     # systemd-oomd ended for memory is given back to the queue, which
     # requeues it once (MCPs board task d111690a, fleet.cli.job_close).
