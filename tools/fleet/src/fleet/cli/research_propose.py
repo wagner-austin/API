@@ -72,6 +72,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "result": result,
                 }
             ),
+            notify=(),
         )
     emit_line(dump_json_str(result))
     return 0
