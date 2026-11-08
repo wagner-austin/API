@@ -90,7 +90,7 @@ class TestAnnouncement:
         assert "acquired 19:28:00Z" in body
         assert "RELEASED after 165s" in body
         assert "+1 step(s) this window" in body
-        assert "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned" in body
+        assert "opus-mosh-reboot-0909: your fleet-lock operation on hub transitioned" in body
 
     def test_a_failure_carries_its_detail(self) -> None:
         events = (
@@ -148,7 +148,7 @@ class TestAnnouncement:
         # Each hold line attributes its own agent; the MENTION is the
         # trailer, once, deduplicated.
         assert post["body"].splitlines()[-1] == (
-            "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned"
+            "opus-mosh-reboot-0909: your fleet-lock operation on hub transitioned"
         )
 
     def test_a_waiting_hold_beside_a_boundary_hold_is_counted_not_lined(self) -> None:
@@ -274,7 +274,7 @@ class TestAnnouncement:
         lines = post["body"].splitlines()
         assert lines[0] == "FLEET-LOCK on hub: 1 hold(s) transitioned"
         assert lines[2] == "CHECKS: 1 make test run(s) finished"
-        assert lines[-1] == "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned"
+        assert lines[-1] == "opus-mosh-reboot-0909: your fleet-lock operation on hub transitioned"
         assert post["agents"] == ("opus-mosh-reboot-0909",)
         assert (post["holds"], post["checks"]) == (1, 1)
         assert "RELEASED after 5s" in lines[1]
@@ -313,8 +313,8 @@ class TestAnnouncement:
                 [
                     "FLEET-LOCK on diphtheria: 1 hold(s) transitioned",
                     "deploy (service-up, pid 2688): acquired 02:41:10Z RELEASED after 1085s "
-                    "by @opus-mosh-reboot-0909",
-                    "@opus-mosh-reboot-0909 your fleet-lock operation on diphtheria transitioned",
+                    "by opus-mosh-reboot-0909",
+                    "opus-mosh-reboot-0909: your fleet-lock operation on diphtheria transitioned",
                 ]
             ),
             "agents": ("opus-mosh-reboot-0909",),
@@ -391,13 +391,13 @@ class TestActions:
                 [
                     "FLEET-LOCK on hub: 1 hold(s) transitioned",
                     "up-transcriber (service-up, pid 1): acquired 19:28:00Z RELEASED after 5s "
-                    "by @opus-mosh-reboot-0909",
+                    "by opus-mosh-reboot-0909",
                     "ACTIONS on hub: 2 action(s) did not finish",
                     "restore (restore, pid 7): FAILED 21:00:09Z (restore exited 1) "
-                    "+1 step(s) this window by @opus-a",
+                    "+1 step(s) this window by opus-a",
                     "db-script (db-script, pid 8): REFUSED 21:01:00Z (no BOARD_AGENT_LABEL)",
-                    "@opus-mosh-reboot-0909 your fleet-lock operation on hub transitioned",
-                    "@opus-a your action on hub did not finish",
+                    "opus-mosh-reboot-0909: your fleet-lock operation on hub transitioned",
+                    "opus-a: your action on hub did not finish",
                 ]
             ),
             "agents": ("opus-mosh-reboot-0909", "opus-a"),
@@ -428,8 +428,8 @@ class TestActions:
 
         assert post["agents"] == ("opus-a",)
         assert post["body"].endswith(
-            "@opus-a your fleet-lock operation on hub transitioned\n"
-            "@opus-a your action on hub did not finish"
+            "opus-a: your fleet-lock operation on hub transitioned\n"
+            "opus-a: your action on hub did not finish"
         )
 
 

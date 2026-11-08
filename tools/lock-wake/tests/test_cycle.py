@@ -100,10 +100,13 @@ class TestRunCycle:
         body = require_str(arguments, "body")
         assert "FLEET-LOCK on hub: 1 hold(s) transitioned" in body
         assert "RELEASED after 165s" in body
+        # MCPs board task 52017b1e: the holder is addressed by record.
+        assert arguments["notify"] == ["opus-mosh-reboot-0909"]
+        assert "@" not in body
         assert offset_of(journal) == len(COMPLETED_HOLD.encode("utf-8"))
         assert emitted == [
             "hub: posted 1 hold(s), 0 check run(s) and 0 unfinished action(s) from 3 line(s): "
-            "tagged @opus-mosh-reboot-0909"
+            "addressed to opus-mosh-reboot-0909"
         ]
 
     def test_a_refused_post_leaves_the_offset_unmoved(
@@ -255,13 +258,13 @@ class TestRunCycle:
             "ACTIONS on hub: 1 action(s) did not finish\n"
             "restore (restore, pid 9100): FAILED 21:00:00Z "
             "(MAKETOOLS_FLEET_STEP: replay of corvis.sql.gz failed) +2 step(s) this window "
-            "by @opus-mcps-1009-74be\n"
-            "@opus-mcps-1009-74be your action on hub did not finish"
+            "by opus-mcps-1009-74be\n"
+            "opus-mcps-1009-74be: your action on hub did not finish"
         )
         assert offset_of(actions) == len(FAILED_ACTION.encode("utf-8"))
         assert emitted == [
             "hub: posted 0 hold(s), 0 check run(s) and 1 unfinished action(s) from 3 line(s): "
-            "tagged @opus-mcps-1009-74be"
+            "addressed to opus-mcps-1009-74be"
         ]
 
     def test_a_finished_action_is_silent_and_its_offset_advances(

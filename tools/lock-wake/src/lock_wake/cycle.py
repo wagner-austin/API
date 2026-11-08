@@ -233,13 +233,14 @@ def _publish(
         task_id=task_id,
         kind="note",
         body=post["body"],
+        notify=post["agents"],
     )
     _advance(streams)
-    tagged = " ".join(f"@{agent}" for agent in post["agents"])
+    addressed = ", ".join(post["agents"])
     _test_hooks.emit(
         f"{host}: posted {post['holds']} hold(s), {post['checks']} check run(s) and "
         f"{post['actions']} unfinished action(s) from {lines} line(s)"
-        + (f": tagged {tagged}" if tagged != "" else ": unaddressed")
+        + (f": addressed to {addressed}" if addressed != "" else ": unaddressed")
     )
 
 

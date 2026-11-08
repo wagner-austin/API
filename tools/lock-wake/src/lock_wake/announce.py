@@ -22,8 +22,8 @@ nobody acts on.
 CHECK RUNS RIDE THE SAME POST, UNADDRESSED (MCPs board task ea2ea29c).
 A ``checked`` row is one finished ``make test`` run, and every such row in
 the slice becomes one line under a CHECKS heading in the same single post.
-Those lines name the runner in plain text and never ``@`` it: the runner
-already watched its own output, and a mention would buy it a wake or a
+Those lines name the runner in plain text and never address it: the runner
+already watched its own output, and an address would buy it a wake or a
 turn-boundary continuation for every run it made. A session that wants
 check results subscribes to this bridge's standing task, and the
 subscription is what makes the post reach it.
@@ -34,8 +34,13 @@ backup, a restore, a production Keycloak account, a mirror push) journals
 its start, each line it said and how it ended into ``.action-events.jsonl``
 beside the fleet journal. An action is not a hold, so its rows are passed
 apart and posted under their own ACTIONS heading; one that ended ``failed``
-or ``refused`` gets a line, and its session an ``@``, because that is the
-result nobody watching a terminal saw. A clean finish is a ``step`` and
+or ``refused`` gets a line, and its session is addressed, because that is
+the result nobody watching a terminal saw.
+
+THE SESSIONS ARE ADDRESSED BY RECORD (MCPs board task 52017b1e). Since MCPs
+migration 933 a post reaches only the sessions its notify list names, so the
+post carries :attr:`Announcement.agents` as that list; the words name each
+session in plain text and address nobody. A clean finish is a ``step`` and
 stays silent, as a hold's progress does: a mirror push runs on every commit
 of fifteen repositories.
 """
@@ -72,7 +77,7 @@ class Announcement(TypedDict):
     Attributes:
         body: The full post text.
         agents: Distinct non-empty session labels behind the announced
-            holds and actions, in first-seen order -- the @mention targets.
+            holds and actions, in first-seen order -- the post's notify list.
             Check runs add none.
         holds: How many holds the post covers, for the cycle's report line.
         checks: How many finished check runs the post covers.
@@ -147,7 +152,7 @@ def _hold_line(events: tuple[LockEvent, ...]) -> str:
     if waits > 0:
         parts.append(f"+{waits} wait(s)")
     if first["agent"] != "":
-        parts.append(f"by @{first['agent']}")
+        parts.append(f"by {first['agent']}")
     return " ".join(parts)
 
 
@@ -187,7 +192,7 @@ def _by_process(
 
 
 def _mention(agents: list[str], what: str) -> str | None:
-    """The line that tags each session behind a group of lines, or None for nobody.
+    """The line that names each session behind a group of lines, or None for nobody.
 
     Args:
         agents: The labels, in first-seen order, empty ones excluded.
@@ -198,7 +203,7 @@ def _mention(agents: list[str], what: str) -> str | None:
     """
     if len(agents) == 0:
         return None
-    return " ".join(f"@{agent}" for agent in agents) + f" {what}"
+    return ", ".join(agents) + f": {what}"
 
 
 def _labels(groups: dict[int, tuple[LockEvent, ...]]) -> list[str]:

@@ -129,13 +129,13 @@ class TestDiphtheriaRow:
         assert require_str(note, "body").splitlines() == [
             "FLEET-LOCK on diphtheria: 1 hold(s) transitioned",
             "deploy (deploy, pid 1544021): acquired 02:41:07Z RELEASED after 1088s "
-            f"+1 step(s) this window by @{_HOLDER}",
-            f"@{_HOLDER} your fleet-lock operation on diphtheria transitioned",
+            f"+1 step(s) this window by {_HOLDER}",
+            f"{_HOLDER}: your fleet-lock operation on diphtheria transitioned",
         ]
         assert _offset(cursor_dir) == len(RELEASED_DEPLOY)
         assert emitted == [
             "diphtheria: posted 1 hold(s), 0 check run(s) and 0 unfinished action(s) from "
-            f"3 line(s): tagged @{_HOLDER}"
+            f"3 line(s): addressed to {_HOLDER}"
         ]
 
     def test_a_failed_deploy_is_posted_from_the_cursor_on(
@@ -154,7 +154,7 @@ class TestDiphtheriaRow:
 
         body = require_str(notes_sent(poster)[0], "body")
         assert "FAILED 03:10:00Z (build exited 1)" in body
-        assert f"by @{_HOLDER}" in body
+        assert f"by {_HOLDER}" in body
         assert _offset(cursor_dir) == len(content)
 
     def test_a_quiet_journal_posts_nothing_and_says_so(
@@ -258,8 +258,8 @@ class TestDiphtheriaActionRow:
         assert require_str(notes_sent(poster)[0], "body").splitlines() == [
             "ACTIONS on diphtheria: 1 action(s) did not finish",
             "restore (restore, pid 2210): FAILED 21:30:00Z "
-            f"(MAKETOOLS_FLEET_STEP: replay failed) +1 step(s) this window by @{_HOLDER}",
-            f"@{_HOLDER} your action on diphtheria did not finish",
+            f"(MAKETOOLS_FLEET_STEP: replay failed) +1 step(s) this window by {_HOLDER}",
+            f"{_HOLDER}: your action on diphtheria did not finish",
         ]
         marks = remote_cursor_path(cursor_dir, parse_remote_journal(REMOTE_ACTION_JOURNAL))
         assert read_offset(file_is_present, read_file_bytes, marks) == len(content)
