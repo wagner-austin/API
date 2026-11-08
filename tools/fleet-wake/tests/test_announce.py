@@ -142,12 +142,15 @@ class TestGrouping:
         assert "a lavender refused no exit code" in posts[0]["body"]
         assert "-1" not in posts[0]["body"]
 
-    def test_the_dispatching_session_is_tagged_last(self) -> None:
+    def test_the_dispatching_session_is_named_last(self) -> None:
+        """MCPs board task 52017b1e: the cycle addresses the agent by the
+        post's notify list; the body names it and addresses nobody."""
         posts = announcements((row("a"),))
 
         assert posts[0]["body"].endswith(
-            "@opus-fleet-0906 your dispatch(es) reached terminal state"
+            "opus-fleet-0906: your dispatch(es) reached terminal state"
         )
+        assert "@" not in posts[0]["body"]
 
     def test_a_long_group_is_capped_and_says_how_many_it_dropped(self) -> None:
         """A capped post that did not say so would read as the whole story."""

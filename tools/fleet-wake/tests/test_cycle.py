@@ -187,10 +187,11 @@ class TestAnnouncingCycles:
         body = require_str(arguments, "body")
         assert body.startswith(f"{MARKER} tools/fleet: 1 dispatch(es) ended (passed x1)")
         assert "tools-fleet-1788633781 lavender passed exit 0 103s" in body
-        assert "@opus-fleet-0906" in body
+        assert "opus-fleet-0906: your dispatch(es)" in body
+        assert arguments["notify"] == ["opus-fleet-0906"]
         assert read_announced(position_path(ledger)) == frozenset({"tools-fleet-1788633781"})
         assert emitted == [
-            "posted tools/fleet: tagged @opus-fleet-0906",
+            "posted tools/fleet: addressed to opus-fleet-0906",
             "cycle: 1 recorded, 1 newly terminal, positions recorded",
         ]
 
@@ -231,8 +232,12 @@ class TestAnnouncingCycles:
 
         bodies = [require_str(sent_arguments(sent), "body") for sent in fake.bodies]
         assert len(bodies) == 2
-        assert "@opus-one-0906" in bodies[0]
-        assert "@opus-two-0906" in bodies[1]
+        assert "opus-one-0906: your" in bodies[0]
+        assert "opus-two-0906: your" in bodies[1]
+        assert [sent_arguments(sent)["notify"] for sent in fake.bodies] == [
+            ["opus-one-0906"],
+            ["opus-two-0906"],
+        ]
 
     def test_a_failure_is_announced_as_a_failure(
         self, tmp_path: pathlib.Path, frozen_clock: int

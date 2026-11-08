@@ -78,8 +78,9 @@ def run_cycle(loaded: LoadedWorkspace) -> None:
             task_id=task_id,
             kind="note",
             body=announcement["body"],
+            notify=(announcement["agent"],),
         )
-        _test_hooks.emit(f"posted {announcement['project']}: tagged @{announcement['agent']}")
+        _test_hooks.emit(f"posted {announcement['project']}: addressed to {announcement['agent']}")
 
     at = _test_hooks.now()
     for entry in fresh:

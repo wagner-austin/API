@@ -37,10 +37,11 @@ class Announcement(TypedDict):
     """One board post's worth of endings.
 
     Attributes:
-        agent: The board label the post tags -- the session that dispatched.
-            Never empty: ``fleet-run`` requires ``--agent`` and the ledger
-            records it on every row, so unlike hpc-wake's submitter there is
-            no untagged case to carry.
+        agent: The board label the post is addressed to by its notify list
+            (MCPs board task 52017b1e) -- the session that dispatched. Never
+            empty: ``fleet-run`` requires ``--agent`` and the ledger records it
+            on every row, so unlike hpc-wake's submitter there is no
+            unaddressed case to carry.
         project: The repo-relative project every dispatch in the post ran.
         body: The full post text, marker first, mention last.
     """
@@ -95,7 +96,7 @@ def _body(project: str, agent: str, entries: Sequence[LedgerEntry]) -> str:
         )
     if len(entries) > LINE_CAP:
         lines.append(f"+{len(entries) - LINE_CAP} more, all in the workspace ledger")
-    lines.append(f"@{agent} your dispatch(es) reached terminal state")
+    lines.append(f"{agent}: your dispatch(es) reached terminal state")
     return "\n".join(lines)
 
 
