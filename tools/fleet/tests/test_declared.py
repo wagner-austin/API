@@ -166,9 +166,11 @@ class TestReadDeclared:
         assert not isinstance(read, str)
         assert read["projects"] == (
             declared.DeclaredProject(
-                project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity")
+                source=None,
+                project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity"),
             ),
             declared.DeclaredProject(
+                source=None,
                 project="MCPs/packages/wiki-check",
                 required_tags=(
                     NodeTag.TESTDB,
@@ -180,6 +182,7 @@ class TestReadDeclared:
                 dispatch_nodes=("sedona", "serendipity"),
             ),
             declared.DeclaredProject(
+                source=None,
                 project="tools/fleet",
                 required_tags=(NodeTag.LINUX,),
                 dispatch_nodes=("sedona", "serendipity"),
@@ -196,14 +199,17 @@ class TestReadDeclared:
             commit=commit,
             projects=(
                 declared.DeclaredProject(
-                    project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity")
+                    source=None,
+                    project="MCPs", required_tags=(), dispatch_nodes=("sedona", "serendipity"),
                 ),
                 declared.DeclaredProject(
+                    source=None,
                     project="MCPs/packages/wiki-check",
                     required_tags=(NodeTag.CXX, NodeTag.PDFTOTEXT),
                     dispatch_nodes=("sedona", "serendipity"),
                 ),
                 declared.DeclaredProject(
+                    source=None,
                     project="tools/fleet",
                     required_tags=(NodeTag.LINUX,),
                     dispatch_nodes=("sedona", "serendipity"),
@@ -268,7 +274,8 @@ class TestReadDeclared:
             commit=COMMIT,
             projects=(
                 declared.DeclaredProject(
-                    project="MCPs", required_tags=(), dispatch_nodes=("sedona",)
+                    source=None,
+                    project="MCPs", required_tags=(), dispatch_nodes=("sedona",),
                 ),
             ),
             runners=("fleet-node-sedona",),
@@ -344,9 +351,11 @@ class TestPublishRegistry:
         commit="b" * 40,
         projects=(
             declared.DeclaredProject(
-                project="MCPs", required_tags=(), dispatch_nodes=("lavender", "sedona")
+                source=None,
+                project="MCPs", required_tags=(), dispatch_nodes=("lavender", "sedona"),
             ),
             declared.DeclaredProject(
+                source=None,
                 project="tools/fleet",
                 required_tags=(NodeTag.LINUX, NodeTag.TESTDB),
                 dispatch_nodes=("sedona",),
@@ -382,11 +391,17 @@ class TestPublishRegistry:
         )
         sent: JSONObject = {
             "projects": [
-                {"project": "MCPs", "requiredTags": [], "dispatchNodes": ["lavender", "sedona"]},
+                {
+                    "project": "MCPs",
+                    "requiredTags": [],
+                    "dispatchNodes": ["lavender", "sedona"],
+                    "source": None,
+                },
                 {
                     "project": "tools/fleet",
                     "requiredTags": ["linux", "testdb"],
                     "dispatchNodes": ["sedona"],
+                    "source": None,
                 },
             ],
             "runners": ["fleet-node-lavender", "fleet-node-sedona"],
@@ -436,16 +451,23 @@ class TestTheHubTickPublishes:
 
         assert endpoint.tools == ["dispatch_list", "dispatch_claim", "dispatch_registry_publish"]
         assert endpoint.arguments[2]["projects"] == [
-            {"project": "MCPs", "requiredTags": [], "dispatchNodes": ["sedona", "serendipity"]},
+            {
+                "project": "MCPs",
+                "requiredTags": [],
+                "dispatchNodes": ["sedona", "serendipity"],
+                "source": None,
+            },
             {
                 "project": "MCPs/packages/wiki-check",
                 "requiredTags": ["cxx", "pdftotext"],
                 "dispatchNodes": ["sedona", "serendipity"],
+                "source": None,
             },
             {
                 "project": "tools/fleet",
                 "requiredTags": ["linux"],
                 "dispatchNodes": ["sedona", "serendipity"],
+                "source": None,
             },
         ]
         assert endpoint.arguments[2]["runners"] == list(RUNNERS)
