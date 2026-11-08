@@ -96,8 +96,10 @@ def registered_codex(board: McpCredentials, machine: str, identity: JSONObject) 
         # served short, its limit the rows served and its nextOffset the
         # first row left out. Before that, one machine's 200 rows answered
         # 141,366 characters against 48,000 and every hub tick was refused.
-        served = require_int(page, "limit")
-        if require_int(page, "offset") != offset or (served != 200 and served != len(rows)):
+        if require_int(page, "offset") != offset or require_int(page, "limit") not in (
+            200,
+            len(rows),
+        ):
             raise ValueError("CODEX_OBSERVE_PAGE: ledger returned another page window")
         if not require_bool(page, "hasMore"):
             return tuple(sorted(targets))
