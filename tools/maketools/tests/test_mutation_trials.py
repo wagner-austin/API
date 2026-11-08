@@ -26,10 +26,8 @@ from maketools.mutation.trials import (
 from tests._mutation_world import COSMIC_RAY, ENVIRONMENT, RUN_ENVIRONMENT, World, failed, ok
 from tests.test_mutation_cosmic import EXCEPTION, NO_TEST, SURVIVED
 
-PYTEST = (
-    "/pkg/.venv/bin/python -W error::SyntaxWarning -m pytest -x -q -p no:cacheprovider "
-    "--basetemp=/scratch/run/pytest"
-)
+#: The package's own pytest: no base temporary directory of the step's.
+PYTEST = "/pkg/.venv/bin/python -W error::SyntaxWarning -m pytest -x -q -p no:cacheprovider"
 NAMED = ("tests/t.py::a", "tests/t.py::b[x y]")
 SITE = Site("src/p.py", 7, 4, "core/ReplaceComparisonOperator_Eq_Lt", 3)
 KILLED = SURVIVED.replace('"survived"', '"killed"')

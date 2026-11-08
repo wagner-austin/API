@@ -1,13 +1,21 @@
 """Running a mutant's tests: unmutated first, then under the mutant (board task fec5851c).
 
 Every run is the package's own pytest with its own configuration, given
-four things a mutant needs: ``-x``, since one failure kills it; no cache
-provider, so no run writes ``.pytest_cache``; a base temporary directory in
-the step's scratch directory; and ``-W error::SyntaxWarning``, so a mutant
-the interpreter refuses (``x is ""``, which CPython warns of and which no
-test could tell from ``x == ""``) fails to import instead of surviving. A
-run of named tests adds ``-n 0``: a few tests in one process start faster
-than xdist's workers.
+three things a mutant needs: ``-x``, since one failure kills it; no cache
+provider, so no run writes ``.pytest_cache``; and ``-W error::SyntaxWarning``,
+so a mutant the interpreter refuses (``x is ""``, which CPython warns of and
+which no test could tell from ``x == ""``) fails to import instead of
+surviving. A run of named tests adds ``-n 0``: a few tests in one process
+start faster than xdist's workers.
+
+THE BASE TEMPORARY DIRECTORY IS THE PACKAGE'S (board task e6c9604f). The
+step once moved it into its scratch directory, outside the checkout; but a
+package's configuration may place it inside on purpose, and maketools' does
+(``--basetemp=.pytest-tmp``): its tests read the repository a ``tmp_path``
+sits in. Its whole-suite baseline then failed unmutated on
+``test_a_sync_refuses_duties_no_node_may_hold``, which found no repository
+above its ``tmp_path`` (fleet job ae15eceb), after the same suite had passed
+5961 cases in the check.
 
 The command is a shell script because a package's ``--prepare`` command
 runs before pytest, in the same run; cosmic-ray splits the line it is given
@@ -88,7 +96,7 @@ def pytest_script(context: StepContext[JsonT], tests: tuple[str, ...]) -> str:
         one.
     """
     pytest = [context.python, "-W", "error::SyntaxWarning", "-m", "pytest", "-x", "-q"]
-    pytest += ["-p", "no:cacheprovider", f"--basetemp={context.run_dir / 'pytest'}"]
+    pytest += ["-p", "no:cacheprovider"]
     if tests:
         pytest += ["-n", "0", *tests]
     script = f"exec {shlex.join(pytest)}"

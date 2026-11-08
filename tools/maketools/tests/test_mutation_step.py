@@ -169,10 +169,7 @@ def _world(times: list[float]) -> tuple[World, Commands]:
 
 
 TIMES = [1000.0, 1001.0, 1051.0, 1060.0, 1062.5, 3200.4]
-PYTEST = (
-    f"exec {PYTHON} -W error::SyntaxWarning -m pytest -x -q -p no:cacheprovider "
-    "--basetemp=/scratch/run/pytest"
-)
+PYTEST = f"exec {PYTHON} -W error::SyntaxWarning -m pytest -x -q -p no:cacheprovider"
 NAMED = f"{PYTEST} -n 0 tests/test_m.py::test_check tests/test_m.py::test_edge"
 
 
