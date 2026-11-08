@@ -103,6 +103,8 @@ def test_report_registers_the_identity_then_posts_on_the_task(
         "taskId": TASK,
         "kind": "note",
         "body": "LOAD-REPORT body",
+        # MCPs board task 52017b1e: the report addresses nobody.
+        "notify": [],
         "agent": identity["agent"],
         "sessionId": identity["session_id"],
         "cwd": identity["cwd"],
