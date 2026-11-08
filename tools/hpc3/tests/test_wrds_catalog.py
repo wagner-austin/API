@@ -197,6 +197,8 @@ def test_cli_posts_its_own_load_report(
         "taskId": TASK,
         "kind": "note",
         "body": report,
+        # MCPs board task 52017b1e: a load report addresses nobody.
+        "notify": [],
         "agent": "load-report-c4522545",
         "sessionId": checkin["sessionId"],
         "cwd": "service://hpc3-wrds-inventory",
