@@ -9,7 +9,7 @@ from hpc3.contracts.status import JobState
 from platform_core.error_codes_tooling import HpcWakeErrorCode
 from platform_core.errors import AppError
 
-from hpc_wake.announce import LINE_CAP, MARKER, announcements
+from hpc_wake.announce import LINE_CAP, MARKER, announcements, recipients
 
 
 def _entry(
@@ -72,9 +72,12 @@ class TestOneAnnouncement:
         lines = body.splitlines()
         assert lines[0] == f"{MARKER} mi: 1 job(s) ended (COMPLETED x1)"
         assert lines[1] == "101 mi.job-101 COMPLETED 4688s"
-        assert lines[-1] == "@label-a-0906 your job(s) reached terminal state"
+        assert lines[-1] == "label-a-0906: your job(s) reached terminal state"
         assert result[0]["submitter"] == "label-a-0906"
         assert result[0]["project"] == "mi"
+        # MCPs board task 52017b1e: the submitter is the post's recipient.
+        assert recipients(result[0]) == ("label-a-0906",)
+        assert "@" not in body
 
     def test_an_unrecorded_elapsed_says_so_rather_than_inventing_zero(self) -> None:
         result = announcements([_closure("101", elapsed=None)], {"101": _entry("101")})
@@ -84,6 +87,7 @@ class TestOneAnnouncement:
         result = announcements([_closure("101")], {"101": _entry("101", submitter="")})
         assert result[0]["submitter"] == ""
         assert "@" not in result[0]["body"]
+        assert recipients(result[0]) == ()
 
     def test_the_tally_counts_every_state(self) -> None:
         closures = [

@@ -40,7 +40,7 @@ from hpc3.core.triage import closures_for, open_entries
 from platform_core.board import post_to_task, register_service_session
 
 from hpc_wake import _test_hooks, pending
-from hpc_wake.announce import announcements, group_key
+from hpc_wake.announce import announcements, group_key, recipients
 from hpc_wake.identity import HARNESS, IDENTITY, PURPOSE, load_task_id
 from hpc_wake.pending import PendingClosure
 from hpc_wake.settling import partition_ripe
@@ -182,11 +182,12 @@ def run_cycle(connection: WorkspaceConnection, cluster: ClusterFacts) -> None:
             task_id=task_id,
             kind="note",
             body=announcement["body"],
+            notify=recipients(announcement),
         )
         _test_hooks.emit(
             f"posted {announcement['project']}: "
             + (
-                f"tagged @{announcement['submitter']}"
+                f"addressed to {announcement['submitter']}"
                 if announcement["submitter"] != ""
                 else "no submitter label on record"
             )

@@ -34,9 +34,10 @@ class Announcement(TypedDict):
     """One board post's worth of endings.
 
     Attributes:
-        submitter: The agent label the post tags, or ``""`` when the ledger
-            recorded that no label was declared -- the post is still made,
-            because the feed is still the record, but it mentions nobody.
+        submitter: The agent label the post is addressed to, or ``""`` when
+            the ledger recorded that no label was declared -- the post is
+            still made, because the feed is still the record, but it is
+            addressed to nobody.
         project: The hpc3 project every job in the post belongs to.
         body: The full post text, marker first, mention last.
     """
@@ -123,8 +124,23 @@ def _body(project: str, submitter: str, items: Sequence[tuple[Closure, LedgerEnt
     if len(items) > LINE_CAP:
         lines.append(f"+{len(items) - LINE_CAP} more, all in the ledger's closure record")
     if submitter != "":
-        lines.append(f"@{submitter} your job(s) reached terminal state")
+        lines.append(f"{submitter}: your job(s) reached terminal state")
     return "\n".join(lines)
+
+
+def recipients(announcement: Announcement) -> tuple[str, ...]:
+    """Whom an announcement is addressed to (MCPs board task 52017b1e).
+
+    Since MCPs migration 933 a post reaches only the sessions its notify list
+    names; the body's closing line names the submitter and addresses nobody.
+
+    Args:
+        announcement: The post.
+
+    Returns:
+        The submitter's label, or nobody when the ledger recorded none.
+    """
+    return (announcement["submitter"],) if announcement["submitter"] else ()
 
 
 def announcements(
@@ -160,4 +176,4 @@ def announcements(
     ]
 
 
-__all__ = ["LINE_CAP", "MARKER", "Announcement", "announcements", "group_key"]
+__all__ = ["LINE_CAP", "MARKER", "Announcement", "announcements", "group_key", "recipients"]

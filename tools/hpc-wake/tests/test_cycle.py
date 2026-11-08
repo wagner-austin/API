@@ -257,7 +257,8 @@ class TestAnnouncingCycles:
         body = require_str(arguments, "body")
         assert body.startswith(f"{MARKER} abl: 1 job(s) ended (COMPLETED x1)")
         assert "101 abl.job-101 COMPLETED 4688s" in body
-        assert "@label-a-0906" in body
+        assert "label-a-0906: your job(s)" in body
+        assert arguments["notify"] == ["label-a-0906"]
 
         closed = ledger.read_closures(ledger.closure_path(path))
         assert closed["101"]["state"] is JobState.COMPLETED
@@ -265,7 +266,7 @@ class TestAnnouncingCycles:
         assert closed["101"]["elapsed_seconds"] == 4688
         assert emitted == [
             "1 ending(s) waiting, none settled; 1 arrived this cycle",
-            "posted abl: tagged @label-a-0906",
+            "posted abl: addressed to label-a-0906",
             "cycle: 1 open, 0 newly terminal, 1 announced, 0 still settling",
         ]
         assert not pending_path(path).read_text(encoding="utf-8")
@@ -362,6 +363,7 @@ class TestAnnouncingCycles:
 
         body = require_str(notes_sent(fake_http)[0], "body")
         assert "@" not in body
+        assert notes_sent(fake_http)[0]["notify"] == []
         assert emitted[1] == "posted abl: no submitter label on record"
 
 
