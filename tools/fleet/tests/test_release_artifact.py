@@ -167,8 +167,9 @@ class TestTheBuilds:
         )
         assert reading.startswith(f"sudo -n -u {EXEC_USER} env PATH=")
         assert f'"$exec_root/{JAR["path"]}"' in reading
-        # The reading, the run's summary, then the copy's removal and the status.
-        assert lines[lines.index(reading) + 2 :] == [
+        # The reading, the check results' copy (MCPs board task 25ab85cf), the
+        # run's summary, then the copy's removal and the status.
+        assert lines[lines.index(reading) + 3 :] == [
             'sudo -n rm -rf "$exec_root"',
             f"printf '%s\\n' \"$status\" > '{target}/{names.RESULT_NAME}'",
         ]
