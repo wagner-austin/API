@@ -17,6 +17,7 @@ def test_publishes_source_coordinates_from_the_commit_instead_of_keys_or_working
 ) -> None:
     """Hand-declared sources differ from their lane keys and later dirty files."""
     cases: tuple[tuple[str, str | None, str, JSONObject | None], ...] = (
+        ("MCPs/packages/db", None, "", None),
         (
             "MCPs/packages/session-audit-linux",
             "https://github.com/wagner-austin/MCPs.git",
@@ -24,22 +25,21 @@ def test_publishes_source_coordinates_from_the_commit_instead_of_keys_or_working
             {"repository": "MCPs", "directory": "packages/session-audit"},
         ),
         (
-            "tools/fleet",
-            "git@github.com:wagner-austin/API.git",
-            "tools/fleet",
-            {"repository": "API", "directory": "tools/fleet"},
-        ),
-        (
             "root-lane",
             "ssh://git@github.com/wagner-austin/slime.git",
             "",
             {"repository": "slime", "directory": ""},
         ),
-        ("MCPs/packages/db", None, "", None),
+        (
+            "tools/fleet",
+            "git@github.com:wagner-austin/API.git",
+            "tools/fleet",
+            {"repository": "API", "directory": "tools/fleet"},
+        ),
     )
     files = {"tools/fleet/registry/machines/sedona.json": machine_file()}
     expected: list[JSONObject] = []
-    for key, remote, directory, source in sorted(cases, key=lambda item: item[0]):
+    for key, remote, directory, source in cases:
         body = narrow_json_to_dict(load_json_str(project_file([])))
         body["source"] = (
             None
