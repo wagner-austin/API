@@ -99,7 +99,7 @@ def post_load_report(
             else "posts native HPC3 accounting, verified artifacts and replay comparisons"
         ),
     )
-    post_to_task(post, credentials, identity, task_id=task_id, kind="note", body=body)
+    post_to_task(post, credentials, identity, task_id=task_id, kind="note", body=body, notify=())
 
 
 __all__ = ["post_load_report", "report_identity"]

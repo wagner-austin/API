@@ -41,6 +41,7 @@ a hook of its own would give each caller two seams to hold in agreement.
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from typing import Final, TypedDict
 
 from platform_core.error_codes_tooling import BoardBridgeErrorCode
@@ -158,7 +159,9 @@ def require_task_id(value: str | None, *, variable: str) -> str:
     return value
 
 
-def encode_board_post(identity: BoardIdentity, *, task_id: str, kind: str, body: str) -> JSONObject:
+def encode_board_post(
+    identity: BoardIdentity, *, task_id: str, kind: str, body: str, notify: Sequence[str]
+) -> JSONObject:
     """Render one ``task_post`` call's arguments.
 
     THE BOARD'S SPELLING, NOT THIS MONOREPO'S. ``taskId``, ``sessionId`` and
@@ -167,11 +170,18 @@ def encode_board_post(identity: BoardIdentity, *, task_id: str, kind: str, body:
     refused at the endpoint rather than at review. Held in one function so
     both bridges cannot spell them differently.
 
+    THE RECIPIENTS ARE CHOSEN, NOT WRITTEN (MCPs board task 52017b1e). Since
+    MCPs migration 933 a post reaches only the sessions its ``notify`` list
+    names, and an ``@label`` in its body is being retired as an address; a
+    label no session of the tenant has written under is refused and nothing
+    is posted.
+
     Args:
         identity: Who is posting.
         task_id: The standing task the post lands in.
         kind: The board's post kind, e.g. ``"note"`` or ``"checkin"``.
         body: The post text.
+        notify: The labels the post is addressed to, or none.
 
     Returns:
         The arguments object, ready for
@@ -182,6 +192,7 @@ def encode_board_post(identity: BoardIdentity, *, task_id: str, kind: str, body:
         "taskId": task_id,
         "kind": kind,
         "body": body,
+        "notify": list(notify),
         "agent": identity["agent"],
         "sessionId": identity["session_id"],
         "cwd": identity["cwd"],
@@ -274,8 +285,9 @@ def post_to_task(
     task_id: str,
     kind: str,
     body: str,
+    notify: Sequence[str],
 ) -> None:
-    """Append one post to a standing task's thread.
+    """Append one post to a standing task's thread, addressed to whom ``notify`` names.
 
     No claim is needed -- posting into a visible task's thread is open to any
     identity -- and no reply is parsed: the board echoes the appended line, and
@@ -290,7 +302,8 @@ def post_to_task(
         identity: Who is posting.
         task_id: The standing task.
         kind: The board's post kind.
-        body: The post text.
+        body: The post text; its words address nobody.
+        notify: The labels the post is addressed to, or none.
 
     Raises:
         AppError: Through :func:`platform_core.mcp_client.call_mcp_tool` --
@@ -305,7 +318,7 @@ def post_to_task(
         post,
         credentials,
         "task_post",
-        encode_board_post(identity, task_id=task_id, kind=kind, body=body),
+        encode_board_post(identity, task_id=task_id, kind=kind, body=body, notify=notify),
     )
 
 

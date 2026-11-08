@@ -128,22 +128,27 @@ class TestEncodeBoardPost:
         spelled either in snake_case would be refused at the endpoint rather
         than at review, and holding it here means two bridges cannot spell
         them differently."""
-        arguments = encode_board_post(IDENTITY, task_id=TASK_ID, kind="note", body="hello")
+        arguments = encode_board_post(
+            IDENTITY, task_id=TASK_ID, kind="note", body="hello", notify=("opus-x-1108",)
+        )
 
+        # MCPs board task 52017b1e: the recipients ride the notify list.
         assert arguments == {
             "room": BOARD_ROOM,
             "taskId": TASK_ID,
             "kind": "note",
             "body": "hello",
+            "notify": ["opus-x-1108"],
             "agent": "bridge-example-0906",
             "sessionId": "00000000-0000-5000-8000-000000000000",
             "cwd": "service://example",
         }
 
     def test_the_kind_is_carried_rather_than_fixed(self) -> None:
-        arguments = encode_board_post(IDENTITY, task_id=TASK_ID, kind="checkin", body="x")
+        arguments = encode_board_post(IDENTITY, task_id=TASK_ID, kind="checkin", body="x", notify=())
 
         assert arguments["kind"] == "checkin"
+        assert arguments["notify"] == []
 
 
 class TestEncodeBoardCheckin:
@@ -205,13 +210,21 @@ class TestPostToTask:
     def test_the_request_carries_the_credentials_and_the_encoded_arguments(self) -> None:
         fake = FakeHttpPost([posted_ok()])
 
-        post_to_task(fake, CREDENTIALS, IDENTITY, task_id=TASK_ID, kind="note", body="hello")
+        post_to_task(
+            fake,
+            CREDENTIALS,
+            IDENTITY,
+            task_id=TASK_ID,
+            kind="note",
+            body="hello",
+            notify=("opus-x-1108",),
+        )
 
         assert fake.urls == ["http://127.0.0.1:8033/mcp"]
         assert fake.headers[0]["x-api-key"] == "test-key"
         assert fake.headers[0]["X-Tenant-Id"] == "2e137b5f-0000-4000-8000-000000000000"
         assert sent_arguments(fake.bodies[0]) == encode_board_post(
-            IDENTITY, task_id=TASK_ID, kind="note", body="hello"
+            IDENTITY, task_id=TASK_ID, kind="note", body="hello", notify=("opus-x-1108",)
         )
 
     def test_a_refused_post_raises_rather_than_reporting_delivery(self) -> None:
@@ -224,7 +237,9 @@ class TestPostToTask:
         )
 
         with pytest.raises(AppError) as caught:
-            post_to_task(fake, CREDENTIALS, IDENTITY, task_id=TASK_ID, kind="note", body="hello")
+            post_to_task(
+                fake, CREDENTIALS, IDENTITY, task_id=TASK_ID, kind="note", body="hello", notify=()
+            )
 
         assert caught.value.code is McpClientErrorCode.HTTP_STATUS
         assert "401" in caught.value.message
