@@ -94,7 +94,7 @@ def read_outcome(tail: str) -> str:
     found: list[tuple[int, str]] = []
     summary = _last(SUMMARY, tail)
     if summary is not None:
-        word = "passed" if summary.group(1) == "passed" else "failed"
+        word = "passed" if f"{summary.group(1)}" == "passed" else "failed"
         found.append((summary.start(), f"{word}:{summary.group(2)}/{summary.group(3)}"))
     empty = _last(NOT_APPLICABLE, tail)
     if empty is not None:
