@@ -28,14 +28,14 @@
           "runner_name": "lavender",
           "service": "actions.runner.wagner-austin-MCPs.lavender.service",
           "workdir": "/home/gharunner/actions-runner-mcps-1/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender", "mcps-fleet-ci"]
         },
         {
           "repo": "wagner-austin/MCPs",
           "runner_name": "lavender-2",
           "service": "actions.runner.wagner-austin-MCPs.lavender-2.service",
           "workdir": "/home/gharunner/actions-runner-mcps-2/_work",
-          "labels": ["lavender"]
+          "labels": ["lavender", "mcps-fleet-ci"]
         },
         {
           "repo": "wagner-austin/corvis-stick",
@@ -113,6 +113,44 @@
         "cpu_weight": 20,
         "io_read_mb_per_s": 200,
         "io_read_iops": 5000
+      }
+    },
+    {
+      "name": "sedona",
+      "host": "sedona",
+      "memory_gb": 15,
+      "payload_dir": "/home/corvis/fleet/runner-payloads",
+      "gpu_required": false,
+      "systemd_timers": ["ci-clean.timer", "fleet-runner-reaper.timer"],
+      "job_timeout_minutes": 120,
+      "installs": [
+        {
+          "repo": "wagner-austin/MCPs",
+          "runner_name": "sedona",
+          "service": "actions.runner.wagner-austin-MCPs.sedona.service",
+          "workdir": "/home/gharunner/actions-runner-mcps-1/_work",
+          "labels": ["mcps-fleet-ci"]
+        }
+      ],
+      "assets": [],
+      "base": {
+        "nix_packages": ["git"],
+        "disk": {
+          "ceiling_gb": 180,
+          "baseline_gb": 96,
+          "baseline_measured": "2026-11-08",
+          "cache_path": "/home/gharunner/.cache",
+          "cache_ceiling_gb": 10,
+          "work_ceiling_gb": 10
+        }
+      },
+      "ci_slice": {
+        "memory_high_gb": 1,
+        "memory_max_gb": 1,
+        "swap_max_gb": 0,
+        "cpu_weight": 20,
+        "io_read_mb_per_s": 100,
+        "io_read_iops": 2500
       }
     }
   ]
