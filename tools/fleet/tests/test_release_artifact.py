@@ -181,7 +181,7 @@ class TestTheReading:
         tail = f"FLEET_ARTIFACT: none\nFLEET_ARTIFACT: {JAR['path']} 2 {DIGEST}\n"
         assert read_artifact(tail) == f"{JAR['path']}:2:{DIGEST}"
 
-    def test_the_verdict_line_carries_the_reading_last(self) -> None:
+    def test_the_verdict_line_carries_the_reading_after_the_registry(self) -> None:
         run = "osrs-lab-recorder-release-colossus-1793990000"
         judged = verdict.judge(
             job_id="0c8ace8d-0000-4000-8000-000000000000",
@@ -199,7 +199,7 @@ class TestTheReading:
 
         assert judged["artifact"] == f"{JAR['path']}:2:{DIGEST}"
         assert verdict.render_verdict(judged).endswith(
-            f" registry=unread artifact={JAR['path']}:2:{DIGEST}"
+            f" registry=unread artifact={JAR['path']}:2:{DIGEST} mutation=unread"
             f" results=colossus:/home/corvis/fleet/stage/logs/{run}.results"
         )
 
