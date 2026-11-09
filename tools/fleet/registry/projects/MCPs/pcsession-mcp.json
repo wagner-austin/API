@@ -10,6 +10,7 @@
     "cxx"
   ],
   "source": {
+    "base_branch": "main",
     "remote": "https://github.com/wagner-austin/MCPs.git",
     "path": "pcsession-mcp",
     "install": [
