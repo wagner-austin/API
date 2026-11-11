@@ -31,7 +31,8 @@
           "-s",
           "-C",
           "scripts/fleet-prepare",
-          "workspace-build"
+          "workspace-build",
+          "ROOTS=packages/db:taskboard-mcp:pcsession-mcp"
         ]
       },
       {

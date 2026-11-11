@@ -23,14 +23,21 @@ from tests._registry import shipped_document
 #: The prepare recipe every MCPs workspace install goes through.
 PREPARE: Final[tuple[str, ...]] = ("make", "-s", "-C", "scripts/fleet-prepare")
 
-#: The source the lane checks: the package, its workspace installed and
-#: built, and the fleet test database migrated.
+#: The source the lane checks: the package, its workspace installed, the
+#: migrator's packages/db and the two services its real audit cases start
+#: built (MCPs board task 01ce5d70: those cases boot taskboard-mcp and
+#: pcsession-mcp from their dist, which a bare build never made, since
+#: session-audit is no npm workspace and the bare build selects packages/db
+#: alone), and the fleet test database migrated.
 SOURCE: Final[ProjectSource] = ProjectSource(
     remote="https://github.com/wagner-austin/MCPs.git",
     path="packages/session-audit",
     install=(
         InstallStep(phase="install", argv=(*PREPARE, "install")),
-        InstallStep(phase="workspace-build", argv=(*PREPARE, "workspace-build")),
+        InstallStep(
+            phase="workspace-build",
+            argv=(*PREPARE, "workspace-build", "ROOTS=packages/db:taskboard-mcp:pcsession-mcp"),
+        ),
         InstallStep(
             phase="test-database",
             argv=(*PREPARE, "test-database", "CONTAINER=corvis-fleet-testdb"),
