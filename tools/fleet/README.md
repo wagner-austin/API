@@ -976,7 +976,7 @@ reinstall wrote, since a reinstall leaves no build behind):
   "cache": "/home/corvis/models",
   "first_port": 8091,
   "last_port": 8094,
-  "idle_seconds": 1800
+  "idle_seconds": 600
 }
 ```
 
