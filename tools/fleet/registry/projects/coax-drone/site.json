@@ -1,0 +1,14 @@
+{
+  "worker_ram_gb": 0.5,
+  "minimum_workers": 1,
+  "expected_minutes": 3,
+  "required_tags": [
+    "linux"
+  ],
+  "source": {
+    "remote": "https://github.com/wagner-austin/coax-drone.git",
+    "path": "site",
+    "install": [],
+    "companions": []
+  }
+}

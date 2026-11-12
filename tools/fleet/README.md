@@ -1569,6 +1569,18 @@ and the observer's login plugin artifact apply. On colossus it passed 5 tests in
 18 s at lines 37/37 and branches 26/26, with the policy scan over 138 production
 sources, and the same tags and workers as the observer.
 
+**`coax-drone/site`** (MCPs board task c88f1f08, 2026-11-12) is coax-drone's
+site directory's own `make check`, the pages lift.austinwagner.org serves: it
+installs the site's pinned TypeScript and type definitions from its own
+`package-lock.json`, type-checks every module, and runs the repository's
+`tests/site` under node's built-in runner at 100% of the covered modules'
+lines, branches and functions, reading the committed CAD export and wiki from
+the same clone. It needs no image, install step or companion, only a Linux
+node with node 22.8 or later for the coverage thresholds; every node measured
+on 2026-11-12 runs v24.22.1. Run on the session host, the tree committed as
+coax-drone 311d05b passed its 45 tests.
+The repository's root check, which needs FreeCAD's kernel, is not declared.
+
 ## A project that names its node: `node`
 
 A tag says what KIND of node a suite needs; a few suites need one particular
