@@ -1,0 +1,48 @@
+{
+  "role": "worker",
+  "platform": "linux",
+  "user": "corvis",
+  "enabled": true,
+  "disabledUntil": null,
+  "duties": [],
+  "standby": [],
+  "ledger_observer": "fleet-arm",
+  "tailnetIp": "100.110.35.206",
+  "reachKey": null,
+  "bootMac": "6c:2b:59:7d:88:3d",
+  "netbootWifi": false,
+  "secureBoot": "enforced",
+  "installDisk": {
+    "rule": "only-disk",
+    "serial": null
+  },
+  "tunnel": null,
+  "guest": null,
+  "ciWorkersPerRunner": null,
+  "boot": {
+    "units": []
+  },
+  "notes": "citrine, the Dell PowerEdge T330 of service tag 9C0Y9T2 (iDRAC8 at LAN 192.168.10.186), the fleet's storage machine to be: emerald's two WD Red Plus 4 TB disks move into its bays 1 and 2 at the storage cutover, which moves the storage duty here. It was admitted as pc-7d883d (admission 2a8b5026, the operator, 2026-11-11: \"yes admit pc-7d883d, wipe it\" and \"and itkk be named citrine?\") and reinstalled with the fleet's NixOS by the netboot installer from MCPs 96585ad7243c onto the Inland SSD IB25ADL0256S01189 in bay 0 behind its PERC H330 in HBA mode (arm 2d47f3db), adopted at 100.110.35.206 on 2026-11-12T01:00:16.393Z, and Secure Boot enforced on its own keys from 01:05Z. Measured by the reimage probe (MCPs board task 42316005): 8 logical cores, 31.2 GiB, no CUDA device, Rust, g++, rootless docker or test database. Renamed from pc-7d883d for MCPs board task 52b4e19f.",
+  "dispatch": {
+    "held": "Storage machine to be (MCPs board task 52b4e19f): no Docker, compiler or test database, so no check can run here.",
+    "stage_root": "/home/corvis/fleet/stage",
+    "logical_cores": 8,
+    "ram_gb": 31.2,
+    "gpu": null,
+    "budget": {
+      "reserved_cores": 2,
+      "reserved_ram_gb": 1.5,
+      "worker_ram_gb": 1.1,
+      "max_disk_gb": 40.0,
+      "checks_at_once": null,
+      "pinned_checks_only": false
+    },
+    "test_database": false,
+    "rust": null,
+    "cxx": null,
+    "docker": null,
+    "stack": null,
+    "netns": null,
+    "models": null
+  }
+}
