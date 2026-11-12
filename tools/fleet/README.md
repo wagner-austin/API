@@ -1552,6 +1552,15 @@ whose `manual-desktop/Dockerfile` change made it needed, it passed 9 tests in
 30 s at lines 37/37 and branches 26/26, with the same tags and workers as the
 observer.
 
+**`osrs-lab/mobile`** (MCPs board task 0ca06475, 2026-11-12) is the official
+Android client's own `make check`, run in the same image: the scrcpy USB video
+link, the in-process H.264 decoder (JavaCPP's FFmpeg 8.0.1, whose linux-x86_64
+natives come from Maven inside the build, so the image needs nothing new) and
+the HUD locator, tested on real Pixel 8 recordings. Run by the same Makefile on
+diphtheria at osrs-lab 4e1a6837 it passed 82 tests, 75 of its own and 7 of
+input-policy's, at lines 592/592 and branches 278/278, with the same tags and
+workers as the observer.
+
 **`osrs-lab/input-policy`** (board task b2ee9cbe, 2026-11-05) is the input
 boundary policy's own `make check`, run in the same image since osrs-lab
 6176e3d: its tests at full coverage and its scan of every module's production
